@@ -1,0 +1,9 @@
+[submodule "3rdparty/observation_equations"]
+	path = 3rdparty/observation_equations
+	url = https://github.com/JanuszBedkowski/observation_equations.git
+[submodule "3rdparty/json"]
+	path = 3rdparty/json
+	url = https://github.com/nlohmann/json.git
+[submodule "3rdparty/LASzip"]
+	path = 3rdparty/LASzip
+	url = https://github.com/LASzip/LASzip.git

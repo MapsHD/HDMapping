@@ -16,12 +16,12 @@ public:
 	OdoWithGnssFusion() { ; };
 	~OdoWithGnssFusion() { ; };
 
-	void imgui();
+	void imgui(CommonData& common_data);
 	void render();
 	
 	std::vector<Node> load_trajectory(const std::string& file_name);
 	bool save_trajectory(const std::string& file_name);
-	void update_shift(float shift_x, float shift_y);
+	void update_shift(float shift_x, float shift_y, CommonData& common_data);
 	std::vector<std::pair<int, int>> find_correspondences_from_lo_to_shifted_gnss();
 	std::vector<BetweenNode> find_between_nodes();
 
@@ -38,8 +38,8 @@ public:
 	std::vector<Node> lidar_odometry_trajectory_initial;
 	std::vector<std::pair<int, int>> correspondences_from_lo_to_shifted_gnss;
 	std::vector<BetweenNode> between_nodes;
-	int offset_x = 0;
-	int offset_y = 0;
+	//int offset_x = 0;
+	//int offset_y = 0;
 	std::string trajectory_file;
 	std::string motion_model_file_name;
 	float color_x = 0;

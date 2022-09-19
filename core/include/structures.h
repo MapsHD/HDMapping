@@ -134,6 +134,8 @@ struct CommonData {
 	bool laz_wrapper = false;
 	bool single_trajectory_viewer = false;
 	bool odo_with_gnss_fusion = false;
+	float shift_x = 0.0;
+	float shift_y = 0.0;
 };
 
 struct PointCloudWithPose {

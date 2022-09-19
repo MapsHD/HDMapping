@@ -153,7 +153,7 @@ void display() {
     //my_display_code();
     project_setings.imgui(odo_with_gnss_fusion, laz_wrapper.sectors, roi_exporter.rois_with_constraints, common_data);
     if (common_data.odo_with_gnss_fusion) { 
-        odo_with_gnss_fusion.imgui(); 
+        odo_with_gnss_fusion.imgui(common_data);
     }
     else if (common_data.single_trajectory_viewer) {
         single_trajectory_viewer.imgui(common_data);

@@ -36,7 +36,7 @@ void LazWrapper::imgui(CommonData& common_data, const ProjectSettings& project_s
         for(int i = 0 ; i < input_file_names.size(); i++){
             std::cout << "loading progers: " << i + 1 << " of " << input_file_names.size() << std::endl;
             const auto& fn = input_file_names[i];
-            LAZSector sector = load_sector(fn, project_setings.shift_x, project_setings.shift_y);
+            LAZSector sector = load_sector(fn, common_data.shift_x, common_data.shift_y);
             if (sector.point_cloud.size() > 0) {
                 sectors.push_back(sector);
                 std::cout << "sector loaded from file '" << fn << "'" << std::endl;
@@ -64,7 +64,7 @@ void LazWrapper::imgui(CommonData& common_data, const ProjectSettings& project_s
             for (size_t i = 0; i < sectors.size(); i++) {
                 if (sectors[i].point_cloud.size() == 0) {
                     LazWrapper lw;
-                    LAZSector sector = lw.load_sector(sectors[i].file_name, project_setings.shift_x, project_setings.shift_y);
+                    LAZSector sector = lw.load_sector(sectors[i].file_name, common_data.shift_x, common_data.shift_y);
                     sectors[i].point_cloud = sector.point_cloud;
 
                 }
@@ -75,7 +75,7 @@ void LazWrapper::imgui(CommonData& common_data, const ProjectSettings& project_s
 
     if (ImGui::Button("LAZ reload all files")) {
         decimation = 100;
-        reload_all_LAZ_files(project_setings.shift_x, project_setings.shift_y);
+        reload_all_LAZ_files(common_data.shift_x, common_data.shift_y);
 
         for (size_t i = 0; i < sectors.size(); i++) {
             sectors[i].visible = true;
@@ -102,7 +102,7 @@ void LazWrapper::imgui(CommonData& common_data, const ProjectSettings& project_s
         if (sectors[i].visible != previous_visibility) {
             if (sectors[i].visible) {
                 if (sectors[i].point_cloud.size() == 0) {
-                    LAZSector sector = load_sector(sectors[i].file_name, project_setings.shift_x, project_setings.shift_y);
+                    LAZSector sector = load_sector(sectors[i].file_name, common_data.shift_x, common_data.shift_y);
                     sectors[i].point_cloud = sector.point_cloud;
                 }
             }

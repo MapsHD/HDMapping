@@ -18,7 +18,7 @@
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
 
 
-void OdoWithGnssFusion::imgui() {
+void OdoWithGnssFusion::imgui(CommonData& common_data) {
 	ImGui::Begin("odometry with gnss fusion");
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
@@ -45,7 +45,11 @@ void OdoWithGnssFusion::imgui() {
 				gnss_trajectory[i].m_pose(0, 3) = tmp;
 			}
 			gnss_trajectory_shifted = gnss_trajectory;
-			update_shift(this->offset_x, this->offset_y);
+
+			float shift_x = -gnss_trajectory[gnss_trajectory.size() / 2].m_pose(0, 3);
+			float shift_y = -gnss_trajectory[gnss_trajectory.size() / 2].m_pose(1, 3);
+
+			update_shift(shift_x, shift_y, common_data);
         }
 	}
 	ImGui::SameLine();
@@ -301,10 +305,10 @@ bool OdoWithGnssFusion::save_trajectory(const std::string& file_name)
 }
 
 
-void OdoWithGnssFusion::update_shift(float shift_x, float shift_y)
+void OdoWithGnssFusion::update_shift(float shift_x, float shift_y, CommonData& common_data)
 {
-	this->offset_x = shift_x;
-	this->offset_y = shift_y;
+	common_data.shift_x = shift_x;
+	common_data.shift_y = shift_y;
 
 	for (size_t i = 0; i < gnss_trajectory.size(); i++) {
 		gnss_trajectory_shifted[i].m_pose(0, 3) = gnss_trajectory[i].m_pose(0, 3) + shift_x;
@@ -840,7 +844,7 @@ bool OdoWithGnssFusion::semi_rigid_registration()
 	std::cout << "result: row, col, value" << std::endl;
 	for (int k = 0; k < x.outerSize(); ++k) {
 		for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it) {
-			std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
+			//std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
 			h_x.push_back(it.value());
 		}
 	}

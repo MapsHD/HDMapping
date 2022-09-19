@@ -69,8 +69,8 @@ void ProjectSettings::imgui(OdoWithGnssFusion& odo_with_gnss_fusion, std::vector
 		t1.join();
 
 		if (input_file_name.size() > 0) {
-			load(std::filesystem::path(input_file_name).string(), sectors, rois_with_constraints);
-			odo_with_gnss_fusion.update_shift(shift_x, shift_y);
+			load(std::filesystem::path(input_file_name).string(), sectors, rois_with_constraints, common_data);
+			odo_with_gnss_fusion.update_shift(common_data.shift_x, common_data.shift_y, common_data);
 		}
 	}
 	ImGui::SameLine();
@@ -87,20 +87,20 @@ void ProjectSettings::imgui(OdoWithGnssFusion& odo_with_gnss_fusion, std::vector
 		t1.join();
 
 		if (output_file_name.size() > 0) {
-			save(std::filesystem::path(output_file_name).string(), sectors, rois_with_constraints);
+			save(std::filesystem::path(output_file_name).string(), sectors, rois_with_constraints, common_data);
 		}
 	}
 
 	ImGui::ColorEdit3("clear color", (float*)&clear_color);
 
-	float old_shift_x = shift_x;
-	float old_shift_y = shift_y;
+	float old_shift_x = common_data.shift_x;
+	float old_shift_y = common_data.shift_y;
 
-	ImGui::InputFloat("shift_x", &shift_x, 1.0f, 100.0f, "%.3f", 0);
-	ImGui::InputFloat("shift_y", &shift_y, 1.0f, 100.0f, "%.3f", 0);
+	ImGui::InputFloat("shift_x", &common_data.shift_x, 1.0f, 100.0f, "%.3f", 0);
+	ImGui::InputFloat("shift_y", &common_data.shift_y, 1.0f, 100.0f, "%.3f", 0);
 
-	if (old_shift_x != shift_x || old_shift_y != shift_y) {
-		odo_with_gnss_fusion.update_shift(shift_x, shift_y);
+	if (old_shift_x != common_data.shift_x || old_shift_y != common_data.shift_y) {
+		odo_with_gnss_fusion.update_shift(common_data.shift_x, common_data.shift_y, common_data);
 	}
 
 	/*if (ImGui::Button("set project main folder")) {
@@ -200,13 +200,14 @@ void ProjectSettings::imgui(OdoWithGnssFusion& odo_with_gnss_fusion, std::vector
 	ImGui::End();
 }
 
-bool ProjectSettings::save(const std::string& file_name, std::vector<LAZSector>& sectors, const std::vector<ROIwithConstraints>& rois_with_constraints)
+bool ProjectSettings::save(const std::string& file_name, std::vector<LAZSector>& sectors,
+	const std::vector<ROIwithConstraints>& rois_with_constraints, const CommonData& common_data)
 {
 	nlohmann::json jj;
 	nlohmann::json j;
 
-	j["shift_x"] = shift_x;
-	j["shift_y"] = shift_y;
+	j["shift_x"] = common_data.shift_x;
+	j["shift_y"] = common_data.shift_y;
 
 	j["clear_color_x"] = clear_color.x;
 	j["clear_color_y"] = clear_color.y;
@@ -266,7 +267,8 @@ bool ProjectSettings::save(const std::string& file_name, std::vector<LAZSector>&
 	return true;
 }
 
-bool ProjectSettings::load(const std::string& file_name, std::vector<LAZSector>& sectors, std::vector<ROIwithConstraints>& rois_with_constraints) {
+bool ProjectSettings::load(const std::string& file_name, std::vector<LAZSector>& sectors, 
+	std::vector<ROIwithConstraints>& rois_with_constraints, CommonData& common_data) {
 	sectors.clear();
 	rois_with_constraints.clear();
 	trajectories.clear();
@@ -282,8 +284,8 @@ bool ProjectSettings::load(const std::string& file_name, std::vector<LAZSector>&
 	clear_color.y = project_settings_json["clear_color_y"];
 	clear_color.z = project_settings_json["clear_color_z"];
 	clear_color.w = project_settings_json["clear_color_w"];
-	shift_x = project_settings_json["shift_x"];
-	shift_y = project_settings_json["shift_y"];
+	common_data.shift_x = project_settings_json["shift_x"];
+	common_data.shift_y = project_settings_json["shift_y"];
 	//project_main_folder = project_settings_json["project_main_folder"];
 	
 	for (const auto& t_json : project_settings_json["Trajectories"])

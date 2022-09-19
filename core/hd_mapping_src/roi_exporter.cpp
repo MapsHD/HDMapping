@@ -150,7 +150,7 @@ void RoiExporter::imgui(CommonData& common_data, const ProjectSettings& project_
         roi_point_clouds.clear();
 
         //georeference from LAZ
-        PointCloudWithPose pc_laz = get_pc_from_laz(common_data, sectors, project_setings.shift_x, project_setings.shift_y);
+        PointCloudWithPose pc_laz = get_pc_from_laz(common_data, sectors, common_data.shift_x, common_data.shift_y);
         pc_laz.m_pose = Eigen::Affine3d::Identity();
         if (pc_laz.points_global.size() > 0) {
             roi_point_clouds.push_back(pc_laz);

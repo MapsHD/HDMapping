@@ -22,6 +22,8 @@ void OdoWithGnssFusion::imgui(CommonData& common_data) {
 	ImGui::Begin("odometry with gnss fusion");
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
+	ImGui::Checkbox("set_initial_offset_from_trajectory", &set_initial_offset_from_trajectory);
+
 	if (ImGui::Button("load GNSS trajectory")) {
         static std::shared_ptr<pfd::open_file> open_file;
         std::string input_file_name = "";
@@ -46,10 +48,17 @@ void OdoWithGnssFusion::imgui(CommonData& common_data) {
 			}
 			gnss_trajectory_shifted = gnss_trajectory;
 
-			float shift_x = -gnss_trajectory[gnss_trajectory.size() / 2].m_pose(0, 3);
-			float shift_y = -gnss_trajectory[gnss_trajectory.size() / 2].m_pose(1, 3);
+			if (set_initial_offset_from_trajectory) {
+				float shift_x = -gnss_trajectory[gnss_trajectory.size() / 2].m_pose(0, 3);
+				float shift_y = -gnss_trajectory[gnss_trajectory.size() / 2].m_pose(1, 3);
+				update_shift(shift_x, shift_y, common_data);
+				set_initial_offset_from_trajectory = false;
+			}
+			else {
+				update_shift(common_data.shift_x, common_data.shift_y, common_data);
+			}
 
-			update_shift(shift_x, shift_y, common_data);
+			
         }
 	}
 	ImGui::SameLine();

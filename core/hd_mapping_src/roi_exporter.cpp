@@ -222,7 +222,7 @@ void RoiExporter::imgui(CommonData& common_data, const ProjectSettings& project_
         if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##roi_right").c_str(), ImGuiDir_Right)) { (roi_point_clouds[i].point_size)++; }
         ImGui::PopButtonRepeat();
         ImGui::SameLine();
-        ImGui::Text("line width %d", roi_point_clouds[i].point_size);
+        ImGui::Text("point size %d", roi_point_clouds[i].point_size);
         if (roi_point_clouds[i].point_size < 1) roi_point_clouds[i].point_size = 1;
 
     }

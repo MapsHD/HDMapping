@@ -126,7 +126,7 @@ void project_gui() {
         std::string input_file_name = "";
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
         const auto t = [&]() {
-            auto sel = pfd::open_file("Choose folder", "C:\\").result();
+            auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
             for (int i = 0; i < sel.size(); i++)
             {
                 input_file_name = sel[i];
@@ -170,7 +170,7 @@ void project_gui() {
         std::string output_file_name = "";
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
         const auto t = [&]() {
-            auto sel = pfd::save_file("Choose folder", "C:\\").result();
+            auto sel = pfd::save_file("Save RESSO file", "C:\\").result();
             output_file_name = sel;
             std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
         };
@@ -825,7 +825,7 @@ void observation_picking_gui(){
         std::string input_file_name = "";
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
         const auto t = [&]() {
-            auto sel = pfd::open_file("Choose folder", "C:\\").result();
+            auto sel = pfd::open_file("Load observations", "C:\\").result();
             for (int i = 0; i < sel.size(); i++)
             {
                 input_file_name = sel[i];
@@ -845,7 +845,7 @@ void observation_picking_gui(){
         std::string output_file_name = "";
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
         const auto t = [&]() {
-            auto sel = pfd::save_file("Choose folder", "C:\\").result();
+            auto sel = pfd::save_file("Save observations", "C:\\").result();
             output_file_name = sel;
             std::cout << "json file to save: '" << output_file_name << "'" << std::endl;
         };

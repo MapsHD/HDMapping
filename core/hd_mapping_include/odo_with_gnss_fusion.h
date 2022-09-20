@@ -47,6 +47,8 @@ public:
 	float color_z = 0;
 	bool visible = true;
 	int line_width = 1;
+	bool set_initial_offset_from_trajectory = true;
+
 };
 
 #endif

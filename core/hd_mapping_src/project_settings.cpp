@@ -58,7 +58,7 @@ void ProjectSettings::imgui(OdoWithGnssFusion& odo_with_gnss_fusion, std::vector
 		std::string input_file_name = "";
 		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
 		const auto t = [&]() {
-			auto sel = pfd::open_file("Load project settings", "C:\\").result();
+			auto sel = pfd::open_file("Load project", "C:\\").result();
 			for (int i = 0; i < sel.size(); i++)
 			{
 				input_file_name = sel[i];
@@ -79,7 +79,7 @@ void ProjectSettings::imgui(OdoWithGnssFusion& odo_with_gnss_fusion, std::vector
 		std::string output_file_name = "";
 		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
 		const auto t = [&]() {
-			auto sel = pfd::save_file("Choose folder", "C:\\").result();
+			auto sel = pfd::save_file("save project", "C:\\").result();
 			output_file_name = sel;
 			std::cout << "project settings file to save: '" << output_file_name << "'" << std::endl;
 		};

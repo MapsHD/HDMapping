@@ -77,10 +77,10 @@ core/include
 3rdparty/json/include/nlohmann
 3rdparty/json/include
 core/hd_mapping_include
-3rdparty/LASZip/include
+3rdparty/LASzip/include
 )
 
-add_subdirectory(3rdparty/LASZip/)
+add_subdirectory(3rdparty/LASzip/)
 
 set(IMGUI_SRCS
 3rdparty/imgui/imgui.cpp 

@@ -161,6 +161,8 @@ if (GTSAM_FOUND)
     target_link_libraries (multi_view_tls_registration gtsam)
 endif()
 
+target_link_libraries (multi_view_tls_registration laszip3)
+
 add_executable(hd_mapper src/hd_mapper.cpp
 ${IMGUI_SRCS}
 ${CORE_SRCS}

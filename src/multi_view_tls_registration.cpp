@@ -58,6 +58,11 @@ bool is_icp_gui = false;
 bool is_pose_graph_slam = false;
 bool is_registration_plane_feature = false;
 bool is_manual_analisys = false;
+bool is_decimate = true;
+double bucket_x = 0.02;
+double bucket_y = 0.02;
+double bucket_z = 0.02;
+
 
 PointClouds point_clouds_container;
 NDT ndt;
@@ -125,6 +130,12 @@ void project_gui() {
     ImGui::Begin("Project");
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
+
+    ImGui::Checkbox("decimate", &is_decimate);
+    ImGui::InputDouble("bucket_x", &bucket_x);
+    ImGui::InputDouble("bucket_y", &bucket_y);
+    ImGui::InputDouble("bucket_z", &bucket_z);
+
     if (ImGui::Button("load RESSO file"))
     {
         static std::shared_ptr<pfd::open_file> open_file;
@@ -145,7 +156,7 @@ void project_gui() {
 
             working_directory = fs::path(input_file_name).parent_path().string();
 
-            if (!point_clouds_container.load(working_directory.c_str(), input_file_name.c_str())) {
+            if (!point_clouds_container.load(working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z)) {
                 std::cout << "check input files" << std::endl;
                 return;
             }
@@ -186,6 +197,81 @@ void project_gui() {
             point_clouds_container.save_poses(fs::path(output_file_name).string());
         }
     }
+
+    ImGui::Text("RESSO dataset: https://3d.bk.tudelft.nl/liangliang/publications/2019/plade/resso.html");
+    if (ImGui::Button("load ETH file")) {
+        static std::shared_ptr<pfd::open_file> open_file;
+        std::string input_file_name = "";
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+        const auto t = [&]() {
+            auto sel = pfd::open_file("Load ETH file", "C:\\").result();
+            for (int i = 0; i < sel.size(); i++)
+            {
+                input_file_name = sel[i];
+                std::cout << "ETH file: '" << input_file_name << "'" << std::endl;
+            }
+        };
+        std::thread t1(t);
+        t1.join();
+      
+        if (input_file_name.size() > 0) {
+            working_directory = fs::path(input_file_name).parent_path().string();
+
+            if (!point_clouds_container.load_eth(working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z)) {
+                std::cout << "check input files" << std::endl;
+                return;
+            }
+            else {
+                std::cout << "loaded: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+            }
+        }
+    }
+    ImGui::Text("ETH dataset: https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
+
+
+    if (ImGui::Button("load AlignedPointCloud from WHU-TLS")) {
+        static std::shared_ptr<pfd::open_file> open_file;
+        std::vector<std::string> input_file_names;
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+        const auto t = [&]() {
+            std::vector<std::string> filters;
+            auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
+            for (int i = 0; i < sel.size(); i++)
+            {
+                input_file_names.push_back(sel[i]);
+                //std::cout << "las file: '" << input_file_name << "'" << std::endl;
+            }
+        };
+        std::thread t1(t);
+        t1.join();
+
+        if (input_file_names.size() > 0) {
+            std::cout << "Las files:" << std::endl;
+            for (size_t i = 0; i < input_file_names.size(); i++) {
+                std::cout << input_file_names[i] << std::endl;
+            }
+
+            if (!point_clouds_container.load_whu_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z)) {
+                std::cout << "check input files" << std::endl;
+                return;
+            }
+            else {
+                std::cout << "loaded: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+            }
+
+            /*working_directory = fs::path(input_file_name).parent_path().string();
+
+            if (!point_clouds_container.load_eth(working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z)) {
+                std::cout << "check input files" << std::endl;
+                return;
+            }
+            else {
+                std::cout << "loaded: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+            }*/
+        }
+    }
+    ImGui::Text("WHU-TLS dataset: http://3s.whu.edu.cn/ybs/en/benchmark.htm");
+
 
     ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
     ImGui::Checkbox("Iterative Closest Point", &is_icp_gui);
@@ -291,6 +377,13 @@ void project_gui() {
             ImGui::InputFloat3(std::string(std::to_string(i) + ": rotation [deg]").c_str(), point_clouds_container.point_clouds[i].gui_rotation);
             point_clouds_container.point_clouds[i].update_from_gui();
         }
+        ImGui::SameLine();
+
+        if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str())) {
+            std::cout << point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
+        }
+
+
     }
 
     ImGui::Separator();

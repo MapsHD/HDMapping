@@ -77,7 +77,7 @@ public:
 	Eigen::Affine3d m_initial_pose;
 	Eigen::Matrix<double, 6, 6, Eigen::RowMajor> covariance_matrix_tait_bryan;
 	Eigen::Matrix<double, 6, 6, Eigen::RowMajor> information_matrix_tait_bryan;
-	int number_points_vertical= 0;
+	int number_points_vertical = 0;
 	int number_points_horizontal = 0;
 	int point_size = 1;
 
@@ -97,13 +97,14 @@ public:
 	bool save_as_global(std::string file_name);
 	//rgd
 	bool build_rgd();
-	void grid_calculate_params();
-	void reindex();
+	void grid_calculate_params(std::vector<Eigen::Vector3d>& points, GridParameters& params);
+	void reindex(std::vector<PointBucketIndexPair>& ip, std::vector<Eigen::Vector3d>& points, GridParameters rgd_params);
 	std::vector<PointCloud::Job> get_jobs(long long unsigned int size, int num_threads);
 	void cout_rgd();
 	std::vector<std::pair<int,int>> nns(PointCloud& pc_target, double search_radious);
 	void clean();
 	void compute_normal_vectors(double search_radious);
+	void decimate(double bucket_x, double bucket_y, double bucket_z);
 };
 
 #endif

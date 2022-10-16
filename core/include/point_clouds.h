@@ -15,7 +15,8 @@ public:
 	std::string folder_name;
 	std::string out_folder_name;
 	std::string out_poses_file_name;
-	bool load(const std::string& folder_with_point_clouds, const std::string& poses_file_name);
+	bool load(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z);
+	bool load_eth(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z);
 	//std::vector<Eigen::Vector3d> load_points(const std::string& point_clouds_file_name);
 	void render(const ObservationPicking& observation_picking);
 	//bool save_poses();
@@ -26,6 +27,9 @@ public:
 
 	std::vector<PointCloud> point_clouds;
 	bool show_with_initial_pose = false;
+
+	bool load_pose_ETH(const std::string& fn, Eigen::Affine3d &m_increment);
+	bool load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z);
 };
 
 double get_mean_uncertainty_xyz_impact6x6(std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>& uncertainty_before, std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>& uncertainty_after);

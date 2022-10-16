@@ -159,7 +159,7 @@ void build_rgd_init_job(int i, PointCloud::Job* job, std::vector < PointCloud::B
 }
 
 void build_rgd_job(int i, PointCloud::Job* job, std::vector<PointCloud::PointBucketIndexPair>* index_pair, std::vector < PointCloud::Bucket>* buckets) {
-	// std::cout << "build_rgd_job:[" << i << "]" << std::endl;
+	//std::cout << "build_rgd_job:[" << i << "]" << std::endl;
 
 	for (long long unsigned int ii = job->index_begin_inclusive; ii < job->index_end_exclusive; ii++) {
 		long long unsigned int ind = ii;
@@ -214,11 +214,21 @@ void build_rgd_final_job(int i, PointCloud::Job* job, std::vector < PointCloud::
 
 bool PointCloud::build_rgd()
 {
-	std::cout << "build_rgd()" << std::endl;
+	//std::cout << "build_rgd()" << std::endl;
 
-	grid_calculate_params();
-	reindex();
+	grid_calculate_params(this->points_local, this->rgd_params);
+	cout_rgd();
+
+	//std::cout << "grid_calculate_params done" << std::endl;
+	
+	reindex(this->index_pairs, this->points_local, this->rgd_params);
+	//std::cout << "reindex done" << std::endl;
+
+	//std::cout << "rgd_params.number_of_buckets: " << rgd_params.number_of_buckets << std::endl;
+
 	buckets.resize(rgd_params.number_of_buckets);
+
+
 	std::vector<Job> jobs = get_jobs(buckets.size(), num_threads);
 
 	std::vector<std::thread> threads;
@@ -258,7 +268,7 @@ bool PointCloud::build_rgd()
 	return true;
 }
 
-void PointCloud::grid_calculate_params()
+void PointCloud::grid_calculate_params(std::vector<Eigen::Vector3d> &points, GridParameters& params)
 {
 	double min_x = std::numeric_limits<double>::max();
 	double max_x = std::numeric_limits<double>::min();
@@ -269,40 +279,40 @@ void PointCloud::grid_calculate_params()
 	double min_z = std::numeric_limits<double>::max();
 	double max_z = std::numeric_limits<double>::min();
 
-	for (size_t i = 0; i < points_local.size(); i++) {
-		if (points_local[i].x() < min_x) min_x = points_local[i].x();
-		if (points_local[i].x() > max_x) max_x = points_local[i].x();
+	for (size_t i = 0; i < points.size(); i++) {
+		if (points[i].x() < min_x) min_x = points[i].x();
+		if (points[i].x() > max_x) max_x = points[i].x();
 
-		if (points_local[i].y() < min_y) min_y = points_local[i].y();
-		if (points_local[i].y() > max_y) max_y = points_local[i].y();
+		if (points[i].y() < min_y) min_y = points[i].y();
+		if (points[i].y() > max_y) max_y = points[i].y();
 
-		if (points_local[i].z() < min_z) min_z = points_local[i].z();
-		if (points_local[i].z() > max_z) max_z = points_local[i].z();
+		if (points[i].z() < min_z) min_z = points[i].z();
+		if (points[i].z() > max_z) max_z = points[i].z();
 	}
 
-	min_x -= rgd_params.bounding_box_extension;
-	max_x += rgd_params.bounding_box_extension;
-	min_y -= rgd_params.bounding_box_extension;
-	max_y += rgd_params.bounding_box_extension;
-	min_z -= rgd_params.bounding_box_extension;
-	max_z += rgd_params.bounding_box_extension;
+	min_x -= params.bounding_box_extension;
+	max_x += params.bounding_box_extension;
+	min_y -= params.bounding_box_extension;
+	max_y += params.bounding_box_extension;
+	min_z -= params.bounding_box_extension;
+	max_z += params.bounding_box_extension;
 
-	long long unsigned int number_of_buckets_X = ((max_x - min_x) / rgd_params.resolution_X) + 1;
-	long long unsigned int number_of_buckets_Y = ((max_y - min_y) / rgd_params.resolution_Y) + 1;
-	long long unsigned int number_of_buckets_Z = ((max_z - min_z) / rgd_params.resolution_Z) + 1;
+	long long unsigned int number_of_buckets_X = ((max_x - min_x) / params.resolution_X) + 1;
+	long long unsigned int number_of_buckets_Y = ((max_y - min_y) / params.resolution_Y) + 1;
+	long long unsigned int number_of_buckets_Z = ((max_z - min_z) / params.resolution_Z) + 1;
 
-	rgd_params.number_of_buckets_X = number_of_buckets_X;
-	rgd_params.number_of_buckets_Y = number_of_buckets_Y;
-	rgd_params.number_of_buckets_Z = number_of_buckets_Z;
-	rgd_params.number_of_buckets = static_cast<long long unsigned int>(number_of_buckets_X) *
+	params.number_of_buckets_X = number_of_buckets_X;
+	params.number_of_buckets_Y = number_of_buckets_Y;
+	params.number_of_buckets_Z = number_of_buckets_Z;
+	params.number_of_buckets = static_cast<long long unsigned int>(number_of_buckets_X) *
 		static_cast<long long unsigned int>(number_of_buckets_Y) * static_cast<long long unsigned int>(number_of_buckets_Z);
 
-	rgd_params.bounding_box_max_X = max_x;
-	rgd_params.bounding_box_min_X = min_x;
-	rgd_params.bounding_box_max_Y = max_y;
-	rgd_params.bounding_box_min_Y = min_y;
-	rgd_params.bounding_box_max_Z = max_z;
-	rgd_params.bounding_box_min_Z = min_z;
+	params.bounding_box_max_X = max_x;
+	params.bounding_box_min_X = min_x;
+	params.bounding_box_max_Y = max_y;
+	params.bounding_box_min_Y = min_y;
+	params.bounding_box_max_Z = max_z;
+	params.bounding_box_min_Z = min_z;
 }
 
 void reindex_job(int i, PointCloud::Job* job, std::vector<Eigen::Vector3d>* points, std::vector<PointCloud::PointBucketIndexPair>* pairs, 
@@ -329,16 +339,16 @@ void reindex_job(int i, PointCloud::Job* job, std::vector<Eigen::Vector3d>* poin
 	}
 }
 
-void PointCloud::reindex()
+void PointCloud::reindex(std::vector<PointBucketIndexPair>& ip, std::vector<Eigen::Vector3d>& points, GridParameters params)
 {
-	index_pairs.resize(points_local.size());
+	ip.resize(points.size());
 
-	std::vector<Job> jobs = get_jobs(index_pairs.size(), num_threads);
+	std::vector<Job> jobs = get_jobs(ip.size(), num_threads);
 
 	std::vector<std::thread> threads;
 
 	for (size_t i = 0; i < jobs.size(); i++) {
-		threads.push_back(std::thread(reindex_job, i, &jobs[i], &points_local, &index_pairs, rgd_params));
+		threads.push_back(std::thread(reindex_job, i, &jobs[i], &points, &ip, params));
 	}
 
 	for (size_t j = 0; j < threads.size(); j++) {
@@ -347,7 +357,7 @@ void PointCloud::reindex()
 	threads.clear();
 
 	//std::sort(index_pairs.begin(), index_pairs.end(), [](const PointBucketIndexPair& a, const PointBucketIndexPair& b) { return ((a.index_of_bucket == b.index_of_bucket) ? (a.index_pose < b.index_pose) : (a.index_of_bucket < b.index_of_bucket)); });
-	std::sort(index_pairs.begin(), index_pairs.end(), [](const PointBucketIndexPair& a, const PointBucketIndexPair& b) { return a.index_of_bucket < b.index_of_bucket; });
+	std::sort(ip.begin(), ip.end(), [](const PointBucketIndexPair& a, const PointBucketIndexPair& b) { return a.index_of_bucket < b.index_of_bucket; });
 }
 
 std::vector<PointCloud::Job> PointCloud::get_jobs(long long unsigned int size, int num_threads) {
@@ -1204,4 +1214,40 @@ void PointCloud::compute_normal_vectors(double search_radious)
 		}
 	}
 	std::cout << "number_points_horizontal: " << number_points_horizontal << " number_points_vertical: " << number_points_vertical << std::endl;
+}
+
+void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
+{
+	auto params = rgd_params;
+
+	params.resolution_X = bucket_x;
+	params.resolution_Y = bucket_y;
+	params.resolution_Z = bucket_z;
+	params.bounding_box_extension = 1.0;
+
+	grid_calculate_params(this->points_local, params);
+	cout_rgd();
+
+	std::vector<PointBucketIndexPair> ip;
+	reindex(ip, this->points_local, params);
+
+	std::vector<Eigen::Vector3d> n_points_local;
+	std::vector<Eigen::Vector3d> n_normal_vectors_local;
+	std::vector <int> n_points_type;
+	std::vector <float> n_intensities;
+
+	for (int i = 1; i < ip.size(); i++) {
+		if (ip[i - 1].index_of_bucket != ip[i].index_of_bucket) {
+			//std::cout << index_pairs[i].index_of_bucket << std::endl;
+			n_points_local.emplace_back(points_local[ip[i].index_of_point]);
+			if (normal_vectors_local.size() == points_local.size())n_normal_vectors_local.emplace_back(normal_vectors_local[ip[i].index_of_point]);
+			if (points_type.size() == points_local.size())n_points_type.emplace_back(n_points_type[ip[i].index_of_point]);
+			if (intensities.size() == points_local.size())n_intensities.emplace_back(n_intensities[ip[i].index_of_point]);
+		}
+	}
+
+	points_local = n_points_local;
+	normal_vectors_local = n_normal_vectors_local;
+	points_type = n_points_type;
+	intensities = n_intensities;
 }

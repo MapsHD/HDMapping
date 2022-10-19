@@ -150,9 +150,9 @@ ${GIZMO}
 )
 
 if (WIN32)
-target_link_libraries(multi_view_tls_registration ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static)	
+target_link_libraries(multi_view_tls_registration ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	
 else()
-target_link_libraries(multi_view_tls_registration ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static)
+target_link_libraries(multi_view_tls_registration ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
 endif()
 if (PCL_FOUND)
     target_link_libraries (multi_view_tls_registration ${PCL_LIBRARIES})
@@ -161,7 +161,6 @@ if (GTSAM_FOUND)
     target_link_libraries (multi_view_tls_registration gtsam)
 endif()
 
-target_link_libraries (multi_view_tls_registration laszip3)
 
 add_executable(hd_mapper src/hd_mapper.cpp
 ${IMGUI_SRCS}
@@ -171,9 +170,9 @@ ${CORE_HD_MAPPING_SRCS}
 )
 
 if (WIN32)
-target_link_libraries(hd_mapper ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static)	
+target_link_libraries(hd_mapper ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	
 else()
-target_link_libraries(hd_mapper ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static)
+target_link_libraries(hd_mapper ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
 endif()
 if (PCL_FOUND)
     target_link_libraries (hd_mapper ${PCL_LIBRARIES})
@@ -182,7 +181,6 @@ if (GTSAM_FOUND)
     target_link_libraries (hd_mapper gtsam)
 endif()
 
-target_link_libraries (hd_mapper laszip3)
 
 
 

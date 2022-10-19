@@ -3,27 +3,20 @@ project(terrestrial-laser-scanning-registration)
 set(CMAKE_CXX_STANDARD 20)
 
 if (WIN32)
-add_compile_definitions(_USE_MATH_DEFINES)
-
-include_directories(3rdparty/eigen)
-#	set (EIGEN3_INCLUDE_DIR "../3rdparty")
-#	include_directories(../3rdparty)
-#	include_directories(../3rdparty/Eigen)
+	add_compile_definitions(_USE_MATH_DEFINES)
+	include_directories(3rdparty/eigen)
 else()
-find_package( Eigen3 REQUIRED)
-if(EIGEN3_FOUND)
-    message("EIGEN3 found")
-    message ("EIGEN3_INCLUDE_DIR: " ${EIGEN3_INCLUDE_DIR})
-    message ("EIGEN3_INCLUDE_DIRS: " ${EIGEN3_INCLUDE_DIRS})
-    message ("Eigen3_DIR: " ${Eigen3_DIR})
-include_directories(
-${EIGEN3_INCLUDE_DIR} 
-${EIGEN3_INCLUDE_DIRS} 
-${Eigen3_DIR}
-)
+	find_package( Eigen3 REQUIRED)
+	if(EIGEN3_FOUND)
+    	message("EIGEN3 found")
+    	message ("EIGEN3_INCLUDE_DIR: " ${EIGEN3_INCLUDE_DIR})
+    	message ("EIGEN3_INCLUDE_DIRS: " ${EIGEN3_INCLUDE_DIRS})
+    	message ("Eigen3_DIR: " ${Eigen3_DIR})
+	include_directories(
+	${EIGEN3_INCLUDE_DIR} 
+	${EIGEN3_INCLUDE_DIRS} 
+	${Eigen3_DIR})
 endif()
-
-
 
 find_package(GLEW REQUIRED)
 include_directories(${GLEW_INCLUDE_DIRS})
@@ -68,19 +61,18 @@ include_directories(
 3rdparty/glew-2.2.0/include/GL
 3rdparty/glm
 core/include
-#${EIGEN3_INCLUDE_DIR} 
-#${EIGEN3_INCLUDE_DIRS} 
-#${Eigen3_DIR}
 3rdparty/observation_equations/codes
 3rdparty/observation_equations/codes/common/include
 3rdparty/portable-file-dialogs-master
 3rdparty/json/include/nlohmann
 3rdparty/json/include
 core/hd_mapping_include
-3rdparty/LASzip/include
 )
 
 add_subdirectory(3rdparty/LASzip/)
+include_directories(
+3rdparty/LASzip/include
+)
 
 set(IMGUI_SRCS
 3rdparty/imgui/imgui.cpp 

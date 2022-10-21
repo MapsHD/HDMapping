@@ -59,9 +59,9 @@ bool is_pose_graph_slam = false;
 bool is_registration_plane_feature = false;
 bool is_manual_analisys = false;
 bool is_decimate = true;
-double bucket_x = 0.02;
-double bucket_y = 0.02;
-double bucket_z = 0.02;
+double bucket_x = 0.05;
+double bucket_y = 0.05;
+double bucket_z = 0.05;
 
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;

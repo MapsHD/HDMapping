@@ -475,7 +475,7 @@ bool PointClouds::load_pose_ETH(const std::string& fn, Eigen::Affine3d &m_increm
 
 bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z)
 {
-	Eigen::Vector3d offset(0, 0, 0);
+	//Eigen::Vector3d offset(0, 0, 0);
 
 
 	for (size_t i = 0; i < input_file_names.size(); i++) {
@@ -567,22 +567,22 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		point_clouds.push_back(pc);
 	}
 	
-	int num = 0;
-	for (int i = 0; i < point_clouds.size(); i++) {
-		for (int j = 0; j < point_clouds[i].points_local.size(); j++) {
-			offset += point_clouds[i].points_local[j];
-			num++;
-		}
-	}
-	offset /= num;
+	//int num = 0;
+	//for (int i = 0; i < point_clouds.size(); i++) {
+	//	for (int j = 0; j < point_clouds[i].points_local.size(); j++) {
+	//		offset += point_clouds[i].points_local[j];
+	//		num++;
+	//	}
+	//}
+	//offset /= num;
 	
 
 
-	for (int i = 0; i < point_clouds.size(); i++) {
-		for (int j = 0; j < point_clouds[i].points_local.size(); j++) {
-			point_clouds[i].points_local[j] -= offset;
-		}
-	}
+	//for (int i = 0; i < point_clouds.size(); i++) {
+	//	for (int j = 0; j < point_clouds[i].points_local.size(); j++) {
+	//		point_clouds[i].points_local[j] -= offset;
+	//	}
+	//}
 
 
 	return true;

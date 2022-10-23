@@ -141,6 +141,16 @@ void project_gui() {
         viewer_decmiate_point_cloud = 1;
     }
 
+    auto tmp = all_point_size;
+    ImGui::InputInt("all points size", &all_point_size);
+    if (all_point_size < 1) all_point_size = 1;
+
+    if (tmp != all_point_size) {
+        for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
+            point_clouds_container.point_clouds[i].point_size = all_point_size;
+        }
+    }
+
     ImGui::Checkbox("is_ortho", &is_ortho);
     if (is_ortho) {
         rotate_x = 0.0;
@@ -379,15 +389,7 @@ void project_gui() {
         }
     }
 
-    auto tmp = all_point_size;
-    ImGui::InputInt("all points size", &all_point_size);
-    if (all_point_size < 1) all_point_size = 1;
     
-    if (tmp != all_point_size) {
-        for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
-            point_clouds_container.point_clouds[i].point_size = all_point_size;
-        }
-    }
 
     ImGui::Separator();
     ImGui::Separator();

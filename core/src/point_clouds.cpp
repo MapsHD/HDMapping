@@ -557,11 +557,7 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 			pc.points_local.push_back(pp);
 		}
 
-		if (is_decimate) {
-			std::cout << "point cloud size before decimation: " << pc.points_local.size() << std::endl;
-			pc.decimate(bucket_x, bucket_y, bucket_z);
-			std::cout << "point cloud size after decimation: " << pc.points_local.size() << std::endl;
-		}
+		
 		pc.file_name = input_file_names[i];
 		point_clouds.push_back(pc);
 	}
@@ -578,6 +574,14 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 	for (int i = 0; i < point_clouds.size(); i++) {
 		for (int j = 0; j < point_clouds[i].points_local.size(); j++) {
 			point_clouds[i].points_local[j] -= offset;
+		}
+	}
+
+	if (is_decimate) {
+		for (int i = 0; i < point_clouds.size(); i++) {
+			std::cout << "point cloud size before decimation: " << point_clouds[i].points_local.size() << std::endl;
+			point_clouds[i].decimate(bucket_x, bucket_y, bucket_z);
+			std::cout << "point cloud size after decimation: " << point_clouds[i].points_local.size() << std::endl;
 		}
 	}
 

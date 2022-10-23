@@ -137,8 +137,8 @@ void project_gui() {
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
     ImGui::InputInt("viewer_decmiate_point_cloud", &viewer_decmiate_point_cloud);
-    if (point_clouds_container < 1) {
-        point_clouds_container = 1;
+    if (viewer_decmiate_point_cloud < 1) {
+        viewer_decmiate_point_cloud = 1;
     }
 
     ImGui::Checkbox("is_ortho", &is_ortho);

@@ -1228,7 +1228,7 @@ void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
 	params.bounding_box_extension = 1.0;
 
 	grid_calculate_params(this->points_local, params);
-	cout_rgd();
+	//cout_rgd();
 
 	std::vector<PointBucketIndexPair> ip;
 	reindex(ip, this->points_local, params);

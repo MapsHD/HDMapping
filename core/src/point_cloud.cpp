@@ -89,14 +89,16 @@ bool PointCloud::load(const std::string& file_name) {
 	return true;
 }
 
-void PointCloud::render(bool show_with_initial_pose, const ObservationPicking& observation_picking) {
+void PointCloud::render(bool show_with_initial_pose, const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud) {
 	glPointSize(observation_picking.point_size);
 	
 	if (this->visible) {
 		glColor3f(render_color[0], render_color[1], render_color[2]);
 		glPointSize(point_size);
 		glBegin(GL_POINTS);
-		for (const auto& p : this->points_local) {
+		//for (const auto& p : this->points_local) {
+		for(int i = 0 ; i < this->points_local.size(); i+= viewer_decmiate_point_cloud){
+			const auto& p = this->points_local[i];
 			Eigen::Vector3d vp;
 			if (show_with_initial_pose) {
 				vp = this->m_initial_pose * p;

@@ -62,6 +62,7 @@ bool is_decimate = true;
 double bucket_x = 0.05;
 double bucket_y = 0.05;
 double bucket_z = 0.05;
+int viewer_decmiate_point_cloud = 10;
 
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
@@ -135,6 +136,8 @@ void project_gui() {
     ImGui::Begin("Project");
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
+    ImGui::InputInt("viewer_decmiate_point_cloud", &viewer_decmiate_point_cloud);
+
     ImGui::Checkbox("is_ortho", &is_ortho);
     if (is_ortho) {
         rotate_x = 0.0;
@@ -146,7 +149,7 @@ void project_gui() {
 
     ImGui::SliderFloat("mouse_sensitivity", &mouse_sensitivity, 0.01f, 10.0f);
 
-    ImGui::Checkbox("decimate", &is_decimate);
+    ImGui::Checkbox("decimate during load", &is_decimate);
     ImGui::InputDouble("bucket_x", &bucket_x);
     ImGui::InputDouble("bucket_y", &bucket_y);
     ImGui::InputDouble("bucket_z", &bucket_z);
@@ -952,23 +955,17 @@ void observation_picking_gui(){
 }
 
 void display() {
-    //const int width = glutGet(GLUT_SCREEN_WIDTH);
-    //const int height = glutGet(GLUT_SCREEN_HEIGHT);
     ImGuiIO& io = ImGui::GetIO();
-    //reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
     
     if (is_ortho) {
-        //reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-        //float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-
+  
         glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
             -camera_ortho_xy_view_zoom / ratio,
             camera_ortho_xy_view_zoom / ratio, -100000, 100000);
-
 
         Eigen::Vector3d v_eye_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h + 10);
         Eigen::Vector3d v_center_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h);
@@ -988,15 +985,12 @@ void display() {
         gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
             v_center_t.x(), v_center_t.y(), v_center_t.z(),
             v_t.x(), v_t.y(), v_t.z());
-
     }
     
     glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
-
-     
-
+    
     if (!is_ortho) {
         reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
         glTranslatef(translate_x, translate_y, translate_z);
@@ -1028,8 +1022,6 @@ void display() {
     ImGui_ImplGLUT_NewFrame();
 
     //my_display_code();
-
-    
     if(is_ndt_gui)ndt_gui();
     if(is_icp_gui)icp_gui();
     if(is_pose_graph_slam)pose_graph_slam_gui();
@@ -1081,7 +1073,7 @@ void display() {
         }
     }
 
-    point_clouds_container.render(observation_picking);
+    point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
     observation_picking.render();
 
     glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -1121,23 +1113,6 @@ void display() {
         for (const auto& [key1, value1] : obs) {
             mean += point_clouds_container.point_clouds[key1].m_initial_pose * value1;
             counter++;
-
-            /*for (const auto& [key2, value2] : obs) {
-                if (key1 != key2) {
-                    Eigen::Vector3d p1, p2;
-                    if (point_clouds_container.show_with_initial_pose) {
-                        p1 = point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-                        p2 = point_clouds_container.point_clouds[key2].m_initial_pose * value2;
-                    }
-                    else {
-                        p1 = point_clouds_container.point_clouds[key1].m_pose * value1;
-                        p2 = point_clouds_container.point_clouds[key2].m_pose * value2;
-                    }
-                    number_of_observations++;
-                    //rms += sqrt((p2.x() - p1.x()) * (p2.x() - p1.x()) + (p2.y() - p1.y()) * (p2.y() - p1.y()) + (p2.z() - p1.z()) * (p2.z() - p1.z()));
-                    rms += sqrt((p2.x() - p1.x()) * (p2.x() - p1.x()) + (p2.y() - p1.y()) * (p2.y() - p1.y()));
-                }
-            }*/
         }
         if (counter > 0) {
             mean /= counter;

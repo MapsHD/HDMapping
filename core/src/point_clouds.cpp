@@ -277,10 +277,10 @@ bool PointClouds::load_eth(const std::string& folder_with_point_clouds, const st
 	return points;
 }*/
 
-void PointClouds::render(const ObservationPicking& observation_picking)
+void PointClouds::render(const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud)
 {
 	for (auto& p : point_clouds) {
-		p.render(this->show_with_initial_pose, observation_picking);
+		p.render(this->show_with_initial_pose, observation_picking, viewer_decmiate_point_cloud);
 	}
 }
 

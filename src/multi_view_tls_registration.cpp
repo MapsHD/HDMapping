@@ -256,6 +256,8 @@ void project_gui() {
         t1.join();
 
         if (input_file_names.size() > 0) {
+            working_directory = fs::path(input_file_names[0]).parent_path().string();
+
             std::cout << "Las files:" << std::endl;
             for (size_t i = 0; i < input_file_names.size(); i++) {
                 std::cout << input_file_names[i] << std::endl;

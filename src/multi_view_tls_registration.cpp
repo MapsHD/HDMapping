@@ -232,7 +232,8 @@ void project_gui() {
     ImGui::Text("ETH dataset: https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
 
 
-    if (ImGui::Button("load AlignedPointCloud from WHU-TLS")) {
+    if (ImGui::Button("load AlignedPointCloud from WHU-TLS (select all *.las files in folder 2-AlignedPointCloud)")) {
+        point_clouds_container.point_clouds.clear();
         static std::shared_ptr<pfd::open_file> open_file;
         std::vector<std::string> input_file_names;
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);

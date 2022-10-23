@@ -563,10 +563,8 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 			pc.decimate(bucket_x, bucket_y, bucket_z);
 			std::cout << "point cloud size after decimation: " << pc.points_local.size() << std::endl;
 		}
+		pc.file_name = input_file_names[i];
 		point_clouds.push_back(pc);
-
-		
-
 	}
 	
 	int num = 0;

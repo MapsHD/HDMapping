@@ -1550,32 +1550,39 @@ void perform_experiment_on_linux()
 
 #if WITH_GTSAM
 	//--96--
-	pose_graph_slam.ndt_bucket_size[0] = ndt.bucket_size[0];
-	pose_graph_slam.ndt_bucket_size[1] = ndt.bucket_size[1];
-	pose_graph_slam.ndt_bucket_size[2] = ndt.bucket_size[2];
+	try{
+		pose_graph_slam.ndt_bucket_size[0] = ndt.bucket_size[0];
+		pose_graph_slam.ndt_bucket_size[1] = ndt.bucket_size[1];
+		pose_graph_slam.ndt_bucket_size[2] = ndt.bucket_size[2];
 
-	pose_graph_slam.set_all_to_false();
-	pose_graph_slam.is_optimize_pcl_ndt = true;
-	pose_graph_slam.is_lie_algebra_right_jacobian = true;
-	pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
+		pose_graph_slam.set_all_to_false();
+		pose_graph_slam.is_optimize_pcl_ndt = true;
+		pose_graph_slam.is_lie_algebra_right_jacobian = true;
+		pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
-	pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
-	rms = compute_rms();
-	id_method = 96;
-	append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method);
-	point_clouds_container = temp_data;
-
+		pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
+		rms = compute_rms();
+		id_method = 96;
+		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method);
+		point_clouds_container = temp_data;
+	}catch (std::exception& e) {
+		std::cout << e.what() << std::endl;
+    }
 	//--97--
-	pose_graph_slam.set_all_to_false();
-	pose_graph_slam.is_optimize_pcl_icp = true;
-	pose_graph_slam.is_lie_algebra_right_jacobian = true;
-	pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
+	try{
+		pose_graph_slam.set_all_to_false();
+		pose_graph_slam.is_optimize_pcl_icp = true;
+		pose_graph_slam.is_lie_algebra_right_jacobian = true;
+		pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
-	pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
-	rms = compute_rms();
-	id_method = 97;
-	append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method);
-	point_clouds_container = temp_data;
+		pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
+		rms = compute_rms();
+		id_method = 97;
+		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method);
+		point_clouds_container = temp_data;
+	}catch (std::exception& e) {
+		std::cout << e.what() << std::endl;
+	}
 #endif
 #if WITH_MANIF
 	//--98--

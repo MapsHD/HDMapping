@@ -1291,7 +1291,7 @@ bool initGL(int* argc, char** argv) {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("tls-registration");
+    glutCreateWindow("multi_view_tls_registration");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -1611,15 +1611,16 @@ void perform_experiment_on_windows()
     reset_poses();
     float rms = 0.0f;
     std::string result_file = working_directory + "/result_win.csv";
+    float search_radious = 0.1f;
+    int number_of_threads = 16;
+    int number_of_iterations = 6;
+    int id_method = 0;
+
     create_header(result_file);
     double initial_rms = compute_rms();
     std::cout << "initial rms: " << initial_rms << std::endl;
     add_initial_rms_to_file(result_file, initial_rms);
     
-    float search_radious = 0.1f;
-    int number_of_threads = 16;
-    int number_of_iterations = 6;
-    int id_method = 0;
 
     //--0--
     icp.is_adaptive_robust_kernel = false;
@@ -1967,7 +1968,7 @@ void perform_experiment_on_windows()
     id_method = 23;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
     point_clouds_container = temp_data;
-    
+   
     //--24--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = true;
@@ -2057,6 +2058,7 @@ void perform_experiment_on_windows()
     point_clouds_container = temp_data;
 
     //----------------------------------------------------------------------------
+
     registration_plane_feature.search_radious = search_radious;
     registration_plane_feature.number_of_threads = number_of_threads;
     registration_plane_feature.number_of_iterations = number_of_iterations;

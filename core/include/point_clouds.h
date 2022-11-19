@@ -27,7 +27,7 @@ public:
 
 	std::vector<PointCloud> point_clouds;
 	bool show_with_initial_pose = false;
-
+	
 	bool load_pose_ETH(const std::string& fn, Eigen::Affine3d &m_increment);
 	bool load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z);
 };

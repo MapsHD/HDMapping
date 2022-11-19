@@ -91,6 +91,7 @@ float m_gizmo[] = { 1,0,0,0,
           0,1,0,0,
           0,0,1,0,
           0,0,0,1 };
+bool manipulate_only_marked_gizmo = true;
 
 void my_display_code()
 {
@@ -318,6 +319,9 @@ void project_gui() {
     }
    
     ImGui::Checkbox("show_with_initial_pose", &point_clouds_container.show_with_initial_pose);
+    ImGui::SameLine();
+    ImGui::Checkbox("manipulate_only_marked_gizmo (false: move also succesive nodes)", &manipulate_only_marked_gizmo);
+
 
     for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
         ImGui::Separator();
@@ -1038,6 +1042,11 @@ void display() {
     
     for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
         if (point_clouds_container.point_clouds[i].gizmo) {
+            std::vector<Eigen::Affine3d> all_m_poses;
+            for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
+                all_m_poses.push_back(point_clouds_container.point_clouds[j].m_pose);
+            }
+            
             ImGuiIO& io = ImGui::GetIO();
             // ImGuizmo -----------------------------------------------
             ImGuizmo::BeginFrame();
@@ -1051,7 +1060,7 @@ void display() {
             glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
             ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
             point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
-            point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1]; 
+            point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1];
             point_clouds_container.point_clouds[i].m_pose(2, 0) = m_gizmo[2];
             point_clouds_container.point_clouds[i].m_pose(3, 0) = m_gizmo[3];
             point_clouds_container.point_clouds[i].m_pose(0, 1) = m_gizmo[4];
@@ -1067,7 +1076,7 @@ void display() {
             point_clouds_container.point_clouds[i].m_pose(2, 3) = m_gizmo[14];
             point_clouds_container.point_clouds[i].m_pose(3, 3) = m_gizmo[15];
             point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
-            
+
             point_clouds_container.point_clouds[i].gui_translation[0] = (float)point_clouds_container.point_clouds[i].pose.px;
             point_clouds_container.point_clouds[i].gui_translation[1] = (float)point_clouds_container.point_clouds[i].pose.py;
             point_clouds_container.point_clouds[i].gui_translation[2] = (float)point_clouds_container.point_clouds[i].pose.pz;
@@ -1077,6 +1086,23 @@ void display() {
             point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(point_clouds_container.point_clouds[i].pose.ka * 180.0 / M_PI);
 
             ImGui::End();
+            
+            if (!manipulate_only_marked_gizmo) {
+                Eigen::Affine3d curr_m_pose = point_clouds_container.point_clouds[i].m_pose;
+                for (int j = i + 1; j < point_clouds_container.point_clouds.size(); j++) {
+                    curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
+                    point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
+                    point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[j].m_pose);
+
+                    point_clouds_container.point_clouds[j].gui_translation[0] = (float)point_clouds_container.point_clouds[j].pose.px;
+                    point_clouds_container.point_clouds[j].gui_translation[1] = (float)point_clouds_container.point_clouds[j].pose.py;
+                    point_clouds_container.point_clouds[j].gui_translation[2] = (float)point_clouds_container.point_clouds[j].pose.pz;
+
+                    point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
+                    point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
+                    point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                }
+            }
         }
     }
 

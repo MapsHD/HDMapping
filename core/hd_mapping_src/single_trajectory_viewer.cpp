@@ -17,7 +17,7 @@ bool SingleTrajectoryViewer::load_fused_trajectory(const std::string &file_name)
     }
 
     working_directory = fs::path(trajectory_filename).parent_path().string();
-    load_vector_data(working_directory.c_str() + std::string("/chunks.bin"), chunk_files);
+    return load_vector_data(working_directory.c_str() + std::string("/chunks.bin"), chunk_files);
 }
 
 bool SingleTrajectoryViewer::load_fused_trajectory()
@@ -37,7 +37,10 @@ bool SingleTrajectoryViewer::load_fused_trajectory()
     t1.join();
 
     if (input_file_name.size() > 0) {
-        load_fused_trajectory(input_file_name);
+        return load_fused_trajectory(input_file_name);
+    }
+    else {
+        return false;
     }
 }
 

@@ -1567,6 +1567,9 @@ void perform_experiment_on_linux()
 		point_clouds_container = temp_data;
 	}catch (std::exception& e) {
 		std::cout << e.what() << std::endl;
+		rms = compute_rms();
+		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method);
+		point_clouds_container = temp_data;
     }
 	//--97--
 	try{
@@ -1582,6 +1585,9 @@ void perform_experiment_on_linux()
 		point_clouds_container = temp_data;
 	}catch (std::exception& e) {
 		std::cout << e.what() << std::endl;
+		rms = compute_rms();
+		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method);
+		point_clouds_container = temp_data;
 	}
 #endif
 #if WITH_MANIF

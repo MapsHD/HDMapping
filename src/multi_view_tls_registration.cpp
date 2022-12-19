@@ -45,7 +45,7 @@ static bool show_another_window = false;
 static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 float rotate_x = 0.0, rotate_y = 0.0;
 float translate_x, translate_y = 0.0;
-float translate_z = -10.0;
+float translate_z = -50.0;
 const unsigned int window_width = 800;
 const unsigned int window_height = 600;
 int mouse_old_x, mouse_old_y;
@@ -61,9 +61,9 @@ bool is_pose_graph_slam = false;
 bool is_registration_plane_feature = false;
 bool is_manual_analisys = false;
 bool is_decimate = true;
-double bucket_x = 0.05;
-double bucket_y = 0.05;
-double bucket_z = 0.05;
+double bucket_x = 0.01;
+double bucket_y = 0.01;
+double bucket_z = 0.01;
 int viewer_decmiate_point_cloud = 10;
 
 double camera_ortho_xy_view_zoom = 10;
@@ -98,6 +98,7 @@ bool manipulate_only_marked_gizmo = true;
 bool exportLaz(const std::string& filename,
     const std::vector<Eigen::Vector3d>& pointcloud,
     const std::vector<float>& intensity);
+double compute_rms(bool initial);
 
 void my_display_code()
 {
@@ -470,7 +471,11 @@ void project_gui() {
     if (ImGui::Button("perform experiment on LINUX")){
     	perform_experiment_on_linux();
 	}
-
+    //if (ImGui::Button("compute_rms")) {
+    //    auto rms = compute_rms();
+    //    std::cout << "final rms: " << rms << std::endl;
+    //}
+    
     ImGui::End();
 }
 
@@ -988,44 +993,10 @@ void observation_picking_gui(){
     }
 
     if (ImGui::Button("compute RMS(xy)")) {
-        std::vector<Eigen::Affine3d> m_poses;
-        for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
-            m_poses.push_back(point_clouds_container.point_clouds[i].m_pose);
-        }
-        double rms = 0.0;
-        int number_of_observations = 0;
-        for (const auto& obs : observation_picking.observations) {
-            for (const auto& [key1, value1] : obs) {
-                for (const auto& [key2, value2] : obs) {
-                    if (key1 != key2) {
-                        Eigen::Vector3d p1, p2;
-                        if (point_clouds_container.show_with_initial_pose) {
-                            p1 = point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-                            p2 = point_clouds_container.point_clouds[key2].m_initial_pose * value2;
-                        }
-                        else {
-                            p1 = point_clouds_container.point_clouds[key1].m_pose * value1;
-                            p2 = point_clouds_container.point_clouds[key2].m_pose * value2;
-                        }
-                        number_of_observations++;
-                        //rms += sqrt((p2.x() - p1.x()) * (p2.x() - p1.x()) + (p2.y() - p1.y()) * (p2.y() - p1.y()) + (p2.z() - p1.z()) * (p2.z() - p1.z()));
-                        rms += sqrt((p2.x() - p1.x()) * (p2.x() - p1.x()) + (p2.y() - p1.y()) * (p2.y() - p1.y()) );
-                    }
-                }
-            }
-        }
-        if (number_of_observations == 0) {
-            std::cout << "number_of_observations == 0" << std::endl;
-        }
-        else {
-            rms /= number_of_observations;
-            if (point_clouds_container.show_with_initial_pose) {
-                std::cout << "RMS (initial poses): " << rms << std::endl;
-            }
-            else {
-                std::cout << "RMS (final poses): " << rms << std::endl;
-            }
-        }
+        double rms = compute_rms(true);
+        std::cout << "RMS (initial poses): " << rms << std::endl;
+        rms = compute_rms(false);
+        std::cout << "RMS (current poses): " << rms << std::endl;
     }
 
     ImGui::End();
@@ -1511,29 +1482,36 @@ void reset_poses() {
     }
 }
 
-double compute_rms() {
+double compute_rms(bool initial) {
     double rms = 0.0;
-    int number_of_observations = 0;
+    int sum = 0;
     for (const auto& obs : observation_picking.observations) {
         for (const auto& [key1, value1] : obs) {
             for (const auto& [key2, value2] : obs) {
                 if (key1 != key2) {
                     Eigen::Vector3d p1, p2;
-                    p1 = point_clouds_container.point_clouds[key1].m_pose * value1;
-                    p2 = point_clouds_container.point_clouds[key2].m_pose * value2;
-                    number_of_observations++;
-                    //rms += sqrt((p2.x() - p1.x()) * (p2.x() - p1.x()) + (p2.y() - p1.y()) * (p2.y() - p1.y()) + (p2.z() - p1.z()) * (p2.z() - p1.z()));
-                    rms += sqrt((p2.x() - p1.x()) * (p2.x() - p1.x()) + (p2.y() - p1.y()) * (p2.y() - p1.y()));
+                    if (initial) {
+                        p1 = point_clouds_container.point_clouds[key1].m_initial_pose * value1;
+                        p2 = point_clouds_container.point_clouds[key2].m_initial_pose * value2;
+                    }
+                    else {
+                        p1 = point_clouds_container.point_clouds[key1].m_pose * value1;
+                        p2 = point_clouds_container.point_clouds[key2].m_pose * value2;
+                    }
+                    rms += (p2.x() - p1.x()) * (p2.x() - p1.x());
+                    sum++;
+                    rms += (p2.y() - p1.y()) * (p2.y() - p1.y());
+                    sum++;
                 }
             }
         }
     }
-    if (number_of_observations == 0) {
-        std::cout << "number_of_observations == 0" << std::endl;
+    if (sum == 0) {
+        std::cout << "sum == 0" << std::endl;
         return -1;
     }
     else {
-        rms /= number_of_observations;
+        rms = sqrt(rms / sum);
         return rms;
     }
 }
@@ -1576,7 +1554,7 @@ void perform_experiment_on_linux()
 	float rms = 0.0f;
 	std::string result_file = working_directory + "/result_linux.csv";
 	create_header(result_file);
-	double initial_rms = compute_rms();
+	double initial_rms = compute_rms(false);
 	std::cout << "initial rms: " << initial_rms << std::endl;
 	add_initial_rms_to_file(result_file, initial_rms);
 
@@ -1623,7 +1601,7 @@ void perform_experiment_on_linux()
 	pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
 	pose_graph_slam.optimize(point_clouds_container);
-	rms = compute_rms();
+	rms = compute_rms(false);
 	id_method = 94;
 	append_to_result_file(result_file, "pose_graph_slam (pcl_ndt)", pose_graph_slam, rms, id_method);
 	point_clouds_container = temp_data;
@@ -1634,7 +1612,7 @@ void perform_experiment_on_linux()
 	pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
 	pose_graph_slam.optimize(point_clouds_container);
-	rms = compute_rms();
+	rms = compute_rms(false);
 	id_method = 95;
 	append_to_result_file(result_file, "pose_graph_slam (pcl_icp)", pose_graph_slam, rms, id_method);
 	point_clouds_container = temp_data;
@@ -1653,7 +1631,7 @@ void perform_experiment_on_linux()
 		pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
 		pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
-		rms = compute_rms();
+		rms = compute_rms(false);
 		id_method = 96;
 		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method);
 		point_clouds_container = temp_data;
@@ -1668,7 +1646,7 @@ void perform_experiment_on_linux()
 		pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
 		pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
-		rms = compute_rms();
+		rms = compute_rms(false);
 		id_method = 97;
 		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method);
 		point_clouds_container = temp_data;
@@ -1684,7 +1662,7 @@ void perform_experiment_on_linux()
 	pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
 	pose_graph_slam.optimize_with_manif(point_clouds_container);
-	rms = compute_rms();
+	rms = compute_rms(false);
 	id_method = 98;
 	append_to_result_file(result_file, "pose_graph_slam (manif pcl_ndt)", pose_graph_slam, rms, id_method);
 	point_clouds_container = temp_data;
@@ -1696,7 +1674,7 @@ void perform_experiment_on_linux()
 	pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
 	pose_graph_slam.optimize_with_manif(point_clouds_container);
-	rms = compute_rms();
+	rms = compute_rms(false);
 	id_method = 99;
 	append_to_result_file(result_file, "pose_graph_slam (manif pcl_icp)", pose_graph_slam, rms, id_method);
 	point_clouds_container = temp_data;
@@ -1716,7 +1694,7 @@ void perform_experiment_on_windows()
     int id_method = 0;
 
     create_header(result_file);
-    double initial_rms = compute_rms();
+    double initial_rms = compute_rms(false);
     std::cout << "initial rms: " << initial_rms << std::endl;
     add_initial_rms_to_file(result_file, initial_rms);
     
@@ -1742,7 +1720,7 @@ void perform_experiment_on_windows()
     icp.is_lie_algebra_right_jacobian = false;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     std::cout << "final rms: " << rms << std::endl;
     
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
@@ -1755,7 +1733,7 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 1;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1766,7 +1744,7 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = true;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 2;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1780,7 +1758,7 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 3;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1791,7 +1769,7 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 4;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1802,7 +1780,7 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = true;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 5;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1821,7 +1799,7 @@ void perform_experiment_on_windows()
     icp.is_lie_algebra_right_jacobian = false;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 6;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1832,7 +1810,7 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 7;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1843,7 +1821,7 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = true;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 8;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1857,7 +1835,7 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 9;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1871,7 +1849,7 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 10;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1885,7 +1863,7 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = true;
 
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 11;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1905,7 +1883,7 @@ void perform_experiment_on_windows()
     icp.is_lie_algebra_right_jacobian = false;
 
     icp.optimize_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 12;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1914,7 +1892,7 @@ void perform_experiment_on_windows()
     icp.is_lie_algebra_left_jacobian = false;
     icp.is_lie_algebra_right_jacobian = true;
     icp.optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 13;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
     point_clouds_container = temp_data;
@@ -1942,7 +1920,7 @@ void perform_experiment_on_windows()
     ndt.is_lie_algebra_right_jacobian = false;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     std::cout << "final rms: " << rms << std::endl;
     
     id_method = 14;
@@ -1955,7 +1933,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = false;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 15;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
@@ -1967,7 +1945,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = true;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 16;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
@@ -1982,7 +1960,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = false;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 17;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
     point_clouds_container = temp_data;
@@ -1993,7 +1971,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = false;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 18;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
@@ -2005,7 +1983,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = true;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 19;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
@@ -2023,7 +2001,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = false;
   
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 20;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
@@ -2035,7 +2013,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = false;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 21;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
@@ -2047,7 +2025,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = true;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 22;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
@@ -2062,7 +2040,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = false;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 23;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
@@ -2074,7 +2052,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = false;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 24;
 
@@ -2087,7 +2065,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = true;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 25;
 
@@ -2109,7 +2087,7 @@ void perform_experiment_on_windows()
     ndt.is_lie_algebra_right_jacobian = false;
 
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 26;
 
@@ -2122,7 +2100,7 @@ void perform_experiment_on_windows()
     ndt.is_levenberg_marguardt = true;
     ndt.is_rodrigues = false;
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 27;
     ndt.is_rodrigues = true;
@@ -2137,7 +2115,7 @@ void perform_experiment_on_windows()
     ndt.is_gauss_newton = true;
     ndt.is_levenberg_marguardt = false;
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 28;
     ndt.is_rodrigues = true;
@@ -2149,7 +2127,7 @@ void perform_experiment_on_windows()
     ndt.is_levenberg_marguardt = true;
     ndt.is_rodrigues = false;
     ndt.optimize(point_clouds_container.point_clouds);
-    rms = compute_rms();
+    rms = compute_rms(false);
     
     id_method = 29;
     ndt.is_rodrigues = true;
@@ -2176,7 +2154,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 30;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2187,7 +2165,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 31;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2198,7 +2176,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 32;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2212,7 +2190,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 33;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2223,7 +2201,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 34;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2234,7 +2212,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 35;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2252,7 +2230,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 36;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2263,7 +2241,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 37;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2274,7 +2252,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 38;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2288,7 +2266,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 39;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2299,7 +2277,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 40;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2310,7 +2288,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 41;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2330,7 +2308,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_lie_algebra_right_jacobian = false;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 42;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2340,7 +2318,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_levenberg_marguardt = true;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 43;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2352,7 +2330,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_lie_algebra_right_jacobian = true;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 44;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2362,7 +2340,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_levenberg_marguardt = true;
 
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 45;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2382,7 +2360,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 46;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2393,7 +2371,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 47;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2404,7 +2382,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 48;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2418,7 +2396,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 49;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2429,7 +2407,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 50;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2440,7 +2418,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 51;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2457,7 +2435,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 52;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2468,7 +2446,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 53;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2479,7 +2457,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 54;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2493,7 +2471,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 55;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2504,7 +2482,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 56;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2515,7 +2493,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 57;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2532,7 +2510,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 58;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2543,7 +2521,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 59;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2554,7 +2532,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 60;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2568,7 +2546,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 61;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2579,7 +2557,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 62;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2590,7 +2568,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 63;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2607,7 +2585,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 64;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2618,7 +2596,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 65;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2629,7 +2607,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 66;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2643,7 +2621,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 67;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2654,7 +2632,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 68;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2665,7 +2643,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 69;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2684,7 +2662,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 70;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2695,7 +2673,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 71;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2706,7 +2684,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 72;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2720,7 +2698,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 73;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2731,7 +2709,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 74;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2742,7 +2720,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 75;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2759,7 +2737,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 76;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2770,7 +2748,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 77;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2781,7 +2759,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 78;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2795,7 +2773,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 79;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2806,7 +2784,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 80;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
     point_clouds_container = temp_data;
@@ -2817,7 +2795,7 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 81;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
   
@@ -2851,7 +2829,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.ndt_bucket_size[1] = ndt.bucket_size[1];
     pose_graph_slam.ndt_bucket_size[2] = ndt.bucket_size[2];
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 82;
     append_to_result_file(result_file, "pose_graph_slam (normal_distributions_transform)", pose_graph_slam, rms, id_method);
         
@@ -2861,7 +2839,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_optimization_point_to_point_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 83;
     append_to_result_file(result_file, "pose_graph_slam (point_to_point)", pose_graph_slam, rms, id_method);
     point_clouds_container = temp_data;
@@ -2872,7 +2850,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 84;
     append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane)", pose_graph_slam, rms, id_method);
     
@@ -2882,7 +2860,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_optimize_point_to_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 85;
     append_to_result_file(result_file, "pose_graph_slam (point_to_plane_using_dot_product)", pose_graph_slam, rms, id_method);
 
@@ -2892,7 +2870,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_optimize_distance_point_to_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 86;
     append_to_result_file(result_file, "pose_graph_slam (distance_point_to_plane)", pose_graph_slam, rms, id_method);
     point_clouds_container = temp_data;
@@ -2905,7 +2883,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_optimize_plane_to_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 87;
     append_to_result_file(result_file, "pose_graph_slam (plane_to_plane)", pose_graph_slam, rms, id_method);
  
@@ -2917,7 +2895,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_lie_algebra_left_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 88;
     append_to_result_file(result_file, "pose_graph_slam (ndt_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method);
 
@@ -2928,7 +2906,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_lie_algebra_right_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 89;
     append_to_result_file(result_file, "pose_graph_slam (ndt_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method);
 
@@ -2939,7 +2917,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_lie_algebra_left_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 90;
     append_to_result_file(result_file, "pose_graph_slam (point_to_point_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method);
 
@@ -2950,7 +2928,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_lie_algebra_right_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 91;
     append_to_result_file(result_file, "pose_graph_slam (point_to_point_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method);
 
@@ -2961,7 +2939,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_lie_algebra_left_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 92;
     append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method);
 
@@ -2972,7 +2950,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_lie_algebra_right_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     pose_graph_slam.optimize(point_clouds_container);
-    rms = compute_rms();
+    rms = compute_rms(false);
     id_method = 93;
     append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method);
 }

@@ -17,7 +17,7 @@ bool SingleTrajectoryViewer::load_fused_trajectory(const std::string &file_name)
     }
 
     working_directory = fs::path(trajectory_filename).parent_path().string();
-    load_vector_data(working_directory.c_str() + std::string("/chunks.bin"), chunk_files);
+    return load_vector_data(working_directory.c_str() + std::string("/chunks.bin"), chunk_files);
 }
 
 bool SingleTrajectoryViewer::load_fused_trajectory()
@@ -37,7 +37,10 @@ bool SingleTrajectoryViewer::load_fused_trajectory()
     t1.join();
 
     if (input_file_name.size() > 0) {
-        load_fused_trajectory(input_file_name);
+        return load_fused_trajectory(input_file_name);
+    }
+    else {
+        return false;
     }
 }
 
@@ -63,7 +66,11 @@ std::vector<Point> SingleTrajectoryViewer::load_points_and_transform_to_global(d
                     auto it = std::lower_bound(trajectory_container.fused_trajectory.begin(), trajectory_container.fused_trajectory.end(),
                         points_tmp[ii].time, [](Node lhs, double time) -> bool { return lhs.timestamp < time; });
 
-                    int index1 = it - trajectory_container.fused_trajectory.begin();
+                    int index1 = it - trajectory_container.fused_trajectory.begin() - 1;
+                    if (index1 < 0) {
+                        index1 = 0;
+                    }
+
                     int index2 = index1 + 1;
                     if (index2 >= trajectory_container.fused_trajectory.size()) index2 = index1;
 

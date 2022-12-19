@@ -273,13 +273,13 @@ bool PointCloud::build_rgd()
 void PointCloud::grid_calculate_params(std::vector<Eigen::Vector3d> &points, GridParameters& params)
 {
 	double min_x = std::numeric_limits<double>::max();
-	double max_x = std::numeric_limits<double>::min();
+	double max_x = std::numeric_limits<double>::lowest();
 
 	double min_y = std::numeric_limits<double>::max();
-	double max_y = std::numeric_limits<double>::min();
+	double max_y = std::numeric_limits<double>::lowest();
 
 	double min_z = std::numeric_limits<double>::max();
-	double max_z = std::numeric_limits<double>::min();
+	double max_z = std::numeric_limits<double>::lowest();
 
 	for (size_t i = 0; i < points.size(); i++) {
 		if (points[i].x() < min_x) min_x = points[i].x();

@@ -920,6 +920,8 @@ void pose_graph_slam_gui() {
 }
 
 void observation_picking_gui(){
+    static std::string observations_file_name = "";
+
     ImGui::Begin("Observations");
 
     ImGui::Checkbox("observation picking mode", &observation_picking.is_observation_picking_mode);
@@ -971,6 +973,7 @@ void observation_picking_gui(){
         t1.join();
 
         if (input_file_name.size() > 0) {
+            observations_file_name = input_file_name;
             observation_picking.import_observations(input_file_name);
         }
     }
@@ -991,6 +994,8 @@ void observation_picking_gui(){
             observation_picking.export_observation(output_file_name);
         }
     }
+
+    ImGui::Text((std::string("Loaded observations from file: '") + observations_file_name + std::string("'")).c_str());
 
     if (ImGui::Button("compute RMS(xy)")) {
         double rms = compute_rms(true);

@@ -61,9 +61,9 @@ bool is_pose_graph_slam = false;
 bool is_registration_plane_feature = false;
 bool is_manual_analisys = false;
 bool is_decimate = true;
-double bucket_x = 0.01;
-double bucket_y = 0.01;
-double bucket_z = 0.01;
+double bucket_x = 0.1;
+double bucket_y = 0.1;
+double bucket_z = 0.1;
 int viewer_decmiate_point_cloud = 10;
 
 double camera_ortho_xy_view_zoom = 10;
@@ -1522,13 +1522,13 @@ double compute_rms(bool initial) {
 }
 
 template<typename T>
-void append_to_result_file(std::string file_name, std::string method, const T &t, float rms, int id_method)
+void append_to_result_file(std::string file_name, std::string method, const T &t, float rms, int id_method, std::chrono::milliseconds elapsed)
 {
     std::ofstream outfile;
     outfile.open(file_name, std::ios_base::app); 
     outfile << method << ";" << id_method << ";" << int(t.is_gauss_newton) << ";" << int(t.is_levenberg_marguardt) << ";" << int(t.is_wc) << ";" << int(t.is_cw)
         << ";" << int(t.is_tait_bryan_angles) << ";" << int(t.is_quaternion) << ";" << int(t.is_rodrigues) << ";" << int(t.is_lie_algebra_left_jacobian)
-        << ";" << int(t.is_lie_algebra_right_jacobian) << ";" << rms << std::endl;;
+        << ";" << int(t.is_lie_algebra_right_jacobian) << ";" << rms << ";" << elapsed.count() << std::endl;
     outfile.close();
 }
 
@@ -1537,7 +1537,7 @@ void create_header(std::string file_name)
 {
     std::ofstream outfile;
     outfile.open(file_name);
-    outfile << "method;id_method;gauss_newton;levenberg_marguardt;wc;cw;tait_bryan_angles;quaternion;rodrigues;Lie_algebra_left_jacobian;Lie_algebra_right_jacobian;rms" << std::endl;
+    outfile << "method;id_method;gauss_newton;levenberg_marguardt;wc;cw;tait_bryan_angles;quaternion;rodrigues;Lie_algebra_left_jacobian;Lie_algebra_right_jacobian;rms;elapsed_time_miliseconds" << std::endl;
     outfile.close();
 }
 
@@ -1545,8 +1545,8 @@ void add_initial_rms_to_file(std::string file_name, float rms)
 {
     std::ofstream outfile;
     outfile.open(file_name, std::ios_base::app);
-    //outfile << "method;is_gauss_newton;is_levenberg_marguardt;is_wc;is_cw;is_tait_bryan_angles;is_quaternion;is_rodrigues;is_Lie_algebra_left;Lie_algebra_right;rms" << std::endl;
-    outfile << "initial_rms;0;0;0;0;0;0;0;0;0;0;" << rms << std::endl;
+    //outfile << "method;is_gauss_newton;is_levenberg_marguardt;is_wc;is_cw;is_tait_bryan_angles;is_quaternion;is_rodrigues;is_Lie_algebra_left;Lie_algebra_right;rms;elapsed_time_miliseconds" << std::endl;
+    outfile << "initial_rms;0;0;0;0;0;0;0;0;0;0;" << rms << ";0" << std::endl;
     outfile.close();
 }
 
@@ -1605,10 +1605,15 @@ void perform_experiment_on_linux()
 	pose_graph_slam.is_optimize_pcl_ndt = true;
 	pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
+    auto start = std::chrono::system_clock::now();
 	pose_graph_slam.optimize(point_clouds_container);
+    auto end = std::chrono::system_clock::now();
+    auto elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
 	rms = compute_rms(false);
 	id_method = 94;
-	append_to_result_file(result_file, "pose_graph_slam (pcl_ndt)", pose_graph_slam, rms, id_method);
+	append_to_result_file(result_file, "pose_graph_slam (pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
 	point_clouds_container = temp_data;
 
 	//--95--
@@ -1616,10 +1621,15 @@ void perform_experiment_on_linux()
 	pose_graph_slam.is_optimize_pcl_icp = true;
 	pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
+    start = std::chrono::system_clock::now();
 	pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
 	rms = compute_rms(false);
 	id_method = 95;
-	append_to_result_file(result_file, "pose_graph_slam (pcl_icp)", pose_graph_slam, rms, id_method);
+	append_to_result_file(result_file, "pose_graph_slam (pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
 	point_clouds_container = temp_data;
 #endif
 
@@ -1635,15 +1645,19 @@ void perform_experiment_on_linux()
 		pose_graph_slam.is_lie_algebra_right_jacobian = true;
 		pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
+        start = std::chrono::system_clock::now();
 		pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
+        end = std::chrono::system_clock::now();
+        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
 		rms = compute_rms(false);
 		id_method = 96;
-		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method);
+		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
 		point_clouds_container = temp_data;
 	}catch (std::exception& e) {
 		std::cout << e.what() << std::endl;
 		rms = compute_rms(false);
-		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method);
+		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
 		point_clouds_container = temp_data;
     }
 	//--97--
@@ -1653,15 +1667,19 @@ void perform_experiment_on_linux()
 		pose_graph_slam.is_lie_algebra_right_jacobian = true;
 		pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
+        start = std::chrono::system_clock::now();
 		pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
+        end = std::chrono::system_clock::now();
+        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
 		rms = compute_rms(false);
 		id_method = 97;
-		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method);
+		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
 		point_clouds_container = temp_data;
 	}catch (std::exception& e) {
 		std::cout << e.what() << std::endl;
 		rms = compute_rms(false);
-		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method);
+		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
 		point_clouds_container = temp_data;
 	}
 #endif
@@ -1672,10 +1690,14 @@ void perform_experiment_on_linux()
 	pose_graph_slam.is_lie_algebra_right_jacobian = true;
 	pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
+    start = std::chrono::system_clock::now();
 	pose_graph_slam.optimize_with_manif(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
 	rms = compute_rms(false);
 	id_method = 98;
-	append_to_result_file(result_file, "pose_graph_slam (manif pcl_ndt)", pose_graph_slam, rms, id_method);
+	append_to_result_file(result_file, "pose_graph_slam (manif pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
 	point_clouds_container = temp_data;
 
 	//--99--
@@ -1684,10 +1706,14 @@ void perform_experiment_on_linux()
 	pose_graph_slam.is_lie_algebra_right_jacobian = true;
 	pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
+    start = std::chrono::system_clock::now();
 	pose_graph_slam.optimize_with_manif(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
 	rms = compute_rms(false);
 	id_method = 99;
-	append_to_result_file(result_file, "pose_graph_slam (manif pcl_icp)", pose_graph_slam, rms, id_method);
+	append_to_result_file(result_file, "pose_graph_slam (manif pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
 	point_clouds_container = temp_data;
 #endif
 }
@@ -1730,11 +1756,15 @@ void perform_experiment_on_windows()
     icp.is_lie_algebra_left_jacobian = false;
     icp.is_lie_algebra_right_jacobian = false;
 
+    auto start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    auto end = std::chrono::system_clock::now();
+    auto elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     std::cout << "final rms: " << rms << std::endl;
     
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     id_method++;
 
@@ -1743,10 +1773,14 @@ void perform_experiment_on_windows()
     icp.is_quaternion = true;
     icp.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 1;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     //id_method++;
     //--2--
@@ -1754,10 +1788,13 @@ void perform_experiment_on_windows()
     icp.is_quaternion = false;
     icp.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 2;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--3--
@@ -1768,10 +1805,13 @@ void perform_experiment_on_windows()
     icp.is_quaternion = false;
     icp.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 3;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--4--
@@ -1779,10 +1819,13 @@ void perform_experiment_on_windows()
     icp.is_quaternion = true;
     icp.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 4;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--5--
@@ -1790,10 +1833,13 @@ void perform_experiment_on_windows()
     icp.is_quaternion = false;
     icp.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 5;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--6--
@@ -1809,10 +1855,13 @@ void perform_experiment_on_windows()
     icp.is_lie_algebra_left_jacobian = false;
     icp.is_lie_algebra_right_jacobian = false;
 
+    start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 6;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--7--
@@ -1820,10 +1869,13 @@ void perform_experiment_on_windows()
     icp.is_quaternion = true;
     icp.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 7;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--8--
@@ -1831,10 +1883,13 @@ void perform_experiment_on_windows()
     icp.is_quaternion = false;
     icp.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 8;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--9--
@@ -1845,10 +1900,13 @@ void perform_experiment_on_windows()
     icp.is_quaternion = false;
     icp.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 9;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--10--
@@ -1859,10 +1917,13 @@ void perform_experiment_on_windows()
     icp.is_quaternion = true;
     icp.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 10;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--11--
@@ -1873,10 +1934,13 @@ void perform_experiment_on_windows()
     icp.is_quaternion = false;
     icp.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 11;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--12--
@@ -1893,19 +1957,25 @@ void perform_experiment_on_windows()
     icp.is_lie_algebra_left_jacobian = true;
     icp.is_lie_algebra_right_jacobian = false;
 
+    start = std::chrono::system_clock::now();
     icp.optimize_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 12;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--13--
     icp.is_lie_algebra_left_jacobian = false;
     icp.is_lie_algebra_right_jacobian = true;
+    start = std::chrono::system_clock::now();
     icp.optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 13;
-    append_to_result_file(result_file, "point_to_point", icp, rms, id_method);
+    append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //---NDT---
@@ -1930,36 +2000,43 @@ void perform_experiment_on_windows()
     ndt.is_lie_algebra_left_jacobian = false;
     ndt.is_lie_algebra_right_jacobian = false;
 
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     std::cout << "final rms: " << rms << std::endl;
     
     id_method = 14;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--15--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
-
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 15;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--16--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
-
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 16;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--17--
@@ -1969,35 +2046,41 @@ void perform_experiment_on_windows()
     ndt.is_tait_bryan_angles = true;
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
-
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 17;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--18--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
-
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 18;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--19--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
-
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 19;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--20--
@@ -2010,36 +2093,42 @@ void perform_experiment_on_windows()
     ndt.is_tait_bryan_angles = true;
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
-  
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 20;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--21--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
-
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 21;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--22--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
-
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 22;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--23--
@@ -2049,38 +2138,44 @@ void perform_experiment_on_windows()
     ndt.is_tait_bryan_angles = true;
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
-
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 23;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
    
     //--24--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
-
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 24;
 
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--25--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
-
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 25;
 
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--26--
@@ -2096,26 +2191,32 @@ void perform_experiment_on_windows()
 
     ndt.is_lie_algebra_left_jacobian = true;
     ndt.is_lie_algebra_right_jacobian = false;
-
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 26;
 
     ndt.is_rodrigues = true;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
    
     //--27--
     ndt.is_gauss_newton = false;
     ndt.is_levenberg_marguardt = true;
     ndt.is_rodrigues = false;
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 27;
     ndt.is_rodrigues = true;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--28--
@@ -2125,24 +2226,30 @@ void perform_experiment_on_windows()
 
     ndt.is_gauss_newton = true;
     ndt.is_levenberg_marguardt = false;
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 28;
     ndt.is_rodrigues = true;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--29--
     ndt.is_gauss_newton = false;
     ndt.is_levenberg_marguardt = true;
     ndt.is_rodrigues = false;
+    start = std::chrono::system_clock::now();
     ndt.optimize(point_clouds_container.point_clouds);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     
     id_method = 29;
     ndt.is_rodrigues = true;
-    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method);
+    append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //----------------------------------------------------------------------------
@@ -2164,10 +2271,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 30;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
     
     //--31--
@@ -2175,10 +2285,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 31;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--32--
@@ -2186,10 +2299,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 32;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--33--
@@ -2200,10 +2316,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 33;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--34--
@@ -2211,10 +2330,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 34;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--35--
@@ -2222,10 +2344,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 35;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //------------------------------------------------------
@@ -2240,10 +2365,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 36;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--37--
@@ -2251,10 +2379,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 37;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--38--
@@ -2262,10 +2393,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 38;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--39--
@@ -2276,10 +2410,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 39;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--40--
@@ -2287,10 +2424,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 40;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--41--
@@ -2298,10 +2438,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 41;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--42-- Lie
@@ -2318,20 +2461,26 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_lie_algebra_left_jacobian = true;
     registration_plane_feature.is_lie_algebra_right_jacobian = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 42;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--43--
     registration_plane_feature.is_gauss_newton = false;
     registration_plane_feature.is_levenberg_marguardt = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 43;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--44--
@@ -2340,20 +2489,26 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_lie_algebra_left_jacobian = false;
     registration_plane_feature.is_lie_algebra_right_jacobian = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 44;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--45--
     registration_plane_feature.is_gauss_newton = false;
     registration_plane_feature.is_levenberg_marguardt = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 45;
-    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--46--using dot product
@@ -2370,10 +2525,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 46;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+
     point_clouds_container = temp_data;
 
     //--47
@@ -2381,10 +2540,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 47;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--48
@@ -2392,10 +2554,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 48;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--49
@@ -2406,10 +2571,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 49;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--50
@@ -2417,10 +2585,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 50;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--51
@@ -2428,10 +2599,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 51;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--52
@@ -2445,10 +2619,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 52;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--53
@@ -2456,10 +2633,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 53;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--54
@@ -2467,10 +2647,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 54;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--55
@@ -2481,10 +2664,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 55;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--56
@@ -2492,10 +2678,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 56;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--57
@@ -2503,10 +2692,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 57;
-    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--58 optimize_distance_point_to_plane_source_to_target
@@ -2520,10 +2712,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 58;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--59
@@ -2531,10 +2726,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 59;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--60
@@ -2542,10 +2740,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 60;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--61
@@ -2556,10 +2757,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 61;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--62
@@ -2567,10 +2771,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 62;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--63
@@ -2578,10 +2785,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 63;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--64
@@ -2595,10 +2805,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 64;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--65
@@ -2606,10 +2819,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 65;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--66
@@ -2617,10 +2833,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 66;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--67
@@ -2631,10 +2850,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 67;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--68
@@ -2642,10 +2864,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 68;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--69
@@ -2653,10 +2878,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 69;
-    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--70 optimize_plane_to_plane_source_to_target
@@ -2672,10 +2900,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 70;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--71
@@ -2683,10 +2914,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 71;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--72
@@ -2694,10 +2928,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 72;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--73
@@ -2708,10 +2945,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 73;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--74
@@ -2719,10 +2959,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 74;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--75
@@ -2730,10 +2973,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 75;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--76
@@ -2747,10 +2993,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 76;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--77
@@ -2758,10 +3007,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 77;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--78
@@ -2769,10 +3021,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 78;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--79
@@ -2783,10 +3038,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 79;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--80
@@ -2794,10 +3052,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = true;
     registration_plane_feature.is_rodrigues = false;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 80;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--81
@@ -2805,10 +3066,13 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_quaternion = false;
     registration_plane_feature.is_rodrigues = true;
 
+    start = std::chrono::system_clock::now();
     registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 81;
-    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method);
+    append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
   
     point_clouds_container = temp_data;
 
@@ -2839,20 +3103,26 @@ void perform_experiment_on_windows()
     pose_graph_slam.ndt_bucket_size[0] = ndt.bucket_size[0];
     pose_graph_slam.ndt_bucket_size[1] = ndt.bucket_size[1];
     pose_graph_slam.ndt_bucket_size[2] = ndt.bucket_size[2];
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 82;
-    append_to_result_file(result_file, "pose_graph_slam (normal_distributions_transform)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (normal_distributions_transform)", pose_graph_slam, rms, id_method, elapsed);
         
     //--83
     point_clouds_container = temp_data;
     pose_graph_slam.set_all_to_false();
     pose_graph_slam.is_optimization_point_to_point_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 83;
-    append_to_result_file(result_file, "pose_graph_slam (point_to_point)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (point_to_point)", pose_graph_slam, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--84
@@ -2860,30 +3130,39 @@ void perform_experiment_on_windows()
     pose_graph_slam.set_all_to_false();
     pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 84;
-    append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane)", pose_graph_slam, rms, id_method, elapsed);
     
     //--85
     point_clouds_container = temp_data;
     pose_graph_slam.set_all_to_false();
     pose_graph_slam.is_optimize_point_to_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 85;
-    append_to_result_file(result_file, "pose_graph_slam (point_to_plane_using_dot_product)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (point_to_plane_using_dot_product)", pose_graph_slam, rms, id_method, elapsed);
 
     //--86
     point_clouds_container = temp_data;
     pose_graph_slam.set_all_to_false();
     pose_graph_slam.is_optimize_distance_point_to_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 86;
-    append_to_result_file(result_file, "pose_graph_slam (distance_point_to_plane)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (distance_point_to_plane)", pose_graph_slam, rms, id_method, elapsed);
     point_clouds_container = temp_data;
 
     //--87
@@ -2893,10 +3172,13 @@ void perform_experiment_on_windows()
     pose_graph_slam.set_all_to_false();
     pose_graph_slam.is_optimize_plane_to_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 87;
-    append_to_result_file(result_file, "pose_graph_slam (plane_to_plane)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (plane_to_plane)", pose_graph_slam, rms, id_method, elapsed);
  
     //--88
     pose_graph_slam.set_all_to_false();
@@ -2905,10 +3187,13 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_ndt_lie_algebra_left_jacobian = true;
     pose_graph_slam.is_lie_algebra_left_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 88;
-    append_to_result_file(result_file, "pose_graph_slam (ndt_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (ndt_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method, elapsed);
 
     //--89
     pose_graph_slam.set_all_to_false();
@@ -2916,10 +3201,13 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_ndt_lie_algebra_right_jacobian = true;
     pose_graph_slam.is_lie_algebra_right_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 89;
-    append_to_result_file(result_file, "pose_graph_slam (ndt_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (ndt_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method, elapsed);
 
     //--90
     pose_graph_slam.set_all_to_false();
@@ -2927,10 +3215,13 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_left_jacobian = true;
     pose_graph_slam.is_lie_algebra_left_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 90;
-    append_to_result_file(result_file, "pose_graph_slam (point_to_point_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (point_to_point_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method, elapsed);
 
     //--91
     pose_graph_slam.set_all_to_false();
@@ -2938,10 +3229,13 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_right_jacobian = true;
     pose_graph_slam.is_lie_algebra_right_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 91;
-    append_to_result_file(result_file, "pose_graph_slam (point_to_point_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (point_to_point_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method, elapsed);
 
     //--92
     pose_graph_slam.set_all_to_false();
@@ -2949,10 +3243,13 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian = true;
     pose_graph_slam.is_lie_algebra_left_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 92;
-    append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method, elapsed);
 
     //--93
     pose_graph_slam.set_all_to_false();
@@ -2960,10 +3257,13 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian = true;
     pose_graph_slam.is_lie_algebra_right_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(point_clouds_container);
+    end = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 93;
-    append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method);
+    append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method, elapsed);
 }
 
 bool exportLaz(const std::string& filename,

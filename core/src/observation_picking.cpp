@@ -83,6 +83,9 @@ void ObservationPicking::render()
 	}
 	glEnd();
 
+	for (auto& i : intersections) {
+		i.render();
+	}
 }
 
 void ObservationPicking::add_picked_to_current_observation(int index_picked, Eigen::Vector3d p)
@@ -151,4 +154,25 @@ void ObservationPicking::export_observation(/*std::vector<std::map<int, Eigen::V
 	fs << json.dump(2);
 	fs.close();
 	std::cout << "number of saved observations: " << observations.size() << std::endl;
+}
+
+void ObservationPicking::add_intersection(Eigen::Vector3d translation)
+{
+	std::cout << "ObservationPicking::add_intersection()" << std::endl;
+
+	Intersection intersection;
+	intersection.color[0] = 1.0;
+	intersection.color[1] = 0.0;
+	intersection.color[2] = 0.0;
+	intersection.translation[0] = (float)translation.x();
+	intersection.translation[1] = (float)translation.y();
+	intersection.translation[2] = (float)translation.z();
+	intersection.rotation[0] = 0.0f;
+	intersection.rotation[1] = 0.0f;
+	intersection.rotation[2] = 0.0f;
+	intersection.width_length_height[0] = 2.0;
+	intersection.width_length_height[1] = 2.0;
+	intersection.width_length_height[2] = 2.0;
+	
+	this->intersections.push_back(intersection);
 }

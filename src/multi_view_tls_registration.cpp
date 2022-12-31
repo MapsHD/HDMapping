@@ -82,12 +82,6 @@ ObservationPicking observation_picking;
 std::vector<Eigen::Vector3d> picked_points;
 std::string working_directory = "";
 int all_point_size = 1;
-//struct LaserBeam {
-//    Eigen::Vector3d position;
-//    Eigen::Vector3d direction;
-//    float distance;
-//    float range;
-//};
 
 float m_gizmo[] = { 1,0,0,0,
           0,1,0,0,
@@ -95,9 +89,7 @@ float m_gizmo[] = { 1,0,0,0,
           0,0,0,1 };
 bool manipulate_only_marked_gizmo = true;
 
-bool exportLaz(const std::string& filename,
-    const std::vector<Eigen::Vector3d>& pointcloud,
-    const std::vector<float>& intensity);
+bool exportLaz(const std::string& filename, const std::vector<Eigen::Vector3d>& pointcloud, const std::vector<float>& intensity);
 double compute_rms(bool initial);
 
 void my_display_code()
@@ -293,16 +285,12 @@ void project_gui() {
     ImGui::Text("WHU-TLS dataset: http://3s.whu.edu.cn/ybs/en/benchmark.htm");
 
     ImGui::Text("-----------------------------------------------------------------------------");
-
-
     ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
     ImGui::Checkbox("Iterative Closest Point", &is_icp_gui);
     ImGui::Checkbox("Plane Features", &is_registration_plane_feature);
     ImGui::Checkbox("Pose Graph SLAM", &is_pose_graph_slam);
     ImGui::Checkbox("Manual analysis", &is_manual_analisys);
     ImGui::ColorEdit3("background color", (float*)&clear_color);
-
-   
 
     if (ImGui::Button("show all")) {
         point_clouds_container.show_all();
@@ -328,7 +316,6 @@ void project_gui() {
     ImGui::Checkbox("show_with_initial_pose", &point_clouds_container.show_with_initial_pose);
     ImGui::SameLine();
     ImGui::Checkbox("manipulate_only_marked_gizmo (false: move also succesive nodes)", &manipulate_only_marked_gizmo);
-
 
     for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
         ImGui::Separator();
@@ -438,26 +425,10 @@ void project_gui() {
                     }
                 }
             }
-           
-
-
             if (!exportLaz(output_file_name, pointcloud, intensity)) {
                 std::cout << "problem with saving file: " << output_file_name << std::endl;
             }
-            //point_clouds_container.save_poses(fs::path(output_file_name).string());
         }
-
-
-        //void PointClouds::render(const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud)
-        //{
-        //    for (auto& p : point_clouds) {
-        //        p.render(this->show_with_initial_pose, observation_picking, viewer_decmiate_point_cloud);
-        //    }
-       // }
-
-
-       
-
     }
 
     ImGui::Separator();
@@ -471,11 +442,6 @@ void project_gui() {
     if (ImGui::Button("perform experiment on LINUX")){
     	perform_experiment_on_linux();
 	}
-    //if (ImGui::Button("compute_rms")) {
-    //    auto rms = compute_rms();
-    //    std::cout << "final rms: " << rms << std::endl;
-    //}
-    
     ImGui::End();
 }
 
@@ -1004,6 +970,136 @@ void observation_picking_gui(){
         std::cout << "RMS (current poses): " << rms << std::endl;
     }
 
+    ImGui::Text("------------------------------------------------");
+    if (ImGui::Button("add intersection")) {
+        observation_picking.add_intersection(Eigen::Vector3d(0.0,0.0,0.0));
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("add intersections from loaded observations")) {
+        for (const auto& obs : observation_picking.observations) {
+            for (const auto& [key, value] : obs) {
+                if (point_clouds_container.show_with_initial_pose) {
+                    auto p = point_clouds_container.point_clouds[key].m_initial_pose * value;
+                    observation_picking.add_intersection(p);
+                }
+                else {
+                    auto p = point_clouds_container.point_clouds[key].m_pose * value;
+                    observation_picking.add_intersection(p);
+                }
+                break;
+            }
+        }
+    }
+
+    int index_intersetion_to_remove = -1;
+    for (int i = 0; i < observation_picking.intersections.size(); i++) {
+        ImGui::Text("--");
+        ImGui::Text(std::string("intersection: '" + std::to_string(i) + "'").c_str());
+        ImGui::ColorEdit3(std::string(std::to_string(i) + ": color").c_str(), observation_picking.intersections[i].color);
+        ImGui::InputFloat3(std::string(std::to_string(i) + ": translation [m]").c_str(), observation_picking.intersections[i].translation);
+        ImGui::InputFloat3(std::string(std::to_string(i) + ": rotation [deg]").c_str(), observation_picking.intersections[i].rotation);
+        ImGui::InputFloat3(std::string(std::to_string(i) + ": width_length_height [m]").c_str(), observation_picking.intersections[i].width_length_height);
+        if (ImGui::Button(std::string("remove: '" + std::to_string(i) + "'").c_str())) {
+            index_intersetion_to_remove = i;
+        }
+    }
+    if (index_intersetion_to_remove != -1) {
+        std::vector<Intersection> intersections;
+        for (int i = 0; i < observation_picking.intersections.size(); i++) {
+            if (i != index_intersetion_to_remove) {
+                intersections.push_back(observation_picking.intersections[i]);
+            }
+        }
+        observation_picking.intersections = intersections;
+    }
+    ImGui::Text("------------------------------------------------");
+    if (observation_picking.intersections.size() > 0) {
+        if (ImGui::Button("export point clouds inside intersections to folder")) {
+            static std::shared_ptr<pfd::select_folder> selected_folder;
+            std::string output_folder_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)selected_folder);
+            const auto t = [&]() {
+                auto sel = pfd::select_folder("Choose folder", "C:\\").result();
+                output_folder_name = sel;
+                std::cout << "folder: '" << output_folder_name << "'" << std::endl;
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (output_folder_name.size() > 0) {
+                for (int i = 0; i < observation_picking.intersections.size(); i++) {
+                    fs::path path(output_folder_name);
+
+                    std::string file_name_initial = "intersection_" + std::to_string(i) + "_initial.csv";
+                    std::string file_name_result = "intersection_" + std::to_string(i) + "_result.csv";
+
+                    auto path_initial = path;
+                    auto path_result = path;
+
+                    path_initial /= file_name_initial;
+                    path_result /= file_name_result;
+
+                    std::cout << "exporting to file: '" << path_initial.string() << "'" << std::endl;
+                    std::cout << "exporting to file: '" << path_result.string() << "'" << std::endl;
+                    
+                    std::ofstream outfile_initial;
+                    std::ofstream outfile_result;
+                    outfile_initial.open(path_initial, std::ios_base::app);
+                    outfile_result.open(path_result, std::ios_base::app);
+
+                    const auto& intersection = observation_picking.intersections[i];
+                    TaitBryanPose pose;
+                    pose.px = intersection.translation[0];
+                    pose.py = intersection.translation[1];
+                    pose.pz = intersection.translation[2];
+                    pose.om = intersection.rotation[0];
+                    pose.fi = intersection.rotation[1];
+                    pose.ka = intersection.rotation[2];
+                    Eigen::Affine3d m_pose_inv = affine_matrix_from_pose_tait_bryan(pose).inverse();
+                        
+                    double w = intersection.width_length_height[0] * 0.5;
+                    double l = intersection.width_length_height[1] * 0.5;
+                    double h = intersection.width_length_height[2] * 0.5;
+
+
+                    outfile_initial << "x;y;z;pc_index;is_initial;index_intersection;file" << std::endl;
+                    outfile_result << "x;y;z;pc_index;is_initial;index_intersection;file" << std::endl;
+                    
+                    for(int pc_index = 0; pc_index < point_clouds_container.point_clouds.size(); pc_index++){
+                        const auto& pc = point_clouds_container.point_clouds[pc_index];
+                        for (const auto& p : pc.points_local) {
+                            Eigen::Vector3d vpi = pc.m_initial_pose * p; 
+                            Eigen::Vector3d vpr = pc.m_pose * p;
+
+                            Eigen::Vector3d vpit = m_pose_inv * vpi;
+                            Eigen::Vector3d vprt = m_pose_inv * vpr;
+
+                            if (fabs(vpit.x()) < w) {
+                                if (fabs(vpit.y()) < l) {
+                                    if (fabs(vpit.z()) < h) {
+                                        outfile_initial << vpit.x() << ";" << vpit.y() << ";" << vpit.z() << ";" << pc_index << ";1;" << i << ";" << pc.file_name << std::endl;
+                                    }
+                                }
+                            }
+                            if (fabs(vprt.x()) < w) {
+                                if (fabs(vprt.y()) < l) {
+                                    if (fabs(vprt.z()) < h) {
+                                        outfile_result << vprt.x() << ";" << vprt.y() << ";" << vprt.z() << ";" << pc_index << ";0;" << i << ";" << pc.file_name << std::endl;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    outfile_initial.close();
+                    outfile_result.close();
+                }
+            }
+        }
+    }
+    ImGui::Text("------------------------------------------------");
+
     ImGui::End();
 }
 
@@ -1253,9 +1349,6 @@ void motion(int x, int y) {
                 rotate_x += dy * 0.2f * mouse_sensitivity;
                 rotate_y += dx * 0.2f * mouse_sensitivity;
             }
-            //else if (mouse_buttons & 4) {
-            //    translate_z += dy * 0.05f * mouse_sensitivity;
-            //}
             if (mouse_buttons & 4) {
                 translate_x += dx * 0.05f * mouse_sensitivity;
                 translate_y -= dy * 0.05f * mouse_sensitivity;
@@ -1359,7 +1452,7 @@ bool initGL(int* argc, char** argv) {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration v0.2");
+    glutCreateWindow("multi_view_tls_registration v0.3");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -1723,7 +1816,7 @@ void perform_experiment_on_windows()
     point_clouds_container.show_with_initial_pose = false;
     auto temp_data = point_clouds_container;
     reset_poses();
-    float rms = 0.0f;
+    double rms = 0.0f;
     std::string result_file = working_directory + "/result_win.csv";
     float search_radious = 0.1f;
     int number_of_threads = 16;

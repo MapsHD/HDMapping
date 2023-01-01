@@ -6,6 +6,11 @@
 
 #include <nlohmann/json.hpp>
 
+//void renderBitmapString(float x, float y, float z, char* string) {
+//	glRasterPos3f(x, y, z);
+//	glutBitmapCharacter(font, GLUT_BITMAP_TIMES_ROMAN_24);
+//}
+
 void ObservationPicking::render()
 {
 	if (is_observation_picking_mode) {
@@ -85,6 +90,17 @@ void ObservationPicking::render()
 
 	for (auto& i : intersections) {
 		i.render();
+	}
+
+	glColor3f(0.0f, 0.0f, 0.0f);
+	for (int i = 0; i < intersections.size(); i++) {
+		glBegin(GL_LINES);
+			glVertex3f(intersections[i].translation[0], intersections[i].translation[1], intersections[i].translation[2]);
+			glVertex3f(label_dist - i * 2, intersections[i].translation[1], intersections[i].translation[2]);
+		glEnd();
+		
+		glRasterPos3f(label_dist + 2 - i * 2, intersections[i].translation[1], intersections[i].translation[2]);
+		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, std::to_string(i).c_str()[0]);
 	}
 }
 

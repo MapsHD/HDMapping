@@ -147,6 +147,7 @@ public:
 	std::map<int, Eigen::Vector3d> current_observation;
 	std::vector<std::map<int, Eigen::Vector3d>> observations;
 	std::vector<Intersection> intersections;
+	float label_dist = 100.0f;
 };
 
 #endif

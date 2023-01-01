@@ -1029,15 +1029,22 @@ void observation_picking_gui(){
             t1.join();
 
             if (output_folder_name.size() > 0) {
-                for (int i = 0; i < observation_picking.intersections.size(); i++) {
-                    fs::path path(output_folder_name);
+                fs::path path(output_folder_name);
+                std::string file_name_rms = "rms.csv";
+                auto path_rms = path;
+                path_rms /= file_name_rms;
+                std::cout << "exporting to file: '" << path_rms.string() << "'" << std::endl;
+                std::ofstream outfile_rms;
+                outfile_rms.open(path_rms, std::ios_base::app);
+                outfile_rms << "index_roi, rms_initial, rms_result" << std::endl;
 
+                for (int i = 0; i < observation_picking.intersections.size(); i++) {
                     std::string file_name_initial = "intersection_" + std::to_string(i) + "_initial.csv";
                     std::string file_name_result = "intersection_" + std::to_string(i) + "_result.csv";
 
                     auto path_initial = path;
                     auto path_result = path;
-
+                    
                     path_initial /= file_name_initial;
                     path_result /= file_name_result;
 
@@ -1046,6 +1053,7 @@ void observation_picking_gui(){
                     
                     std::ofstream outfile_initial;
                     std::ofstream outfile_result;
+
                     outfile_initial.open(path_initial, std::ios_base::app);
                     outfile_result.open(path_result, std::ios_base::app);
 
@@ -1094,9 +1102,40 @@ void observation_picking_gui(){
                     }
                     outfile_initial.close();
                     outfile_result.close();
+                   
+                    const auto& obs = observation_picking.observations[i];
+                    double rms_initial = 0.0;
+                    int sum = 0;
+                    double rms_result = 0.0;
+                
+                    for (const auto& [key1, value1] : obs) {
+                        for (const auto& [key2, value2] : obs) {
+                            if (key1 != key2) {
+                                Eigen::Vector3d p1, p2;
+                                p1 = point_clouds_container.point_clouds[key1].m_initial_pose * value1;
+                                p2 = point_clouds_container.point_clouds[key2].m_initial_pose * value2;
+                                rms_initial += (p2.x() - p1.x()) * (p2.x() - p1.x());
+                                rms_initial += (p2.y() - p1.y()) * (p2.y() - p1.y());
+                              
+                                p1 = point_clouds_container.point_clouds[key1].m_pose * value1;
+                                p2 = point_clouds_container.point_clouds[key2].m_pose * value2;
+                                rms_result += (p2.x() - p1.x()) * (p2.x() - p1.x());
+                                rms_result += (p2.y() - p1.y()) * (p2.y() - p1.y());
+
+                                sum += 2;
+                            }
+                        }
+                    }
+                    if (sum > 0) {
+                        rms_initial = sqrt(rms_initial / sum);
+                        rms_result = sqrt(rms_result / sum);
+                        outfile_rms << i << ";" << rms_initial << ";" << rms_result << std::endl;
+                    }
                 }
+                outfile_rms.close();
             }
         }
+        ImGui::InputFloat("label_dist", &observation_picking.label_dist);
     }
     ImGui::Text("------------------------------------------------");
 

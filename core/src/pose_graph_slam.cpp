@@ -274,7 +274,7 @@ bool PoseGraphSLAM::optimize(PointClouds& point_clouds_container)
                 //   }
                 //}
 
-                tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1));
+                tripletListP.emplace_back(ir    , ir    , get_cauchy_w(delta(0, 0), 10));
                 tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 10));
                 tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta(2, 0), 10));
                 tripletListP.emplace_back(ir + 3, ir + 3, get_cauchy_w(delta(3, 0), 10));
@@ -372,6 +372,7 @@ bool PoseGraphSLAM::optimize(PointClouds& point_clouds_container)
             }
             else {
                 std::cout << "optimizing with tait bryan FAILED" << std::endl;
+                std::cout << "h_x.size(): " << h_x.size() << " should be: " << 6 * point_clouds_container.point_clouds.size() << std::endl;
                 is_ok = false;
                 break;
             }
@@ -632,6 +633,7 @@ bool PoseGraphSLAM::optimize(PointClouds& point_clouds_container)
             }
             else {
                 std::cout << "optimizing with rodrigues FAILED" << std::endl;
+                std::cout << "h_x.size(): " << h_x.size() << " should be: " << 6 * point_clouds_container.point_clouds.size() << std::endl;
                 is_ok = false;
                 break;
             }

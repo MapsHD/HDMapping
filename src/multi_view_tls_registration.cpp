@@ -885,6 +885,128 @@ void pose_graph_slam_gui() {
     ImGui::End();
 }
 
+
+void export_result_to_folder(std::string output_folder_name){
+    fs::path path(output_folder_name);
+    std::string file_name_rms = "rms.csv";
+    auto path_rms = path;
+    path_rms /= file_name_rms;
+    std::cout << "exporting to file: '" << path_rms.string() << "'" << std::endl;
+    std::ofstream outfile_rms;
+    outfile_rms.open(path_rms, std::ios_base::app);
+    outfile_rms << "index_roi, rms_initial, rms_result" << std::endl;
+
+    for (int i = 0; i < observation_picking.intersections.size(); i++) {
+        std::string file_name_initial = "intersection_" + std::to_string(i) + "_initial.csv";
+        std::string file_name_result = "intersection_" + std::to_string(i) + "_result.csv";
+
+        auto path_initial = path;
+        auto path_result = path;
+
+        path_initial /= file_name_initial;
+        path_result /= file_name_result;
+
+        std::cout << "exporting to file: '" << path_initial.string() << "'" << std::endl;
+        std::cout << "exporting to file: '" << path_result.string() << "'" << std::endl;
+
+        std::ofstream outfile_initial;
+        std::ofstream outfile_result;
+
+        outfile_initial.open(path_initial, std::ios_base::app);
+        outfile_result.open(path_result, std::ios_base::app);
+
+        const auto& intersection = observation_picking.intersections[i];
+        TaitBryanPose pose;
+        pose.px = intersection.translation[0];
+        pose.py = intersection.translation[1];
+        pose.pz = intersection.translation[2];
+        pose.om = intersection.rotation[0];
+        pose.fi = intersection.rotation[1];
+        pose.ka = intersection.rotation[2];
+        Eigen::Affine3d m_pose_inv = affine_matrix_from_pose_tait_bryan(pose).inverse();
+
+        double w = intersection.width_length_height[0] * 0.5;
+        double l = intersection.width_length_height[1] * 0.5;
+        double h = intersection.width_length_height[2] * 0.5;
+
+
+        outfile_initial << "x;y;z;pc_index;is_initial;index_intersection;file" << std::endl;
+        outfile_result << "x;y;z;pc_index;is_initial;index_intersection;file" << std::endl;
+
+        for (int pc_index = 0; pc_index < point_clouds_container.point_clouds.size(); pc_index++) {
+            const auto& pc = point_clouds_container.point_clouds[pc_index];
+            for (const auto& p : pc.points_local) {
+                Eigen::Vector3d vpi = pc.m_initial_pose * p;
+                Eigen::Vector3d vpr = pc.m_pose * p;
+
+                Eigen::Vector3d vpit = m_pose_inv * vpi;
+                Eigen::Vector3d vprt = m_pose_inv * vpr;
+
+                if (fabs(vpit.x()) < w) {
+                    if (fabs(vpit.y()) < l) {
+                        if (fabs(vpit.z()) < h) {
+                            outfile_initial << vpit.x() << ";" << vpit.y() << ";" << vpit.z() << ";" << pc_index << ";1;" << i << ";" << pc.file_name << std::endl;
+                        }
+                    }
+                }
+                if (fabs(vprt.x()) < w) {
+                    if (fabs(vprt.y()) < l) {
+                        if (fabs(vprt.z()) < h) {
+                            outfile_result << vprt.x() << ";" << vprt.y() << ";" << vprt.z() << ";" << pc_index << ";0;" << i << ";" << pc.file_name << std::endl;
+                        }
+                    }
+                }
+            }
+        }
+        outfile_initial.close();
+        outfile_result.close();
+
+        const auto& obs = observation_picking.observations[i];
+        double rms_initial = 0.0;
+        int sum = 0;
+        double rms_result = 0.0;
+
+        for (const auto& [key1, value1] : obs) {
+            for (const auto& [key2, value2] : obs) {
+                if (key1 != key2) {
+                    Eigen::Vector3d p1, p2;
+                    p1 = point_clouds_container.point_clouds[key1].m_initial_pose * value1;
+                    p2 = point_clouds_container.point_clouds[key2].m_initial_pose * value2;
+                    rms_initial += (p2.x() - p1.x()) * (p2.x() - p1.x());
+                    rms_initial += (p2.y() - p1.y()) * (p2.y() - p1.y());
+
+                    p1 = point_clouds_container.point_clouds[key1].m_pose * value1;
+                    p2 = point_clouds_container.point_clouds[key2].m_pose * value2;
+                    rms_result += (p2.x() - p1.x()) * (p2.x() - p1.x());
+                    rms_result += (p2.y() - p1.y()) * (p2.y() - p1.y());
+
+                    sum += 2;
+                }
+            }
+        }
+        if (sum > 0) {
+            rms_initial = sqrt(rms_initial / sum);
+            rms_result = sqrt(rms_result / sum);
+            outfile_rms << i << ";" << rms_initial << ";" << rms_result << std::endl;
+        }
+    }
+    outfile_rms.close();
+   
+    std::string file_name_poses = "poses_RESSO.reg";
+    auto path_poses = path;
+    path_poses /= file_name_poses;
+    std::cout << "saving poses to: " << path_poses << std::endl;
+    point_clouds_container.save_poses(path_poses.string());
+}
+
+void export_result_to_folder(std::string output_folder_name, int method_id) {
+    fs::path path(output_folder_name);
+    path /= std::to_string(method_id);
+    create_directory(path);
+    export_result_to_folder(path.string());
+}
+
+
 void observation_picking_gui(){
     static std::string observations_file_name = "";
 
@@ -941,6 +1063,20 @@ void observation_picking_gui(){
         if (input_file_name.size() > 0) {
             observations_file_name = input_file_name;
             observation_picking.import_observations(input_file_name);
+
+            for (const auto& obs : observation_picking.observations) {
+                for (const auto& [key, value] : obs) {
+                    if (point_clouds_container.show_with_initial_pose) {
+                        auto p = point_clouds_container.point_clouds[key].m_initial_pose * value;
+                        observation_picking.add_intersection(p);
+                    }
+                    else {
+                        auto p = point_clouds_container.point_clouds[key].m_pose * value;
+                        observation_picking.add_intersection(p);
+                    }
+                    break;
+                }
+            }
         }
     }
     ImGui::SameLine();
@@ -977,7 +1113,7 @@ void observation_picking_gui(){
 
     ImGui::SameLine();
 
-    if (ImGui::Button("add intersections from loaded observations")) {
+    /*if (ImGui::Button("add intersections from loaded observations")) {
         for (const auto& obs : observation_picking.observations) {
             for (const auto& [key, value] : obs) {
                 if (point_clouds_container.show_with_initial_pose) {
@@ -991,7 +1127,7 @@ void observation_picking_gui(){
                 break;
             }
         }
-    }
+    }*/
 
     int index_intersetion_to_remove = -1;
     for (int i = 0; i < observation_picking.intersections.size(); i++) {
@@ -1029,110 +1165,7 @@ void observation_picking_gui(){
             t1.join();
 
             if (output_folder_name.size() > 0) {
-                fs::path path(output_folder_name);
-                std::string file_name_rms = "rms.csv";
-                auto path_rms = path;
-                path_rms /= file_name_rms;
-                std::cout << "exporting to file: '" << path_rms.string() << "'" << std::endl;
-                std::ofstream outfile_rms;
-                outfile_rms.open(path_rms, std::ios_base::app);
-                outfile_rms << "index_roi, rms_initial, rms_result" << std::endl;
-
-                for (int i = 0; i < observation_picking.intersections.size(); i++) {
-                    std::string file_name_initial = "intersection_" + std::to_string(i) + "_initial.csv";
-                    std::string file_name_result = "intersection_" + std::to_string(i) + "_result.csv";
-
-                    auto path_initial = path;
-                    auto path_result = path;
-                    
-                    path_initial /= file_name_initial;
-                    path_result /= file_name_result;
-
-                    std::cout << "exporting to file: '" << path_initial.string() << "'" << std::endl;
-                    std::cout << "exporting to file: '" << path_result.string() << "'" << std::endl;
-                    
-                    std::ofstream outfile_initial;
-                    std::ofstream outfile_result;
-
-                    outfile_initial.open(path_initial, std::ios_base::app);
-                    outfile_result.open(path_result, std::ios_base::app);
-
-                    const auto& intersection = observation_picking.intersections[i];
-                    TaitBryanPose pose;
-                    pose.px = intersection.translation[0];
-                    pose.py = intersection.translation[1];
-                    pose.pz = intersection.translation[2];
-                    pose.om = intersection.rotation[0];
-                    pose.fi = intersection.rotation[1];
-                    pose.ka = intersection.rotation[2];
-                    Eigen::Affine3d m_pose_inv = affine_matrix_from_pose_tait_bryan(pose).inverse();
-                        
-                    double w = intersection.width_length_height[0] * 0.5;
-                    double l = intersection.width_length_height[1] * 0.5;
-                    double h = intersection.width_length_height[2] * 0.5;
-
-
-                    outfile_initial << "x;y;z;pc_index;is_initial;index_intersection;file" << std::endl;
-                    outfile_result << "x;y;z;pc_index;is_initial;index_intersection;file" << std::endl;
-                    
-                    for(int pc_index = 0; pc_index < point_clouds_container.point_clouds.size(); pc_index++){
-                        const auto& pc = point_clouds_container.point_clouds[pc_index];
-                        for (const auto& p : pc.points_local) {
-                            Eigen::Vector3d vpi = pc.m_initial_pose * p; 
-                            Eigen::Vector3d vpr = pc.m_pose * p;
-
-                            Eigen::Vector3d vpit = m_pose_inv * vpi;
-                            Eigen::Vector3d vprt = m_pose_inv * vpr;
-
-                            if (fabs(vpit.x()) < w) {
-                                if (fabs(vpit.y()) < l) {
-                                    if (fabs(vpit.z()) < h) {
-                                        outfile_initial << vpit.x() << ";" << vpit.y() << ";" << vpit.z() << ";" << pc_index << ";1;" << i << ";" << pc.file_name << std::endl;
-                                    }
-                                }
-                            }
-                            if (fabs(vprt.x()) < w) {
-                                if (fabs(vprt.y()) < l) {
-                                    if (fabs(vprt.z()) < h) {
-                                        outfile_result << vprt.x() << ";" << vprt.y() << ";" << vprt.z() << ";" << pc_index << ";0;" << i << ";" << pc.file_name << std::endl;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    outfile_initial.close();
-                    outfile_result.close();
-                   
-                    const auto& obs = observation_picking.observations[i];
-                    double rms_initial = 0.0;
-                    int sum = 0;
-                    double rms_result = 0.0;
-                
-                    for (const auto& [key1, value1] : obs) {
-                        for (const auto& [key2, value2] : obs) {
-                            if (key1 != key2) {
-                                Eigen::Vector3d p1, p2;
-                                p1 = point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-                                p2 = point_clouds_container.point_clouds[key2].m_initial_pose * value2;
-                                rms_initial += (p2.x() - p1.x()) * (p2.x() - p1.x());
-                                rms_initial += (p2.y() - p1.y()) * (p2.y() - p1.y());
-                              
-                                p1 = point_clouds_container.point_clouds[key1].m_pose * value1;
-                                p2 = point_clouds_container.point_clouds[key2].m_pose * value2;
-                                rms_result += (p2.x() - p1.x()) * (p2.x() - p1.x());
-                                rms_result += (p2.y() - p1.y()) * (p2.y() - p1.y());
-
-                                sum += 2;
-                            }
-                        }
-                    }
-                    if (sum > 0) {
-                        rms_initial = sqrt(rms_initial / sum);
-                        rms_result = sqrt(rms_result / sum);
-                        outfile_rms << i << ";" << rms_initial << ";" << rms_result << std::endl;
-                    }
-                }
-                outfile_rms.close();
+                export_result_to_folder(output_folder_name);
             }
         }
         ImGui::InputFloat("label_dist", &observation_picking.label_dist);
@@ -1746,6 +1779,7 @@ void perform_experiment_on_linux()
 	rms = compute_rms(false);
 	id_method = 94;
 	append_to_result_file(result_file, "pose_graph_slam (pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
 	point_clouds_container = temp_data;
 
 	//--95--
@@ -1762,6 +1796,7 @@ void perform_experiment_on_linux()
 	rms = compute_rms(false);
 	id_method = 95;
 	append_to_result_file(result_file, "pose_graph_slam (pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
 	point_clouds_container = temp_data;
 #endif
 
@@ -1781,15 +1816,16 @@ void perform_experiment_on_linux()
 		pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
         end = std::chrono::system_clock::now();
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
 		rms = compute_rms(false);
 		id_method = 96;
 		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
+        export_result_to_folder(path_result.string(), id_method);
 		point_clouds_container = temp_data;
 	}catch (std::exception& e) {
 		std::cout << e.what() << std::endl;
 		rms = compute_rms(false);
 		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
+        export_result_to_folder(path_result.string(), id_method);
 		point_clouds_container = temp_data;
     }
 	//--97--
@@ -1807,11 +1843,13 @@ void perform_experiment_on_linux()
 		rms = compute_rms(false);
 		id_method = 97;
 		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
+        export_result_to_folder(path_result.string(), id_method);
 		point_clouds_container = temp_data;
 	}catch (std::exception& e) {
 		std::cout << e.what() << std::endl;
 		rms = compute_rms(false);
 		append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
+        export_result_to_folder(path_result.string(), id_method);
 		point_clouds_container = temp_data;
 	}
 #endif
@@ -1830,6 +1868,7 @@ void perform_experiment_on_linux()
 	rms = compute_rms(false);
 	id_method = 98;
 	append_to_result_file(result_file, "pose_graph_slam (manif pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
 	point_clouds_container = temp_data;
 
 	//--99--
@@ -1846,6 +1885,7 @@ void perform_experiment_on_linux()
 	rms = compute_rms(false);
 	id_method = 99;
 	append_to_result_file(result_file, "pose_graph_slam (manif pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
 	point_clouds_container = temp_data;
 #endif
 }
@@ -1867,6 +1907,18 @@ void perform_experiment_on_windows()
     std::cout << "initial rms: " << initial_rms << std::endl;
     add_initial_rms_to_file(result_file, initial_rms);
     
+    //void export_result_to_folder(std::string output_folder_name, int method_id) {
+    //    fs::path path(output_folder_name);
+    //    path /= std::to_string(method_id);
+    //    create_directory(path);
+    //    export_result_to_folder(path.string());
+    //}
+
+    fs::path path_result(working_directory);
+    path_result /= "results";
+    create_directory(path_result);
+
+   
 
     //--0--
     icp.is_adaptive_robust_kernel = false;
@@ -1897,6 +1949,7 @@ void perform_experiment_on_windows()
     std::cout << "final rms: " << rms << std::endl;
     
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     id_method++;
 
@@ -1913,6 +1966,7 @@ void perform_experiment_on_windows()
     id_method = 1;
 
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     //id_method++;
     //--2--
@@ -1927,6 +1981,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 2;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--3--
@@ -1944,6 +1999,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 3;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--4--
@@ -1958,6 +2014,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 4;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--5--
@@ -1972,6 +2029,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 5;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--6--
@@ -1994,6 +2052,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 6;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--7--
@@ -2008,6 +2067,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 7;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--8--
@@ -2022,6 +2082,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 8;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--9--
@@ -2039,6 +2100,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 9;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--10--
@@ -2056,6 +2118,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 10;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--11--
@@ -2073,6 +2136,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 11;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--12--
@@ -2096,6 +2160,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 12;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--13--
@@ -2108,6 +2173,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 13;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //---NDT---
@@ -2141,6 +2207,7 @@ void perform_experiment_on_windows()
     
     id_method = 14;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--15--
@@ -2169,6 +2236,7 @@ void perform_experiment_on_windows()
     
     id_method = 16;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--17--
@@ -2185,6 +2253,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 17;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--18--
@@ -2199,6 +2268,7 @@ void perform_experiment_on_windows()
     
     id_method = 18;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--19--
@@ -2213,6 +2283,7 @@ void perform_experiment_on_windows()
     
     id_method = 19;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--20--
@@ -2233,6 +2304,7 @@ void perform_experiment_on_windows()
     
     id_method = 20;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--21--
@@ -2247,6 +2319,7 @@ void perform_experiment_on_windows()
     
     id_method = 21;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--22--
@@ -2261,6 +2334,7 @@ void perform_experiment_on_windows()
     
     id_method = 22;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--23--
@@ -2278,6 +2352,7 @@ void perform_experiment_on_windows()
     
     id_method = 23;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
    
     //--24--
@@ -2293,6 +2368,7 @@ void perform_experiment_on_windows()
     id_method = 24;
 
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--25--
@@ -2308,6 +2384,7 @@ void perform_experiment_on_windows()
     id_method = 25;
 
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--26--
@@ -2334,6 +2411,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = true;
 
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
    
     //--27--
@@ -2349,6 +2427,7 @@ void perform_experiment_on_windows()
     id_method = 27;
     ndt.is_rodrigues = true;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--28--
@@ -2367,6 +2446,7 @@ void perform_experiment_on_windows()
     id_method = 28;
     ndt.is_rodrigues = true;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--29--
@@ -2382,6 +2462,7 @@ void perform_experiment_on_windows()
     id_method = 29;
     ndt.is_rodrigues = true;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //----------------------------------------------------------------------------
@@ -2410,6 +2491,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 30;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
     
     //--31--
@@ -2424,6 +2506,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 31;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--32--
@@ -2438,6 +2521,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 32;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--33--
@@ -2455,6 +2539,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 33;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--34--
@@ -2469,6 +2554,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 34;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--35--
@@ -2483,6 +2569,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 35;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //------------------------------------------------------
@@ -2504,6 +2591,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 36;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--37--
@@ -2518,6 +2606,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 37;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--38--
@@ -2532,6 +2621,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 38;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--39--
@@ -2549,6 +2639,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 39;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--40--
@@ -2563,6 +2654,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 40;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--41--
@@ -2577,6 +2669,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 41;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--42-- Lie
@@ -2600,6 +2693,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 42;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--43--
@@ -2613,6 +2707,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 43;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--44--
@@ -2628,6 +2723,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 44;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--45--
@@ -2641,6 +2737,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 45;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--46--using dot product
@@ -2664,7 +2761,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 46;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
-
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--47
@@ -2679,6 +2776,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 47;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--48
@@ -2693,6 +2791,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 48;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--49
@@ -2710,6 +2809,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 49;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--50
@@ -2724,6 +2824,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 50;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--51
@@ -2738,6 +2839,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 51;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--52
@@ -2758,6 +2860,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 52;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--53
@@ -2772,6 +2875,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 53;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--54
@@ -2786,6 +2890,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 54;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--55
@@ -2803,6 +2908,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 55;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--56
@@ -2817,6 +2923,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 56;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--57
@@ -2831,6 +2938,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 57;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--58 optimize_distance_point_to_plane_source_to_target
@@ -2851,6 +2959,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 58;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--59
@@ -2865,6 +2974,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 59;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--60
@@ -2879,6 +2989,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 60;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--61
@@ -2896,6 +3007,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 61;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--62
@@ -2910,6 +3022,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 62;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--63
@@ -2924,6 +3037,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 63;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--64
@@ -2944,6 +3058,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 64;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--65
@@ -2958,6 +3073,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 65;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--66
@@ -2972,6 +3088,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 66;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--67
@@ -2989,6 +3106,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 67;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--68
@@ -3003,6 +3121,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 68;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--69
@@ -3017,6 +3136,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 69;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--70 optimize_plane_to_plane_source_to_target
@@ -3039,6 +3159,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 70;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--71
@@ -3053,6 +3174,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 71;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--72
@@ -3067,6 +3189,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 72;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--73
@@ -3084,6 +3207,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 73;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--74
@@ -3098,6 +3222,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 74;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--75
@@ -3112,6 +3237,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 75;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--76
@@ -3132,6 +3258,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 76;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--77
@@ -3146,6 +3273,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 77;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--78
@@ -3160,6 +3288,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 78;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--79
@@ -3177,6 +3306,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 79;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--80
@@ -3191,6 +3321,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 80;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--81
@@ -3205,7 +3336,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 81;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
-  
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //pose graph slam
@@ -3242,6 +3373,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 82;
     append_to_result_file(result_file, "pose_graph_slam (normal_distributions_transform)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
         
     //--83
     point_clouds_container = temp_data;
@@ -3255,6 +3387,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 83;
     append_to_result_file(result_file, "pose_graph_slam (point_to_point)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--84
@@ -3269,7 +3402,8 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 84;
     append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane)", pose_graph_slam, rms, id_method, elapsed);
-    
+    export_result_to_folder(path_result.string(), id_method);
+
     //--85
     point_clouds_container = temp_data;
     pose_graph_slam.set_all_to_false();
@@ -3282,6 +3416,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 85;
     append_to_result_file(result_file, "pose_graph_slam (point_to_plane_using_dot_product)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
 
     //--86
     point_clouds_container = temp_data;
@@ -3295,10 +3430,10 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 86;
     append_to_result_file(result_file, "pose_graph_slam (distance_point_to_plane)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
     point_clouds_container = temp_data;
 
     //--87
-    point_clouds_container = temp_data;
     pose_graph_slam.is_adaptive_robust_kernel = true;
 
     pose_graph_slam.set_all_to_false();
@@ -3311,7 +3446,8 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 87;
     append_to_result_file(result_file, "pose_graph_slam (plane_to_plane)", pose_graph_slam, rms, id_method, elapsed);
- 
+    export_result_to_folder(path_result.string(), id_method);
+
     //--88
     pose_graph_slam.set_all_to_false();
     point_clouds_container = temp_data;
@@ -3326,6 +3462,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 88;
     append_to_result_file(result_file, "pose_graph_slam (ndt_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
 
     //--89
     pose_graph_slam.set_all_to_false();
@@ -3340,6 +3477,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 89;
     append_to_result_file(result_file, "pose_graph_slam (ndt_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
 
     //--90
     pose_graph_slam.set_all_to_false();
@@ -3354,6 +3492,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 90;
     append_to_result_file(result_file, "pose_graph_slam (point_to_point_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
 
     //--91
     pose_graph_slam.set_all_to_false();
@@ -3368,6 +3507,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 91;
     append_to_result_file(result_file, "pose_graph_slam (point_to_point_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
 
     //--92
     pose_graph_slam.set_all_to_false();
@@ -3382,6 +3522,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 92;
     append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
 
     //--93
     pose_graph_slam.set_all_to_false();
@@ -3396,6 +3537,7 @@ void perform_experiment_on_windows()
     rms = compute_rms(false);
     id_method = 93;
     append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method, elapsed);
+    export_result_to_folder(path_result.string(), id_method);
 }
 
 bool exportLaz(const std::string& filename,

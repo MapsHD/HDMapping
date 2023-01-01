@@ -1718,6 +1718,10 @@ void add_initial_rms_to_file(std::string file_name, float rms)
 
 void perform_experiment_on_linux()
 {
+	fs::path path_result(working_directory);
+	path_result /= "results_linux";
+	create_directory(path_result);
+
 	point_clouds_container.show_with_initial_pose = false;
 	auto temp_data = point_clouds_container;
 	//reset_poses();
@@ -1915,7 +1919,7 @@ void perform_experiment_on_windows()
     //}
 
     fs::path path_result(working_directory);
-    path_result /= "results";
+    path_result /= "results_win";
     create_directory(path_result);
 
    

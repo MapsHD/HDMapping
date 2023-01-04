@@ -151,6 +151,87 @@ bool PointClouds::load(const std::string& folder_with_point_clouds, const std::s
 	return true;
 }
 
+bool PointClouds::update_poses_from_RESSO(const std::string& folder_with_point_clouds, const std::string& poses_file_name)
+{
+	std::ifstream infile(poses_file_name);
+	if (!infile.good()) {
+		std::cout << "problem with file: '" << poses_file_name << "'" << std::endl;
+		return false;
+	}
+	std::string line;
+	std::getline(infile, line);
+	std::istringstream iss(line);
+
+	int num_scans;
+	iss >> num_scans;
+
+	std::cout << "number of scans: " << num_scans << std::endl;
+
+	std::vector<PointCloud> pcs;
+
+	for (size_t i = 0; i < num_scans; i++) {
+		std::getline(infile, line);
+		std::istringstream iss(line);
+		std::string point_cloud_file_name;
+		iss >> point_cloud_file_name;
+
+		double r11, r12, r13, r21, r22, r23, r31, r32, r33;
+		double t14, t24, t34;
+
+		std::getline(infile, line);
+		std::istringstream iss1(line);
+		iss1 >> r11 >> r12 >> r13 >> t14;
+
+		std::getline(infile, line);
+		std::istringstream iss2(line);
+		iss2 >> r21 >> r22 >> r23 >> t24;
+
+		std::getline(infile, line);
+		std::istringstream iss3(line);
+		iss3 >> r31 >> r32 >> r33 >> t34;
+
+		std::getline(infile, line);
+
+		PointCloud pc;
+		pc.file_name = point_cloud_file_name;
+		pc.m_pose = Eigen::Affine3d::Identity();
+		pc.m_pose(0, 0) = r11;
+		pc.m_pose(0, 1) = r12;
+		pc.m_pose(0, 2) = r13;
+		pc.m_pose(1, 0) = r21;
+		pc.m_pose(1, 1) = r22;
+		pc.m_pose(1, 2) = r23;
+		pc.m_pose(2, 0) = r31;
+		pc.m_pose(2, 1) = r32;
+		pc.m_pose(2, 2) = r33;
+		pc.m_pose(0, 3) = t14;
+		pc.m_pose(1, 3) = t24;
+		pc.m_pose(2, 3) = t34;
+		pc.m_initial_pose = pc.m_pose;
+		pcs.push_back(pc);
+	}
+	infile.close();
+
+	if (point_clouds.size() == pcs.size()) {
+		for (int i = 0; i < point_clouds.size(); i++) {
+			std::cout << "-------------------------" << std::endl;
+			std::cout << "update pose: " << i << std::endl;
+			std::cout << "previous pose: " << std::endl << point_clouds[i].m_pose.matrix() << std::endl;
+			std::cout << "current pose: " << std::endl << pcs[i].m_pose.matrix() << std::endl;
+
+			point_clouds[i].m_pose = pcs[i].m_pose;
+			point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds[i].m_pose);
+			point_clouds[i].gui_translation[0] = point_clouds[i].pose.px;
+			point_clouds[i].gui_translation[1] = point_clouds[i].pose.py;
+			point_clouds[i].gui_translation[2] = point_clouds[i].pose.pz;
+			point_clouds[i].gui_rotation[0] = rad2deg(point_clouds[i].pose.om);
+			point_clouds[i].gui_rotation[1] = rad2deg(point_clouds[i].pose.fi);
+			point_clouds[i].gui_rotation[2] = rad2deg(point_clouds[i].pose.ka);
+		}
+	}
+	return true;
+}
+
 bool PointClouds::load_eth(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z)
 {
 	point_clouds.clear();

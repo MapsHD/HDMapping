@@ -284,6 +284,39 @@ void project_gui() {
     }
     ImGui::Text("WHU-TLS dataset: http://3s.whu.edu.cn/ybs/en/benchmark.htm");
 
+    if (ImGui::Button("update poses from RESSO file"))
+    {
+        static std::shared_ptr<pfd::open_file> open_file;
+        std::string input_file_name = "";
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+        const auto t = [&]() {
+            auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
+            for (int i = 0; i < sel.size(); i++)
+            {
+                input_file_name = sel[i];
+                std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
+            }
+        };
+        std::thread t1(t);
+        t1.join();
+
+        if (input_file_name.size() > 0) {
+
+            working_directory = fs::path(input_file_name).parent_path().string();
+
+            if (!point_clouds_container.update_poses_from_RESSO(working_directory.c_str(), input_file_name.c_str())) {
+                std::cout << "check input files" << std::endl;
+                return;
+            }
+            else {
+                std::cout << "updated: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+            }
+        }
+    }
+
+
+
+
     ImGui::Text("-----------------------------------------------------------------------------");
     ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
     ImGui::Checkbox("Iterative Closest Point", &is_icp_gui);
@@ -984,6 +1017,7 @@ void export_result_to_folder(std::string output_folder_name){
                 }
             }
         }
+        std::cout << "sum: " << sum << std::endl;
         if (sum > 0) {
             rms_initial = sqrt(rms_initial / sum);
             rms_result = sqrt(rms_result / sum);
@@ -1019,7 +1053,7 @@ void observation_picking_gui(){
         ImGui::Checkbox("grid 0.1 x 0.1 [m]", &observation_picking.grid01x01m);
         ImGui::Checkbox("grid 0.01 x 0.01 [m]", &observation_picking.grid001x001m);
         ImGui::SliderFloat("picking_plane_height", &observation_picking.picking_plane_height, -20.0f, 20.0f);
-        ImGui::SliderFloat("picking_plane_threshold", &observation_picking.picking_plane_threshold, 0.01f, 20.0f);
+        ImGui::SliderFloat("picking_plane_threshold", &observation_picking.picking_plane_threshold, 0.01f, 200.0f);
         ImGui::SliderFloat("picking_plane_max_xy", &observation_picking.max_xy, 10.0f, 1000.0f);
         ImGui::SliderInt("point_size", &observation_picking.point_size, 1, 10);
     
@@ -1152,7 +1186,7 @@ void observation_picking_gui(){
     }
     ImGui::Text("------------------------------------------------");
     if (observation_picking.intersections.size() > 0) {
-        if (ImGui::Button("export point clouds inside intersections to folder")) {
+        if (ImGui::Button("export point clouds inside intersections, rms and poses (RESSO format) to folder")) {
             static std::shared_ptr<pfd::select_folder> selected_folder;
             std::string output_folder_name = "";
             ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)selected_folder);

@@ -1220,6 +1220,8 @@ void PointCloud::compute_normal_vectors(double search_radious)
 
 void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
 {
+	std::cout << "single scan, num points before decimation: " << this->points_local.size() << std::endl;
+
 	auto params = rgd_params;
 
 	params.resolution_X = bucket_x;
@@ -1252,4 +1254,6 @@ void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
 	normal_vectors_local = n_normal_vectors_local;
 	points_type = n_points_type;
 	intensities = n_intensities;
+
+	std::cout << "single scan, num points after decimation: " << this->points_local.size() << std::endl;
 }

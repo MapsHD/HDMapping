@@ -32,6 +32,7 @@ public:
 	
 	bool load_pose_ETH(const std::string& fn, Eigen::Affine3d &m_increment);
 	bool load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z);
+	void print_point_cloud_dimention();
 };
 
 double get_mean_uncertainty_xyz_impact6x6(std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>& uncertainty_before, std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>& uncertainty_after);

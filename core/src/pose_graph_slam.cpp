@@ -114,11 +114,14 @@ bool PoseGraphSLAM::optimize(PointClouds& point_clouds_container)
     }
 
     //get edges based on overlap
+    auto min_overlap = std::numeric_limits<double>::max();
+    auto max_overlap = std::numeric_limits<double>::lowest();
+
     for (int i = 0; i < point_clouds_container.point_clouds.size(); i++) {
         for (int j = i + 1; j < point_clouds_container.point_clouds.size(); j++) {
             std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], 0.5);
 
-            float overlap = float(nns.size()) / float(point_clouds_container.point_clouds[i].points_local.size());
+            double overlap = double(nns.size()) / double(point_clouds_container.point_clouds[i].points_local.size());
             std::cout << "overlap: " << overlap << " between " << i << "," << j << std::endl;
             if (overlap > overlap_threshold) {
                 Edge edge;
@@ -126,8 +129,19 @@ bool PoseGraphSLAM::optimize(PointClouds& point_clouds_container)
                 edge.index_to = j;
                 edges.push_back(edge);
             }
+
+            if (overlap < min_overlap) {
+                min_overlap = overlap;
+            }
+            if (overlap > max_overlap) {
+                max_overlap = overlap;
+            }
         }
     }
+
+    std::cout << "min_overlap: " << min_overlap * 100 << "[%]" << std::endl;
+    std::cout << "max_overlap: " << max_overlap * 100 << "[%]" << std::endl;
+
 
     calculate_edges(point_clouds_container.point_clouds);
 

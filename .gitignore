@@ -52,3 +52,7 @@ build
 *.pyc
 
 data/
+
+#Clion
+.idea/
+cmake-*

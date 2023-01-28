@@ -36,6 +36,8 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 add_definitions("-DWITH_MANIF")
 endif()
 
+
+
 find_package(PCL)
 if(PCL_FOUND)
     message("PCL found")
@@ -62,11 +64,12 @@ include_directories(
 3rdparty/glm
 core/include
 3rdparty/observation_equations/codes
-3rdparty/observation_equations/codes/common/include
 3rdparty/portable-file-dialogs-master
 3rdparty/json/include/nlohmann
 3rdparty/json/include
 core/hd_mapping_include
+3rdparty/manif/include
+3rdparty/manif/external/tl
 )
 
 add_subdirectory(3rdparty/LASzip/)

@@ -89,6 +89,7 @@ public:
 	bool visible;
 	bool gizmo;
 	int num_threads = 16;
+	bool fixed = false;
 	//double search_radious = 2.0;
 
 	bool load(const std::string& file_name);

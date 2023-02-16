@@ -942,14 +942,15 @@ bool NDT::optimize(std::vector<PointCloud>& point_clouds)
 				else {
 					point_clouds[i].m_pose = m_pose.inverse();
 				}
-
-				point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds[i].m_pose);
-				point_clouds[i].gui_translation[0] = point_clouds[i].pose.px;
-				point_clouds[i].gui_translation[1] = point_clouds[i].pose.py;
-				point_clouds[i].gui_translation[2] = point_clouds[i].pose.pz;
-				point_clouds[i].gui_rotation[0] = rad2deg(point_clouds[i].pose.om);
-				point_clouds[i].gui_rotation[1] = rad2deg(point_clouds[i].pose.fi);
-				point_clouds[i].gui_rotation[2] = rad2deg(point_clouds[i].pose.ka);
+				if (!point_clouds[i].fixed) {
+					point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds[i].m_pose);
+					point_clouds[i].gui_translation[0] = point_clouds[i].pose.px;
+					point_clouds[i].gui_translation[1] = point_clouds[i].pose.py;
+					point_clouds[i].gui_translation[2] = point_clouds[i].pose.pz;
+					point_clouds[i].gui_rotation[0] = rad2deg(point_clouds[i].pose.om);
+					point_clouds[i].gui_rotation[1] = rad2deg(point_clouds[i].pose.fi);
+					point_clouds[i].gui_rotation[2] = rad2deg(point_clouds[i].pose.ka);
+				}
 			}
 			if (is_levenberg_marguardt) {
 				m_poses_tmp.clear();

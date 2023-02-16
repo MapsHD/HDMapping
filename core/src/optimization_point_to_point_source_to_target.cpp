@@ -204,15 +204,17 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds& point_clouds
 {
     if (is_rodrigues || is_quaternion) {
         for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
-            TaitBryanPose pose;
-            pose.px = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-            pose.py = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-            pose.pz = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-            pose.om = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-            pose.fi = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-            pose.ka = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-            Eigen::Affine3d m = affine_matrix_from_pose_tait_bryan(pose);
-            point_clouds_container.point_clouds[i].m_pose = point_clouds_container.point_clouds[i].m_pose * m;
+            if (!point_clouds_container.point_clouds[i].fixed) {
+                TaitBryanPose pose;
+                pose.px = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+                pose.py = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+                pose.pz = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+                pose.om = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+                pose.fi = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+                pose.ka = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+                Eigen::Affine3d m = affine_matrix_from_pose_tait_bryan(pose);
+                point_clouds_container.point_clouds[i].m_pose = point_clouds_container.point_clouds[i].m_pose * m;
+            }
         }
     }
 
@@ -748,6 +750,8 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds& point_clouds
             }
 
             for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
+                
+
                 if (rotation_matrix_parametrization == RotationMatrixParametrization::tait_bryan_xyz) {
                     TaitBryanPose pose;
                     if (pose_convention == PoseConvention::wc) {
@@ -764,7 +768,7 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds& point_clouds
                     pose.fi += h_x[counter++] * 0.5;
                     pose.ka += h_x[counter++] * 0.5;
 
-                    if (i == 0 && is_fix_first_node) {
+                    if (i == 0 && is_fix_first_node && point_clouds_container.point_clouds[i].fixed) {
                         continue;
                     }
 
@@ -792,6 +796,10 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds& point_clouds
                     pose.sz += h_x[counter++] * 0.5;
 
                     if (i == 0 && is_fix_first_node) {
+                        continue;
+                    }
+                    if (point_clouds_container.point_clouds[i].fixed) {
+                        std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed" << std::endl;
                         continue;
                     }
 
@@ -822,6 +830,10 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds& point_clouds
                     if (i == 0 && is_fix_first_node) {
                         continue;
                     }
+                    if (point_clouds_container.point_clouds[i].fixed) {
+                        std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed" << std::endl;
+                        continue;
+                    }
 
                     if (pose_convention == PoseConvention::wc) {
                         point_clouds_container.point_clouds[i].m_pose = affine_matrix_from_pose_quaternion(pose);
@@ -831,13 +843,18 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds& point_clouds
                     }
                 }
 
-                point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
-                point_clouds_container.point_clouds[i].gui_translation[0] = (float)point_clouds_container.point_clouds[i].pose.px;
-                point_clouds_container.point_clouds[i].gui_translation[1] = (float)point_clouds_container.point_clouds[i].pose.py;
-                point_clouds_container.point_clouds[i].gui_translation[2] = (float)point_clouds_container.point_clouds[i].pose.pz;
-                point_clouds_container.point_clouds[i].gui_rotation[0] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.om);
-                point_clouds_container.point_clouds[i].gui_rotation[1] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.fi);
-                point_clouds_container.point_clouds[i].gui_rotation[2] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.ka);
+                if (!point_clouds_container.point_clouds[i].fixed) {
+                    point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+                    point_clouds_container.point_clouds[i].gui_translation[0] = (float)point_clouds_container.point_clouds[i].pose.px;
+                    point_clouds_container.point_clouds[i].gui_translation[1] = (float)point_clouds_container.point_clouds[i].pose.py;
+                    point_clouds_container.point_clouds[i].gui_translation[2] = (float)point_clouds_container.point_clouds[i].pose.pz;
+                    point_clouds_container.point_clouds[i].gui_rotation[0] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.om);
+                    point_clouds_container.point_clouds[i].gui_rotation[1] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.fi);
+                    point_clouds_container.point_clouds[i].gui_rotation[2] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.ka);
+                }
+                else {
+                    std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed" << std::endl;
+                }
             }
 
             if (optimization_algorithm == OptimizationAlgorithm::levenberg_marguardt) {

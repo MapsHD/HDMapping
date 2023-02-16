@@ -356,6 +356,8 @@ void project_gui() {
         ImGui::SameLine();
         ImGui::Checkbox((std::string("gizmo_") + std::to_string(i)).c_str(), &point_clouds_container.point_clouds[i].gizmo);
         ImGui::SameLine();
+        ImGui::Checkbox((std::string("fixed_") + std::to_string(i)).c_str(), &point_clouds_container.point_clouds[i].fixed);
+        ImGui::SameLine();
         ImGui::PushButtonRepeat(true);
         float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
         if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##left").c_str(), ImGuiDir_Left)) { (point_clouds_container.point_clouds[i].point_size)--; }
@@ -446,7 +448,7 @@ void project_gui() {
                     for (int i = 0; i < p.points_local.size(); i++) {
                         const auto& pp = p.points_local[i];
                         Eigen::Vector3d vp;
-                        vp = p.m_pose * pp;
+                        vp = p.m_pose * pp + point_clouds_container.offset;
 
                         pointcloud.push_back(vp);
                         if (i < p.intensities.size()) {
@@ -1558,7 +1560,7 @@ bool initGL(int* argc, char** argv) {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration v0.3");
+    glutCreateWindow("multi_view_tls_registration v0.4");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

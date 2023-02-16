@@ -450,7 +450,7 @@ bool PointClouds::load_pose_ETH(const std::string& fn, Eigen::Affine3d &m_increm
 
 bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z)
 {
-	Eigen::Vector3d offset(0, 0, 0);
+	this->offset = Eigen::Vector3d(0, 0, 0);
 	size_t sum_points_before_decimation = 0;
 	size_t sum_points_after_decimation = 0;
 
@@ -518,15 +518,15 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 	int num = 0;
 	for (int i = 0; i < point_clouds.size(); i++) {
 		for (int j = 0; j < point_clouds[i].points_local.size(); j++) {
-			offset += point_clouds[i].points_local[j];
+			this->offset += point_clouds[i].points_local[j];
 			num++;
 		}
 	}
-	offset /= num;
+	this->offset /= num;
 	
 	for (int i = 0; i < point_clouds.size(); i++) {
 		for (int j = 0; j < point_clouds[i].points_local.size(); j++) {
-			point_clouds[i].points_local[j] -= offset;
+			point_clouds[i].points_local[j] -= this->offset;
 		}
 	}
 

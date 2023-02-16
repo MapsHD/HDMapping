@@ -15,6 +15,9 @@ public:
 	std::string folder_name;
 	std::string out_folder_name;
 	std::string out_poses_file_name;
+
+	Eigen::Vector3d offset;
+
 	bool load(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z);
 	bool update_poses_from_RESSO(const std::string& folder_with_point_clouds, const std::string& poses_file_name);
 

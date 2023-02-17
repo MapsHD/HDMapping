@@ -225,4 +225,14 @@ struct BetweenNode {
 	float color_z = 0;
 };
 
+struct GeoPoint {
+	std::string name;
+	Eigen::Vector3d coordinates;
+	bool choosen = false;
+	double w_x = 1000000.0;
+	double w_y = 1000000.0;
+	double w_z = 1000000.0;
+};
+
+
 #endif

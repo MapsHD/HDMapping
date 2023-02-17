@@ -35,11 +35,6 @@
 #include <fstream>
 namespace fs = std::filesystem;
 
-void reshape(int w, int h);
-void perform_experiment_on_windows();
-void perform_experiment_on_linux();
-Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observation_picking);
-
 static bool show_demo_window = true;
 static bool show_another_window = false;
 static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -72,13 +67,14 @@ double camera_ortho_xy_view_shift_y = 0.0;
 double camera_ortho_xy_view_rotation_angle_deg = 0;
 double camera_mode_ortho_z_center_h = 0.0;
 
+std::vector<GeoPoint> available_geo_points;
+
 PointClouds point_clouds_container;
 NDT ndt;
 ICP icp;
 PoseGraphSLAM pose_graph_slam;
 RegistrationPlaneFeature registration_plane_feature;
 ObservationPicking observation_picking;
-
 std::vector<Eigen::Vector3d> picked_points;
 std::string working_directory = "";
 int all_point_size = 1;
@@ -89,6 +85,10 @@ float m_gizmo[] = { 1,0,0,0,
           0,0,0,1 };
 bool manipulate_only_marked_gizmo = true;
 
+void reshape(int w, int h);
+void perform_experiment_on_windows();
+void perform_experiment_on_linux();
+Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observation_picking);
 bool exportLaz(const std::string& filename, const std::vector<Eigen::Vector3d>& pointcloud, const std::vector<float>& intensity);
 double compute_rms(bool initial);
 
@@ -314,9 +314,6 @@ void project_gui() {
         }
     }
 
-
-
-
     ImGui::Text("-----------------------------------------------------------------------------");
     ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
     ImGui::Checkbox("Iterative Closest Point", &is_icp_gui);
@@ -420,6 +417,15 @@ void project_gui() {
         if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str())) {
             std::cout << point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
         }
+        ImGui::SameLine();
+        ImGui::Checkbox(std::string("#" + std::to_string(i) + " choose_geo").c_str(), &point_clouds_container.point_clouds[i].choosing_geo);
+
+        if (point_clouds_container.point_clouds[i].choosing_geo) {
+            for (int gp = 0; gp < point_clouds_container.point_clouds[i].available_geo_points.size(); gp++) {
+                ImGui::Checkbox(std::string("#" + std::to_string(i) + " " + std::to_string(gp) + "[" + 
+                    point_clouds_container.point_clouds[i].available_geo_points[gp].name +  "]").c_str(), &point_clouds_container.point_clouds[i].available_geo_points[gp].choosen);
+            }
+        }
     }
 
     ImGui::Separator();
@@ -462,6 +468,91 @@ void project_gui() {
             }
             if (!exportLaz(output_file_name, pointcloud, intensity)) {
                 std::cout << "problem with saving file: " << output_file_name << std::endl;
+            }
+        }
+    }
+
+    ImGui::Separator();
+    ImGui::Separator();
+
+    if (point_clouds_container.point_clouds.size() > 0) {
+        if (ImGui::Button("load georefence points")) {
+            static std::shared_ptr<pfd::open_file> open_file;
+            std::string input_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+            const auto t = [&]() {
+                auto sel = pfd::open_file("Load geo-reference file", "C:\\").result();
+                for (int i = 0; i < sel.size(); i++)
+                {
+                    input_file_name = sel[i];
+                    std::cout << "geo-reference file: '" << input_file_name << "'" << std::endl;
+                }
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (input_file_name.size() > 0) {
+                std::ifstream f;
+                f.open(input_file_name.c_str());
+                if (f.good()) {
+                    std::cout << "parsing file: " << input_file_name << std::endl;
+
+                    std::string s;
+                    getline(f, s);
+                    while (!f.eof()) {
+                        getline(f, s);
+
+                        //underground_mining::Intersection intersection;
+                        std::string name;
+                        double x;
+                        double y;
+                        double z;
+
+                        stringstream ss(s);
+                        ss >> name;
+                        ss >> x;
+                        ss >> y;
+                        ss >> z;
+
+                        GeoPoint geopoint;
+                        geopoint.choosen = false;
+                        geopoint.coordinates.x() = x;
+                        geopoint.coordinates.y() = y;
+                        geopoint.coordinates.z() = z;
+                        geopoint.name = name;
+
+                        std::cout << "adding geo point: " << geopoint.name << " " << geopoint.coordinates.x() << " " << geopoint.coordinates.y() << " " << geopoint.coordinates.z() << std::endl;
+
+                        available_geo_points.push_back(geopoint);
+                        //int len = sscanf(s.c_str(), "%lf;%lf;%lf", &index, &h, &w);
+
+                        //if (len == 3) {
+                        //    intersection.center_pose.z() = h;
+                        //    intersection.height = w;
+                        //   common_data.intersections.push_back(intersection);
+                        //}
+                    }
+                    f.close();
+
+                    auto geo = available_geo_points;
+                    for (auto& g : geo) {
+                        g.coordinates -= point_clouds_container.offset;
+                    }
+                    for (auto& p : point_clouds_container.point_clouds) {
+                        p.available_geo_points = geo;
+                    }
+                }
+
+
+                //working_directory = fs::path(input_file_name).parent_path().string();
+
+                //if (!point_clouds_container.load(working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z)) {
+                //    std::cout << "check input files" << std::endl;
+                //    return;
+                //}
+                //else {
+                //    std::cout << "loaded: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                //}
             }
         }
     }
@@ -629,7 +720,6 @@ void icp_gui() {
         if (ImGui::Button("icp_optimization_source_to_target(Lie-algebra right Jacobian)")) {
             icp.optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
         }
-
     ImGui::End();
 }
 
@@ -1274,6 +1364,57 @@ void display() {
         glVertex3f(0.0f, 0.0f, 100);
         glEnd();
     }
+
+    for (const auto& g:available_geo_points) {
+        glBegin(GL_LINES);
+        glColor3f(1.0f, 0.0f, 0.0f);
+            auto c = g.coordinates - point_clouds_container.offset;
+            glVertex3f(c.x() - 0.5, c.y(), c.z());
+            glVertex3f(c.x() + 0.5, c.y(), c.z());
+
+            glVertex3f(c.x(), c.y() - 0.5, c.z());
+            glVertex3f(c.x(), c.y() + 0.5, c.z());
+
+            glVertex3f(c.x(), c.y(), c.z() - 0.5);
+            glVertex3f(c.x(), c.y(), c.z() + 0.5);
+        glEnd();
+    }
+
+    //
+    for (const auto& pc : point_clouds_container.point_clouds) {
+        for (const auto& gp : pc.available_geo_points) {
+            if (gp.choosen) {
+                auto c = pc.m_pose * gp.coordinates;
+                glBegin(GL_LINES);
+                glColor3f(1.0f, 0.0f, 0.0f);
+                    glVertex3f(c.x() - 0.5, c.y(), c.z());
+                    glVertex3f(c.x() + 0.5, c.y(), c.z());
+
+                    glVertex3f(c.x(), c.y() - 0.5, c.z());
+                    glVertex3f(c.x(), c.y() + 0.5, c.z());
+
+                    glVertex3f(c.x(), c.y(), c.z() - 0.5);
+                    glVertex3f(c.x(), c.y(), c.z() + 0.5);
+                glEnd();
+
+                glBegin(GL_LINES);
+                glColor3f(0.0f, 1.0f, 0.0f);
+                    glVertex3f(c.x(), c.y(), c.z());
+                    glVertex3f(gp.coordinates.x(), gp.coordinates.y(), gp.coordinates.z());
+                glEnd();
+
+                glColor3f(0.0f, 0.0f, 0.0f);
+                glBegin(GL_LINES);
+                    glVertex3f(c.x(), c.y(), c.z());
+                    glVertex3f(c.x() + 10, c.y(), c.z());
+                glEnd();
+
+                glRasterPos3f(c.x() + 10, c.y(), c.z());
+                glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char*)gp.name.c_str());
+            }
+        }
+    }
+
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();

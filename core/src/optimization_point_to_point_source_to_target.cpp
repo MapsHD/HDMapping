@@ -413,6 +413,9 @@ void alpha_point_to_point_job(ICP::Job* job, std::vector<double>* alphas, float 
 bool ICP::optimization_point_to_point_source_to_target(PointClouds& point_clouds_container,
     PoseConvention pose_convention, OptimizationAlgorithm optimization_algorithm, RotationMatrixParametrization rotation_matrix_parametrization)
 {
+    //for (const auto& pc : point_clouds_container.point_clouds) {
+    //    for (const auto& gp : pc.available_geo_points) {
+
     int number_of_unknowns_per_pose;
     if (rotation_matrix_parametrization == RotationMatrixParametrization::tait_bryan_xyz || rotation_matrix_parametrization == RotationMatrixParametrization::rodrigues) {
         number_of_unknowns_per_pose = 6;
@@ -439,6 +442,8 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds& point_clouds
         }
     }
 
+    
+
     for (int iter = 0; iter < number_of_iterations; iter++) {
         std::cout << "Iteration: " << iter + 1 << " of " << number_of_iterations << std::endl;
 
@@ -447,6 +452,8 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds& point_clouds
         std::vector<Eigen::Triplet<double>> tripletListB;
 
         double rms = 0.0;
+        double rms_geo = 0.0;
+        double rms_geo_sum = 0.0;
 
         for (int i = 0; i < point_clouds_container.point_clouds.size(); i++) {
             //barron
@@ -602,6 +609,95 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds& point_clouds
             }
         }
         rms /= tripletListB.size();
+                
+        for (int i = 0; i < point_clouds_container.point_clouds.size(); i++) {
+            for (int gp = 0; gp < point_clouds_container.point_clouds[i].available_geo_points.size(); gp++) {
+                if (point_clouds_container.point_clouds[i].available_geo_points[gp].choosen) {
+                    std::cout << "X adding geo point " << point_clouds_container.point_clouds[i].available_geo_points[gp].name << std::endl;
+
+                    Eigen::Vector3d p_s = point_clouds_container.point_clouds[i].available_geo_points[gp].coordinates;
+                    Eigen::Vector3d p_t = point_clouds_container.point_clouds[i].available_geo_points[gp].coordinates;
+
+                    Eigen::Matrix<double, 3, 1> delta;
+                    if (rotation_matrix_parametrization == RotationMatrixParametrization::tait_bryan_xyz) {
+                        delta = get_delta_point_to_point_tait_bryan(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
+                    }
+                    if (rotation_matrix_parametrization == RotationMatrixParametrization::rodrigues) {
+                        delta = get_delta_point_to_point_rodrigues(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
+                    }
+                    if (rotation_matrix_parametrization == RotationMatrixParametrization::quaternion) {
+                        delta = get_delta_point_to_point_quaternion(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
+                    }
+
+
+                    if (!(delta(0, 0) == delta(0, 0))) {
+                        continue;
+                    }
+                    if (!(delta(1, 0) == delta(1, 0))) {
+                        continue;
+                    }
+                    if (!(delta(2, 0) == delta(2, 0))) {
+                        continue;
+                    }
+
+                    Eigen::Matrix<double, 3, 6> jacobian3x6;
+                    Eigen::Matrix<double, 3, 7> jacobian3x7;
+                    if (rotation_matrix_parametrization == RotationMatrixParametrization::tait_bryan_xyz) {
+                        jacobian3x6 = get_point_to_point_jacobian_tait_bryan(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
+                    }
+                    if (rotation_matrix_parametrization == RotationMatrixParametrization::rodrigues) {
+                        jacobian3x6 = get_point_to_point_jacobian_rodrigues(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
+                    }
+                    if (rotation_matrix_parametrization == RotationMatrixParametrization::quaternion) {
+                        jacobian3x7 = get_point_to_point_jacobian_quaternion(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
+                    }
+
+                    int ir = tripletListB.size();
+
+                    if (rotation_matrix_parametrization == RotationMatrixParametrization::tait_bryan_xyz || rotation_matrix_parametrization == RotationMatrixParametrization::rodrigues) {
+                        int ic = i * number_of_unknowns_per_pose;
+                        for (int row = 0; row < 3; row++) {
+                            for (int col = 0; col < number_of_unknowns_per_pose; col++) {
+                                if (jacobian3x6(row, col) != 0.0) {
+                                    tripletListA.emplace_back(ir + row, ic + col, -jacobian3x6(row, col));
+                                }
+                            }
+                        }
+                    }
+                    if (rotation_matrix_parametrization == RotationMatrixParametrization::quaternion) {
+                        int ic = i * number_of_unknowns_per_pose;
+                        for (int row = 0; row < 3; row++) {
+                            for (int col = 0; col < number_of_unknowns_per_pose; col++) {
+                                if (jacobian3x7(row, col) != 0.0) {
+                                    tripletListA.emplace_back(ir + row, ic + col, -jacobian3x7(row, col));
+                                }
+                            }
+                        }
+                    }
+
+                    tripletListP.emplace_back(ir    , ir    , point_clouds_container.point_clouds[i].available_geo_points[gp].w_x * get_cauchy_w(delta(0, 0), 1));
+                    tripletListP.emplace_back(ir + 1, ir + 1, point_clouds_container.point_clouds[i].available_geo_points[gp].w_y * get_cauchy_w(delta(1, 0), 1));
+                    tripletListP.emplace_back(ir + 2, ir + 2, point_clouds_container.point_clouds[i].available_geo_points[gp].w_z * get_cauchy_w(delta(2, 0), 1));
+                
+                    std::cout << "delta(0, 0) " << delta(0, 0) << " get_cauchy_w(delta(0, 0), 1): " << get_cauchy_w(delta(0, 0), 1) << std::endl;
+                    std::cout << "delta(1, 0) " << delta(1, 0) << " get_cauchy_w(delta(1, 0), 1): " << get_cauchy_w(delta(1, 0), 1) << std::endl;
+                    std::cout << "delta(2, 0) " << delta(2, 0) << " get_cauchy_w(delta(2, 0), 1): " << get_cauchy_w(delta(2, 0), 1) << std::endl;
+
+                    tripletListB.emplace_back(ir, 0, delta(0, 0));
+                    tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+                    tripletListB.emplace_back(ir + 2, 0, delta(2, 0));
+
+                    rms_geo += delta(0, 0) * delta(0, 0);
+                    rms_geo += delta(1, 0) * delta(1, 0);
+                    rms_geo += delta(2, 0) * delta(2, 0);
+                    rms_geo_sum += 3.0;
+                }
+            }
+        }
+
+        if (rms_geo_sum > 0) {
+            std::cout << "rms geo: " << sqrt(rms_geo / rms_geo_sum) << std::endl;
+        }
 
         std::cout << "previous_rms: " << previous_rms << " rms: " << rms << std::endl;
         if (optimization_algorithm == OptimizationAlgorithm::levenberg_marguardt) {

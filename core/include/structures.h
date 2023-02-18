@@ -186,6 +186,7 @@ struct LAZPoint
 	float g;
 	float b;
 	uint8_t  classsification;
+	//unsigned short RGB[4];
 };
 
 struct LAZSector {

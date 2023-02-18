@@ -409,7 +409,6 @@ bool PointClouds::load_pose_ETH(const std::string& fn, Eigen::Affine3d &m_increm
 {
 	m_increment = Eigen::Affine3d::Identity();
 
-
 	std::ifstream infile(fn);
 	if (!infile.good()) {
 		std::cout << "problem with file: '" << fn << "'" << std::endl;
@@ -581,8 +580,6 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 				std::abort();
 			}
 			
-
-
 			LAZPoint p;
 			p.x = header->x_offset + header->x_scale_factor * static_cast<double>(point->X);
 			p.y = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y);
@@ -591,15 +588,25 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 			Eigen::Vector3d pp(p.x, p.y, p.z);
 			pc.points_local.push_back(pp);
 			
-			//if (point->intensity != 0) {
-			//	std::cout << "jojo";
-			//}
-
-			laszip_U16 intensity = static_cast<laszip_U16>(point->intensity);
-
-			//std::cout << ":" << (int)intensity << " ";
-			//pc.intensities.push_back(point->intensity);
-			pc.intensities.push_back(rand()%256);
+			//std::cout << (int)point->rgb[0] << " " << (int)point->rgb[1] << " " << (int)point->rgb[2] << " " << (int)point->rgb[3] << std::endl;
+			//std::cout << (int)point->user_data << std::endl;
+			//int->
+			/*std::cout << (int)point->extra_bytes[0] << " " <<
+				(int)point->extra_bytes[1] << " " <<
+				(int)point->extra_bytes[2] << " " <<
+				(int)point->extra_bytes[3] << " " <<
+				(int)point->extra_bytes[4] << " " <<
+				(int)point->extra_bytes[5] << " " <<
+				(int)point->extra_bytes[6] << " " <<
+				(int)point->extra_bytes[7] << std::endl;*/
+				
+			if (point->num_extra_bytes > 6) {
+				laszip_U16 intensity = point->extra_bytes[6];
+				pc.intensities.push_back(intensity);
+			}
+			else {
+				pc.intensities.push_back(0);
+			}
 		}
 
 		pc.file_name = input_file_names[i];

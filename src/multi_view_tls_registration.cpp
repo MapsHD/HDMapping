@@ -103,13 +103,9 @@ void adjustHeader(laszip_header* output_header, laszip_header* input_header, con
     min -= offset_in;
     offset -= offset_in;
 
-    Eigen::Vector3d adj_max = m_pose * max;
-    Eigen::Vector3d adj_min = m_pose * min;
-    Eigen::Vector3d adj_off = m_pose * offset;
-
-    max += offset_in;
-    min += offset_in;
-    offset += offset_in;
+    Eigen::Vector3d adj_max = m_pose * max + offset_in;
+    Eigen::Vector3d adj_min = m_pose * min + offset_in;
+    Eigen::Vector3d adj_off = m_pose * offset + offset_in;
 
     output_header->max_x = adj_max.x();
     output_header->max_y = adj_max.y();
@@ -270,11 +266,11 @@ void save_processed_pc(const fs::path& file_path_in, const fs::path& file_path_p
     // destroy the writer
 
     //ToDo --> solve it
-    //if (laszip_destroy(laszip_writer))
-    //{
-    //    fprintf(stderr, "DLL ERROR: destroying laszip writer\n");
-    //    return;
-    //}
+    if (laszip_destroy(laszip_writer))
+    {
+        fprintf(stderr, "DLL ERROR: destroying laszip writer\n");
+        return;
+    }
 
     std::cout << "saving to " << file_path_put << std::endl;
 }

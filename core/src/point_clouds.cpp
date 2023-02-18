@@ -11,7 +11,7 @@
 #include <set>
 
 #include <laszip/laszip_api.h>
-#include <liblas/liblas.hpp>
+//#include <liblas/liblas.hpp>
 //#include <laszip/laszip_api.h>
 
 bool PointClouds::load(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z)

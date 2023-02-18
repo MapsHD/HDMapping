@@ -323,7 +323,7 @@ void project_gui() {
     ImGui::Begin("Project");
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-    ImGui::Text("Offset x: %.10f y: %.10f z: %.10", point_clouds_container.offset.x(), point_clouds_container.offset.y(), point_clouds_container.offset.z());
+    ImGui::Text("Offset x: %.10f y: %.10f z: %.10f", point_clouds_container.offset.x(), point_clouds_container.offset.y(), point_clouds_container.offset.z());
     ImGui::SameLine();
     if (ImGui::Button("print offset to console"))
     {   

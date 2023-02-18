@@ -198,7 +198,6 @@ void save_processed_pc(const fs::path& file_path_in, const fs::path& file_path_p
         std::abort();
     }
 
-
     for (int i = 0; i < header->number_of_point_records; i++)
     {
         if (laszip_read_point(laszip_reader))

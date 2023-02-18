@@ -7,6 +7,7 @@
 
 #include <structures.h>
 #include <observation_picking.h>
+//#include <laszip/laszip_api.h>
 
 class PointCloud {
 public:
@@ -72,7 +73,7 @@ public:
 	std::vector<Eigen::Vector3d> points_local;
 	std::vector<Eigen::Vector3d> normal_vectors_local;
 	std::vector <int> points_type;
-	std::vector <float> intensities;
+	std::vector <unsigned short> intensities;
 	Eigen::Affine3d m_pose;
 	Eigen::Affine3d m_initial_pose;
 	Eigen::Matrix<double, 6, 6, Eigen::RowMajor> covariance_matrix_tait_bryan;

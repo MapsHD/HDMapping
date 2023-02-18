@@ -1238,15 +1238,17 @@ void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
 	std::vector<Eigen::Vector3d> n_points_local;
 	std::vector<Eigen::Vector3d> n_normal_vectors_local;
 	std::vector <int> n_points_type;
-	std::vector <float> n_intensities;
+	std::vector <unsigned short> n_intensities;
+
+	//std::cout << points_local.size() << " " << intensities.size() << std::endl;
 
 	for (int i = 1; i < ip.size(); i++) {
 		if (ip[i - 1].index_of_bucket != ip[i].index_of_bucket) {
 			//std::cout << index_pairs[i].index_of_bucket << std::endl;
 			n_points_local.emplace_back(points_local[ip[i].index_of_point]);
 			if (normal_vectors_local.size() == points_local.size())n_normal_vectors_local.emplace_back(normal_vectors_local[ip[i].index_of_point]);
-			if (points_type.size() == points_local.size())n_points_type.emplace_back(n_points_type[ip[i].index_of_point]);
-			if (intensities.size() == points_local.size())n_intensities.emplace_back(n_intensities[ip[i].index_of_point]);
+			if (points_type.size() == points_local.size())n_points_type.emplace_back(points_type[ip[i].index_of_point]);
+			if (intensities.size() == points_local.size())n_intensities.emplace_back(intensities[ip[i].index_of_point]);
 		}
 	}
 

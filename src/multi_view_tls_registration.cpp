@@ -89,7 +89,7 @@ void reshape(int w, int h);
 void perform_experiment_on_windows();
 void perform_experiment_on_linux();
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observation_picking);
-bool exportLaz(const std::string& filename, const std::vector<Eigen::Vector3d>& pointcloud, const std::vector<float>& intensity);
+bool exportLaz(const std::string& filename, const std::vector<Eigen::Vector3d>& pointcloud, const std::vector<unsigned short>& intensity);
 double compute_rms(bool initial);
 
 void my_display_code()
@@ -135,6 +135,15 @@ void my_display_code()
 void project_gui() {
     ImGui::Begin("Project");
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+    ImGui::Text("Offset x: %.10f y: %.10f z: %.10", point_clouds_container.offset.x(), point_clouds_container.offset.y(), point_clouds_container.offset.z());
+    ImGui::SameLine();
+    if (ImGui::Button("print offset to console"))
+    {   
+        std::cout << "offset:" << std::endl;
+        std::cout << std::setprecision(10) << std::endl;
+        std::cout << point_clouds_container.offset << std::endl;
+    }
 
     ImGui::InputInt("viewer_decmiate_point_cloud", &viewer_decmiate_point_cloud);
     if (viewer_decmiate_point_cloud < 1) {
@@ -445,9 +454,9 @@ void project_gui() {
 
         if (output_file_name.size() > 0) {
             std::vector<Eigen::Vector3d> pointcloud;
-            std::vector<float> intensity;
+            std::vector<unsigned short> intensity;
 
-            point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
+            //point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
 
             for (auto& p : point_clouds_container.point_clouds) {
                 if (p.visible) {
@@ -458,6 +467,8 @@ void project_gui() {
 
                         pointcloud.push_back(vp);
                         if (i < p.intensities.size()) {
+
+                            //std::cout << (int)p.intensities[i] << " ";
                             intensity.push_back(p.intensities[i]);
                         }
                         else {
@@ -1628,17 +1639,19 @@ void mouse(int glut_button, int state, int x, int y) {
             mouse_buttons |= 1 << glut_button;
 
             //-
-            Eigen::Vector3d p = GLWidgetGetOGLPos(x, y, observation_picking);
-            int number_active_pcs = 0;
-            int index_picked = -1;
-            for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
-                if (point_clouds_container.point_clouds[i].visible) {
-                    number_active_pcs++;
-                    index_picked = i;
+            if (observation_picking.is_observation_picking_mode) {
+                Eigen::Vector3d p = GLWidgetGetOGLPos(x, y, observation_picking);
+                int number_active_pcs = 0;
+                int index_picked = -1;
+                for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
+                    if (point_clouds_container.point_clouds[i].visible) {
+                        number_active_pcs++;
+                        index_picked = i;
+                    }
                 }
-            }
-            if (number_active_pcs == 1) {
-                observation_picking.add_picked_to_current_observation(index_picked, p);
+                if (number_active_pcs == 1) {
+                    observation_picking.add_picked_to_current_observation(index_picked, p);
+                }
             }
         }
         else if (state == GLUT_UP) {
@@ -3723,7 +3736,7 @@ void perform_experiment_on_windows()
 
 bool exportLaz(const std::string& filename,
     const std::vector<Eigen::Vector3d>& pointcloud,
-    const std::vector<float>& intensity)
+    const std::vector<unsigned short>& intensity)
 {
 
     constexpr float scale = 0.0001f; // one tenth of milimeter
@@ -3804,11 +3817,15 @@ bool exportLaz(const std::string& filename,
         return false;
     }
 
+    
+
     laszip_I64 p_count = 0;
     laszip_F64 coordinates[3];
 
     for (int i = 0; i < pointcloud.size(); i++)
     {
+        point->intensity = intensity[i];
+
         const auto& p = pointcloud[i];
         p_count++;
         coordinates[0] = p.x();
@@ -3819,9 +3836,14 @@ bool exportLaz(const std::string& filename,
             fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);
             return false;
         }
-        if (i < intensity.size()) {
-            point->intensity = intensity[i];
-        }
+ 
+        //p.SetIntensity(pp.intensity);
+        
+        //if (i < intensity.size()) {
+        //    point->intensity = intensity[i];
+        //}
+        //laszip_set_point
+
 
         if (laszip_write_point(laszip_writer)) {
             fprintf(stderr, "DLL ERROR: writing point %I64d\n", p_count);

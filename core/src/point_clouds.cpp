@@ -11,6 +11,8 @@
 #include <set>
 
 #include <laszip/laszip_api.h>
+#include <liblas/liblas.hpp>
+//#include <laszip/laszip_api.h>
 
 bool PointClouds::load(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z)
 {
@@ -455,6 +457,82 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 	size_t sum_points_after_decimation = 0;
 
 	for (size_t i = 0; i < input_file_names.size(); i++) {
+#if 0
+		std::cout << "parsing file: " << input_file_names[i] << std::endl;
+		//printf("===================\n"); fflush(stdout);
+		std::ifstream ifs;
+
+		std::cout << "1" << std::endl;
+		ifs.open(input_file_names[i].c_str(), std::ios::in | std::ios::binary);
+
+		if (!ifs.good()) {
+			return false;
+		}
+		std::cout << "2" << std::endl;
+		liblas::ReaderFactory f;
+		
+		liblas::Reader reader = f.CreateWithStream(ifs);
+		std::cout << "3" << std::endl;
+		liblas::Header const& header = reader.GetHeader();
+		
+		std::cout << "Compressed: " << ((header.Compressed() == true) ? "true" : "false") << std::endl;
+		std::cout << "Signature: " << header.GetFileSignature() << '\n';
+		std::cout << "LAS Points count: " << header.GetPointRecordsCount() << ". loading...\n";
+
+		PointCloud pc;
+		pc.m_pose = Eigen::Affine3d::Identity();
+		pc.m_initial_pose = pc.m_pose;
+		pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+		pc.gui_translation[0] = pc.pose.px;
+		pc.gui_translation[1] = pc.pose.py;
+		pc.gui_translation[2] = pc.pose.pz;
+		pc.gui_rotation[0] = rad2deg(pc.pose.om);
+		pc.gui_rotation[1] = rad2deg(pc.pose.fi);
+		pc.gui_rotation[2] = rad2deg(pc.pose.ka);
+
+		while (reader.ReadNextPoint())
+		{
+			liblas::Point const& p = reader.GetPoint();
+			pc.points_local.push_back({ p.GetX(), p.GetY(), p.GetZ() });
+			pc.intensities.push_back(p.GetIntensity());
+
+
+			//pc.gui_rotation[2] = rad2deg(pc.pose.ka);
+			//Point pp;
+			// printf("---\n"); fflush(stdout);
+			//pp.coordinates = Eigen::Vector3d(p.GetX(), p.GetY(), p.GetZ());
+			// printf("coordinates\n"); fflush(stdout);
+			//pp.type_ground_truth = las_type(p.GetClassification().GetClass());
+			// printf("type_ground_truth\n"); fflush(stdout);
+			//pp.type = las_type::NeverClassified;
+			// printf("type\n"); fflush(stdout);
+			//pp.timestamp = p.GetTime();
+			// printf("timestamp\n"); fflush(stdout);
+			//pp.intensity = p.GetIntensity();
+			//pp.return_id = p.GetReturnNumber();
+			//pp.returns_count = p.GetNumberOfReturns();
+			//pp.source_id = p.GetPointSourceID();
+			//pp.scan_angle_rank = p.GetScanAngleRank();
+			//pp.flight_line_edge = p.GetFlightLineEdge();
+			//pp.scan_direction = p.GetScanDirection();
+			//pp.user_data = p.GetUserData();
+			//pp.type = las_type::Unassigned;
+			//pp.index = points.size();
+			//points.push_back(pp);
+		}
+		pc.file_name = input_file_names[i];
+		point_clouds.push_back(pc);
+
+		std::cout << "LAS Points count - loaded: " << pc.points_local.size() << "\n";
+		//Points points_dec;
+		//for(size_t i = 0; i < points.size(); i+= dec){
+		//	points_dec.push_back(points[i]);
+		//}
+		//points = points_dec;
+
+		//return true;
+#endif
+#if 1
 		laszip_POINTER laszip_reader;
 		if (laszip_create(&laszip_reader))
 		{
@@ -502,6 +580,9 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 				fprintf(stderr, "DLL ERROR: reading point %u\n", j);
 				std::abort();
 			}
+			
+
+
 			LAZPoint p;
 			p.x = header->x_offset + header->x_scale_factor * static_cast<double>(point->X);
 			p.y = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y);
@@ -509,10 +590,21 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 
 			Eigen::Vector3d pp(p.x, p.y, p.z);
 			pc.points_local.push_back(pp);
+			
+			//if (point->intensity != 0) {
+			//	std::cout << "jojo";
+			//}
+
+			laszip_U16 intensity = static_cast<laszip_U16>(point->intensity);
+
+			//std::cout << ":" << (int)intensity << " ";
+			//pc.intensities.push_back(point->intensity);
+			pc.intensities.push_back(rand()%256);
 		}
 
 		pc.file_name = input_file_names[i];
 		point_clouds.push_back(pc);
+#endif
 	}
 	
 	int num = 0;
@@ -530,6 +622,7 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		}
 	}
 
+	std::cout << "start downsampling" << std::endl;
 	if (is_decimate) {
 		for (int i = 0; i < point_clouds.size(); i++) {
 			sum_points_before_decimation += point_clouds[i].points_local.size();
@@ -537,6 +630,7 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 			sum_points_after_decimation += point_clouds[i].points_local.size();
 		}
 	}
+	std::cout << "downsampling finished" << std::endl;
 	std::cout << "all scans, sum_points_before_decimation: " << sum_points_before_decimation << std::endl;
 	std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
 	print_point_cloud_dimention();

@@ -92,32 +92,31 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observ
 bool exportLaz(const std::string& filename, const std::vector<Eigen::Vector3d>& pointcloud, const std::vector<unsigned short>& intensity);
 double compute_rms(bool initial);
 
-void adjustHeader(laszip_header* output_header, laszip_header* input_header, const Eigen::Affine3d& m_pose, const Eigen::Vector3d& offset_in)
+void adjustHeader(laszip_header* header, const Eigen::Affine3d& m_pose, const Eigen::Vector3d& offset_in)
 {
-    *output_header = *input_header;
-    Eigen::Vector3d max{ output_header->max_x, output_header->max_y, output_header->max_z };
-    Eigen::Vector3d min{ output_header->min_x, output_header->min_y, output_header->min_z };
-    Eigen::Vector3d offset{ output_header->x_offset, output_header->y_offset, output_header->z_offset };
+    Eigen::Vector3d max{ header->max_x, header->max_y, header->max_z };
+    Eigen::Vector3d min{ header->min_x, header->min_y, header->min_z };
+    //Eigen::Vector3d offset{ header->x_offset, header->y_offset, header->z_offset };
 
     max -= offset_in;
     min -= offset_in;
-    offset -= offset_in;
+    //offset -= offset_in;
 
     Eigen::Vector3d adj_max = m_pose * max + offset_in;
     Eigen::Vector3d adj_min = m_pose * min + offset_in;
-    Eigen::Vector3d adj_off = m_pose * offset + offset_in;
+    //Eigen::Vector3d adj_off = m_pose * offset + offset_in;
 
-    output_header->max_x = adj_max.x();
-    output_header->max_y = adj_max.y();
-    output_header->max_z = adj_max.z();
+    header->max_x = adj_max.x();
+    header->max_y = adj_max.y();
+    header->max_z = adj_max.z();
 
-    output_header->min_x = adj_min.x();
-    output_header->min_y = adj_min.y();
-    output_header->min_z = adj_min.z();
+    header->min_x = adj_min.x();
+    header->min_y = adj_min.y();
+    header->min_z = adj_min.z();
 
-    output_header->x_offset = adj_off.x();
-    output_header->y_offset = adj_off.y();
-    output_header->z_offset = adj_off.z();
+    //header->x_offset = adj_off.x();
+    //header->y_offset = adj_off.y();
+    //header->z_offset = adj_off.z();
 }
 
 void adjustPoint(laszip_F64 output_coordinates[3], laszip_F64 input_coordinates[3], const Eigen::Affine3d& m_pose, const Eigen::Vector3d& offset)
@@ -168,7 +167,7 @@ void save_processed_pc(const fs::path& file_path_in, const fs::path& file_path_p
         std::abort();
     }
 
-    adjustHeader(header, header, m_pose, offset);
+    adjustHeader(header, m_pose, offset);
 
     if (laszip_set_header(laszip_writer, header))
     {
@@ -197,7 +196,7 @@ void save_processed_pc(const fs::path& file_path_in, const fs::path& file_path_p
         fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
         std::abort();
     }
-
+        
     for (int i = 0; i < header->number_of_point_records; i++)
     {
         if (laszip_read_point(laszip_reader))
@@ -212,8 +211,7 @@ void save_processed_pc(const fs::path& file_path_in, const fs::path& file_path_p
             fprintf(stderr, "DLL ERROR: laszip_set_coordinates %u\n", i);
             std::abort();
         }
-        *output_point = *input_point;
-
+        
         laszip_F64 output_coordinates[3];
         adjustPoint(output_coordinates, input_coordinates, m_pose, offset);
 
@@ -222,15 +220,18 @@ void save_processed_pc(const fs::path& file_path_in, const fs::path& file_path_p
             fprintf(stderr, "DLL ERROR: laszip_set_coordinates %u\n", i);
             std::abort();
         }
+        output_point->intensity = input_point->intensity;
+        output_point->classification = input_point->classification;
+        output_point->num_extra_bytes = input_point->num_extra_bytes;
+        memcpy(output_point->extra_bytes, input_point->extra_bytes, output_point->num_extra_bytes);
 
         if (laszip_write_point(laszip_writer)) {
             fprintf(stderr, "DLL ERROR: writing point %I64d\n", i);
             return;
         }
     }
-
+    
     // close the reader
-
     if (laszip_close_reader(laszip_reader))
     {
         fprintf(stderr, "DLL ERROR: closing laszip reader\n");

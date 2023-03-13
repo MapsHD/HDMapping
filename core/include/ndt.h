@@ -6,7 +6,6 @@
 
 class NDT {
 public:
-
 	struct GridParameters {
 		double bounding_box_min_X;
 		double bounding_box_min_Y;
@@ -97,6 +96,12 @@ public:
 	bool is_rodrigues = false;
 	bool is_lie_algebra_left_jacobian = false;
 	bool is_lie_algebra_right_jacobian = false;
+
+	bool is_generalized = false;
+	double sigma_r = 0.01;
+	double sigma_polar_angle = 0.0001;
+	double sigma_azimuthal_angle = 0.0001;
+	int num_extended_points = 100;
 };
 
 #endif

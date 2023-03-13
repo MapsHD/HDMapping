@@ -744,13 +744,6 @@ void project_gui() {
                         std::cout << "adding geo point: " << geopoint.name << " " << geopoint.coordinates.x() << " " << geopoint.coordinates.y() << " " << geopoint.coordinates.z() << std::endl;
 
                         available_geo_points.push_back(geopoint);
-                        //int len = sscanf(s.c_str(), "%lf;%lf;%lf", &index, &h, &w);
-
-                        //if (len == 3) {
-                        //    intersection.center_pose.z() = h;
-                        //    intersection.height = w;
-                        //   common_data.intersections.push_back(intersection);
-                        //}
                     }
                     f.close();
 
@@ -762,26 +755,12 @@ void project_gui() {
                         p.available_geo_points = geo;
                     }
                 }
-
-
-                //working_directory = fs::path(input_file_name).parent_path().string();
-
-                //if (!point_clouds_container.load(working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z)) {
-                //    std::cout << "check input files" << std::endl;
-                //    return;
-                //}
-                //else {
-                //    std::cout << "loaded: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                //}
             }
         }
     }
 
     ImGui::Separator();
     ImGui::Separator();
-
-
-
     if (ImGui::Button("perform experiment on WIN")){
         perform_experiment_on_windows();
     }
@@ -866,6 +845,17 @@ void ndt_gui() {
         if (ImGui::Button("ndt_optimization(Lie-algebra right Jacobian)")) {
             //icp.optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
             ndt.optimize_lie_algebra_right_jacobian(point_clouds_container.point_clouds);
+        }
+
+        ImGui::Text("--------------------------------------------------------------------------------------------------------");
+
+        ImGui::Checkbox("generelized", &ndt.is_generalized);
+
+        if(ndt.is_generalized){
+            ImGui::InputDouble("sigma_r", &ndt.sigma_r, 0.01, 0.01);
+            ImGui::InputDouble("sigma_polar_angle", &ndt.sigma_polar_angle, 0.0001, 0.0001);
+            ImGui::InputDouble("sigma_azimuthal_angle", &ndt.sigma_azimuthal_angle, 0.0001, 0.0001);
+            ImGui::InputInt("num_extended_points", &ndt.num_extended_points, 1, 1);
         }
 
     ImGui::End();
@@ -1923,7 +1913,7 @@ bool initGL(int* argc, char** argv) {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration v0.4");
+    glutCreateWindow("multi_view_tls_registration v0.5");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

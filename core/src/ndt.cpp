@@ -18,6 +18,8 @@
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_quaternion_cw_jacobian.h>
 #include <python-scripts/constraints/quaternion_constraint_jacobian.h>
 
+#include <python-scripts/elementary_error_theory_for_terrestrial_laser_scanner_jacobian.h>
+
 void NDT::grid_calculate_params(const std::vector<Point3D>& point_cloud_global, GridParameters& in_out_params)
 {
 	double min_x = std::numeric_limits<double>::max();
@@ -249,7 +251,8 @@ void NDT::build_rgd(std::vector<Point3D>& points, std::vector<NDT::PointBucketIn
 void ndt_job(int i, NDT::Job* job, std::vector<NDT::Bucket>* buckets, Eigen::SparseMatrix<double >* AtPA,
 	Eigen::SparseMatrix<double >* AtPB, std::vector<NDT::PointBucketIndexPair>* index_pair_internal, std::vector<Point3D>* pp,
 	std::vector<Eigen::Affine3d>* mposes, std::vector<Eigen::Affine3d>* mposes_inv, size_t trajectory_size,
-	NDT::PoseConvention pose_convention, NDT::RotationMatrixParametrization rotation_matrix_parametrization, int number_of_unknowns, double* sumssr, int* sums_obs) {
+	NDT::PoseConvention pose_convention, NDT::RotationMatrixParametrization rotation_matrix_parametrization, int number_of_unknowns, double* sumssr, int* sums_obs,
+	bool is_generalized, double sigma_r, double sigma_polar_angle, double sigma_azimuthal_angle, int num_extended_points) {
 
 	
 	std::vector<Eigen::Triplet<double>> tripletListA;
@@ -268,8 +271,20 @@ void ndt_job(int i, NDT::Job* job, std::vector<NDT::Bucket>* buckets, Eigen::Spa
 		cov.setZero();
 
 		for (int index = b.index_begin; index < b.index_end; index++) {
-			const auto& p = (*pp)[(*index_pair_internal)[index].index_of_point];
-			mean += Eigen::Vector3d(p.x, p.y, p.z);
+			if(is_generalized){
+				const auto& p = (*pp)[(*index_pair_internal)[index].index_of_point];
+				double r = sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+    			double polar_angle = acos(p.z / sqrt(p.x * p.x + p.y * p.y + p.z * p.z));
+    			double azimuthal_angle = atan(p.y / p.x);
+    			
+				Eigen::Matrix<double, 3, 3> j;
+    			elementary_error_theory_for_terrestrial_laser_scanner_jacobian(j, measurement_r, measurement_polar_angle, measurement_azimuthal_angle);
+
+
+			}else{
+				const auto& p = (*pp)[(*index_pair_internal)[index].index_of_point];
+				mean += Eigen::Vector3d(p.x, p.y, p.z);
+			}
 		}
 		mean /= b.number_of_points;
 
@@ -715,7 +730,8 @@ bool NDT::optimize(std::vector<PointCloud>& point_clouds)
 
 		for (size_t k = 0; k < jobs.size(); k++) {
 			threads.push_back(std::thread(ndt_job, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
-				&index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization, number_of_unknowns, &(sumrmss[k]), &(sums[k])));
+				&index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization, number_of_unknowns, &(sumrmss[k]), &(sums[k]),
+				is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points));
 		}
 		
 		for (size_t j = 0; j < threads.size(); j++) {
@@ -1081,7 +1097,8 @@ std::vector<Eigen::SparseMatrix<double>> NDT::compute_covariance_matrices_and_rm
 
 	for (size_t k = 0; k < jobs.size(); k++) {
 		threads.push_back(std::thread(ndt_job, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
-			&index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization, number_of_unknowns, &(sumrmss[k]), &(sums[k])));
+			&index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization, number_of_unknowns, &(sumrmss[k]), &(sums[k]),
+			is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points));
 	}
 
 	for (size_t j = 0; j < threads.size(); j++) {

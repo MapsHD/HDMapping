@@ -897,7 +897,9 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 			}
 			// std::cout << AtPAt << std::endl;
 		}
-	}else{
+	}
+	else
+	{
 		(*AtPA) = AtPAt_tmp;
 		(*AtPB) = AtPBt_tmp;
 	}
@@ -990,7 +992,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds)
 	for (int iter = 0; iter < number_of_iterations; iter++)
 	{
 
-	#if 1
+#if 1
 		//////rgd external///////
 		std::vector<PointBucketIndexPair> index_pair_external;
 		std::vector<Bucket> buckets_external;
@@ -1018,12 +1020,13 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds)
 
 		grid_calculate_params(points_global_external, rgd_params_external);
 		build_rgd(points_global_external, index_pair_external, buckets_external, rgd_params_external, this->number_of_threads);
-		//std::cout << "number_of_external_buckets: " << rgd_params_external.number_of_buckets << std::endl;
 
 		std::vector<Bucket> buckets_external_reduced;
 
-		for(const auto &b:buckets_external){
-			if(b.number_of_points > 1000){
+		for (const auto &b : buckets_external)
+		{
+			if (b.number_of_points > 1000)
+			{
 				buckets_external_reduced.push_back(b);
 			}
 		}
@@ -1038,11 +1041,13 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds)
 		double rms = 0.0;
 		int sum = 0;
 
-		for(int bi = 0; bi < buckets_external.size(); bi++){
-			std::cout << "computing internal bucket [" << bi + 1 << "] of " << buckets_external.size() << " | iteration [" << iter + 1 << "] of " << number_of_iterations <<  std::endl;
+		for (int bi = 0; bi < buckets_external.size(); bi++)
+		{
+			std::cout << "computing internal bucket [" << bi + 1 << "] of " << buckets_external.size() << " | iteration [" << iter + 1 << "] of " << number_of_iterations << std::endl;
 			std::vector<Point3D> points_global;
 
-			for(size_t index = buckets_external[bi].index_begin; index < buckets_external[bi].index_end; index++){
+			for (size_t index = buckets_external[bi].index_begin; index < buckets_external[bi].index_end; index++)
+			{
 				points_global.push_back(points_global_external[index_pair_external[index].index_of_point]);
 			}
 
@@ -1051,7 +1056,6 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds)
 			rgd_params.resolution_Y = this->bucket_size[1];
 			rgd_params.resolution_Z = this->bucket_size[2];
 			rgd_params.bounding_box_extension = 1.0;
-
 
 			std::vector<PointBucketIndexPair> index_pair;
 			std::vector<Bucket> buckets;
@@ -1087,21 +1091,21 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds)
 			for (size_t k = 0; k < jobs.size(); k++)
 			{
 				threads.push_back(std::thread(ndt_job, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
-												&index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization, number_of_unknowns, &(sumrmss[k]), &(sums[k]),
-												is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points));
+											  &index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization, number_of_unknowns, &(sumrmss[k]), &(sums[k]),
+											  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points));
 			}
 
 			for (size_t j = 0; j < threads.size(); j++)
 			{
 				threads[j].join();
 			}
-			
+
 			for (size_t k = 0; k < jobs.size(); k++)
 			{
 				rms += sumrmss[k];
 				sum += sums[k];
 			}
-			
+
 			for (size_t k = 0; k < jobs.size(); k++)
 			{
 				if (!init)
@@ -1126,7 +1130,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds)
 		}
 		rms /= sum;
 		std::cout << "rms " << rms << std::endl;
-	#else
+#else
 
 		GridParameters rgd_params;
 		rgd_params.resolution_X = this->bucket_size[0];
@@ -1228,9 +1232,8 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds)
 				}
 			}
 		}
-	#endif
+#endif
 		//////////////////////////////////////////////////////////////////
-
 
 		if (is_fix_first_node)
 		{

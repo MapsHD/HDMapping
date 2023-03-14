@@ -62,7 +62,10 @@ public:
 		bucket_size[0] = 0.5;
 		bucket_size[1] = 0.5;
 		bucket_size[2] = 0.5;
-		number_of_threads = 16;
+		bucket_size_external[0] = 50.0;
+		bucket_size_external[1] = 50.0;
+		bucket_size_external[2] = 50.0;
+		number_of_threads = std::thread::hardware_concurrency();
 		number_of_iterations = 6;
 	};
 	~NDT() { ; };
@@ -83,6 +86,7 @@ public:
 	//std::vector<Eigen::Matrix<double, 7, 7, Eigen::RowMajor>> compute_covariance_matrices7x7(PointClouds& point_clouds_container);
 	
 	float bucket_size[3];
+	float bucket_size_external[3];
 	int number_of_threads;
 	int number_of_iterations;
 

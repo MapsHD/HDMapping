@@ -27,7 +27,7 @@ public:
 
 	ICP() {
 		search_radious = 0.1;
-		number_of_threads = 16;
+		number_of_threads = std::thread::hardware_concurrency();
 		number_of_iterations = 6;
 		is_adaptive_robust_kernel = false;
 		is_ballanced_horizontal_vs_vertical = true;
@@ -42,8 +42,9 @@ public:
 	bool optimize_source_to_target_lie_algebra_right_jacobian(PointClouds& point_clouds_container, bool fix_first_node);
 	//-
 	bool optimization_point_to_point_source_to_target(PointClouds& point_clouds_container);
+	bool optimization_point_to_point_source_to_target_compute_rms(PointClouds& point_clouds_container, double &rms);
 	bool optimization_point_to_point_source_to_target(PointClouds& point_clouds_container,
-		PoseConvention pose_convention, OptimizationAlgorithm optimization_algorithm, RotationMatrixParametrization rotation_matrix_parametrization);
+		PoseConvention pose_convention, OptimizationAlgorithm optimization_algorithm, RotationMatrixParametrization rotation_matrix_parametrization, double &out_rms, bool compute_only_rms);
 	std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> compute_covariance_matrices_tait_bryan_point_to_point_source_to_target(
 		PointClouds& point_clouds_container, PoseConvention pose_convention);
 	std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> compute_covariance_matrices_rodrigues_point_to_point_source_to_target(

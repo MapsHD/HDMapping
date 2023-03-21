@@ -217,6 +217,8 @@ void build_rgd_final_job(int i, PointCloud::Job* job, std::vector < PointCloud::
 bool PointCloud::build_rgd()
 {
 	//std::cout << "build_rgd()" << std::endl;
+	buckets.clear();
+	index_pairs.clear();
 
 	grid_calculate_params(this->points_local, this->rgd_params);
 	cout_rgd();
@@ -1028,7 +1030,6 @@ void compute_normal_vectors_job(
 
 										double dist = (point_nn - point).norm();
 
-
 										if (dist < search_radious) {
 											mean += point_nn;
 											number_of_points_nn++;
@@ -1044,7 +1045,6 @@ void compute_normal_vectors_job(
 
 		if (number_of_points_nn >= 3) {
 			mean /= number_of_points_nn;
-
 
 			double cov[3][3];
 			cov[0][0] = cov[0][1] = cov[0][2] = cov[1][0] = cov[1][1] = cov[1][2] = cov[2][0] = cov[2][1] = cov[2][2] = 0;
@@ -1220,7 +1220,7 @@ void PointCloud::compute_normal_vectors(double search_radious)
 
 void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
 {
-	std::cout << "single scan, num points before decimation: " << this->points_local.size() << std::endl;
+	//std::cout << "single scan, num points before decimation: " << this->points_local.size() << std::endl;
 
 	auto params = rgd_params;
 
@@ -1257,5 +1257,5 @@ void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
 	points_type = n_points_type;
 	intensities = n_intensities;
 
-	std::cout << "single scan, num points after decimation: " << this->points_local.size() << std::endl;
+	//std::cout << "single scan, num points after decimation: " << this->points_local.size() << std::endl;
 }

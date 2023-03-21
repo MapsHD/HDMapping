@@ -3,10 +3,13 @@
 
 #include <point_cloud.h>
 #include <Eigen/Eigen>
+#include <thread>
 
-class NDT {
+class NDT
+{
 public:
-	struct GridParameters {
+	struct GridParameters
+	{
 		double bounding_box_min_X;
 		double bounding_box_min_Y;
 		double bounding_box_min_Z;
@@ -23,13 +26,15 @@ public:
 		double resolution_Z;
 	};
 
-	struct PointBucketIndexPair {
+	struct PointBucketIndexPair
+	{
 		int index_of_point;
 		long long unsigned int index_of_bucket;
 		int index_pose;
 	};
 
-	struct Bucket {
+	struct Bucket
+	{
 		long long unsigned int index_begin;
 		long long unsigned int index_end;
 		long long unsigned int number_of_points;
@@ -37,20 +42,24 @@ public:
 		Eigen::Matrix3d cov;
 	};
 
-	struct Job {
+	struct Job
+	{
 		long long unsigned int index_begin_inclusive;
 		long long unsigned int index_end_exclusive;
 	};
 
-	enum PoseConvention {
+	enum PoseConvention
+	{
 		cw,
 		wc
 	};
-	enum OptimizationAlgorithm {
+	enum OptimizationAlgorithm
+	{
 		gauss_newton,
 		levenberg_marguardt
 	};
-	enum RotationMatrixParametrization {
+	enum RotationMatrixParametrization
+	{
 		tait_bryan_xyz,
 		rodrigues,
 		quaternion,
@@ -58,33 +67,34 @@ public:
 		lie_algebra_right_jacobian
 	};
 
-	NDT() {
+	NDT()
+	{
 		bucket_size[0] = 0.5;
 		bucket_size[1] = 0.5;
 		bucket_size[2] = 0.5;
-		bucket_size_external[0] = 50.0;
-		bucket_size_external[1] = 50.0;
-		bucket_size_external[2] = 50.0;
+		bucket_size_external[0] = 5.0;
+		bucket_size_external[1] = 5.0;
+		bucket_size_external[2] = 5.0;
 		number_of_threads = std::thread::hardware_concurrency();
 		number_of_iterations = 6;
 	};
 	~NDT() { ; };
 
-	
-	void grid_calculate_params(const std::vector<Point3D>& point_cloud_global, GridParameters& in_out_params);
-	void build_rgd(std::vector<Point3D>& points, std::vector<PointBucketIndexPair>& index_pair, std::vector<Bucket>& buckets, GridParameters& rgd_params, int num_threads = 8);
-	std::vector<Job> get_jobs(long long unsigned int size, int num_threads = 8);
-	void reindex(std::vector<Point3D>& points, std::vector<NDT::PointBucketIndexPair>& index_pair, NDT::GridParameters& rgd_params, int num_threads);
+	void grid_calculate_params(const std::vector<Point3D> &point_cloud_global, GridParameters &in_out_params);
+	void build_rgd(std::vector<Point3D> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
+				   int num_threads = std::thread::hardware_concurrency());
+	std::vector<Job> get_jobs(long long unsigned int size, int num_threads = std::thread::hardware_concurrency());
+	void reindex(std::vector<Point3D> &points, std::vector<NDT::PointBucketIndexPair> &index_pair, NDT::GridParameters &rgd_params, int num_threads);
 
-	bool optimize(std::vector<PointCloud>& point_clouds);
-	std::vector<Eigen::SparseMatrix<double>> compute_covariance_matrices_and_rms(std::vector<PointCloud>& point_clouds, double& rms);
-	
-	bool optimize(std::vector<PointCloud>& point_clouds, double& rms_initial, double& rms_final, double& mui);
-	
-	bool optimize_lie_algebra_left_jacobian(std::vector<PointCloud>& point_clouds);
-	bool optimize_lie_algebra_right_jacobian(std::vector<PointCloud>& point_clouds);
-	//std::vector<Eigen::Matrix<double, 7, 7, Eigen::RowMajor>> compute_covariance_matrices7x7(PointClouds& point_clouds_container);
-	
+	bool optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance = false);
+	std::vector<Eigen::SparseMatrix<double>> compute_covariance_matrices_and_rms(std::vector<PointCloud> &point_clouds, double &rms);
+
+	bool optimize(std::vector<PointCloud> &point_clouds, double &rms_initial, double &rms_final, double &mui);
+
+	bool optimize_lie_algebra_left_jacobian(std::vector<PointCloud> &point_clouds);
+	bool optimize_lie_algebra_right_jacobian(std::vector<PointCloud> &point_clouds);
+	// std::vector<Eigen::Matrix<double, 7, 7, Eigen::RowMajor>> compute_covariance_matrices7x7(PointClouds& point_clouds_container);
+
 	float bucket_size[3];
 	float bucket_size_external[3];
 	int number_of_threads;
@@ -105,7 +115,7 @@ public:
 	double sigma_r = 0.01;
 	double sigma_polar_angle = 0.0001;
 	double sigma_azimuthal_angle = 0.0001;
-	int num_extended_points = 100;
+	int num_extended_points = 10;
 };
 
 #endif

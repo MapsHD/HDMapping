@@ -59,7 +59,7 @@ bool is_decimate = true;
 double bucket_x = 0.1;
 double bucket_y = 0.1;
 double bucket_z = 0.1;
-int viewer_decmiate_point_cloud = 10;
+int viewer_decmiate_point_cloud = 1000;
 
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
@@ -317,6 +317,22 @@ void my_display_code()
 
 void project_gui() {
     ImGui::Begin("Project");
+
+    if (ImGui::Button("reset view"))
+    { 
+        rotate_x = 0.0;
+        rotate_y = 0.0;
+        translate_x = 0.0;
+        translate_y = 0.0;
+        translate_z = -50.0;
+        viewer_decmiate_point_cloud = 1000;
+
+        camera_ortho_xy_view_zoom = 10;
+        camera_ortho_xy_view_shift_x = 0.0;
+        camera_ortho_xy_view_shift_y = 0.0;
+        camera_ortho_xy_view_rotation_angle_deg = 0;
+        camera_mode_ortho_z_center_h = 0.0;
+    }
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
     ImGui::Text("Offset x: %.10f y: %.10f z: %.10f", point_clouds_container.offset.x(), point_clouds_container.offset.y(), point_clouds_container.offset.z());
@@ -439,7 +455,8 @@ void project_gui() {
     }
     ImGui::Text("ETH dataset: https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
 
-
+    static bool calculate_offset = false;
+    
     if (ImGui::Button("load AlignedPointCloud from WHU-TLS (select all *.las files in folder 2-AlignedPointCloud)")) {
         point_clouds_container.point_clouds.clear();
         static std::shared_ptr<pfd::open_file> open_file;
@@ -465,7 +482,7 @@ void project_gui() {
                 std::cout << input_file_names[i] << std::endl;
             }
 
-            if (!point_clouds_container.load_whu_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z)) {
+            if (!point_clouds_container.load_whu_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset)) {
                 std::cout << "check input files" << std::endl;
                 return;
             }
@@ -474,7 +491,75 @@ void project_gui() {
             }
         }
     }
+    ImGui::SameLine();
+    ImGui::Checkbox("calculate_offset for WHU-TLS", &calculate_offset);
     ImGui::Text("WHU-TLS dataset: http://3s.whu.edu.cn/ybs/en/benchmark.htm");
+
+    if (ImGui::Button("load 3DTK files (select all *.txt files)")) {
+        point_clouds_container.point_clouds.clear();
+        static std::shared_ptr<pfd::open_file> open_file;
+        std::vector<std::string> input_file_names;
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+        const auto t = [&]() {
+            std::vector<std::string> filters;
+            auto sel = pfd::open_file("Load txt files", "C:\\", filters, true).result();
+            for (int i = 0; i < sel.size(); i++)
+            {
+                input_file_names.push_back(sel[i]);
+                //std::cout << "las file: '" << input_file_name << "'" << std::endl;
+            }
+        };
+        std::thread t1(t);
+        t1.join();
+
+        if (input_file_names.size() > 0) {
+            working_directory = fs::path(input_file_names[0]).parent_path().string();
+
+            std::cout << "txt files:" << std::endl;
+            for (size_t i = 0; i < input_file_names.size(); i++) {
+                std::cout << input_file_names[i] << std::endl;
+            }
+
+            if (!point_clouds_container.load_3DTK_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z)) {
+                std::cout << "check input files" << std::endl;
+                return;
+            }
+            else {
+                std::cout << "loaded: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+            }
+        }
+    }
+    ImGui::Text("3DTK dataset: http://kos.informatik.uni-osnabrueck.de/3Dscans/ 18: the campus of the Jacobs University Bremen");
+
+    if (ImGui::Button("update initial poses from RESSO file"))
+    {
+        static std::shared_ptr<pfd::open_file> open_file;
+        std::string input_file_name = "";
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+        const auto t = [&]() {
+            auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
+            for (int i = 0; i < sel.size(); i++)
+            {
+                input_file_name = sel[i];
+                std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
+            }
+        };
+        std::thread t1(t);
+        t1.join();
+
+        if (input_file_name.size() > 0) {
+
+            working_directory = fs::path(input_file_name).parent_path().string();
+
+            if (!point_clouds_container.update_initial_poses_from_RESSO(working_directory.c_str(), input_file_name.c_str())) {
+                std::cout << "check input files" << std::endl;
+                return;
+            }
+            else {
+                std::cout << "updated: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+            }
+        }
+    }
 
     if (ImGui::Button("update poses from RESSO file"))
     {
@@ -619,6 +704,13 @@ void project_gui() {
             }
         }
     }
+    ImGui::Separator();
+    int total_number_of_points = 0;
+    for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
+        total_number_of_points += point_clouds_container.point_clouds[i].points_local.size();
+    }
+    std::string point_size_message = "total number of points: " + std::to_string(total_number_of_points);
+    ImGui::Text(point_size_message.c_str());
 
     ImGui::Separator();
     ImGui::Separator();
@@ -836,6 +928,15 @@ void ndt_gui() {
             ndt.optimize(point_clouds_container.point_clouds);
         }
 
+        if (ImGui::Button("compute mean mahalanobis distance")) {
+            double rms_initial = 0.0;
+            double rms_final = 0.0;
+            double mui = 0.0;
+            //ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
+            //std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
+            ndt.optimize(point_clouds_container.point_clouds, true);
+        }
+
         ImGui::Text("--------------------------------------------------------------------------------------------------------");
 
         if (ImGui::Button("ndt_optimization(Lie-algebra left Jacobian)")) {
@@ -853,10 +954,29 @@ void ndt_gui() {
 
         if(ndt.is_generalized){
             ImGui::InputDouble("sigma_r", &ndt.sigma_r, 0.01, 0.01);
-            ImGui::InputDouble("sigma_polar_angle", &ndt.sigma_polar_angle, 0.0001, 0.0001);
-            ImGui::InputDouble("sigma_azimuthal_angle", &ndt.sigma_azimuthal_angle, 0.0001, 0.0001);
+            ImGui::InputDouble("sigma_polar_angle_rad", &ndt.sigma_polar_angle, 0.0001, 0.0001);
+            ImGui::InputDouble("sigma_azimuthal_angle_rad", &ndt.sigma_azimuthal_angle, 0.0001, 0.0001);
             ImGui::InputInt("num_extended_points", &ndt.num_extended_points, 1, 1);
         }
+
+        if(ImGui::Button("Set Zoller+Fröhlich TLS Imager 5006i errors")){
+            ndt.sigma_r = 0.0068;
+            ndt.sigma_polar_angle = 0.007 / 180.0 * M_PI;
+            ndt.sigma_azimuthal_angle = 0.007 / 180.0 * M_PI;
+        }
+        if(ImGui::Button("Set Faro Focus3D errors")){
+            ndt.sigma_r = 0.001;
+            ndt.sigma_polar_angle = 19.0 * (1.0 / 3600.0) / 180.0 * M_PI; 
+            ndt.sigma_azimuthal_angle = 19.0 * (1.0 / 3600.0) / 180.0 * M_PI; 
+        }
+        if(ImGui::Button("Set Leica ScanStation C10 errors")){
+            ndt.sigma_r = 0.006;
+            ndt.sigma_polar_angle = 0.00006; 
+            ndt.sigma_azimuthal_angle = 0.00006; 
+        }
+
+        
+        
 
     ImGui::End();
 }
@@ -930,6 +1050,14 @@ void icp_gui() {
         if (ImGui::Button("icp_optimization_source_to_target(Lie-algebra right Jacobian)")) {
             icp.optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
         }
+        ImGui::Text("--------------------------------------------------------------------------------------------------------");
+
+        if (ImGui::Button("compute rms(optimization_point_to_point_source_to_target)")) {
+            double rms = 0.0;
+            icp.optimization_point_to_point_source_to_target_compute_rms(point_clouds_container, rms);
+            std::cout << "rms(optimization_point_to_point_source_to_target): " << rms << std::endl;
+        }
+
     ImGui::End();
 }
 

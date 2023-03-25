@@ -9,7 +9,7 @@
 #include <vector>
 #include <algorithm>
 #include <set>
-
+#include <filesystem>
 #include <laszip/laszip_api.h>
 
 // #include <liblas/liblas.hpp>
@@ -168,7 +168,7 @@ bool PointClouds::update_poses_from_RESSO(const std::string &folder_with_point_c
 		pc.m_pose(0, 3) = t14;
 		pc.m_pose(1, 3) = t24;
 		pc.m_pose(2, 3) = t34;
-		//pc.m_initial_pose = pc.m_pose;
+		// pc.m_initial_pose = pc.m_pose;
 		pcs.push_back(pc);
 	}
 	infile.close();
@@ -177,23 +177,31 @@ bool PointClouds::update_poses_from_RESSO(const std::string &folder_with_point_c
 	{
 		for (int i = 0; i < point_clouds.size(); i++)
 		{
-			std::cout << "-------------------------" << std::endl;
-			std::cout << "update pose: " << i << std::endl;
-			std::cout << "previous pose: " << std::endl
-					  << point_clouds[i].m_pose.matrix() << std::endl;
-			std::cout << "current pose: " << std::endl
-					  << pcs[i].m_pose.matrix() << std::endl;
+			for (int j = 0; j < pcs.size(); j++)
+			{
+				if (std::filesystem::path(point_clouds[i].file_name).filename().string() == pcs[j].file_name)
+				{
+					std::cout << "-------------------------" << std::endl;
+					std::cout << "update pose: " << i << std::endl;
+					std::cout << "previous pose: " << std::endl
+							  << point_clouds[i].m_pose.matrix() << std::endl;
+					std::cout << "current pose: " << std::endl
+							  << pcs[j].m_pose.matrix() << std::endl;
 
-			point_clouds[i].m_pose = pcs[i].m_pose;
-			point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds[i].m_pose);
-			point_clouds[i].gui_translation[0] = point_clouds[i].pose.px;
-			point_clouds[i].gui_translation[1] = point_clouds[i].pose.py;
-			point_clouds[i].gui_translation[2] = point_clouds[i].pose.pz;
-			point_clouds[i].gui_rotation[0] = rad2deg(point_clouds[i].pose.om);
-			point_clouds[i].gui_rotation[1] = rad2deg(point_clouds[i].pose.fi);
-			point_clouds[i].gui_rotation[2] = rad2deg(point_clouds[i].pose.ka);
+					point_clouds[i].m_pose = pcs[j].m_pose;
+					point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds[i].m_pose);
+					point_clouds[i].gui_translation[0] = point_clouds[i].pose.px;
+					point_clouds[i].gui_translation[1] = point_clouds[i].pose.py;
+					point_clouds[i].gui_translation[2] = point_clouds[i].pose.pz;
+					point_clouds[i].gui_rotation[0] = rad2deg(point_clouds[i].pose.om);
+					point_clouds[i].gui_rotation[1] = rad2deg(point_clouds[i].pose.fi);
+					point_clouds[i].gui_rotation[2] = rad2deg(point_clouds[i].pose.ka);
+				}
+			}
 
-			//point_clouds[i].m_initial_pose = point_clouds[i].m_pose;
+			/**/
+
+			// point_clouds[i].m_initial_pose = point_clouds[i].m_pose;
 		}
 	}
 	return true;
@@ -257,7 +265,7 @@ bool PointClouds::update_initial_poses_from_RESSO(const std::string &folder_with
 		pc.m_initial_pose(0, 3) = t14;
 		pc.m_initial_pose(1, 3) = t24;
 		pc.m_initial_pose(2, 3) = t34;
-		//pc.m_initial_pose = pc.m_pose;
+		// pc.m_initial_pose = pc.m_pose;
 		pcs.push_back(pc);
 	}
 	infile.close();
@@ -266,14 +274,20 @@ bool PointClouds::update_initial_poses_from_RESSO(const std::string &folder_with
 	{
 		for (int i = 0; i < point_clouds.size(); i++)
 		{
-			std::cout << "-------------------------" << std::endl;
-			std::cout << "update pose: " << i << std::endl;
-			std::cout << "previous pose: " << std::endl
-					  << point_clouds[i].m_initial_pose.matrix() << std::endl;
-			std::cout << "current pose: " << std::endl
-					  << pcs[i].m_initial_pose.matrix() << std::endl;
+			for (int j = 0; j < pcs.size(); j++)
+			{
+				if (std::filesystem::path(point_clouds[i].file_name).filename().string() == pcs[j].file_name)
+				{
+					std::cout << "-------------------------" << std::endl;
+					std::cout << "update pose: " << i << std::endl;
+					std::cout << "previous pose: " << std::endl
+							  << point_clouds[i].m_initial_pose.matrix() << std::endl;
+					std::cout << "current pose: " << std::endl
+							  << pcs[j].m_initial_pose.matrix() << std::endl;
 
-			point_clouds[i].m_initial_pose = pcs[i].m_initial_pose;
+					point_clouds[i].m_initial_pose = pcs[j].m_initial_pose;
+				}
+			}
 		}
 	}
 	return true;
@@ -566,8 +580,8 @@ bool PointClouds::load_pose_ETH(const std::string &fn, Eigen::Affine3d &m_increm
 bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
 {
 	this->offset = Eigen::Vector3d(0, 0, 0);
-	//size_t sum_points_before_decimation = 0;
-	//size_t sum_points_after_decimation = 0;
+	// size_t sum_points_before_decimation = 0;
+	// size_t sum_points_after_decimation = 0;
 
 	for (size_t i = 0; i < input_file_names.size(); i++)
 	{
@@ -703,10 +717,10 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 
 			Eigen::Vector3d pp(p.x, p.y, p.z);
 			pc.points_local.push_back(pp);
-			//sum_points_before_decimation++;
-			// std::cout << (int)point->rgb[0] << " " << (int)point->rgb[1] << " " << (int)point->rgb[2] << " " << (int)point->rgb[3] << std::endl;
-			// std::cout << (int)point->user_data << std::endl;
-			// int->
+			// sum_points_before_decimation++;
+			//  std::cout << (int)point->rgb[0] << " " << (int)point->rgb[1] << " " << (int)point->rgb[2] << " " << (int)point->rgb[3] << std::endl;
+			//  std::cout << (int)point->user_data << std::endl;
+			//  int->
 			/*std::cout << (int)point->extra_bytes[0] << " " <<
 				(int)point->extra_bytes[1] << " " <<
 				(int)point->extra_bytes[2] << " " <<
@@ -730,19 +744,19 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		if (is_decimate)
 		{
 			std::cout << "start downsampling" << std::endl;
-			
+
 			size_t sum_points_before_decimation = pc.points_local.size();
 			pc.decimate(bucket_x, bucket_y, bucket_z);
 			size_t sum_points_after_decimation = pc.points_local.size();
-			
+
 			std::cout << "downsampling finished" << std::endl;
 			std::cout << "all scans, sum_points_before_decimation: " << sum_points_before_decimation << std::endl;
 			std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
 		}
-		//else
+		// else
 		//{
 		//	sum_points_after_decimation = sum_points_before_decimation;
-		//}
+		// }
 
 		pc.file_name = input_file_names[i];
 		point_clouds.push_back(pc);

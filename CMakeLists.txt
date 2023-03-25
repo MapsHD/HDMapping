@@ -176,6 +176,7 @@ if (GTSAM_FOUND)
     target_link_libraries (hd_mapper gtsam)
 endif()
 
+add_executable(matrix_mul src/matrix_mul.cpp)
 
 
 

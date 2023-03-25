@@ -964,16 +964,32 @@ void ndt_gui() {
             ndt.sigma_polar_angle = 0.007 / 180.0 * M_PI;
             ndt.sigma_azimuthal_angle = 0.007 / 180.0 * M_PI;
         }
+        if(ImGui::Button("Set Zoller+Fröhlich TLS Imager 5010C errors")){
+            ndt.sigma_r = 0.01;
+            ndt.sigma_polar_angle = 0.007 / 180.0 * M_PI;
+            ndt.sigma_azimuthal_angle = 0.007 / 180.0 * M_PI;
+        }
         if(ImGui::Button("Set Faro Focus3D errors")){
             ndt.sigma_r = 0.001;
             ndt.sigma_polar_angle = 19.0 * (1.0 / 3600.0) / 180.0 * M_PI; 
             ndt.sigma_azimuthal_angle = 19.0 * (1.0 / 3600.0) / 180.0 * M_PI; 
         }
-        if(ImGui::Button("Set Leica ScanStation C10 errors")){
+        if(ImGui::Button("Set Leica ScanStation C5 C10 errors")){
             ndt.sigma_r = 0.006;
             ndt.sigma_polar_angle = 0.00006; 
             ndt.sigma_azimuthal_angle = 0.00006; 
         }
+        if(ImGui::Button("Set Riegl VZ400 errors")){
+            ndt.sigma_r = 0.01;
+            ndt.sigma_polar_angle = 0.0005 / 180.0 * M_PI; //Laser Beam Dicvergence
+            ndt.sigma_azimuthal_angle = 0.0005 / 180.0 * M_PI; //Laser Beam Dicvergence
+        }
+        if(ImGui::Button("Set Leica HDS6100 errors")){
+            ndt.sigma_r = 0.009;
+            ndt.sigma_polar_angle = 0.000125; 
+            ndt.sigma_azimuthal_angle = 0.000125;
+        }
+        
 
         
         

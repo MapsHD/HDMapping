@@ -980,15 +980,21 @@ void ndt_gui() {
             ndt.sigma_azimuthal_angle = 0.00006; 
         }
         if(ImGui::Button("Set Riegl VZ400 errors")){
-            ndt.sigma_r = 0.01;
-            ndt.sigma_polar_angle = 0.0005 / 180.0 * M_PI; //Laser Beam Dicvergence
-            ndt.sigma_azimuthal_angle = 0.0005 / 180.0 * M_PI; //Laser Beam Dicvergence
+            ndt.sigma_r = 0.005;
+            ndt.sigma_polar_angle = 0.0005 / 180.0 * M_PI + 0.0003; //Laser Beam Dicvergence
+            ndt.sigma_azimuthal_angle = 0.0005 / 180.0 * M_PI + 0.0003; //Laser Beam Dicvergence
         }
         if(ImGui::Button("Set Leica HDS6100 errors")){
             ndt.sigma_r = 0.009;
             ndt.sigma_polar_angle = 0.000125; 
             ndt.sigma_azimuthal_angle = 0.000125;
         }
+        if(ImGui::Button("Set Leica P40 errors")){
+            ndt.sigma_r = 0.0012;
+            ndt.sigma_polar_angle = 8.0/3600; 
+            ndt.sigma_azimuthal_angle = 8.0/3600;
+        }
+        
         
 
         

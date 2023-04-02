@@ -431,7 +431,7 @@ bool PointClouds::save_poses(const std::string file_name)
 	outfile << this->point_clouds.size() << std::endl;
 	for (size_t i = 0; i < this->point_clouds.size(); i++)
 	{
-		outfile << this->point_clouds[i].file_name << std::endl;
+		outfile << std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl;
 		outfile << this->point_clouds[i].m_pose(0, 0) << " " << this->point_clouds[i].m_pose(0, 1) << " " << this->point_clouds[i].m_pose(0, 2) << " " << this->point_clouds[i].m_pose(0, 3) << std::endl;
 		outfile << this->point_clouds[i].m_pose(1, 0) << " " << this->point_clouds[i].m_pose(1, 1) << " " << this->point_clouds[i].m_pose(1, 2) << " " << this->point_clouds[i].m_pose(1, 3) << std::endl;
 		outfile << this->point_clouds[i].m_pose(2, 0) << " " << this->point_clouds[i].m_pose(2, 1) << " " << this->point_clouds[i].m_pose(2, 2) << " " << this->point_clouds[i].m_pose(2, 3) << std::endl;

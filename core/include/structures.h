@@ -203,7 +203,6 @@ struct LAZSector {
 	int point_size = 1;
 };
 
-
 struct ConstraintToGeoreference {
 	std::string trajectory_file_name;
 	double time_stamp;

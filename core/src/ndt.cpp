@@ -50,20 +50,14 @@ void NDT::grid_calculate_params(const std::vector<Point3D> &point_cloud_global, 
 			max_z = point_cloud_global[i].z;
 	}
 
-	// if (min_x < -200)
-	//	min_x = -500;
-	// if (max_x > 200)
-	//	max_x = 500;
+	max_x += in_out_params.bounding_box_extension;
+	min_x -= in_out_params.bounding_box_extension;
 
-	// if (min_y < -200)
-	//	min_y = -500;
-	// if (max_y > 200)
-	//	max_y = 500;
+	max_y += in_out_params.bounding_box_extension;
+	min_y -= in_out_params.bounding_box_extension;
 
-	// if (min_z < -200)
-	//	min_z = -100;
-	// if (max_z > 200)
-	//	max_z = 100;
+	max_z += in_out_params.bounding_box_extension;
+	min_z -= in_out_params.bounding_box_extension;
 
 	long long unsigned int number_of_buckets_X = ((max_x - min_x) / in_out_params.resolution_X) + 1;
 	long long unsigned int number_of_buckets_Y = ((max_y - min_y) / in_out_params.resolution_Y) + 1;
@@ -184,8 +178,8 @@ void build_rgd_init_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets)
 
 	for (size_t ii = job->index_begin_inclusive; ii < job->index_end_exclusive; ii++)
 	{
-		(*buckets)[ii].index_begin = -1;
-		(*buckets)[ii].index_end = -1;
+		(*buckets)[ii].index_begin = 0;
+		(*buckets)[ii].index_end = 0;
 		(*buckets)[ii].number_of_points = 0;
 	}
 }
@@ -234,7 +228,7 @@ void build_rgd_final_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets
 	{
 		long long unsigned int index_begin = (*buckets)[ii].index_begin;
 		long long unsigned int index_end = (*buckets)[ii].index_end;
-		if (index_begin != -1 && index_end != -1)
+		if (index_end > index_begin)
 		{
 			(*buckets)[ii].number_of_points = index_end - index_begin;
 		}
@@ -313,7 +307,7 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 			 Eigen::SparseMatrix<double> *AtPB, std::vector<NDT::PointBucketIndexPair> *index_pair_internal, std::vector<Point3D> *pp,
 			 std::vector<Eigen::Affine3d> *mposes, std::vector<Eigen::Affine3d> *mposes_inv, size_t trajectory_size,
 			 NDT::PoseConvention pose_convention, NDT::RotationMatrixParametrization rotation_matrix_parametrization, int number_of_unknowns, double *sumssr, int *sums_obs,
-			 bool is_generalized, double sigma_r, double sigma_polar_angle, double sigma_azimuthal_angle, int num_extended_points, double *md_out, double *md_count_out)
+			 bool is_generalized, double sigma_r, double sigma_polar_angle, double sigma_azimuthal_angle, int num_extended_points, double *md_out, double *md_count_out, bool compute_only_mean_and_cov)
 {
 
 	std::vector<Eigen::Triplet<double>> tripletListA;
@@ -461,6 +455,10 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 
 		(*buckets)[ii].mean = mean;
 		(*buckets)[ii].cov = cov;
+
+		if(compute_only_mean_and_cov){
+			continue;
+		}
 
 		Eigen::Matrix3d infm = cov.inverse();
 
@@ -917,7 +915,7 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 	}
 }
 
-bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance)
+bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance, bool compute_only_mean_and_cov)
 {
 	auto start = std::chrono::system_clock::now();
 
@@ -1159,7 +1157,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_maha
 				threads.push_back(std::thread(ndt_job, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
 											  &index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization,
 											  number_of_unknowns, &(sumrmss[k]), &(sums[k]),
-											  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points, &(md_out[k]), &(md_count_out[k])));
+											  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points, &(md_out[k]), &(md_count_out[k]), compute_only_mean_and_cov));
 			}
 
 			for (size_t j = 0; j < threads.size(); j++)
@@ -1709,7 +1707,7 @@ std::vector<Eigen::SparseMatrix<double>> NDT::compute_covariance_matrices_and_rm
 		threads.push_back(std::thread(ndt_job, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
 									  &index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization, 
 									  number_of_unknowns, &(sumrmss[k]), &(sums[k]),
-									  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points, &(md_out[k]), &(md_count_out[k])));
+									  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points, &(md_out[k]), &(md_count_out[k]), false));
 	}
 
 	for (size_t j = 0; j < threads.size(); j++)
@@ -1786,7 +1784,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, double &rms_initial, d
 	// std::vector<Eigen::SparseMatrix<double>> cm_before = compute_covariance_matrices_and_rms(point_clouds, rms);
 	// rms_initial = rms;
 	//--
-	bool res = optimize(point_clouds);
+	bool res = optimize(point_clouds, false, false);
 	//--
 	// std::vector<Eigen::SparseMatrix<double>> cm_after = compute_covariance_matrices_and_rms(point_clouds, rms);
 	// rms_final = rms;
@@ -1802,7 +1800,7 @@ bool NDT::optimize_lie_algebra_left_jacobian(std::vector<PointCloud> &point_clou
 	is_lie_algebra_left_jacobian = true;
 	is_lie_algebra_right_jacobian = false;
 
-	bool res = optimize(point_clouds);
+	bool res = optimize(point_clouds, false, false);
 
 	is_tait_bryan_angles = true;
 	is_quaternion = false;
@@ -1820,7 +1818,7 @@ bool NDT::optimize_lie_algebra_right_jacobian(std::vector<PointCloud> &point_clo
 	is_lie_algebra_left_jacobian = false;
 	is_lie_algebra_right_jacobian = true;
 
-	bool res = optimize(point_clouds);
+	bool res = optimize(point_clouds, false, false);
 
 	is_tait_bryan_angles = true;
 	is_quaternion = false;

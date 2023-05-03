@@ -14,11 +14,19 @@
 #include <glew.h>
 #include <GL/freeglut.h>
 
+#include <structures.h>
+#include <ndt.h>
+
 #define SAMPLE_PERIOD (1.0 / 200.0)
 
 std::vector<Eigen::Vector3d> all_points;
+std::vector<Point3D> initial_points;
+NDT ndt;
 
-struct Point {
+bool show_all_points = true;
+bool show_initial_points = true;
+
+struct PPoint {
     double timestamp;
     float intensity;
     Eigen::Vector3d point;
@@ -34,6 +42,15 @@ int mouse_old_x, mouse_old_y;
 bool gui_mouse_down{ false };
 int mouse_buttons = 0; 
 float mouse_sensitivity = 1.0;
+
+void lidar_odometry_gui() {
+    if(ImGui::Begin("lidar_odometry_gui")){
+        ImGui::Checkbox("show_all_points", &show_all_points);
+        ImGui::Checkbox("show_initial_points", &show_initial_points);
+
+        ImGui::End();
+    }
+}
 
 void mouse(int glut_button, int state, int x, int y) {
     ImGuiIO& io = ImGui::GetIO();
@@ -138,25 +155,28 @@ void display() {
     glVertex3f(0.0f, 0.0f, 100);
     glEnd();
   
-    glColor3d(1.0, 0.0, 0.0);
-    glBegin(GL_POINTS);
-    for(const auto &p:all_points){
-        glVertex3d(p.x(), p.y(), p.z());
+    if(show_all_points){
+        glColor3d(1.0, 0.0, 0.0);
+        glBegin(GL_POINTS);
+        for(const auto &p:all_points){
+            glVertex3d(p.x(), p.y(), p.z());
+        }
+        glEnd();
     }
-    glEnd();
-
+    if(show_initial_points){
+        glColor3d(0.0, 1.0, 0.0);
+        glBegin(GL_POINTS);
+        for(const auto &p:initial_points){
+            glVertex3d(p.x, p.y, p.z);
+        }
+        glEnd();
+    }
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
 
-    //my_display_code();
-    //if(is_ndt_gui)ndt_gui();
-    //if(is_icp_gui)icp_gui();
-    //if(is_pose_graph_slam)pose_graph_slam_gui();
-    //if(is_registration_plane_feature)registration_plane_feature_gui();
-    //if(is_manual_analisys)observation_picking_gui();
-    //project_gui();
-    
+    lidar_odometry_gui();
+       
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
     
@@ -195,9 +215,9 @@ bool initGL(int* argc, char** argv) {
     return true;
 }
 
-std::vector<Point> load_point_cloud(const std::string& lazFile)
+std::vector<PPoint> load_point_cloud(const std::string& lazFile)
 {
-    std::vector<Point> points;
+    std::vector<PPoint> points;
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))
     {
@@ -234,7 +254,7 @@ std::vector<Point> load_point_cloud(const std::string& lazFile)
             fprintf(stderr, "DLL ERROR: reading point %u\n", j);
             std::abort();
         }
-        Point p;
+        PPoint p;
         p.point.x() = header->x_offset + header->x_scale_factor * static_cast<double>(point->X);
         p.point.y() = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y);
         p.point.z() = header->z_offset + header->z_scale_factor * static_cast<double>(point->Z);
@@ -322,8 +342,6 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &tra
     return ret;
 }
 
-
-
 int main(int argc, char *argv[]){
     std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data1 = load_imu("C:/data/mandeye_360/StopScan+straightGoing/imu0000.csv");
     std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data2 = load_imu("C:/data/mandeye_360/StopScan+straightGoing/imu0001.csv");
@@ -358,6 +376,7 @@ int main(int argc, char *argv[]){
         printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw);
     }
 
+    std::cout << "number of points: " << point_data.size() << std::endl;
     for (auto &p : point_data) {
         Eigen::Matrix4d t = getInterpolatedPose(trajectory, p.timestamp);
         if (!t.isZero()) {
@@ -366,6 +385,36 @@ int main(int argc, char *argv[]){
             all_points.push_back(tp);
         }
     }
+
+    for(int i = 0; i < 1000000; i++){
+        Point3D ip;
+        ip.index_pose = 0;
+        //ip.x = all_points[i].x();
+        //ip.y = all_points[i].y();
+        //ip.z = all_points[i].z();
+        ip.x = point_data[i].point.x();
+        ip.y = point_data[i].point.y();
+        ip.z = point_data[i].point.z();
+
+        initial_points.push_back(ip);
+    }
+
+    NDT::GridParameters in_out_params;
+    in_out_params.resolution_X = 0.3;
+    in_out_params.resolution_Y = 0.3;
+    in_out_params.resolution_Z = 0.3;
+    in_out_params.bounding_box_extension = 20.0;
+
+    ndt.grid_calculate_params(initial_points, in_out_params);
+
+    std::vector<NDT::PointBucketIndexPair> index_pair;
+    std::vector<NDT::Bucket> buckets;
+
+    ndt.build_rgd(initial_points, index_pair, buckets, in_out_params);
+
+    std::cout << "buckets.size() " << buckets.size() << std::endl;
+
+
     
     initGL(&argc, argv);
     glutDisplayFunc(display);

@@ -133,6 +133,12 @@ set(GIZMO
 3rdparty/ImGuizmo/ImGuizmo.cpp
 )
 
+set(FUSION 
+3rdparty/Fusion/Fusion/FusionAhrs.c
+3rdparty/Fusion/Fusion/FusionCompass.c
+3rdparty/Fusion/Fusion/FusionOffset.c
+)
+
 include_directories(3rdparty/freeglut-3.2.2/include/)
 add_subdirectory(3rdparty/freeglut-3.2.2)
 
@@ -179,10 +185,13 @@ include_directories(
 3rdparty/Fusion/Fusion
 )
 
+
+
 add_executable(lidar_odometry src/lidar_odometry.cpp
 ${IMGUI_SRCS}
 ${CORE_SRCS}
 ${GIZMO}
+${FUSION}
 )
 
 if (WIN32)

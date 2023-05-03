@@ -207,7 +207,7 @@ void build_rgd_job(int i, NDT::Job *job, std::vector<NDT::PointBucketIndexPair> 
 				(*buckets)[index_of_bucket_1].index_end = ind + 1;
 			}
 		}
-		else if (ind == (*buckets).size() - 1)
+		else if (ind == (*index_pair).size() - 1)
 		{
 			if ((*index_pair)[ind].index_of_bucket < (*buckets).size())
 			{

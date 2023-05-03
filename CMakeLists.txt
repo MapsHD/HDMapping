@@ -36,8 +36,6 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 add_definitions("-DWITH_MANIF")
 endif()
 
-
-
 find_package(PCL)
 if(PCL_FOUND)
     message("PCL found")
@@ -156,7 +154,6 @@ if (GTSAM_FOUND)
     target_link_libraries (multi_view_tls_registration gtsam)
 endif()
 
-
 add_executable(hd_mapper src/hd_mapper.cpp
 ${IMGUI_SRCS}
 ${CORE_SRCS}
@@ -177,6 +174,22 @@ if (GTSAM_FOUND)
 endif()
 
 add_executable(matrix_mul src/matrix_mul.cpp)
+
+include_directories(
+3rdparty/Fusion/Fusion
+)
+
+add_executable(lidar_odometry src/lidar_odometry.cpp
+${IMGUI_SRCS}
+${CORE_SRCS}
+${GIZMO}
+)
+
+if (WIN32)
+target_link_libraries(lidar_odometry ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)
+else()
+target_link_libraries(lidar_odometry ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
+endif()
 
 
 

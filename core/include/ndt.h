@@ -69,14 +69,14 @@ public:
 
 	NDT()
 	{
-		bucket_size[0] = 0.5;
-		bucket_size[1] = 0.5;
-		bucket_size[2] = 0.5;
+		bucket_size[0] = 0.3;
+		bucket_size[1] = 0.3;
+		bucket_size[2] = 0.3;
 		bucket_size_external[0] = 5.0;
 		bucket_size_external[1] = 5.0;
 		bucket_size_external[2] = 5.0;
 		number_of_threads = std::thread::hardware_concurrency();
-		number_of_iterations = 6;
+		number_of_iterations = 30;
 	};
 	~NDT() { ; };
 

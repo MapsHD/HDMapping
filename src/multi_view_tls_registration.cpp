@@ -1504,10 +1504,14 @@ void observation_picking_gui(){
         ImGui::Checkbox("grid 1 x 1 [m]", &observation_picking.grid1x1m);
         ImGui::Checkbox("grid 0.1 x 0.1 [m]", &observation_picking.grid01x01m);
         ImGui::Checkbox("grid 0.01 x 0.01 [m]", &observation_picking.grid001x001m);
-        ImGui::SliderFloat("picking_plane_height", &observation_picking.picking_plane_height, -20.0f, 20.0f);
-        ImGui::SliderFloat("picking_plane_threshold", &observation_picking.picking_plane_threshold, 0.01f, 200.0f);
-        ImGui::SliderFloat("picking_plane_max_xy", &observation_picking.max_xy, 10.0f, 1000.0f);
-        ImGui::SliderInt("point_size", &observation_picking.point_size, 1, 10);
+        //ImGui::SliderFloat("picking_plane_height", &observation_picking.picking_plane_height, -20.0f, 20.0f);
+        ImGui::InputFloat("picking_plane_height", &observation_picking.picking_plane_height);
+        //ImGui::SliderFloat("picking_plane_threshold", &observation_picking.picking_plane_threshold, 0.01f, 200.0f);
+        ImGui::InputFloat("picking_plane_threshold", &observation_picking.picking_plane_threshold);
+        //ImGui::SliderFloat("picking_plane_max_xy", &observation_picking.max_xy, 10.0f, 1000.0f);
+        ImGui::InputFloat("picking_plane_max_xy", &observation_picking.max_xy);
+        //ImGui::SliderInt("point_size", &observation_picking.point_size, 1, 10);
+        ImGui::InputInt("point_size", &observation_picking.point_size);
     
         if (ImGui::Button("accept_current_observation")) {
             std::vector<Eigen::Affine3d> m_poses;
@@ -2063,7 +2067,7 @@ bool initGL(int* argc, char** argv) {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration v0.5");
+    glutCreateWindow("multi_view_tls_registration v0.6");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

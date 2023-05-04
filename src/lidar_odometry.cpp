@@ -23,6 +23,9 @@ std::vector<Eigen::Vector3d> all_points;
 std::vector<Point3D> initial_points;
 NDT ndt;
 
+//std::vector<PointCloud> initial_points;
+
+
 bool show_all_points = true;
 bool show_initial_points = true;
 
@@ -386,17 +389,15 @@ int main(int argc, char *argv[]){
         }
     }
 
+    //PointCloud initial_pc;
     for(int i = 0; i < 1000000; i++){
-        Point3D ip;
-        ip.index_pose = 0;
-        //ip.x = all_points[i].x();
-        //ip.y = all_points[i].y();
-        //ip.z = all_points[i].z();
-        ip.x = point_data[i].point.x();
-        ip.y = point_data[i].point.y();
-        ip.z = point_data[i].point.z();
+        auto p = point_data[i];
+        Point3D pp;
+        pp.x = p.point.x();
+        pp.y = p.point.y();
+        pp.z = p.point.z();
 
-        initial_points.push_back(ip);
+        initial_points.push_back(pp);
     }
 
     NDT::GridParameters in_out_params;
@@ -404,16 +405,15 @@ int main(int argc, char *argv[]){
     in_out_params.resolution_Y = 0.3;
     in_out_params.resolution_Z = 0.3;
     in_out_params.bounding_box_extension = 20.0;
-
     ndt.grid_calculate_params(initial_points, in_out_params);
 
     std::vector<NDT::PointBucketIndexPair> index_pair;
     std::vector<NDT::Bucket> buckets;
 
     ndt.build_rgd(initial_points, index_pair, buckets, in_out_params);
-
     std::cout << "buckets.size() " << buckets.size() << std::endl;
 
+    //bool optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance, bool compute_only_mean_and_cov);
 
     
     initGL(&argc, argv);

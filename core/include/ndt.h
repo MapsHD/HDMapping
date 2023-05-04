@@ -86,7 +86,7 @@ public:
 	std::vector<Job> get_jobs(long long unsigned int size, int num_threads = std::thread::hardware_concurrency());
 	void reindex(std::vector<Point3D> &points, std::vector<NDT::PointBucketIndexPair> &index_pair, NDT::GridParameters &rgd_params, int num_threads);
 
-	bool optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance, bool compute_only_mean_and_cov);
+	bool optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance);
 	std::vector<Eigen::SparseMatrix<double>> compute_covariance_matrices_and_rms(std::vector<PointCloud> &point_clouds, double &rms);
 
 	bool optimize(std::vector<PointCloud> &point_clouds, double &rms_initial, double &rms_final, double &mui);
@@ -94,6 +94,8 @@ public:
 	bool optimize_lie_algebra_left_jacobian(std::vector<PointCloud> &point_clouds);
 	bool optimize_lie_algebra_right_jacobian(std::vector<PointCloud> &point_clouds);
 	// std::vector<Eigen::Matrix<double, 7, 7, Eigen::RowMajor>> compute_covariance_matrices7x7(PointClouds& point_clouds_container);
+
+	//bool compute_cov_mean();
 
 	float bucket_size[3];
 	float bucket_size_external[3];

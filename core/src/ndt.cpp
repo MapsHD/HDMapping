@@ -915,7 +915,7 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 	}
 }
 
-bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance, bool compute_only_mean_and_cov)
+bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance)
 {
 	auto start = std::chrono::system_clock::now();
 
@@ -1157,7 +1157,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_maha
 				threads.push_back(std::thread(ndt_job, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
 											  &index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization,
 											  number_of_unknowns, &(sumrmss[k]), &(sums[k]),
-											  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points, &(md_out[k]), &(md_count_out[k]), compute_only_mean_and_cov));
+											  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points, &(md_out[k]), &(md_count_out[k]), false));
 			}
 
 			for (size_t j = 0; j < threads.size(); j++)
@@ -1784,7 +1784,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, double &rms_initial, d
 	// std::vector<Eigen::SparseMatrix<double>> cm_before = compute_covariance_matrices_and_rms(point_clouds, rms);
 	// rms_initial = rms;
 	//--
-	bool res = optimize(point_clouds, false, false);
+	bool res = optimize(point_clouds, false);
 	//--
 	// std::vector<Eigen::SparseMatrix<double>> cm_after = compute_covariance_matrices_and_rms(point_clouds, rms);
 	// rms_final = rms;
@@ -1800,7 +1800,7 @@ bool NDT::optimize_lie_algebra_left_jacobian(std::vector<PointCloud> &point_clou
 	is_lie_algebra_left_jacobian = true;
 	is_lie_algebra_right_jacobian = false;
 
-	bool res = optimize(point_clouds, false, false);
+	bool res = optimize(point_clouds, false);
 
 	is_tait_bryan_angles = true;
 	is_quaternion = false;
@@ -1818,7 +1818,7 @@ bool NDT::optimize_lie_algebra_right_jacobian(std::vector<PointCloud> &point_clo
 	is_lie_algebra_left_jacobian = false;
 	is_lie_algebra_right_jacobian = true;
 
-	bool res = optimize(point_clouds, false, false);
+	bool res = optimize(point_clouds, false);
 
 	is_tait_bryan_angles = true;
 	is_quaternion = false;

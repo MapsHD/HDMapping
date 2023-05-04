@@ -925,7 +925,7 @@ void ndt_gui() {
             double mui = 0.0;
             //ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
             //std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
-            ndt.optimize(point_clouds_container.point_clouds, false, false);
+            ndt.optimize(point_clouds_container.point_clouds, false);
         }
 
         if (ImGui::Button("compute mean mahalanobis distance")) {
@@ -934,7 +934,7 @@ void ndt_gui() {
             double mui = 0.0;
             //ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
             //std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
-            ndt.optimize(point_clouds_container.point_clouds, true, false);
+            ndt.optimize(point_clouds_container.point_clouds, true);
         }
 
         ImGui::Text("--------------------------------------------------------------------------------------------------------");
@@ -2746,7 +2746,7 @@ void perform_experiment_on_windows()
     ndt.is_lie_algebra_right_jacobian = false;
 
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2762,7 +2762,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2776,7 +2776,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2794,7 +2794,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2808,7 +2808,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2823,7 +2823,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2844,7 +2844,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2859,7 +2859,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2874,7 +2874,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2892,7 +2892,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2907,7 +2907,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2923,7 +2923,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2948,7 +2948,7 @@ void perform_experiment_on_windows()
     ndt.is_lie_algebra_left_jacobian = true;
     ndt.is_lie_algebra_right_jacobian = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2966,7 +2966,7 @@ void perform_experiment_on_windows()
     ndt.is_levenberg_marguardt = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -2985,7 +2985,7 @@ void perform_experiment_on_windows()
     ndt.is_gauss_newton = true;
     ndt.is_levenberg_marguardt = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3001,7 +3001,7 @@ void perform_experiment_on_windows()
     ndt.is_levenberg_marguardt = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true, true);
+    ndt.optimize(point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);

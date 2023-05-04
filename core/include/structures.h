@@ -62,6 +62,7 @@ struct Point3D
 	float y;
 	float z;
 	int index_pose;
+	//double timestamp;
 };
 
 struct Point

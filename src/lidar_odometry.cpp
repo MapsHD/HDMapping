@@ -25,12 +25,12 @@ NDT ndt;
 std::vector<Eigen::Vector3d> means;
 std::vector<Eigen::Matrix3d> covs;
 
-
-//std::vector<PointCloud> initial_points;
+std::vector<Point3D> intermediate_points;
 
 
 bool show_all_points = true;
 bool show_initial_points = true;
+bool show_intermadiate_points = false;
 bool show_covs = false;
 int dec_covs = 10;
 
@@ -96,6 +96,7 @@ void lidar_odometry_gui() {
         ImGui::Checkbox("show_covs", &show_covs);
         ImGui::SameLine();
         ImGui::InputInt("dec_covs" , &dec_covs);
+        ImGui::Checkbox("show_intermadiate_points", &show_intermadiate_points);
         ImGui::End();
     }
 }
@@ -224,6 +225,14 @@ void display() {
             draw_ellipse(covs[i], means[i], Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
         }
         //draw_ellipse(const Eigen::Matrix3d& covar, Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd  = 3)
+    }
+    if(show_intermadiate_points){
+        glColor3d(0.0, 0.0, 1.0);
+        glBegin(GL_POINTS);
+        for(const auto &p:intermediate_points){
+            glVertex3d(p.x, p.y, p.z);
+        }
+        glEnd();
     }
 
     ImGui_ImplOpenGL2_NewFrame();
@@ -440,7 +449,6 @@ int main(int argc, char *argv[]){
         }
     }
 
-    //PointCloud initial_pc;
     for(int i = 0; i < 1000000; i++){
         auto p = point_data[i];
         Point3D pp;
@@ -450,6 +458,17 @@ int main(int argc, char *argv[]){
 
         initial_points.push_back(pp);
     }
+
+    for(int i = 5500000; i < 5800000; i++){
+        auto p = point_data[i];
+        Point3D pp;
+        pp.x = p.point.x();
+        pp.y = p.point.y();
+        pp.z = p.point.z();
+        //std::cout << p.timestamp << std::endl;
+        intermediate_points.push_back(pp);
+    }
+
 
     NDT::GridParameters in_out_params;
     in_out_params.resolution_X = 0.3;
@@ -473,9 +492,7 @@ int main(int argc, char *argv[]){
 
     //ndt.build_rgd(initial_points, index_pair, buckets, in_out_params);
     //std::cout << "buckets.size() " << buckets.size() << std::endl;
-
     //bool optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance, bool compute_only_mean_and_cov);
-
     
     initGL(&argc, argv);
     glutDisplayFunc(display);

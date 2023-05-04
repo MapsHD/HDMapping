@@ -22,12 +22,17 @@
 std::vector<Eigen::Vector3d> all_points;
 std::vector<Point3D> initial_points;
 NDT ndt;
+std::vector<Eigen::Vector3d> means;
+std::vector<Eigen::Matrix3d> covs;
+
 
 //std::vector<PointCloud> initial_points;
 
 
 bool show_all_points = true;
 bool show_initial_points = true;
+bool show_covs = false;
+int dec_covs = 10;
 
 struct PPoint {
     double timestamp;
@@ -46,11 +51,51 @@ bool gui_mouse_down{ false };
 int mouse_buttons = 0; 
 float mouse_sensitivity = 1.0;
 
+void draw_ellipse(const Eigen::Matrix3d& covar, Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd  = 3)
+{
+    Eigen::LLT<Eigen::Matrix<double,3,3> > cholSolver(covar);
+    Eigen::Matrix3d transform = cholSolver.matrixL();
+
+    const double pi = 3.141592;
+    const double di = 0.02;
+    const double dj = 0.04;
+    const double du = di*2*pi;
+    const double dv = dj*pi;
+    glColor3f(color.x(), color.y(),color.z());
+
+    for (double i = 0; i < 1.0; i+=di)  //horizonal
+    {
+        for (double j = 0; j < 1.0; j+=dj)  //vertical
+        {
+            double u = i*2*pi;      //0     to  2pi
+            double v = (j-0.5)*pi;  //-pi/2 to pi/2
+
+            const Eigen::Vector3d pp0( cos(v)* cos(u),cos(v) * sin(u),sin(v));
+            const Eigen::Vector3d pp1(cos(v) * cos(u + du) ,cos(v) * sin(u + du) ,sin(v));
+            const Eigen::Vector3d pp2(cos(v + dv)* cos(u + du) ,cos(v + dv)* sin(u + du) ,sin(v + dv));
+            const Eigen::Vector3d pp3( cos(v + dv)* cos(u),cos(v + dv)* sin(u),sin(v + dv));
+            Eigen::Vector3d tp0 = transform * (nstd*pp0) + mean;
+            Eigen::Vector3d tp1 = transform * (nstd*pp1) + mean;
+            Eigen::Vector3d tp2 = transform * (nstd*pp2) + mean;
+            Eigen::Vector3d tp3 = transform * (nstd*pp3) + mean;
+
+            glBegin(GL_LINE_LOOP);
+            glVertex3dv(tp0.data());
+            glVertex3dv(tp1.data());
+            glVertex3dv(tp2.data());
+            glVertex3dv(tp3.data());
+            glEnd();
+        }
+    }
+}
+
 void lidar_odometry_gui() {
     if(ImGui::Begin("lidar_odometry_gui")){
         ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
-
+        ImGui::Checkbox("show_covs", &show_covs);
+        ImGui::SameLine();
+        ImGui::InputInt("dec_covs" , &dec_covs);
         ImGui::End();
     }
 }
@@ -173,6 +218,12 @@ void display() {
             glVertex3d(p.x, p.y, p.z);
         }
         glEnd();
+    }
+    if(show_covs){
+        for(int i = 0; i < means.size(); i += dec_covs){
+            draw_ellipse(covs[i], means[i], Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
+        }
+        //draw_ellipse(const Eigen::Matrix3d& covar, Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd  = 3)
     }
 
     ImGui_ImplOpenGL2_NewFrame();
@@ -404,14 +455,24 @@ int main(int argc, char *argv[]){
     in_out_params.resolution_X = 0.3;
     in_out_params.resolution_Y = 0.3;
     in_out_params.resolution_Z = 0.3;
-    in_out_params.bounding_box_extension = 20.0;
-    ndt.grid_calculate_params(initial_points, in_out_params);
+    in_out_params.bounding_box_extension = 1.0;
+    
 
     std::vector<NDT::PointBucketIndexPair> index_pair;
     std::vector<NDT::Bucket> buckets;
 
-    ndt.build_rgd(initial_points, index_pair, buckets, in_out_params);
-    std::cout << "buckets.size() " << buckets.size() << std::endl;
+    ndt.compute_cov_mean(initial_points, index_pair, buckets, in_out_params);
+
+    for(int i = 0; i < buckets.size(); i++){
+		if(buckets[i].number_of_points > 5){
+			//std::cout << i << " " << buckets[i].cov << std::endl;
+            covs.push_back(buckets[i].cov);
+            means.push_back(buckets[i].mean);
+		}
+	}
+
+    //ndt.build_rgd(initial_points, index_pair, buckets, in_out_params);
+    //std::cout << "buckets.size() " << buckets.size() << std::endl;
 
     //bool optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance, bool compute_only_mean_and_cov);
 

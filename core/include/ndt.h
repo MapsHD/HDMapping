@@ -95,7 +95,8 @@ public:
 	bool optimize_lie_algebra_right_jacobian(std::vector<PointCloud> &point_clouds);
 	// std::vector<Eigen::Matrix<double, 7, 7, Eigen::RowMajor>> compute_covariance_matrices7x7(PointClouds& point_clouds_container);
 
-	//bool compute_cov_mean();
+	bool compute_cov_mean(std::vector<Point3D> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
+				   int num_threads = std::thread::hardware_concurrency());
 
 	float bucket_size[3];
 	float bucket_size_external[3];

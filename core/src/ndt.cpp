@@ -310,7 +310,6 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 			 bool is_generalized, double sigma_r, double sigma_polar_angle, double sigma_azimuthal_angle, int num_extended_points, double *md_out, double *md_count_out, 
 			 bool compute_only_mean_and_cov)
 {
-
 	std::vector<Eigen::Triplet<double>> tripletListA;
 	std::vector<Eigen::Triplet<double>> tripletListP;
 	std::vector<Eigen::Triplet<double>> tripletListB;

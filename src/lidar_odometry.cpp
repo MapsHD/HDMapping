@@ -34,6 +34,9 @@ NDT::GridParameters in_out_params;
 std::vector<NDT::PointBucketIndexPair> index_pair;
 std::vector<NDT::Bucket> buckets;
 
+void update_rgd(NDT::GridParameters& rgd_params, std::vector<NDT::PointBucketIndexPair>& index_pair, std::vector<NDT::Bucket>& buckets,
+                std::vector<Point3D>& points_global);
+
 bool show_all_points = true;
 bool show_initial_points = true;
 //bool show_intermadiate_points = false;
@@ -122,7 +125,7 @@ void lidar_odometry_gui() {
             ImGui::SameLine();
             std::string text2 = "optimize[" + std::to_string(i) + "]";
             if(ImGui::Button(text2.c_str())){
-                for(int iter = 0; iter < 10; iter++){
+                for(int iter = 0; iter < 30; iter++){
                     optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model, 
                         in_out_params, index_pair, buckets);
                 }
@@ -136,7 +139,33 @@ void lidar_odometry_gui() {
                     for(int k = 1; k < tmp.size(); k++){
                         Eigen::Affine3d m_update = tmp[k-1].inverse() * tmp[k];
                         m_last = m_last * m_update;
-                        worker_data[j].intermediate_trajectory[k] =  m_last;
+                        worker_data[j].intermediate_trajectory[k] = m_last;
+                    }
+                }
+
+                std::vector<Point3D> points_global;
+
+                for(int j = 0; j < worker_data[i].intermediate_points.size(); j++){
+                    Eigen::Vector3d pt = worker_data[i].intermediate_trajectory[worker_data[i].intermediate_points[j].index_pose] * 
+                        Eigen::Vector3d(worker_data[i].intermediate_points[j].x, worker_data[i].intermediate_points[j].y, worker_data[i].intermediate_points[j].z);
+
+                    Point3D pp;
+                    pp.x = pt.x();
+                    pp.y = pt.y();
+                    pp.z = pt.z();
+                    pp.index_pose = worker_data[i].intermediate_points[j].index_pose;
+                    points_global.push_back(pp);
+                }
+
+                update_rgd(in_out_params, index_pair, buckets, points_global);
+
+                covs.clear();
+                means.clear();
+                for(int j = 0; j < buckets.size(); j++){
+                    if(buckets[j].number_of_points > 5){
+                        //std::cout << i << " " << buckets[i].cov << std::endl;
+                        covs.push_back(buckets[j].cov);
+                        means.push_back(buckets[j].mean);
                     }
                 }
             }
@@ -395,8 +424,7 @@ std::vector<PPoint> load_point_cloud(const std::string& lazFile)
 
         if(p.timestamp == 0){
             counter_ts0 ++;
-        }
-        if(p.timestamp > 0){
+        }else{
             points.emplace_back(p);
         }//else{
            // std::cout << "timestamp == 0!!!" << std::endl;
@@ -555,7 +583,7 @@ int main(int argc, char *argv[]){
 
     std::cout << "poses.size(): " << poses.size() << std::endl;
 
-    int thershold = 10;
+    int thershold = 20;
     WorkerData wd;
     std::vector<double> temp_ts;
     for(size_t i = 0; i < poses.size(); i++){
@@ -950,9 +978,9 @@ void optimize(std::vector<Point3D> &intermediate_points, std::vector<Eigen::Affi
         tripletListP.emplace_back(ir ,    ir,     1000000);
         tripletListP.emplace_back(ir + 1, ir + 1, 1000000);
         tripletListP.emplace_back(ir + 2, ir + 2, 1000000);
-        tripletListP.emplace_back(ir + 3, ir + 3, 10000000000);
-        tripletListP.emplace_back(ir + 4, ir + 4, 10000000000);
-        tripletListP.emplace_back(ir + 5, ir + 5, 100000000);
+        tripletListP.emplace_back(ir + 3, ir + 3, 1000000);
+        tripletListP.emplace_back(ir + 4, ir + 4, 1000000);
+        tripletListP.emplace_back(ir + 5, ir + 5, 1000000);
     }
 
     Eigen::SparseMatrix<double> matA(tripletListB.size(), intermediate_trajectory.size() * 6);
@@ -1022,4 +1050,91 @@ void optimize(std::vector<Point3D> &intermediate_points, std::vector<Eigen::Affi
         << chrono::duration_cast<chrono::milliseconds>(end - start).count()
         << " ms" << endl;
 return;
+}
+
+void update_rgd(NDT::GridParameters& rgd_params, std::vector<NDT::PointBucketIndexPair>& index_pair, std::vector<NDT::Bucket>& buckets,
+                std::vector<Point3D>& points_global)
+{
+    std::cout << "update_rgd" << std::endl;
+
+    for(int i = 0; i < points_global.size(); i++){
+        if (points_global[i].x < rgd_params.bounding_box_min_X)
+		{
+			continue;
+		}
+		if (points_global[i].x > rgd_params.bounding_box_max_X)
+		{
+			continue;
+		}
+		if (points_global[i].y < rgd_params.bounding_box_min_Y)
+		{
+			continue;
+		}
+		if (points_global[i].y > rgd_params.bounding_box_max_Y)
+		{
+			continue;
+		}
+		if (points_global[i].z < rgd_params.bounding_box_min_Z)
+		{
+			continue;
+		}
+		if (points_global[i].z > rgd_params.bounding_box_max_Z)
+		{
+			continue;
+		}
+
+		long long unsigned int ix = (points_global[i].x - rgd_params.bounding_box_min_X) / rgd_params.resolution_X;
+		long long unsigned int iy = (points_global[i].y - rgd_params.bounding_box_min_Y) / rgd_params.resolution_Y;
+		long long unsigned int iz = (points_global[i].z - rgd_params.bounding_box_min_Z) / rgd_params.resolution_Z;
+
+		auto index_of_bucket = ix * static_cast<long long unsigned int>(rgd_params.number_of_buckets_Y) *
+										   static_cast<long long unsigned int>(rgd_params.number_of_buckets_Z) +
+									   iy * static_cast<long long unsigned int>(rgd_params.number_of_buckets_Z) + iz;
+
+        //std::cout << "index_of_bucket " << index_of_bucket << " " << buckets[index_of_bucket].number_of_points << std::endl;
+        //mean_acc      += (cur_acc - mean_acc) / N;
+        //mean_gyr      += (cur_gyr - mean_gyr) / N;
+
+        //cov_acc = cov_acc * (N - 1.0) / N + (cur_acc - mean_acc).cwiseProduct(cur_acc - mean_acc) * (N - 1.0) / (N * N);
+        //cov_gyr = cov_gyr * (N - 1.0) / N + (cur_gyr - mean_gyr).cwiseProduct(cur_gyr - mean_gyr) * (N - 1.0) / (N * N);
+
+        if(buckets[index_of_bucket].number_of_points == 0){
+            buckets[index_of_bucket].mean = Eigen::Vector3d(points_global[i].x, points_global[i].y, points_global[i].z);
+            buckets[index_of_bucket].cov = Eigen::Matrix3d::Zero();
+            buckets[index_of_bucket].cov(0,0) = 0.03 * 0.03;
+            buckets[index_of_bucket].cov(1,1) = 0.03 * 0.03;
+            buckets[index_of_bucket].cov(2,2) = 0.03 * 0.03;
+
+            buckets[index_of_bucket].number_of_points = 1;
+        }else{
+            buckets[index_of_bucket].number_of_points ++;
+            auto curr_mean = Eigen::Vector3d(points_global[i].x, points_global[i].y, points_global[i].z);
+            auto mean = buckets[index_of_bucket].mean;
+            buckets[index_of_bucket].mean += (mean - curr_mean) / buckets[index_of_bucket].number_of_points;
+            
+            Eigen::Matrix3d cov_update;
+            cov_update(0, 0) = (mean.x() - curr_mean.x()) * (mean.x() - curr_mean.x());
+            cov_update(0, 1) = (mean.x() - curr_mean.x()) * (mean.y() - curr_mean.y());
+            cov_update(0, 2) = (mean.x() - curr_mean.x()) * (mean.z() - curr_mean.z());
+            cov_update(1, 0) = (mean.y() - curr_mean.y()) * (mean.x() - curr_mean.x());
+            cov_update(1, 1) = (mean.y() - curr_mean.y()) * (mean.y() - curr_mean.y());
+            cov_update(1, 2) = (mean.y() - curr_mean.y()) * (mean.z() - curr_mean.z());
+            cov_update(2, 0) = (mean.z() - curr_mean.z()) * (mean.x() - curr_mean.x());
+            cov_update(2, 1) = (mean.z() - curr_mean.z()) * (mean.y() - curr_mean.y());
+            cov_update(2, 2) = (mean.z() - curr_mean.z()) * (mean.z() - curr_mean.z());
+
+            buckets[index_of_bucket].cov = buckets[index_of_bucket].cov * (buckets[index_of_bucket].number_of_points - 1) / buckets[index_of_bucket].number_of_points +
+                cov_update * (buckets[index_of_bucket].number_of_points - 1)/ (buckets[index_of_bucket].number_of_points * buckets[index_of_bucket].number_of_points);
+            
+            //std::cout << "---------before " << std::endl;
+            //std::cout <<  buckets[index_of_bucket].cov << std::endl;
+            
+            //buckets[index_of_bucket].cov += cov_update * (1.0 / buckets[index_of_bucket].number_of_points * buckets[index_of_bucket].number_of_points);
+        
+            //std::cout << (mean - curr_mean).norm() << " ";
+            //std::cout << "---------after " << std::endl;
+            //std::cout <<  buckets[index_of_bucket].cov << std::endl;
+
+        }
+    }
 }

@@ -119,6 +119,57 @@ void lidar_odometry_gui() {
         ImGui::InputInt("dec_covs" , &dec_covs);
         //ImGui::Checkbox("show_intermadiate_points", &show_intermadiate_points);
 
+        if(ImGui::Button("compute_all")){
+            for(int i = 0; i < worker_data.size(); i++){
+                std::cout << "computing: [" << i + 1 << "] of " << worker_data.size() << std::endl; 
+                for(int iter = 0; iter < 30; iter++){
+                    optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model, 
+                        in_out_params, index_pair, buckets);
+                }
+                //update
+
+                for(int j = i + 1; j < worker_data.size(); j++){
+                    Eigen::Affine3d m_last = worker_data[j - 1].intermediate_trajectory[worker_data[j - 1].intermediate_trajectory.size() - 1];
+                    auto tmp = worker_data[j].intermediate_trajectory;
+
+                    worker_data[j].intermediate_trajectory[0] = m_last;
+                    for(int k = 1; k < tmp.size(); k++){
+                        Eigen::Affine3d m_update = tmp[k-1].inverse() * tmp[k];
+                        m_last = m_last * m_update;
+                        worker_data[j].intermediate_trajectory[k] = m_last;
+                    }
+                }
+
+                std::vector<Point3D> points_global;
+
+                for(int j = 0; j < worker_data[i].intermediate_points.size(); j++){
+                    Eigen::Vector3d pt = worker_data[i].intermediate_trajectory[worker_data[i].intermediate_points[j].index_pose] * 
+                        Eigen::Vector3d(worker_data[i].intermediate_points[j].x, worker_data[i].intermediate_points[j].y, worker_data[i].intermediate_points[j].z);
+
+                    Point3D pp;
+                    pp.x = pt.x();
+                    pp.y = pt.y();
+                    pp.z = pt.z();
+                    pp.index_pose = worker_data[i].intermediate_points[j].index_pose;
+                    points_global.push_back(pp);
+                }
+
+                std::cout << "computed: [" << i + 1 << "] of " << worker_data.size() << std::endl; 
+                update_rgd(in_out_params, index_pair, buckets, points_global);
+
+                covs.clear();
+                means.clear();
+                for(int j = 0; j < buckets.size(); j++){
+                    if(buckets[j].number_of_points > 5){
+                        //std::cout << i << " " << buckets[i].cov << std::endl;
+                        covs.push_back(buckets[j].cov);
+                        means.push_back(buckets[j].mean);
+                    }
+                }
+                std::cout << "computed: [" << i + 1 << "] of " << worker_data.size() << std::endl; 
+            }
+        }
+
         for(int i = 0; i < worker_data.size(); i++){
             std::string text = "show[" + std::to_string(i) + "]";
             ImGui::Checkbox(text.c_str() , &worker_data[i].show);
@@ -416,16 +467,22 @@ std::vector<PPoint> load_point_cloud(const std::string& lazFile)
             std::abort();
         }
         PPoint p;
-        p.point.x() = header->x_offset + header->x_scale_factor * static_cast<double>(point->X);
-        p.point.y() = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y);
-        p.point.z() = header->z_offset + header->z_scale_factor * static_cast<double>(point->Z);
+
+        double cal_x = 11.0 / 1000.0;
+        double cal_y = 23.29 / 1000.0;
+        double cal_z = -44.12 / 1000.0;
+        p.point.x() = header->x_offset + header->x_scale_factor * static_cast<double>(point->X) - cal_x;
+        p.point.y() = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y) - cal_y;
+        p.point.z() = header->z_offset + header->z_scale_factor * static_cast<double>(point->Z) - cal_z;
         p.timestamp = point->gps_time;
         p.intensity = point->intensity;
 
         if(p.timestamp == 0){
             counter_ts0 ++;
         }else{
-            points.emplace_back(p);
+            if( sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y()) > 1.5){
+                points.emplace_back(p);
+            }
         }//else{
            // std::cout << "timestamp == 0!!!" << std::endl;
         //}
@@ -513,18 +570,66 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &tra
     return ret;
 }
 
+//std::vector<Point3D> intermediate_points;
+std::vector<Point3D> decimate(std::vector<Point3D> points, double bucket_x, double bucket_y, double bucket_z)
+{
+    std::vector<Point3D> out;
+
+    PointCloud pc;
+    PointCloud::GridParameters params;
+
+	params.resolution_X = bucket_x;
+	params.resolution_Y = bucket_y;
+	params.resolution_Z = bucket_z;
+	params.bounding_box_extension = 1.0;
+
+    std::vector<Eigen::Vector3d> ppoints;
+    for(int i = 0; i < points.size(); i++){
+        ppoints.emplace_back(points[i].x, points[i].y, points[i].z);
+    }
+
+	pc.grid_calculate_params(ppoints, params);
+    std::vector<PointCloud::PointBucketIndexPair> ip;
+	pc.reindex(ip, ppoints, params);
+
+    for (int i = 1; i < ip.size(); i++) {
+		if (ip[i - 1].index_of_bucket != ip[i].index_of_bucket) {
+			out.emplace_back(points[ip[i].index_of_point]);
+        }
+    }
+    return out;
+}
+
 int main(int argc, char *argv[]){
-    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data1 = load_imu("C:/data/mandeye_360/StopScan+straightGoing/imu0000.csv");
-    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data2 = load_imu("C:/data/mandeye_360/StopScan+straightGoing/imu0001.csv");
+    //std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data1 = load_imu("C:/data/mandeye_360/StopScan+straightGoing/imu0000.csv");
+    //std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data2 = load_imu("C:/data/mandeye_360/StopScan+straightGoing/imu0001.csv");
 
-    auto im_data = imu_data1;
+    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data0 = load_imu("C:/data/mandeye_360/square_test/imu0000.csv");
+    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data1 = load_imu("C:/data/mandeye_360/square_test/imu0001.csv");
+    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data2 = load_imu("C:/data/mandeye_360/square_test/imu0002.csv");
+    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data3 = load_imu("C:/data/mandeye_360/square_test/imu0003.csv");
+    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data4 = load_imu("C:/data/mandeye_360/square_test/imu0004.csv");
+
+    auto im_data = imu_data0;
+    im_data.insert(std::end(im_data), std::begin(imu_data1), std::end(imu_data1));
     im_data.insert(std::end(im_data), std::begin(imu_data2), std::end(imu_data2));
+    im_data.insert(std::end(im_data), std::begin(imu_data3), std::end(imu_data3));
+    im_data.insert(std::end(im_data), std::begin(imu_data4), std::end(imu_data4));
 
-    auto points1 = load_point_cloud("C:/data/mandeye_360/StopScan+straightGoing/lidar0000.laz");
-    auto points2 = load_point_cloud("C:/data/mandeye_360/StopScan+straightGoing/lidar0001.laz");
+    //auto points1 = load_point_cloud("C:/data/mandeye_360/StopScan+straightGoing/lidar0000.laz");
+    //auto points2 = load_point_cloud("C:/data/mandeye_360/StopScan+straightGoing/lidar0001.laz");
 
-    auto point_data = points1;
+    auto points0 = load_point_cloud("C:/data/mandeye_360/square_test/lidar0000.laz");
+    auto points1 = load_point_cloud("C:/data/mandeye_360/square_test/lidar0001.laz");
+    auto points2 = load_point_cloud("C:/data/mandeye_360/square_test/lidar0002.laz");
+    auto points3 = load_point_cloud("C:/data/mandeye_360/square_test/lidar0003.laz");
+    auto points4 = load_point_cloud("C:/data/mandeye_360/square_test/lidar0004.laz");
+
+    auto point_data = points0;
+    point_data.insert(std::end(point_data), std::begin(points1), std::end(points1));
     point_data.insert(std::end(point_data), std::begin(points2), std::end(points2));
+    point_data.insert(std::end(point_data), std::begin(points3), std::end(points3));
+    point_data.insert(std::end(point_data), std::begin(points4), std::end(points4));
 
     FusionAhrs ahrs;
     FusionAhrsInitialise(&ahrs);
@@ -609,6 +714,8 @@ int main(int argc, char *argv[]){
                 }
             }
 
+            wd.intermediate_points = decimate(wd.intermediate_points, 0.1, 0.1, 0.1);
+
             worker_data.push_back(wd);
             wd.intermediate_points.clear();
             wd.intermediate_trajectory.clear();
@@ -678,7 +785,7 @@ int main(int argc, char *argv[]){
     in_out_params.resolution_X = 0.3;
     in_out_params.resolution_Y = 0.3;
     in_out_params.resolution_Z = 0.3;
-    in_out_params.bounding_box_extension = 1.0;
+    in_out_params.bounding_box_extension = 50.0;
     
     ndt.compute_cov_mean(initial_points, index_pair, buckets, in_out_params);
 
@@ -1004,13 +1111,13 @@ void optimize(std::vector<Point3D> &intermediate_points, std::vector<Eigen::Affi
     tripletListP.clear();
     tripletListB.clear();
 
-    std::cout << "AtPA.size: " << AtPA.size() << std::endl;
-    std::cout << "AtPB.size: " << AtPB.size() << std::endl;
+    //std::cout << "AtPA.size: " << AtPA.size() << std::endl;
+    //std::cout << "AtPB.size: " << AtPB.size() << std::endl;
 
-    std::cout << "start solving AtPA=AtPB" << std::endl;
+    //std::cout << "start solving AtPA=AtPB" << std::endl;
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
 
-    std::cout << "x = solver.solve(AtPB)" << std::endl;
+    //std::cout << "x = solver.solve(AtPB)" << std::endl;
     Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
     std::vector<double> h_x;
@@ -1020,12 +1127,12 @@ void optimize(std::vector<Point3D> &intermediate_points, std::vector<Eigen::Affi
             h_x.push_back(it.value());
         }
     }
-    std::cout << "h_x.size(): " << h_x.size() << std::endl;
-    std::cout << "AtPA=AtPB SOLVED" << std::endl;
+    //std::cout << "h_x.size(): " << h_x.size() << std::endl;
+    //std::cout << "AtPA=AtPB SOLVED" << std::endl;
 
-    for(size_t i = 0 ; i < h_x.size(); i++){
-        std::cout << h_x[i] << std::endl;
-    }
+    //for(size_t i = 0 ; i < h_x.size(); i++){
+    //    std::cout << h_x[i] << std::endl;
+    //}
 
     if(h_x.size() == 6 * intermediate_trajectory.size()){
         int counter = 0;
@@ -1046,7 +1153,7 @@ void optimize(std::vector<Point3D> &intermediate_points, std::vector<Eigen::Affi
     }
 
     auto end = chrono::steady_clock::now();
-    std::cout << "Elapsed time in milliseconds: "
+    std::cout << "single iteration Elapsed time in milliseconds: "
         << chrono::duration_cast<chrono::milliseconds>(end - start).count()
         << " ms" << endl;
 return;

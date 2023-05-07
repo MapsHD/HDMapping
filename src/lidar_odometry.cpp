@@ -23,6 +23,7 @@
 #include <chrono>
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
+#define NR_ITER 30
 
 std::vector<Eigen::Vector3d> all_points;
 std::vector<Point3D> initial_points;
@@ -34,7 +35,7 @@ NDT::GridParameters in_out_params;
 std::vector<NDT::PointBucketIndexPair> index_pair;
 std::vector<NDT::Bucket> buckets;
 
-void update_rgd(NDT::GridParameters& rgd_params, std::vector<NDT::PointBucketIndexPair>& index_pair, std::vector<NDT::Bucket>& buckets,
+void update_rgd(NDT::GridParameters& rgd_params, std::vector<NDT::Bucket>& buckets,
                 std::vector<Point3D>& points_global);
 
 bool show_all_points = true;
@@ -70,7 +71,7 @@ int mouse_buttons = 0;
 float mouse_sensitivity = 1.0;
 
 void optimize(std::vector<Point3D> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory, std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model, 
-    NDT::GridParameters& rgd_params, std::vector<NDT::PointBucketIndexPair>& index_pair, std::vector<NDT::Bucket>& buckets);
+    NDT::GridParameters& rgd_params, std::vector<NDT::Bucket>& buckets);
 
 void draw_ellipse(const Eigen::Matrix3d& covar, Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd  = 3)
 {
@@ -110,6 +111,152 @@ void draw_ellipse(const Eigen::Matrix3d& covar, Eigen::Vector3d& mean, Eigen::Ve
     }
 }
 
+bool update_sliding_window_rgd(Eigen::Vector3d offset, 
+                        std::vector<WorkerData>& worker_data, 
+                        const NDT::GridParameters &rgd_params,
+                        std::vector<NDT::Bucket>& buckets)
+{
+    long long int ix_prev = (0.0 - rgd_params.bounding_box_min_X) / rgd_params.resolution_X;
+    long long int iy_prev = (0.0 - rgd_params.bounding_box_min_Y) / rgd_params.resolution_Y;
+    long long int iz_prev = (0.0 - rgd_params.bounding_box_min_Z) / rgd_params.resolution_Z;
+
+    long long int ix_curr = (offset.x() - rgd_params.bounding_box_min_X) / rgd_params.resolution_X;
+    long long int iy_curr = (offset.y() - rgd_params.bounding_box_min_Y) / rgd_params.resolution_Y;
+    long long int iz_curr = (offset.z() - rgd_params.bounding_box_min_Z) / rgd_params.resolution_Z;
+
+    if(ix_prev != ix_curr || iy_prev != iy_curr || iz_prev != iz_curr){
+        std::cout << "update_sliding_window_rgd" << std::endl;
+
+        std::cout << "ix_prev: " << ix_prev << std::endl;
+        std::cout << "iy_prev: " << iy_prev << std::endl;
+        std::cout << "iz_prev: " << iz_prev << std::endl;
+
+        std::cout << "ix_curr: " << ix_curr << std::endl;
+        std::cout << "iy_curr: " << iy_curr << std::endl;
+        std::cout << "iz_curr: " << iz_curr << std::endl;
+        //exit(1);
+        //NDT::GridParameters in_out_params;
+        //std::vector<NDT::PointBucketIndexPair> index_pair;
+        //std::vector<NDT::Bucket> buckets;
+
+        std::vector<NDT::Bucket> buckets_new(buckets.size());
+        for(int i = 0; i < buckets_new.size(); i++){
+            buckets_new[i].number_of_points = 0;
+            buckets_new[i].index_begin = 0;
+            buckets_new[i].index_end = 0;
+            buckets_new[i].cov = Eigen::Matrix3d::Zero();
+            buckets_new[i].mean = {0,0,0};
+        }
+
+        for(int ix = 0; ix < in_out_params.number_of_buckets_X; ix++){
+            for(int iy = 0; iy < in_out_params.number_of_buckets_Y; iy++){
+                for(int iz = 0; iz < in_out_params.number_of_buckets_Z; iz++){
+                    int new_ix = ix - (ix_curr - ix_prev);
+                    int new_iy = iy - (iy_curr - iy_prev);
+                    int new_iz = iz - (iz_curr - iz_prev);
+
+                    if(new_ix < 0 || new_ix >= in_out_params.number_of_buckets_X){
+                        continue;
+                    }
+                    if(new_iy < 0 || new_iy >= in_out_params.number_of_buckets_Y){
+                        continue;
+                    }
+                    if(new_iz < 0 || new_iz >= in_out_params.number_of_buckets_Z){
+                        continue;
+                    }
+
+                    long long int new_index_of_bucket = new_ix * static_cast<long long int>(rgd_params.number_of_buckets_Y) *
+										   static_cast<long long int>(rgd_params.number_of_buckets_Z) +
+									   new_iy * static_cast<long long int>(rgd_params.number_of_buckets_Z) + new_iz;
+
+                    long long int prev_index_of_bucket = ix * static_cast<long long int>(rgd_params.number_of_buckets_Y) *
+										   static_cast<long long int>(rgd_params.number_of_buckets_Z) +
+									   iy * static_cast<long long int>(rgd_params.number_of_buckets_Z) + iz;       
+                    
+                    buckets_new[new_index_of_bucket] = buckets[prev_index_of_bucket];   
+                    buckets_new[new_index_of_bucket].mean.x() -= (double(ix_curr - ix_prev)) * rgd_params.resolution_X;
+                    buckets_new[new_index_of_bucket].mean.y() -= (double(ix_curr - ix_prev)) * rgd_params.resolution_Y;
+                    buckets_new[new_index_of_bucket].mean.z() -= (double(ix_curr - ix_prev)) * rgd_params.resolution_Z;
+
+                }
+            }
+        }
+        buckets = buckets_new;
+
+        for(int index = 0 ; index < worker_data.size(); index++){
+            //for(auto &it:worker_data[index].intermediate_trajectory){
+            for(int ii=0; ii < worker_data[index].intermediate_trajectory.size(); ii++){
+                //std::cout << it.translation() << " x" << std::endl;
+                worker_data[index].intermediate_trajectory[ii].translation().x() -= (double(ix_curr - ix_prev)) * rgd_params.resolution_X;
+                worker_data[index].intermediate_trajectory[ii].translation().y() -= (double(iy_curr - iy_prev)) * rgd_params.resolution_Y;
+                worker_data[index].intermediate_trajectory[ii].translation().z() -= (double(iz_curr - iz_prev)) * rgd_params.resolution_Z;
+                //worker_data[index].intermediate_trajectory_motion_model[ii].translation().z() -= (iz_curr - iz_prev) * rgd_params.resolution_Z;
+
+                //std::cout << (iz_curr - iz_prev)*rgd_params.resolution_Z << std::endl;
+                //std::cout << it.translation() << " xx" << std::endl;
+
+                //it.translation() -= offset;
+            }
+        }
+       
+        std::cout << "offset " << offset << std::endl;
+        
+
+        return true;
+    }
+
+    return false;
+}
+
+void shift_rgd(const NDT::GridParameters &rgd_params, std::vector<NDT::Bucket>& buckets){
+    std::vector<NDT::Bucket> buckets_new(buckets.size());
+    for(int i = 0; i < buckets.size(); i++){
+        buckets_new[i].number_of_points = 0;
+        buckets_new[i].index_begin = 0;
+        buckets_new[i].index_end = 0;
+        buckets_new[i].cov = Eigen::Matrix3d::Zero();
+        buckets_new[i].mean = {0,0,0};
+    }
+
+    for(int ix = 0; ix < in_out_params.number_of_buckets_X; ix++){
+        for(int iy = 0; iy < in_out_params.number_of_buckets_Y; iy++){
+            for(int iz = 0; iz < in_out_params.number_of_buckets_Z; iz++){
+                int new_ix = ix - 0;
+                int new_iy = iy - 0;
+                int new_iz = iz - 1;
+
+                bool isok = true;
+                if(new_ix < 0 || new_ix >= in_out_params.number_of_buckets_X){
+                    isok = false;
+                }
+                if(new_iy < 0 || new_iy >= in_out_params.number_of_buckets_Y){
+                    isok = false;
+                }
+                if(new_iz < 0 || new_iz >= in_out_params.number_of_buckets_Z){
+                    isok = false;
+                }
+
+                if(isok){
+                    long long int new_index_of_bucket = new_ix * static_cast<long long int>(rgd_params.number_of_buckets_Y) *
+                                            static_cast<long long int>(rgd_params.number_of_buckets_Z) +
+                                        new_iy * static_cast<long long int>(rgd_params.number_of_buckets_Z) + new_iz;
+
+                    long long int prev_index_of_bucket = ix * static_cast<long long int>(rgd_params.number_of_buckets_Y) *
+                                            static_cast<long long int>(rgd_params.number_of_buckets_Z) +
+                                        iy * static_cast<long long int>(rgd_params.number_of_buckets_Z) + iz;       
+                    
+
+                    buckets_new[new_index_of_bucket] = buckets[prev_index_of_bucket]; 
+                    buckets_new[new_index_of_bucket].mean.z() -= rgd_params.resolution_Z;
+                }   
+            }
+        }
+    }
+    buckets = buckets_new;  
+
+}
+
+
 void lidar_odometry_gui() {
     if(ImGui::Begin("lidar_odometry_gui")){
         ImGui::Checkbox("show_all_points", &show_all_points);
@@ -119,13 +266,34 @@ void lidar_odometry_gui() {
         ImGui::InputInt("dec_covs" , &dec_covs);
         //ImGui::Checkbox("show_intermadiate_points", &show_intermadiate_points);
 
-        if(ImGui::Button("compute_all")){
-            for(int i = 0; i < worker_data.size(); i++){
-                std::cout << "computing: [" << i + 1 << "] of " << worker_data.size() << std::endl; 
-                for(int iter = 0; iter < 30; iter++){
-                    optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model, 
-                        in_out_params, index_pair, buckets);
+        if(ImGui::Button("shift rgd")){
+            std::cout << "shift rgd" << std::endl;
+            shift_rgd(in_out_params, buckets);
+            covs.clear();
+            means.clear();
+            for(int j = 0; j < buckets.size(); j++){
+                if(buckets[j].number_of_points > 5){
+                    //std::cout << i << " " << buckets[i].cov << std::endl;
+                    covs.push_back(buckets[j].cov);
+                    means.push_back(buckets[j].mean);
                 }
+            }
+        }
+        if(ImGui::Button("compute_all")){
+
+            //Eigen::Vector3d last_position = worker_data[0].intermediate_trajectory[worker_data[0].intermediate_trajectory.size()-1].translation();
+            //for(int i = 0; i < worker_data.size(); i++){
+            for(int i = 0; i < 70; i++){
+                std::cout << "computing: [" << i + 1 << "] of " << worker_data.size() << std::endl; 
+
+                //std::vector<Eigen::Affine3d> intermediate_trajectory_prev = worker_data[i].intermediate_trajectory;
+
+                //std::cout << "XX " << worker_data[i].intermediate_trajectory[0].translation() << std::endl; 
+                for(int iter = 0; iter < NR_ITER; iter++){
+                    optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model, 
+                        in_out_params, buckets);
+                }
+
                 //update
 
                 for(int j = i + 1; j < worker_data.size(); j++){
@@ -155,7 +323,7 @@ void lidar_odometry_gui() {
                 }
 
                 std::cout << "computed: [" << i + 1 << "] of " << worker_data.size() << std::endl; 
-                update_rgd(in_out_params, index_pair, buckets, points_global);
+                update_rgd(in_out_params, buckets, points_global);
 
                 covs.clear();
                 means.clear();
@@ -166,7 +334,13 @@ void lidar_odometry_gui() {
                         means.push_back(buckets[j].mean);
                     }
                 }
-                std::cout << "computed: [" << i + 1 << "] of " << worker_data.size() << std::endl; 
+                std::cout << "computed: [" << i + 1 << "] of " << worker_data.size() << std::endl;
+
+                //std::vector<Eigen::Affine3d> intermediate_trajectory_curr = worker_data[i].intermediate_trajectory;
+                //Eigen::Vector3d curr_posiotion = worker_data[i].intermediate_trajectory[ worker_data[i].intermediate_trajectory.size() - 1].translation();
+                auto offset = worker_data[i].intermediate_trajectory[ worker_data[i].intermediate_trajectory.size() - 1].translation();
+                std::cout << "curr offset " << offset << std::endl;
+                update_sliding_window_rgd(offset, worker_data, in_out_params, buckets);
             }
         }
 
@@ -176,9 +350,13 @@ void lidar_odometry_gui() {
             ImGui::SameLine();
             std::string text2 = "optimize[" + std::to_string(i) + "]";
             if(ImGui::Button(text2.c_str())){
-                for(int iter = 0; iter < 30; iter++){
+                //Eigen::Vector3d last_position = worker_data[0].intermediate_trajectory[0].translation();
+
+                //std::vector<Eigen::Affine3d> intermediate_trajectory_prev = worker_data[i].intermediate_trajectory;
+
+                for(int iter = 0; iter < NR_ITER; iter++){
                     optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model, 
-                        in_out_params, index_pair, buckets);
+                        in_out_params, buckets);
                 }
                 //update
 
@@ -208,7 +386,7 @@ void lidar_odometry_gui() {
                     points_global.push_back(pp);
                 }
 
-                update_rgd(in_out_params, index_pair, buckets, points_global);
+                update_rgd(in_out_params, buckets, points_global);
 
                 covs.clear();
                 means.clear();
@@ -219,6 +397,10 @@ void lidar_odometry_gui() {
                         means.push_back(buckets[j].mean);
                     }
                 }
+
+                //std::vector<Eigen::Affine3d> intermediate_trajectory_curr = worker_data[i].intermediate_trajectory;
+
+                //sliding_window_rgd(intermediate_trajectory_prev, intermediate_trajectory_curr, worker_data, in_out_params, index_pair, buckets);
             }
         }
 
@@ -785,9 +967,9 @@ int main(int argc, char *argv[]){
     in_out_params.resolution_X = 0.3;
     in_out_params.resolution_Y = 0.3;
     in_out_params.resolution_Z = 0.3;
-    in_out_params.bounding_box_extension = 50.0;
+    in_out_params.bounding_box_extension = 1.0;
     
-    ndt.compute_cov_mean(initial_points, index_pair, buckets, in_out_params);
+    ndt.compute_cov_mean(initial_points, index_pair, buckets, in_out_params, -10, 10, -10, 10, -10, 10);
 
     for(int i = 0; i < buckets.size(); i++){
 		if(buckets[i].number_of_points > 5){
@@ -813,7 +995,7 @@ int main(int argc, char *argv[]){
 
 void optimize(std::vector<Point3D> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory, 
     std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-    NDT::GridParameters& rgd_params, std::vector<NDT::PointBucketIndexPair>& index_pair, std::vector<NDT::Bucket>& buckets)
+    NDT::GridParameters& rgd_params, std::vector<NDT::Bucket>& buckets)
 {
     auto start = chrono::steady_clock::now();
 
@@ -1159,7 +1341,7 @@ void optimize(std::vector<Point3D> &intermediate_points, std::vector<Eigen::Affi
 return;
 }
 
-void update_rgd(NDT::GridParameters& rgd_params, std::vector<NDT::PointBucketIndexPair>& index_pair, std::vector<NDT::Bucket>& buckets,
+void update_rgd(NDT::GridParameters& rgd_params, std::vector<NDT::Bucket>& buckets,
                 std::vector<Point3D>& points_global)
 {
     std::cout << "update_rgd" << std::endl;

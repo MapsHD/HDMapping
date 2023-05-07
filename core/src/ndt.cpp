@@ -77,6 +77,26 @@ void NDT::grid_calculate_params(const std::vector<Point3D> &point_cloud_global, 
 	in_out_params.bounding_box_min_Z = min_z;
 }
 
+void NDT::grid_calculate_params(GridParameters &in_out_params, double min_x, double max_x, double min_y, double max_y, double min_z, double max_z)
+{
+	long long unsigned int number_of_buckets_X = ((max_x - min_x) / in_out_params.resolution_X) + 1;
+	long long unsigned int number_of_buckets_Y = ((max_y - min_y) / in_out_params.resolution_Y) + 1;
+	long long unsigned int number_of_buckets_Z = ((max_z - min_z) / in_out_params.resolution_Z) + 1;
+
+	in_out_params.number_of_buckets_X = number_of_buckets_X;
+	in_out_params.number_of_buckets_Y = number_of_buckets_Y;
+	in_out_params.number_of_buckets_Z = number_of_buckets_Z;
+	in_out_params.number_of_buckets = static_cast<long long unsigned int>(number_of_buckets_X) *
+									  static_cast<long long unsigned int>(number_of_buckets_Y) * static_cast<long long unsigned int>(number_of_buckets_Z);
+
+	in_out_params.bounding_box_max_X = max_x;
+	in_out_params.bounding_box_min_X = min_x;
+	in_out_params.bounding_box_max_Y = max_y;
+	in_out_params.bounding_box_min_Y = min_y;
+	in_out_params.bounding_box_max_Z = max_z;
+	in_out_params.bounding_box_min_Z = min_z;
+}
+
 std::vector<NDT::Job> NDT::get_jobs(long long unsigned int size, int num_threads)
 {
 
@@ -1829,11 +1849,11 @@ bool NDT::optimize_lie_algebra_right_jacobian(std::vector<PointCloud> &point_clo
 }
 
 bool NDT::compute_cov_mean(std::vector<Point3D> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
-				   int num_threads)
+		double min_x, double max_x, double min_y, double max_y, double min_z, double max_z, int num_threads)
 {
 	int number_of_unknowns = 6;
 
-	grid_calculate_params(points, rgd_params);
+	grid_calculate_params(rgd_params, min_x, max_x, min_y, max_y, min_z, max_z);
 	build_rgd(points, index_pair, buckets, rgd_params);
 	std::cout << "buckets.size() " << buckets.size() << std::endl;
 
@@ -1893,6 +1913,6 @@ bool NDT::compute_cov_mean(std::vector<Point3D> &points, std::vector<PointBucket
 	//		std::cout << i << " " << buckets[i].cov << std::endl;
 	//	}
 	//}
-
+	buckets[0].number_of_points = 0;
 	return true;
 }

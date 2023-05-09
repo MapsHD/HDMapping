@@ -4,7 +4,7 @@
 #include <python-scripts/constraints/relative_pose_tait_bryan_cw_jacobian.h>
 
 #include <python-scripts/constraints/relative_pose_rodrigues_wc_jacobian.h>
-#include <python-scripts/constraints/relative_pose_rodrigues_cw_jacobian.h>
+//#include <python-scripts/constraints/relative_pose_rodrigues_cw_jacobian.h>
 
 #include <python-scripts/constraints/relative_pose_quaternion_wc_jacobian.h>
 #include <python-scripts/constraints/relative_pose_quaternion_cw_jacobian.h>
@@ -470,7 +470,7 @@ bool PoseGraphSLAM::optimize(PointClouds& point_clouds_container)
                         poses[edges[i].index_to].sz);
                 }
                 else if (is_cw) {
-                    relative_pose_obs_eq_rodrigues_cw(
+                    /*relative_pose_obs_eq_rodrigues_cw(
                         delta,
                         poses[edges[i].index_from].px,
                         poses[edges[i].index_from].py,
@@ -503,6 +503,7 @@ bool PoseGraphSLAM::optimize(PointClouds& point_clouds_container)
                         poses[edges[i].index_to].sx,
                         poses[edges[i].index_to].sy,
                         poses[edges[i].index_to].sz);
+                        */
                 }
 
                 int ir = tripletListB.size();
@@ -1264,7 +1265,7 @@ std::vector<Eigen::SparseMatrix<double>> PoseGraphSLAM::compute_covariance_matri
                         poses[edges[i].index_to].sz);
                 }
                 else if (is_cw) {
-                    relative_pose_obs_eq_rodrigues_cw(
+                    /*relative_pose_obs_eq_rodrigues_cw(
                         delta,
                         poses[edges[i].index_from].px,
                         poses[edges[i].index_from].py,
@@ -1296,7 +1297,7 @@ std::vector<Eigen::SparseMatrix<double>> PoseGraphSLAM::compute_covariance_matri
                         poses[edges[i].index_to].pz,
                         poses[edges[i].index_to].sx,
                         poses[edges[i].index_to].sy,
-                        poses[edges[i].index_to].sz);
+                        poses[edges[i].index_to].sz);*/
                 }
 
                 int ir = tripletListB.size();

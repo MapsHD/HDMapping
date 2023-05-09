@@ -82,6 +82,7 @@ public:
 
 	void grid_calculate_params(const std::vector<Point3D> &point_cloud_global, GridParameters &in_out_params);
 	void grid_calculate_params(GridParameters &in_out_params, double min_x, double max_x, double min_y, double max_y, double min_z, double max_z);
+	
 	void build_rgd(std::vector<Point3D> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
 				   int num_threads = std::thread::hardware_concurrency());
 	std::vector<Job> get_jobs(long long unsigned int size, int num_threads = std::thread::hardware_concurrency());
@@ -98,6 +99,11 @@ public:
 
 	bool compute_cov_mean(std::vector<Point3D> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
 					double min_x, double max_x, double min_y, double max_y, double min_z, double max_z, int num_threads = std::thread::hardware_concurrency());
+
+	bool compute_cov_mean(std::vector<Point3D> &points, 
+		std::vector<PointBucketIndexPair> &index_pair, 
+		std::vector<Bucket> &buckets, GridParameters &rgd_params,
+		int num_threads = std::thread::hardware_concurrency());
 
 	float bucket_size[3];
 	float bucket_size_external[3];

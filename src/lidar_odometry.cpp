@@ -28,6 +28,7 @@
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
 #define NR_ITER 100
+namespace fs = std::filesystem;
 
 std::vector<Eigen::Vector3d> all_points;
 std::vector<Point3D> initial_points;
@@ -51,6 +52,8 @@ bool show_initial_points = true;
 //bool show_intermadiate_points = false;
 bool show_covs = false;
 int dec_covs = 10;
+
+
 
 struct WorkerData{
     std::vector<Point3D> intermediate_points;
@@ -78,6 +81,7 @@ int mouse_old_x, mouse_old_y;
 bool gui_mouse_down{ false };
 int mouse_buttons = 0; 
 float mouse_sensitivity = 1.0;
+std::string working_directory = "";
 
 std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::string &imu_file);
 std::vector<PPoint> load_point_cloud(const std::string& lazFile);
@@ -264,7 +268,224 @@ void shift_rgd(const NDT::GridParameters &rgd_params, std::vector<NDT::Bucket>& 
         }
     }
     buckets = buckets_new;  
+}
 
+bool saveLaz(const std::string& filename, const WorkerData &data)
+{
+
+	constexpr float scale = 0.0001f; // one tenth of milimeter
+	// find max
+	double max_x{std::numeric_limits<double>::lowest()};
+	double max_y{std::numeric_limits<double>::lowest()};
+	double max_z{std::numeric_limits<double>::lowest()};
+
+	//double min_x{std::numeric_limits<double>::max() };
+	//double min_y{std::numeric_limits<double>::max() };
+	//double min_z{std::numeric_limits<double>::max() };
+    double min_x = 1000000000000.0;
+	double min_y = 1000000000000.0;
+	double min_z = 1000000000000.0;
+
+    //struct WorkerData{
+    //std::vector<Point3D> intermediate_points;
+    //std::vector<Point3D> original_points;
+    //std::vector<Eigen::Affine3d> intermediate_trajectory;
+    //std::vector<Eigen::Affine3d> intermediate_trajectory_motion_model;
+    //bool show = false;
+    //};
+
+    std::vector<Point3D> points;
+    Eigen::Affine3d m_pose = data.intermediate_trajectory[0].inverse();
+    for(const auto &org_p:data.original_points){
+        Point3D p;
+        Eigen::Vector3d pp(org_p.x, org_p.y, org_p.z);
+        Eigen::Vector3d pt = m_pose * (data.intermediate_trajectory[org_p.index_pose] * pp);
+        //Eigen::Vector3d pt = pp;
+        p.x = pt.x();
+        p.y = pt.y();
+        p.z = pt.z();
+        points.push_back(p);
+    }
+
+	for(auto& p : points)
+	{
+        if(p.x < min_x){
+            min_x = p.x;
+        }
+        if(p.x > max_x){
+            max_x = p.x;
+        }
+
+        if(p.y < min_y){
+            min_y = p.y;
+        }
+        if(p.y > max_y){
+            max_y = p.y;
+        }
+
+        if(p.z < min_z){
+            min_z = p.z;
+        }
+        if(p.z > max_z){
+            max_z = p.z;
+        }
+
+		/*double x = 0.001 * p.point.x;
+		double y = 0.001 * p.point.y;
+		double z = 0.001 * p.point.z;
+
+		max_x = std::max(max_x, x);
+		max_y = std::max(max_y, y);
+		max_z = std::max(max_z, z);
+
+		min_x = std::min(min_x, x);
+		min_y = std::min(min_y, y);
+		min_z = std::min(min_z, z);*/
+	}
+
+	std::cout << "processing: " << filename << "points " << points.size() << std::endl;
+
+	laszip_POINTER laszip_writer;
+	if(laszip_create(&laszip_writer))
+	{
+		fprintf(stderr, "DLL ERROR: creating laszip writer\n");
+		return false;
+	}
+
+	// get a pointer to the header of the writer so we can populate it
+
+	laszip_header* header;
+
+	if(laszip_get_header_pointer(laszip_writer, &header))
+	{
+		fprintf(stderr, "DLL ERROR: getting header pointer from laszip writer\n");
+		return false;
+	}
+
+	// populate the header
+
+	header->file_source_ID = 4711;
+	header->global_encoding = (1 << 0); // see LAS specification for details
+	header->version_major = 1;
+	header->version_minor = 2;
+	//    header->file_creation_day = 120;
+	//    header->file_creation_year = 2013;
+	header->point_data_format = 1;
+	header->point_data_record_length = 0;
+	header->number_of_point_records = points.size();
+	header->number_of_points_by_return[0] = points.size();
+	header->number_of_points_by_return[1] = 0;
+	header->point_data_record_length = 28;
+	header->x_scale_factor = scale;
+	header->y_scale_factor = scale;
+	header->z_scale_factor = scale;
+
+	header->max_x = max_x;
+	header->min_x = min_x;
+	header->max_y = max_y;
+	header->min_y = min_y;
+	header->max_z = max_z;
+	header->min_z = min_z;
+
+	// optional: use the bounding box and the scale factor to create a "good" offset
+	// open the writer
+	laszip_BOOL compress = (strstr(filename.c_str(), ".laz") != 0);
+
+	if(laszip_open_writer(laszip_writer, filename.c_str(), compress))
+	{
+		fprintf(stderr, "DLL ERROR: opening laszip writer for '%s'\n", filename.c_str());
+		return false;
+	}
+
+	fprintf(stderr, "writing file '%s' %scompressed\n", filename.c_str(), (compress ? "" : "un"));
+
+	// get a pointer to the point of the writer that we will populate and write
+
+	laszip_point* point;
+	if(laszip_get_point_pointer(laszip_writer, &point))
+	{
+		fprintf(stderr, "DLL ERROR: getting point pointer from laszip writer\n");
+		return false;
+	}
+
+	laszip_I64 p_count = 0;
+	laszip_F64 coordinates[3];
+
+	for(int i = 0; i < points.size(); i++)
+	{
+
+		const auto& p = points[i];
+		//point->intensity = 0;//p.point.reflectivity;
+		//point->gps_time = 0;//p.timestamp * 1e-9;
+		//point->user_data = 0;//p.line_id;
+		//point->classification = p.point.tag;
+		p_count++;
+		coordinates[0] = p.x;
+		coordinates[1] = p.y;
+		coordinates[2] = p.z;
+		if(laszip_set_coordinates(laszip_writer, coordinates))
+		{
+			fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);
+			return false;
+		}
+
+		if(laszip_write_point(laszip_writer))
+		{
+			fprintf(stderr, "DLL ERROR: writing point %I64d\n", p_count);
+			return false;
+		}
+	}
+
+	if(laszip_get_point_count(laszip_writer, &p_count))
+	{
+		fprintf(stderr, "DLL ERROR: getting point count\n");
+		return false;
+	}
+
+	fprintf(stderr, "successfully written %I64d points\n", p_count);
+
+	// close the writer
+
+	if(laszip_close_writer(laszip_writer))
+	{
+		fprintf(stderr, "DLL ERROR: closing laszip writer\n");
+		return false;
+	}
+
+	// destroy the writer
+
+	if(laszip_destroy(laszip_writer))
+	{
+		fprintf(stderr, "DLL ERROR: destroying laszip writer\n");
+		return false;
+	}
+
+	std::cout << "exportLaz DONE" << std::endl;
+	return true;
+}
+
+bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_poses, std::vector<std::string> filenames)
+{
+	std::ofstream outfile;
+	outfile.open(file_name);
+	if (!outfile.good())
+	{
+		std::cout << "can not save file: " << file_name << std::endl;
+		return false;
+	}
+
+	outfile << m_poses.size() << std::endl;
+	for (size_t i = 0; i < m_poses.size(); i++)
+	{
+		outfile << filenames[i] << std::endl;
+		outfile << m_poses[i](0, 0) << " " << m_poses[i](0, 1) << " " << m_poses[i](0, 2) << " " << m_poses[i](0, 3) << std::endl;
+		outfile << m_poses[i](1, 0) << " " << m_poses[i](1, 1) << " " << m_poses[i](1, 2) << " " << m_poses[i](1, 3) << std::endl;
+		outfile << m_poses[i](2, 0) << " " << m_poses[i](2, 1) << " " << m_poses[i](2, 2) << " " << m_poses[i](2, 3) << std::endl;
+		outfile << "0 0 0 1" << std::endl;
+	}
+	outfile.close();
+
+	return true;
 }
 
 void lidar_odometry_gui() {
@@ -314,6 +535,7 @@ void lidar_odometry_gui() {
 
             if (input_file_names.size() > 0) {
                 if(input_file_names.size() % 2 == 0){
+                    working_directory = fs::path(input_file_names[0]).parent_path().string();
                     for(size_t i = 0; i < input_file_names.size(); i++){
                         std::cout << input_file_names[i] << std::endl;
                     }
@@ -408,6 +630,8 @@ void lidar_odometry_gui() {
                                     pp.x = p.point.x();
                                     pp.y = p.point.y();
                                     pp.z = p.point.z();
+
+                                    //std::cout << pp.x <<" " << pp.y << " " << pp.z << std::endl;
                                   
                                     auto lower = std::lower_bound(temp_ts.begin(), temp_ts.end(), p.timestamp);
                                     pp.index_pose = std::distance(temp_ts.begin(), lower);
@@ -535,6 +759,58 @@ void lidar_odometry_gui() {
                 //std::cout << "curr offset " << offset << std::endl;
                 //update_sliding_window_rgd(offset, worker_data, in_out_params, buckets);
             }
+        }
+        if(ImGui::Button("save result")){
+            //concatenate data
+
+            std::vector<WorkerData> worker_data_concatenated;
+            
+            WorkerData wd;
+            int counter = 0;
+            int pose_offset = 0;
+            for(int i = 0 ; i < worker_data.size(); i++){
+                auto tmp_data = worker_data[i].original_points;
+
+                for(auto &t:tmp_data){
+                    t.index_pose += pose_offset;
+                }
+
+                wd.intermediate_trajectory.insert(std::end(wd.intermediate_trajectory), 
+                    std::begin(worker_data[i].intermediate_trajectory), std::end(worker_data[i].intermediate_trajectory));
+
+                wd.original_points.insert(std::end(wd.original_points), 
+                    std::begin(tmp_data), std::end(tmp_data));
+                
+                pose_offset += worker_data[i].intermediate_trajectory.size();
+                
+                counter ++;
+                if(counter > 50){
+                    worker_data_concatenated.push_back(wd); 
+                    wd.intermediate_trajectory.clear();
+                    wd.original_points.clear();
+                    counter = 0; 
+                    pose_offset = 0; 
+                }
+            }
+
+            if(counter > 10){
+                worker_data_concatenated.push_back(wd);   
+            }    
+
+            std::vector<Eigen::Affine3d> m_poses;
+            std::vector<std::string> file_names;
+            for(int i = 0 ; i < worker_data_concatenated.size(); i++){
+                fs::path path(working_directory);
+                std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
+                path /= filename;
+                std::cout << "saving to: " << path << std::endl;
+                saveLaz(path.string(), worker_data_concatenated[i]);
+                m_poses.push_back(worker_data_concatenated[i].intermediate_trajectory[0]);
+                file_names.push_back(filename);
+            }
+            fs::path path(working_directory);
+            path /= "lio_poses.reg";
+            save_poses(path.string(), m_poses, file_names);
         }
 
         for(int i = 0; i < worker_data.size(); i++){

@@ -483,8 +483,8 @@ void project_gui() {
             }
 
             if (!point_clouds_container.load_whu_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset)) {
-                std::cout << "check input files" << std::endl;
-                return;
+                std::cout << "check input files laz/las" << std::endl;
+                //return;
             }
             else {
                 std::cout << "loaded: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;

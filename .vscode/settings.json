@@ -106,6 +106,7 @@
         "openglsupport": "cpp",
         "specialfunctions": "cpp",
         "splines": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "bitset": "cpp"
     }
 }

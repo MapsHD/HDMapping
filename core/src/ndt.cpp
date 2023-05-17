@@ -1914,5 +1914,89 @@ bool NDT::compute_cov_mean(std::vector<Point3D> &points, std::vector<PointBucket
 	//	}
 	//}
 	buckets[0].number_of_points = 0;
+	for(auto &b:buckets){
+		if(b.number_of_points < 5){
+			b.number_of_points = 0;
+		}
+	}
+	return true;
+}
+
+bool NDT::compute_cov_mean(std::vector<Point3D> &points, 
+		std::vector<PointBucketIndexPair> &index_pair, 
+		std::vector<Bucket> &buckets, GridParameters &rgd_params,
+		int num_threads)
+{
+	int number_of_unknowns = 6;
+	
+	grid_calculate_params(points, rgd_params);
+
+	//grid_calculate_params(rgd_params, min_x, max_x, min_y, max_y, min_z, max_z);
+	build_rgd(points, index_pair, buckets, rgd_params);
+	std::cout << "buckets.size() " << buckets.size() << std::endl;
+
+	std::vector<Job> jobs = get_jobs(buckets.size(), this->number_of_threads);
+
+	std::vector<std::thread> threads;
+
+	std::vector<Eigen::SparseMatrix<double>> AtPAtmp(jobs.size());
+	std::vector<Eigen::SparseMatrix<double>> AtPBtmp(jobs.size());
+	std::vector<double> sumrmss(jobs.size());
+	std::vector<int> sums(jobs.size());
+
+	std::vector<double> md_out(jobs.size());
+	std::vector<double> md_count_out(jobs.size());
+	// double *md_out, double *md_count_out
+
+	for (size_t i = 0; i < jobs.size(); i++)
+	{
+		AtPAtmp[i] = Eigen::SparseMatrix<double>(points.size() * number_of_unknowns, points.size() * number_of_unknowns);
+		AtPBtmp[i] = Eigen::SparseMatrix<double>(points.size() * number_of_unknowns, 1);
+		sumrmss[i] = 0;
+		sums[i] = 0;
+		md_out[i] = 0.0;
+		md_count_out[i] = 0.0;
+	}
+
+	std::vector<Eigen::Affine3d> mposes;
+	std::vector<Eigen::Affine3d> mposes_inv;
+	mposes.push_back(Eigen::Affine3d::Identity());
+	mposes_inv.push_back(Eigen::Affine3d::Identity());
+
+	//for (size_t i = 0; i < points.size(); i++)
+	//{
+	//	mposes.push_back(points[i].m_pose);
+	//	mposes_inv.push_back(points[i].m_pose.inverse());
+	//}
+
+	std::cout << "computing cov mean start" << std::endl;
+	for (size_t k = 0; k < jobs.size(); k++)
+	{
+		threads.push_back(std::thread(ndt_job, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
+										&index_pair, &points, &mposes, &mposes_inv, points.size(), 
+										PoseConvention::wc, RotationMatrixParametrization::tait_bryan_xyz,
+										number_of_unknowns, &(sumrmss[k]), &(sums[k]),
+										is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, 
+										num_extended_points, &(md_out[k]), &(md_count_out[k]), true));
+	}
+
+	for (size_t j = 0; j < threads.size(); j++)
+	{
+		threads[j].join();
+	}
+	std::cout << "computing cov mean finished" << std::endl;
+
+	//for(int i = 0; i < buckets.size(); i++){
+	//	if(buckets[i].number_of_points > 5){
+	//		std::cout << i << " " << buckets[i].cov << std::endl;
+	//	}
+	//}
+	buckets[0].number_of_points = 0;
+
+	for(auto &b:buckets){
+		if(b.number_of_points < 5){
+			b.number_of_points = 0;
+		}
+	}
 	return true;
 }

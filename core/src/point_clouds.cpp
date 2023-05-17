@@ -115,7 +115,7 @@ bool PointClouds::update_poses_from_RESSO(const std::string &folder_with_point_c
 	std::ifstream infile(poses_file_name);
 	if (!infile.good())
 	{
-		std::cout << "problem with file: '" << poses_file_name << "'" << std::endl;
+		std::cout << "problem with file: '" << poses_file_name << "' (!infile.good())" << std::endl;
 		return false;
 	}
 	std::string line;
@@ -169,6 +169,10 @@ bool PointClouds::update_poses_from_RESSO(const std::string &folder_with_point_c
 		pc.m_pose(1, 3) = t24;
 		pc.m_pose(2, 3) = t34;
 		// pc.m_initial_pose = pc.m_pose;
+
+		std::cout << "update pose: " << std::endl;
+		std::cout << pc.m_pose.matrix() << std::endl;
+
 		pcs.push_back(pc);
 	}
 	infile.close();
@@ -196,13 +200,24 @@ bool PointClouds::update_poses_from_RESSO(const std::string &folder_with_point_c
 					point_clouds[i].gui_rotation[0] = rad2deg(point_clouds[i].pose.om);
 					point_clouds[i].gui_rotation[1] = rad2deg(point_clouds[i].pose.fi);
 					point_clouds[i].gui_rotation[2] = rad2deg(point_clouds[i].pose.ka);
-				}
+				}//else{
+				//	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string() != pcs[j].file_name" << std::endl;
+				//	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string(): "<< std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl;
+				//	std::cout << "pcs[j].file_name: "<< pcs[j].file_name << std::endl;
+				//	std::cout << "j: " << j << std::endl;
+					//return false;
+				//}
 			}
 
 			/**/
 
 			// point_clouds[i].m_initial_pose = point_clouds[i].m_pose;
 		}
+	}else{
+		std::cout << "PROBLEM point_clouds.size() != pcs.size()" << std::endl;
+		std::cout << "point_clouds.size() " << point_clouds.size() << std::endl;
+		std::cout << "poses.size() " << pcs.size() << std::endl;
+		return false;
 	}
 	return true;
 }
@@ -666,14 +681,40 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		if (laszip_create(&laszip_reader))
 		{
 			fprintf(stderr, "DLL ERROR: creating laszip reader\n");
-			std::abort();
+			PointCloud pc;
+			pc.m_pose = Eigen::Affine3d::Identity();
+			pc.m_initial_pose = pc.m_pose;
+			pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+			pc.gui_translation[0] = pc.pose.px;
+			pc.gui_translation[1] = pc.pose.py;
+			pc.gui_translation[2] = pc.pose.pz;
+			pc.gui_rotation[0] = rad2deg(pc.pose.om);
+			pc.gui_rotation[1] = rad2deg(pc.pose.fi);
+			pc.gui_rotation[2] = rad2deg(pc.pose.ka);
+			pc.file_name = input_file_names[i];
+			point_clouds.push_back(pc);
+			continue;
+			//std::abort();
 		}
 
 		laszip_BOOL is_compressed = 0;
 		if (laszip_open_reader(laszip_reader, input_file_names[i].c_str(), &is_compressed))
 		{
 			fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", input_file_names[i].c_str());
-			std::abort();
+			PointCloud pc;
+			pc.m_pose = Eigen::Affine3d::Identity();
+			pc.m_initial_pose = pc.m_pose;
+			pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+			pc.gui_translation[0] = pc.pose.px;
+			pc.gui_translation[1] = pc.pose.py;
+			pc.gui_translation[2] = pc.pose.pz;
+			pc.gui_rotation[0] = rad2deg(pc.pose.om);
+			pc.gui_rotation[1] = rad2deg(pc.pose.fi);
+			pc.gui_rotation[2] = rad2deg(pc.pose.ka);
+			pc.file_name = input_file_names[i];
+			point_clouds.push_back(pc);
+			continue;
+			//std::abort();
 		}
 		std::cout << "compressed : " << is_compressed << std::endl;
 		laszip_header *header;
@@ -681,14 +722,28 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		if (laszip_get_header_pointer(laszip_reader, &header))
 		{
 			fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
-			std::abort();
+			PointCloud pc;
+			pc.m_pose = Eigen::Affine3d::Identity();
+			pc.m_initial_pose = pc.m_pose;
+			pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+			pc.gui_translation[0] = pc.pose.px;
+			pc.gui_translation[1] = pc.pose.py;
+			pc.gui_translation[2] = pc.pose.pz;
+			pc.gui_rotation[0] = rad2deg(pc.pose.om);
+			pc.gui_rotation[1] = rad2deg(pc.pose.fi);
+			pc.gui_rotation[2] = rad2deg(pc.pose.ka);
+			pc.file_name = input_file_names[i];
+			point_clouds.push_back(pc);
+			continue;
+			//std::abort();
 		}
 		fprintf(stderr, "file '%s' contains %u points\n", input_file_names[i].c_str(), header->number_of_point_records);
 		laszip_point *point;
 		if (laszip_get_point_pointer(laszip_reader, &point))
 		{
 			fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
-			std::abort();
+			continue;
+			//std::abort();
 		}
 
 		PointCloud pc;
@@ -707,7 +762,8 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 			if (laszip_read_point(laszip_reader))
 			{
 				fprintf(stderr, "DLL ERROR: reading point %u\n", j);
-				std::abort();
+				continue;
+				//std::abort();
 			}
 
 			LAZPoint p;

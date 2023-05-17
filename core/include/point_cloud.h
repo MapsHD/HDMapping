@@ -108,6 +108,7 @@ public:
 	void clean();
 	void compute_normal_vectors(double search_radious);
 	void decimate(double bucket_x, double bucket_y, double bucket_z);
+	void shift_to_center();
 };
 
 #endif

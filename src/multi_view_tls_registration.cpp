@@ -658,7 +658,10 @@ void project_gui() {
                 point_clouds_container.point_clouds[i].save_as_global(output_file_name);
             }
         }
-
+        ImGui::SameLine();
+        if (ImGui::Button(std::string("#" + std::to_string(i) + " shift points to center").c_str())) {
+            point_clouds_container.point_clouds[i].shift_to_center();
+        }
         if (point_clouds_container.point_clouds[i].gizmo) {
             for (size_t j = 0; j < point_clouds_container.point_clouds.size(); j++) {
                 if (i != j) {
@@ -703,6 +706,7 @@ void project_gui() {
                     point_clouds_container.point_clouds[i].available_geo_points[gp].name +  "]").c_str(), &point_clouds_container.point_clouds[i].available_geo_points[gp].choosen);
             }
         }
+        
     }
     ImGui::Separator();
     int total_number_of_points = 0;
@@ -2067,7 +2071,7 @@ bool initGL(int* argc, char** argv) {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration v0.6");
+    glutCreateWindow("multi_view_tls_registration v0.7");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

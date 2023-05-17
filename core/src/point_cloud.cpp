@@ -1259,3 +1259,20 @@ void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
 
 	//std::cout << "single scan, num points after decimation: " << this->points_local.size() << std::endl;
 }
+
+void PointCloud::shift_to_center()
+{
+	Eigen::Vector3d mean(0,0,0);
+	double sum = 0.0;
+
+	for(int i = 0; i < this->points_local.size(); i += 1000){
+		mean += this->points_local[i];
+		sum ++;
+	}
+	if(sum > 0){
+		mean /= sum;
+		for(int i = 0; i < this->points_local.size(); i ++){
+			this->points_local[i] -= mean;
+		}
+	}
+}

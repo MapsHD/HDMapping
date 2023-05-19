@@ -83,6 +83,18 @@ float m_gizmo[] = { 1,0,0,0,
           0,1,0,0,
           0,0,1,0,
           0,0,0,1 };
+
+float m_ortho_gizmo_view[] = { 1,0,0,0,
+                   0,1,0,0,
+                   0,0,1,0,
+                   0,0,0,1 };
+
+float m_ortho_projection[] = { 1,0,0,0,
+                              0,1,0,0,
+                              0,0,1,0,
+                              0,0,0,1 };
+
+
 bool manipulate_only_marked_gizmo = true;
 
 void reshape(int w, int h);
@@ -1682,6 +1694,12 @@ void display() {
             -camera_ortho_xy_view_zoom / ratio,
             camera_ortho_xy_view_zoom / ratio, -100000, 100000);
 
+        glm::mat4 proj = glm::orthoLH_ZO<float>(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
+                                                -camera_ortho_xy_view_zoom / ratio,
+                                                camera_ortho_xy_view_zoom / ratio, -100, 100);
+
+        std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
+
         Eigen::Vector3d v_eye_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h + 10);
         Eigen::Vector3d v_center_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h);
         Eigen::Vector3d v(0, 1, 0);
@@ -1700,6 +1718,10 @@ void display() {
         gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
             v_center_t.x(), v_center_t.y(), v_center_t.z(),
             v_t.x(), v_t.y(), v_t.z());
+        glm::mat4  lookat = glm::lookAt(glm::vec3 (v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
+                    glm::vec3 (v_center_t.x(), v_center_t.y(), v_center_t.z()),
+                    glm::vec3 (v_t.x(), v_t.y(), v_t.z()));
+        std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
     }
     
     glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
@@ -1808,12 +1830,19 @@ void display() {
             ImGuizmo::Enable(true);
             ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-            GLfloat projection[16];
-            glGetFloatv(GL_PROJECTION_MATRIX, projection);
+            if (!is_ortho)
+            {
+              GLfloat projection[16];
+              glGetFloatv(GL_PROJECTION_MATRIX, projection);
 
-            GLfloat modelview[16];
-            glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-            ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+              GLfloat modelview[16];
+              glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+
+              ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+            }else{
+              ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z , ImGuizmo::WORLD, m_gizmo, NULL);
+            }
+
             point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
             point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1];
             point_clouds_container.point_clouds[i].m_pose(2, 0) = m_gizmo[2];

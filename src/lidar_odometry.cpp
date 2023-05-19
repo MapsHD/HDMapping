@@ -52,7 +52,7 @@ bool show_initial_points = true;
 //bool show_intermadiate_points = false;
 bool show_covs = false;
 int dec_covs = 10;
-
+double filter_threshold_xy = 1.5;
 
 
 struct WorkerData{
@@ -489,7 +489,7 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
 }
 
 void lidar_odometry_gui() {
-    if(ImGui::Begin("lidar_odometry_gui v0.1")){
+    if(ImGui::Begin("lidar_odometry_gui v0.8")){
         ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
         ImGui::Checkbox("show_covs", &show_covs);
@@ -499,6 +499,10 @@ void lidar_odometry_gui() {
         ImGui::InputDouble("resolution_X" , &in_out_params.resolution_X);
         ImGui::InputDouble("resolution_Y" , &in_out_params.resolution_Y);
         ImGui::InputDouble("resolution_Z" , &in_out_params.resolution_Z);
+
+        ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed)" , &filter_threshold_xy);
+
+        
 
 
         //ImGui::Checkbox("show_intermadiate_points", &show_intermadiate_points);
@@ -1122,16 +1126,18 @@ std::vector<PPoint> load_point_cloud(const std::string& lazFile)
         double cal_x = 11.0 / 1000.0;
         double cal_y = 23.29 / 1000.0;
         double cal_z = -44.12 / 1000.0;
-        p.point.x() = header->x_offset + header->x_scale_factor * static_cast<double>(point->X) - cal_x;
-        p.point.y() = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y) - cal_y;
-        p.point.z() = header->z_offset + header->z_scale_factor * static_cast<double>(point->Z) - cal_z;
+
+        Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
+        p.point.x() = pf.x() - cal_x;
+        p.point.y() = pf.y() - cal_y;
+        p.point.z() = pf.z() - cal_z;
         p.timestamp = point->gps_time;
         p.intensity = point->intensity;
 
         if(p.timestamp == 0){
             counter_ts0 ++;
         }else{
-            if( sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y()) > 1.5){
+            if( sqrt(pf.x() * pf.x() + pf.y() * pf.y()) > filter_threshold_xy){
                 points.emplace_back(p);
             }
         }//else{

@@ -65,6 +65,17 @@ struct Point3D
 	//double timestamp;
 };
 
+struct Point3Di
+{
+    Eigen::Vector3d point;
+	//float x;
+	//float y;
+	//float z;
+	double timestamp;
+    float intensity;
+    int index_pose;
+};
+
 struct Point
 {
 	float x = 0.0f;

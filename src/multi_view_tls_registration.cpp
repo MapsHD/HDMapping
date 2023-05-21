@@ -758,8 +758,6 @@ void project_gui() {
 
                         pointcloud.push_back(vp);
                         if (i < p.intensities.size()) {
-
-                            //std::cout << (int)p.intensities[i] << " ";
                             intensity.push_back(p.intensities[i]);
                         }
                         else {
@@ -2100,7 +2098,7 @@ bool initGL(int* argc, char** argv) {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration v0.8");
+    glutCreateWindow("multi_view_tls_registration v0.9");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

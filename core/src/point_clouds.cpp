@@ -786,15 +786,21 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 				(int)point->extra_bytes[6] << " " <<
 				(int)point->extra_bytes[7] << std::endl;*/
 
-			if (point->num_extra_bytes > 6)
-			{
-				laszip_U16 intensity = point->extra_bytes[6];
-				pc.intensities.push_back(intensity);
-			}
-			else
-			{
-				pc.intensities.push_back(0);
-			}
+
+///////////////////////////////////////////
+			//if (point->num_extra_bytes > 6)
+			//{
+			//	laszip_U16 intensity = point->extra_bytes[6];
+			//	pc.intensities.push_back(intensity);
+			//}
+			//else
+			//{
+			//	pc.intensities.push_back(0);
+			//}
+///////////////////////////////////////////
+			pc.intensities.push_back(point->intensity);
+
+
 		}
 
 		if (is_decimate)

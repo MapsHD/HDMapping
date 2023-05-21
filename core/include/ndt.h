@@ -81,12 +81,16 @@ public:
 	~NDT() { ; };
 
 	void grid_calculate_params(const std::vector<Point3D> &point_cloud_global, GridParameters &in_out_params);
+	void grid_calculate_params(const std::vector<Point3Di> &point_cloud_global, GridParameters &in_out_params);
 	void grid_calculate_params(GridParameters &in_out_params, double min_x, double max_x, double min_y, double max_y, double min_z, double max_z);
 	
 	void build_rgd(std::vector<Point3D> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
 				   int num_threads = std::thread::hardware_concurrency());
+	void build_rgd(std::vector<Point3Di> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
+				   int num_threads = std::thread::hardware_concurrency());
 	std::vector<Job> get_jobs(long long unsigned int size, int num_threads = std::thread::hardware_concurrency());
 	void reindex(std::vector<Point3D> &points, std::vector<NDT::PointBucketIndexPair> &index_pair, NDT::GridParameters &rgd_params, int num_threads);
+	void reindex(std::vector<Point3Di> &points, std::vector<NDT::PointBucketIndexPair> &index_pair, NDT::GridParameters &rgd_params, int num_threads);
 
 	bool optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance);
 	std::vector<Eigen::SparseMatrix<double>> compute_covariance_matrices_and_rms(std::vector<PointCloud> &point_clouds, double &rms);
@@ -100,7 +104,7 @@ public:
 	bool compute_cov_mean(std::vector<Point3D> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
 					double min_x, double max_x, double min_y, double max_y, double min_z, double max_z, int num_threads = std::thread::hardware_concurrency());
 
-	bool compute_cov_mean(std::vector<Point3D> &points, 
+	bool compute_cov_mean(std::vector<Point3Di> &points, 
 		std::vector<PointBucketIndexPair> &index_pair, 
 		std::vector<Bucket> &buckets, GridParameters &rgd_params,
 		int num_threads = std::thread::hardware_concurrency());

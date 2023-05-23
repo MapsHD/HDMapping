@@ -107,6 +107,8 @@
         "specialfunctions": "cpp",
         "splines": "cpp",
         "codecvt": "cpp",
-        "bitset": "cpp"
+        "bitset": "cpp",
+        "coroutine": "cpp",
+        "resumable": "cpp"
     }
 }

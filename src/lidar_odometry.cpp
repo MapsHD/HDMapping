@@ -60,6 +60,7 @@ int nr_iter = 100;
 bool fusionConventionNwu = true;
 bool fusionConventionEnu = false;
 bool fusionConventionNed = false;
+bool use_motion_from_previous_step = true;
 
 //struct PPoint {
 //    double timestamp;
@@ -551,6 +552,9 @@ void lidar_odometry_gui() {
             fusionConventionNwu = true;
         }
 
+        ImGui::Checkbox("use_motion_from_previous_step", &use_motion_from_previous_step);
+        
+
 
 
 
@@ -684,12 +688,14 @@ void lidar_odometry_gui() {
                     int thershold = 20;
                     WorkerData wd;
                     std::vector<double> temp_ts;
+                    temp_ts.reserve(1000000);
                     for(size_t i = 0; i < poses.size(); i++){
-                        std::cout << "preparing data " << i + 1 << " of " << poses.size() << std::endl;
-
-                        wd.intermediate_trajectory.push_back(poses[i]);
-                        wd.intermediate_trajectory_motion_model.push_back(poses[i]);
-                        temp_ts.push_back(timestamps[i]);
+                        if(i % 100 == 0){
+                            std::cout << "preparing data " << i + 1 << " of " << poses.size() << std::endl;
+                        }
+                        wd.intermediate_trajectory.emplace_back(poses[i]);
+                        wd.intermediate_trajectory_motion_model.emplace_back(poses[i]);
+                        temp_ts.emplace_back(timestamps[i]);
 
                         if(wd.intermediate_trajectory.size() >= thershold){
                             for(int k = 0; k < points.size(); k++){
@@ -707,8 +713,8 @@ void lidar_odometry_gui() {
                                     auto lower = std::lower_bound(temp_ts.begin(), temp_ts.end(), p.timestamp);
                                     p.index_pose = std::distance(temp_ts.begin(), lower);
                                     //std::cout << pp.index_pose << " ";
-                                    wd.intermediate_points.push_back(p);
-                                    wd.original_points.push_back(p);
+                                    wd.intermediate_points.emplace_back(p);
+                                    wd.original_points.emplace_back(p);
                                     //timestamps.push_back(p.timestamp);
                                 }
                             }
@@ -720,6 +726,13 @@ void lidar_odometry_gui() {
                             wd.original_points.clear();
                             wd.intermediate_trajectory.clear();
                             wd.intermediate_trajectory_motion_model.clear();
+
+                            wd.intermediate_points.reserve(1000000);
+                            wd.original_points.reserve(1000000);
+                            wd.intermediate_trajectory.reserve(1000);
+                            wd.intermediate_trajectory_motion_model.reserve(1000);
+
+
                             temp_ts.clear();
                         }
                     }
@@ -751,14 +764,25 @@ void lidar_odometry_gui() {
             std::vector<Point3Di> points_global;
 
             for(int i = 0; i < worker_data.size(); i++){
-                if(i > 0){
-                    Eigen::Vector3d mean_shift(0.0f, 0.0f, 0.0f);
+                Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
+                //std::cout << "i " << i << " use_motion_from_previous_step " << (int)use_motion_from_previous_step << std::endl;
+                if(i > 0 && use_motion_from_previous_step){
+                    //exit(1);
                     for(int tr = 1; tr < worker_data[i-1].intermediate_trajectory.size(); tr++){
                         //acc_distance += ((worker_data[i].intermediate_trajectory[tr-1].inverse()) * worker_data[i].intermediate_trajectory[tr]).translation().norm();
-                        Eigen::Affine3d m_relative = worker_data[i].intermediate_trajectory[tr-1].inverse() * worker_data[i].intermediate_trajectory[tr];
+                        Eigen::Affine3d m_relative = worker_data[i-1].intermediate_trajectory[tr-1].inverse() * worker_data[i-1].intermediate_trajectory[tr];
                         mean_shift += m_relative.translation();
                     }
                     mean_shift /= (worker_data[i-1].intermediate_trajectory.size() - 1);
+                    std::cout << "mean_shift mean_shift " << mean_shift << std::endl;
+
+                    //if(mean_shift.norm() > 0.001){
+                    //    exit(1);
+                    //}
+
+                    if(mean_shift.norm() > 1.0){
+                        mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
+                    }
 
                     Eigen::Affine3d m_mean_shift = Eigen::Affine3d::Identity();
                     m_mean_shift.translation() = mean_shift;
@@ -793,6 +817,7 @@ void lidar_odometry_gui() {
                     std::cout << "computing: [" << i + 1 << "] of " << worker_data.size() << std::endl; 
                     std::cout << "computing iter: [" << iter + 1 << "] of " << nr_iter << std::endl; 
                     std::cout << "acc_distance: " << acc_distance << std::endl;
+                    std::cout << "mean_shift: " << mean_shift << std::endl;
 
                     optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model, 
                         in_out_params, buckets);

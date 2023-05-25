@@ -114,6 +114,8 @@ core/src/pcl_wrapper.cpp
 core/src/optimization_point_to_point_source_to_target.cpp
 core/include/observation_picking.h
 core/src/observation_picking.cpp
+core/include/manual_pose_graph_loop_closure.h
+core/src/manual_pose_graph_loop_closure.cpp
 )
 
 set(CORE_HD_MAPPING_SRCS

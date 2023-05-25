@@ -780,7 +780,7 @@ void lidar_odometry_gui() {
                     //    exit(1);
                     //}
 
-                    if(mean_shift.norm() > 1.0){
+                    if(mean_shift.norm() > 0.1){
                         mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
                     }
 

@@ -2834,3 +2834,181 @@ bool NDT::compute_cov_mean(std::vector<Point3Di> &points,
 	//std::cout << "counter_active_buckets: " << counter_active_buckets << std::endl;
 	return true;
 }
+
+bool NDT::compute_cov_mean(std::vector<Point3Di> &points, 
+		std::vector<PointBucketIndexPair> &index_pair, 
+		std::map<unsigned long long int, NDT::Bucket> &buckets, GridParameters &rgd_params,
+		int num_threads)
+{
+	#if 0
+	int number_of_unknowns = 6;
+
+	std::cout << "grid_calculate_params start" << std::endl;	
+	grid_calculate_params(points, rgd_params);
+	//for(auto &p:points){
+	//	std::cout << p.point;
+	//}
+	std::cout << "grid_calculate_params finished" << std::endl;	
+
+	//grid_calculate_params(rgd_params, min_x, max_x, min_y, max_y, min_z, max_z);
+	std::cout << "build_rgd start" << std::endl;	
+	build_rgd(points, index_pair, buckets, rgd_params);
+	std::cout << "build_rgd finished" << std::endl;
+
+	std::cout << "check" << std::endl;
+	int counter_active_buckets = 0; 
+	//for(int i = 0; i < buckets.size(); i++){
+	//	if(buckets[i].number_of_points > 5){
+	//		counter_active_buckets ++;
+	//	}
+	//}
+	for (const auto& [key, value] : buckets){
+		if(value.number_of_points > 5){
+			counter_active_buckets ++;
+		}
+	}
+
+	std::cout << "check: counter_active_buckets: " << counter_active_buckets << std::endl;
+
+
+	std::cout << "buckets.size() " << buckets.size() << std::endl;
+
+	std::vector<Job> jobs = get_jobs(buckets.size(), this->number_of_threads);
+
+	std::vector<std::thread> threads;
+
+	std::vector<Eigen::SparseMatrix<double>> AtPAtmp(jobs.size());
+	std::vector<Eigen::SparseMatrix<double>> AtPBtmp(jobs.size());
+	std::vector<double> sumrmss(jobs.size());
+	std::vector<int> sums(jobs.size());
+
+	std::vector<double> md_out(jobs.size());
+	std::vector<double> md_count_out(jobs.size());
+	// double *md_out, double *md_count_out
+
+	for (size_t i = 0; i < jobs.size(); i++)
+	{
+		AtPAtmp[i] = Eigen::SparseMatrix<double>(points.size() * number_of_unknowns, points.size() * number_of_unknowns);
+		AtPBtmp[i] = Eigen::SparseMatrix<double>(points.size() * number_of_unknowns, 1);
+		sumrmss[i] = 0;
+		sums[i] = 0;
+		md_out[i] = 0.0;
+		md_count_out[i] = 0.0;
+	}
+
+	std::vector<Eigen::Affine3d> mposes;
+	std::vector<Eigen::Affine3d> mposes_inv;
+	mposes.push_back(Eigen::Affine3d::Identity());
+	mposes_inv.push_back(Eigen::Affine3d::Identity());
+
+	//for (size_t i = 0; i < points.size(); i++)
+	//{
+	//	mposes.push_back(points[i].m_pose);
+	//	mposes_inv.push_back(points[i].m_pose.inverse());
+	//}
+
+	std::cout << "computing cov mean ndt_jobi start" << std::endl;
+	for (size_t k = 0; k < jobs.size(); k++)
+	{
+		threads.push_back(std::thread(ndt_jobi, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
+										&index_pair, &points, &mposes, &mposes_inv, points.size(), 
+										PoseConvention::wc, RotationMatrixParametrization::tait_bryan_xyz,
+										number_of_unknowns, &(sumrmss[k]), &(sums[k]),
+										is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, 
+										num_extended_points, &(md_out[k]), &(md_count_out[k]), true));
+	}
+
+	for (size_t j = 0; j < threads.size(); j++)
+	{
+		threads[j].join();
+	}
+	std::cout << "computing cov mean ndt_jobi finished" << std::endl;
+
+	//for(int i = 0; i < buckets.size(); i++){
+	//	if(buckets[i].number_of_points > 5){
+	//		std::cout << i << " " << buckets[i].cov << std::endl;
+	//	}
+	//}
+	buckets[0].number_of_points = 0;
+
+	//int counter_active_buckets = 0;
+	/*for(auto &b:buckets){
+		if(b.number_of_points < 5){
+			b.number_of_points = 0;
+		}else{
+			//counter_active_buckets ++;
+		}
+	}*/
+
+	for (auto& [key, value] : buckets){
+		if(value.number_of_points < 5){
+			value.number_of_points = 0;
+		}
+	}
+
+	//std::cout << "counter_active_buckets: " << counter_active_buckets << std::endl;
+	#endif
+	return true;
+}
+
+void NDT::build_rgd(std::vector<Point3Di> &points, std::vector<NDT::PointBucketIndexPair> &index_pair, std::map<unsigned long long int, NDT::Bucket> &buckets, NDT::GridParameters &rgd_params, int num_threads)
+{
+	if (num_threads < 1)
+		num_threads = 1;
+
+	index_pair.resize(points.size());
+	std::cout << "reindex start" << std::endl;
+	reindex(points, index_pair, rgd_params, num_threads);
+	std::cout << "reindex finished" << std::endl;
+
+	//buckets.resize(rgd_params.number_of_buckets);
+
+	//std::vector<NDT::Job> jobs = get_jobs(buckets.size(), num_threads);
+	//std::vector<std::thread> threads;
+
+	//std::cout << "build_rgd_init_jobs start" << std::endl;
+	//for (size_t i = 0; i < jobs.size(); i++)
+	//{
+	//	threads.push_back(std::thread(build_rgd_init_job, i, &jobs[i], &buckets));
+	//}
+
+	//for (size_t j = 0; j < threads.size(); j++)
+	//{
+	//	threads[j].join();
+	//}
+	//threads.clear();
+	//std::cout << "build_rgd_init_jobs finished" << std::endl;
+
+	//jobs = get_jobs(points.size(), num_threads);
+
+	//std::cout << "build_rgd_jobs start jobs.size():" << jobs.size() << std::endl;
+	//std::cout << "points.size() " << points.size() << std::endl;
+	//std::cout << "index_pair.size() " << index_pair.size() << std::endl;
+	//std::cout << "buckets.size() " << buckets.size() << std::endl;
+
+	//for (size_t i = 0; i < jobs.size(); i++)
+	//{
+	//	threads.push_back(std::thread(build_rgd_job, i, &jobs[i], &index_pair, &buckets));
+	//}
+	//for (size_t j = 0; j < threads.size(); j++)
+	//{
+	//	threads[j].join();
+	//}
+	//threads.clear();
+	//std::cout << "build_rgd_jobs finished" << std::endl;
+
+	//jobs = get_jobs(buckets.size(), num_threads);
+
+	//std::cout << "build_rgd_final_jobs start" << std::endl;
+	//for (size_t i = 0; i < jobs.size(); i++)
+	//{
+	//	threads.push_back(std::thread(build_rgd_final_job, i, &jobs[i], &buckets));
+	//}
+
+	//for (size_t j = 0; j < threads.size(); j++)
+	//{
+	//	threads[j].join();
+	//}
+	//threads.clear();
+	//std::cout << "build_rgd_final_jobs finished" << std::endl;
+}

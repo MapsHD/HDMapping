@@ -109,6 +109,14 @@ public:
 		std::vector<Bucket> &buckets, GridParameters &rgd_params,
 		int num_threads = std::thread::hardware_concurrency());
 
+	bool compute_cov_mean(std::vector<Point3Di> &points, 
+		std::vector<PointBucketIndexPair> &index_pair, 
+		std::map<unsigned long long int, NDT::Bucket> &buckets, GridParameters &rgd_params,
+		int num_threads = std::thread::hardware_concurrency());
+
+	void build_rgd(std::vector<Point3Di> &points, std::vector<PointBucketIndexPair> &index_pair, std::map<unsigned long long int, NDT::Bucket> &buckets, GridParameters &rgd_params,
+		int num_threads = std::thread::hardware_concurrency());
+
 	float bucket_size[3];
 	float bucket_size_external[3];
 	int number_of_threads;

@@ -512,7 +512,7 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
 }
 
 void lidar_odometry_gui() {
-    if(ImGui::Begin("lidar_odometry_gui v0.9")){
+    if(ImGui::Begin("lidar_odometry_gui v0.10")){
         ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
         ImGui::Checkbox("show_covs", &show_covs);

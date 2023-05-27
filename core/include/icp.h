@@ -2,6 +2,7 @@
 #define _ICP_H_
 
 #include <point_clouds.h>
+#include <thread>
 
 class ICP {
 public:

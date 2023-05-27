@@ -2741,10 +2741,10 @@ void perform_experiment_on_linux()
     pose_graph_slam.is_lie_algebra_right_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
-    start = std::chrono::system_clock::now();
+    auto start = std::chrono::system_clock::now();
     pose_graph_slam.optimize_with_manif(point_clouds_container);
-    end = std::chrono::system_clock::now();
-    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    auto end = std::chrono::system_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
     rms = compute_rms(false);
     id_method = 98;

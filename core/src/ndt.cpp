@@ -2400,7 +2400,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_maha
 	auto elapsed =
 		std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-	std::cout << "ndt execution time [ms]: " << elapsed << std::endl;
+	std::cout << "ndt execution time [ms]: " << elapsed.count()  << std::endl;
 
 	return true;
 }

@@ -59,6 +59,7 @@ bool show_covs = false;
 int dec_covs = 10;
 double filter_threshold_xy = 1.5;
 int nr_iter = 100;
+double sliding_window_trajectory_length_threshold = 10.0;
 
 bool fusionConventionNwu = true;
 bool fusionConventionEnu = false;
@@ -97,6 +98,7 @@ int mouse_buttons = 0;
 float mouse_sensitivity = 1.0;
 std::string working_directory = "";
 double decimation = 0.01;
+int threshold_initial_points = 100000;
 
 std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::string &imu_file);
 std::vector<Point3Di> load_point_cloud(const std::string& lazFile);
@@ -518,7 +520,7 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
 }
 
 void lidar_odometry_gui() {
-    if(ImGui::Begin("lidar_odometry_gui v0.10")){
+    if(ImGui::Begin("lidar_odometry_gui v0.11")){
         ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
         //ImGui::Checkbox("show_covs", &show_covs);
@@ -533,6 +535,8 @@ void lidar_odometry_gui() {
 
         ImGui::InputDouble("decimation (larger value of decimation better performance, but worse accuracy)" , &decimation);
         ImGui::InputInt("number iterations", &nr_iter);
+        ImGui::InputDouble("sliding window trajectory length threshold" , &sliding_window_trajectory_length_threshold);
+        ImGui::InputInt("threshold initial points", &threshold_initial_points);
 
         ImGui::Checkbox("fusionConventionNwu", &fusionConventionNwu);
         if(fusionConventionNwu){
@@ -653,13 +657,13 @@ void lidar_odometry_gui() {
                         }
                     }
 
-                    for(int i = 0; i < 1000000; i++){
+                    for(int i = 0; i < threshold_initial_points; i++){
                         auto p = points[i];
                         //p.point = all_points[i];
                         initial_points.push_back(p);
                     }
 
-                    double timestamp_begin = points[1000000-1].timestamp;
+                    double timestamp_begin = points[10000-1].timestamp;
                     std::cout << "timestamp_begin: " << timestamp_begin << std::endl; 
 
                     std::vector<double> timestamps;
@@ -760,18 +764,13 @@ void lidar_odometry_gui() {
                     mean_shift /= (worker_data[i-1].intermediate_trajectory.size() - 1);
                     std::cout << "mean_shift mean_shift " << mean_shift << std::endl;
 
-                    //if(mean_shift.norm() > 0.001){
-                    //    exit(1);
-                    //}
-
                     if(mean_shift.norm() > 0.1){
                         mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
                     }
 
                     Eigen::Affine3d m_mean_shift = Eigen::Affine3d::Identity();
                     m_mean_shift.translation() = mean_shift;
-                    //std::cout << "mean_shift " << mean_shift << std::endl;
-
+                    
                     std::vector<Eigen::Affine3d> new_trajectory;
                     Eigen::Affine3d current_node = worker_data[i].intermediate_trajectory[0];
                     new_trajectory.push_back(current_node);
@@ -830,7 +829,7 @@ void lidar_odometry_gui() {
                     points_global.push_back(pp);
                 }
 
-                if(acc_distance > 10.0){
+                if(acc_distance > sliding_window_trajectory_length_threshold){
                     index_pair.clear();
                     buckets.clear();
                     //ndt.compute_cov_mean(points_global, index_pair, buckets, in_out_params);
@@ -839,8 +838,9 @@ void lidar_odometry_gui() {
                     update_rgd(in_out_params, buckets, points_global);
 
                     std::vector<Point3Di> points_global_new;
+                    points_global_new.reserve(points_global.size() / 2 + 1);
                     for(int k = points_global.size() /2; k < points_global.size(); k++){
-                        points_global_new.push_back(points_global[k]);
+                        points_global_new.emplace_back(points_global[k]);
                     }
 
                     acc_distance = 0;

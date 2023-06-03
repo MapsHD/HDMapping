@@ -52,7 +52,6 @@ struct QuaternionPose
 	double q3;
 };
 
-
 struct Point3D
 {
 	//double x;

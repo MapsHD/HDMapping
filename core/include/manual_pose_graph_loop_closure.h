@@ -5,11 +5,19 @@
 
 class ManualPoseGraphLoopClosure{
     public:
+        struct Edge
+        {
+            TaitBryanPose relative_pose_tb;
+            TaitBryanPose relative_pose_tb_weights;
+            int index_from;
+            int index_to;
+        };
+
     ManualPoseGraphLoopClosure(){};
     ~ManualPoseGraphLoopClosure(){};
 
-    void Gui();
-    void Render(const PointClouds &point_clouds_container);
+    void Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target);
+    void Render(PointClouds &point_clouds_container, int index_loop_closure_source, int index_loop_closure_target);
 };
 
 #endif

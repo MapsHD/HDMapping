@@ -82,6 +82,8 @@ std::vector<Eigen::Vector3d> picked_points;
 std::string working_directory = "";
 ManualPoseGraphLoopClosure manual_pose_graph_loop_closure;
 int all_point_size = 1;
+int index_loop_closure_source = 0;
+int index_loop_closure_target = 0;
 
 float m_gizmo[] = {1, 0, 0, 0,
                    0, 1, 0, 0,
@@ -651,12 +653,13 @@ void project_gui()
     ImGui::Checkbox("Iterative Closest Point", &is_icp_gui);
     ImGui::Checkbox("Plane Features", &is_registration_plane_feature);
     ImGui::Checkbox("Pose Graph SLAM", &is_pose_graph_slam);
-    ImGui::Checkbox("Manual analysis", &is_manual_analisys);
-    ImGui::Checkbox("manual_pose_graph_loop_closure_mode", &manual_pose_graph_loop_closure_mode);
+    ImGui::Checkbox("Manual Analysis", &is_manual_analisys);
+    ImGui::Checkbox("Manual Pose Graph Loop Closure Mode", &manual_pose_graph_loop_closure_mode);
     ImGui::ColorEdit3("background color", (float *)&clear_color);
 
     if (manual_pose_graph_loop_closure_mode)
     {
+        manual_pose_graph_loop_closure.Gui(point_clouds_container, index_loop_closure_source, index_loop_closure_target);
     }
     else
     {
@@ -1977,7 +1980,7 @@ void display()
 
     if (manual_pose_graph_loop_closure_mode)
     {
-        manual_pose_graph_loop_closure.Render(point_clouds_container);
+        manual_pose_graph_loop_closure.Render(point_clouds_container, index_loop_closure_source, index_loop_closure_target);
     }
     else
     {
@@ -2050,10 +2053,10 @@ void display()
         registration_plane_feature_gui();
     if (is_manual_analisys)
         observation_picking_gui();
-    if (manual_pose_graph_loop_closure_mode)
-    {
-        manual_pose_graph_loop_closure.Gui();
-    }
+    //if (manual_pose_graph_loop_closure_mode)
+    //{
+    //    manual_pose_graph_loop_closure.Gui();
+    //}
     project_gui();
 
     if (!manual_pose_graph_loop_closure_mode)

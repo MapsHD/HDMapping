@@ -17,12 +17,12 @@ class ManualPoseGraphLoopClosure{
         int index_active_edge = 0;
         bool manipulate_active_edge = false;
         bool gizmo = false;
-        //float m_gizmo[16];
+        double search_radious = 0.3;
 
         ManualPoseGraphLoopClosure(){};
         ~ManualPoseGraphLoopClosure(){};
 
-        void Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target);
+        void Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo);
         void Render(PointClouds &point_clouds_container, int index_loop_closure_source, int index_loop_closure_target);
 };
 

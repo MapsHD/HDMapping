@@ -1,6 +1,7 @@
 #include <manual_pose_graph_loop_closure.h>
+#include <icp.h>
 
-void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target)
+void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo)
 {
     if(point_clouds_container.point_clouds.size() > 0){
 
@@ -76,33 +77,30 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                 index_active_edge = (int)edges.size() - 1;
             }
 
+            bool prev_gizmo = gizmo;
             ImGui::Checkbox("gizmo", &gizmo);
 
-            //if (gizmo && (prev_index_active_edge != index_active_edge))
-            //{
-            //    int index_src = edges[index_active_edge].index_from;
-            //    int index_trg = edges[index_active_edge].index_to;
+            if (prev_gizmo != gizmo){
 
-            //    Eigen::Affine3d m_from = point_clouds_container.point_clouds.at(index_src).m_pose;
-            //    Eigen::Affine3d m_to = m_from * affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                auto m_to = point_clouds_container.point_clouds[edges[index_active_edge].index_to].m_pose;
 
-                //m_gizmo[0] = (float)m_to(0, 0);
-                //m_gizmo[1] = (float)m_to(1, 0);
-               // m_gizmo[2] = (float)m_to(2, 0);
-                //m_gizmo[3] = (float)m_to(3, 0);
-                //m_gizmo[4] = (float)m_to(0, 1);
-                //m_gizmo[5] = (float)m_to(1, 1);
-               // m_gizmo[6] = (float)m_to(2, 1);
-               // m_gizmo[7] = (float)m_to(3, 1);
-               // m_gizmo[8] = (float)m_to(0, 2);
-               // m_gizmo[9] = (float)m_to(1, 2);
-               // m_gizmo[10] = (float)m_to(2, 2);
-               // m_gizmo[11] = (float)m_to(3, 2);
-               // m_gizmo[12] = (float)m_to(0, 3);
-               // m_gizmo[13] = (float)m_to(1, 3);
-               // m_gizmo[14] = (float)m_to(2, 3);
-                //m_gizmo[15] = (float)m_to(3, 3);
-           // }
+                m_gizmo[0] = (float)m_to(0, 0);
+                m_gizmo[1] = (float)m_to(1, 0);
+                m_gizmo[2] = (float)m_to(2, 0);
+                m_gizmo[3] = (float)m_to(3, 0);
+                m_gizmo[4] = (float)m_to(0, 1);
+                m_gizmo[5] = (float)m_to(1, 1);
+                m_gizmo[6] = (float)m_to(2, 1);
+                m_gizmo[7] = (float)m_to(3, 1);
+                m_gizmo[8] = (float)m_to(0, 2);
+                m_gizmo[9] = (float)m_to(1, 2);
+                m_gizmo[10] = (float)m_to(2, 2);
+                m_gizmo[11] = (float)m_to(3, 2);
+                m_gizmo[12] = (float)m_to(0, 3);
+                m_gizmo[13] = (float)m_to(1, 3);
+                m_gizmo[14] = (float)m_to(2, 3);
+                m_gizmo[15] = (float)m_to(3, 3);
+            }
 
             ////////////////////////////////////////
             if (remove_edge_index != -1)
@@ -118,6 +116,52 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                 edges = new_edges;
 
                 index_active_edge = remove_edge_index - 1;
+            }
+
+            if (!gizmo){
+                if (ImGui::Button("ICP"))
+                {
+                    std::cout << "Iterative Closest Point" << std::endl;
+
+                    PointClouds pcs;
+                    pcs.point_clouds.push_back(point_clouds_container.point_clouds[edges[index_active_edge].index_from]);
+                    pcs.point_clouds.push_back(point_clouds_container.point_clouds[edges[index_active_edge].index_to]);
+                    pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
+                    pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                    for (auto &pc : pcs.point_clouds)
+                    {
+                        pc.build_rgd();
+                        pc.cout_rgd();
+                        pc.compute_normal_vectors(0.5);
+                    }
+                    ICP icp;
+                    icp.search_radious = search_radious;
+                    icp.number_of_threads = std::thread::hardware_concurrency();
+                    ;
+                    icp.number_of_iterations = 10;
+                    icp.is_adaptive_robust_kernel = false;
+
+                    icp.is_ballanced_horizontal_vs_vertical = false;
+                    icp.is_fix_first_node = true;
+                    icp.is_gauss_newton = true;
+                    icp.is_levenberg_marguardt = false;
+                    icp.is_cw = false;
+                    icp.is_wc = true;
+                    icp.is_tait_bryan_angles = true;
+                    icp.is_quaternion = false;
+                    icp.is_rodrigues = false;
+                    std::cout << "optimization_point_to_point_source_to_target" << std::endl;
+
+                    icp.optimization_point_to_point_source_to_target(pcs);
+
+                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
+                }
+                ImGui::SameLine();
+                ImGui::InputDouble("search_radious", &search_radious);
+                if (search_radious < 0.01){
+                    search_radious = 0.01;
+                }
             }
         }
     }
@@ -145,8 +189,4 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
             point_clouds_container.point_clouds.at(index_trg).render(m_trg, 1);
         }
     }
-
-    
-
-
 }

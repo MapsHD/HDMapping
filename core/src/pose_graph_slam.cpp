@@ -40,15 +40,24 @@
 
 #include <m_estimators.h>
 
+std::random_device rd;
+std::mt19937 gen(rd());
+
+inline double random(double low, double high)
+{
+    std::uniform_real_distribution<double> dist(low, high);
+    return dist(gen);
+}
+
 void PoseGraphSLAM::add_random_noise(PointClouds& point_clouds_container) {
     for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++) {
         TaitBryanPose pose;
-        pose.px = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.py = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.pz = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.om = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.fi = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.ka = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+        pose.px = random(-0.000001, 0.000001); 
+        pose.py = random(-0.000001, 0.000001);
+        pose.pz = random(-0.000001, 0.000001);
+        pose.om = random(-0.000001, 0.000001);
+        pose.fi = random(-0.000001, 0.000001);
+        pose.ka = random(-0.000001, 0.000001);
         Eigen::Affine3d m = affine_matrix_from_pose_tait_bryan(pose);
         point_clouds_container.point_clouds[i].m_pose = point_clouds_container.point_clouds[i].m_pose * m;
     }
@@ -56,24 +65,24 @@ void PoseGraphSLAM::add_random_noise(PointClouds& point_clouds_container) {
 
 void add_noise_to_poses(std::vector<TaitBryanPose>& poses) {
     for (size_t i = 0; i < poses.size(); i++) {
-        poses[i].px += (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        poses[i].py += (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        poses[i].pz += (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        poses[i].om += (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        poses[i].fi += (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        poses[i].ka += (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+        poses[i].px += random(-0.000001, 0.000001);
+        poses[i].py += random(-0.000001, 0.000001);
+        poses[i].pz += random(-0.000001, 0.000001);
+        poses[i].om += random(-0.000001, 0.000001);
+        poses[i].fi += random(-0.000001, 0.000001);
+        poses[i].ka += random(-0.000001, 0.000001);
     }
 }
 
 void add_noise_to_poses(std::vector<RodriguesPose>& poses) {
     for (size_t i = 0; i < poses.size(); i++) {
         TaitBryanPose pose;
-        pose.px = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.py = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.pz = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.om = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.fi = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.ka = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+        pose.px = random(-0.000001, 0.000001);
+        pose.py = random(-0.000001, 0.000001);
+        pose.pz = random(-0.000001, 0.000001);
+        pose.om = random(-0.000001, 0.000001);
+        pose.fi = random(-0.000001, 0.000001);
+        pose.ka = random(-0.000001, 0.000001);
         Eigen::Affine3d m = affine_matrix_from_pose_tait_bryan(pose);
 
         Eigen::Affine3d mr = affine_matrix_from_pose_rodrigues(poses[i]);
@@ -85,12 +94,12 @@ void add_noise_to_poses(std::vector<RodriguesPose>& poses) {
 void add_noise_to_poses(std::vector<QuaternionPose>& poses) {
     for (size_t i = 0; i < poses.size(); i++) {
         TaitBryanPose pose;
-        pose.px = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.py = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.pz = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.om = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.fi = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-        pose.ka = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+        pose.px = random(-0.000001, 0.000001);
+        pose.py = random(-0.000001, 0.000001);
+        pose.pz = random(-0.000001, 0.000001);
+        pose.om = random(-0.000001, 0.000001);
+        pose.fi = random(-0.000001, 0.000001);
+        pose.ka = random(-0.000001, 0.000001);
         Eigen::Affine3d m = affine_matrix_from_pose_tait_bryan(pose);
 
         Eigen::Affine3d mr = affine_matrix_from_pose_quaternion(poses[i]);

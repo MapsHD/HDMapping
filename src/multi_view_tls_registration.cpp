@@ -659,7 +659,7 @@ void project_gui()
 
     if (manual_pose_graph_loop_closure_mode)
     {
-        manual_pose_graph_loop_closure.Gui(point_clouds_container, index_loop_closure_source, index_loop_closure_target);
+        manual_pose_graph_loop_closure.Gui(point_clouds_container, index_loop_closure_source, index_loop_closure_target, m_gizmo);
 
         /*if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size()> 0)
         {

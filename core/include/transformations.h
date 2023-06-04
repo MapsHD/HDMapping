@@ -11,6 +11,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#include <random>
+
 inline double deg2rad(double deg) {
 	return (deg * M_PI) / 180.0;
 }

@@ -476,8 +476,8 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
 
             if (prev_gizmo != gizmo)
             {
-
-                auto m_to = point_clouds_container.point_clouds[edges[index_active_edge].index_to].m_pose;
+                auto m_to = point_clouds_container.point_clouds[edges[index_active_edge].index_from].m_pose *
+                            affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
                 m_gizmo[0] = (float)m_to(0, 0);
                 m_gizmo[1] = (float)m_to(1, 0);
@@ -590,4 +590,26 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
             point_clouds_container.point_clouds.at(index_trg).render(m_trg, 1);
         }
     }
+
+    glColor3f(0, 1, 0);
+    glBegin(GL_LINE_STRIP);
+    for (auto &pc : point_clouds_container.point_clouds){
+        glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
+    }
+    glEnd();
+
+    glColor3f(1, 0, 0);
+    glBegin(GL_LINES);
+    for (auto &edge : edges)
+    {
+        int index_src = edges[index_active_edge].index_from;
+        int index_trg = edges[index_active_edge].index_to;
+
+        Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
+        Eigen::Affine3d m_trg = point_clouds_container.point_clouds.at(index_trg).m_pose;
+
+        glVertex3f(m_src(0, 3), m_src(1, 3), m_src(2, 3));
+        glVertex3f(m_trg(0, 3), m_trg(1, 3), m_trg(2, 3));
+    }
+    glEnd();
 }

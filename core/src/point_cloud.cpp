@@ -120,6 +120,26 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking& o
 	}
 }
 
+void PointCloud::render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud)
+{
+	if (this->visible)
+	{
+		glColor3f(render_color[0], render_color[1], render_color[2]);
+		glPointSize(point_size);
+		glBegin(GL_POINTS);
+		
+		for (int i = 0; i < this->points_local.size(); i += viewer_decmiate_point_cloud)
+		{
+			const auto &p = this->points_local[i];
+			Eigen::Vector3d vp;
+			vp = pose * p;
+			glVertex3d(vp.x(), vp.y(), vp.z());
+		}
+		glEnd();
+		glPointSize(1);
+	}
+}
+
 void PointCloud::update_from_gui()
 {
 	pose.px = gui_translation[0];

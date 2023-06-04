@@ -660,6 +660,32 @@ void project_gui()
     if (manual_pose_graph_loop_closure_mode)
     {
         manual_pose_graph_loop_closure.Gui(point_clouds_container, index_loop_closure_source, index_loop_closure_target);
+
+        /*if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size()> 0)
+        {
+            int index_src = manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].index_from;
+            int index_trg = manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].index_to;
+
+            Eigen::Affine3d m_from = point_clouds_container.point_clouds.at(index_src).m_pose;
+            Eigen::Affine3d m_to = m_from * affine_matrix_from_pose_tait_bryan(manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].relative_pose_tb);
+
+            m_gizmo[0] = (float)m_to(0, 0);
+            m_gizmo[1] = (float)m_to(1, 0);
+            m_gizmo[2] = (float)m_to(2, 0);
+            m_gizmo[3] = (float)m_to(3, 0);
+            m_gizmo[4] = (float)m_to(0, 1);
+            m_gizmo[5] = (float)m_to(1, 1);
+            m_gizmo[6] = (float)m_to(2, 1);
+            m_gizmo[7] = (float)m_to(3, 1);
+            m_gizmo[8] = (float)m_to(0, 2);
+            m_gizmo[9] = (float)m_to(1, 2);
+            m_gizmo[10] = (float)m_to(2, 2);
+            m_gizmo[11] = (float)m_to(3, 2);
+            m_gizmo[12] = (float)m_to(0, 3);
+            m_gizmo[13] = (float)m_to(1, 3);
+            m_gizmo[14] = (float)m_to(2, 3);
+            m_gizmo[15] = (float)m_to(3, 3);
+        }*/
     }
     else
     {
@@ -2212,6 +2238,55 @@ void display()
             glVertex3f(p.x(), p.y(), p.z());
         }
         glEnd();
+    }else{
+        // ImGuizmo -----------------------------------------------
+        if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size() > 0)
+        {
+            ImGuizmo::BeginFrame();
+            ImGuizmo::Enable(true);
+            ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+            if (!is_ortho)
+            {
+                GLfloat projection[16];
+                glGetFloatv(GL_PROJECTION_MATRIX, projection);
+
+                GLfloat modelview[16];
+                glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+
+                ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+            }
+            else
+            {
+                ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+            }
+
+            Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
+
+            m_g(0, 0) = m_gizmo[0];
+            m_g(1, 0) = m_gizmo[1];
+            m_g(2, 0) = m_gizmo[2];
+            m_g(3, 0) = m_gizmo[3];
+            m_g(0, 1) = m_gizmo[4];
+            m_g(1, 1) = m_gizmo[5];
+            m_g(2, 1) = m_gizmo[6];
+            m_g(3, 1) = m_gizmo[7];
+            m_g(0, 2) = m_gizmo[8];
+            m_g(1, 2) = m_gizmo[9];
+            m_g(2, 2) = m_gizmo[10];
+            m_g(3, 2) = m_gizmo[11];
+            m_g(0, 3) = m_gizmo[12];
+            m_g(1, 3) = m_gizmo[13];
+            m_g(2, 3) = m_gizmo[14];
+            m_g(3, 3) = m_gizmo[15];
+
+            const int &index_src = manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].index_from;
+           
+            const Eigen::Affine3d &m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
+            manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
+
+            ImGui::End();
+        }
     }
 
     ImGui::Render();

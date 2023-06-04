@@ -14,6 +14,10 @@ class ManualPoseGraphLoopClosure{
         };
 
         std::vector<Edge> edges;
+        int index_active_edge = 0;
+        bool manipulate_active_edge = false;
+        bool gizmo = false;
+        //float m_gizmo[16];
 
         ManualPoseGraphLoopClosure(){};
         ~ManualPoseGraphLoopClosure(){};

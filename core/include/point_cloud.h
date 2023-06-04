@@ -96,6 +96,7 @@ public:
 
 	bool load(const std::string& file_name);
 	void render(bool show_with_initial_pose, const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud);
+	void render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud);
 	void update_from_gui();
 	bool save_as_global(std::string file_name);
 	//rgd

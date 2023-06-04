@@ -116,7 +116,7 @@ bool PointClouds::update_poses_from_RESSO(const std::string &folder_with_point_c
 	if (!infile.good())
 	{
 		std::cout << "problem with file: '" << poses_file_name << "' (!infile.good())" << std::endl;
-		return false;
+	//	return false;
 	}
 	std::string line;
 	std::getline(infile, line);
@@ -592,237 +592,135 @@ bool PointClouds::load_pose_ETH(const std::string &fn, Eigen::Affine3d &m_increm
 	return true;
 }
 
+bool load_pc(PointCloud &pc, std::string input_file_name)
+{
+	
+	laszip_POINTER laszip_reader;
+	if (laszip_create(&laszip_reader))
+	{
+		fprintf(stderr, ":DLL ERROR: creating laszip reader\n");
+		/*PointCloud pc;
+		pc.m_pose = Eigen::Affine3d::Identity();
+		pc.m_initial_pose = pc.m_pose;
+		pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+		pc.gui_translation[0] = pc.pose.px;
+		pc.gui_translation[1] = pc.pose.py;
+		pc.gui_translation[2] = pc.pose.pz;
+		pc.gui_rotation[0] = rad2deg(pc.pose.om);
+		pc.gui_rotation[1] = rad2deg(pc.pose.fi);
+		pc.gui_rotation[2] = rad2deg(pc.pose.ka);
+		pc.file_name = input_file_names[i];
+		point_clouds.push_back(pc);*/
+		return false;
+	}
+
+	laszip_BOOL is_compressed = 0;
+	if (laszip_open_reader(laszip_reader, input_file_name.c_str(), &is_compressed))
+	{
+		fprintf(stderr, ":DLL ERROR: opening laszip reader for '%s'\n", input_file_name.c_str());
+		/*PointCloud pc;
+		pc.m_pose = Eigen::Affine3d::Identity();
+		pc.m_initial_pose = pc.m_pose;
+		pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+		pc.gui_translation[0] = pc.pose.px;
+		pc.gui_translation[1] = pc.pose.py;
+		pc.gui_translation[2] = pc.pose.pz;
+		pc.gui_rotation[0] = rad2deg(pc.pose.om);
+		pc.gui_rotation[1] = rad2deg(pc.pose.fi);
+		pc.gui_rotation[2] = rad2deg(pc.pose.ka);
+		pc.file_name = input_file_names[i];
+		point_clouds.push_back(pc);*/
+		return false;
+	}
+	std::cout << "compressed : " << is_compressed << std::endl;
+	laszip_header *header;
+
+	
+	if (laszip_get_header_pointer(laszip_reader, &header))
+	{
+		fprintf(stderr, ":DLL ERROR: getting header pointer from laszip reader\n");
+		/*PointCloud pc;
+		pc.m_pose = Eigen::Affine3d::Identity();
+		pc.m_initial_pose = pc.m_pose;
+		pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+		pc.gui_translation[0] = pc.pose.px;
+		pc.gui_translation[1] = pc.pose.py;
+		pc.gui_translation[2] = pc.pose.pz;
+		pc.gui_rotation[0] = rad2deg(pc.pose.om);
+		pc.gui_rotation[1] = rad2deg(pc.pose.fi);
+		pc.gui_rotation[2] = rad2deg(pc.pose.ka);
+		pc.file_name = input_file_names[i];
+		point_clouds.push_back(pc);*/
+		return false;
+	}
+	fprintf(stderr, "file '%s' contains %u points\n", input_file_name.c_str(), header->number_of_point_records);
+	laszip_point *point;
+	if (laszip_get_point_pointer(laszip_reader, &point))
+	{
+		fprintf(stderr, ":DLL ERROR: getting point pointer from laszip reader\n");
+		return false;
+	}
+
+	pc.m_pose = Eigen::Affine3d::Identity();
+	pc.m_initial_pose = pc.m_pose;
+	pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+	pc.gui_translation[0] = pc.pose.px;
+	pc.gui_translation[1] = pc.pose.py;
+	pc.gui_translation[2] = pc.pose.pz;
+	pc.gui_rotation[0] = rad2deg(pc.pose.om);
+	pc.gui_rotation[1] = rad2deg(pc.pose.fi);
+	pc.gui_rotation[2] = rad2deg(pc.pose.ka);
+
+	for (int j = 0; j < header->number_of_point_records; j++)
+	{
+		if (laszip_read_point(laszip_reader))
+		{
+			fprintf(stderr, ":DLL ERROR: reading point %u\n", j);
+			continue;
+		}
+
+		LAZPoint p;
+		p.x = header->x_offset + header->x_scale_factor * static_cast<double>(point->X);
+		p.y = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y);
+		p.z = header->z_offset + header->z_scale_factor * static_cast<double>(point->Z);
+
+		Eigen::Vector3d pp(p.x, p.y, p.z);
+		pc.points_local.push_back(pp);
+		pc.intensities.push_back(point->intensity);
+	}
+	laszip_close_reader(laszip_reader);
+	//laszip_clean(laszip_reader);
+	//laszip_destroy(laszip_reader);
+
+}
+
 bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
 {
 	this->offset = Eigen::Vector3d(0, 0, 0);
-	// size_t sum_points_before_decimation = 0;
-	// size_t sum_points_after_decimation = 0;
 
 	for (size_t i = 0; i < input_file_names.size(); i++)
 	{
 		std::cout << "loading file: " << input_file_names[i] << " [" << i + 1 << "] of " << input_file_names.size() << std::endl;
-#if 0
-		std::cout << "parsing file: " << input_file_names[i] << std::endl;
-		//printf("===================\n"); fflush(stdout);
-		std::ifstream ifs;
-
-		std::cout << "1" << std::endl;
-		ifs.open(input_file_names[i].c_str(), std::ios::in | std::ios::binary);
-
-		if (!ifs.good()) {
-			return false;
-		}
-		std::cout << "2" << std::endl;
-		liblas::ReaderFactory f;
-		
-		liblas::Reader reader = f.CreateWithStream(ifs);
-		std::cout << "3" << std::endl;
-		liblas::Header const& header = reader.GetHeader();
-		
-		std::cout << "Compressed: " << ((header.Compressed() == true) ? "true" : "false") << std::endl;
-		std::cout << "Signature: " << header.GetFileSignature() << '\n';
-		std::cout << "LAS Points count: " << header.GetPointRecordsCount() << ". loading...\n";
-
 		PointCloud pc;
-		pc.m_pose = Eigen::Affine3d::Identity();
-		pc.m_initial_pose = pc.m_pose;
-		pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-		pc.gui_translation[0] = pc.pose.px;
-		pc.gui_translation[1] = pc.pose.py;
-		pc.gui_translation[2] = pc.pose.pz;
-		pc.gui_rotation[0] = rad2deg(pc.pose.om);
-		pc.gui_rotation[1] = rad2deg(pc.pose.fi);
-		pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-
-		while (reader.ReadNextPoint())
+		if (load_pc(pc, input_file_names[i]))
 		{
-			liblas::Point const& p = reader.GetPoint();
-			pc.points_local.push_back({ p.GetX(), p.GetY(), p.GetZ() });
-			pc.intensities.push_back(p.GetIntensity());
-
-
-			//pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-			//Point pp;
-			// printf("---\n"); fflush(stdout);
-			//pp.coordinates = Eigen::Vector3d(p.GetX(), p.GetY(), p.GetZ());
-			// printf("coordinates\n"); fflush(stdout);
-			//pp.type_ground_truth = las_type(p.GetClassification().GetClass());
-			// printf("type_ground_truth\n"); fflush(stdout);
-			//pp.type = las_type::NeverClassified;
-			// printf("type\n"); fflush(stdout);
-			//pp.timestamp = p.GetTime();
-			// printf("timestamp\n"); fflush(stdout);
-			//pp.intensity = p.GetIntensity();
-			//pp.return_id = p.GetReturnNumber();
-			//pp.returns_count = p.GetNumberOfReturns();
-			//pp.source_id = p.GetPointSourceID();
-			//pp.scan_angle_rank = p.GetScanAngleRank();
-			//pp.flight_line_edge = p.GetFlightLineEdge();
-			//pp.scan_direction = p.GetScanDirection();
-			//pp.user_data = p.GetUserData();
-			//pp.type = las_type::Unassigned;
-			//pp.index = points.size();
-			//points.push_back(pp);
-		}
-		pc.file_name = input_file_names[i];
-		point_clouds.push_back(pc);
-
-		std::cout << "LAS Points count - loaded: " << pc.points_local.size() << "\n";
-		//Points points_dec;
-		//for(size_t i = 0; i < points.size(); i+= dec){
-		//	points_dec.push_back(points[i]);
-		//}
-		//points = points_dec;
-
-		//return true;
-#endif
-#if 1
-		laszip_POINTER laszip_reader;
-		if (laszip_create(&laszip_reader))
-		{
-			fprintf(stderr, "DLL ERROR: creating laszip reader\n");
-			PointCloud pc;
-			pc.m_pose = Eigen::Affine3d::Identity();
-			pc.m_initial_pose = pc.m_pose;
-			pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-			pc.gui_translation[0] = pc.pose.px;
-			pc.gui_translation[1] = pc.pose.py;
-			pc.gui_translation[2] = pc.pose.pz;
-			pc.gui_rotation[0] = rad2deg(pc.pose.om);
-			pc.gui_rotation[1] = rad2deg(pc.pose.fi);
-			pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-			pc.file_name = input_file_names[i];
-			point_clouds.push_back(pc);
-			continue;
-			//std::abort();
-		}
-
-		laszip_BOOL is_compressed = 0;
-		if (laszip_open_reader(laszip_reader, input_file_names[i].c_str(), &is_compressed))
-		{
-			fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", input_file_names[i].c_str());
-			PointCloud pc;
-			pc.m_pose = Eigen::Affine3d::Identity();
-			pc.m_initial_pose = pc.m_pose;
-			pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-			pc.gui_translation[0] = pc.pose.px;
-			pc.gui_translation[1] = pc.pose.py;
-			pc.gui_translation[2] = pc.pose.pz;
-			pc.gui_rotation[0] = rad2deg(pc.pose.om);
-			pc.gui_rotation[1] = rad2deg(pc.pose.fi);
-			pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-			pc.file_name = input_file_names[i];
-			point_clouds.push_back(pc);
-			continue;
-			//std::abort();
-		}
-		std::cout << "compressed : " << is_compressed << std::endl;
-		laszip_header *header;
-
-		if (laszip_get_header_pointer(laszip_reader, &header))
-		{
-			fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
-			PointCloud pc;
-			pc.m_pose = Eigen::Affine3d::Identity();
-			pc.m_initial_pose = pc.m_pose;
-			pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-			pc.gui_translation[0] = pc.pose.px;
-			pc.gui_translation[1] = pc.pose.py;
-			pc.gui_translation[2] = pc.pose.pz;
-			pc.gui_rotation[0] = rad2deg(pc.pose.om);
-			pc.gui_rotation[1] = rad2deg(pc.pose.fi);
-			pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-			pc.file_name = input_file_names[i];
-			point_clouds.push_back(pc);
-			continue;
-			//std::abort();
-		}
-		fprintf(stderr, "file '%s' contains %u points\n", input_file_names[i].c_str(), header->number_of_point_records);
-		laszip_point *point;
-		if (laszip_get_point_pointer(laszip_reader, &point))
-		{
-			fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
-			continue;
-			//std::abort();
-		}
-
-		PointCloud pc;
-		pc.m_pose = Eigen::Affine3d::Identity();
-		pc.m_initial_pose = pc.m_pose;
-		pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-		pc.gui_translation[0] = pc.pose.px;
-		pc.gui_translation[1] = pc.pose.py;
-		pc.gui_translation[2] = pc.pose.pz;
-		pc.gui_rotation[0] = rad2deg(pc.pose.om);
-		pc.gui_rotation[1] = rad2deg(pc.pose.fi);
-		pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-
-		for (int j = 0; j < header->number_of_point_records; j++)
-		{
-			if (laszip_read_point(laszip_reader))
+			if (is_decimate && pc.points_local.size() > 0)
 			{
-				fprintf(stderr, "DLL ERROR: reading point %u\n", j);
-				continue;
-				//std::abort();
+				std::cout << "start downsampling" << std::endl;
+
+				size_t sum_points_before_decimation = pc.points_local.size();
+				pc.decimate(bucket_x, bucket_y, bucket_z);
+				size_t sum_points_after_decimation = pc.points_local.size();
+
+				std::cout << "downsampling finished" << std::endl;
+				std::cout << "all scans, sum_points_before_decimation: " << sum_points_before_decimation << std::endl;
+				std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
 			}
-
-			LAZPoint p;
-			p.x = header->x_offset + header->x_scale_factor * static_cast<double>(point->X);
-			p.y = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y);
-			p.z = header->z_offset + header->z_scale_factor * static_cast<double>(point->Z);
-
-			Eigen::Vector3d pp(p.x, p.y, p.z);
-			pc.points_local.push_back(pp);
-			// sum_points_before_decimation++;
-			//  std::cout << (int)point->rgb[0] << " " << (int)point->rgb[1] << " " << (int)point->rgb[2] << " " << (int)point->rgb[3] << std::endl;
-			//  std::cout << (int)point->user_data << std::endl;
-			//  int->
-			/*std::cout << (int)point->extra_bytes[0] << " " <<
-				(int)point->extra_bytes[1] << " " <<
-				(int)point->extra_bytes[2] << " " <<
-				(int)point->extra_bytes[3] << " " <<
-				(int)point->extra_bytes[4] << " " <<
-				(int)point->extra_bytes[5] << " " <<
-				(int)point->extra_bytes[6] << " " <<
-				(int)point->extra_bytes[7] << std::endl;*/
-
-
-///////////////////////////////////////////
-			//if (point->num_extra_bytes > 6)
-			//{
-			//	laszip_U16 intensity = point->extra_bytes[6];
-			//	pc.intensities.push_back(intensity);
-			//}
-			//else
-			//{
-			//	pc.intensities.push_back(0);
-			//}
-///////////////////////////////////////////
-			pc.intensities.push_back(point->intensity);
-
-
+			pc.file_name = input_file_names[i];
+			point_clouds.push_back(pc);
+		}else{
+			std::cout << "problem with loading file: " << input_file_names[i] << std::endl;
 		}
-
-		if (is_decimate)
-		{
-			std::cout << "start downsampling" << std::endl;
-
-			size_t sum_points_before_decimation = pc.points_local.size();
-			pc.decimate(bucket_x, bucket_y, bucket_z);
-			size_t sum_points_after_decimation = pc.points_local.size();
-
-			std::cout << "downsampling finished" << std::endl;
-			std::cout << "all scans, sum_points_before_decimation: " << sum_points_before_decimation << std::endl;
-			std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
-		}
-		// else
-		//{
-		//	sum_points_after_decimation = sum_points_before_decimation;
-		// }
-
-		pc.file_name = input_file_names[i];
-		point_clouds.push_back(pc);
-#endif
 	}
 
 	if (calculate_offset)
@@ -846,24 +744,6 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 			point_clouds[i].points_local[j] -= this->offset;
 		}
 	}
-
-	/*if (is_decimate)
-	{
-		std::cout << "start downsampling" << std::endl;
-		for (int i = 0; i < point_clouds.size(); i++)
-		{
-			sum_points_before_decimation += point_clouds[i].points_local.size();
-			point_clouds[i].decimate(bucket_x, bucket_y, bucket_z);
-			sum_points_after_decimation += point_clouds[i].points_local.size();
-		}
-		std::cout << "downsampling finished" << std::endl;
-		std::cout << "all scans, sum_points_before_decimation: " << sum_points_before_decimation << std::endl;
-		std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
-	}
-	else
-	{
-		sum_points_after_decimation = sum_points_before_decimation;
-	}*/
 
 	print_point_cloud_dimention();
 	return true;

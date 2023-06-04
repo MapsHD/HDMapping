@@ -38,7 +38,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
             edge.relative_pose_tb_weights.fi = 1.0;
             edge.relative_pose_tb_weights.ka = 1.0;
 
-
+            edges.push_back(edge);
         }
     }
 }

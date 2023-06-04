@@ -13,11 +13,13 @@ class ManualPoseGraphLoopClosure{
             int index_to;
         };
 
-    ManualPoseGraphLoopClosure(){};
-    ~ManualPoseGraphLoopClosure(){};
+        std::vector<Edge> edges;
 
-    void Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target);
-    void Render(PointClouds &point_clouds_container, int index_loop_closure_source, int index_loop_closure_target);
+        ManualPoseGraphLoopClosure(){};
+        ~ManualPoseGraphLoopClosure(){};
+
+        void Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target);
+        void Render(PointClouds &point_clouds_container, int index_loop_closure_source, int index_loop_closure_target);
 };
 
 #endif

@@ -1,9 +1,43 @@
 #include <manual_pose_graph_loop_closure.h>
 #include <icp.h>
+#include <transformations.h>
+#include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
+#include <python-scripts/constraints/relative_pose_tait_bryan_cw_jacobian.h>
+
+#include <python-scripts/constraints/relative_pose_rodrigues_wc_jacobian.h>
+
+#include <python-scripts/constraints/relative_pose_quaternion_wc_jacobian.h>
+#include <python-scripts/constraints/relative_pose_quaternion_cw_jacobian.h>
+#include <python-scripts/constraints/quaternion_constraint_jacobian.h>
+
+#include <m_estimators.h>
+
+// std::random_device rd;
+// std::mt19937 gen(rd());
+
+// inline double random(double low, double high)
+//{
+//     std::uniform_real_distribution<double> dist(low, high);
+//     return dist(gen);
+// }
+
+/*void add_noise_to_poses(std::vector<TaitBryanPose> &poses)
+{
+    for (size_t i = 0; i < poses.size(); i++)
+    {
+        poses[i].px += random(-0.000001, 0.000001);
+        poses[i].py += random(-0.000001, 0.000001);
+        poses[i].pz += random(-0.000001, 0.000001);
+        poses[i].om += random(-0.000001, 0.000001);
+        poses[i].fi += random(-0.000001, 0.000001);
+        poses[i].ka += random(-0.000001, 0.000001);
+    }
+}*/
 
 void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo)
 {
-    if(point_clouds_container.point_clouds.size() > 0){
+    if (point_clouds_container.point_clouds.size() > 0)
+    {
 
         if (!manipulate_active_edge)
         {
@@ -25,7 +59,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
             {
                 index_loop_closure_target = point_clouds_container.point_clouds.size() - 1;
             }
-        
+
             if (ImGui::Button("Add edge"))
             {
                 Edge edge;
@@ -48,8 +82,368 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
 
                 index_active_edge = edges.size() - 1;
             }
-        }
 
+            if (edges.size() > 0 && !manipulate_active_edge)
+            {
+
+                if (ImGui::Button("Set initial poses as motion model"))
+                {
+                    poses_motion_model.clear();
+                    for (auto &pc : point_clouds_container.point_clouds)
+                    {
+                        poses_motion_model.push_back(pc.m_initial_pose);
+                    }
+                    std::cout << "Set initial poses as motion model DONE" << std::endl;
+                }
+
+                ImGui::SameLine();
+
+                if (ImGui::Button("Set current result as motion model"))
+                {
+                    poses_motion_model.clear();
+                    for (auto &pc : point_clouds_container.point_clouds)
+                    {
+                        poses_motion_model.push_back(pc.m_pose);
+                    }
+                    std::cout << "Set current result as motion model DONE" << std::endl;
+                }
+
+                if (poses_motion_model.size() == point_clouds_container.point_clouds.size())
+                {
+                    ImGui::SameLine();
+                    if (ImGui::Button("Compute Pose Graph SLAM"))
+                    {
+                        std::cout << "Compute Pose Graph SLAM" << std::endl;
+                        // exit(1);
+                        ///////////////////////////////////////////////////////////////////
+                        // graph slam
+                        bool is_ok = true;
+                        std::vector<Eigen::Affine3d> m_poses;
+                        for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+                        {
+                            m_poses.push_back(point_clouds_container.point_clouds[i].m_pose);
+                        }
+
+                        std::vector<TaitBryanPose> poses;
+
+                        bool is_wc = true;
+                        bool is_cw = false;
+                        int iterations = 10;
+                        bool is_fix_first_node = true;
+
+                        for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+                        {
+                            if (is_wc)
+                            {
+                                poses.push_back(pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose));
+                            }
+                            else if (is_cw)
+                            {
+                                poses.push_back(pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose.inverse()));
+                            }
+                        }
+
+                        std::vector<Edge> all_edges;
+
+                        // motion model;
+                        for (int i = 1; i < poses_motion_model.size(); i++)
+                        {
+                            Eigen::Affine3d m_rel = poses_motion_model[i - 1].inverse() * poses_motion_model[i];
+                            Edge edge;
+                            edge.index_from = i - 1;
+                            edge.index_to = i;
+                            edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_rel);
+                            edge.relative_pose_tb_weights.om = 1.0;
+                            edge.relative_pose_tb_weights.fi = 1.0;
+                            edge.relative_pose_tb_weights.ka = 1.0;
+                            edge.relative_pose_tb_weights.px = 1.0;
+                            edge.relative_pose_tb_weights.py = 1.0;
+                            edge.relative_pose_tb_weights.pz = 1.0;
+                            all_edges.push_back(edge);
+                        }
+
+                        for (int i = 0; i < edges.size(); i++)
+                        {
+                            all_edges.push_back(edges[i]);
+                        }
+
+                        for (int iter = 0; iter < iterations; iter++)
+                        {
+                            std::cout << "iteration " << iter + 1 << " of " << iterations << std::endl;
+                            std::vector<Eigen::Triplet<double>> tripletListA;
+                            std::vector<Eigen::Triplet<double>> tripletListP;
+                            std::vector<Eigen::Triplet<double>> tripletListB;
+
+                            for (size_t i = 0; i < all_edges.size(); i++)
+                            {
+                                Eigen::Matrix<double, 6, 1> delta;
+                                Eigen::Matrix<double, 6, 12, Eigen::RowMajor> jacobian;
+                                // auto relative_pose = pose_tait_bryan_from_affine_matrix(all_edges[i].relative_pose_tb);
+                                if (is_wc)
+                                {
+                                    relative_pose_obs_eq_tait_bryan_wc_case1(
+                                        delta,
+                                        poses[all_edges[i].index_from].px,
+                                        poses[all_edges[i].index_from].py,
+                                        poses[all_edges[i].index_from].pz,
+                                        normalize_angle(poses[all_edges[i].index_from].om),
+                                        normalize_angle(poses[all_edges[i].index_from].fi),
+                                        normalize_angle(poses[all_edges[i].index_from].ka),
+                                        poses[all_edges[i].index_to].px,
+                                        poses[all_edges[i].index_to].py,
+                                        poses[all_edges[i].index_to].pz,
+                                        normalize_angle(poses[all_edges[i].index_to].om),
+                                        normalize_angle(poses[all_edges[i].index_to].fi),
+                                        normalize_angle(poses[all_edges[i].index_to].ka),
+                                        all_edges[i].relative_pose_tb.px,
+                                        all_edges[i].relative_pose_tb.py,
+                                        all_edges[i].relative_pose_tb.pz,
+                                        normalize_angle(all_edges[i].relative_pose_tb.om),
+                                        normalize_angle(all_edges[i].relative_pose_tb.fi),
+                                        normalize_angle(all_edges[i].relative_pose_tb.ka));
+                                    relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(jacobian,
+                                                                                      poses[all_edges[i].index_from].px,
+                                                                                      poses[all_edges[i].index_from].py,
+                                                                                      poses[all_edges[i].index_from].pz,
+                                                                                      normalize_angle(poses[all_edges[i].index_from].om),
+                                                                                      normalize_angle(poses[all_edges[i].index_from].fi),
+                                                                                      normalize_angle(poses[all_edges[i].index_from].ka),
+                                                                                      poses[all_edges[i].index_to].px,
+                                                                                      poses[all_edges[i].index_to].py,
+                                                                                      poses[all_edges[i].index_to].pz,
+                                                                                      normalize_angle(poses[all_edges[i].index_to].om),
+                                                                                      normalize_angle(poses[all_edges[i].index_to].fi),
+                                                                                      normalize_angle(poses[all_edges[i].index_to].ka));
+                                }
+                                else if (is_cw)
+                                {
+                                    relative_pose_obs_eq_tait_bryan_cw_case1(
+                                        delta,
+                                        poses[all_edges[i].index_from].px,
+                                        poses[all_edges[i].index_from].py,
+                                        poses[all_edges[i].index_from].pz,
+                                        normalize_angle(poses[all_edges[i].index_from].om),
+                                        normalize_angle(poses[all_edges[i].index_from].fi),
+                                        normalize_angle(poses[all_edges[i].index_from].ka),
+                                        poses[all_edges[i].index_to].px,
+                                        poses[all_edges[i].index_to].py,
+                                        poses[all_edges[i].index_to].pz,
+                                        normalize_angle(poses[all_edges[i].index_to].om),
+                                        normalize_angle(poses[all_edges[i].index_to].fi),
+                                        normalize_angle(poses[all_edges[i].index_to].ka),
+                                        all_edges[i].relative_pose_tb.px,
+                                        all_edges[i].relative_pose_tb.py,
+                                        all_edges[i].relative_pose_tb.pz,
+                                        normalize_angle(all_edges[i].relative_pose_tb.om),
+                                        normalize_angle(all_edges[i].relative_pose_tb.fi),
+                                        normalize_angle(all_edges[i].relative_pose_tb.ka));
+                                    relative_pose_obs_eq_tait_bryan_cw_case1_jacobian(jacobian,
+                                                                                      poses[all_edges[i].index_from].px,
+                                                                                      poses[all_edges[i].index_from].py,
+                                                                                      poses[all_edges[i].index_from].pz,
+                                                                                      normalize_angle(poses[all_edges[i].index_from].om),
+                                                                                      normalize_angle(poses[all_edges[i].index_from].fi),
+                                                                                      normalize_angle(poses[all_edges[i].index_from].ka),
+                                                                                      poses[all_edges[i].index_to].px,
+                                                                                      poses[all_edges[i].index_to].py,
+                                                                                      poses[all_edges[i].index_to].pz,
+                                                                                      normalize_angle(poses[all_edges[i].index_to].om),
+                                                                                      normalize_angle(poses[all_edges[i].index_to].fi),
+                                                                                      normalize_angle(poses[all_edges[i].index_to].ka));
+                                }
+
+                                int ir = tripletListB.size();
+
+                                int ic_1 = all_edges[i].index_from * 6;
+                                int ic_2 = all_edges[i].index_to * 6;
+
+                                for (size_t row = 0; row < 6; row++)
+                                {
+                                    tripletListA.emplace_back(ir + row, ic_1, -jacobian(row, 0));
+                                    tripletListA.emplace_back(ir + row, ic_1 + 1, -jacobian(row, 1));
+                                    tripletListA.emplace_back(ir + row, ic_1 + 2, -jacobian(row, 2));
+                                    tripletListA.emplace_back(ir + row, ic_1 + 3, -jacobian(row, 3));
+                                    tripletListA.emplace_back(ir + row, ic_1 + 4, -jacobian(row, 4));
+                                    tripletListA.emplace_back(ir + row, ic_1 + 5, -jacobian(row, 5));
+
+                                    tripletListA.emplace_back(ir + row, ic_2, -jacobian(row, 6));
+                                    tripletListA.emplace_back(ir + row, ic_2 + 1, -jacobian(row, 7));
+                                    tripletListA.emplace_back(ir + row, ic_2 + 2, -jacobian(row, 8));
+                                    tripletListA.emplace_back(ir + row, ic_2 + 3, -jacobian(row, 9));
+                                    tripletListA.emplace_back(ir + row, ic_2 + 4, -jacobian(row, 10));
+                                    tripletListA.emplace_back(ir + row, ic_2 + 5, -jacobian(row, 11));
+                                }
+
+                                tripletListB.emplace_back(ir, 0, delta(0, 0));
+                                tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+                                tripletListB.emplace_back(ir + 2, 0, delta(2, 0));
+                                tripletListB.emplace_back(ir + 3, 0, normalize_angle(delta(3, 0)));
+                                tripletListB.emplace_back(ir + 4, 0, normalize_angle(delta(4, 0)));
+                                tripletListB.emplace_back(ir + 5, 0, normalize_angle(delta(5, 0)));
+
+                                std::cout << "delta(0, 0): " << delta(0, 0) << std::endl;
+                                std::cout << "delta(1, 0): " << delta(0, 0) << std::endl;
+                                std::cout << "delta(2, 0): " << delta(0, 0) << std::endl;
+                                std::cout << "normalize_angle(delta(3, 0)): " << normalize_angle(delta(3, 0)) << std::endl;
+                                std::cout << "normalize_angle(delta(4, 0)): " << normalize_angle(delta(4, 0)) << std::endl;
+                                std::cout << "normalize_angle(delta(5, 0)): " << normalize_angle(delta(5, 0)) << std::endl;
+
+                                // for (int r = 0; r < 6; r++) {
+                                //     for (int c = 0; c < 6; c++) {
+                                //         tripletListP.emplace_back(ir + r, ir + c, edges[i].information_matrix.coeffRef(r, c));
+                                //    }
+                                // }
+
+                                // tripletListP.emplace_back(ir    , ir    , get_cauchy_w(delta(0, 0), 10));
+                                // tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 10));
+                                // tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta(2, 0), 10));
+                                // tripletListP.emplace_back(ir + 3, ir + 3, get_cauchy_w(delta(3, 0), 10));
+                                // tripletListP.emplace_back(ir + 4, ir + 4, get_cauchy_w(delta(4, 0), 10));
+                                // tripletListP.emplace_back(ir + 5, ir + 5, get_cauchy_w(delta(5, 0), 10));
+                                tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
+                                tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
+                                tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
+                                tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
+                                tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
+                                tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
+                            }
+                            if (is_fix_first_node)
+                            {
+                                int ir = tripletListB.size();
+                                tripletListA.emplace_back(ir, 0, 1);
+                                tripletListA.emplace_back(ir + 1, 1, 1);
+                                tripletListA.emplace_back(ir + 2, 2, 1);
+                                tripletListA.emplace_back(ir + 3, 3, 1);
+                                tripletListA.emplace_back(ir + 4, 4, 1);
+                                tripletListA.emplace_back(ir + 5, 5, 1);
+
+                                tripletListP.emplace_back(ir, ir, 1);
+                                tripletListP.emplace_back(ir + 1, ir + 1, 1);
+                                tripletListP.emplace_back(ir + 2, ir + 2, 1);
+                                tripletListP.emplace_back(ir + 3, ir + 3, 1);
+                                tripletListP.emplace_back(ir + 4, ir + 4, 1);
+                                tripletListP.emplace_back(ir + 5, ir + 5, 1);
+
+                                tripletListB.emplace_back(ir, 0, 0);
+                                tripletListB.emplace_back(ir + 1, 0, 0);
+                                tripletListB.emplace_back(ir + 2, 0, 0);
+                                tripletListB.emplace_back(ir + 3, 0, 0);
+                                tripletListB.emplace_back(ir + 4, 0, 0);
+                                tripletListB.emplace_back(ir + 5, 0, 0);
+                            }
+
+                            Eigen::SparseMatrix<double> matA(tripletListB.size(), point_clouds_container.point_clouds.size() * 6);
+                            Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
+                            Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
+
+                            matA.setFromTriplets(tripletListA.begin(), tripletListA.end());
+                            matP.setFromTriplets(tripletListP.begin(), tripletListP.end());
+                            matB.setFromTriplets(tripletListB.begin(), tripletListB.end());
+
+                            Eigen::SparseMatrix<double> AtPA(point_clouds_container.point_clouds.size() * 6, point_clouds_container.point_clouds.size() * 6);
+                            Eigen::SparseMatrix<double> AtPB(point_clouds_container.point_clouds.size() * 6, 1);
+
+                            {
+                                Eigen::SparseMatrix<double> AtP = matA.transpose() * matP;
+                                AtPA = (AtP)*matA;
+                                AtPB = (AtP)*matB;
+                            }
+
+                            tripletListA.clear();
+                            tripletListP.clear();
+                            tripletListB.clear();
+
+                            std::cout << "AtPA.size: " << AtPA.size() << std::endl;
+                            std::cout << "AtPB.size: " << AtPB.size() << std::endl;
+
+                            std::cout << "start solving AtPA=AtPB" << std::endl;
+                            Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
+
+                            std::cout << "x = solver.solve(AtPB)" << std::endl;
+                            Eigen::SparseMatrix<double> x = solver.solve(AtPB);
+
+                            std::vector<double> h_x;
+
+                            for (int k = 0; k < x.outerSize(); ++k)
+                            {
+                                for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
+                                {
+                                    h_x.push_back(it.value());
+                                }
+                            }
+
+                            std::cout << "h_x.size(): " << h_x.size() << std::endl;
+
+                            std::cout << "AtPA=AtPB SOLVED" << std::endl;
+                            std::cout << "updates:" << std::endl;
+                            for (size_t i = 0; i < h_x.size(); i += 6)
+                            {
+                                std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << std::endl;
+                            }
+
+                            if (h_x.size() == 6 * point_clouds_container.point_clouds.size())
+                            {
+                                int counter = 0;
+
+                                for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+                                {
+                                    TaitBryanPose pose = poses[i];
+                                    poses[i].px += h_x[counter++];
+                                    poses[i].py += h_x[counter++];
+                                    poses[i].pz += h_x[counter++];
+                                    poses[i].om += h_x[counter++];
+                                    poses[i].fi += h_x[counter++];
+                                    poses[i].ka += h_x[counter++];
+
+                                    if (i == 0 && is_fix_first_node)
+                                    {
+                                        poses[i] = pose;
+                                    }
+                                }
+                                std::cout << "optimizing with tait bryan finished" << std::endl;
+                            }
+                            else
+                            {
+                                std::cout << "optimizing with tait bryan FAILED" << std::endl;
+                                std::cout << "h_x.size(): " << h_x.size() << " should be: " << 6 * point_clouds_container.point_clouds.size() << std::endl;
+                                is_ok = false;
+                                break;
+                            }
+                        }
+                        if (is_ok)
+                        {
+                            for (size_t i = 0; i < m_poses.size(); i++)
+                            {
+                                if (is_wc)
+                                {
+                                    m_poses[i] = affine_matrix_from_pose_tait_bryan(poses[i]);
+                                }
+                                else if (is_cw)
+                                {
+                                    m_poses[i] = affine_matrix_from_pose_tait_bryan(poses[i]).inverse();
+                                }
+                            }
+                        }
+
+                        if (is_ok)
+                        {
+                            for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+                            {
+                                point_clouds_container.point_clouds[i].m_pose = m_poses[i];
+                                point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+                                point_clouds_container.point_clouds[i].gui_translation[0] = point_clouds_container.point_clouds[i].pose.px;
+                                point_clouds_container.point_clouds[i].gui_translation[1] = point_clouds_container.point_clouds[i].pose.py;
+                                point_clouds_container.point_clouds[i].gui_translation[2] = point_clouds_container.point_clouds[i].pose.pz;
+                                point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(point_clouds_container.point_clouds[i].pose.om);
+                                point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(point_clouds_container.point_clouds[i].pose.fi);
+                                point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(point_clouds_container.point_clouds[i].pose.ka);
+                            }
+                        }
+                        ///////////////////////////////////////////////////////////////////
+                    }
+                }
+            }
+        }
         std::string number_active_edges = "number_edges: " + std::to_string(edges.size());
         ImGui::Text(number_active_edges.c_str());
 
@@ -57,7 +451,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
 
         if (edges.size() > 0 && manipulate_active_edge)
         {
-            //ImGui::SameLine();
+            // ImGui::SameLine();
             int remove_edge_index = -1;
             if (ImGui::Button("remove active edge"))
             {
@@ -66,7 +460,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
             }
 
             int prev_index_active_edge = index_active_edge;
-                ImGui::InputInt("index_active_edge", &index_active_edge);
+            ImGui::InputInt("index_active_edge", &index_active_edge);
 
             if (index_active_edge < 0)
             {
@@ -80,7 +474,8 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
             bool prev_gizmo = gizmo;
             ImGui::Checkbox("gizmo", &gizmo);
 
-            if (prev_gizmo != gizmo){
+            if (prev_gizmo != gizmo)
+            {
 
                 auto m_to = point_clouds_container.point_clouds[edges[index_active_edge].index_to].m_pose;
 
@@ -118,7 +513,8 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                 index_active_edge = remove_edge_index - 1;
             }
 
-            if (!gizmo){
+            if (!gizmo)
+            {
                 if (ImGui::Button("ICP"))
                 {
                     std::cout << "Iterative Closest Point" << std::endl;
@@ -159,7 +555,8 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                 }
                 ImGui::SameLine();
                 ImGui::InputDouble("search_radious", &search_radious);
-                if (search_radious < 0.01){
+                if (search_radious < 0.01)
+                {
                     search_radious = 0.01;
                 }
             }
@@ -173,12 +570,16 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
     point_clouds_container.point_clouds.at(index_loop_closure_source).visible = true;
     point_clouds_container.point_clouds.at(index_loop_closure_target).visible = true;
 
-    if (!manipulate_active_edge){
+    if (!manipulate_active_edge)
+    {
         ObservationPicking observation_picking;
         point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, 1);
         point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, 1);
-    }else{
-        if (edges.size() > 0){
+    }
+    else
+    {
+        if (edges.size() > 0)
+        {
             int index_src = edges[index_active_edge].index_from;
             int index_trg = edges[index_active_edge].index_to;
 

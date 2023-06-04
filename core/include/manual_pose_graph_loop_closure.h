@@ -19,6 +19,8 @@ class ManualPoseGraphLoopClosure{
         bool gizmo = false;
         double search_radious = 0.3;
 
+        std::vector<Eigen::Affine3d> poses_motion_model;
+
         ManualPoseGraphLoopClosure(){};
         ~ManualPoseGraphLoopClosure(){};
 

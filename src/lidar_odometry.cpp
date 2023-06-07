@@ -108,7 +108,7 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
     std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
     NDT::GridParameters& rgd_params, std::map<unsigned long long int, NDT::Bucket> &buckets);
 
-void draw_ellipse(const Eigen::Matrix3d& covar, Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd  = 3)
+void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd  = 3)
 {
     Eigen::LLT<Eigen::Matrix<double,3,3> > cholSolver(covar);
     Eigen::Matrix3d transform = cholSolver.matrixL();
@@ -339,7 +339,8 @@ void lidar_odometry_gui() {
     if(ImGui::Begin("lidar_odometry_gui v0.12")){
         ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
-        ImGui::InputDouble("resolution_X" , &in_out_params.resolution_X);
+        //ImGui::Checkbox("show_covs", &show_covs);
+        ImGui::InputDouble("resolution_X", &in_out_params.resolution_X);
         ImGui::InputDouble("resolution_Y" , &in_out_params.resolution_Y);
         ImGui::InputDouble("resolution_Z" , &in_out_params.resolution_Z);
 
@@ -848,9 +849,14 @@ void display() {
         }
         glEnd();
     }
+    //if(show_covs){
+    //    for(int i = 0; i < means.size(); i += dec_covs){
+    //        draw_ellipse(covs[i], means[i], Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
+    //    }
+    //}
     if(show_covs){
-        for(int i = 0; i < means.size(); i += dec_covs){
-            draw_ellipse(covs[i], means[i], Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
+        for(const auto &b:buckets){
+            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
         }
     }
 
@@ -1463,7 +1469,7 @@ void update_rgd(NDT::GridParameters& rgd_params, std::map<unsigned long long int
             buckets[index_of_bucket].number_of_points ++;
             auto curr_mean = points_global[i].point;
             auto mean = buckets[index_of_bucket].mean;
-            buckets[index_of_bucket].mean += (mean - curr_mean) / buckets[index_of_bucket].number_of_points;
+            //buckets[index_of_bucket].mean += (mean - curr_mean) / buckets[index_of_bucket].number_of_points;
             
             Eigen::Matrix3d cov_update;
             cov_update(0, 0) = (mean.x() - curr_mean.x()) * (mean.x() - curr_mean.x());

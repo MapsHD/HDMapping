@@ -43,8 +43,10 @@ NDT::GridParameters in_out_params;
 //std::vector<NDT::Bucket> buckets;
 std::map<unsigned long long int, NDT::Bucket> buckets;
 std::map<unsigned long long int, NDT::Bucket> reference_buckets;
+bool show_reference_buckets = true;
 
-std::vector<Point3Di> reference_points;
+    std::vector<Point3Di>
+        reference_points;
 bool show_reference_points = false;
 int dec_reference_points = 100;
 
@@ -57,8 +59,9 @@ void update_rgd(NDT::GridParameters& rgd_params, std::map<unsigned long long int
 
 bool show_all_points = false;
 bool show_initial_points = true;
-//bool show_intermadiate_points = false;
-bool show_covs = false;
+bool show_trajectory = true;
+    // bool show_intermadiate_points = false;
+    bool show_covs = false;
 int dec_covs = 10;
 double filter_threshold_xy = 1.5;
 int nr_iter = 100;
@@ -527,6 +530,7 @@ void lidar_odometry_gui() {
     if(ImGui::Begin("lidar_odometry_gui v0.12")){
         ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
+        ImGui::Checkbox("show_trajectory", &show_trajectory);
         //ImGui::Checkbox("show_covs", &show_covs);
         ImGui::InputDouble("resolution_X", &in_out_params.resolution_X);
         ImGui::InputDouble("resolution_Y" , &in_out_params.resolution_Y);
@@ -1067,8 +1071,9 @@ void lidar_odometry_gui() {
 
         ImGui::SameLine();
         ImGui::Checkbox("show reference points", &show_reference_points);
+        ImGui::Checkbox("show reference buckets" , &show_reference_buckets);
         ImGui::InputInt("decimation reference points", &dec_reference_points);
-        
+
         if(initial_points.size() > 0){
             ImGui::Text("-----manipulate initial transformation begin-------");
             ImGui::Checkbox("initial transformation gizmo", &initial_transformation_gizmo);
@@ -1103,13 +1108,103 @@ void lidar_odometry_gui() {
             }
             ImGui::Text("-----manipulate initial transformation end---------");
         }
+        //show_trajectory
+        if (ImGui::Button("save trajectory to ascii (x y z)"))
+        {
+            static std::shared_ptr<pfd::save_file> save_file;
+            std::string output_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+            const auto t = [&]()
+            {
+                auto sel = pfd::save_file("Save trajectory", "C:\\").result();
+                output_file_name = sel;
+                std::cout << "file to save: '" << output_file_name << "'" << std::endl;
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (output_file_name.size() > 0)
+            {
+                ofstream file;
+                file.open(output_file_name);
+                for (const auto &wd : worker_data)
+                {
+                    for (const auto &it : wd.intermediate_trajectory)
+                    {
+                        file << it(0, 3) << " " << it(1, 3) << " " << it(2, 3) << std::endl;
+                    }
+                }
+                file.close();
+            }
+        }
+
+        static int current_scan = -1;
+        int prev = current_scan;
+        ImGui::InputInt("change_current_scan", &current_scan);
+        {
+            int curr = current_scan;
+
+            if (prev != curr){
+                for (int k = 0; k < worker_data.size(); k++){
+                    worker_data[k].show = false;
+                }
+            }
+            if (current_scan <= 0){
+                current_scan = 0;
+            }
+            if (current_scan >= worker_data.size())
+            {
+                current_scan = worker_data.size();
+            }
+            if (current_scan >= 0 && current_scan < worker_data.size())
+            {
+                worker_data[current_scan].show = true;
+            }
+        }
+        if (ImGui::Button("select all scans"))
+        {
+            for (int k = 0; k < worker_data.size(); k++)
+            {
+                worker_data[k].show = true;
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("unselect all scans"))
+        {
+            for (int k = 0; k < worker_data.size(); k++)
+            {
+                worker_data[k].show = false;
+            }
+        }
+
+        if (ImGui::Button("filter reference buckets"))
+        {
+            std::map<unsigned long long int, NDT::Bucket> reference_buckets_out;
+            for (const auto &b : reference_buckets){
+                if(b.second.number_of_points > 10){
+                    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(b.second.cov, Eigen::ComputeEigenvectors);
+                    
+                    auto eigen_values = eigen_solver.eigenvalues();
+                    double sum_ev = eigen_values.x() + eigen_values.y() + eigen_values.z();
+                    double ev1 = eigen_values.x();
+                    double ev2 = eigen_values.y();
+                    double ev3 = eigen_values.z();
+
+                    double planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
+                    if (planarity > 0.7)
+                    {
+                        reference_buckets_out[b.first] = b.second;
+                    }
+                }
+            }
+            reference_buckets = reference_buckets_out;
+        }
 
         for (int i = 0; i < worker_data.size(); i++)
         {
             std::string text = "show[" + std::to_string(i) + "]";
             ImGui::Checkbox(text.c_str(), &worker_data[i].show);
         }
-
 
         ImGui::End();
     }
@@ -1270,13 +1365,39 @@ void display() {
         }
         glEnd();
     }
- 
+
+    if(show_trajectory)
+    {
+        glColor3f(0,1,0);
+        glBegin(GL_LINE_STRIP);
+        for (const auto &wd : worker_data)
+        {
+            for (const auto &it : wd.intermediate_trajectory)
+            {
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+            }
+        }
+        glEnd();
+    }
+
+    if (show_reference_buckets)
+    {
+        glColor3f(1, 0, 0);
+        glBegin(GL_POINTS);
+        for (const auto &b:reference_buckets)
+        {
+            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+        }
+        glEnd();
+    }
+
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
 
     lidar_odometry_gui();
 
-    if(initial_transformation_gizmo){
+    if (initial_transformation_gizmo)
+    {
         ImGuiIO &io = ImGui::GetIO();
         // ImGuizmo -----------------------------------------------
         ImGuizmo::BeginFrame();
@@ -1291,7 +1412,7 @@ void display() {
 
         ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::LOCAL, m_gizmo, NULL);
 
-        //Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
+        // Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
 
         m_g(0, 0) = m_gizmo[0];
         m_g(1, 0) = m_gizmo[1];
@@ -1309,13 +1430,11 @@ void display() {
         m_g(1, 3) = m_gizmo[13];
         m_g(2, 3) = m_gizmo[14];
         m_g(3, 3) = m_gizmo[15];
-
-
     }
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
-    
+
     glutSwapBuffers();
     glutPostRedisplay();
 }
@@ -1418,6 +1537,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
 
     std::cout << "number points with ts == 0: " << counter_ts0 << std::endl;
     std::cout << "total number points: " << points.size() << std::endl;
+    laszip_close_reader(laszip_reader);
     return points;
 }
 
@@ -2032,6 +2152,13 @@ void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &
         }
         //}
     }
+
+    AtPAndt.coeffRef(0, 0) += 10000.0;
+    AtPAndt.coeffRef(1, 1) += 10000.0;
+    AtPAndt.coeffRef(2, 2) += 10000.0;
+    AtPAndt.coeffRef(3, 3) += 10000.0;
+    AtPAndt.coeffRef(4, 4) += 10000.0;
+    AtPAndt.coeffRef(5, 5) += 10000.0;
 
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPAndt);
     Eigen::SparseMatrix<double> x = solver.solve(AtPBndt);

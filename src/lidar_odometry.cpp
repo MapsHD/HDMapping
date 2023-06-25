@@ -620,6 +620,7 @@ void lidar_odometry_gui() {
 
                     std::map<double, Eigen::Matrix4d> trajectory;
 
+                    int counter = 1;
                     for(const auto& [timestamp, gyr, acc]:imu_data){
                         const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
                         const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
@@ -633,17 +634,25 @@ void lidar_odometry_gui() {
                         t.rotate(d);
                         trajectory[timestamp] = t.matrix();
                         const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
-                        printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw);
+                        printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
                     }
 
                     std::cout << "number of points: " << points.size() << std::endl;
-                    for (auto &p : points) {
+                    std::cout << "start transforming points" << std::endl;
+
+                    counter = 1; //ToDo make it faster
+                    for (auto &p : points)
+                    {
                         Eigen::Matrix4d t = getInterpolatedPose(trajectory, p.timestamp);
                         if (!t.isZero()) {
                             Eigen::Affine3d tt(t);
                             Eigen::Vector3d tp = tt * p.point;
                             all_points.push_back(tp);
                         }
+                        if(counter % 1000 == 0){
+                            printf("tranform point %d of", counter, points.size());
+                        }
+                        counter++;
                     }
 
                     for(int i = 0; i < threshold_initial_points; i++){
@@ -652,7 +661,7 @@ void lidar_odometry_gui() {
                         initial_points.push_back(p);
                     }
 
-                    double timestamp_begin = points[10000-1].timestamp;
+                    double timestamp_begin = points[threshold_initial_points - 1].timestamp;
                     std::cout << "timestamp_begin: " << timestamp_begin << std::endl; 
 
                     std::vector<double> timestamps;
@@ -675,7 +684,7 @@ void lidar_odometry_gui() {
 
                     //int last_point = 0;
                     for(size_t i = 0; i < poses.size(); i++){
-                        if(i % 100 == 0){
+                        if(i % 1000 == 0){
                             std::cout << "preparing data " << i + 1 << " of " << poses.size() << std::endl;
                         }
                         wd.intermediate_trajectory.emplace_back(poses[i]);
@@ -987,6 +996,7 @@ void lidar_odometry_gui() {
             int counter = 0;
             int pose_offset = 0;
             for(int i = 0 ; i < worker_data.size(); i++){
+                printf("processing worker_data [%d] of %f", i + 1, worker_data.size());
                 auto tmp_data = worker_data[i].original_points;
 
                 for(auto &t:tmp_data){
@@ -1030,7 +1040,35 @@ void lidar_odometry_gui() {
             path /= "lio_poses.reg";
             save_poses(path.string(), m_poses, file_names);
         }
+        ImGui::SameLine();
+        if (ImGui::Button("save trajectory to ascii (x y z)"))
+        {
+            static std::shared_ptr<pfd::save_file> save_file;
+            std::string output_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+            const auto t = [&]()
+            {
+                auto sel = pfd::save_file("Save trajectory", "C:\\").result();
+                output_file_name = sel;
+                std::cout << "file to save: '" << output_file_name << "'" << std::endl;
+            };
+            std::thread t1(t);
+            t1.join();
 
+            if (output_file_name.size() > 0)
+            {
+                ofstream file;
+                file.open(output_file_name);
+                for (const auto &wd : worker_data)
+                {
+                    for (const auto &it : wd.intermediate_trajectory)
+                    {
+                        file << it(0, 3) << " " << it(1, 3) << " " << it(2, 3) << std::endl;
+                    }
+                }
+                file.close();
+            }
+        }
         if (ImGui::Button("load reference point clouds (laz)"))
         {
             static std::shared_ptr<pfd::open_file> open_file;
@@ -1109,34 +1147,7 @@ void lidar_odometry_gui() {
             ImGui::Text("-----manipulate initial transformation end---------");
         }
         //show_trajectory
-        if (ImGui::Button("save trajectory to ascii (x y z)"))
-        {
-            static std::shared_ptr<pfd::save_file> save_file;
-            std::string output_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::save_file("Save trajectory", "C:\\").result();
-                output_file_name = sel;
-                std::cout << "file to save: '" << output_file_name << "'" << std::endl;
-            };
-            std::thread t1(t);
-            t1.join();
-
-            if (output_file_name.size() > 0)
-            {
-                ofstream file;
-                file.open(output_file_name);
-                for (const auto &wd : worker_data)
-                {
-                    for (const auto &it : wd.intermediate_trajectory)
-                    {
-                        file << it(0, 3) << " " << it(1, 3) << " " << it(2, 3) << std::endl;
-                    }
-                }
-                file.close();
-            }
-        }
+        
 
         static int current_scan = -1;
         int prev = current_scan;

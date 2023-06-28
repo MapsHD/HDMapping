@@ -94,6 +94,7 @@ bool gui_mouse_down{ false };
 int mouse_buttons = 0; 
 float mouse_sensitivity = 1.0;
 std::string working_directory = "";
+std::string working_directory_preview = "";
 double decimation = 0.1;
 int threshold_initial_points = 100000;
 bool initial_transformation_gizmo = false;
@@ -527,7 +528,7 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
 }
 
 void lidar_odometry_gui() {
-    if(ImGui::Begin("lidar_odometry_gui v0.12")){
+    if(ImGui::Begin("lidar_odometry_gui v0.14")){
         ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
         ImGui::Checkbox("show_trajectory", &show_trajectory);
@@ -587,7 +588,17 @@ void lidar_odometry_gui() {
             if (input_file_names.size() > 0) {
                 if(input_file_names.size() % 2 == 0){
                     working_directory = fs::path(input_file_names[0]).parent_path().string();
-                    for(size_t i = 0; i < input_file_names.size(); i++){
+                    fs::path wdp = fs::path(input_file_names[0]).parent_path();
+                    wdp /= "preview";
+                    if (!fs::exists(wdp))
+                    {
+                        fs::create_directory(wdp);
+                    }
+
+                    working_directory_preview = wdp.string();
+
+                    for (size_t i = 0; i < input_file_names.size(); i++)
+                    {
                         std::cout << input_file_names[i] << std::endl;
                     }
                     std::cout << "loading imu" << std::endl;
@@ -650,7 +661,7 @@ void lidar_odometry_gui() {
                             all_points.push_back(tp);
                         }
                         if(counter % 1000 == 0){
-                            printf("tranform point %d of", counter, points.size());
+                            printf("tranform point %d of %d \n", counter, points.size());
                         }
                         counter++;
                     }
@@ -899,7 +910,7 @@ void lidar_odometry_gui() {
                         p.point = worker_data[i].intermediate_trajectory[index_pose] * p.point;
                         global_points.push_back(p);
                     }
-                    std::string fn = "temp_point_cloud_" + std::to_string(i) + ".laz";
+                    std::string fn = working_directory_preview + "/temp_point_cloud_" + std::to_string(i) + ".laz";
                     saveLaz(fn.c_str(), global_points);
                 }
 
@@ -996,7 +1007,9 @@ void lidar_odometry_gui() {
             int counter = 0;
             int pose_offset = 0;
             for(int i = 0 ; i < worker_data.size(); i++){
-                printf("processing worker_data [%d] of %f", i + 1, worker_data.size());
+                if(i % 100 == 0){
+                    printf("processing worker_data [%d] of %f \n", i + 1, worker_data.size());
+                }
                 auto tmp_data = worker_data[i].original_points;
 
                 for(auto &t:tmp_data){

@@ -1,0 +1,37 @@
+\documentclass[a4paper,12pt]{book}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\graphicspath{ {./screen_shots/} }
+\usepackage{hyperref}
+
+\begin{document}
+
+\author{}
+\title{MANUAL v0.14}
+\date{25 June 2023}
+
+\frontmatter
+\maketitle
+\tableofcontents
+
+\mainmatter
+
+\chapter{Introduction}
+This manual v0.14 is prepared for mobile mapping system \href{https://github.com/JanuszBedkowski/mandeye_controller/blob/main/doc/manual/manual_v0_1/mandeye_dev_manual_v0_1.pdf}{MANDEYE} available as open hardware project.
+The software is composed of:
+\begin{itemize}
+	\item Lidar odometry (for initial trajectory calculation),
+	\item Multi view terrestrial laser scan registration (for final trajectory calculation).
+\end{itemize}
+
+
+\include{./TeX_files/lidar_odometry}
+
+\include{./TeX_files/multi_view_tls_registration}
+
+\backmatter
+% bibliography, glossary and index would go here.
+
+\end{document}

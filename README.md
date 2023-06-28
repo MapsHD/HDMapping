@@ -1,5 +1,20 @@
 # TLS registration
 
+The methodology behing this research is elaborated in following paper:
+
+@article{BEDKOWSKI2023113199,
+title = {Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms},
+journal = {Measurement},
+pages = {113199},
+year = {2023},
+issn = {0263-2241},
+doi = {https://doi.org/10.1016/j.measurement.2023.113199},
+url = {https://www.sciencedirect.com/science/article/pii/S0263224123007637},
+author = {Janusz Będkowski},
+keywords = {TLS, Point cloud, Open-source, Multi-view data registration, LiDAR data metrics, Robust loss function, Tait-bryan angles, Quaternions, Rodrigues’ formula, Lie algebra, Rotation matrix parameterization},
+abstract = {This study addresses multi-view Terrestrial Laser Scanning Point Cloud data registration methods. Multiple rigid point cloud data registration is mandatory for aligning all scans into a common reference frame and it is still considered a challenge looking from a large-scale surveys point of view. The goal of this work is to support the development of cutting-edge registration methods in geoscience and mobile robotics domains. This work evaluates 3 data sets of total 20 scenes available in the literature. This paper provides a novel open-source framework for multi-view Terrestrial Laser Scanning Point Cloud data registration benchmarks. The goal was to verify experimentally which registration variant can improve the open-source data looking from the quantitative and qualitative points of view. In particular, the following scanners provided measurement data: Z+F TLS Imager 5006i, Z+F TLS Imager 5010C, Leica ScanStation C5, Leica ScanStation C10, Leica P40 and Riegl VZ-400. The benchmark shows an impact of the metric e.g. point to point, point to projection onto a plane, plane to plane etc..., rotation matrix parameterization (Tait-Bryan, quaternion, Rodrigues) and other implementation variations (e.g. multi-view Normal Distributions Transform, Pose Graph SLAM approach) onto the multi-view data registration accuracy and performance. An open-source project is created and it can be used for improving existing data sets reported in the literature, it is the added value of the presented research. The combination of metrics, rotation matrix parameterization and optimization algorithms creates hundreds of possible approaches. It is shown that chosen metric is a dominant factor in data registration. The rotation parameterization and other degrees of freedom of proposed variants are rather negligible compared with chosen metric. Most of the proposed approaches improve registered reference data provided by other researchers. Only for 2 from 20 scenes it was not possible to provide significant improvement. The largest improvements are evident for large-scale scenes. The project is available and maintained at https://github.com/MapsHD/HDMapping.}
+}
+
 Tested on following datasets:
 
 ![datasets](images/datasets.jpg)
@@ -47,47 +62,4 @@ WHU_TLS:
 }
 ```
 
-# Download app
-
-Download *.exe and laszip3.dll from [Releases](https://github.com/MapsHD/HDMapping/releases)
-
-# Running the app
-
-Step 1: Load RESSO file reported by [1] as ground truth
-
-![Step 1](images/1.jpg)
-
-![Step 2](images/2.jpg)
-
-Step 2: Choose manual analisys and load observations
-
-![Step 3](images/3.jpg)
-
-![Step 4](images/4.jpg)
-
-Step 3: Choose observation picking mode and compute RMS
-
-![Step 5](images/5.jpg)
-
-![Step 6](images/6.jpg)
-
-Step 4: Choose one from plenty of optimization variants 
-
-![Step 7](images/7.jpg)
-
-Step 5: Check results before (initial pose) and after optimization
-
-![Step 8](images/8.jpg)
-
-![Step 9](images/9.jpg)
-
-Step 6: Compute RMS
-
-![Step 10](images/10.jpg)
-
-![Step 11](images/11.jpg)
-
-Step 7: Enjoy improved ground truth
-
-[1] Songlin Chen, Liangliang Nan, Renbo Xia, Jibin Zhao, and Peter Wonka. Plade: A plane-based descriptor for point cloud registration with small overlap. 58(4):2530–2540, 2020.
 

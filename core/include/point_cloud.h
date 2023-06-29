@@ -51,6 +51,11 @@ public:
 		bool found = false;
 	};
 
+	struct LocalTrajectoryNode{
+		double timestamp;
+		Eigen::Affine3d m_pose;
+	};
+
 	PointCloud() {
 		m_pose = Eigen::Affine3d::Identity();
 		pose.px = pose.py = pose.pz = pose.om = pose.fi = pose.ka = 0.0;
@@ -74,6 +79,7 @@ public:
 	std::vector<Eigen::Vector3d> normal_vectors_local;
 	std::vector <int> points_type;
 	std::vector <unsigned short> intensities;
+	std::vector<double> timestamps;
 	Eigen::Affine3d m_pose;
 	Eigen::Affine3d m_initial_pose;
 	Eigen::Matrix<double, 6, 6, Eigen::RowMajor> covariance_matrix_tait_bryan;
@@ -83,6 +89,8 @@ public:
 	int point_size = 1;
 	std::vector<GeoPoint> available_geo_points;
 	bool choosing_geo = false;
+	std::vector<LocalTrajectoryNode> local_trajectory;
+	bool show_local_trajectory = false;
 
 	TaitBryanPose pose;
 	float gui_translation[3];

@@ -14,6 +14,17 @@
 
 // #include <liblas/liblas.hpp>
 // #include <laszip/laszip_api.h>
+inline void split(std::string &str, char delim, std::vector<std::string> &out)
+{
+	size_t start;
+	size_t end = 0;
+
+	while ((start = str.find_first_not_of(delim, end)) != std::string::npos)
+	{
+		end = str.find(delim, start);
+		out.push_back(str.substr(start, end - start));
+	}
+}
 
 bool PointClouds::load(const std::string &folder_with_point_clouds, const std::string &poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z)
 {
@@ -116,7 +127,7 @@ bool PointClouds::update_poses_from_RESSO(const std::string &folder_with_point_c
 	if (!infile.good())
 	{
 		std::cout << "problem with file: '" << poses_file_name << "' (!infile.good())" << std::endl;
-	//	return false;
+		//	return false;
 	}
 	std::string line;
 	std::getline(infile, line);
@@ -200,20 +211,22 @@ bool PointClouds::update_poses_from_RESSO(const std::string &folder_with_point_c
 					point_clouds[i].gui_rotation[0] = rad2deg(point_clouds[i].pose.om);
 					point_clouds[i].gui_rotation[1] = rad2deg(point_clouds[i].pose.fi);
 					point_clouds[i].gui_rotation[2] = rad2deg(point_clouds[i].pose.ka);
-				}//else{
-				//	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string() != pcs[j].file_name" << std::endl;
-				//	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string(): "<< std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl;
-				//	std::cout << "pcs[j].file_name: "<< pcs[j].file_name << std::endl;
-				//	std::cout << "j: " << j << std::endl;
-					//return false;
-				//}
+				} // else{
+				  //	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string() != pcs[j].file_name" << std::endl;
+				  //	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string(): "<< std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl;
+				  //	std::cout << "pcs[j].file_name: "<< pcs[j].file_name << std::endl;
+				  //	std::cout << "j: " << j << std::endl;
+				  // return false;
+				  //}
 			}
 
 			/**/
 
 			// point_clouds[i].m_initial_pose = point_clouds[i].m_pose;
 		}
-	}else{
+	}
+	else
+	{
 		std::cout << "PROBLEM point_clouds.size() != pcs.size()" << std::endl;
 		std::cout << "point_clouds.size() " << point_clouds.size() << std::endl;
 		std::cout << "poses.size() " << pcs.size() << std::endl;
@@ -594,7 +607,7 @@ bool PointClouds::load_pose_ETH(const std::string &fn, Eigen::Affine3d &m_increm
 
 bool load_pc(PointCloud &pc, std::string input_file_name)
 {
-	
+
 	laszip_POINTER laszip_reader;
 	if (laszip_create(&laszip_reader))
 	{
@@ -635,7 +648,6 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 	std::cout << "compressed : " << is_compressed << std::endl;
 	laszip_header *header;
 
-	
 	if (laszip_get_header_pointer(laszip_reader, &header))
 	{
 		fprintf(stderr, ":DLL ERROR: getting header pointer from laszip reader\n");
@@ -683,15 +695,16 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 		p.x = header->x_offset + header->x_scale_factor * static_cast<double>(point->X);
 		p.y = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y);
 		p.z = header->z_offset + header->z_scale_factor * static_cast<double>(point->Z);
+		p.timestamp = point->gps_time;
 
 		Eigen::Vector3d pp(p.x, p.y, p.z);
 		pc.points_local.push_back(pp);
 		pc.intensities.push_back(point->intensity);
+		pc.timestamps.push_back(p.timestamp);
 	}
 	laszip_close_reader(laszip_reader);
-	//laszip_clean(laszip_reader);
-	//laszip_destroy(laszip_reader);
-
+	// laszip_clean(laszip_reader);
+	// laszip_destroy(laszip_reader);
 }
 
 bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
@@ -717,8 +730,63 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 				std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
 			}
 			pc.file_name = input_file_names[i];
+
+			auto trj_path = std::filesystem::path(input_file_names[i]).parent_path();
+			std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
+
+			trj_path /= trajectory_filename;
+
+			if (std::filesystem::exists(trj_path))
+			{
+				std::cout << "loading trajectory from file: " << trj_path << std::endl;
+
+				std::vector<PointCloud::LocalTrajectoryNode> local_trajectory;
+				//
+				std::ifstream infile(trj_path.string());
+				if (!infile.good())
+				{
+					std::cout << "problem with file: '" << trj_path.string() << "'" << std::endl;
+					return false;
+				}
+
+				std::string s;
+				while (!infile.eof())
+				{
+					getline(infile, s);
+					std::vector<std::string> strs;
+					split(s, ' ', strs);
+
+					if (strs.size() == 13)
+					{
+						PointCloud::LocalTrajectoryNode ltn;
+						std::istringstream(strs[0]) >> ltn.timestamp;
+						std::istringstream(strs[1]) >> ltn.m_pose(0, 0);
+						std::istringstream(strs[2]) >> ltn.m_pose(0, 1);
+						std::istringstream(strs[3]) >> ltn.m_pose(0, 2);
+						std::istringstream(strs[4]) >> ltn.m_pose(0, 3);
+						std::istringstream(strs[5]) >> ltn.m_pose(1, 0);
+						std::istringstream(strs[6]) >> ltn.m_pose(1, 1);
+						std::istringstream(strs[7]) >> ltn.m_pose(1, 2);
+						std::istringstream(strs[8]) >> ltn.m_pose(1, 3);
+						std::istringstream(strs[9]) >> ltn.m_pose(2, 0);
+						std::istringstream(strs[10]) >> ltn.m_pose(2, 1);
+						std::istringstream(strs[11]) >> ltn.m_pose(2, 2);
+						std::istringstream(strs[12]) >> ltn.m_pose(2, 3);
+
+						local_trajectory.push_back(ltn);
+					}
+				}
+
+				std::cout << "loaded: [" << local_trajectory.size() << "] local trajectory nodes" << std::endl;
+				infile.close();
+				///
+				pc.local_trajectory = local_trajectory;
+			}
+
 			point_clouds.push_back(pc);
-		}else{
+		}
+		else
+		{
 			std::cout << "problem with loading file: " << input_file_names[i] << std::endl;
 		}
 	}
@@ -728,7 +796,7 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		int num = 0;
 		for (int i = 0; i < point_clouds.size(); i++)
 		{
-			for (int j = 0; j < point_clouds[i].points_local.size(); j++)
+			for (int j = 0; j < point_clouds[i].points_local.size(); j += 1000)
 			{
 				this->offset += point_clouds[i].points_local[j];
 				num++;
@@ -796,18 +864,6 @@ void PointClouds::print_point_cloud_dimention()
 	std::cout << "z: " << z_max - z_min << std::endl;
 }
 
-inline void split(std::string &str, char delim, std::vector<std::string> &out)
-{
-	size_t start;
-	size_t end = 0;
-
-	while ((start = str.find_first_not_of(delim, end)) != std::string::npos)
-	{
-		end = str.find(delim, start);
-		out.push_back(str.substr(start, end - start));
-	}
-}
-
 bool PointClouds::load_3DTK_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z)
 {
 	this->offset = Eigen::Vector3d(0, 0, 0);
@@ -848,6 +904,7 @@ bool PointClouds::load_3DTK_tls(std::vector<std::string> input_file_names, bool 
 					std::istringstream(strs[2]) >> pp.z();
 					pc.points_local.push_back(pp);
 					pc.intensities.push_back(0);
+					pc.timestamps.push_back(0);
 					sum_points_before_decimation++;
 				}
 			}

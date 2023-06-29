@@ -35,6 +35,8 @@
 #include <fstream>
 
 #include <manual_pose_graph_loop_closure.h>
+
+#include <gnss.h>
 namespace fs = std::filesystem;
 
 static bool show_demo_window = true;
@@ -81,6 +83,7 @@ ObservationPicking observation_picking;
 std::vector<Eigen::Vector3d> picked_points;
 std::string working_directory = "";
 ManualPoseGraphLoopClosure manual_pose_graph_loop_closure;
+GNSS gnss;
 int all_point_size = 1;
 int index_loop_closure_source = 0;
 int index_loop_closure_target = 0;
@@ -659,7 +662,7 @@ void project_gui()
 
     if (manual_pose_graph_loop_closure_mode)
     {
-        manual_pose_graph_loop_closure.Gui(point_clouds_container, index_loop_closure_source, index_loop_closure_target, m_gizmo);
+        manual_pose_graph_loop_closure.Gui(point_clouds_container, index_loop_closure_source, index_loop_closure_target, m_gizmo, gnss);
 
         /*if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size()> 0)
         {
@@ -982,6 +985,32 @@ void project_gui()
                         {
                             p.available_geo_points = geo;
                         }
+                    }
+                }
+            }
+
+            if (ImGui::Button("load gnss files and convert from wgs84 to puwg92"))
+            {
+                static std::shared_ptr<pfd::open_file> open_file;
+                std::vector<std::string> input_file_names;
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+                const auto t = [&]()
+                {
+                    std::vector<std::string> filters;
+                    auto sel = pfd::open_file("Load gnss files", "C:\\", filters, true).result();
+                    for (int i = 0; i < sel.size(); i++)
+                    {
+                        input_file_names.push_back(sel[i]);
+                        // std::cout << "las file: '" << input_file_name << "'" << std::endl;
+                    }
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (input_file_names.size() > 0)
+                {
+                    if (!gnss.load(input_file_names)){
+                        std::cout << "problem with loading gnss files" << std::endl;
                     }
                 }
             }
@@ -2064,6 +2093,8 @@ void display()
             }
         }
     }
+
+    gnss.render(point_clouds_container);
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();

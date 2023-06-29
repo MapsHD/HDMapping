@@ -2,6 +2,7 @@
 #define _manual_pose_graph_loop_closure_h_
 
 #include <point_clouds.h>
+#include <gnss.h>
 
 class ManualPoseGraphLoopClosure{
     public:
@@ -24,7 +25,7 @@ class ManualPoseGraphLoopClosure{
         ManualPoseGraphLoopClosure(){};
         ~ManualPoseGraphLoopClosure(){};
 
-        void Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo);
+        void Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss);
         void Render(PointClouds &point_clouds_container, int index_loop_closure_source, int index_loop_closure_target);
 };
 

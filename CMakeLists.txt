@@ -116,6 +116,10 @@ core/include/observation_picking.h
 core/src/observation_picking.cpp
 core/include/manual_pose_graph_loop_closure.h
 core/src/manual_pose_graph_loop_closure.cpp
+core/include/gnss.h
+core/src/gnss.cpp
+core/include/wgs84_do_puwg92.h
+core/src/wgs84_do_puwg92.cc
 )
 
 set(CORE_HD_MAPPING_SRCS

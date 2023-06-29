@@ -117,6 +117,15 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking& o
 		}
 		glEnd();
 		glPointSize(1);
+
+		glColor3f(render_color[0], render_color[1], render_color[2]);
+		glBegin(GL_LINE_STRIP);
+		for (int i = 0; i < this->local_trajectory.size(); i ++)
+		{
+			auto m = this->m_pose * this->local_trajectory[i].m_pose;
+			glVertex3f(m(0,3), m(1,3), m(2,3));
+		}
+		glEnd();
 	}
 }
 
@@ -137,6 +146,15 @@ void PointCloud::render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud)
 		}
 		glEnd();
 		glPointSize(1);
+
+		glColor3f(render_color[0], render_color[1], render_color[2]);
+		glBegin(GL_LINE_STRIP);
+		for (int i = 0; i < this->local_trajectory.size(); i++)
+		{
+			auto m = this->m_pose * this->local_trajectory[i].m_pose;
+			glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+		}
+		glEnd();
 	}
 }
 
@@ -1240,8 +1258,6 @@ void PointCloud::compute_normal_vectors(double search_radious)
 
 void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
 {
-	//std::cout << "single scan, num points before decimation: " << this->points_local.size() << std::endl;
-
 	auto params = rgd_params;
 
 	params.resolution_X = bucket_x;
@@ -1250,7 +1266,6 @@ void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
 	params.bounding_box_extension = 1.0;
 
 	grid_calculate_params(this->points_local, params);
-	//cout_rgd();
 
 	std::vector<PointBucketIndexPair> ip;
 	reindex(ip, this->points_local, params);
@@ -1259,9 +1274,7 @@ void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
 	std::vector<Eigen::Vector3d> n_normal_vectors_local;
 	std::vector <int> n_points_type;
 	std::vector <unsigned short> n_intensities;
-
-	//std::cout << points_local.size() << " " << intensities.size() << std::endl;
-
+	std::vector<double> n_timestamps;
 	for (int i = 1; i < ip.size(); i++) {
 		if (ip[i - 1].index_of_bucket != ip[i].index_of_bucket) {
 			//std::cout << index_pairs[i].index_of_bucket << std::endl;
@@ -1269,15 +1282,14 @@ void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
 			if (normal_vectors_local.size() == points_local.size())n_normal_vectors_local.emplace_back(normal_vectors_local[ip[i].index_of_point]);
 			if (points_type.size() == points_local.size())n_points_type.emplace_back(points_type[ip[i].index_of_point]);
 			if (intensities.size() == points_local.size())n_intensities.emplace_back(intensities[ip[i].index_of_point]);
+			if (timestamps.size() == points_local.size())n_timestamps.emplace_back(timestamps[ip[i].index_of_point]);
 		}
 	}
-
 	points_local = n_points_local;
 	normal_vectors_local = n_normal_vectors_local;
 	points_type = n_points_type;
 	intensities = n_intensities;
-
-	//std::cout << "single scan, num points after decimation: " << this->points_local.size() << std::endl;
+	timestamps = n_timestamps;
 }
 
 void PointCloud::shift_to_center()

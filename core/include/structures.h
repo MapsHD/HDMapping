@@ -200,6 +200,7 @@ struct LAZPoint
 	float g;
 	float b;
 	uint8_t  classsification;
+	double timestamp;
 	//unsigned short RGB[4];
 };
 

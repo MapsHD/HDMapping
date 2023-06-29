@@ -11,6 +11,9 @@
 #include <python-scripts/constraints/quaternion_constraint_jacobian.h>
 
 #include <m_estimators.h>
+#include <gnss.h>
+
+#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 
 // std::random_device rd;
 // std::mt19937 gen(rd());
@@ -34,11 +37,10 @@
     }
 }*/
 
-void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo)
+void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss)
 {
     if (point_clouds_container.point_clouds.size() > 0)
     {
-
         if (!manipulate_active_edge)
         {
             ImGui::InputInt("index_loop_closure_source", &index_loop_closure_source);
@@ -71,12 +73,12 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                     point_clouds_container.point_clouds[index_loop_closure_source].m_pose.inverse() *
                     point_clouds_container.point_clouds[index_loop_closure_target].m_pose);
 
-                edge.relative_pose_tb_weights.px = 1.0;
-                edge.relative_pose_tb_weights.py = 1.0;
-                edge.relative_pose_tb_weights.pz = 1.0;
-                edge.relative_pose_tb_weights.om = 1.0;
-                edge.relative_pose_tb_weights.fi = 1.0;
-                edge.relative_pose_tb_weights.ka = 1.0;
+                edge.relative_pose_tb_weights.px = 1000000.0;
+                edge.relative_pose_tb_weights.py = 1000000.0;
+                edge.relative_pose_tb_weights.pz = 1000000.0;
+                edge.relative_pose_tb_weights.om = 1000000.0;
+                edge.relative_pose_tb_weights.fi = 1000000.0;
+                edge.relative_pose_tb_weights.ka = 1000000.0;
 
                 edges.push_back(edge);
 
@@ -130,6 +132,10 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                         bool is_cw = false;
                         int iterations = 10;
                         bool is_fix_first_node = true;
+                        if (gnss.gnss_poses.size() > 0)
+                        {
+                            is_fix_first_node = false;
+                        }
 
                         for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
                         {
@@ -153,12 +159,12 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                             edge.index_from = i - 1;
                             edge.index_to = i;
                             edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_rel);
-                            edge.relative_pose_tb_weights.om = 1.0;
-                            edge.relative_pose_tb_weights.fi = 1.0;
-                            edge.relative_pose_tb_weights.ka = 1.0;
-                            edge.relative_pose_tb_weights.px = 1.0;
-                            edge.relative_pose_tb_weights.py = 1.0;
-                            edge.relative_pose_tb_weights.pz = 1.0;
+                            edge.relative_pose_tb_weights.om = 1000000.0;
+                            edge.relative_pose_tb_weights.fi = 1000000.0;
+                            edge.relative_pose_tb_weights.ka = 1000000.0;
+                            edge.relative_pose_tb_weights.px = 1000000.0;
+                            edge.relative_pose_tb_weights.py = 1000000.0;
+                            edge.relative_pose_tb_weights.pz = 1000000.0;
                             all_edges.push_back(edge);
                         }
 
@@ -332,6 +338,75 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                                 tripletListB.emplace_back(ir + 5, 0, 0);
                             }
 
+                            // gnss
+                            // for (const auto &pc : point_clouds_container.point_clouds)
+                            for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
+                            {
+                                const auto &pc = point_clouds_container.point_clouds[index_pose];
+                                for (int i = 0; i < gnss.gnss_poses.size(); i++)
+                                {
+                                    double time_stamp = gnss.gnss_poses[i].timestamp;
+
+                                    auto it = std::lower_bound(pc.local_trajectory.begin(), pc.local_trajectory.end(),
+                                                               time_stamp, [](const PointCloud::LocalTrajectoryNode &lhs, const double &time) -> bool
+                                                               { return lhs.timestamp < time; });
+
+                                    int index = it - pc.local_trajectory.begin();
+
+                                    if (index > 0 && index < pc.local_trajectory.size())
+                                    {
+
+                                        if (fabs(time_stamp - pc.local_trajectory[index].timestamp) < 10e12)
+                                        {
+
+                                            Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+                                            TaitBryanPose pose_s;
+                                            pose_s = pose_tait_bryan_from_affine_matrix(m_poses[index_pose]);
+                                            Eigen::Vector3d p_s = pc.local_trajectory[index].m_pose.translation();
+                                            point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                                                   p_s.x(), p_s.y(), p_s.z());
+
+                                            double delta_x;
+                                            double delta_y;
+                                            double delta_z;
+                                            Eigen::Vector3d p_t(gnss.gnss_poses[i].x - gnss.offset_x, gnss.gnss_poses[i].y - gnss.offset_y, gnss.gnss_poses[i].alt - gnss.offset_alt);
+                                            point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                                                          pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                                          p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+
+                                            std::cout << " delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
+
+                                            int ir = tripletListB.size();
+                                            int ic = index_pose * 6;
+                                            for (int row = 0; row < 3; row++)
+                                            {
+                                                for (int col = 0; col < 6; col++)
+                                                {
+                                                    if (jacobian(row, col) != 0.0)
+                                                    {
+                                                        tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
+                                                    }
+                                                }
+                                            }
+                                            tripletListP.emplace_back(ir, ir, get_cauchy_w(delta_x, 1) * 0.01);
+                                            tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta_y, 1) * 0.01);
+                                            tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta_z, 1) * 0.01);
+
+                                            tripletListB.emplace_back(ir, 0, delta_x);
+                                            tripletListB.emplace_back(ir + 1, 0, delta_y);
+                                            tripletListB.emplace_back(ir + 2, 0, delta_z);
+
+                                            // jacobian3x6 = get_point_to_point_jacobian_tait_bryan(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
+
+                                            // auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
+                                            // glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+                                            // glVertex3f(gnss_poses[i].x - offset_x, gnss_poses[i].y - offset_y, gnss_poses[i].alt - offset_alt);
+                                        }
+                                    }
+                                }
+                            }
+                            //
+
                             Eigen::SparseMatrix<double> matA(tripletListB.size(), point_clouds_container.point_clouds.size() * 6);
                             Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
                             Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
@@ -409,36 +484,38 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                                 is_ok = false;
                                 break;
                             }
-                        }
-                        if (is_ok)
-                        {
-                            for (size_t i = 0; i < m_poses.size(); i++)
+
+                            if (is_ok)
                             {
-                                if (is_wc)
+                                for (size_t i = 0; i < m_poses.size(); i++)
                                 {
-                                    m_poses[i] = affine_matrix_from_pose_tait_bryan(poses[i]);
+                                    if (is_wc)
+                                    {
+                                        m_poses[i] = affine_matrix_from_pose_tait_bryan(poses[i]);
+                                    }
+                                    else if (is_cw)
+                                    {
+                                        m_poses[i] = affine_matrix_from_pose_tait_bryan(poses[i]).inverse();
+                                    }
                                 }
-                                else if (is_cw)
+                            }
+
+                            if (is_ok)
+                            {
+                                for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
                                 {
-                                    m_poses[i] = affine_matrix_from_pose_tait_bryan(poses[i]).inverse();
+                                    point_clouds_container.point_clouds[i].m_pose = m_poses[i];
+                                    point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+                                    point_clouds_container.point_clouds[i].gui_translation[0] = point_clouds_container.point_clouds[i].pose.px;
+                                    point_clouds_container.point_clouds[i].gui_translation[1] = point_clouds_container.point_clouds[i].pose.py;
+                                    point_clouds_container.point_clouds[i].gui_translation[2] = point_clouds_container.point_clouds[i].pose.pz;
+                                    point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(point_clouds_container.point_clouds[i].pose.om);
+                                    point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(point_clouds_container.point_clouds[i].pose.fi);
+                                    point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(point_clouds_container.point_clouds[i].pose.ka);
                                 }
                             }
                         }
 
-                        if (is_ok)
-                        {
-                            for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
-                            {
-                                point_clouds_container.point_clouds[i].m_pose = m_poses[i];
-                                point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
-                                point_clouds_container.point_clouds[i].gui_translation[0] = point_clouds_container.point_clouds[i].pose.px;
-                                point_clouds_container.point_clouds[i].gui_translation[1] = point_clouds_container.point_clouds[i].pose.py;
-                                point_clouds_container.point_clouds[i].gui_translation[2] = point_clouds_container.point_clouds[i].pose.pz;
-                                point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(point_clouds_container.point_clouds[i].pose.om);
-                                point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(point_clouds_container.point_clouds[i].pose.fi);
-                                point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(point_clouds_container.point_clouds[i].pose.ka);
-                            }
-                        }
                         ///////////////////////////////////////////////////////////////////
                     }
                 }
@@ -593,7 +670,8 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
 
     glColor3f(0, 1, 0);
     glBegin(GL_LINE_STRIP);
-    for (auto &pc : point_clouds_container.point_clouds){
+    for (auto &pc : point_clouds_container.point_clouds)
+    {
         glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
     }
     glEnd();

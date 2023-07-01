@@ -66,8 +66,10 @@ bool GNSS::load(const std::vector<std::string> &input_file_names)
 
                 wgs84_do_puwg92(B, L, &gp.y, &gp.x);
                 // std::cout << std::setprecision(20) << B << " " << L << " " << gp.x << " " << gp.y << std::endl;
-
-                gnss_poses.push_back(gp);
+                if (Eigen::Vector3d(gp.y, gp.x, gp.alt).norm() > 0)
+                {
+                    gnss_poses.push_back(gp);
+                }
             }
         }
         infile.close();
@@ -102,30 +104,34 @@ void GNSS::render(const PointClouds &point_clouds_container)
     }
     glEnd();
 
-    glColor3f(1, 0, 0);
-    glBegin(GL_LINES);
-    for (const auto &pc : point_clouds_container.point_clouds){
-        for (int i = 0; i < gnss_poses.size(); i++)
+    if (show_correspondences)
+    {
+        glColor3f(1, 0, 0);
+        glBegin(GL_LINES);
+        for (const auto &pc : point_clouds_container.point_clouds)
         {
-            double time_stamp = gnss_poses[i].timestamp;
-
-            auto it = std::lower_bound(pc.local_trajectory.begin(), pc.local_trajectory.end(),
-                                       time_stamp, [](const PointCloud::LocalTrajectoryNode & lhs, const double& time) -> bool
-                                       { return lhs.timestamp < time; });
-
-            int index = it - pc.local_trajectory.begin();
-
-            if (index > 0 && index < pc.local_trajectory.size())
+            for (int i = 0; i < gnss_poses.size(); i++)
             {
+                double time_stamp = gnss_poses[i].timestamp;
 
-                if (fabs(time_stamp - pc.local_trajectory[index].timestamp) < 10e12)
+                auto it = std::lower_bound(pc.local_trajectory.begin(), pc.local_trajectory.end(),
+                                           time_stamp, [](const PointCloud::LocalTrajectoryNode &lhs, const double &time) -> bool
+                                           { return lhs.timestamp < time; });
+
+                int index = it - pc.local_trajectory.begin();
+
+                if (index > 0 && index < pc.local_trajectory.size())
                 {
-                    auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
-                    glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-                    glVertex3f(gnss_poses[i].x - offset_x, gnss_poses[i].y - offset_y, gnss_poses[i].alt - offset_alt);
+
+                    if (fabs(time_stamp - pc.local_trajectory[index].timestamp) < 10e12)
+                    {
+                        auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
+                        glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+                        glVertex3f(gnss_poses[i].x - offset_x, gnss_poses[i].y - offset_y, gnss_poses[i].alt - offset_alt);
+                    }
                 }
             }
         }
+        glEnd();
     }
-    glEnd();
 }

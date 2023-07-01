@@ -159,12 +159,12 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                             edge.index_from = i - 1;
                             edge.index_to = i;
                             edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_rel);
-                            edge.relative_pose_tb_weights.om = 1000000.0;
-                            edge.relative_pose_tb_weights.fi = 1000000.0;
-                            edge.relative_pose_tb_weights.ka = 1000000.0;
-                            edge.relative_pose_tb_weights.px = 1000000.0;
-                            edge.relative_pose_tb_weights.py = 1000000.0;
-                            edge.relative_pose_tb_weights.pz = 1000000.0;
+                            edge.relative_pose_tb_weights.om = 10000.0;
+                            edge.relative_pose_tb_weights.fi = 10000.0;
+                            edge.relative_pose_tb_weights.ka = 10000.0;
+                            edge.relative_pose_tb_weights.px = 10000.0;
+                            edge.relative_pose_tb_weights.py = 10000.0;
+                            edge.relative_pose_tb_weights.pz = 10000.0;
                             all_edges.push_back(edge);
                         }
 
@@ -388,9 +388,9 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                                                     }
                                                 }
                                             }
-                                            tripletListP.emplace_back(ir, ir, get_cauchy_w(delta_x, 1) * 0.01);
-                                            tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta_y, 1) * 0.01);
-                                            tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta_z, 1) * 0.01);
+                                            tripletListP.emplace_back(ir, ir, get_cauchy_w(delta_x, 1));
+                                            tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta_y, 1));
+                                            tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta_z, 1));
 
                                             tripletListB.emplace_back(ir, 0, delta_x);
                                             tripletListB.emplace_back(ir + 1, 0, delta_y);

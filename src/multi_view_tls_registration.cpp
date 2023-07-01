@@ -109,7 +109,9 @@ void reshape(int w, int h);
 void perform_experiment_on_windows();
 void perform_experiment_on_linux();
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking);
-bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity);
+bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity, double offset_x,
+               double offset_y,
+               double offset_alt);
 double compute_rms(bool initial);
 
 void adjustHeader(laszip_header *header, const Eigen::Affine3d &m_pose, const Eigen::Vector3d &offset_in)
@@ -880,7 +882,7 @@ void project_gui()
                         }
                     }
                 }
-                if (!exportLaz(output_file_name, pointcloud, intensity))
+                if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
                 {
                     std::cout << "problem with saving file: " << output_file_name << std::endl;
                 }
@@ -1009,11 +1011,15 @@ void project_gui()
 
                 if (input_file_names.size() > 0)
                 {
-                    if (!gnss.load(input_file_names)){
+                    if (!gnss.load(input_file_names))
+                    {
                         std::cout << "problem with loading gnss files" << std::endl;
                     }
                 }
             }
+
+            ImGui::SameLine();
+            ImGui::Checkbox("show GNSS correspondences", &gnss.show_correspondences);
         }
 
         ImGui::Separator();
@@ -2110,10 +2116,10 @@ void display()
         registration_plane_feature_gui();
     if (is_manual_analisys)
         observation_picking_gui();
-    //if (manual_pose_graph_loop_closure_mode)
+    // if (manual_pose_graph_loop_closure_mode)
     //{
-    //    manual_pose_graph_loop_closure.Gui();
-    //}
+    //     manual_pose_graph_loop_closure.Gui();
+    // }
     project_gui();
 
     if (!manual_pose_graph_loop_closure_mode)
@@ -2269,7 +2275,9 @@ void display()
             glVertex3f(p.x(), p.y(), p.z());
         }
         glEnd();
-    }else{
+    }
+    else
+    {
         // ImGuizmo -----------------------------------------------
         if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size() > 0)
         {
@@ -2312,7 +2320,7 @@ void display()
             m_g(3, 3) = m_gizmo[15];
 
             const int &index_src = manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].index_from;
-           
+
             const Eigen::Affine3d &m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
             manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
 
@@ -4530,7 +4538,7 @@ void perform_experiment_on_windows()
 
 bool exportLaz(const std::string &filename,
                const std::vector<Eigen::Vector3d> &pointcloud,
-               const std::vector<unsigned short> &intensity)
+               const std::vector<unsigned short> &intensity, double offset_x, double offset_y, double offset_alt)
 {
 
     constexpr float scale = 0.0001f; // one tenth of milimeter
@@ -4584,12 +4592,16 @@ bool exportLaz(const std::string &filename,
     header->y_scale_factor = scale;
     header->z_scale_factor = scale;
 
-    header->max_x = max.x();
-    header->min_x = min.x();
-    header->max_y = max.y();
-    header->min_y = min.y();
-    header->max_z = max.z();
-    header->min_z = min.z();
+    header->max_x = max.x() + offset_x;
+    header->min_x = min.x() + offset_x;
+    header->max_y = max.y() + offset_y;
+    header->min_y = min.y() + offset_y;
+    header->max_z = max.z() + offset_alt;
+    header->min_z = min.z() + offset_alt;
+
+    header->x_offset = offset_x;
+    header->y_offset = offset_y;
+    header->z_offset = offset_alt;
 
     // optional: use the bounding box and the scale factor to create a "good" offset
     // open the writer
@@ -4621,9 +4633,9 @@ bool exportLaz(const std::string &filename,
 
         const auto &p = pointcloud[i];
         p_count++;
-        coordinates[0] = p.x();
-        coordinates[1] = p.y();
-        coordinates[2] = p.z();
+        coordinates[0] = p.x() + offset_x;
+        coordinates[1] = p.y() + offset_y;
+        coordinates[2] = p.z() + offset_alt;
         if (laszip_set_coordinates(laszip_writer, coordinates))
         {
             fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);

@@ -30,9 +30,10 @@ class GNSS{
     void render(const PointClouds &point_clouds_container);
 
     std::vector<GlobalPose> gnss_poses;
-    double offset_x;
-    double offset_y;
-    double offset_alt;
+    double offset_x = 0;
+    double offset_y = 0;
+    double offset_alt = 0;
+    bool show_correspondences = true;
 };
 
 

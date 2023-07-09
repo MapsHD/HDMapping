@@ -41,8 +41,9 @@ NDT::GridParameters in_out_params;
 
 // std::vector<NDT::PointBucketIndexPair> index_pair;
 // std::vector<NDT::Bucket> buckets;
-std::map<unsigned long long int, NDT::Bucket> buckets;
-std::map<unsigned long long int, NDT::Bucket> reference_buckets;
+using NDTBucketMapType = std::unordered_map<uint64_t, NDT::Bucket>;
+NDTBucketMapType buckets;
+NDTBucketMapType reference_buckets;
 bool show_reference_buckets = true;
 
 std::vector<Point3Di>
@@ -54,7 +55,7 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &tra
 std::vector<Point3Di> decimate(const std::vector<Point3Di> &points, double bucket_x, double bucket_y, double bucket_z);
 // void update_rgd(NDT::GridParameters& rgd_params, std::vector<NDT::Bucket>& buckets,
 //                 std::vector<Point3Di>& points_global);
-void update_rgd(NDT::GridParameters &rgd_params, std::map<unsigned long long int, NDT::Bucket> &buckets,
+void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
                 std::vector<Point3Di> &points_global);
 
 bool show_all_points = false;
@@ -125,8 +126,8 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
 std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero = true);
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, std::map<unsigned long long int, NDT::Bucket> &buckets);
-void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &initial_points, Eigen::Affine3d &m_g, std::map<unsigned long long int, NDT::Bucket> &buckets);
+              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets);
+void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &initial_points, Eigen::Affine3d &m_g, NDTBucketMapType &buckets);
 
 void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd = 3)
 {
@@ -1299,7 +1300,7 @@ void lidar_odometry_gui()
 
         if (ImGui::Button("filter reference buckets"))
         {
-            std::map<unsigned long long int, NDT::Bucket> reference_buckets_out;
+            NDTBucketMapType reference_buckets_out;
             for (const auto &b : reference_buckets)
             {
                 if (b.second.number_of_points > 10)
@@ -1827,15 +1828,16 @@ int main(int argc, char *argv[])
 
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, std::map<unsigned long long int, NDT::Bucket> &buckets)
+              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets)
 {
     std::vector<Eigen::Triplet<double>> tripletListA;
     std::vector<Eigen::Triplet<double>> tripletListP;
     std::vector<Eigen::Triplet<double>> tripletListB;
 
-    Eigen::SparseMatrix<double> AtPAndt(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
-    Eigen::SparseMatrix<double> AtPBndt(intermediate_trajectory.size() * 6, 1);
-
+    Eigen::MatrixX<double> AtPAndt(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
+    AtPAndt.setZero();
+    Eigen::MatrixX<double> AtPBndt(intermediate_trajectory.size() * 6, 1);
+    AtPBndt.setZero();
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
     for (int i = 0; i < intermediate_points.size(); i += 1)
@@ -1848,57 +1850,29 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points[i].index_pose] * intermediate_points[i].point;
         auto index_of_bucket = get_rgd_index(point_global, b);
 
-        if (!buckets.contains(index_of_bucket))
+        auto bucket_it = buckets.find(index_of_bucket);
+        // no bucket found
+        if (bucket_it == buckets.end())
         {
             continue;
         }
+        auto& this_bucket = bucket_it->second;
 
         // if(buckets[index_of_bucket].number_of_points >= 5){
-        Eigen::Matrix3d infm = buckets[index_of_bucket].cov.inverse();
+        const Eigen::Matrix3d& infm = this_bucket.cov.inverse();
 
-        double threshold = 10000.0;
+        const double threshold = 10000.0;
 
-        if (infm(0, 0) > threshold)
+        if ((infm.array() > threshold).any()) {
             continue;
-        if (infm(0, 1) > threshold)
+        }
+        if ((infm.array() < -threshold).any()) {
             continue;
-        if (infm(0, 2) > threshold)
-            continue;
-        if (infm(1, 0) > threshold)
-            continue;
-        if (infm(1, 1) > threshold)
-            continue;
-        if (infm(1, 2) > threshold)
-            continue;
-        if (infm(2, 0) > threshold)
-            continue;
-        if (infm(2, 1) > threshold)
-            continue;
-        if (infm(2, 2) > threshold)
-            continue;
+        }
 
-        if (infm(0, 0) < -threshold)
-            continue;
-        if (infm(0, 1) < -threshold)
-            continue;
-        if (infm(0, 2) < -threshold)
-            continue;
-        if (infm(1, 0) < -threshold)
-            continue;
-        if (infm(1, 1) < -threshold)
-            continue;
-        if (infm(1, 2) < -threshold)
-            continue;
-        if (infm(2, 0) < -threshold)
-            continue;
-        if (infm(2, 1) < -threshold)
-            continue;
-        if (infm(2, 2) < -threshold)
-            continue;
-
-        Eigen::Affine3d m_pose = intermediate_trajectory[intermediate_points[i].index_pose];
-        Eigen::Vector3d &p_s = intermediate_points[i].point;
-        TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
+        const Eigen::Affine3d& m_pose = intermediate_trajectory[intermediate_points[i].index_pose];
+        const Eigen::Vector3d &p_s = intermediate_points[i].point;
+        const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
         //
         Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
         point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
@@ -1913,23 +1887,12 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
             pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
             p_s.x(), p_s.y(), p_s.z(),
             infm(0, 0), infm(0, 1), infm(0, 2), infm(1, 0), infm(1, 1), infm(1, 2), infm(2, 0), infm(2, 1), infm(2, 2),
-            buckets[index_of_bucket].mean.x(), buckets[index_of_bucket].mean.y(), buckets[index_of_bucket].mean.z());
+            this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
 
         int c = intermediate_points[i].index_pose * 6;
 
-        for (int row = 0; row < 6; row++)
-        {
-            for (int col = 0; col < 6; col++)
-            {
-                AtPAndt.coeffRef(c + row, c + col) += AtPA(row, col);
-            }
-        }
-
-        for (int row = 0; row < 6; row++)
-        {
-            AtPBndt.coeffRef(c + row, 0) -= AtPB(row, 0);
-        }
-        //}
+        AtPAndt.block<6,6>(c,c) += AtPA;
+        AtPBndt.block<6, 1>(c, 0) -= AtPB;
     }
 
     std::vector<std::pair<int, int>> odo_edges;
@@ -2151,8 +2114,8 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
     tripletListP.clear();
     tripletListB.clear();
 
-    AtPA += AtPAndt;
-    AtPB += AtPBndt;
+    AtPA += AtPAndt.sparseView();
+    AtPB += AtPBndt.sparseView();
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
     Eigen::SparseMatrix<double> x = solver.solve(AtPB);
     std::vector<double> h_x;
@@ -2183,7 +2146,7 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
     return;
 }
 
-void update_rgd(NDT::GridParameters &rgd_params, std::map<unsigned long long int, NDT::Bucket> &buckets,
+void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
                 std::vector<Point3Di> &points_global)
 {
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
@@ -2192,40 +2155,39 @@ void update_rgd(NDT::GridParameters &rgd_params, std::map<unsigned long long int
     {
         auto index_of_bucket = get_rgd_index(points_global[i].point, b);
 
-        if (buckets.contains(index_of_bucket))
+        auto bucket_it = buckets.find(index_of_bucket);
+
+        if (bucket_it != buckets.end())
         {
-            buckets[index_of_bucket].number_of_points++;
-            auto curr_mean = points_global[i].point;
-            auto mean = buckets[index_of_bucket].mean;
+            auto& this_bucket = bucket_it->second;
+            this_bucket.number_of_points++;
+            const auto& curr_mean = points_global[i].point;
+            const auto& mean = this_bucket.mean;
             // buckets[index_of_bucket].mean += (mean - curr_mean) / buckets[index_of_bucket].number_of_points;
 
+            auto mean_diff = mean - curr_mean;
             Eigen::Matrix3d cov_update;
-            cov_update(0, 0) = (mean.x() - curr_mean.x()) * (mean.x() - curr_mean.x());
-            cov_update(0, 1) = (mean.x() - curr_mean.x()) * (mean.y() - curr_mean.y());
-            cov_update(0, 2) = (mean.x() - curr_mean.x()) * (mean.z() - curr_mean.z());
-            cov_update(1, 0) = (mean.y() - curr_mean.y()) * (mean.x() - curr_mean.x());
-            cov_update(1, 1) = (mean.y() - curr_mean.y()) * (mean.y() - curr_mean.y());
-            cov_update(1, 2) = (mean.y() - curr_mean.y()) * (mean.z() - curr_mean.z());
-            cov_update(2, 0) = (mean.z() - curr_mean.z()) * (mean.x() - curr_mean.x());
-            cov_update(2, 1) = (mean.z() - curr_mean.z()) * (mean.y() - curr_mean.y());
-            cov_update(2, 2) = (mean.z() - curr_mean.z()) * (mean.z() - curr_mean.z());
+            cov_update.row(0) = mean_diff.x() * mean_diff;
+            cov_update.row(1) = mean_diff.y() * mean_diff;
+            cov_update.row(2) = mean_diff.z() * mean_diff;
 
-            buckets[index_of_bucket].cov = buckets[index_of_bucket].cov * (buckets[index_of_bucket].number_of_points - 1) / buckets[index_of_bucket].number_of_points +
-                                           cov_update * (buckets[index_of_bucket].number_of_points - 1) / (buckets[index_of_bucket].number_of_points * buckets[index_of_bucket].number_of_points);
+
+
+            this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+                                           cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
         }
         else
         {
-            buckets[index_of_bucket].mean = points_global[i].point;
-            buckets[index_of_bucket].cov = Eigen::Matrix3d::Zero();
-            buckets[index_of_bucket].cov(0, 0) = 0.03 * 0.03;
-            buckets[index_of_bucket].cov(1, 1) = 0.03 * 0.03;
-            buckets[index_of_bucket].cov(2, 2) = 0.03 * 0.03;
-            buckets[index_of_bucket].number_of_points = 1;
+            NDT::Bucket bucket_to_add;
+            bucket_to_add.mean = points_global[i].point;
+            bucket_to_add.cov = Eigen::Matrix3d::Identity() * 0.03 * 0.03;
+            bucket_to_add.number_of_points = 1;
+            buckets.emplace(index_of_bucket,bucket_to_add);
         }
     }
 }
 
-void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &initial_points, Eigen::Affine3d &m_g, std::map<unsigned long long int, NDT::Bucket> &reference_buckets)
+void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &initial_points, Eigen::Affine3d &m_g, NDTBucketMapType &reference_buckets)
 {
     Eigen::SparseMatrix<double> AtPAndt(6, 6);
     Eigen::SparseMatrix<double> AtPBndt(6, 1);
@@ -2250,49 +2212,18 @@ void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &
         // if(buckets[index_of_bucket].number_of_points >= 5){
         Eigen::Matrix3d infm = reference_buckets[index_of_bucket].cov.inverse();
 
-        double threshold = 10000.0;
+        constexpr double threshold = 10000.0;
 
-        if (infm(0, 0) > threshold)
+        if ((infm.array() > threshold).any()) {
             continue;
-        if (infm(0, 1) > threshold)
+        }
+        if ((infm.array() < -threshold).any()) {
             continue;
-        if (infm(0, 2) > threshold)
-            continue;
-        if (infm(1, 0) > threshold)
-            continue;
-        if (infm(1, 1) > threshold)
-            continue;
-        if (infm(1, 2) > threshold)
-            continue;
-        if (infm(2, 0) > threshold)
-            continue;
-        if (infm(2, 1) > threshold)
-            continue;
-        if (infm(2, 2) > threshold)
-            continue;
+        }
 
-        if (infm(0, 0) < -threshold)
-            continue;
-        if (infm(0, 1) < -threshold)
-            continue;
-        if (infm(0, 2) < -threshold)
-            continue;
-        if (infm(1, 0) < -threshold)
-            continue;
-        if (infm(1, 1) < -threshold)
-            continue;
-        if (infm(1, 2) < -threshold)
-            continue;
-        if (infm(2, 0) < -threshold)
-            continue;
-        if (infm(2, 1) < -threshold)
-            continue;
-        if (infm(2, 2) < -threshold)
-            continue;
-
-        Eigen::Affine3d m_pose = m_g;
-        Eigen::Vector3d &p_s = initial_points[i].point;
-        TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
+        const Eigen::Affine3d& m_pose = m_g;
+        const Eigen::Vector3d &p_s = initial_points[i].point;
+        const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
         //
         Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
         point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(

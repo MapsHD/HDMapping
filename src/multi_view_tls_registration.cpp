@@ -889,6 +889,52 @@ void project_gui()
             }
         }
 
+        ImGui::SameLine();
+
+        if (ImGui::Button("save all marked trajectories to laz (as one global scan)"))
+        {
+            std::shared_ptr<pfd::save_file> save_file;
+            std::string output_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+            const auto t = [&]()
+            {
+                auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                output_file_name = sel;
+                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (output_file_name.size() > 0)
+            {
+                std::vector<Eigen::Vector3d> pointcloud;
+                std::vector<unsigned short> intensity;
+
+                // point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
+
+                for (auto &p : point_clouds_container.point_clouds)
+                {
+                    if (p.visible)
+                    {
+
+                        for (int i = 0; i < p.local_trajectory.size(); i++)
+                        {
+                            const auto &pp = p.local_trajectory[i].m_pose.translation();
+                            Eigen::Vector3d vp;
+                            vp = p.m_pose * pp + point_clouds_container.offset;
+
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+                }
+                if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                {
+                    std::cout << "problem with saving file: " << output_file_name << std::endl;
+                }
+            }
+        }
+
         if (ImGui::Button("save all marked scans to laz (as separate global scans)"))
         {
             for (auto &p : point_clouds_container.point_clouds)
@@ -2501,7 +2547,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration v0.14");
+    glutCreateWindow("multi_view_tls_registration v0.15");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

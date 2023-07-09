@@ -536,7 +536,7 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_gui v0.14"))
+    if (ImGui::Begin("lidar_odometry_gui v0.15"))
     {
         ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
@@ -757,7 +757,9 @@ void lidar_odometry_gui()
                                 }
                             }
 
-                            wd.intermediate_points = decimate(wd.intermediate_points, decimation, decimation, decimation);
+                            if (decimation > 0.0){
+                                wd.intermediate_points = decimate(wd.intermediate_points, decimation, decimation, decimation);
+                            }
 
                             worker_data.push_back(wd);
                             wd.intermediate_points.clear();
@@ -915,8 +917,9 @@ void lidar_odometry_gui()
                         local_points.push_back(p);
                     }
                     // std::cout << "before " << m_first.matrix() << std::endl;
-
-                    local_points = decimate(local_points, 0.3, 0.3, 0.3);
+                    if (decimation > 0){
+                        local_points = decimate(local_points, decimation, decimation, decimation);
+                    }
                     for (int iter = 0; iter < nr_iter; iter++)
                     {
                         align_to_reference(in_out_params, local_points, m_first, reference_buckets);
@@ -1003,7 +1006,9 @@ void lidar_odometry_gui()
                     points_global = points_global_new;
 
                     // decimate
-                    decimate(points_global, decimation, decimation, decimation);
+                    if (decimation > 0){
+                        decimate(points_global, decimation, decimation, decimation);
+                    }
                     update_rgd(in_out_params, buckets, points_global);
                     //
                     endu = std::chrono::system_clock::now();

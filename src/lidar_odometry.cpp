@@ -956,10 +956,12 @@ void lidar_odometry_gui()
                     saveLaz(fn.c_str(), global_points);
                 }
 
-                for (int tr = 1; tr < worker_data[i].intermediate_trajectory.size(); tr++)
-                {
-                    acc_distance += ((worker_data[i].intermediate_trajectory[tr - 1].inverse()) * worker_data[i].intermediate_trajectory[tr]).translation().norm();
-                }
+                //for (int tr = 1; tr < worker_data[i].intermediate_trajectory.size(); tr++)
+                //{
+                //    acc_distance += ((worker_data[i].intermediate_trajectory[tr - 1].inverse()) * worker_data[i].intermediate_trajectory[tr]).translation().norm();
+                //}
+                acc_distance += ((worker_data[i].intermediate_trajectory[0].inverse()) *
+                                 worker_data[i].intermediate_trajectory[worker_data[i].intermediate_trajectory.size() - 1]).translation().norm();
 
                 // update
                 for (int j = i + 1; j < worker_data.size(); j++)
@@ -1514,7 +1516,8 @@ void display()
     if (show_trajectory)
     {
         glColor3f(0, 1, 0);
-        glBegin(GL_LINE_STRIP);
+        //glBegin(GL_LINE_STRIP);
+        glBegin(GL_POINTS);
         for (const auto &wd : worker_data)
         {
             for (const auto &it : wd.intermediate_trajectory)
@@ -1995,7 +1998,7 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         tripletListB.emplace_back(ir + 3, 0, delta(3, 0));
         tripletListB.emplace_back(ir + 4, 0, delta(4, 0));
         tripletListB.emplace_back(ir + 5, 0, delta(5, 0));
-
+        
         tripletListP.emplace_back(ir, ir, 1000000);
         tripletListP.emplace_back(ir + 1, ir + 1, 100000000);
         tripletListP.emplace_back(ir + 2, ir + 2, 100000000);

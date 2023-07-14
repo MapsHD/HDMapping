@@ -889,7 +889,33 @@ void project_gui()
             }
         }
 
-        ImGui::SameLine();
+        if (ImGui::Button("save all marked scans to laz (as separate global scans)"))
+        {
+            for (auto &p : point_clouds_container.point_clouds)
+            {
+                if (p.visible)
+                {
+
+                    fs::path file_path_in = p.file_name;
+                    // std::cout << filePath.stem() << std::endl;
+                    // std::cout << filePath.extension() << std::endl;
+                    // std::cout << filePath.root_name() << std::endl;
+                    // std::cout << filePath.root_directory() << std::endl;
+                    // std::cout << filePath.root_path() << std::endl;
+                    // std::cout << filePath.relative_path() << std::endl;
+                    // std::cout << filePath.parent_path() << std::endl;
+                    // std::cout << filePath.filename() << std::endl;
+                    fs::path file_path_put = file_path_in.parent_path();
+                    file_path_put /= (file_path_in.stem().string() + "_processed" + file_path_in.extension().string());
+                    std::cout << "file_in: " << file_path_in << std::endl;
+                    std::cout << "file_out: " << file_path_put << std::endl;
+
+                    std::cout << "start save_processed_pc" << std::endl;
+                    save_processed_pc(file_path_in, file_path_put, p.m_pose, point_clouds_container.offset);
+                    std::cout << "processed_pc finished" << std::endl;
+                }
+            }
+        }
 
         if (ImGui::Button("save all marked trajectories to laz (as one global scan)"))
         {
@@ -934,32 +960,71 @@ void project_gui()
                 }
             }
         }
-
-        if (ImGui::Button("save all marked scans to laz (as separate global scans)"))
+        if (ImGui::Button("save all marked trajectories to csv (x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
         {
-            for (auto &p : point_clouds_container.point_clouds)
+            std::shared_ptr<pfd::save_file> save_file;
+            std::string output_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+            const auto t = [&]()
             {
-                if (p.visible)
-                {
+                auto sel = pfd::save_file("Save las or csv file", "C:\\").result();
+                output_file_name = sel;
+                std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
+            };
+            std::thread t1(t);
+            t1.join();
 
-                    fs::path file_path_in = p.file_name;
-                    // std::cout << filePath.stem() << std::endl;
-                    // std::cout << filePath.extension() << std::endl;
-                    // std::cout << filePath.root_name() << std::endl;
-                    // std::cout << filePath.root_directory() << std::endl;
-                    // std::cout << filePath.root_path() << std::endl;
-                    // std::cout << filePath.relative_path() << std::endl;
-                    // std::cout << filePath.parent_path() << std::endl;
-                    // std::cout << filePath.filename() << std::endl;
-                    fs::path file_path_put = file_path_in.parent_path();
-                    file_path_put /= (file_path_in.stem().string() + "_processed" + file_path_in.extension().string());
-                    std::cout << "file_in: " << file_path_in << std::endl;
-                    std::cout << "file_out: " << file_path_put << std::endl;
+            if (output_file_name.size() > 0)
+            {
+                std::ofstream outfile(output_file_name);
+                if (outfile.good()){
+                    for (auto &p : point_clouds_container.point_clouds)
+                    {
+                        if (p.visible)
+                        {
 
-                    std::cout << "start save_processed_pc" << std::endl;
-                    save_processed_pc(file_path_in, file_path_put, p.m_pose, point_clouds_container.offset);
-                    std::cout << "processed_pc finished" << std::endl;
+                            for (int i = 0; i < p.local_trajectory.size(); i++)
+                            {
+                                const auto &m = p.local_trajectory[i].m_pose;
+                                Eigen::Affine3d pose = p.m_pose * m;
+                                pose.translation() += point_clouds_container.offset;
+
+                                outfile << 
+                                pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << 
+                                pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << 
+                                pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << 
+                                pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                            }
+                        }
+                    }
+                    outfile.close();
                 }
+
+                /*std::vector<Eigen::Vector3d> pointcloud;
+                std::vector<unsigned short> intensity;
+
+                // point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
+
+                for (auto &p : point_clouds_container.point_clouds)
+                {
+                    if (p.visible)
+                    {
+
+                        for (int i = 0; i < p.local_trajectory.size(); i++)
+                        {
+                            const auto &pp = p.local_trajectory[i].m_pose.translation();
+                            Eigen::Vector3d vp;
+                            vp = p.m_pose * pp + point_clouds_container.offset;
+
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+                }
+                if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                {
+                    std::cout << "problem with saving file: " << output_file_name << std::endl;
+                }*/
             }
         }
 
@@ -2547,7 +2612,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration v0.15");
+    glutCreateWindow("multi_view_tls_registration v0.16");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

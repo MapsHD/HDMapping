@@ -61,6 +61,7 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
 bool show_all_points = false;
 bool show_initial_points = true;
 bool show_trajectory = true;
+bool show_trajectory_as_axes = false;
 // bool show_intermadiate_points = false;
 bool show_covs = false;
 int dec_covs = 10;
@@ -537,11 +538,13 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_gui v0.15"))
+    if (ImGui::Begin("lidar_odometry_gui v0.16"))
     {
         ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
         ImGui::Checkbox("show_trajectory", &show_trajectory);
+        ImGui::SameLine();
+        ImGui::Checkbox("show_trajectory_as_axes", &show_trajectory_as_axes);
         // ImGui::Checkbox("show_covs", &show_covs);
         ImGui::InputDouble("resolution_X", &in_out_params.resolution_X);
         ImGui::InputDouble("resolution_Y", &in_out_params.resolution_Y);
@@ -1513,10 +1516,36 @@ void display()
         glEnd();
     }
 
-    if (show_trajectory)
+    if (show_trajectory_as_axes)
     {
         glColor3f(0, 1, 0);
         //glBegin(GL_LINE_STRIP);
+        glBegin(GL_LINES);
+        for (const auto &wd : worker_data)
+        {
+            for (const auto &it : wd.intermediate_trajectory)
+            {
+                glColor3f(1,0,0);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + it(0, 0) * 0.1, it(1, 3) + it(1, 0) * 0.1, it(2, 3) + it(2, 0) * 0.1);
+
+                glColor3f(0, 1, 0);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + it(0, 1) * 0.1, it(1, 3) + it(1, 1) * 0.1, it(2, 3) + it(2, 1) * 0.1);
+
+                glColor3f(0, 0, 1);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + it(0, 2) * 0.1, it(1, 3) + it(1, 2) * 0.1, it(2, 3) + it(2, 2) * 0.1);
+
+            }
+        }
+        glEnd();
+    }
+
+    if (show_trajectory)
+    {
+        glPointSize(3);
+        glColor3f(0, 1, 1);
         glBegin(GL_POINTS);
         for (const auto &wd : worker_data)
         {
@@ -1526,6 +1555,7 @@ void display()
             }
         }
         glEnd();
+        glPointSize(1);
     }
 
     if (show_reference_buckets)

@@ -34,8 +34,6 @@ namespace fs = std::filesystem;
 std::vector<Eigen::Vector3d> all_points;
 std::vector<Point3Di> initial_points;
 NDT ndt;
-std::vector<Eigen::Vector3d> means;
-std::vector<Eigen::Matrix3d> covs;
 
 NDT::GridParameters in_out_params;
 
@@ -1825,7 +1823,7 @@ int main(int argc, char *argv[])
     ImGui::DestroyContext();
     return 0;
 }
-
+#include <execution>
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
               NDT::GridParameters &rgd_params, NDTBucketMapType &buckets)
@@ -1840,21 +1838,23 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
     AtPBndt.setZero();
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
-    for (int i = 0; i < intermediate_points.size(); i += 1)
+    std::vector<std::mutex> mutexes(intermediate_trajectory.size());
+
+    std::for_each(std::execution::par_unseq, std::begin(intermediate_points), std::end(intermediate_points), [&](const Point3Di& intermediate_points_i)
     {
-        if (intermediate_points[i].point.norm() < 1.0)
+        if (intermediate_points_i.point.norm() < 1.0)
         {
-            continue;
+            return;
         }
 
-        Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points[i].index_pose] * intermediate_points[i].point;
+        Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
         auto index_of_bucket = get_rgd_index(point_global, b);
 
         auto bucket_it = buckets.find(index_of_bucket);
         // no bucket found
         if (bucket_it == buckets.end())
         {
-            continue;
+            return;
         }
         auto& this_bucket = bucket_it->second;
 
@@ -1864,14 +1864,14 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         const double threshold = 10000.0;
 
         if ((infm.array() > threshold).any()) {
-            continue;
+            return;
         }
         if ((infm.array() < -threshold).any()) {
-            continue;
+            return;
         }
 
-        const Eigen::Affine3d& m_pose = intermediate_trajectory[intermediate_points[i].index_pose];
-        const Eigen::Vector3d &p_s = intermediate_points[i].point;
+        const Eigen::Affine3d& m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
+        const Eigen::Vector3d& p_s = intermediate_points_i.point;
         const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
         //
         Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
@@ -1889,11 +1889,14 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
             infm(0, 0), infm(0, 1), infm(0, 2), infm(1, 0), infm(1, 1), infm(1, 2), infm(2, 0), infm(2, 1), infm(2, 2),
             this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
 
-        int c = intermediate_points[i].index_pose * 6;
+        int c = intermediate_points_i.index_pose * 6;
 
-        AtPAndt.block<6,6>(c,c) += AtPA;
+        std::mutex& m = mutexes[intermediate_points_i.index_pose];
+        std::unique_lock lck(m);
+        AtPAndt.block<6, 6>(c, c) += AtPA;
         AtPBndt.block<6, 1>(c, 0) -= AtPB;
-    }
+
+    });
 
     std::vector<std::pair<int, int>> odo_edges;
     for (size_t i = 1; i < intermediate_trajectory.size(); i++)

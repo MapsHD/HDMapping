@@ -65,7 +65,7 @@ bool show_trajectory_as_axes = false;
 // bool show_intermadiate_points = false;
 bool show_covs = false;
 int dec_covs = 10;
-double filter_threshold_xy = 1.5;
+double filter_threshold_xy = 0.5;
 int nr_iter = 100;
 double sliding_window_trajectory_length_threshold = 50.0;
 
@@ -538,7 +538,7 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_gui v0.16"))
+    if (ImGui::Begin("lidar_odometry_gui v0.17"))
     {
         ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
@@ -1683,6 +1683,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
     }
 
     int counter_ts0 = 0;
+    int counter_filtered_points = 0;
     for (laszip_U32 j = 0; j < header->number_of_point_records; j++)
     {
         if (laszip_read_point(laszip_reader))
@@ -1712,11 +1713,14 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
             if (sqrt(pf.x() * pf.x() + pf.y() * pf.y()) > filter_threshold_xy)
             {
                 points.emplace_back(p);
+            }else{
+                counter_filtered_points ++;
             }
         }
     }
 
     std::cout << "number points with ts == 0: " << counter_ts0 << std::endl;
+    std::cout << "counter_filtered_points: " << counter_filtered_points << std::endl;
     std::cout << "total number points: " << points.size() << std::endl;
     laszip_close_reader(laszip_reader);
     return points;

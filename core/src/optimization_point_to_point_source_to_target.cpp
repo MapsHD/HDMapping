@@ -1255,7 +1255,7 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
                 }
                 else
                 {
-                    std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed" << std::endl;
+                    std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed (check it!!!)" << std::endl;
                 }
             }
 

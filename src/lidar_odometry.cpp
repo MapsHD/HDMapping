@@ -6,6 +6,7 @@
 #include <vector>
 #include <Fusion.h>
 #include <map>
+#include <execution>
 
 #include <imgui.h>
 #include <imgui_impl_glut.h>
@@ -25,6 +26,7 @@
 #include <chrono>
 #include <python-scripts/constraints/smoothness_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian_simplified.h>
+
 //
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
@@ -34,8 +36,6 @@ namespace fs = std::filesystem;
 std::vector<Eigen::Vector3d> all_points;
 std::vector<Point3Di> initial_points;
 NDT ndt;
-std::vector<Eigen::Vector3d> means;
-std::vector<Eigen::Matrix3d> covs;
 
 NDT::GridParameters in_out_params;
 
@@ -73,7 +73,7 @@ bool fusionConventionNwu = true;
 bool fusionConventionEnu = false;
 bool fusionConventionNed = false;
 bool use_motion_from_previous_step = true;
-
+bool useMultithread = true;
 struct WorkerData
 {
     std::vector<Point3Di> intermediate_points;
@@ -127,7 +127,7 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
 std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero = true);
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets);
+              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread);
 void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &initial_points, Eigen::Affine3d &m_g, NDTBucketMapType &buckets);
 
 void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd = 3)
@@ -558,6 +558,7 @@ void lidar_odometry_gui()
         ImGui::InputInt("threshold initial points", &threshold_initial_points);
 
         ImGui::Checkbox("fusionConventionNwu", &fusionConventionNwu);
+        ImGui::Checkbox("use_multithread", &useMultithread);
         if (fusionConventionNwu)
         {
             // fusionConventionNwu
@@ -604,182 +605,211 @@ void lidar_odometry_gui()
             std::thread t1(t);
             t1.join();
 
-            if (input_file_names.size() > 0)
-            {
-                if (input_file_names.size() % 2 == 0)
+            std::sort(std::begin(input_file_names), std::end(input_file_names));
+
+            std::vector<std::string> csv_files;
+            std::vector<std::string> laz_files;
+            std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string& fileName)
                 {
-                    working_directory = fs::path(input_file_names[0]).parent_path().string();
-                    fs::path wdp = fs::path(input_file_names[0]).parent_path();
-                    wdp /= "preview";
-                    if (!fs::exists(wdp))
+                    if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
                     {
-                        fs::create_directory(wdp);
+                        laz_files.push_back(fileName);
                     }
-
-                    working_directory_preview = wdp.string();
-
-                    for (size_t i = 0; i < input_file_names.size(); i++)
+                    if (fileName.ends_with(".csv"))
                     {
-                        std::cout << input_file_names[i] << std::endl;
+                        csv_files.push_back(fileName);
                     }
-                    std::cout << "loading imu" << std::endl;
-                    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data;
-                    for (size_t i = 0; i < input_file_names.size() / 2; i++)
-                    {
-                        auto imu = load_imu(input_file_names[i].c_str());
-                        imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
-                    }
+                }
+            );
 
-                    std::cout << "loading points" << std::endl;
-                    std::vector<Point3Di> points;
-                    for (size_t i = input_file_names.size() / 2; i < input_file_names.size(); i++)
-                    {
-                        auto pp = load_point_cloud(input_file_names[i].c_str());
-                        points.insert(std::end(points), std::begin(pp), std::end(pp));
-                    }
+            if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
+            {
+                working_directory = fs::path(input_file_names[0]).parent_path().string();
+                fs::path wdp = fs::path(input_file_names[0]).parent_path();
+                wdp /= "preview";
+                if (!fs::exists(wdp))
+                {
+                    fs::create_directory(wdp);
+                }
 
+                working_directory_preview = wdp.string();
+
+                for (size_t i = 0; i < input_file_names.size(); i++)
+                {
+                    std::cout << input_file_names[i] << std::endl;
+                }
+                std::cout << "loading imu" << std::endl;
+                std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data;
+
+                std::for_each( std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string& fn)
+                {
+                    auto imu = load_imu(fn.c_str());
+                    std::cout << fn << std::endl;
+                    imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
+                });
+   
+
+                std::cout << "loading points" << std::endl;
+                std::vector<std::vector<Point3Di>> pointsPerFile;
+                pointsPerFile.resize(laz_files.size());
+
+                std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile),[](const std::string& fn)
+                {
+                    return load_point_cloud(fn.c_str());
+                    //std::unique_lock lck(mutex);
+
+                    //std::cout << fn << std::endl;
                     //
-                    FusionAhrs ahrs;
-                    FusionAhrsInitialise(&ahrs);
+                });
 
-                    if (fusionConventionNwu)
+                std::vector<Point3Di> points;
+                for (const auto& pp : pointsPerFile)
+                {
+                    points.insert(std::end(points), std::begin(pp), std::end(pp));
+                }
+
+                //
+                FusionAhrs ahrs;
+                FusionAhrsInitialise(&ahrs);
+
+                if (fusionConventionNwu)
+                {
+                    ahrs.settings.convention = FusionConventionNwu;
+                }
+                if (fusionConventionEnu)
+                {
+                    ahrs.settings.convention = FusionConventionEnu;
+                }
+                if (fusionConventionNed)
+                {
+                    ahrs.settings.convention = FusionConventionNed;
+                }
+
+                std::map<double, Eigen::Matrix4d> trajectory;
+
+                int counter = 1;
+                for (const auto &[timestamp, gyr, acc] : imu_data)
+                {
+                    const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
+                    const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
+
+                    FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
+
+                    FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
+
+                    Eigen::Quaterniond d{quat.element.w, quat.element.x, quat.element.y, quat.element.z};
+                    Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
+                    t.rotate(d);
+                    trajectory[timestamp] = t.matrix();
+                    const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+                    printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+                }
+
+                std::cout << "number of points: " << points.size() << std::endl;
+                std::cout << "start transforming points" << std::endl;
+
+                counter = 1; // ToDo make it faster
+                for (auto &p : points)
+                {
+                    Eigen::Matrix4d t = getInterpolatedPose(trajectory, p.timestamp);
+                    if (!t.isZero())
                     {
-                        ahrs.settings.convention = FusionConventionNwu;
+                        Eigen::Affine3d tt(t);
+                        Eigen::Vector3d tp = tt * p.point;
+                        all_points.push_back(tp);
                     }
-                    if (fusionConventionEnu)
+                    if (counter % 1000000 == 0)
                     {
-                        ahrs.settings.convention = FusionConventionEnu;
+                        printf("tranform point %d of %d \n", counter, points.size());
                     }
-                    if (fusionConventionNed)
+                    counter++;
+                }
+
+                for (int i = 0; i < threshold_initial_points; i++)
+                {
+                    auto p = points[i];
+                    // p.point = all_points[i];
+                    initial_points.push_back(p);
+                }
+
+                double timestamp_begin = points[threshold_initial_points - 1].timestamp;
+                std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
+
+                std::vector<double> timestamps;
+                std::vector<Eigen::Affine3d> poses;
+                for (const auto &t : trajectory)
+                {
+                    if (t.first >= timestamp_begin)
                     {
-                        ahrs.settings.convention = FusionConventionNed;
+                        timestamps.push_back(t.first);
+                        Eigen::Affine3d m;
+                        m.matrix() = t.second;
+                        poses.push_back(m);
                     }
+                }
 
-                    std::map<double, Eigen::Matrix4d> trajectory;
+                std::cout << "poses.size(): " << poses.size() << std::endl;
 
-                    int counter = 1;
-                    for (const auto &[timestamp, gyr, acc] : imu_data)
+                int thershold = 20;
+                WorkerData wd;
+                // std::vector<double> temp_ts;
+                // temp_ts.reserve(1000000);
+
+                // int last_point = 0;
+                for (size_t i = 0; i < poses.size(); i++)
+                {
+                    if (i % 1000 == 0)
                     {
-                        const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
-                        const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
-
-                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-
-                        FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-                        Eigen::Quaterniond d{quat.element.w, quat.element.x, quat.element.y, quat.element.z};
-                        Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
-                        t.rotate(d);
-                        trajectory[timestamp] = t.matrix();
-                        const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
-                        printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+                        std::cout << "preparing data " << i + 1 << " of " << poses.size() << std::endl;
                     }
+                    wd.intermediate_trajectory.emplace_back(poses[i]);
+                    wd.intermediate_trajectory_motion_model.emplace_back(poses[i]);
+                    wd.intermediate_trajectory_timestamps.emplace_back(timestamps[i]);
+                    // temp_ts.emplace_back(timestamps[i]);
 
-                    std::cout << "number of points: " << points.size() << std::endl;
-                    std::cout << "start transforming points" << std::endl;
-
-                    counter = 1; // ToDo make it faster
-                    for (auto &p : points)
+                    if (wd.intermediate_trajectory.size() >= thershold)
                     {
-                        Eigen::Matrix4d t = getInterpolatedPose(trajectory, p.timestamp);
-                        if (!t.isZero())
+                        auto index_lower = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[0],
+                                                            [](Point3Di lhs, double rhs) -> bool
+                                                            { return lhs.timestamp < rhs; });
+                        unsigned long long int i_begin = std::distance(points.begin(), index_lower);
+
+                        auto index_upper = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1],
+                                                            [](Point3Di lhs, double rhs) -> bool
+                                                            { return lhs.timestamp < rhs; });
+                        unsigned long long int i_end = std::distance(points.begin(), index_upper);
+
+                        for (unsigned long long int k = i_begin; k < i_end; k++)
                         {
-                            Eigen::Affine3d tt(t);
-                            Eigen::Vector3d tp = tt * p.point;
-                            all_points.push_back(tp);
-                        }
-                        if (counter % 1000000 == 0)
-                        {
-                            printf("tranform point %d of %d \n", counter, points.size());
-                        }
-                        counter++;
-                    }
-
-                    for (int i = 0; i < threshold_initial_points; i++)
-                    {
-                        auto p = points[i];
-                        // p.point = all_points[i];
-                        initial_points.push_back(p);
-                    }
-
-                    double timestamp_begin = points[threshold_initial_points - 1].timestamp;
-                    std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
-
-                    std::vector<double> timestamps;
-                    std::vector<Eigen::Affine3d> poses;
-                    for (const auto &t : trajectory)
-                    {
-                        if (t.first >= timestamp_begin)
-                        {
-                            timestamps.push_back(t.first);
-                            Eigen::Affine3d m;
-                            m.matrix() = t.second;
-                            poses.push_back(m);
-                        }
-                    }
-
-                    std::cout << "poses.size(): " << poses.size() << std::endl;
-
-                    int thershold = 20;
-                    WorkerData wd;
-                    // std::vector<double> temp_ts;
-                    // temp_ts.reserve(1000000);
-
-                    // int last_point = 0;
-                    for (size_t i = 0; i < poses.size(); i++)
-                    {
-                        if (i % 1000 == 0)
-                        {
-                            std::cout << "preparing data " << i + 1 << " of " << poses.size() << std::endl;
-                        }
-                        wd.intermediate_trajectory.emplace_back(poses[i]);
-                        wd.intermediate_trajectory_motion_model.emplace_back(poses[i]);
-                        wd.intermediate_trajectory_timestamps.emplace_back(timestamps[i]);
-                        // temp_ts.emplace_back(timestamps[i]);
-
-                        if (wd.intermediate_trajectory.size() >= thershold)
-                        {
-                            auto index_lower = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[0],
-                                                                [](Point3Di lhs, double rhs) -> bool
-                                                                { return lhs.timestamp < rhs; });
-                            unsigned long long int i_begin = std::distance(points.begin(), index_lower);
-
-                            auto index_upper = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1],
-                                                                [](Point3Di lhs, double rhs) -> bool
-                                                                { return lhs.timestamp < rhs; });
-                            unsigned long long int i_end = std::distance(points.begin(), index_upper);
-
-                            for (unsigned long long int k = i_begin; k < i_end; k++)
+                            if (points[k].timestamp > wd.intermediate_trajectory_timestamps[0] && points[k].timestamp < wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
                             {
-                                if (points[k].timestamp > wd.intermediate_trajectory_timestamps[0] && points[k].timestamp < wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
-                                {
-                                    auto p = points[k];
-                                    auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp);
-                                    p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
-                                    wd.intermediate_points.emplace_back(p);
-                                    wd.original_points.emplace_back(p);
-                                }
+                                auto p = points[k];
+                                auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp);
+                                p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
+                                wd.intermediate_points.emplace_back(p);
+                                wd.original_points.emplace_back(p);
                             }
-
-                            if (decimation > 0.0){
-                                wd.intermediate_points = decimate(wd.intermediate_points, decimation, decimation, decimation);
-                            }
-
-                            worker_data.push_back(wd);
-                            wd.intermediate_points.clear();
-                            wd.original_points.clear();
-                            wd.intermediate_trajectory.clear();
-                            wd.intermediate_trajectory_motion_model.clear();
-                            wd.intermediate_trajectory_timestamps.clear();
-
-                            wd.intermediate_points.reserve(1000000);
-                            wd.original_points.reserve(1000000);
-                            wd.intermediate_trajectory.reserve(1000);
-                            wd.intermediate_trajectory_motion_model.reserve(1000);
-                            wd.intermediate_trajectory_timestamps.reserve(1000);
-
-                            // temp_ts.clear();
                         }
+
+                        if (decimation > 0.0){
+                            wd.intermediate_points = decimate(wd.intermediate_points, decimation, decimation, decimation);
+                        }
+
+                        worker_data.push_back(wd);
+                        wd.intermediate_points.clear();
+                        wd.original_points.clear();
+                        wd.intermediate_trajectory.clear();
+                        wd.intermediate_trajectory_motion_model.clear();
+                        wd.intermediate_trajectory_timestamps.clear();
+
+                        wd.intermediate_points.reserve(1000000);
+                        wd.original_points.reserve(1000000);
+                        wd.intermediate_trajectory.reserve(1000);
+                        wd.intermediate_trajectory_motion_model.reserve(1000);
+                        wd.intermediate_trajectory_timestamps.reserve(1000);
+
+                        // temp_ts.clear();
+                        
                     }
 
                     // if(reference_points.size() == 0){
@@ -789,11 +819,12 @@ void lidar_odometry_gui()
                     //     std::cout << "done" << std::endl;
                     // }
                 }
-                else
-                {
-                    std::cout << "please select files correctly" << std::endl;
-                }
+
             }
+                            else
+                {
+                std::cout << "please select files correctly" << std::endl;
+                }
         }
         if (ImGui::Button("compute_all"))
         {
@@ -900,7 +931,7 @@ void lidar_odometry_gui()
                 for (int iter = 0; iter < nr_iter; iter++)
                 {
                     optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
-                             in_out_params, buckets);
+                             in_out_params, buckets, useMultithread);
                 }
 
                 // align to reference
@@ -1865,7 +1896,7 @@ int main(int argc, char *argv[])
 
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets)
+              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool multithread)
 {
     std::vector<Eigen::Triplet<double>> tripletListA;
     std::vector<Eigen::Triplet<double>> tripletListP;
@@ -1877,21 +1908,24 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
     AtPBndt.setZero();
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
-    for (int i = 0; i < intermediate_points.size(); i += 1)
+    std::vector<std::mutex> mutexes(intermediate_trajectory.size());
+
+
+    const auto hessian_fun = [&](const Point3Di& intermediate_points_i)
     {
-        if (intermediate_points[i].point.norm() < 1.0)
+        if (intermediate_points_i.point.norm() < 1.0)
         {
-            continue;
+            return;
         }
 
-        Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points[i].index_pose] * intermediate_points[i].point;
+        Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
         auto index_of_bucket = get_rgd_index(point_global, b);
 
         auto bucket_it = buckets.find(index_of_bucket);
         // no bucket found
         if (bucket_it == buckets.end())
         {
-            continue;
+            return;
         }
         auto& this_bucket = bucket_it->second;
 
@@ -1901,14 +1935,14 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         const double threshold = 10000.0;
 
         if ((infm.array() > threshold).any()) {
-            continue;
+            return;
         }
         if ((infm.array() < -threshold).any()) {
-            continue;
+            return;
         }
 
-        const Eigen::Affine3d& m_pose = intermediate_trajectory[intermediate_points[i].index_pose];
-        const Eigen::Vector3d &p_s = intermediate_points[i].point;
+        const Eigen::Affine3d& m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
+        const Eigen::Vector3d& p_s = intermediate_points_i.point;
         const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
         //
         Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
@@ -1926,12 +1960,22 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
             infm(0, 0), infm(0, 1), infm(0, 2), infm(1, 0), infm(1, 1), infm(1, 2), infm(2, 0), infm(2, 1), infm(2, 2),
             this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
 
-        int c = intermediate_points[i].index_pose * 6;
+        int c = intermediate_points_i.index_pose * 6;
 
-        AtPAndt.block<6,6>(c,c) += AtPA;
+        std::mutex& m = mutexes[intermediate_points_i.index_pose];
+        std::unique_lock lck(m);
+        AtPAndt.block<6, 6>(c, c) += AtPA;
         AtPBndt.block<6, 1>(c, 0) -= AtPB;
-    }
+    };
 
+    if (multithread)
+    {
+        std::for_each(std::execution::par_unseq, std::begin(intermediate_points), std::end(intermediate_points), hessian_fun);
+    }
+    else
+    {
+        std::for_each(std::begin(intermediate_points), std::end(intermediate_points), hessian_fun);
+    }
     std::vector<std::pair<int, int>> odo_edges;
     for (size_t i = 1; i < intermediate_trajectory.size(); i++)
     {

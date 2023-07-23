@@ -113,6 +113,7 @@ bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &
                double offset_y,
                double offset_alt);
 double compute_rms(bool initial);
+void  reset_poses();
 
 void adjustHeader(laszip_header *header, const Eigen::Affine3d &m_pose, const Eigen::Vector3d &offset_in)
 {
@@ -609,15 +610,19 @@ void project_gui()
 
             if (!point_clouds_container.update_initial_poses_from_RESSO(working_directory.c_str(), input_file_name.c_str()))
             {
+
                 std::cout << "check input files" << std::endl;
                 return;
             }
             else
             {
+                point_clouds_container.initial_poses_file_name = input_file_name;
                 std::cout << "updated: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
             }
         }
     }
+    ImGui::SameLine();
+    ImGui::Text(point_clouds_container.initial_poses_file_name.c_str());
 
     if (ImGui::Button("update poses from RESSO file"))
     {
@@ -649,9 +654,12 @@ void project_gui()
             else
             {
                 std::cout << "updated: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                point_clouds_container.poses_file_name = input_file_name;
             }
         }
     }
+    ImGui::SameLine();
+    ImGui::Text(point_clouds_container.poses_file_name.c_str());
 
     ImGui::Text("-----------------------------------------------------------------------------");
     ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
@@ -706,7 +714,8 @@ void project_gui()
         ImGui::SameLine();
         if (ImGui::Button("reset poses"))
         {
-            for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+            reset_poses();
+            /*for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
             {
                 point_clouds_container.point_clouds[i].m_pose = point_clouds_container.point_clouds[i].m_initial_pose;
                 point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
@@ -716,7 +725,7 @@ void project_gui()
                 point_clouds_container.point_clouds[i].gui_rotation[0] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.om);
                 point_clouds_container.point_clouds[i].gui_rotation[1] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.fi);
                 point_clouds_container.point_clouds[i].gui_rotation[2] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.ka);
-            }
+            }*/
         }
 
         ImGui::Checkbox("show_with_initial_pose", &point_clouds_container.show_with_initial_pose);
@@ -746,8 +755,10 @@ void project_gui()
             ImGui::PopButtonRepeat();
             ImGui::SameLine();
             ImGui::Text("point size %d", point_clouds_container.point_clouds[i].point_size);
-            if (point_clouds_container.point_clouds[i].point_size < 1)
+            if (point_clouds_container.point_clouds[i].point_size < 1){
                 point_clouds_container.point_clouds[i].point_size = 1;
+            }
+            
             ImGui::SameLine();
             if (ImGui::Button(std::string("#" + std::to_string(i) + " save scan(global reference frame)").c_str()))
             {
@@ -803,12 +814,130 @@ void project_gui()
             if (point_clouds_container.point_clouds[i].visible)
             {
                 ImGui::ColorEdit3(std::string(std::to_string(i) + ": pc_color").c_str(), point_clouds_container.point_clouds[i].render_color);
-                ImGui::InputFloat3(std::string(std::to_string(i) + ": translation [m]").c_str(), point_clouds_container.point_clouds[i].gui_translation);
-                ImGui::InputFloat3(std::string(std::to_string(i) + ": rotation [deg]").c_str(), point_clouds_container.point_clouds[i].gui_rotation);
-                point_clouds_container.point_clouds[i].update_from_gui();
+                ImGui::SameLine();
+                if (ImGui::Button(std::string("#" + std::to_string(i) + "_ICP").c_str()))
+                {
+                    size_t index_target = i;
+
+                    //for (int k = 0; k < point_clouds_container.point_clouds.size(); k++){
+                    //    point_clouds_container.point_clouds[k].m_pose(0, 3) += 10;
+                    //}
+
+                    //point_clouds_container.point_clouds[index_target].m_initial_pose(0, 3) = 10;
+                    //point_clouds_container.point_clouds[index_target].m_pose(0,3) = 10;
+                    //point_clouds_container.point_clouds[index_target].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[index_target].m_pose);
+                    //return;
+                    PointClouds pcs;
+                    for (size_t k = 0; k < index_target; k++)
+                    {
+                        if (point_clouds_container.point_clouds[k].visible)
+                        {
+                            pcs.point_clouds.push_back(point_clouds_container.point_clouds[k]);
+                        }
+                    }
+
+                    if (pcs.point_clouds.size() > 0)
+                    {
+                        for (size_t k = 0; k < pcs.point_clouds.size(); k++)
+                        {
+                            pcs.point_clouds[k].fixed = true;
+                        }
+                    }
+                    pcs.point_clouds.push_back(point_clouds_container.point_clouds[index_target]);
+                    pcs.point_clouds[pcs.point_clouds.size()-1].fixed = false;
+
+                    ICP icp;
+                    icp.search_radious = 0.3; // ToDo move to params
+                    for (auto &pc : pcs.point_clouds)
+                    {
+                        pc.rgd_params.resolution_X = icp.search_radious;
+                        pc.rgd_params.resolution_Y = icp.search_radious;
+                        pc.rgd_params.resolution_Z = icp.search_radious;
+
+                        pc.build_rgd();
+                        pc.cout_rgd();
+                        pc.compute_normal_vectors(0.5);
+                    }
+                   
+                    icp.number_of_threads = std::thread::hardware_concurrency();
+
+                    icp.number_of_iterations = 10;
+                    icp.is_adaptive_robust_kernel = false;
+
+                    icp.is_ballanced_horizontal_vs_vertical = false;
+                    icp.is_fix_first_node = false;
+                    icp.is_gauss_newton = true;
+                    icp.is_levenberg_marguardt = false;
+                    icp.is_cw = false;
+                    icp.is_wc = true;
+                    icp.is_tait_bryan_angles = true;
+                    icp.is_quaternion = false;
+                    icp.is_rodrigues = false;
+                    std::cout << "optimization_point_to_point_source_to_target" << std::endl;
+
+                    icp.optimization_point_to_point_source_to_target(pcs);
+
+                    std::cout << "pose before: " << point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+
+                    std::vector<Eigen::Affine3d> all_m_poses;
+                    for (int j = 0; j < point_clouds_container.point_clouds.size(); j++)
+                    {
+                        all_m_poses.push_back(point_clouds_container.point_clouds[j].m_pose);
+                    }
+
+                    point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
+                    
+                    std::cout << "pose after ICP: " << point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+
+                    // like gizmo
+                    if (!manipulate_only_marked_gizmo)
+                    {
+                        std::cout << "update all poses after current pose" << std::endl;
+                       
+
+                        Eigen::Affine3d curr_m_pose = point_clouds_container.point_clouds[index_target].m_pose;
+                        for (int j = index_target + 1; j < point_clouds_container.point_clouds.size(); j++)
+                        {
+                            curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
+                            point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
+                            //point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[j].m_pose);
+
+                            //point_clouds_container.point_clouds[j].gui_translation[0] = (float)point_clouds_container.point_clouds[j].pose.px;
+                            //point_clouds_container.point_clouds[j].gui_translation[1] = (float)point_clouds_container.point_clouds[j].pose.py;
+                            //point_clouds_container.point_clouds[j].gui_translation[2] = (float)point_clouds_container.point_clouds[j].pose.pz;
+
+                            //point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
+                            //point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
+                            //point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                        }
+                    }
+
+                    //update gui
+                    /*for (int k = 0; k < point_clouds_container.point_clouds.size(); k++){
+                        point_clouds_container.point_clouds[k].gui_translation[0] = (float)point_clouds_container.point_clouds[k].pose.px;
+                        point_clouds_container.point_clouds[k].gui_translation[1] = (float)point_clouds_container.point_clouds[k].pose.py;
+                        point_clouds_container.point_clouds[k].gui_translation[2] = (float)point_clouds_container.point_clouds[k].pose.pz;
+                        point_clouds_container.point_clouds[k].gui_rotation[0] = (float)rad2deg(point_clouds_container.point_clouds[k].pose.om);
+                        point_clouds_container.point_clouds[k].gui_rotation[1] = (float)rad2deg(point_clouds_container.point_clouds[k].pose.fi);
+                        point_clouds_container.point_clouds[k].gui_rotation[2] = (float)rad2deg(point_clouds_container.point_clouds[k].pose.ka);
+                    }*/
+                }
+                /*for (int k = 0; k < point_clouds_container.point_clouds.size(); k++)
+                {
+                    point_clouds_container.point_clouds[k].gui_translation[0] = (float)point_clouds_container.point_clouds[k].pose.px;
+                    point_clouds_container.point_clouds[k].gui_translation[1] = (float)point_clouds_container.point_clouds[k].pose.py;
+                    point_clouds_container.point_clouds[k].gui_translation[2] = (float)point_clouds_container.point_clouds[k].pose.pz;
+                    point_clouds_container.point_clouds[k].gui_rotation[0] = (float)rad2deg(point_clouds_container.point_clouds[k].pose.om);
+                    point_clouds_container.point_clouds[k].gui_rotation[1] = (float)rad2deg(point_clouds_container.point_clouds[k].pose.fi);
+                    point_clouds_container.point_clouds[k].gui_rotation[2] = (float)rad2deg(point_clouds_container.point_clouds[k].pose.ka);
+                }*/
+
+                //update gui
+                //ImGui::InputFloat3(std::string(std::to_string(i) + ": translation [m]").c_str(), point_clouds_container.point_clouds[i].gui_translation);
+                //ImGui::InputFloat3(std::string(std::to_string(i) + ": rotation [deg]").c_str(), point_clouds_container.point_clouds[i].gui_rotation);
+                //point_clouds_container.point_clouds[i].update_from_gui();
             }
             ImGui::SameLine();
-
             if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str()))
             {
                 std::cout << point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
@@ -826,6 +955,7 @@ void project_gui()
                                     &point_clouds_container.point_clouds[i].available_geo_points[gp].choosen);
                 }
             }
+            
         }
         ImGui::Separator();
         int total_number_of_points = 0;
@@ -4794,3 +4924,4 @@ bool exportLaz(const std::string &filename,
     std::cout << "exportLaz DONE" << std::endl;
     return true;
 }
+

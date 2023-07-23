@@ -601,17 +601,20 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                     pcs.point_clouds.push_back(point_clouds_container.point_clouds[edges[index_active_edge].index_to]);
                     pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
                     pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                    ICP icp;
+                    icp.search_radious = search_radious;
 
                     for (auto &pc : pcs.point_clouds)
                     {
+                        pc.rgd_params.resolution_X = icp.search_radious;
+                        pc.rgd_params.resolution_Y = icp.search_radious;
+                        pc.rgd_params.resolution_Z = icp.search_radious;
                         pc.build_rgd();
                         pc.cout_rgd();
                         pc.compute_normal_vectors(0.5);
                     }
-                    ICP icp;
-                    icp.search_radious = search_radious;
+                   
                     icp.number_of_threads = std::thread::hardware_concurrency();
-                    ;
                     icp.number_of_iterations = 10;
                     icp.is_adaptive_robust_kernel = false;
 

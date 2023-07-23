@@ -109,6 +109,7 @@
         "codecvt": "cpp",
         "bitset": "cpp",
         "coroutine": "cpp",
-        "resumable": "cpp"
+        "resumable": "cpp",
+        "execution": "cpp"
     }
 }

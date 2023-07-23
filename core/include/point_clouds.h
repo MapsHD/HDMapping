@@ -15,6 +15,8 @@ public:
 	std::string folder_name;
 	std::string out_folder_name;
 	std::string out_poses_file_name;
+	std::string initial_poses_file_name;
+	std::string poses_file_name;
 
 	Eigen::Vector3d offset;
 	

@@ -2742,7 +2742,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration v0.17");
+    glutCreateWindow("multi_view_tls_registration v0.18");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

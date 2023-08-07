@@ -249,5 +249,4 @@ struct GeoPoint {
 	double w_z = 1000000.0;
 };
 
-
 #endif

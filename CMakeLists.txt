@@ -120,6 +120,8 @@ core/include/gnss.h
 core/src/gnss.cpp
 core/include/wgs84_do_puwg92.h
 core/src/wgs84_do_puwg92.cc
+core/include/session.h
+core/src/session.cpp
 )
 
 set(CORE_HD_MAPPING_SRCS

@@ -17,7 +17,7 @@
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
 
-#include <point_clouds.h>
+
 #include <ndt.h>
 #include <icp.h>
 #include <registration_plane_feature.h>
@@ -37,6 +37,8 @@
 #include <manual_pose_graph_loop_closure.h>
 
 #include <gnss.h>
+#include <session.h>
+
 namespace fs = std::filesystem;
 
 static bool show_demo_window = true;
@@ -74,7 +76,7 @@ double camera_mode_ortho_z_center_h = 0.0;
 
 std::vector<GeoPoint> available_geo_points;
 
-PointClouds point_clouds_container;
+//PointClouds point_clouds_container;
 NDT ndt;
 ICP icp;
 PoseGraphSLAM pose_graph_slam;
@@ -82,7 +84,7 @@ RegistrationPlaneFeature registration_plane_feature;
 ObservationPicking observation_picking;
 std::vector<Eigen::Vector3d> picked_points;
 std::string working_directory = "";
-ManualPoseGraphLoopClosure manual_pose_graph_loop_closure;
+// ManualPoseGraphLoopClosure manual_pose_graph_loop_closure;
 GNSS gnss;
 int all_point_size = 1;
 int index_loop_closure_source = 0;
@@ -105,6 +107,8 @@ float m_ortho_projection[] = {1, 0, 0, 0,
 
 bool manipulate_only_marked_gizmo = true;
 
+Session session;
+
 void reshape(int w, int h);
 void perform_experiment_on_windows();
 void perform_experiment_on_linux();
@@ -113,7 +117,7 @@ bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &
                double offset_y,
                double offset_alt);
 double compute_rms(bool initial);
-void  reset_poses();
+void reset_poses();
 
 void adjustHeader(laszip_header *header, const Eigen::Affine3d &m_pose, const Eigen::Vector3d &offset_in)
 {
@@ -360,13 +364,13 @@ void project_gui()
     }
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-    ImGui::Text("Offset x: %.10f y: %.10f z: %.10f", point_clouds_container.offset.x(), point_clouds_container.offset.y(), point_clouds_container.offset.z());
+    ImGui::Text("Offset x: %.10f y: %.10f z: %.10f", session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
     ImGui::SameLine();
     if (ImGui::Button("print offset to console"))
     {
         std::cout << "offset:" << std::endl;
         std::cout << std::setprecision(10) << std::endl;
-        std::cout << point_clouds_container.offset << std::endl;
+        std::cout << session.point_clouds_container.offset << std::endl;
     }
 
     ImGui::InputInt("viewer_decmiate_point_cloud", &viewer_decmiate_point_cloud);
@@ -382,9 +386,9 @@ void project_gui()
 
     if (tmp != all_point_size)
     {
-        for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
         {
-            point_clouds_container.point_clouds[i].point_size = all_point_size;
+            session.point_clouds_container.point_clouds[i].point_size = all_point_size;
         }
     }
 
@@ -431,14 +435,14 @@ void project_gui()
 
             working_directory = fs::path(input_file_name).parent_path().string();
 
-            if (!point_clouds_container.load(working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
+            if (!session.point_clouds_container.load(working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
             {
                 std::cout << "check input files" << std::endl;
                 return;
             }
             else
             {
-                std::cout << "loaded: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
             }
         }
     }
@@ -459,7 +463,7 @@ void project_gui()
 
         if (output_file_name.size() > 0)
         {
-            point_clouds_container.save_poses(fs::path(output_file_name).string());
+            session.point_clouds_container.save_poses(fs::path(output_file_name).string());
         }
     }
 
@@ -485,14 +489,14 @@ void project_gui()
         {
             working_directory = fs::path(input_file_name).parent_path().string();
 
-            if (!point_clouds_container.load_eth(working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
+            if (!session.point_clouds_container.load_eth(working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
             {
                 std::cout << "check input files" << std::endl;
                 return;
             }
             else
             {
-                std::cout << "loaded: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
             }
         }
     }
@@ -502,7 +506,7 @@ void project_gui()
 
     if (ImGui::Button("load AlignedPointCloud from WHU-TLS (select all *.las files in folder 2-AlignedPointCloud)"))
     {
-        point_clouds_container.point_clouds.clear();
+        session.point_clouds_container.point_clouds.clear();
         static std::shared_ptr<pfd::open_file> open_file;
         std::vector<std::string> input_file_names;
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
@@ -529,14 +533,14 @@ void project_gui()
                 std::cout << input_file_names[i] << std::endl;
             }
 
-            if (!point_clouds_container.load_whu_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset))
+            if (!session.point_clouds_container.load_whu_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset))
             {
                 std::cout << "check input files laz/las" << std::endl;
                 // return;
             }
             else
             {
-                std::cout << "loaded: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
             }
         }
     }
@@ -546,7 +550,7 @@ void project_gui()
 
     if (ImGui::Button("load 3DTK files (select all *.txt files)"))
     {
-        point_clouds_container.point_clouds.clear();
+        session.point_clouds_container.point_clouds.clear();
         static std::shared_ptr<pfd::open_file> open_file;
         std::vector<std::string> input_file_names;
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
@@ -573,14 +577,14 @@ void project_gui()
                 std::cout << input_file_names[i] << std::endl;
             }
 
-            if (!point_clouds_container.load_3DTK_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z))
+            if (!session.point_clouds_container.load_3DTK_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z))
             {
                 std::cout << "check input files" << std::endl;
                 return;
             }
             else
             {
-                std::cout << "loaded: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
             }
         }
     }
@@ -608,7 +612,7 @@ void project_gui()
 
             working_directory = fs::path(input_file_name).parent_path().string();
 
-            if (!point_clouds_container.update_initial_poses_from_RESSO(working_directory.c_str(), input_file_name.c_str()))
+            if (!session.point_clouds_container.update_initial_poses_from_RESSO(working_directory.c_str(), input_file_name.c_str()))
             {
 
                 std::cout << "check input files" << std::endl;
@@ -616,13 +620,13 @@ void project_gui()
             }
             else
             {
-                point_clouds_container.initial_poses_file_name = input_file_name;
-                std::cout << "updated: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                session.point_clouds_container.initial_poses_file_name = input_file_name;
+                std::cout << "updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
             }
         }
     }
     ImGui::SameLine();
-    ImGui::Text(point_clouds_container.initial_poses_file_name.c_str());
+    ImGui::Text(session.point_clouds_container.initial_poses_file_name.c_str());
 
     if (ImGui::Button("update poses from RESSO file"))
     {
@@ -646,20 +650,28 @@ void project_gui()
 
             working_directory = fs::path(input_file_name).parent_path().string();
 
-            if (!point_clouds_container.update_poses_from_RESSO(working_directory.c_str(), input_file_name.c_str()))
+            if (!session.point_clouds_container.update_poses_from_RESSO(working_directory.c_str(), input_file_name.c_str()))
             {
                 std::cout << "check input files" << std::endl;
                 return;
             }
             else
             {
-                std::cout << "updated: " << point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                point_clouds_container.poses_file_name = input_file_name;
+                std::cout << "updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                session.point_clouds_container.poses_file_name = input_file_name;
             }
         }
     }
     ImGui::SameLine();
-    ImGui::Text(point_clouds_container.poses_file_name.c_str());
+    ImGui::Text(session.point_clouds_container.poses_file_name.c_str());
+
+    if (ImGui::Button("load session"))
+    {
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("save session"))
+    {
+    }
 
     ImGui::Text("-----------------------------------------------------------------------------");
     ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
@@ -672,7 +684,7 @@ void project_gui()
 
     if (manual_pose_graph_loop_closure_mode)
     {
-        manual_pose_graph_loop_closure.Gui(point_clouds_container, index_loop_closure_source, index_loop_closure_target, m_gizmo, gnss);
+        session.manual_pose_graph_loop_closure.Gui(session.point_clouds_container, index_loop_closure_source, index_loop_closure_target, m_gizmo, gnss);
 
         /*if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size()> 0)
         {
@@ -704,12 +716,12 @@ void project_gui()
     {
         if (ImGui::Button("show all"))
         {
-            point_clouds_container.show_all();
+            session.point_clouds_container.show_all();
         }
         ImGui::SameLine();
         if (ImGui::Button("hide all"))
         {
-            point_clouds_container.hide_all();
+            session.point_clouds_container.hide_all();
         }
         ImGui::SameLine();
         if (ImGui::Button("reset poses"))
@@ -728,37 +740,38 @@ void project_gui()
             }*/
         }
 
-        ImGui::Checkbox("show_with_initial_pose", &point_clouds_container.show_with_initial_pose);
+        ImGui::Checkbox("show_with_initial_pose", &session.point_clouds_container.show_with_initial_pose);
         ImGui::SameLine();
         ImGui::Checkbox("manipulate_only_marked_gizmo (false: move also succesive nodes)", &manipulate_only_marked_gizmo);
 
-        for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
         {
             ImGui::Separator();
-            ImGui::Checkbox(point_clouds_container.point_clouds[i].file_name.c_str(), &point_clouds_container.point_clouds[i].visible);
+            ImGui::Checkbox(session.point_clouds_container.point_clouds[i].file_name.c_str(), &session.point_clouds_container.point_clouds[i].visible);
             ImGui::SameLine();
-            ImGui::Checkbox((std::string("gizmo_") + std::to_string(i)).c_str(), &point_clouds_container.point_clouds[i].gizmo);
+            ImGui::Checkbox((std::string("gizmo_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
             ImGui::SameLine();
-            ImGui::Checkbox((std::string("fixed_") + std::to_string(i)).c_str(), &point_clouds_container.point_clouds[i].fixed);
+            ImGui::Checkbox((std::string("fixed_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed);
             ImGui::SameLine();
             ImGui::PushButtonRepeat(true);
             float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
             if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##left").c_str(), ImGuiDir_Left))
             {
-                (point_clouds_container.point_clouds[i].point_size)--;
+                (session.point_clouds_container.point_clouds[i].point_size)--;
             }
             ImGui::SameLine(0.0f, spacing);
             if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##right").c_str(), ImGuiDir_Right))
             {
-                (point_clouds_container.point_clouds[i].point_size)++;
+                (session.point_clouds_container.point_clouds[i].point_size)++;
             }
             ImGui::PopButtonRepeat();
             ImGui::SameLine();
-            ImGui::Text("point size %d", point_clouds_container.point_clouds[i].point_size);
-            if (point_clouds_container.point_clouds[i].point_size < 1){
-                point_clouds_container.point_clouds[i].point_size = 1;
+            ImGui::Text("point size %d", session.point_clouds_container.point_clouds[i].point_size);
+            if (session.point_clouds_container.point_clouds[i].point_size < 1)
+            {
+                session.point_clouds_container.point_clouds[i].point_size = 1;
             }
-            
+
             ImGui::SameLine();
             if (ImGui::Button(std::string("#" + std::to_string(i) + " save scan(global reference frame)").c_str()))
             {
@@ -776,63 +789,63 @@ void project_gui()
 
                 if (output_file_name.size() > 0)
                 {
-                    point_clouds_container.point_clouds[i].save_as_global(output_file_name);
+                    session.point_clouds_container.point_clouds[i].save_as_global(output_file_name);
                 }
             }
             ImGui::SameLine();
             if (ImGui::Button(std::string("#" + std::to_string(i) + " shift points to center").c_str()))
             {
-                point_clouds_container.point_clouds[i].shift_to_center();
+                session.point_clouds_container.point_clouds[i].shift_to_center();
             }
-            if (point_clouds_container.point_clouds[i].gizmo)
+            if (session.point_clouds_container.point_clouds[i].gizmo)
             {
-                for (size_t j = 0; j < point_clouds_container.point_clouds.size(); j++)
+                for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
                 {
                     if (i != j)
                     {
-                        point_clouds_container.point_clouds[j].gizmo = false;
+                        session.point_clouds_container.point_clouds[j].gizmo = false;
                     }
                 }
-                m_gizmo[0] = (float)point_clouds_container.point_clouds[i].m_pose(0, 0);
-                m_gizmo[1] = (float)point_clouds_container.point_clouds[i].m_pose(1, 0);
-                m_gizmo[2] = (float)point_clouds_container.point_clouds[i].m_pose(2, 0);
-                m_gizmo[3] = (float)point_clouds_container.point_clouds[i].m_pose(3, 0);
-                m_gizmo[4] = (float)point_clouds_container.point_clouds[i].m_pose(0, 1);
-                m_gizmo[5] = (float)point_clouds_container.point_clouds[i].m_pose(1, 1);
-                m_gizmo[6] = (float)point_clouds_container.point_clouds[i].m_pose(2, 1);
-                m_gizmo[7] = (float)point_clouds_container.point_clouds[i].m_pose(3, 1);
-                m_gizmo[8] = (float)point_clouds_container.point_clouds[i].m_pose(0, 2);
-                m_gizmo[9] = (float)point_clouds_container.point_clouds[i].m_pose(1, 2);
-                m_gizmo[10] = (float)point_clouds_container.point_clouds[i].m_pose(2, 2);
-                m_gizmo[11] = (float)point_clouds_container.point_clouds[i].m_pose(3, 2);
-                m_gizmo[12] = (float)point_clouds_container.point_clouds[i].m_pose(0, 3);
-                m_gizmo[13] = (float)point_clouds_container.point_clouds[i].m_pose(1, 3);
-                m_gizmo[14] = (float)point_clouds_container.point_clouds[i].m_pose(2, 3);
-                m_gizmo[15] = (float)point_clouds_container.point_clouds[i].m_pose(3, 3);
+                m_gizmo[0] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 0);
+                m_gizmo[1] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 0);
+                m_gizmo[2] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 0);
+                m_gizmo[3] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 0);
+                m_gizmo[4] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 1);
+                m_gizmo[5] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 1);
+                m_gizmo[6] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 1);
+                m_gizmo[7] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 1);
+                m_gizmo[8] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 2);
+                m_gizmo[9] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 2);
+                m_gizmo[10] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 2);
+                m_gizmo[11] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 2);
+                m_gizmo[12] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 3);
+                m_gizmo[13] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 3);
+                m_gizmo[14] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 3);
+                m_gizmo[15] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 3);
             }
 
-            if (point_clouds_container.point_clouds[i].visible)
+            if (session.point_clouds_container.point_clouds[i].visible)
             {
-                ImGui::ColorEdit3(std::string(std::to_string(i) + ": pc_color").c_str(), point_clouds_container.point_clouds[i].render_color);
+                ImGui::ColorEdit3(std::string(std::to_string(i) + ": pc_color").c_str(), session.point_clouds_container.point_clouds[i].render_color);
                 ImGui::SameLine();
                 if (ImGui::Button(std::string("#" + std::to_string(i) + "_ICP").c_str()))
                 {
                     size_t index_target = i;
 
-                    //for (int k = 0; k < point_clouds_container.point_clouds.size(); k++){
-                    //    point_clouds_container.point_clouds[k].m_pose(0, 3) += 10;
-                    //}
+                    // for (int k = 0; k < point_clouds_container.point_clouds.size(); k++){
+                    //     point_clouds_container.point_clouds[k].m_pose(0, 3) += 10;
+                    // }
 
-                    //point_clouds_container.point_clouds[index_target].m_initial_pose(0, 3) = 10;
-                    //point_clouds_container.point_clouds[index_target].m_pose(0,3) = 10;
-                    //point_clouds_container.point_clouds[index_target].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[index_target].m_pose);
-                    //return;
+                    // point_clouds_container.point_clouds[index_target].m_initial_pose(0, 3) = 10;
+                    // point_clouds_container.point_clouds[index_target].m_pose(0,3) = 10;
+                    // point_clouds_container.point_clouds[index_target].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[index_target].m_pose);
+                    // return;
                     PointClouds pcs;
                     for (size_t k = 0; k < index_target; k++)
                     {
-                        if (point_clouds_container.point_clouds[k].visible)
+                        if (session.point_clouds_container.point_clouds[k].visible)
                         {
-                            pcs.point_clouds.push_back(point_clouds_container.point_clouds[k]);
+                            pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[k]);
                         }
                     }
 
@@ -843,8 +856,8 @@ void project_gui()
                             pcs.point_clouds[k].fixed = true;
                         }
                     }
-                    pcs.point_clouds.push_back(point_clouds_container.point_clouds[index_target]);
-                    pcs.point_clouds[pcs.point_clouds.size()-1].fixed = false;
+                    pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[index_target]);
+                    pcs.point_clouds[pcs.point_clouds.size() - 1].fixed = false;
 
                     ICP icp;
                     icp.search_radious = 0.3; // ToDo move to params
@@ -858,7 +871,7 @@ void project_gui()
                         pc.cout_rgd();
                         pc.compute_normal_vectors(0.5);
                     }
-                   
+
                     icp.number_of_threads = std::thread::hardware_concurrency();
 
                     icp.number_of_iterations = 10;
@@ -877,42 +890,41 @@ void project_gui()
 
                     icp.optimization_point_to_point_source_to_target(pcs);
 
-                    std::cout << "pose before: " << point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+                    std::cout << "pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
 
                     std::vector<Eigen::Affine3d> all_m_poses;
-                    for (int j = 0; j < point_clouds_container.point_clouds.size(); j++)
+                    for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
                     {
-                        all_m_poses.push_back(point_clouds_container.point_clouds[j].m_pose);
+                        all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
                     }
 
-                    point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
-                    
-                    std::cout << "pose after ICP: " << point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+                    session.point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
+
+                    std::cout << "pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
 
                     // like gizmo
                     if (!manipulate_only_marked_gizmo)
                     {
                         std::cout << "update all poses after current pose" << std::endl;
-                       
 
-                        Eigen::Affine3d curr_m_pose = point_clouds_container.point_clouds[index_target].m_pose;
-                        for (int j = index_target + 1; j < point_clouds_container.point_clouds.size(); j++)
+                        Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[index_target].m_pose;
+                        for (int j = index_target + 1; j < session.point_clouds_container.point_clouds.size(); j++)
                         {
                             curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                            point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                            //point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[j].m_pose);
+                            session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
+                            // point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[j].m_pose);
 
-                            //point_clouds_container.point_clouds[j].gui_translation[0] = (float)point_clouds_container.point_clouds[j].pose.px;
-                            //point_clouds_container.point_clouds[j].gui_translation[1] = (float)point_clouds_container.point_clouds[j].pose.py;
-                            //point_clouds_container.point_clouds[j].gui_translation[2] = (float)point_clouds_container.point_clouds[j].pose.pz;
+                            // point_clouds_container.point_clouds[j].gui_translation[0] = (float)point_clouds_container.point_clouds[j].pose.px;
+                            // point_clouds_container.point_clouds[j].gui_translation[1] = (float)point_clouds_container.point_clouds[j].pose.py;
+                            // point_clouds_container.point_clouds[j].gui_translation[2] = (float)point_clouds_container.point_clouds[j].pose.pz;
 
-                            //point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
-                            //point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
-                            //point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                            // point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
+                            // point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
+                            // point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
                         }
                     }
 
-                    //update gui
+                    // update gui
                     /*for (int k = 0; k < point_clouds_container.point_clouds.size(); k++){
                         point_clouds_container.point_clouds[k].gui_translation[0] = (float)point_clouds_container.point_clouds[k].pose.px;
                         point_clouds_container.point_clouds[k].gui_translation[1] = (float)point_clouds_container.point_clouds[k].pose.py;
@@ -932,36 +944,35 @@ void project_gui()
                     point_clouds_container.point_clouds[k].gui_rotation[2] = (float)rad2deg(point_clouds_container.point_clouds[k].pose.ka);
                 }*/
 
-                //update gui
-                //ImGui::InputFloat3(std::string(std::to_string(i) + ": translation [m]").c_str(), point_clouds_container.point_clouds[i].gui_translation);
-                //ImGui::InputFloat3(std::string(std::to_string(i) + ": rotation [deg]").c_str(), point_clouds_container.point_clouds[i].gui_rotation);
-                //point_clouds_container.point_clouds[i].update_from_gui();
+                // update gui
+                // ImGui::InputFloat3(std::string(std::to_string(i) + ": translation [m]").c_str(), point_clouds_container.point_clouds[i].gui_translation);
+                // ImGui::InputFloat3(std::string(std::to_string(i) + ": rotation [deg]").c_str(), point_clouds_container.point_clouds[i].gui_rotation);
+                // point_clouds_container.point_clouds[i].update_from_gui();
             }
             ImGui::SameLine();
             if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str()))
             {
-                std::cout << point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
+                std::cout << session.point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
             }
             ImGui::SameLine();
-            ImGui::Checkbox(std::string("#" + std::to_string(i) + " choose_geo").c_str(), &point_clouds_container.point_clouds[i].choosing_geo);
+            ImGui::Checkbox(std::string("#" + std::to_string(i) + " choose_geo").c_str(), &session.point_clouds_container.point_clouds[i].choosing_geo);
 
-            if (point_clouds_container.point_clouds[i].choosing_geo)
+            if (session.point_clouds_container.point_clouds[i].choosing_geo)
             {
-                for (int gp = 0; gp < point_clouds_container.point_clouds[i].available_geo_points.size(); gp++)
+                for (int gp = 0; gp < session.point_clouds_container.point_clouds[i].available_geo_points.size(); gp++)
                 {
                     ImGui::Checkbox(std::string("#" + std::to_string(i) + " " + std::to_string(gp) + "[" +
-                                                point_clouds_container.point_clouds[i].available_geo_points[gp].name + "]")
+                                                session.point_clouds_container.point_clouds[i].available_geo_points[gp].name + "]")
                                         .c_str(),
-                                    &point_clouds_container.point_clouds[i].available_geo_points[gp].choosen);
+                                    &session.point_clouds_container.point_clouds[i].available_geo_points[gp].choosen);
                 }
             }
-            
         }
         ImGui::Separator();
         int total_number_of_points = 0;
-        for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
         {
-            total_number_of_points += point_clouds_container.point_clouds[i].points_local.size();
+            total_number_of_points += session.point_clouds_container.point_clouds[i].points_local.size();
         }
         std::string point_size_message = "total number of points: " + std::to_string(total_number_of_points);
         ImGui::Text(point_size_message.c_str());
@@ -990,7 +1001,7 @@ void project_gui()
 
                 // point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
 
-                for (auto &p : point_clouds_container.point_clouds)
+                for (auto &p : session.point_clouds_container.point_clouds)
                 {
                     if (p.visible)
                     {
@@ -998,7 +1009,7 @@ void project_gui()
                         {
                             const auto &pp = p.points_local[i];
                             Eigen::Vector3d vp;
-                            vp = p.m_pose * pp + point_clouds_container.offset;
+                            vp = p.m_pose * pp + session.point_clouds_container.offset;
 
                             pointcloud.push_back(vp);
                             if (i < p.intensities.size())
@@ -1021,7 +1032,7 @@ void project_gui()
 
         if (ImGui::Button("save all marked scans to laz (as separate global scans)"))
         {
-            for (auto &p : point_clouds_container.point_clouds)
+            for (auto &p : session.point_clouds_container.point_clouds)
             {
                 if (p.visible)
                 {
@@ -1041,7 +1052,7 @@ void project_gui()
                     std::cout << "file_out: " << file_path_put << std::endl;
 
                     std::cout << "start save_processed_pc" << std::endl;
-                    save_processed_pc(file_path_in, file_path_put, p.m_pose, point_clouds_container.offset);
+                    save_processed_pc(file_path_in, file_path_put, p.m_pose, session.point_clouds_container.offset);
                     std::cout << "processed_pc finished" << std::endl;
                 }
             }
@@ -1068,7 +1079,7 @@ void project_gui()
 
                 // point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
 
-                for (auto &p : point_clouds_container.point_clouds)
+                for (auto &p : session.point_clouds_container.point_clouds)
                 {
                     if (p.visible)
                     {
@@ -1077,7 +1088,7 @@ void project_gui()
                         {
                             const auto &pp = p.local_trajectory[i].m_pose.translation();
                             Eigen::Vector3d vp;
-                            vp = p.m_pose * pp + point_clouds_container.offset;
+                            vp = p.m_pose * pp + session.point_clouds_container.offset;
 
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
@@ -1107,8 +1118,9 @@ void project_gui()
             if (output_file_name.size() > 0)
             {
                 std::ofstream outfile(output_file_name);
-                if (outfile.good()){
-                    for (auto &p : point_clouds_container.point_clouds)
+                if (outfile.good())
+                {
+                    for (auto &p : session.point_clouds_container.point_clouds)
                     {
                         if (p.visible)
                         {
@@ -1117,13 +1129,9 @@ void project_gui()
                             {
                                 const auto &m = p.local_trajectory[i].m_pose;
                                 Eigen::Affine3d pose = p.m_pose * m;
-                                pose.translation() += point_clouds_container.offset;
+                                pose.translation() += session.point_clouds_container.offset;
 
-                                outfile << 
-                                pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << 
-                                pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << 
-                                pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << 
-                                pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                outfile << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
                             }
                         }
                     }
@@ -1161,7 +1169,7 @@ void project_gui()
         ImGui::Separator();
         ImGui::Separator();
 
-        if (point_clouds_container.point_clouds.size() > 0)
+        if (session.point_clouds_container.point_clouds.size() > 0)
         {
             if (ImGui::Button("load georefence points"))
             {
@@ -1222,9 +1230,9 @@ void project_gui()
                         auto geo = available_geo_points;
                         for (auto &g : geo)
                         {
-                            g.coordinates -= point_clouds_container.offset;
+                            g.coordinates -= session.point_clouds_container.offset;
                         }
-                        for (auto &p : point_clouds_container.point_clouds)
+                        for (auto &p : session.point_clouds_container.point_clouds)
                         {
                             p.available_geo_points = geo;
                         }
@@ -1354,7 +1362,7 @@ void ndt_gui()
         double mui = 0.0;
         // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
         // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
-        ndt.optimize(point_clouds_container.point_clouds, false);
+        ndt.optimize(session.point_clouds_container.point_clouds, false);
     }
 
     if (ImGui::Button("compute mean mahalanobis distance"))
@@ -1364,7 +1372,7 @@ void ndt_gui()
         double mui = 0.0;
         // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
         // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
-        ndt.optimize(point_clouds_container.point_clouds, true);
+        ndt.optimize(session.point_clouds_container.point_clouds, true);
     }
 
     ImGui::Text("--------------------------------------------------------------------------------------------------------");
@@ -1372,12 +1380,12 @@ void ndt_gui()
     if (ImGui::Button("ndt_optimization(Lie-algebra left Jacobian)"))
     {
         // icp.optimize_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
-        ndt.optimize_lie_algebra_left_jacobian(point_clouds_container.point_clouds);
+        ndt.optimize_lie_algebra_left_jacobian(session.point_clouds_container.point_clouds);
     }
     if (ImGui::Button("ndt_optimization(Lie-algebra right Jacobian)"))
     {
         // icp.optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
-        ndt.optimize_lie_algebra_right_jacobian(point_clouds_container.point_clouds);
+        ndt.optimize_lie_algebra_right_jacobian(session.point_clouds_container.point_clouds);
     }
 
     ImGui::Text("--------------------------------------------------------------------------------------------------------");
@@ -1510,24 +1518,24 @@ void icp_gui()
     }
     if (ImGui::Button("optimization_point_to_point_source_to_target"))
     {
-        icp.optimization_point_to_point_source_to_target(point_clouds_container);
+        icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     }
     ImGui::Text("--------------------------------------------------------------------------------------------------------");
 
     if (ImGui::Button("icp_optimization_source_to_target(Lie-algebra left Jacobian)"))
     {
-        icp.optimize_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
+        icp.optimize_source_to_target_lie_algebra_left_jacobian(session.point_clouds_container);
     }
     if (ImGui::Button("icp_optimization_source_to_target(Lie-algebra right Jacobian)"))
     {
-        icp.optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
+        icp.optimize_source_to_target_lie_algebra_right_jacobian(session.point_clouds_container);
     }
     ImGui::Text("--------------------------------------------------------------------------------------------------------");
 
     if (ImGui::Button("compute rms(optimization_point_to_point_source_to_target)"))
     {
         double rms = 0.0;
-        icp.optimization_point_to_point_source_to_target_compute_rms(point_clouds_container, rms);
+        icp.optimization_point_to_point_source_to_target_compute_rms(session.point_clouds_container, rms);
         std::cout << "rms(optimization_point_to_point_source_to_target): " << rms << std::endl;
     }
 
@@ -1608,31 +1616,31 @@ void registration_plane_feature_gui()
     ImGui::Text("--------------------------------------------------------------------------------------------");
     if (ImGui::Button("optimize_point_to_projection_onto_plane_source_to_target"))
     {
-        registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+        registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     }
     // ImGui::Text("--------------------------------------------------------------------------------------------------------");
     if (ImGui::Button("optimize_point_to_projection_onto_plane_source_to_target(Lie-algebra left Jacobian)"))
     {
-        registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
+        registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(session.point_clouds_container);
     }
     if (ImGui::Button("optimize_point_to_projection_onto_plane_source_to_target(Lie-algebra right Jacobian)"))
     {
-        registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
+        registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(session.point_clouds_container);
     }
 
     ImGui::Text("--------------------------------------------------------------------------------------------");
 
     if (ImGui::Button("optimize_point_to_plane_source_to_target (using dot product)"))
     {
-        registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+        registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     }
     if (ImGui::Button("optimize_distance_point_to_plane_source_to_target"))
     {
-        registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+        registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     }
     if (ImGui::Button("optimize_plane_to_plane_source_to_target"))
     {
-        registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+        registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     }
 
     ImGui::End();
@@ -1835,7 +1843,7 @@ void pose_graph_slam_gui()
         // double rms_initial = 0.0;
         // double rms_final = 0.0;
         // double mui = 0.0;
-        pose_graph_slam.optimize(point_clouds_container);
+        pose_graph_slam.optimize(session.point_clouds_container);
         // pose_graph_slam.optimize(point_clouds_container, rms_initial, rms_final, mui);
         // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
     }
@@ -1849,7 +1857,7 @@ void pose_graph_slam_gui()
         double rms_initial = 0.0;
         double rms_final = 0.0;
         double mui = 0.0;
-        pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
+        pose_graph_slam.optimize_with_GTSAM(session.point_clouds_container);
         // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
     }
 #endif
@@ -1859,7 +1867,7 @@ void pose_graph_slam_gui()
 #if WITH_MANIF
     if (ImGui::Button("optimize with manif (A small header-only library for Lie theory)"))
     {
-        pose_graph_slam.optimize_with_manif(point_clouds_container);
+        pose_graph_slam.optimize_with_manif(session.point_clouds_container);
         std::cout << "optimize with manif (A small header-only library for Lie theory) DONE" << std::endl;
     }
 #endif
@@ -1915,9 +1923,9 @@ void export_result_to_folder(std::string output_folder_name)
         outfile_initial << "x;y;z;pc_index;is_initial;index_intersection;file" << std::endl;
         outfile_result << "x;y;z;pc_index;is_initial;index_intersection;file" << std::endl;
 
-        for (int pc_index = 0; pc_index < point_clouds_container.point_clouds.size(); pc_index++)
+        for (int pc_index = 0; pc_index < session.point_clouds_container.point_clouds.size(); pc_index++)
         {
-            const auto &pc = point_clouds_container.point_clouds[pc_index];
+            const auto &pc = session.point_clouds_container.point_clouds[pc_index];
             for (const auto &p : pc.points_local)
             {
                 Eigen::Vector3d vpi = pc.m_initial_pose * p;
@@ -1963,13 +1971,13 @@ void export_result_to_folder(std::string output_folder_name)
                 if (key1 != key2)
                 {
                     Eigen::Vector3d p1, p2;
-                    p1 = point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-                    p2 = point_clouds_container.point_clouds[key2].m_initial_pose * value2;
+                    p1 = session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
+                    p2 = session.point_clouds_container.point_clouds[key2].m_initial_pose * value2;
                     rms_initial += (p2.x() - p1.x()) * (p2.x() - p1.x());
                     rms_initial += (p2.y() - p1.y()) * (p2.y() - p1.y());
 
-                    p1 = point_clouds_container.point_clouds[key1].m_pose * value1;
-                    p2 = point_clouds_container.point_clouds[key2].m_pose * value2;
+                    p1 = session.point_clouds_container.point_clouds[key1].m_pose * value1;
+                    p2 = session.point_clouds_container.point_clouds[key2].m_pose * value2;
                     rms_result += (p2.x() - p1.x()) * (p2.x() - p1.x());
                     rms_result += (p2.y() - p1.y()) * (p2.y() - p1.y());
 
@@ -1991,7 +1999,7 @@ void export_result_to_folder(std::string output_folder_name)
     auto path_poses = path;
     path_poses /= file_name_poses;
     std::cout << "saving poses to: " << path_poses << std::endl;
-    point_clouds_container.save_poses(path_poses.string());
+    session.point_clouds_container.save_poses(path_poses.string());
 }
 
 void export_result_to_folder(std::string output_folder_name, int method_id)
@@ -2027,9 +2035,9 @@ void observation_picking_gui()
         if (ImGui::Button("accept_current_observation"))
         {
             std::vector<Eigen::Affine3d> m_poses;
-            for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
             {
-                m_poses.push_back(point_clouds_container.point_clouds[i].m_pose);
+                m_poses.push_back(session.point_clouds_container.point_clouds[i].m_pose);
             }
             observation_picking.accept_current_observation(m_poses);
         }
@@ -2076,14 +2084,14 @@ void observation_picking_gui()
             {
                 for (const auto &[key, value] : obs)
                 {
-                    if (point_clouds_container.show_with_initial_pose)
+                    if (session.point_clouds_container.show_with_initial_pose)
                     {
-                        auto p = point_clouds_container.point_clouds[key].m_initial_pose * value;
+                        auto p = session.point_clouds_container.point_clouds[key].m_initial_pose * value;
                         observation_picking.add_intersection(p);
                     }
                     else
                     {
-                        auto p = point_clouds_container.point_clouds[key].m_pose * value;
+                        auto p = session.point_clouds_container.point_clouds[key].m_pose * value;
                         observation_picking.add_intersection(p);
                     }
                     break;
@@ -2282,7 +2290,7 @@ void display()
 
     if (manual_pose_graph_loop_closure_mode)
     {
-        manual_pose_graph_loop_closure.Render(point_clouds_container, index_loop_closure_source, index_loop_closure_target);
+        session.manual_pose_graph_loop_closure.Render(session.point_clouds_container, index_loop_closure_source, index_loop_closure_target);
     }
     else
     {
@@ -2290,7 +2298,7 @@ void display()
         {
             glBegin(GL_LINES);
             glColor3f(1.0f, 0.0f, 0.0f);
-            auto c = g.coordinates - point_clouds_container.offset;
+            auto c = g.coordinates - session.point_clouds_container.offset;
             glVertex3f(c.x() - 0.5, c.y(), c.z());
             glVertex3f(c.x() + 0.5, c.y(), c.z());
 
@@ -2303,7 +2311,7 @@ void display()
         }
 
         //
-        for (const auto &pc : point_clouds_container.point_clouds)
+        for (const auto &pc : session.point_clouds_container.point_clouds)
         {
             for (const auto &gp : pc.available_geo_points)
             {
@@ -2341,7 +2349,7 @@ void display()
         }
     }
 
-    gnss.render(point_clouds_container);
+    gnss.render(session.point_clouds_container);
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
@@ -2365,14 +2373,14 @@ void display()
 
     if (!manual_pose_graph_loop_closure_mode)
     {
-        for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
         {
-            if (point_clouds_container.point_clouds[i].gizmo)
+            if (session.point_clouds_container.point_clouds[i].gizmo)
             {
                 std::vector<Eigen::Affine3d> all_m_poses;
-                for (int j = 0; j < point_clouds_container.point_clouds.size(); j++)
+                for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
                 {
-                    all_m_poses.push_back(point_clouds_container.point_clouds[j].m_pose);
+                    all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
                 }
 
                 ImGuiIO &io = ImGui::GetIO();
@@ -2396,56 +2404,56 @@ void display()
                     ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
                 }
 
-                point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
-                point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1];
-                point_clouds_container.point_clouds[i].m_pose(2, 0) = m_gizmo[2];
-                point_clouds_container.point_clouds[i].m_pose(3, 0) = m_gizmo[3];
-                point_clouds_container.point_clouds[i].m_pose(0, 1) = m_gizmo[4];
-                point_clouds_container.point_clouds[i].m_pose(1, 1) = m_gizmo[5];
-                point_clouds_container.point_clouds[i].m_pose(2, 1) = m_gizmo[6];
-                point_clouds_container.point_clouds[i].m_pose(3, 1) = m_gizmo[7];
-                point_clouds_container.point_clouds[i].m_pose(0, 2) = m_gizmo[8];
-                point_clouds_container.point_clouds[i].m_pose(1, 2) = m_gizmo[9];
-                point_clouds_container.point_clouds[i].m_pose(2, 2) = m_gizmo[10];
-                point_clouds_container.point_clouds[i].m_pose(3, 2) = m_gizmo[11];
-                point_clouds_container.point_clouds[i].m_pose(0, 3) = m_gizmo[12];
-                point_clouds_container.point_clouds[i].m_pose(1, 3) = m_gizmo[13];
-                point_clouds_container.point_clouds[i].m_pose(2, 3) = m_gizmo[14];
-                point_clouds_container.point_clouds[i].m_pose(3, 3) = m_gizmo[15];
-                point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+                session.point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
+                session.point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1];
+                session.point_clouds_container.point_clouds[i].m_pose(2, 0) = m_gizmo[2];
+                session.point_clouds_container.point_clouds[i].m_pose(3, 0) = m_gizmo[3];
+                session.point_clouds_container.point_clouds[i].m_pose(0, 1) = m_gizmo[4];
+                session.point_clouds_container.point_clouds[i].m_pose(1, 1) = m_gizmo[5];
+                session.point_clouds_container.point_clouds[i].m_pose(2, 1) = m_gizmo[6];
+                session.point_clouds_container.point_clouds[i].m_pose(3, 1) = m_gizmo[7];
+                session.point_clouds_container.point_clouds[i].m_pose(0, 2) = m_gizmo[8];
+                session.point_clouds_container.point_clouds[i].m_pose(1, 2) = m_gizmo[9];
+                session.point_clouds_container.point_clouds[i].m_pose(2, 2) = m_gizmo[10];
+                session.point_clouds_container.point_clouds[i].m_pose(3, 2) = m_gizmo[11];
+                session.point_clouds_container.point_clouds[i].m_pose(0, 3) = m_gizmo[12];
+                session.point_clouds_container.point_clouds[i].m_pose(1, 3) = m_gizmo[13];
+                session.point_clouds_container.point_clouds[i].m_pose(2, 3) = m_gizmo[14];
+                session.point_clouds_container.point_clouds[i].m_pose(3, 3) = m_gizmo[15];
+                session.point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
 
-                point_clouds_container.point_clouds[i].gui_translation[0] = (float)point_clouds_container.point_clouds[i].pose.px;
-                point_clouds_container.point_clouds[i].gui_translation[1] = (float)point_clouds_container.point_clouds[i].pose.py;
-                point_clouds_container.point_clouds[i].gui_translation[2] = (float)point_clouds_container.point_clouds[i].pose.pz;
+                session.point_clouds_container.point_clouds[i].gui_translation[0] = (float)session.point_clouds_container.point_clouds[i].pose.px;
+                session.point_clouds_container.point_clouds[i].gui_translation[1] = (float)session.point_clouds_container.point_clouds[i].pose.py;
+                session.point_clouds_container.point_clouds[i].gui_translation[2] = (float)session.point_clouds_container.point_clouds[i].pose.pz;
 
-                point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(point_clouds_container.point_clouds[i].pose.om * 180.0 / M_PI);
-                point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(point_clouds_container.point_clouds[i].pose.fi * 180.0 / M_PI);
-                point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(point_clouds_container.point_clouds[i].pose.ka * 180.0 / M_PI);
+                session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[i].pose.om * 180.0 / M_PI);
+                session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[i].pose.fi * 180.0 / M_PI);
+                session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[i].pose.ka * 180.0 / M_PI);
 
                 ImGui::End();
 
                 if (!manipulate_only_marked_gizmo)
                 {
-                    Eigen::Affine3d curr_m_pose = point_clouds_container.point_clouds[i].m_pose;
-                    for (int j = i + 1; j < point_clouds_container.point_clouds.size(); j++)
+                    Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[i].m_pose;
+                    for (int j = i + 1; j < session.point_clouds_container.point_clouds.size(); j++)
                     {
                         curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                        point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                        point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[j].m_pose);
+                        session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
+                        session.point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
 
-                        point_clouds_container.point_clouds[j].gui_translation[0] = (float)point_clouds_container.point_clouds[j].pose.px;
-                        point_clouds_container.point_clouds[j].gui_translation[1] = (float)point_clouds_container.point_clouds[j].pose.py;
-                        point_clouds_container.point_clouds[j].gui_translation[2] = (float)point_clouds_container.point_clouds[j].pose.pz;
+                        session.point_clouds_container.point_clouds[j].gui_translation[0] = (float)session.point_clouds_container.point_clouds[j].pose.px;
+                        session.point_clouds_container.point_clouds[j].gui_translation[1] = (float)session.point_clouds_container.point_clouds[j].pose.py;
+                        session.point_clouds_container.point_clouds[j].gui_translation[2] = (float)session.point_clouds_container.point_clouds[j].pose.pz;
 
-                        point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
-                        point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
-                        point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
                     }
                 }
             }
         }
 
-        point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
+        session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
         observation_picking.render();
 
         glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -2459,15 +2467,15 @@ void display()
                     if (key1 != key2)
                     {
                         Eigen::Vector3d p1, p2;
-                        if (point_clouds_container.show_with_initial_pose)
+                        if (session.point_clouds_container.show_with_initial_pose)
                         {
-                            p1 = point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-                            p2 = point_clouds_container.point_clouds[key2].m_initial_pose * value2;
+                            p1 = session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
+                            p2 = session.point_clouds_container.point_clouds[key2].m_initial_pose * value2;
                         }
                         else
                         {
-                            p1 = point_clouds_container.point_clouds[key1].m_pose * value1;
-                            p2 = point_clouds_container.point_clouds[key2].m_pose * value2;
+                            p1 = session.point_clouds_container.point_clouds[key1].m_pose * value1;
+                            p2 = session.point_clouds_container.point_clouds[key2].m_pose * value2;
                         }
                         glColor3f(0, 1, 0);
                         glBegin(GL_POINTS);
@@ -2491,7 +2499,7 @@ void display()
             int counter = 0;
             for (const auto &[key1, value1] : obs)
             {
-                mean += point_clouds_container.point_clouds[key1].m_initial_pose * value1;
+                mean += session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
                 counter++;
             }
             if (counter > 0)
@@ -2520,7 +2528,7 @@ void display()
     else
     {
         // ImGuizmo -----------------------------------------------
-        if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size() > 0)
+        if (session.manual_pose_graph_loop_closure.gizmo && session.manual_pose_graph_loop_closure.edges.size() > 0)
         {
             ImGuizmo::BeginFrame();
             ImGuizmo::Enable(true);
@@ -2560,10 +2568,10 @@ void display()
             m_g(2, 3) = m_gizmo[14];
             m_g(3, 3) = m_gizmo[15];
 
-            const int &index_src = manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].index_from;
+            const int &index_src = session.manual_pose_graph_loop_closure.edges[session.manual_pose_graph_loop_closure.index_active_edge].index_from;
 
-            const Eigen::Affine3d &m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
-            manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
+            const Eigen::Affine3d &m_src = session.point_clouds_container.point_clouds.at(index_src).m_pose;
+            session.manual_pose_graph_loop_closure.edges[session.manual_pose_graph_loop_closure.index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
 
             ImGui::End();
         }
@@ -2658,9 +2666,9 @@ void mouse(int glut_button, int state, int x, int y)
                 Eigen::Vector3d p = GLWidgetGetOGLPos(x, y, observation_picking);
                 int number_active_pcs = 0;
                 int index_picked = -1;
-                for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+                for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
                 {
-                    if (point_clouds_container.point_clouds[i].visible)
+                    if (session.point_clouds_container.point_clouds[i].visible)
                     {
                         number_active_pcs++;
                         index_picked = i;
@@ -2861,16 +2869,16 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observ
 
 void reset_poses()
 {
-    for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+    for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
     {
-        point_clouds_container.point_clouds[i].m_pose = point_clouds_container.point_clouds[i].m_initial_pose;
-        point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
-        point_clouds_container.point_clouds[i].gui_translation[0] = (float)point_clouds_container.point_clouds[i].pose.px;
-        point_clouds_container.point_clouds[i].gui_translation[1] = (float)point_clouds_container.point_clouds[i].pose.py;
-        point_clouds_container.point_clouds[i].gui_translation[2] = (float)point_clouds_container.point_clouds[i].pose.pz;
-        point_clouds_container.point_clouds[i].gui_rotation[0] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.om);
-        point_clouds_container.point_clouds[i].gui_rotation[1] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.fi);
-        point_clouds_container.point_clouds[i].gui_rotation[2] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.ka);
+        session.point_clouds_container.point_clouds[i].m_pose = session.point_clouds_container.point_clouds[i].m_initial_pose;
+        session.point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
+        session.point_clouds_container.point_clouds[i].gui_translation[0] = (float)session.point_clouds_container.point_clouds[i].pose.px;
+        session.point_clouds_container.point_clouds[i].gui_translation[1] = (float)session.point_clouds_container.point_clouds[i].pose.py;
+        session.point_clouds_container.point_clouds[i].gui_translation[2] = (float)session.point_clouds_container.point_clouds[i].pose.pz;
+        session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)rad2deg(session.point_clouds_container.point_clouds[i].pose.om);
+        session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)rad2deg(session.point_clouds_container.point_clouds[i].pose.fi);
+        session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)rad2deg(session.point_clouds_container.point_clouds[i].pose.ka);
     }
 }
 
@@ -2889,13 +2897,13 @@ double compute_rms(bool initial)
                     Eigen::Vector3d p1, p2;
                     if (initial)
                     {
-                        p1 = point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-                        p2 = point_clouds_container.point_clouds[key2].m_initial_pose * value2;
+                        p1 = session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
+                        p2 = session.point_clouds_container.point_clouds[key2].m_initial_pose * value2;
                     }
                     else
                     {
-                        p1 = point_clouds_container.point_clouds[key1].m_pose * value1;
-                        p2 = point_clouds_container.point_clouds[key2].m_pose * value2;
+                        p1 = session.point_clouds_container.point_clouds[key1].m_pose * value1;
+                        p2 = session.point_clouds_container.point_clouds[key2].m_pose * value2;
                     }
                     rms += (p2.x() - p1.x()) * (p2.x() - p1.x());
                     sum++;
@@ -2951,8 +2959,8 @@ void perform_experiment_on_linux()
     path_result /= "results_linux";
     create_directory(path_result);
 
-    point_clouds_container.show_with_initial_pose = false;
-    auto temp_data = point_clouds_container;
+    session.point_clouds_container.show_with_initial_pose = false;
+    auto temp_data = session.point_clouds_container;
     // reset_poses();
     float rms = 0.0f;
     std::string result_file = working_directory + "/result_linux.csv";
@@ -2986,7 +2994,7 @@ void perform_experiment_on_linux()
     pose_graph_slam.is_quaternion = false;
     pose_graph_slam.is_rodrigues = true;
 
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     // pose_graph_slam.is_ndt = true;
     // pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
@@ -3004,7 +3012,7 @@ void perform_experiment_on_linux()
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
     auto start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     auto end = std::chrono::system_clock::now();
     auto elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -3013,7 +3021,7 @@ void perform_experiment_on_linux()
     id_method = 94;
     append_to_result_file(result_file, "pose_graph_slam (pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--95--
     pose_graph_slam.set_all_to_false();
@@ -3021,7 +3029,7 @@ void perform_experiment_on_linux()
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -3030,7 +3038,7 @@ void perform_experiment_on_linux()
     id_method = 95;
     append_to_result_file(result_file, "pose_graph_slam (pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 #endif
 
 #if WITH_GTSAM
@@ -3047,14 +3055,14 @@ void perform_experiment_on_linux()
         pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
         start = std::chrono::system_clock::now();
-        pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
+        pose_graph_slam.optimize_with_GTSAM(session.point_clouds_container);
         end = std::chrono::system_clock::now();
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         rms = compute_rms(false);
         id_method = 96;
         append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
         export_result_to_folder(path_result.string(), id_method);
-        point_clouds_container = temp_data;
+        session.point_clouds_container = temp_data;
     }
     catch (std::exception &e)
     {
@@ -3062,7 +3070,7 @@ void perform_experiment_on_linux()
         rms = compute_rms(false);
         append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
         export_result_to_folder(path_result.string(), id_method);
-        point_clouds_container = temp_data;
+        session.point_clouds_container = temp_data;
     }
     //--97--
     try
@@ -3073,7 +3081,7 @@ void perform_experiment_on_linux()
         pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
         start = std::chrono::system_clock::now();
-        pose_graph_slam.optimize_with_GTSAM(point_clouds_container);
+        pose_graph_slam.optimize_with_GTSAM(session.point_clouds_container);
         end = std::chrono::system_clock::now();
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
@@ -3081,7 +3089,7 @@ void perform_experiment_on_linux()
         id_method = 97;
         append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
         export_result_to_folder(path_result.string(), id_method);
-        point_clouds_container = temp_data;
+        session.point_clouds_container = temp_data;
     }
     catch (std::exception &e)
     {
@@ -3089,7 +3097,7 @@ void perform_experiment_on_linux()
         rms = compute_rms(false);
         append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
         export_result_to_folder(path_result.string(), id_method);
-        point_clouds_container = temp_data;
+        session.point_clouds_container = temp_data;
     }
 #endif
 #if WITH_MANIF
@@ -3100,7 +3108,7 @@ void perform_experiment_on_linux()
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
     auto start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize_with_manif(point_clouds_container);
+    pose_graph_slam.optimize_with_manif(session.point_clouds_container);
     auto end = std::chrono::system_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
@@ -3108,7 +3116,7 @@ void perform_experiment_on_linux()
     id_method = 98;
     append_to_result_file(result_file, "pose_graph_slam (manif pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--99--
     pose_graph_slam.set_all_to_false();
@@ -3117,7 +3125,7 @@ void perform_experiment_on_linux()
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize_with_manif(point_clouds_container);
+    pose_graph_slam.optimize_with_manif(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
@@ -3125,14 +3133,14 @@ void perform_experiment_on_linux()
     id_method = 99;
     append_to_result_file(result_file, "pose_graph_slam (manif pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 #endif
 }
 
 void perform_experiment_on_windows()
 {
-    point_clouds_container.show_with_initial_pose = false;
-    auto temp_data = point_clouds_container;
+    session.point_clouds_container.show_with_initial_pose = false;
+    auto temp_data = session.point_clouds_container;
     reset_poses();
     double rms = 0.0f;
     std::string result_file = working_directory + "/result_win.csv";
@@ -3178,7 +3186,7 @@ void perform_experiment_on_windows()
     icp.is_lie_algebra_right_jacobian = false;
 
     auto start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     auto end = std::chrono::system_clock::now();
     auto elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -3187,7 +3195,7 @@ void perform_experiment_on_windows()
 
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     id_method++;
 
     //--1--
@@ -3196,7 +3204,7 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3204,7 +3212,7 @@ void perform_experiment_on_windows()
 
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     // id_method++;
     //--2--
     icp.is_tait_bryan_angles = false;
@@ -3212,14 +3220,14 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 2;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--3--
     icp.is_wc = false;
@@ -3230,14 +3238,14 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 3;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--4--
     icp.is_tait_bryan_angles = false;
@@ -3245,14 +3253,14 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 4;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--5--
     icp.is_tait_bryan_angles = false;
@@ -3260,14 +3268,14 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 5;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--6--
     icp.is_gauss_newton = false;
@@ -3283,14 +3291,14 @@ void perform_experiment_on_windows()
     icp.is_lie_algebra_right_jacobian = false;
 
     start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 6;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--7--
     icp.is_tait_bryan_angles = false;
@@ -3298,14 +3306,14 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 7;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--8--
     icp.is_tait_bryan_angles = false;
@@ -3313,14 +3321,14 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 8;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--9--
     icp.is_wc = false;
@@ -3331,14 +3339,14 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 9;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--10--
     icp.is_wc = false;
@@ -3349,14 +3357,14 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 10;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--11--
     icp.is_wc = false;
@@ -3367,14 +3375,14 @@ void perform_experiment_on_windows()
     icp.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    icp.optimization_point_to_point_source_to_target(point_clouds_container);
+    icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 11;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--12--
     icp.is_gauss_newton = true;
@@ -3391,27 +3399,27 @@ void perform_experiment_on_windows()
     icp.is_lie_algebra_right_jacobian = false;
 
     start = std::chrono::system_clock::now();
-    icp.optimize_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
+    icp.optimize_source_to_target_lie_algebra_left_jacobian(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 12;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--13--
     icp.is_lie_algebra_left_jacobian = false;
     icp.is_lie_algebra_right_jacobian = true;
     start = std::chrono::system_clock::now();
-    icp.optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
+    icp.optimize_source_to_target_lie_algebra_right_jacobian(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 13;
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //---NDT---
     //--14--
@@ -3436,7 +3444,7 @@ void perform_experiment_on_windows()
     ndt.is_lie_algebra_right_jacobian = false;
 
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3445,28 +3453,28 @@ void perform_experiment_on_windows()
     id_method = 14;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--15--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
 
     id_method = 15;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--16--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3474,7 +3482,7 @@ void perform_experiment_on_windows()
     id_method = 16;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--17--
     ndt.is_wc = false;
@@ -3484,21 +3492,21 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 17;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--18--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3506,14 +3514,14 @@ void perform_experiment_on_windows()
     id_method = 18;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--19--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3521,7 +3529,7 @@ void perform_experiment_on_windows()
     id_method = 19;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--20--
     ndt.is_gauss_newton = false;
@@ -3534,7 +3542,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3542,14 +3550,14 @@ void perform_experiment_on_windows()
     id_method = 20;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--21--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3557,14 +3565,14 @@ void perform_experiment_on_windows()
     id_method = 21;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--22--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3572,7 +3580,7 @@ void perform_experiment_on_windows()
     id_method = 22;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--23--
     ndt.is_wc = false;
@@ -3582,7 +3590,7 @@ void perform_experiment_on_windows()
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3590,14 +3598,14 @@ void perform_experiment_on_windows()
     id_method = 23;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--24--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3606,14 +3614,14 @@ void perform_experiment_on_windows()
 
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--25--
     ndt.is_tait_bryan_angles = false;
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3622,7 +3630,7 @@ void perform_experiment_on_windows()
 
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--26--
     ndt.is_gauss_newton = true;
@@ -3638,7 +3646,7 @@ void perform_experiment_on_windows()
     ndt.is_lie_algebra_left_jacobian = true;
     ndt.is_lie_algebra_right_jacobian = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3649,14 +3657,14 @@ void perform_experiment_on_windows()
 
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--27--
     ndt.is_gauss_newton = false;
     ndt.is_levenberg_marguardt = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3665,7 +3673,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = true;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--28--
     ndt.is_lie_algebra_left_jacobian = false;
@@ -3675,7 +3683,7 @@ void perform_experiment_on_windows()
     ndt.is_gauss_newton = true;
     ndt.is_levenberg_marguardt = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3684,14 +3692,14 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = true;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--29--
     ndt.is_gauss_newton = false;
     ndt.is_levenberg_marguardt = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -3700,7 +3708,7 @@ void perform_experiment_on_windows()
     ndt.is_rodrigues = true;
     append_to_result_file(result_file, "normal_distributions_transform", ndt, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //----------------------------------------------------------------------------
 
@@ -3722,14 +3730,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 30;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--31--
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -3737,14 +3745,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 31;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--32--
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -3752,14 +3760,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 32;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--33--
     registration_plane_feature.is_wc = false;
@@ -3770,14 +3778,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 33;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--34--
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -3785,14 +3793,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 34;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--35--
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -3800,14 +3808,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 35;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //------------------------------------------------------
     //--36--
@@ -3822,14 +3830,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 36;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--37--
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -3837,14 +3845,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 37;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--38--
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -3852,14 +3860,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 38;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--39--
     registration_plane_feature.is_wc = false;
@@ -3870,14 +3878,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 39;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--40--
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -3885,14 +3893,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 40;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--41--
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -3900,14 +3908,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 41;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--42-- Lie
     registration_plane_feature.is_gauss_newton = true;
@@ -3924,28 +3932,28 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_lie_algebra_right_jacobian = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 42;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--43--
     registration_plane_feature.is_gauss_newton = false;
     registration_plane_feature.is_levenberg_marguardt = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 43;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--44--
     registration_plane_feature.is_gauss_newton = true;
@@ -3954,28 +3962,28 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_lie_algebra_right_jacobian = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 44;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--45--
     registration_plane_feature.is_gauss_newton = false;
     registration_plane_feature.is_levenberg_marguardt = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 45;
     append_to_result_file(result_file, "point_to_projection_onto_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--46--using dot product
     registration_plane_feature.is_lie_algebra_left_jacobian = false;
@@ -3992,14 +4000,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 46;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--47
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4007,14 +4015,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 47;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--48
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4022,14 +4030,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 48;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--49
     registration_plane_feature.is_wc = false;
@@ -4040,14 +4048,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 49;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--50
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4055,14 +4063,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 50;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--51
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4070,14 +4078,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 51;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--52
     registration_plane_feature.is_gauss_newton = false;
@@ -4091,14 +4099,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 52;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--53
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4106,14 +4114,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 53;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--54
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4121,14 +4129,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 54;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--55
     registration_plane_feature.is_wc = false;
@@ -4139,14 +4147,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 55;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--56
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4154,14 +4162,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 56;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--57
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4169,14 +4177,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 57;
     append_to_result_file(result_file, "point_to_plane_using_dot_product", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--58 optimize_distance_point_to_plane_source_to_target
     registration_plane_feature.is_gauss_newton = true;
@@ -4190,14 +4198,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 58;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--59
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4205,14 +4213,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 59;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--60
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4220,14 +4228,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 60;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--61
     registration_plane_feature.is_wc = false;
@@ -4238,14 +4246,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 61;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--62
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4253,14 +4261,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 62;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--63
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4268,14 +4276,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 63;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--64
     registration_plane_feature.is_gauss_newton = false;
@@ -4289,14 +4297,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 64;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--65
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4304,14 +4312,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 65;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--66
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4319,14 +4327,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 66;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--67
     registration_plane_feature.is_wc = false;
@@ -4337,14 +4345,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 67;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--68
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4352,14 +4360,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 68;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--69
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4367,14 +4375,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 69;
     append_to_result_file(result_file, "distance_point_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--70 optimize_plane_to_plane_source_to_target
     registration_plane_feature.is_adaptive_robust_kernel = true;
@@ -4390,14 +4398,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 70;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--71
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4405,14 +4413,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 71;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--72
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4420,14 +4428,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 72;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--73
     registration_plane_feature.is_wc = false;
@@ -4438,14 +4446,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 73;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--74
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4453,14 +4461,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 74;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--75
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4468,14 +4476,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 75;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--76
     registration_plane_feature.is_gauss_newton = false;
@@ -4489,14 +4497,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 76;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--77
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4504,14 +4512,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 77;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--78
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4519,14 +4527,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 78;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--79
     registration_plane_feature.is_wc = false;
@@ -4537,14 +4545,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 79;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--80
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4552,14 +4560,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 80;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--81
     registration_plane_feature.is_tait_bryan_angles = false;
@@ -4567,14 +4575,14 @@ void perform_experiment_on_windows()
     registration_plane_feature.is_rodrigues = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_plane_to_plane_source_to_target(point_clouds_container);
+    registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 81;
     append_to_result_file(result_file, "plane_to_plane", registration_plane_feature, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     // pose graph slam
     //--82--
@@ -4596,7 +4604,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_quaternion = false;
     pose_graph_slam.is_rodrigues = false;
 
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     pose_graph_slam.set_all_to_false();
     pose_graph_slam.is_ndt = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
@@ -4604,7 +4612,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.ndt_bucket_size[1] = ndt.bucket_size[1];
     pose_graph_slam.ndt_bucket_size[2] = ndt.bucket_size[2];
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -4613,27 +4621,27 @@ void perform_experiment_on_windows()
     export_result_to_folder(path_result.string(), id_method);
 
     //--83
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     pose_graph_slam.set_all_to_false();
     pose_graph_slam.is_optimization_point_to_point_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 83;
     append_to_result_file(result_file, "pose_graph_slam (point_to_point)", pose_graph_slam, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--84
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     pose_graph_slam.set_all_to_false();
     pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -4642,12 +4650,12 @@ void perform_experiment_on_windows()
     export_result_to_folder(path_result.string(), id_method);
 
     //--85
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     pose_graph_slam.set_all_to_false();
     pose_graph_slam.is_optimize_point_to_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -4656,19 +4664,19 @@ void perform_experiment_on_windows()
     export_result_to_folder(path_result.string(), id_method);
 
     //--86
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     pose_graph_slam.set_all_to_false();
     pose_graph_slam.is_optimize_distance_point_to_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
     id_method = 86;
     append_to_result_file(result_file, "pose_graph_slam (distance_point_to_plane)", pose_graph_slam, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
 
     //--87
     pose_graph_slam.is_adaptive_robust_kernel = true;
@@ -4677,7 +4685,7 @@ void perform_experiment_on_windows()
     pose_graph_slam.is_optimize_plane_to_plane_source_to_target = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -4687,13 +4695,13 @@ void perform_experiment_on_windows()
 
     //--88
     pose_graph_slam.set_all_to_false();
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     pose_graph_slam.is_adaptive_robust_kernel = false;
     pose_graph_slam.is_ndt_lie_algebra_left_jacobian = true;
     pose_graph_slam.is_lie_algebra_left_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -4703,12 +4711,12 @@ void perform_experiment_on_windows()
 
     //--89
     pose_graph_slam.set_all_to_false();
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     pose_graph_slam.is_ndt_lie_algebra_right_jacobian = true;
     pose_graph_slam.is_lie_algebra_right_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -4718,12 +4726,12 @@ void perform_experiment_on_windows()
 
     //--90
     pose_graph_slam.set_all_to_false();
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_left_jacobian = true;
     pose_graph_slam.is_lie_algebra_left_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -4733,12 +4741,12 @@ void perform_experiment_on_windows()
 
     //--91
     pose_graph_slam.set_all_to_false();
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_right_jacobian = true;
     pose_graph_slam.is_lie_algebra_right_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -4748,12 +4756,12 @@ void perform_experiment_on_windows()
 
     //--92
     pose_graph_slam.set_all_to_false();
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian = true;
     pose_graph_slam.is_lie_algebra_left_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -4763,12 +4771,12 @@ void perform_experiment_on_windows()
 
     //--93
     pose_graph_slam.set_all_to_false();
-    point_clouds_container = temp_data;
+    session.point_clouds_container = temp_data;
     pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian = true;
     pose_graph_slam.is_lie_algebra_right_jacobian = true;
     pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
     start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize(point_clouds_container);
+    pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false);
@@ -4924,4 +4932,3 @@ bool exportLaz(const std::string &filename,
     std::cout << "exportLaz DONE" << std::endl;
     return true;
 }
-

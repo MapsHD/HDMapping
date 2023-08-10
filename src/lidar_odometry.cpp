@@ -942,6 +942,10 @@ void lidar_odometry_gui()
 
                     for (int iter = 0; iter < nr_iter; iter++)
                     {
+                        if (worker_data[i].intermediate_points.empty())
+                        {
+                            continue;
+                        }
                         optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
                                  in_out_params, buckets, useMultithread, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch);
                     }
@@ -2233,22 +2237,13 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         int ic_1 = odo_edges[i].first * 6;
         int ic_2 = odo_edges[i].second * 6;
 
-        for (int row = 0; row < 6; row++)
-        {
-            for (int col = 0; col < 6; col++)
-            {
-                AtPAndt(ic_1 + row, ic_1 + col) += AtPAodo(row, col);
-                AtPAndt(ic_1 + row, ic_2 + col) += AtPAodo(row, col + 6);
-                AtPAndt(ic_2 + row, ic_1 + col) += AtPAodo(row + 6, col);
-                AtPAndt(ic_2 + row, ic_2 + col) += AtPAodo(row + 6, col + 6);
-            }
-        }
+        AtPAndt.block<6, 6>(ic_1, ic_1) += AtPAodo.topLeftCorner<6, 6>();
+        AtPAndt.block<6, 6>(ic_1, ic_2) += AtPAodo.topRightCorner<6, 6>();
+        AtPAndt.block<6, 6>(ic_2, ic_1) += AtPAodo.bottomLeftCorner<6, 6>();
+        AtPAndt.block<6, 6>(ic_2, ic_2) += AtPAodo.bottomRightCorner<6, 6>();
 
-        for (int row = 0; row < 6; row++)
-        {
-            AtPBndt(ic_1 + row, 0) -= AtPBodo(row, 0);
-            AtPBndt(ic_2 + row, 0) -= AtPBodo(row + 6, 0);
-        }
+        AtPBndt.block<6, 1>(ic_1, 0) -= AtPBodo.block<6, 1>(0,0);
+        AtPBndt.block<6, 1>(ic_2, 0) -= AtPBodo.block<6, 1>(6,0);
     }
 
     // smoothness

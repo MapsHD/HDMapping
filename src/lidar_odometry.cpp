@@ -691,6 +691,8 @@ void lidar_odometry_gui()
                 std::map<double, Eigen::Matrix4d> trajectory;
 
                 int counter = 1;
+                std::ofstream imu_testData (wdp / "imu_test.csv");
+                imu_testData << "ts,gx,gy,gz,y,p,r" << std::endl;
                 for (const auto &[timestamp, gyr, acc] : imu_data)
                 {
                     const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
@@ -714,9 +716,10 @@ void lidar_odometry_gui()
 
                     trajectory[timestamp] = t.matrix();
                     const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+                    imu_testData << timestamp << "," << gyr.axis.x << "," << gyr.axis.y << "," << gyr.axis.z << "," << euler.angle.roll << "," << euler.angle.pitch << "," << euler.angle.yaw << std::endl;
                     printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
                 }
-
+                imu_testData.close();
                 std::cout << "number of points: " << points.size() << std::endl;
                 std::cout << "start transforming points" << std::endl;
 

@@ -48,8 +48,7 @@ NDTBucketMapType buckets;
 NDTBucketMapType reference_buckets;
 bool show_reference_buckets = true;
 
-std::vector<Point3Di>
-    reference_points;
+std::vector<Point3Di> reference_points;
 bool show_reference_points = false;
 int dec_reference_points = 100;
 
@@ -108,6 +107,7 @@ float m_gizmo[] = {1, 0, 0, 0,
                    0, 0, 0, 1};
 Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
 double consecutive_distance = 0.0;
+float x_displacement = 0.01;
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z)
 {
@@ -534,6 +534,7 @@ void lidar_odometry_gui()
 {
     if (ImGui::Begin("lidar_odometry_gui v0.19"))
     {
+        ImGui::SliderFloat("mouse_sensitivity_xy", &mouse_sensitivity, 0.1, 10);
         ImGui::Text(("Working directory: " + working_directory).c_str());
         ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
@@ -869,7 +870,7 @@ void lidar_odometry_gui()
 
                 for (int i = 0; i < worker_data.size(); i++)
                 {
-                    //std::cout << "computing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << std::endl;
+                    // std::cout << "computing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << std::endl;
                     Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
                     if (i > 1 && use_motion_from_previous_step)
                     {
@@ -878,9 +879,9 @@ void lidar_odometry_gui()
 
                         mean_shift /= (worker_data[i].intermediate_trajectory.size());
 
-                        if (mean_shift.norm() > 0.1)
+                        if (mean_shift.norm() > 1.0)
                         {
-                            mean_shift = Eigen::Vector3d(0.1, 0.1, 0.1);
+                            mean_shift = Eigen::Vector3d(1.0, 1.0, 1.0);
                         }
 
                         Eigen::Affine3d m_mean_shift = Eigen::Affine3d::Identity();
@@ -1113,10 +1114,15 @@ void lidar_odometry_gui()
 
                 std::cout << "finished computation at " << std::ctime(&end_time)
                           << "elapsed time: " << elapsed_seconds.count() << "s\n";
-            }
 
-            std::vector<Eigen::Affine3d> intermediate_trajectory;
-            std::vector<Eigen::Affine3d> intermediate_trajectory_motion_model;
+                // estimate total lenght of trajectory
+                double length_of_trajectory = 0;
+                for (int i = 1; i < worker_data.size(); i++)
+                {
+                    length_of_trajectory += (worker_data[i].intermediate_trajectory[0].translation() - worker_data[i - 1].intermediate_trajectory[0].translation()).norm();
+                }
+                std::cout << "length_of_trajectory: " << length_of_trajectory << " [m]" << std::endl;
+            }
         }
         // if (ImGui::Button("fix pitch roll"))
         //{
@@ -1352,13 +1358,58 @@ void lidar_odometry_gui()
             }
             if (current_scan >= worker_data.size())
             {
-                current_scan = worker_data.size();
+                current_scan = worker_data.size() - 1;
             }
             if (current_scan >= 0 && current_scan < worker_data.size())
             {
                 worker_data[current_scan].show = true;
             }
         }
+        /*ImGui::InputFloat("x_displacement", &x_displacement);
+        int num_sel = 0;
+        for (int k = 0; k < worker_data.size(); k++)
+        {
+            if (worker_data[k].show)
+            {
+                num_sel++;
+            }
+        }
+
+        if (num_sel == 1)
+        {
+            ImGui::SameLine();
+            if (ImGui::Button("apply x_displacement for current scan"))
+            {
+                Eigen::Affine3d m_x_displacement = Eigen::Affine3d::Identity();
+                m_x_displacement(0, 3) = x_displacement;
+                Eigen::Affine3d m_last = worker_data[current_scan].intermediate_trajectory[worker_data[current_scan].intermediate_trajectory.size() - 1];
+                auto tmp = worker_data[current_scan].intermediate_trajectory;
+
+                worker_data[current_scan].intermediate_trajectory[0] = m_last;
+                for (int k = 1; k < tmp.size(); k++)
+                {
+                    Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
+                    m_last = m_last * m_update * m_x_displacement;
+                    worker_data[current_scan].intermediate_trajectory[k] = m_last;
+                }
+
+                // update
+                for (int j = current_scan + 1; j < worker_data.size(); j++)
+                {
+                    Eigen::Affine3d m_last = worker_data[j - 1].intermediate_trajectory[worker_data[j - 1].intermediate_trajectory.size() - 1];
+                    auto tmp = worker_data[j].intermediate_trajectory;
+
+                    worker_data[j].intermediate_trajectory[0] = m_last;
+                    for (int k = 1; k < tmp.size(); k++)
+                    {
+                        Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
+                        m_last = m_last * m_update;
+                        worker_data[j].intermediate_trajectory[k] = m_last;
+                    }
+                }
+            }
+        }*/
+
         if (ImGui::Button("select all scans"))
         {
             for (int k = 0; k < worker_data.size(); k++)
@@ -1478,8 +1529,8 @@ void motion(int x, int y)
         gui_mouse_down = mouse_buttons > 0;
         if (mouse_buttons & 1)
         {
-            rotate_x += dy * 0.2f * mouse_sensitivity;
-            rotate_y += dx * 0.2f * mouse_sensitivity;
+            rotate_x += dy * 0.2f;
+            rotate_y += dx * 0.2f;
         }
         if (mouse_buttons & 4)
         {

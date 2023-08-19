@@ -193,8 +193,6 @@ include_directories(
 3rdparty/Fusion/Fusion
 )
 
-
-
 add_executable(lidar_odometry src/lidar_odometry.cpp
 ${IMGUI_SRCS}
 ${CORE_SRCS}
@@ -206,6 +204,24 @@ if (WIN32)
 target_link_libraries(lidar_odometry ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)
 else()
 target_link_libraries(lidar_odometry ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
+endif()
+
+add_executable(multi_session_registration src/multi_session_registration.cpp
+${IMGUI_SRCS}
+${CORE_SRCS}
+${GIZMO}
+)
+
+if (WIN32)
+target_link_libraries(multi_session_registration ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	
+else()
+target_link_libraries(multi_session_registration ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
+endif()
+if (PCL_FOUND)
+    target_link_libraries (multi_session_registration ${PCL_LIBRARIES})
+endif()
+if (GTSAM_FOUND)
+    target_link_libraries (multi_session_registration gtsam)
 endif()
 
 

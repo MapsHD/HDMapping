@@ -287,12 +287,12 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                                 tripletListB.emplace_back(ir + 4, 0, normalize_angle(delta(4, 0)));
                                 tripletListB.emplace_back(ir + 5, 0, normalize_angle(delta(5, 0)));
 
-                                std::cout << "delta(0, 0): " << delta(0, 0) << std::endl;
-                                std::cout << "delta(1, 0): " << delta(0, 0) << std::endl;
-                                std::cout << "delta(2, 0): " << delta(0, 0) << std::endl;
-                                std::cout << "normalize_angle(delta(3, 0)): " << normalize_angle(delta(3, 0)) << std::endl;
-                                std::cout << "normalize_angle(delta(4, 0)): " << normalize_angle(delta(4, 0)) << std::endl;
-                                std::cout << "normalize_angle(delta(5, 0)): " << normalize_angle(delta(5, 0)) << std::endl;
+                                //std::cout << "delta(0, 0): " << delta(0, 0) << std::endl;
+                                //std::cout << "delta(1, 0): " << delta(0, 0) << std::endl;
+                                //std::cout << "delta(2, 0): " << delta(0, 0) << std::endl;
+                                //std::cout << "normalize_angle(delta(3, 0)): " << normalize_angle(delta(3, 0)) << std::endl;
+                                //std::cout << "normalize_angle(delta(4, 0)): " << normalize_angle(delta(4, 0)) << std::endl;
+                                //std::cout << "normalize_angle(delta(5, 0)): " << normalize_angle(delta(5, 0)) << std::endl;
 
                                 // for (int r = 0; r < 6; r++) {
                                 //     for (int c = 0; c < 6; c++) {

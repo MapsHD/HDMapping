@@ -17,6 +17,8 @@ class Session
     PointClouds point_clouds_container;
     ManualPoseGraphLoopClosure manual_pose_graph_loop_closure;
     std::string working_directory = "";
+    bool visible = true;
+    bool is_gizmo = false;
 };
 
 #endif

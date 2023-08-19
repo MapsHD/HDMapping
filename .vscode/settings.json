@@ -111,6 +111,7 @@
         "coroutine": "cpp",
         "resumable": "cpp",
         "execution": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "eigen": "cpp"
     }
 }

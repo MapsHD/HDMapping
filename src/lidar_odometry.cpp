@@ -1229,8 +1229,11 @@ void lidar_odometry_gui()
                 //
             }
             fs::path path(working_directory);
-            path /= "lio_poses.reg";
+            path /= "lio_initial_poses.reg";
             save_poses(path.string(), m_poses, file_names);
+            fs::path path2(working_directory);
+            path2 /= "poses.reg";
+            save_poses(path2.string(), m_poses, file_names);
         }
         ImGui::SameLine();
         if (ImGui::Button("save trajectory to ascii (x y z)"))

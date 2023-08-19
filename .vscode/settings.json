@@ -110,6 +110,7 @@
         "bitset": "cpp",
         "coroutine": "cpp",
         "resumable": "cpp",
-        "execution": "cpp"
+        "execution": "cpp",
+        "variant": "cpp"
     }
 }

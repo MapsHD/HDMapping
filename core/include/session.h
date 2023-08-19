@@ -11,10 +11,12 @@ class Session
     Session(){;};
     ~Session(){;};
 
+    bool load(const std::string &file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset);
     bool save(const std::string &file_name);
 
     PointClouds point_clouds_container;
     ManualPoseGraphLoopClosure manual_pose_graph_loop_closure;
+    std::string working_directory = "";
 };
 
 #endif

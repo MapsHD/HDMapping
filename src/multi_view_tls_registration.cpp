@@ -83,7 +83,7 @@ PoseGraphSLAM pose_graph_slam;
 RegistrationPlaneFeature registration_plane_feature;
 ObservationPicking observation_picking;
 std::vector<Eigen::Vector3d> picked_points;
-std::string working_directory = "";
+//std::string working_directory = "";
 // ManualPoseGraphLoopClosure manual_pose_graph_loop_closure;
 GNSS gnss;
 int all_point_size = 1;
@@ -433,9 +433,9 @@ void project_gui()
         if (input_file_name.size() > 0)
         {
 
-            working_directory = fs::path(input_file_name).parent_path().string();
+            session.working_directory = fs::path(input_file_name).parent_path().string();
 
-            if (!session.point_clouds_container.load(working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
+            if (!session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
             {
                 std::cout << "check input files" << std::endl;
                 return;
@@ -487,9 +487,9 @@ void project_gui()
 
         if (input_file_name.size() > 0)
         {
-            working_directory = fs::path(input_file_name).parent_path().string();
+            session.working_directory = fs::path(input_file_name).parent_path().string();
 
-            if (!session.point_clouds_container.load_eth(working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
+            if (!session.point_clouds_container.load_eth(session.working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
             {
                 std::cout << "check input files" << std::endl;
                 return;
@@ -525,7 +525,7 @@ void project_gui()
 
         if (input_file_names.size() > 0)
         {
-            working_directory = fs::path(input_file_names[0]).parent_path().string();
+            session.working_directory = fs::path(input_file_names[0]).parent_path().string();
 
             std::cout << "Las/Laz files:" << std::endl;
             for (size_t i = 0; i < input_file_names.size(); i++)
@@ -569,7 +569,7 @@ void project_gui()
 
         if (input_file_names.size() > 0)
         {
-            working_directory = fs::path(input_file_names[0]).parent_path().string();
+            session.working_directory = fs::path(input_file_names[0]).parent_path().string();
 
             std::cout << "txt files:" << std::endl;
             for (size_t i = 0; i < input_file_names.size(); i++)
@@ -610,9 +610,9 @@ void project_gui()
         if (input_file_name.size() > 0)
         {
 
-            working_directory = fs::path(input_file_name).parent_path().string();
+            session.working_directory = fs::path(input_file_name).parent_path().string();
 
-            if (!session.point_clouds_container.update_initial_poses_from_RESSO(working_directory.c_str(), input_file_name.c_str()))
+            if (!session.point_clouds_container.update_initial_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
             {
 
                 std::cout << "check input files" << std::endl;
@@ -648,9 +648,9 @@ void project_gui()
         if (input_file_name.size() > 0)
         {
 
-            working_directory = fs::path(input_file_name).parent_path().string();
+            session.working_directory = fs::path(input_file_name).parent_path().string();
 
-            if (!session.point_clouds_container.update_poses_from_RESSO(working_directory.c_str(), input_file_name.c_str()))
+            if (!session.point_clouds_container.update_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
             {
                 std::cout << "check input files" << std::endl;
                 return;
@@ -667,10 +667,45 @@ void project_gui()
 
     if (ImGui::Button("load session"))
     {
+        static std::shared_ptr<pfd::open_file> open_file;
+        std::string input_file_name = "";
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+        const auto t = [&]()
+        {
+            auto sel = pfd::open_file("Load session", "C:\\").result();
+            for (int i = 0; i < sel.size(); i++)
+            {
+                input_file_name = sel[i];
+                std::cout << "Session file: '" << input_file_name << "'" << std::endl;
+            }
+        };
+        std::thread t1(t);
+        t1.join();
+
+        if (input_file_name.size() > 0)
+        {
+            session.load(fs::path(input_file_name).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
+        }
     }
     ImGui::SameLine();
     if (ImGui::Button("save session"))
     {
+        std::shared_ptr<pfd::save_file> save_file;
+        std::string output_file_name = "";
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+        const auto t = [&]()
+        {
+            auto sel = pfd::save_file("Save session", "C:\\").result();
+            output_file_name = sel;
+            std::cout << "Seesion file to save: '" << output_file_name << "'" << std::endl;
+        };
+        std::thread t1(t);
+        t1.join();
+
+        if (output_file_name.size() > 0)
+        {
+            session.save(fs::path(output_file_name).string());
+        }
     }
 
     ImGui::Text("-----------------------------------------------------------------------------");
@@ -2602,7 +2637,6 @@ void motion(int x, int y)
                 float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
                 Eigen::Vector3d v(dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
                                   dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio), 0);
-
                 TaitBryanPose pose_tb;
                 pose_tb.px = 0.0;
                 pose_tb.py = 0.0;
@@ -2618,12 +2652,11 @@ void motion(int x, int y)
         }
         else
         {
-
             gui_mouse_down = mouse_buttons > 0;
             if (mouse_buttons & 1)
             {
-                rotate_x += dy * 0.2f * mouse_sensitivity;
-                rotate_y += dx * 0.2f * mouse_sensitivity;
+                rotate_x += dy * 0.2f;// * mouse_sensitivity;
+                rotate_y += dx * 0.2f;// * mouse_sensitivity;
             }
             if (mouse_buttons & 4)
             {
@@ -2955,7 +2988,7 @@ void add_initial_rms_to_file(std::string file_name, float rms)
 
 void perform_experiment_on_linux()
 {
-    fs::path path_result(working_directory);
+    fs::path path_result(session.working_directory);
     path_result /= "results_linux";
     create_directory(path_result);
 
@@ -2963,7 +2996,7 @@ void perform_experiment_on_linux()
     auto temp_data = session.point_clouds_container;
     // reset_poses();
     float rms = 0.0f;
-    std::string result_file = working_directory + "/result_linux.csv";
+    std::string result_file = session.working_directory + "/result_linux.csv";
     create_header(result_file);
     double initial_rms = compute_rms(false);
     std::cout << "initial rms: " << initial_rms << std::endl;
@@ -3143,7 +3176,7 @@ void perform_experiment_on_windows()
     auto temp_data = session.point_clouds_container;
     reset_poses();
     double rms = 0.0f;
-    std::string result_file = working_directory + "/result_win.csv";
+    std::string result_file = session.working_directory + "/result_win.csv";
     float search_radious = 0.1f;
     int number_of_threads = 16;
     int number_of_iterations = 6;
@@ -3161,7 +3194,7 @@ void perform_experiment_on_windows()
     //     export_result_to_folder(path.string());
     // }
 
-    fs::path path_result(working_directory);
+    fs::path path_result(session.working_directory);
     path_result /= "results_win";
     create_directory(path_result);
 

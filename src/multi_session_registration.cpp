@@ -2613,12 +2613,12 @@ bool optimize(std::vector<Session> &sessions)
             tripletListA.emplace_back(ir + 4, 4, 1);
             tripletListA.emplace_back(ir + 5, 5, 1);
 
-            tripletListP.emplace_back(ir, ir, 1);
-            tripletListP.emplace_back(ir + 1, ir + 1, 1);
-            tripletListP.emplace_back(ir + 2, ir + 2, 1);
-            tripletListP.emplace_back(ir + 3, ir + 3, 1);
-            tripletListP.emplace_back(ir + 4, ir + 4, 1);
-            tripletListP.emplace_back(ir + 5, ir + 5, 1);
+            tripletListP.emplace_back(ir, ir, 0.0001);
+            tripletListP.emplace_back(ir + 1, ir + 1, 0.0001);
+            tripletListP.emplace_back(ir + 2, ir + 2, 0.0001);
+            tripletListP.emplace_back(ir + 3, ir + 3, 0.0001);
+            tripletListP.emplace_back(ir + 4, ir + 4, 0.0001);
+            tripletListP.emplace_back(ir + 5, ir + 5, 0.0001);
 
             tripletListB.emplace_back(ir, 0, 0);
             tripletListB.emplace_back(ir + 1, 0, 0);
@@ -2639,12 +2639,12 @@ bool optimize(std::vector<Session> &sessions)
                     tripletListA.emplace_back(ir + 4, i * 6 + 4, 1);
                     tripletListA.emplace_back(ir + 5, i * 6 + 5, 1);
 
-                    tripletListP.emplace_back(ir, ir, 1);
-                    tripletListP.emplace_back(ir + 1, ir + 1, 1);
-                    tripletListP.emplace_back(ir + 2, ir + 2, 1);
-                    tripletListP.emplace_back(ir + 3, ir + 3, 1);
-                    tripletListP.emplace_back(ir + 4, ir + 4, 1);
-                    tripletListP.emplace_back(ir + 5, ir + 5, 1);
+                    tripletListP.emplace_back(ir, ir, 0.0001);
+                    tripletListP.emplace_back(ir + 1, ir + 1, 0.0001);
+                    tripletListP.emplace_back(ir + 2, ir + 2, 0.0001);
+                    tripletListP.emplace_back(ir + 3, ir + 3, 0.0001);
+                    tripletListP.emplace_back(ir + 4, ir + 4, 0.0001);
+                    tripletListP.emplace_back(ir + 5, ir + 5, 0.0001);
 
                     tripletListB.emplace_back(ir, 0, 0);
                     tripletListB.emplace_back(ir + 1, 0, 0);

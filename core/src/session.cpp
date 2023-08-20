@@ -147,8 +147,19 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
 
 		manual_pose_graph_loop_closure.edges = loop_closure_edges;
 
-		return true;
-	}
+        //change color
+        render_color[0] = float(rand() % 255) / 255.0;
+        render_color[1] = float(rand() % 255) / 255.0;
+        render_color[2] = float(rand() % 255) / 255.0;
+
+        for (auto &pc:point_clouds_container.point_clouds){
+            pc.render_color[0] = render_color[0];
+            pc.render_color[1] = render_color[1];
+            pc.render_color[2] = render_color[2];
+        }
+
+        return true;
+    }
     catch (std::exception &e)
     {
         std::cout << "cant load session: " << e.what() << std::endl;

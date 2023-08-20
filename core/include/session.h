@@ -19,6 +19,7 @@ class Session
     std::string working_directory = "";
     bool visible = true;
     bool is_gizmo = false;
+    float render_color[3];
 };
 
 #endif

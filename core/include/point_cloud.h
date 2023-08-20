@@ -80,6 +80,7 @@ public:
 	std::vector <int> points_type;
 	std::vector <unsigned short> intensities;
 	std::vector<double> timestamps;
+	Eigen::Affine3d m_pose_temp;
 	Eigen::Affine3d m_pose;
 	Eigen::Affine3d m_initial_pose;
 	Eigen::Matrix<double, 6, 6, Eigen::RowMajor> covariance_matrix_tait_bryan;

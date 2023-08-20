@@ -22,6 +22,9 @@
 
 #include <icp.h>
 
+#include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
+#include <python-scripts/constraints/relative_pose_tait_bryan_cw_jacobian.h>
+
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
 double camera_ortho_xy_view_shift_y = 0.0;
@@ -67,6 +70,8 @@ int index_loop_closure_target = -1;
 int first_session_index = -1;
 int second_session_index = -1;
 double search_radious = 0.3;
+bool loaded_sessions = false;
+bool optimized = false;
 
 struct ProjectSettings
 {
@@ -98,6 +103,10 @@ ProjectSettings project_settings;
 std::vector<Session> sessions;
 
 namespace fs = std::filesystem;
+
+bool optimize(std::vector<Session> &sessions);
+bool revert(std::vector<Session> &sessions);
+bool save_results(std::vector<Session> &sessions);
 
 bool load_project_settings(const std::string &file_name, ProjectSettings &_project_settings)
 {
@@ -222,10 +231,10 @@ bool save_project_settings(const std::string &file_name, const ProjectSettings &
 
 void project_gui()
 {
-
     if (ImGui::Begin("Multi_session_registration v0.19"))
     {
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::ColorEdit3("clear color", (float *)&clear_color); // Edit 3 floats representing a color
 
         if (ImGui::Button("reset view"))
         {
@@ -371,6 +380,14 @@ void project_gui()
                     }
                     index_gizmo = i;
                 }
+                // ImGui::SameLine();
+                ImGui::ColorEdit3(("color[" + std::to_string(i) + "]").c_str(), (float *)&sessions[i].render_color);
+                for (auto &pc : sessions[i].point_clouds_container.point_clouds)
+                {
+                    pc.render_color[0] = sessions[i].render_color[0];
+                    pc.render_color[1] = sessions[i].render_color[1];
+                    pc.render_color[2] = sessions[i].render_color[2];
+                }
             }
         }
         if (project_settings.session_file_names.size() == sessions.size())
@@ -407,14 +424,18 @@ void project_gui()
 
         if (project_settings.session_file_names.size() > 0)
         {
-            if (ImGui::Button("load sessions"))
+            if (!loaded_sessions)
             {
-                sessions.clear();
-                for (const auto &ps : project_settings.session_file_names)
+                if (ImGui::Button("load sessions"))
                 {
-                    Session session;
-                    session.load(fs::path(ps).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
-                    sessions.push_back(session);
+                    sessions.clear();
+                    for (const auto &ps : project_settings.session_file_names)
+                    {
+                        Session session;
+                        session.load(fs::path(ps).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
+                        sessions.push_back(session);
+                    }
+                    loaded_sessions = true;
                 }
             }
 
@@ -440,6 +461,29 @@ void project_gui()
                         }
                     }
                 }
+
+                if (!manual_pose_graph_loop_closure_mode)
+                {
+                    if (ImGui::Button("Optimize"))
+                    {
+                        optimize(sessions);
+                        optimized = true;
+                    }
+                    if (optimized)
+                    {
+                        ImGui::SameLine();
+                        if (ImGui::Button("Revert"))
+                        {
+                            revert(sessions);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Save results"))
+                        {
+                            save_results(sessions);
+                        }
+                    }
+                }
+
                 if (number_visible_sessions == 1 || number_visible_sessions == 2)
                 {
                     ImGui::Checkbox("Manual Pose Graph Loop Closure Mode", &manual_pose_graph_loop_closure_mode);
@@ -514,6 +558,15 @@ void project_gui()
                                 {
                                     index_active_edge = (int)edges.size() - 1;
                                 }
+
+                                std::string txt = "index_session_from: " + std::to_string(edges[index_active_edge].index_session_from);
+                                ImGui::Text(txt.c_str());
+                                txt = "index_session_to: " + std::to_string(edges[index_active_edge].index_session_to);
+                                ImGui::Text(txt.c_str());
+                                txt = "index_from: " + std::to_string(edges[index_active_edge].index_from);
+                                ImGui::Text(txt.c_str());
+                                txt = "index_to: " + std::to_string(edges[index_active_edge].index_to);
+                                ImGui::Text(txt.c_str());
 
                                 if (remove_edge_index != -1)
                                 {
@@ -2292,4 +2345,523 @@ int main(int argc, char *argv[])
 
     ImGui::DestroyContext();
     return 0;
+}
+
+bool optimize(std::vector<Session> &sessions)
+{
+    for (auto &session : sessions)
+    {
+        // std::cout << session.point_clouds_container.point_clouds.size() << std::endl;
+        for (auto &pc : session.point_clouds_container.point_clouds)
+        {
+            pc.m_pose_temp = pc.m_pose;
+        }
+    }
+
+    std::vector<int> sums;
+    sums.push_back(0);
+    int sum = 0;
+
+    for (int i = 0; i < sessions.size(); i++)
+    {
+        sum += sessions[i].point_clouds_container.point_clouds.size();
+        sums.push_back(sum);
+    }
+
+    std::cout << "Compute Pose Graph SLAM" << std::endl;
+
+    ///////////////////////////////////////////////////////////////////
+    // graph slam
+    bool is_ok = true;
+    std::vector<Eigen::Affine3d> m_poses;
+    std::vector<Eigen::Affine3d> poses_motion_model;
+    std::vector<int> index_trajectory;
+
+    for (int j = 0; j < sessions.size(); j++)
+    {
+        for (size_t i = 0; i < sessions[j].point_clouds_container.point_clouds.size(); i++)
+        {
+            m_poses.push_back(sessions[j].point_clouds_container.point_clouds[i].m_pose);
+            poses_motion_model.push_back(sessions[j].point_clouds_container.point_clouds[i].m_initial_pose);
+            index_trajectory.push_back(j);
+        }
+    }
+
+    std::vector<TaitBryanPose> poses;
+
+    bool is_wc = true;
+    bool is_cw = false;
+    int iterations = 10;
+    bool is_fix_first_node = true;
+
+    // if (gnss.gnss_poses.size() > 0)
+    //{
+    //     is_fix_first_node = false;
+    // }
+
+    for (int j = 0; j < sessions.size(); j++)
+    {
+        for (size_t i = 0; i < sessions[j].point_clouds_container.point_clouds.size(); i++)
+        {
+            if (is_wc)
+            {
+                poses.push_back(pose_tait_bryan_from_affine_matrix(sessions[j].point_clouds_container.point_clouds[i].m_pose));
+            }
+            else if (is_cw)
+            {
+                poses.push_back(pose_tait_bryan_from_affine_matrix(sessions[j].point_clouds_container.point_clouds[i].m_pose.inverse()));
+            }
+        }
+    }
+
+    std::vector<Edge> all_edges;
+
+    // motion model edges;
+    for (int i = 1; i < poses_motion_model.size(); i++)
+    {
+        if (index_trajectory[i - 1] == index_trajectory[i])
+        {
+            Eigen::Affine3d m_rel = poses_motion_model[i - 1].inverse() * poses_motion_model[i];
+            Edge edge;
+            edge.index_from = i - 1;
+            edge.index_to = i;
+            edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_rel);
+            edge.relative_pose_tb_weights.om = 10000.0;
+            edge.relative_pose_tb_weights.fi = 10000.0;
+            edge.relative_pose_tb_weights.ka = 10000.0;
+            edge.relative_pose_tb_weights.px = 10000.0;
+            edge.relative_pose_tb_weights.py = 10000.0;
+            edge.relative_pose_tb_weights.pz = 10000.0;
+            all_edges.push_back(edge);
+        }
+    }
+
+    for (int i = 0; i < sessions.size(); i++)
+    {
+        for (int j = 0; j < sessions[i].manual_pose_graph_loop_closure.edges.size(); j++)
+        {
+            // std::cout << "add manual_pose_graph_loop_closure.edge" << std::endl;
+            Edge edge;
+            edge.index_from = sessions[i].manual_pose_graph_loop_closure.edges[j].index_from + sums[i];
+            edge.index_to = sessions[i].manual_pose_graph_loop_closure.edges[j].index_to + sums[i];
+            edge.relative_pose_tb = sessions[i].manual_pose_graph_loop_closure.edges[j].relative_pose_tb;
+            edge.relative_pose_tb_weights = sessions[i].manual_pose_graph_loop_closure.edges[j].relative_pose_tb_weights;
+            // edge.is_fixed_fi = ToDo
+            all_edges.push_back(edge);
+        }
+    }
+
+    for (int i = 0; i < edges.size(); i++)
+    {
+        // std::cout << "add edges" << std::endl;
+        Edge edge;
+        edge.index_from = edges[i].index_from + sums[edges[i].index_session_from];
+        edge.index_to = edges[i].index_to + sums[edges[i].index_session_to];
+        edge.relative_pose_tb = edges[i].relative_pose_tb;
+        edge.relative_pose_tb_weights = edges[i].relative_pose_tb_weights;
+        // edge.is_fixed_fi = ToDo
+        all_edges.push_back(edge);
+    }
+
+    for (int iter = 0; iter < iterations; iter++)
+    {
+        std::cout << "iteration " << iter + 1 << " of " << iterations << std::endl;
+        std::vector<Eigen::Triplet<double>> tripletListA;
+        std::vector<Eigen::Triplet<double>> tripletListP;
+        std::vector<Eigen::Triplet<double>> tripletListB;
+
+        for (size_t i = 0; i < all_edges.size(); i++)
+        {
+            Eigen::Matrix<double, 6, 1> delta;
+            Eigen::Matrix<double, 6, 12, Eigen::RowMajor> jacobian;
+            // auto relative_pose = pose_tait_bryan_from_affine_matrix(all_edges[i].relative_pose_tb);
+            if (is_wc)
+            {
+                relative_pose_obs_eq_tait_bryan_wc_case1(
+                    delta,
+                    poses[all_edges[i].index_from].px,
+                    poses[all_edges[i].index_from].py,
+                    poses[all_edges[i].index_from].pz,
+                    normalize_angle(poses[all_edges[i].index_from].om),
+                    normalize_angle(poses[all_edges[i].index_from].fi),
+                    normalize_angle(poses[all_edges[i].index_from].ka),
+                    poses[all_edges[i].index_to].px,
+                    poses[all_edges[i].index_to].py,
+                    poses[all_edges[i].index_to].pz,
+                    normalize_angle(poses[all_edges[i].index_to].om),
+                    normalize_angle(poses[all_edges[i].index_to].fi),
+                    normalize_angle(poses[all_edges[i].index_to].ka),
+                    all_edges[i].relative_pose_tb.px,
+                    all_edges[i].relative_pose_tb.py,
+                    all_edges[i].relative_pose_tb.pz,
+                    normalize_angle(all_edges[i].relative_pose_tb.om),
+                    normalize_angle(all_edges[i].relative_pose_tb.fi),
+                    normalize_angle(all_edges[i].relative_pose_tb.ka));
+                relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(jacobian,
+                                                                  poses[all_edges[i].index_from].px,
+                                                                  poses[all_edges[i].index_from].py,
+                                                                  poses[all_edges[i].index_from].pz,
+                                                                  normalize_angle(poses[all_edges[i].index_from].om),
+                                                                  normalize_angle(poses[all_edges[i].index_from].fi),
+                                                                  normalize_angle(poses[all_edges[i].index_from].ka),
+                                                                  poses[all_edges[i].index_to].px,
+                                                                  poses[all_edges[i].index_to].py,
+                                                                  poses[all_edges[i].index_to].pz,
+                                                                  normalize_angle(poses[all_edges[i].index_to].om),
+                                                                  normalize_angle(poses[all_edges[i].index_to].fi),
+                                                                  normalize_angle(poses[all_edges[i].index_to].ka));
+            }
+            else if (is_cw)
+            {
+                relative_pose_obs_eq_tait_bryan_cw_case1(
+                    delta,
+                    poses[all_edges[i].index_from].px,
+                    poses[all_edges[i].index_from].py,
+                    poses[all_edges[i].index_from].pz,
+                    normalize_angle(poses[all_edges[i].index_from].om),
+                    normalize_angle(poses[all_edges[i].index_from].fi),
+                    normalize_angle(poses[all_edges[i].index_from].ka),
+                    poses[all_edges[i].index_to].px,
+                    poses[all_edges[i].index_to].py,
+                    poses[all_edges[i].index_to].pz,
+                    normalize_angle(poses[all_edges[i].index_to].om),
+                    normalize_angle(poses[all_edges[i].index_to].fi),
+                    normalize_angle(poses[all_edges[i].index_to].ka),
+                    all_edges[i].relative_pose_tb.px,
+                    all_edges[i].relative_pose_tb.py,
+                    all_edges[i].relative_pose_tb.pz,
+                    normalize_angle(all_edges[i].relative_pose_tb.om),
+                    normalize_angle(all_edges[i].relative_pose_tb.fi),
+                    normalize_angle(all_edges[i].relative_pose_tb.ka));
+                relative_pose_obs_eq_tait_bryan_cw_case1_jacobian(jacobian,
+                                                                  poses[all_edges[i].index_from].px,
+                                                                  poses[all_edges[i].index_from].py,
+                                                                  poses[all_edges[i].index_from].pz,
+                                                                  normalize_angle(poses[all_edges[i].index_from].om),
+                                                                  normalize_angle(poses[all_edges[i].index_from].fi),
+                                                                  normalize_angle(poses[all_edges[i].index_from].ka),
+                                                                  poses[all_edges[i].index_to].px,
+                                                                  poses[all_edges[i].index_to].py,
+                                                                  poses[all_edges[i].index_to].pz,
+                                                                  normalize_angle(poses[all_edges[i].index_to].om),
+                                                                  normalize_angle(poses[all_edges[i].index_to].fi),
+                                                                  normalize_angle(poses[all_edges[i].index_to].ka));
+            }
+
+            int ir = tripletListB.size();
+
+            int ic_1 = all_edges[i].index_from * 6;
+            int ic_2 = all_edges[i].index_to * 6;
+
+            for (size_t row = 0; row < 6; row++)
+            {
+                tripletListA.emplace_back(ir + row, ic_1, -jacobian(row, 0));
+                tripletListA.emplace_back(ir + row, ic_1 + 1, -jacobian(row, 1));
+                tripletListA.emplace_back(ir + row, ic_1 + 2, -jacobian(row, 2));
+                tripletListA.emplace_back(ir + row, ic_1 + 3, -jacobian(row, 3));
+                tripletListA.emplace_back(ir + row, ic_1 + 4, -jacobian(row, 4));
+                tripletListA.emplace_back(ir + row, ic_1 + 5, -jacobian(row, 5));
+
+                tripletListA.emplace_back(ir + row, ic_2, -jacobian(row, 6));
+                tripletListA.emplace_back(ir + row, ic_2 + 1, -jacobian(row, 7));
+                tripletListA.emplace_back(ir + row, ic_2 + 2, -jacobian(row, 8));
+                tripletListA.emplace_back(ir + row, ic_2 + 3, -jacobian(row, 9));
+                tripletListA.emplace_back(ir + row, ic_2 + 4, -jacobian(row, 10));
+                tripletListA.emplace_back(ir + row, ic_2 + 5, -jacobian(row, 11));
+            }
+
+            tripletListB.emplace_back(ir, 0, delta(0, 0));
+            tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+            tripletListB.emplace_back(ir + 2, 0, delta(2, 0));
+            tripletListB.emplace_back(ir + 3, 0, normalize_angle(delta(3, 0)));
+            tripletListB.emplace_back(ir + 4, 0, normalize_angle(delta(4, 0)));
+            tripletListB.emplace_back(ir + 5, 0, normalize_angle(delta(5, 0)));
+
+            // std::cout << "delta(0, 0): " << delta(0, 0) << std::endl;
+            // std::cout << "delta(1, 0): " << delta(0, 0) << std::endl;
+            // std::cout << "delta(2, 0): " << delta(0, 0) << std::endl;
+            // std::cout << "normalize_angle(delta(3, 0)): " << normalize_angle(delta(3, 0)) << std::endl;
+            // std::cout << "normalize_angle(delta(4, 0)): " << normalize_angle(delta(4, 0)) << std::endl;
+            // std::cout << "normalize_angle(delta(5, 0)): " << normalize_angle(delta(5, 0)) << std::endl;
+
+            // for (int r = 0; r < 6; r++) {
+            //     for (int c = 0; c < 6; c++) {
+            //         tripletListP.emplace_back(ir + r, ir + c, edges[i].information_matrix.coeffRef(r, c));
+            //    }
+            // }
+
+            // tripletListP.emplace_back(ir    , ir    , get_cauchy_w(delta(0, 0), 10));
+            // tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 10));
+            // tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta(2, 0), 10));
+            // tripletListP.emplace_back(ir + 3, ir + 3, get_cauchy_w(delta(3, 0), 10));
+            // tripletListP.emplace_back(ir + 4, ir + 4, get_cauchy_w(delta(4, 0), 10));
+            // tripletListP.emplace_back(ir + 5, ir + 5, get_cauchy_w(delta(5, 0), 10));
+            tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
+            tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
+            tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
+            tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
+            tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
+            tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
+        }
+        if (is_fix_first_node)
+        {
+            int ir = tripletListB.size();
+            tripletListA.emplace_back(ir, 0, 1);
+            tripletListA.emplace_back(ir + 1, 1, 1);
+            tripletListA.emplace_back(ir + 2, 2, 1);
+            tripletListA.emplace_back(ir + 3, 3, 1);
+            tripletListA.emplace_back(ir + 4, 4, 1);
+            tripletListA.emplace_back(ir + 5, 5, 1);
+
+            tripletListP.emplace_back(ir, ir, 1);
+            tripletListP.emplace_back(ir + 1, ir + 1, 1);
+            tripletListP.emplace_back(ir + 2, ir + 2, 1);
+            tripletListP.emplace_back(ir + 3, ir + 3, 1);
+            tripletListP.emplace_back(ir + 4, ir + 4, 1);
+            tripletListP.emplace_back(ir + 5, ir + 5, 1);
+
+            tripletListB.emplace_back(ir, 0, 0);
+            tripletListB.emplace_back(ir + 1, 0, 0);
+            tripletListB.emplace_back(ir + 2, 0, 0);
+            tripletListB.emplace_back(ir + 3, 0, 0);
+            tripletListB.emplace_back(ir + 4, 0, 0);
+            tripletListB.emplace_back(ir + 5, 0, 0);
+
+            for (int i = 1; i < index_trajectory.size(); i++)
+            {
+                if (index_trajectory[i - 1] != index_trajectory[i])
+                {
+                    ir = tripletListB.size();
+                    tripletListA.emplace_back(ir, i * 6 + 0, 1);
+                    tripletListA.emplace_back(ir + 1, i * 6 + 1, 1);
+                    tripletListA.emplace_back(ir + 2, i * 6 + 2, 1);
+                    tripletListA.emplace_back(ir + 3, i * 6 + 3, 1);
+                    tripletListA.emplace_back(ir + 4, i * 6 + 4, 1);
+                    tripletListA.emplace_back(ir + 5, i * 6 + 5, 1);
+
+                    tripletListP.emplace_back(ir, ir, 1);
+                    tripletListP.emplace_back(ir + 1, ir + 1, 1);
+                    tripletListP.emplace_back(ir + 2, ir + 2, 1);
+                    tripletListP.emplace_back(ir + 3, ir + 3, 1);
+                    tripletListP.emplace_back(ir + 4, ir + 4, 1);
+                    tripletListP.emplace_back(ir + 5, ir + 5, 1);
+
+                    tripletListB.emplace_back(ir, 0, 0);
+                    tripletListB.emplace_back(ir + 1, 0, 0);
+                    tripletListB.emplace_back(ir + 2, 0, 0);
+                    tripletListB.emplace_back(ir + 3, 0, 0);
+                    tripletListB.emplace_back(ir + 4, 0, 0);
+                    tripletListB.emplace_back(ir + 5, 0, 0);
+                }
+            }
+        }
+
+        // gnss
+        // for (const auto &pc : point_clouds_container.point_clouds)
+        /*for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
+        {
+            const auto &pc = point_clouds_container.point_clouds[index_pose];
+            for (int i = 0; i < gnss.gnss_poses.size(); i++)
+            {
+                double time_stamp = gnss.gnss_poses[i].timestamp;
+
+                auto it = std::lower_bound(pc.local_trajectory.begin(), pc.local_trajectory.end(),
+                                           time_stamp, [](const PointCloud::LocalTrajectoryNode &lhs, const double &time) -> bool
+                                           { return lhs.timestamp < time; });
+
+                int index = it - pc.local_trajectory.begin();
+
+                if (index > 0 && index < pc.local_trajectory.size())
+                {
+
+                    if (fabs(time_stamp - pc.local_trajectory[index].timestamp) < 10e12)
+                    {
+
+                        Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+                        TaitBryanPose pose_s;
+                        pose_s = pose_tait_bryan_from_affine_matrix(m_poses[index_pose]);
+                        Eigen::Vector3d p_s = pc.local_trajectory[index].m_pose.translation();
+                        point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                               p_s.x(), p_s.y(), p_s.z());
+
+                        double delta_x;
+                        double delta_y;
+                        double delta_z;
+                        Eigen::Vector3d p_t(gnss.gnss_poses[i].x - gnss.offset_x, gnss.gnss_poses[i].y - gnss.offset_y, gnss.gnss_poses[i].alt - gnss.offset_alt);
+                        point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                                      pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                      p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+
+                        std::cout << " delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
+
+                        int ir = tripletListB.size();
+                        int ic = index_pose * 6;
+                        for (int row = 0; row < 3; row++)
+                        {
+                            for (int col = 0; col < 6; col++)
+                            {
+                                if (jacobian(row, col) != 0.0)
+                                {
+                                    tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
+                                }
+                            }
+                        }
+                        tripletListP.emplace_back(ir, ir, get_cauchy_w(delta_x, 1));
+                        tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta_y, 1));
+                        tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta_z, 1));
+
+                        tripletListB.emplace_back(ir, 0, delta_x);
+                        tripletListB.emplace_back(ir + 1, 0, delta_y);
+                        tripletListB.emplace_back(ir + 2, 0, delta_z);
+
+                        // jacobian3x6 = get_point_to_point_jacobian_tait_bryan(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
+
+                        // auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
+                        // glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+                        // glVertex3f(gnss_poses[i].x - offset_x, gnss_poses[i].y - offset_y, gnss_poses[i].alt - offset_alt);
+                    }
+                }
+            }
+        }*/
+        //
+
+        Eigen::SparseMatrix<double> matA(tripletListB.size(), poses.size() * 6);
+        Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
+        Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
+
+        matA.setFromTriplets(tripletListA.begin(), tripletListA.end());
+        matP.setFromTriplets(tripletListP.begin(), tripletListP.end());
+        matB.setFromTriplets(tripletListB.begin(), tripletListB.end());
+
+        Eigen::SparseMatrix<double> AtPA(poses.size() * 6, poses.size() * 6);
+        Eigen::SparseMatrix<double> AtPB(poses.size() * 6, 1);
+
+        {
+            Eigen::SparseMatrix<double> AtP = matA.transpose() * matP;
+            AtPA = (AtP)*matA;
+            AtPB = (AtP)*matB;
+        }
+
+        tripletListA.clear();
+        tripletListP.clear();
+        tripletListB.clear();
+
+        std::cout << "AtPA.size: " << AtPA.size() << std::endl;
+        std::cout << "AtPB.size: " << AtPB.size() << std::endl;
+
+        std::cout << "start solving AtPA=AtPB" << std::endl;
+        Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
+
+        std::cout << "x = solver.solve(AtPB)" << std::endl;
+        Eigen::SparseMatrix<double> x = solver.solve(AtPB);
+
+        std::vector<double> h_x;
+
+        for (int k = 0; k < x.outerSize(); ++k)
+        {
+            for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
+            {
+                h_x.push_back(it.value());
+            }
+        }
+
+        std::cout << "h_x.size(): " << h_x.size() << std::endl;
+
+        std::cout << "AtPA=AtPB SOLVED" << std::endl;
+        std::cout << "updates:" << std::endl;
+        for (size_t i = 0; i < h_x.size(); i += 6)
+        {
+            std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << std::endl;
+        }
+
+        if (h_x.size() == 6 * poses.size())
+        {
+            int counter = 0;
+
+            for (size_t i = 0; i < poses.size(); i++)
+            {
+                TaitBryanPose pose = poses[i];
+                poses[i].px += h_x[counter++];
+                poses[i].py += h_x[counter++];
+                poses[i].pz += h_x[counter++];
+                poses[i].om += h_x[counter++];
+                poses[i].fi += h_x[counter++];
+                poses[i].ka += h_x[counter++];
+
+                if (i == 0 && is_fix_first_node)
+                {
+                    poses[i] = pose;
+                }
+            }
+            std::cout << "optimizing with tait bryan finished" << std::endl;
+        }
+        else
+        {
+            std::cout << "optimizing with tait bryan FAILED" << std::endl;
+            std::cout << "h_x.size(): " << h_x.size() << " should be: " << 6 * poses.size() << std::endl;
+            is_ok = false;
+            break;
+        }
+
+        if (is_ok)
+        {
+            for (size_t i = 0; i < m_poses.size(); i++)
+            {
+                if (is_wc)
+                {
+                    m_poses[i] = affine_matrix_from_pose_tait_bryan(poses[i]);
+                }
+                else if (is_cw)
+                {
+                    m_poses[i] = affine_matrix_from_pose_tait_bryan(poses[i]).inverse();
+                }
+            }
+        }
+
+        if (is_ok)
+        {
+            int index = 0;
+            for (size_t i = 0; i < m_poses.size(); i++)
+            {
+                if (i > 0)
+                {
+                    if (index_trajectory[i - 1] != index_trajectory[i])
+                    {
+                        index = 0;
+                    }
+                }
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].m_pose = m_poses[i];
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose = pose_tait_bryan_from_affine_matrix(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].m_pose);
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_translation[0] = sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.px;
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_translation[1] = sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.py;
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_translation[2] = sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.pz;
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[0] = rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.om);
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[1] = rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.fi);
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[2] = rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.ka);
+                index++;
+            }
+        }
+    }
+    return true;
+}
+
+bool revert(std::vector<Session> &sessions)
+{
+    for (auto &session : sessions)
+    {
+        for (auto &pc : session.point_clouds_container.point_clouds)
+        {
+            pc.m_pose = pc.m_pose_temp;
+        }
+    }
+    return true;
+}
+
+bool save_results(std::vector<Session> &sessions)
+{
+    for(auto &session:sessions){
+        std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
+        session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string());
+    }
+    return true;
 }

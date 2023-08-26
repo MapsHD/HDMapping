@@ -35,7 +35,7 @@
 // #define NR_ITER 100
 namespace fs = std::filesystem;
 
-std::vector<Eigen::Vector3d> all_points;
+// std::vector<Eigen::Vector3d> all_points;
 std::vector<Point3Di> initial_points;
 NDT ndt;
 
@@ -57,7 +57,7 @@ std::vector<Point3Di> decimate(const std::vector<Point3Di> &points, double bucke
 void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
                 std::vector<Point3Di> &points_global);
 
-bool show_all_points = false;
+// bool show_all_points = false;
 bool show_initial_points = true;
 bool show_trajectory = true;
 bool show_trajectory_as_axes = false;
@@ -536,7 +536,7 @@ void lidar_odometry_gui()
     {
         ImGui::SliderFloat("mouse_sensitivity_xy", &mouse_sensitivity, 0.1, 10);
         ImGui::Text(("Working directory: " + working_directory).c_str());
-        ImGui::Checkbox("show_all_points", &show_all_points);
+        // ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::Checkbox("show_initial_points", &show_initial_points);
         ImGui::Checkbox("show_trajectory", &show_trajectory);
         ImGui::SameLine();
@@ -657,6 +657,7 @@ void lidar_odometry_gui()
                 std::vector<std::vector<Point3Di>> pointsPerFile;
                 pointsPerFile.resize(laz_files.size());
 
+                std::cout << "start std::transform" << std::endl;
                 std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [](const std::string &fn)
                                {
                                    return load_point_cloud(fn.c_str());
@@ -665,12 +666,18 @@ void lidar_odometry_gui()
                                    // std::cout << fn << std::endl;
                                    //
                                });
-
-                std::vector<Point3Di> points;
-                for (const auto &pp : pointsPerFile)
-                {
-                    points.insert(std::end(points), std::begin(pp), std::end(pp));
-                }
+                std::cout << "std::transform finished" << std::endl;
+                // std::cout << "start points.insert" << std::endl;
+                // std::vector<Point3Di> points;
+                // int count = 1;
+                // for (auto &pp : pointsPerFile)
+                //{
+                //     points.insert(std::end(points), std::begin(pp), std::end(pp));
+                //     pp.clear();
+                //     std::cout << "inserted [" << count << "] of " << pointsPerFile.size() << std::endl;
+                //     count++;
+                // }
+                // std::cout << "points.insert finished" << std::endl;
 
                 //
                 FusionAhrs ahrs;
@@ -715,13 +722,22 @@ void lidar_odometry_gui()
 
                     trajectory[timestamp] = t.matrix();
                     const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
-                    printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+                    counter++;
+                    if (counter % 100 == 0)
+                    {
+                        printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+                    }
                 }
 
-                std::cout << "number of points: " << points.size() << std::endl;
+                int number_of_points = 0;
+                for (const auto &pp : pointsPerFile)
+                {
+                    number_of_points += pp.size();
+                }
+                std::cout << "number of points: " << number_of_points << std::endl;
                 std::cout << "start transforming points" << std::endl;
 
-                counter = 1; // ToDo make it faster
+                /*counter = 1; // ToDo make it faster
                 for (auto &p : points)
                 {
                     Eigen::Matrix4d t = getInterpolatedPose(trajectory, p.timestamp);
@@ -736,16 +752,38 @@ void lidar_odometry_gui()
                         printf("tranform point %d of %d \n", counter, points.size());
                     }
                     counter++;
-                }
+                }*/
 
-                for (int i = 0; i < threshold_initial_points; i++)
+                // for (int i = 0; i < threshold_initial_points; i++)
+                //{
+                //     auto p = points[i];
+                //     // p.point = all_points[i];
+                //     initial_points.push_back(p);
+                // }
+
+                int number_of_initial_points = 0;
+                double timestamp_begin;
+                for (const auto &pp : pointsPerFile)
                 {
-                    auto p = points[i];
-                    // p.point = all_points[i];
-                    initial_points.push_back(p);
+                    // number_of_points += pp.size();
+                    for (const auto &p : pp)
+                    {
+                        number_of_initial_points++;
+                        initial_points.push_back(p);
+                        if (number_of_initial_points > threshold_initial_points)
+                        {
+                            timestamp_begin = p.timestamp;
+                            break;
+                        }
+                    }
+                    if (number_of_initial_points > threshold_initial_points)
+                    {
+                        break;
+                    }
                 }
 
-                double timestamp_begin = points[threshold_initial_points - 1].timestamp;
+                // double timestamp_begin = //points[threshold_initial_points - 1].timestamp;
+
                 std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
 
                 std::vector<double> timestamps;
@@ -769,6 +807,8 @@ void lidar_odometry_gui()
                 // temp_ts.reserve(1000000);
 
                 // int last_point = 0;
+                int index_begin = 0;
+
                 for (size_t i = 0; i < poses.size(); i++)
                 {
                     if (i % 1000 == 0)
@@ -785,9 +825,10 @@ void lidar_odometry_gui()
 
                     // temp_ts.emplace_back(timestamps[i]);
 
+                    
                     if (wd.intermediate_trajectory.size() >= thershold)
                     {
-                        auto index_lower = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[0],
+                        /*auto index_lower = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[0],
                                                             [](Point3Di lhs, double rhs) -> bool
                                                             { return lhs.timestamp < rhs; });
                         unsigned long long int i_begin = std::distance(points.begin(), index_lower);
@@ -795,18 +836,54 @@ void lidar_odometry_gui()
                         auto index_upper = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1],
                                                             [](Point3Di lhs, double rhs) -> bool
                                                             { return lhs.timestamp < rhs; });
-                        unsigned long long int i_end = std::distance(points.begin(), index_upper);
+                        unsigned long long int i_end = std::distance(points.begin(), index_upper);*/
 
-                        for (unsigned long long int k = i_begin; k < i_end; k++)
+                        std::vector<Point3Di> points;
+                        // for (const auto &pp : pointsPerFile)
+                        //{
+                        //     for (const auto &p : pp)
+                        //     {
+                        //         if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1]){
+                        //             points.push_back(p);
+                        //         }
+                        //     }
+                        // }
+                        bool found = false;
+                        for (int index = index_begin; index < pointsPerFile.size(); index++)
                         {
-                            if (points[k].timestamp > wd.intermediate_trajectory_timestamps[0] && points[k].timestamp < wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                            for (const auto &p : pointsPerFile[index])
                             {
+                                if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                                {
+                                    points.push_back(p);
+                                }
+                                if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && !found)
+                                {
+                                    index_begin = index;
+                                    found = true;
+                                }
+                                if (p.timestamp > wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1]){
+                                    break;
+                                }
+                            }
+                        }
+
+                        // for (unsigned long long int k = i_begin; k < i_end; k++)
+                        //if (i % 1000 == 0)
+                        //{
+                            //std::cout << "points.size() " << points.size() << std::endl;
+                        //}
+
+                        for (unsigned long long int k = 0; k < points.size(); k++)
+                        {
+                            //if (points[k].timestamp > wd.intermediate_trajectory_timestamps[0] && points[k].timestamp < wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                            //{
                                 auto p = points[k];
                                 auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp);
                                 p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
                                 wd.intermediate_points.emplace_back(p);
                                 wd.original_points.emplace_back(p);
-                            }
+                            //}
                         }
 
                         if (decimation > 0.0)
@@ -1578,7 +1655,7 @@ void display()
     glVertex3f(0.0f, 0.0f, 100);
     glEnd();
 
-    if (show_all_points)
+    /*if (show_all_points)
     {
         glColor3d(1.0, 0.0, 0.0);
         glBegin(GL_POINTS);
@@ -1587,7 +1664,7 @@ void display()
             glVertex3d(p.x(), p.y(), p.z());
         }
         glEnd();
-    }
+    }*/
     if (show_initial_points)
     {
         glColor3d(0.0, 1.0, 0.0);

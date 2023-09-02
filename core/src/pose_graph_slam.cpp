@@ -915,10 +915,10 @@ bool PoseGraphSLAM::optimize(PointClouds& point_clouds_container)
             std::cout << "h_x.size(): " << h_x.size() << std::endl;
 
             std::cout << "AtPA=AtPB SOLVED" << std::endl;
-            std::cout << "updates:" << std::endl;
-            for (size_t i = 0; i < h_x.size(); i += 7) {
-                std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << "," << h_x[i + 6] << std::endl;
-            }
+            //std::cout << "updates:" << std::endl;
+            //for (size_t i = 0; i < h_x.size(); i += 7) {
+            //    std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << "," << h_x[i + 6] << std::endl;
+            //}
 
             if (h_x.size() == 7 * point_clouds_container.point_clouds.size()) {
                 int counter = 0;

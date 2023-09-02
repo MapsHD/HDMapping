@@ -706,6 +706,28 @@ void project_gui()
         }
     }
 
+    if (ImGui::Button("generate random colors"))
+    {
+        for (auto &pc : session.point_clouds_container.point_clouds)
+        {
+            pc.render_color[0] = float(rand() % 255) / 255.0f;
+            pc.render_color[1] = float(rand() % 255) / 255.0f;
+            pc.render_color[2] = float(rand() % 255) / 255.0f;
+        }
+    }
+    ImGui::SameLine();
+
+    if (ImGui::Button("generate random color for all"))
+    {
+        float color = float(rand() % 255) / 255.0f;
+        for (auto &pc : session.point_clouds_container.point_clouds)
+        {
+            pc.render_color[0] = color;
+            pc.render_color[1] = color;
+            pc.render_color[2] = color;
+        }
+    }
+
     ImGui::Text("-----------------------------------------------------------------------------");
     ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
     ImGui::Checkbox("Iterative Closest Point", &is_icp_gui);

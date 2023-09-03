@@ -258,7 +258,7 @@ void project_gui()
             camera_mode_ortho_z_center_h = 0.0;
         }
 
-        ImGui::InputInt("viewer_decmiate_point_cloud", &viewer_decmiate_point_cloud);
+        ImGui::InputInt("increase for better performance, decrease for rendering more points", &viewer_decmiate_point_cloud);
         if (viewer_decmiate_point_cloud < 1)
         {
             viewer_decmiate_point_cloud = 1;

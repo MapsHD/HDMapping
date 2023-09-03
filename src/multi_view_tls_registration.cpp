@@ -354,6 +354,7 @@ void project_gui()
     ImGui::Text("It refines trajectory e.g with loop closure.");
     ImGui::Text("It refines trajectory with many approaches e.g. Iterative Closest Point, Normal Distributions Transform.");
     ImGui::Text("It exports session as rigid point cloud to single LAZ file).");
+    ImGui::Text("LAZ files are the product of MANDEYE process. Open it with Cloud Compare.");
 
     ImGui::Checkbox("simple_gui", &simple_gui);
     if (!session_loaded)
@@ -437,7 +438,7 @@ void project_gui()
         }
     }
 
-    ImGui::InputInt("increase for better performance, dercease for see more points", &viewer_decmiate_point_cloud);
+    ImGui::InputInt("increase for better performance, decrease for rendering more points", &viewer_decmiate_point_cloud);
     if (viewer_decmiate_point_cloud < 1)
     {
         viewer_decmiate_point_cloud = 1;
@@ -1072,6 +1073,8 @@ void project_gui()
                 }
             }
         }
+        ImGui::SameLine();
+        ImGui::Text("To export in full resolution, close the program and open again, unmark 'simple_gui', unmark 'decimate during load'");
         if (!simple_gui)
         {
 

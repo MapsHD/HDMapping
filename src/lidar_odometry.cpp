@@ -72,6 +72,11 @@ bool fusionConventionEnu = false;
 bool fusionConventionNed = false;
 bool use_motion_from_previous_step = true;
 bool useMultithread = true;
+bool simple_gui = true;
+bool step_1_done = false;
+bool step_2_done = false;
+bool step_3_done = false;
+
 struct WorkerData
 {
     std::vector<Point3Di> intermediate_points;
@@ -532,93 +537,106 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_gui v0.19"))
+    if (ImGui::Begin("lidar_odometry_step_1 v0.20"))
     {
-        ImGui::SliderFloat("mouse_sensitivity_xy", &mouse_sensitivity, 0.1, 10);
-        ImGui::Text(("Working directory: " + working_directory).c_str());
+        ImGui::Text("This program is first step in MANDEYE process.");
+        ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
+        ImGui::Text("It saves session.json file in 'Working directory'.");
+        ImGui::Text("Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program.");
+        ImGui::Checkbox("simple_gui", &simple_gui);
+        if (!simple_gui)
+        {
+            ImGui::SliderFloat("mouse_sensitivity_xy", &mouse_sensitivity, 0.1, 10);
+        }
+        ImGui::Text(("Working directory ('session.json' will be saved here): '" + working_directory + "'").c_str());
         // ImGui::Checkbox("show_all_points", &show_all_points);
-        ImGui::Checkbox("show_initial_points", &show_initial_points);
-        ImGui::Checkbox("show_trajectory", &show_trajectory);
-        ImGui::SameLine();
-        ImGui::Checkbox("show_trajectory_as_axes", &show_trajectory_as_axes);
-        // ImGui::Checkbox("show_covs", &show_covs);
-        ImGui::InputDouble("normal distributions transform bucket size X", &in_out_params.resolution_X);
-        if (in_out_params.resolution_X < 0.2)
+        if (!simple_gui)
         {
-            in_out_params.resolution_X = 0.2;
-        }
-        ImGui::InputDouble("normal distributions transform bucket size Y", &in_out_params.resolution_Y);
-        if (in_out_params.resolution_Y < 0.2)
-        {
-            in_out_params.resolution_Y = 0.2;
-        }
-        ImGui::InputDouble("normal distributions transform bucket size Z", &in_out_params.resolution_Z);
-        if (in_out_params.resolution_Z < 0.2)
-        {
-            in_out_params.resolution_Z = 0.2;
-        }
-
-        ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed)", &filter_threshold_xy);
-
-        ImGui::InputDouble("decimation (larger value of decimation better performance, but worse accuracy)", &decimation);
-        ImGui::InputInt("number iterations", &nr_iter);
-        ImGui::InputDouble("sliding window trajectory length threshold", &sliding_window_trajectory_length_threshold);
-        ImGui::InputInt("threshold initial points", &threshold_initial_points);
-
-        ImGui::Checkbox("fusionConventionNwu", &fusionConventionNwu);
-        ImGui::Checkbox("use_multithread", &useMultithread);
-        if (fusionConventionNwu)
-        {
-            // fusionConventionNwu
-            fusionConventionEnu = false;
-            fusionConventionNed = false;
-        }
-        ImGui::Checkbox("fusionConventionEnu", &fusionConventionEnu);
-        if (fusionConventionEnu)
-        {
-            fusionConventionNwu = false;
-            // fusionConventionEnu
-            fusionConventionNed = false;
-        }
-        ImGui::Checkbox("fusionConventionNed", &fusionConventionNed);
-        if (fusionConventionNed)
-        {
-            fusionConventionNwu = false;
-            fusionConventionEnu = false;
-            // fusionConventionNed
-        }
-
-        if (!fusionConventionNwu && !fusionConventionEnu && !fusionConventionNed)
-        {
-            fusionConventionNwu = true;
-        }
-
-        ImGui::Checkbox("use_motion_from_previous_step", &use_motion_from_previous_step);
-
-        if (ImGui::Button("load data"))
-        {
-            static std::shared_ptr<pfd::open_file> open_file;
-            std::vector<std::string> input_file_names;
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
+            ImGui::Checkbox("show_initial_points", &show_initial_points);
+            ImGui::Checkbox("show_trajectory", &show_trajectory);
+            ImGui::SameLine();
+            ImGui::Checkbox("show_trajectory_as_axes", &show_trajectory_as_axes);
+            // ImGui::Checkbox("show_covs", &show_covs);
+            ImGui::InputDouble("normal distributions transform bucket size X", &in_out_params.resolution_X);
+            if (in_out_params.resolution_X < 0.2)
             {
-                std::vector<std::string> filters;
-                auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
-                for (int i = 0; i < sel.size(); i++)
+                in_out_params.resolution_X = 0.2;
+            }
+            ImGui::InputDouble("normal distributions transform bucket size Y", &in_out_params.resolution_Y);
+            if (in_out_params.resolution_Y < 0.2)
+            {
+                in_out_params.resolution_Y = 0.2;
+            }
+            ImGui::InputDouble("normal distributions transform bucket size Z", &in_out_params.resolution_Z);
+            if (in_out_params.resolution_Z < 0.2)
+            {
+                in_out_params.resolution_Z = 0.2;
+            }
+
+            ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed)", &filter_threshold_xy);
+
+            ImGui::InputDouble("decimation (larger value of decimation better performance, but worse accuracy)", &decimation);
+            ImGui::InputInt("number iterations", &nr_iter);
+            ImGui::InputDouble("sliding window trajectory length threshold", &sliding_window_trajectory_length_threshold);
+            ImGui::InputInt("threshold initial points", &threshold_initial_points);
+
+            ImGui::Checkbox("fusionConventionNwu", &fusionConventionNwu);
+            ImGui::Checkbox("use_multithread", &useMultithread);
+            if (fusionConventionNwu)
+            {
+                // fusionConventionNwu
+                fusionConventionEnu = false;
+                fusionConventionNed = false;
+            }
+            ImGui::Checkbox("fusionConventionEnu", &fusionConventionEnu);
+            if (fusionConventionEnu)
+            {
+                fusionConventionNwu = false;
+                // fusionConventionEnu
+                fusionConventionNed = false;
+            }
+            ImGui::Checkbox("fusionConventionNed", &fusionConventionNed);
+            if (fusionConventionNed)
+            {
+                fusionConventionNwu = false;
+                fusionConventionEnu = false;
+                // fusionConventionNed
+            }
+
+            if (!fusionConventionNwu && !fusionConventionEnu && !fusionConventionNed)
+            {
+                fusionConventionNwu = true;
+            }
+
+            ImGui::Checkbox("use_motion_from_previous_step", &use_motion_from_previous_step);
+        }
+        if (!step_1_done)
+        {
+
+            if (ImGui::Button("load data (step 1)"))
+            {
+                static std::shared_ptr<pfd::open_file> open_file;
+                std::vector<std::string> input_file_names;
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+                const auto t = [&]()
                 {
-                    input_file_names.push_back(sel[i]);
-                    // std::cout << "las file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
+                    std::vector<std::string> filters;
+                    auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
+                    for (int i = 0; i < sel.size(); i++)
+                    {
+                        input_file_names.push_back(sel[i]);
+                        // std::cout << "las file: '" << input_file_name << "'" << std::endl;
+                    }
+                };
+                std::thread t1(t);
+                t1.join();
 
-            std::sort(std::begin(input_file_names), std::end(input_file_names));
+                std::sort(std::begin(input_file_names), std::end(input_file_names));
 
-            std::vector<std::string> csv_files;
-            std::vector<std::string> laz_files;
-            std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
-                          {
+                std::vector<std::string> csv_files;
+                std::vector<std::string> laz_files;
+                std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
+                              {
                     if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
                     {
                         laz_files.push_back(fileName);
@@ -628,477 +646,926 @@ void lidar_odometry_gui()
                         csv_files.push_back(fileName);
                     } });
 
-            if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
-            {
-                working_directory = fs::path(input_file_names[0]).parent_path().string();
-                fs::path wdp = fs::path(input_file_names[0]).parent_path();
-                wdp /= "preview";
-                if (!fs::exists(wdp))
+                if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
                 {
-                    fs::create_directory(wdp);
-                }
+                    working_directory = fs::path(input_file_names[0]).parent_path().string();
+                    fs::path wdp = fs::path(input_file_names[0]).parent_path();
+                    wdp /= "preview";
+                    if (!fs::exists(wdp))
+                    {
+                        fs::create_directory(wdp);
+                    }
 
-                working_directory_preview = wdp.string();
+                    working_directory_preview = wdp.string();
 
-                for (size_t i = 0; i < input_file_names.size(); i++)
-                {
-                    std::cout << input_file_names[i] << std::endl;
-                }
-                std::cout << "loading imu" << std::endl;
-                std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data;
+                    for (size_t i = 0; i < input_file_names.size(); i++)
+                    {
+                        std::cout << input_file_names[i] << std::endl;
+                    }
+                    std::cout << "loading imu" << std::endl;
+                    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data;
 
-                std::for_each(std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string &fn)
-                              {
+                    std::for_each(std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string &fn)
+                                  {
                     auto imu = load_imu(fn.c_str());
                     std::cout << fn << std::endl;
                     imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu)); });
 
-                std::cout << "loading points" << std::endl;
-                std::vector<std::vector<Point3Di>> pointsPerFile;
-                pointsPerFile.resize(laz_files.size());
+                    std::cout << "loading points" << std::endl;
+                    std::vector<std::vector<Point3Di>> pointsPerFile;
+                    pointsPerFile.resize(laz_files.size());
 
-                std::cout << "start std::transform" << std::endl;
-                std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [](const std::string &fn)
-                               {
-                                   return load_point_cloud(fn.c_str());
-                                   // std::unique_lock lck(mutex);
+                    std::cout << "start std::transform" << std::endl;
+                    std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [](const std::string &fn)
+                                   {
+                                       return load_point_cloud(fn.c_str());
+                                       // std::unique_lock lck(mutex);
 
-                                   // std::cout << fn << std::endl;
-                                   //
-                               });
-                std::cout << "std::transform finished" << std::endl;
-                // std::cout << "start points.insert" << std::endl;
-                // std::vector<Point3Di> points;
-                // int count = 1;
-                // for (auto &pp : pointsPerFile)
-                //{
-                //     points.insert(std::end(points), std::begin(pp), std::end(pp));
-                //     pp.clear();
-                //     std::cout << "inserted [" << count << "] of " << pointsPerFile.size() << std::endl;
-                //     count++;
-                // }
-                // std::cout << "points.insert finished" << std::endl;
-
-                //
-                FusionAhrs ahrs;
-                FusionAhrsInitialise(&ahrs);
-
-                if (fusionConventionNwu)
-                {
-                    ahrs.settings.convention = FusionConventionNwu;
-                }
-                if (fusionConventionEnu)
-                {
-                    ahrs.settings.convention = FusionConventionEnu;
-                }
-                if (fusionConventionNed)
-                {
-                    ahrs.settings.convention = FusionConventionNed;
-                }
-
-                std::map<double, Eigen::Matrix4d> trajectory;
-
-                int counter = 1;
-                for (const auto &[timestamp, gyr, acc] : imu_data)
-                {
-                    const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
-                    const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
-
-                    FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-
-                    FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-                    Eigen::Quaterniond d{quat.element.w, quat.element.x, quat.element.y, quat.element.z};
-                    Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
-                    t.rotate(d);
+                                       // std::cout << fn << std::endl;
+                                       //
+                                   });
+                    std::cout << "std::transform finished" << std::endl;
+                    // std::cout << "start points.insert" << std::endl;
+                    // std::vector<Point3Di> points;
+                    // int count = 1;
+                    // for (auto &pp : pointsPerFile)
+                    //{
+                    //     points.insert(std::end(points), std::begin(pp), std::end(pp));
+                    //     pp.clear();
+                    //     std::cout << "inserted [" << count << "] of " << pointsPerFile.size() << std::endl;
+                    //     count++;
+                    // }
+                    // std::cout << "points.insert finished" << std::endl;
 
                     //
-                    // TaitBryanPose rot_y;
-                    // rot_y.px = rot_y.py = rot_y.pz = rot_y.px = rot_y.py = rot_y.pz;
-                    // rot_y.fi = -5 * M_PI / 180.0;
-                    // Eigen::Affine3d m_rot_y = affine_matrix_from_pose_tait_bryan(rot_y);
-                    // t = t * m_rot_y;
-                    //
+                    FusionAhrs ahrs;
+                    FusionAhrsInitialise(&ahrs);
 
-                    trajectory[timestamp] = t.matrix();
-                    const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
-                    counter++;
-                    if (counter % 100 == 0)
+                    if (fusionConventionNwu)
                     {
-                        printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+                        ahrs.settings.convention = FusionConventionNwu;
                     }
-                }
-
-                int number_of_points = 0;
-                for (const auto &pp : pointsPerFile)
-                {
-                    number_of_points += pp.size();
-                }
-                std::cout << "number of points: " << number_of_points << std::endl;
-                std::cout << "start transforming points" << std::endl;
-
-                /*counter = 1; // ToDo make it faster
-                for (auto &p : points)
-                {
-                    Eigen::Matrix4d t = getInterpolatedPose(trajectory, p.timestamp);
-                    if (!t.isZero())
+                    if (fusionConventionEnu)
                     {
-                        Eigen::Affine3d tt(t);
-                        Eigen::Vector3d tp = tt * p.point;
-                        all_points.push_back(tp);
+                        ahrs.settings.convention = FusionConventionEnu;
                     }
-                    if (counter % 1000000 == 0)
+                    if (fusionConventionNed)
                     {
-                        printf("tranform point %d of %d \n", counter, points.size());
+                        ahrs.settings.convention = FusionConventionNed;
                     }
-                    counter++;
-                }*/
 
-                // for (int i = 0; i < threshold_initial_points; i++)
-                //{
-                //     auto p = points[i];
-                //     // p.point = all_points[i];
-                //     initial_points.push_back(p);
-                // }
+                    std::map<double, Eigen::Matrix4d> trajectory;
 
-                int number_of_initial_points = 0;
-                double timestamp_begin;
-                for (const auto &pp : pointsPerFile)
-                {
-                    // number_of_points += pp.size();
-                    for (const auto &p : pp)
+                    int counter = 1;
+                    for (const auto &[timestamp, gyr, acc] : imu_data)
                     {
-                        number_of_initial_points++;
-                        initial_points.push_back(p);
+                        const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
+                        const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
+
+                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
+
+                        FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
+
+                        Eigen::Quaterniond d{quat.element.w, quat.element.x, quat.element.y, quat.element.z};
+                        Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
+                        t.rotate(d);
+
+                        //
+                        // TaitBryanPose rot_y;
+                        // rot_y.px = rot_y.py = rot_y.pz = rot_y.px = rot_y.py = rot_y.pz;
+                        // rot_y.fi = -5 * M_PI / 180.0;
+                        // Eigen::Affine3d m_rot_y = affine_matrix_from_pose_tait_bryan(rot_y);
+                        // t = t * m_rot_y;
+                        //
+
+                        trajectory[timestamp] = t.matrix();
+                        const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+                        counter++;
+                        if (counter % 100 == 0)
+                        {
+                            printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+                        }
+                    }
+
+                    int number_of_points = 0;
+                    for (const auto &pp : pointsPerFile)
+                    {
+                        number_of_points += pp.size();
+                    }
+                    std::cout << "number of points: " << number_of_points << std::endl;
+                    std::cout << "start transforming points" << std::endl;
+
+                    /*counter = 1; // ToDo make it faster
+                    for (auto &p : points)
+                    {
+                        Eigen::Matrix4d t = getInterpolatedPose(trajectory, p.timestamp);
+                        if (!t.isZero())
+                        {
+                            Eigen::Affine3d tt(t);
+                            Eigen::Vector3d tp = tt * p.point;
+                            all_points.push_back(tp);
+                        }
+                        if (counter % 1000000 == 0)
+                        {
+                            printf("tranform point %d of %d \n", counter, points.size());
+                        }
+                        counter++;
+                    }*/
+
+                    // for (int i = 0; i < threshold_initial_points; i++)
+                    //{
+                    //     auto p = points[i];
+                    //     // p.point = all_points[i];
+                    //     initial_points.push_back(p);
+                    // }
+
+                    int number_of_initial_points = 0;
+                    double timestamp_begin;
+                    for (const auto &pp : pointsPerFile)
+                    {
+                        // number_of_points += pp.size();
+                        for (const auto &p : pp)
+                        {
+                            number_of_initial_points++;
+                            initial_points.push_back(p);
+                            if (number_of_initial_points > threshold_initial_points)
+                            {
+                                timestamp_begin = p.timestamp;
+                                break;
+                            }
+                        }
                         if (number_of_initial_points > threshold_initial_points)
                         {
-                            timestamp_begin = p.timestamp;
                             break;
                         }
                     }
-                    if (number_of_initial_points > threshold_initial_points)
+
+                    // double timestamp_begin = //points[threshold_initial_points - 1].timestamp;
+
+                    std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
+
+                    std::vector<double> timestamps;
+                    std::vector<Eigen::Affine3d> poses;
+                    for (const auto &t : trajectory)
                     {
-                        break;
-                    }
-                }
-
-                // double timestamp_begin = //points[threshold_initial_points - 1].timestamp;
-
-                std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
-
-                std::vector<double> timestamps;
-                std::vector<Eigen::Affine3d> poses;
-                for (const auto &t : trajectory)
-                {
-                    if (t.first >= timestamp_begin)
-                    {
-                        timestamps.push_back(t.first);
-                        Eigen::Affine3d m;
-                        m.matrix() = t.second;
-                        poses.push_back(m);
-                    }
-                }
-
-                std::cout << "poses.size(): " << poses.size() << std::endl;
-
-                int thershold = 20;
-                WorkerData wd;
-                // std::vector<double> temp_ts;
-                // temp_ts.reserve(1000000);
-
-                // int last_point = 0;
-                int index_begin = 0;
-
-                for (size_t i = 0; i < poses.size(); i++)
-                {
-                    if (i % 1000 == 0)
-                    {
-                        std::cout << "preparing data " << i + 1 << " of " << poses.size() << std::endl;
-                    }
-                    wd.intermediate_trajectory.emplace_back(poses[i]);
-                    wd.intermediate_trajectory_motion_model.emplace_back(poses[i]);
-                    wd.intermediate_trajectory_timestamps.emplace_back(timestamps[i]);
-
-                    //
-                    TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(poses[i]);
-                    wd.imu_roll_pitch.emplace_back(tb.om, tb.fi);
-
-                    // temp_ts.emplace_back(timestamps[i]);
-
-                    
-                    if (wd.intermediate_trajectory.size() >= thershold)
-                    {
-                        /*auto index_lower = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[0],
-                                                            [](Point3Di lhs, double rhs) -> bool
-                                                            { return lhs.timestamp < rhs; });
-                        unsigned long long int i_begin = std::distance(points.begin(), index_lower);
-
-                        auto index_upper = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1],
-                                                            [](Point3Di lhs, double rhs) -> bool
-                                                            { return lhs.timestamp < rhs; });
-                        unsigned long long int i_end = std::distance(points.begin(), index_upper);*/
-
-                        std::vector<Point3Di> points;
-                        // for (const auto &pp : pointsPerFile)
-                        //{
-                        //     for (const auto &p : pp)
-                        //     {
-                        //         if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1]){
-                        //             points.push_back(p);
-                        //         }
-                        //     }
-                        // }
-                        bool found = false;
-                        for (int index = index_begin; index < pointsPerFile.size(); index++)
+                        if (t.first >= timestamp_begin)
                         {
-                            for (const auto &p : pointsPerFile[index])
+                            timestamps.push_back(t.first);
+                            Eigen::Affine3d m;
+                            m.matrix() = t.second;
+                            poses.push_back(m);
+                        }
+                    }
+
+                    std::cout << "poses.size(): " << poses.size() << std::endl;
+
+                    int thershold = 20;
+                    WorkerData wd;
+                    // std::vector<double> temp_ts;
+                    // temp_ts.reserve(1000000);
+
+                    // int last_point = 0;
+                    int index_begin = 0;
+
+                    for (size_t i = 0; i < poses.size(); i++)
+                    {
+                        if (i % 1000 == 0)
+                        {
+                            std::cout << "preparing data " << i + 1 << " of " << poses.size() << std::endl;
+                        }
+                        wd.intermediate_trajectory.emplace_back(poses[i]);
+                        wd.intermediate_trajectory_motion_model.emplace_back(poses[i]);
+                        wd.intermediate_trajectory_timestamps.emplace_back(timestamps[i]);
+
+                        //
+                        TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(poses[i]);
+                        wd.imu_roll_pitch.emplace_back(tb.om, tb.fi);
+
+                        // temp_ts.emplace_back(timestamps[i]);
+
+                        if (wd.intermediate_trajectory.size() >= thershold)
+                        {
+                            /*auto index_lower = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[0],
+                                                                [](Point3Di lhs, double rhs) -> bool
+                                                                { return lhs.timestamp < rhs; });
+                            unsigned long long int i_begin = std::distance(points.begin(), index_lower);
+
+                            auto index_upper = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1],
+                                                                [](Point3Di lhs, double rhs) -> bool
+                                                                { return lhs.timestamp < rhs; });
+                            unsigned long long int i_end = std::distance(points.begin(), index_upper);*/
+
+                            std::vector<Point3Di> points;
+                            // for (const auto &pp : pointsPerFile)
+                            //{
+                            //     for (const auto &p : pp)
+                            //     {
+                            //         if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1]){
+                            //             points.push_back(p);
+                            //         }
+                            //     }
+                            // }
+                            bool found = false;
+                            for (int index = index_begin; index < pointsPerFile.size(); index++)
                             {
-                                if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                                for (const auto &p : pointsPerFile[index])
                                 {
-                                    points.push_back(p);
-                                }
-                                if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && !found)
-                                {
-                                    index_begin = index;
-                                    found = true;
-                                }
-                                if (p.timestamp > wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1]){
-                                    break;
+                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                                    {
+                                        points.push_back(p);
+                                    }
+                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && !found)
+                                    {
+                                        index_begin = index;
+                                        found = true;
+                                    }
+                                    if (p.timestamp > wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                                    {
+                                        break;
+                                    }
                                 }
                             }
-                        }
 
-                        // for (unsigned long long int k = i_begin; k < i_end; k++)
-                        //if (i % 1000 == 0)
-                        //{
-                            //std::cout << "points.size() " << points.size() << std::endl;
-                        //}
-
-                        for (unsigned long long int k = 0; k < points.size(); k++)
-                        {
-                            //if (points[k].timestamp > wd.intermediate_trajectory_timestamps[0] && points[k].timestamp < wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                            // for (unsigned long long int k = i_begin; k < i_end; k++)
+                            // if (i % 1000 == 0)
                             //{
+                            // std::cout << "points.size() " << points.size() << std::endl;
+                            //}
+
+                            for (unsigned long long int k = 0; k < points.size(); k++)
+                            {
+                                // if (points[k].timestamp > wd.intermediate_trajectory_timestamps[0] && points[k].timestamp < wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                                //{
                                 auto p = points[k];
                                 auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp);
                                 p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
                                 wd.intermediate_points.emplace_back(p);
                                 wd.original_points.emplace_back(p);
-                            //}
+                                //}
+                            }
+
+                            if (decimation > 0.0)
+                            {
+                                wd.intermediate_points = decimate(wd.intermediate_points, decimation, decimation, decimation);
+                            }
+
+                            worker_data.push_back(wd);
+                            wd.intermediate_points.clear();
+                            wd.original_points.clear();
+                            wd.intermediate_trajectory.clear();
+                            wd.intermediate_trajectory_motion_model.clear();
+                            wd.intermediate_trajectory_timestamps.clear();
+                            wd.imu_roll_pitch.clear();
+
+                            wd.intermediate_points.reserve(1000000);
+                            wd.original_points.reserve(1000000);
+                            wd.intermediate_trajectory.reserve(1000);
+                            wd.intermediate_trajectory_motion_model.reserve(1000);
+                            wd.intermediate_trajectory_timestamps.reserve(1000);
+                            wd.imu_roll_pitch.reserve(1000);
+
+                            // temp_ts.clear();
                         }
-
-                        if (decimation > 0.0)
-                        {
-                            wd.intermediate_points = decimate(wd.intermediate_points, decimation, decimation, decimation);
-                        }
-
-                        worker_data.push_back(wd);
-                        wd.intermediate_points.clear();
-                        wd.original_points.clear();
-                        wd.intermediate_trajectory.clear();
-                        wd.intermediate_trajectory_motion_model.clear();
-                        wd.intermediate_trajectory_timestamps.clear();
-                        wd.imu_roll_pitch.clear();
-
-                        wd.intermediate_points.reserve(1000000);
-                        wd.original_points.reserve(1000000);
-                        wd.intermediate_trajectory.reserve(1000);
-                        wd.intermediate_trajectory_motion_model.reserve(1000);
-                        wd.intermediate_trajectory_timestamps.reserve(1000);
-                        wd.imu_roll_pitch.reserve(1000);
-
-                        // temp_ts.clear();
                     }
+                    m_g = worker_data[0].intermediate_trajectory[0];
+                    step_1_done = true;
                 }
-                m_g = worker_data[0].intermediate_trajectory[0];
+                else
+                {
+                    std::cout << "please select files correctly" << std::endl;
+                }
             }
-            else
-            {
-                std::cout << "please select files correctly" << std::endl;
-            }
+            ImGui::SameLine();
+            ImGui::Text("Select all imu *.csv and lidar *.laz files produced by MANDEYE saved in 'continousScanning_*' folder");
         }
-        if (ImGui::Button("compute_all"))
+        if (step_1_done && !step_2_done)
         {
-            if (worker_data.size() != 0)
+            if (ImGui::Button("compute_all (step 2)"))
             {
-
-                std::chrono::time_point<std::chrono::system_clock> start, end;
-                start = std::chrono::system_clock::now();
-                double acc_distance = 0.0;
-                std::vector<Point3Di> points_global;
-
-                Eigen::Affine3d m_last = m_g;
-                auto tmp = worker_data[0].intermediate_trajectory;
-
-                worker_data[0].intermediate_trajectory[0] = m_last;
-                for (int k = 1; k < tmp.size(); k++)
+                if (worker_data.size() != 0)
                 {
-                    Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
-                    m_last = m_last * m_update;
-                    worker_data[0].intermediate_trajectory[k] = m_last;
-                }
-                worker_data[0].intermediate_trajectory_motion_model = worker_data[0].intermediate_trajectory;
 
-                auto pp = initial_points;
-                for (int i = 0; i < pp.size(); i++)
-                {
-                    pp[i].point = m_g * pp[i].point;
-                }
-                update_rgd(in_out_params, buckets, pp);
+                    std::chrono::time_point<std::chrono::system_clock> start, end;
+                    start = std::chrono::system_clock::now();
+                    double acc_distance = 0.0;
+                    std::vector<Point3Di> points_global;
 
-                for (int i = 0; i < worker_data.size(); i++)
-                {
-                    // std::cout << "computing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << std::endl;
-                    Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
-                    if (i > 1 && use_motion_from_previous_step)
+                    Eigen::Affine3d m_last = m_g;
+                    auto tmp = worker_data[0].intermediate_trajectory;
+
+                    worker_data[0].intermediate_trajectory[0] = m_last;
+                    for (int k = 1; k < tmp.size(); k++)
                     {
-                        Eigen::Affine3d m_relative = worker_data[i - 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].inverse() *
-                                                     worker_data[i - 1].intermediate_trajectory[0];
+                        Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
+                        m_last = m_last * m_update;
+                        worker_data[0].intermediate_trajectory[k] = m_last;
+                    }
+                    worker_data[0].intermediate_trajectory_motion_model = worker_data[0].intermediate_trajectory;
 
-                        mean_shift /= (worker_data[i].intermediate_trajectory.size());
+                    auto pp = initial_points;
+                    for (int i = 0; i < pp.size(); i++)
+                    {
+                        pp[i].point = m_g * pp[i].point;
+                    }
+                    update_rgd(in_out_params, buckets, pp);
 
-                        if (mean_shift.norm() > 1.0)
+                    for (int i = 0; i < worker_data.size(); i++)
+                    {
+                        // std::cout << "computing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << std::endl;
+                        Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
+                        if (i > 1 && use_motion_from_previous_step)
                         {
-                            mean_shift = Eigen::Vector3d(1.0, 1.0, 1.0);
-                        }
+                            Eigen::Affine3d m_relative = worker_data[i - 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].inverse() *
+                                                         worker_data[i - 1].intermediate_trajectory[0];
 
-                        Eigen::Affine3d m_mean_shift = Eigen::Affine3d::Identity();
-                        m_mean_shift.translation() = mean_shift;
+                            mean_shift /= (worker_data[i].intermediate_trajectory.size());
 
-                        std::vector<Eigen::Affine3d> new_trajectory;
-                        Eigen::Affine3d current_node = worker_data[i].intermediate_trajectory[0];
-                        new_trajectory.push_back(current_node);
+                            if (mean_shift.norm() > 1.0)
+                            {
+                                mean_shift = Eigen::Vector3d(1.0, 1.0, 1.0);
+                            }
 
-                        for (int tr = 1; tr < worker_data[i].intermediate_trajectory.size(); tr++)
-                        {
-                            current_node = current_node * (worker_data[i].intermediate_trajectory[tr - 1].inverse() * worker_data[i].intermediate_trajectory[tr]);
-                            current_node = current_node * m_mean_shift;
+                            Eigen::Affine3d m_mean_shift = Eigen::Affine3d::Identity();
+                            m_mean_shift.translation() = mean_shift;
+
+                            std::vector<Eigen::Affine3d> new_trajectory;
+                            Eigen::Affine3d current_node = worker_data[i].intermediate_trajectory[0];
                             new_trajectory.push_back(current_node);
-                        }
 
-                        worker_data[i].intermediate_trajectory = new_trajectory;
-                        ////////////////////////////////////////////////////////////////////////
-                        std::vector<Eigen::Affine3d> new_trajectory_motion_model;
-                        Eigen::Affine3d current_node_motion_model = worker_data[i].intermediate_trajectory_motion_model[0];
-                        new_trajectory_motion_model.push_back(current_node_motion_model);
+                            for (int tr = 1; tr < worker_data[i].intermediate_trajectory.size(); tr++)
+                            {
+                                current_node = current_node * (worker_data[i].intermediate_trajectory[tr - 1].inverse() * worker_data[i].intermediate_trajectory[tr]);
+                                current_node = current_node * m_mean_shift;
+                                new_trajectory.push_back(current_node);
+                            }
 
-                        for (int tr = 1; tr < worker_data[i].intermediate_trajectory_motion_model.size(); tr++)
-                        {
-                            current_node_motion_model = current_node_motion_model * (worker_data[i].intermediate_trajectory_motion_model[tr - 1].inverse() * worker_data[i].intermediate_trajectory_motion_model[tr]);
-                            current_node_motion_model = current_node_motion_model * m_mean_shift;
+                            worker_data[i].intermediate_trajectory = new_trajectory;
+                            ////////////////////////////////////////////////////////////////////////
+                            std::vector<Eigen::Affine3d> new_trajectory_motion_model;
+                            Eigen::Affine3d current_node_motion_model = worker_data[i].intermediate_trajectory_motion_model[0];
                             new_trajectory_motion_model.push_back(current_node_motion_model);
+
+                            for (int tr = 1; tr < worker_data[i].intermediate_trajectory_motion_model.size(); tr++)
+                            {
+                                current_node_motion_model = current_node_motion_model * (worker_data[i].intermediate_trajectory_motion_model[tr - 1].inverse() * worker_data[i].intermediate_trajectory_motion_model[tr]);
+                                current_node_motion_model = current_node_motion_model * m_mean_shift;
+                                new_trajectory_motion_model.push_back(current_node_motion_model);
+                            }
+
+                            worker_data[i].intermediate_trajectory_motion_model = new_trajectory_motion_model;
                         }
 
-                        worker_data[i].intermediate_trajectory_motion_model = new_trajectory_motion_model;
-                    }
-
-                    bool add_pitch_roll_constraint = false;
-                    TaitBryanPose pose;
-                    pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
-
-                    double residual1;
-                    double residual2;
-                    residual_constraint_fixed_optimization_parameter(residual1, normalize_angle(worker_data[i].imu_roll_pitch[0].first), normalize_angle(pose.om));
-                    residual_constraint_fixed_optimization_parameter(residual2, normalize_angle(worker_data[i].imu_roll_pitch[0].second), normalize_angle(pose.fi));
-
-                    if (fabs(worker_data[i].imu_roll_pitch[0].first) < 30.0 / 180.0 * M_PI && fabs(worker_data[i].imu_roll_pitch[0].second) < 30.0 / 180.0 * M_PI)
-                    {
-                        if (consecutive_distance > 10.0)
-                        {
-                            add_pitch_roll_constraint = true;
-                            consecutive_distance = 0.0;
-                        }
-                    }
-
-                    if (add_pitch_roll_constraint)
-                    {
-                        std::cout << "residual_imu_roll_deg before: " << residual1 / M_PI * 180.0 << std::endl;
-                        std::cout << "residual_imu_pitch_deg before: " << residual2 / M_PI * 180.0 << std::endl;
-                    }
-
-                    std::chrono::time_point<std::chrono::system_clock> start1, end1;
-                    start1 = std::chrono::system_clock::now();
-
-                    for (int iter = 0; iter < nr_iter; iter++)
-                    {
-                        optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
-                                 in_out_params, buckets, useMultithread, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch);
-                    }
-                    end1 = std::chrono::system_clock::now();
-                    std::chrono::duration<double> elapsed_seconds1 = end1 - start1;
-                    std::cout << "optimizing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << " elapsed time: " << elapsed_seconds1.count() << std::endl;
-
-                    if (add_pitch_roll_constraint)
-                    {
+                        bool add_pitch_roll_constraint = false;
+                        TaitBryanPose pose;
                         pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
 
+                        double residual1;
+                        double residual2;
                         residual_constraint_fixed_optimization_parameter(residual1, normalize_angle(worker_data[i].imu_roll_pitch[0].first), normalize_angle(pose.om));
                         residual_constraint_fixed_optimization_parameter(residual2, normalize_angle(worker_data[i].imu_roll_pitch[0].second), normalize_angle(pose.fi));
 
-                        std::cout << "residual_imu_roll_deg after: " << residual1 / M_PI * 180.0 << std::endl;
-                        std::cout << "residual_imu_pitch_deg after: " << residual2 / M_PI * 180.0 << std::endl;
-                    }
-
-                    // align to reference
-                    if (reference_points.size() > 0)
-                    {
-                        std::cout << "align to reference" << std::endl;
-                        Eigen::Affine3d m_first = worker_data[i].intermediate_trajectory[0];
-                        Eigen::Affine3d m_first_inv = m_first.inverse();
-
-                        // create rigid scan
-                        std::vector<Point3Di> local_points;
-                        for (int k = 0; k < worker_data[i].intermediate_points.size(); k++)
+                        if (fabs(worker_data[i].imu_roll_pitch[0].first) < 30.0 / 180.0 * M_PI && fabs(worker_data[i].imu_roll_pitch[0].second) < 30.0 / 180.0 * M_PI)
                         {
-                            Point3Di p = worker_data[i].intermediate_points[k];
-                            int index_pose = p.index_pose;
-                            p.point = worker_data[i].intermediate_trajectory[index_pose] * p.point;
-                            p.point = m_first_inv * p.point;
-                            local_points.push_back(p);
+                            if (consecutive_distance > 10.0)
+                            {
+                                add_pitch_roll_constraint = true;
+                                consecutive_distance = 0.0;
+                            }
                         }
-                        // std::cout << "before " << m_first.matrix() << std::endl;
-                        if (decimation > 0)
+
+                        if (add_pitch_roll_constraint)
                         {
-                            local_points = decimate(local_points, decimation, decimation, decimation);
+                            std::cout << "residual_imu_roll_deg before: " << residual1 / M_PI * 180.0 << std::endl;
+                            std::cout << "residual_imu_pitch_deg before: " << residual2 / M_PI * 180.0 << std::endl;
                         }
+
+                        std::chrono::time_point<std::chrono::system_clock> start1, end1;
+                        start1 = std::chrono::system_clock::now();
+
                         for (int iter = 0; iter < nr_iter; iter++)
                         {
-                            align_to_reference(in_out_params, local_points, m_first, reference_buckets);
+                            optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
+                                     in_out_params, buckets, useMultithread, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch);
                         }
+                        end1 = std::chrono::system_clock::now();
+                        std::chrono::duration<double> elapsed_seconds1 = end1 - start1;
+                        std::cout << "optimizing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << " elapsed time: " << elapsed_seconds1.count() << std::endl;
 
-                        auto tmp = worker_data[i].intermediate_trajectory;
-
-                        worker_data[i].intermediate_trajectory[0] = m_first;
-
-                        for (int k = 1; k < tmp.size(); k++)
+                        if (add_pitch_roll_constraint)
                         {
-                            Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
-                            m_first = m_first * m_update;
-                            worker_data[i].intermediate_trajectory[k] = m_first;
+                            pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
+
+                            residual_constraint_fixed_optimization_parameter(residual1, normalize_angle(worker_data[i].imu_roll_pitch[0].first), normalize_angle(pose.om));
+                            residual_constraint_fixed_optimization_parameter(residual2, normalize_angle(worker_data[i].imu_roll_pitch[0].second), normalize_angle(pose.fi));
+
+                            std::cout << "residual_imu_roll_deg after: " << residual1 / M_PI * 180.0 << std::endl;
+                            std::cout << "residual_imu_pitch_deg after: " << residual2 / M_PI * 180.0 << std::endl;
                         }
+
+                        // align to reference
+                        if (reference_points.size() > 0)
+                        {
+                            std::cout << "align to reference" << std::endl;
+                            Eigen::Affine3d m_first = worker_data[i].intermediate_trajectory[0];
+                            Eigen::Affine3d m_first_inv = m_first.inverse();
+
+                            // create rigid scan
+                            std::vector<Point3Di> local_points;
+                            for (int k = 0; k < worker_data[i].intermediate_points.size(); k++)
+                            {
+                                Point3Di p = worker_data[i].intermediate_points[k];
+                                int index_pose = p.index_pose;
+                                p.point = worker_data[i].intermediate_trajectory[index_pose] * p.point;
+                                p.point = m_first_inv * p.point;
+                                local_points.push_back(p);
+                            }
+                            // std::cout << "before " << m_first.matrix() << std::endl;
+                            if (decimation > 0)
+                            {
+                                local_points = decimate(local_points, decimation, decimation, decimation);
+                            }
+                            for (int iter = 0; iter < nr_iter; iter++)
+                            {
+                                align_to_reference(in_out_params, local_points, m_first, reference_buckets);
+                            }
+
+                            auto tmp = worker_data[i].intermediate_trajectory;
+
+                            worker_data[i].intermediate_trajectory[0] = m_first;
+
+                            for (int k = 1; k < tmp.size(); k++)
+                            {
+                                Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
+                                m_first = m_first * m_update;
+                                worker_data[i].intermediate_trajectory[k] = m_first;
+                            }
+                            worker_data[i].intermediate_trajectory_motion_model = worker_data[i].intermediate_trajectory;
+                        }
+
+                        // temp save
+                        if (i % 100 == 0)
+                        {
+                            std::vector<Point3Di> global_points;
+                            for (int k = 0; k < worker_data[i].intermediate_points.size(); k++)
+                            {
+                                Point3Di p = worker_data[i].intermediate_points[k];
+                                int index_pose = p.index_pose;
+                                p.point = worker_data[i].intermediate_trajectory[index_pose] * p.point;
+                                global_points.push_back(p);
+                            }
+                            std::string fn = working_directory_preview + "/temp_point_cloud_" + std::to_string(i) + ".laz";
+                            saveLaz(fn.c_str(), global_points);
+                        }
+                        acc_distance += ((worker_data[i].intermediate_trajectory[0].inverse()) *
+                                         worker_data[i].intermediate_trajectory[worker_data[i].intermediate_trajectory.size() - 1])
+                                            .translation()
+                                            .norm();
+
+                        // update
+                        for (int j = i + 1; j < worker_data.size(); j++)
+                        {
+                            Eigen::Affine3d m_last = worker_data[j - 1].intermediate_trajectory[worker_data[j - 1].intermediate_trajectory.size() - 1];
+                            auto tmp = worker_data[j].intermediate_trajectory;
+
+                            worker_data[j].intermediate_trajectory[0] = m_last;
+                            for (int k = 1; k < tmp.size(); k++)
+                            {
+                                Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
+                                m_last = m_last * m_update;
+                                worker_data[j].intermediate_trajectory[k] = m_last;
+                            }
+                        }
+
+                        for (int j = 0; j < worker_data[i].intermediate_points.size(); j++)
+                        {
+                            Point3Di pp = worker_data[i].intermediate_points[j];
+                            pp.point = worker_data[i].intermediate_trajectory[worker_data[i].intermediate_points[j].index_pose] * pp.point;
+                            points_global.push_back(pp);
+                        }
+
+                        // if(reference_points.size() == 0){
+                        if (acc_distance > sliding_window_trajectory_length_threshold)
+                        {
+                            std::chrono::time_point<std::chrono::system_clock> startu, endu;
+                            startu = std::chrono::system_clock::now();
+
+                            if (reference_points.size() == 0)
+                            {
+                                buckets.clear();
+                            }
+
+                            std::vector<Point3Di> points_global_new;
+                            points_global_new.reserve(points_global.size() / 2 + 1);
+                            for (int k = points_global.size() / 2; k < points_global.size(); k++)
+                            {
+                                points_global_new.emplace_back(points_global[k]);
+                            }
+
+                            acc_distance = 0;
+                            points_global = points_global_new;
+
+                            // decimate
+                            if (decimation > 0)
+                            {
+                                decimate(points_global, decimation, decimation, decimation);
+                            }
+                            update_rgd(in_out_params, buckets, points_global);
+                            //
+                            endu = std::chrono::system_clock::now();
+
+                            std::chrono::duration<double> elapsed_secondsu = endu - startu;
+                            std::time_t end_timeu = std::chrono::system_clock::to_time_t(endu);
+
+                            std::cout << "finished computation at " << std::ctime(&end_timeu)
+                                      << "elapsed time update: " << elapsed_secondsu.count() << "s\n";
+                            // std::cout << "update" << std::endl;
+                        }
+                        else
+                        {
+                            std::vector<Point3Di> pg;
+                            for (int j = 0; j < worker_data[i].intermediate_points.size(); j++)
+                            {
+                                Point3Di pp = worker_data[i].intermediate_points[j];
+                                pp.point = worker_data[i].intermediate_trajectory[worker_data[i].intermediate_points[j].index_pose] * pp.point;
+                                pg.push_back(pp);
+                            }
+                            update_rgd(in_out_params, buckets, pg);
+                        }
+
+                        if (i > 1)
+                        {
+                            double translation = (worker_data[i - 1].intermediate_trajectory[0].translation() -
+                                                  worker_data[i - 2].intermediate_trajectory[0].translation())
+                                                     .norm();
+                            consecutive_distance += translation;
+                            // std::cout << "consecutive_distance " << consecutive_distance << std::endl;
+                        }
+                        //}
+                    }
+
+                    for (int i = 0; i < worker_data.size(); i++)
+                    {
                         worker_data[i].intermediate_trajectory_motion_model = worker_data[i].intermediate_trajectory;
                     }
 
-                    // temp save
-                    if (i % 100 == 0)
+                    end = std::chrono::system_clock::now();
+
+                    std::chrono::duration<double> elapsed_seconds = end - start;
+                    std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+
+                    std::cout << "finished computation at " << std::ctime(&end_time)
+                              << "elapsed time: " << elapsed_seconds.count() << "s\n";
+
+                    // estimate total lenght of trajectory
+                    double length_of_trajectory = 0;
+                    for (int i = 1; i < worker_data.size(); i++)
                     {
-                        std::vector<Point3Di> global_points;
-                        for (int k = 0; k < worker_data[i].intermediate_points.size(); k++)
-                        {
-                            Point3Di p = worker_data[i].intermediate_points[k];
-                            int index_pose = p.index_pose;
-                            p.point = worker_data[i].intermediate_trajectory[index_pose] * p.point;
-                            global_points.push_back(p);
-                        }
-                        std::string fn = working_directory_preview + "/temp_point_cloud_" + std::to_string(i) + ".laz";
-                        saveLaz(fn.c_str(), global_points);
+                        length_of_trajectory += (worker_data[i].intermediate_trajectory[0].translation() - worker_data[i - 1].intermediate_trajectory[0].translation()).norm();
                     }
-                    acc_distance += ((worker_data[i].intermediate_trajectory[0].inverse()) *
-                                     worker_data[i].intermediate_trajectory[worker_data[i].intermediate_trajectory.size() - 1])
-                                        .translation()
-                                        .norm();
+                    std::cout << "length_of_trajectory: " << length_of_trajectory << " [m]" << std::endl;
+                }
+                step_2_done = true;
+            }
+            ImGui::SameLine();
+            ImGui::Text("Press this button for automatic lidar odometry calculation -> it will produce trajectory");
+            // if (ImGui::Button("fix pitch roll"))
+            //{
+            //     fix_ptch_roll(worker_data);
+            // }
+        }
+        if (step_1_done && step_2_done && !step_3_done)
+        {
+            if (ImGui::Button("save result (step 3)"))
+            {
+                // concatenate data
+
+                std::vector<WorkerData> worker_data_concatenated;
+
+                WorkerData wd;
+                int counter = 0;
+                int pose_offset = 0;
+                for (int i = 0; i < worker_data.size(); i++)
+                {
+                    if (i % 1000 == 0)
+                    {
+                        printf("processing worker_data [%d] of %d \n", i + 1, worker_data.size());
+                    }
+                    auto tmp_data = worker_data[i].original_points;
+
+                    for (auto &t : tmp_data)
+                    {
+                        t.index_pose += pose_offset;
+                    }
+
+                    wd.intermediate_trajectory.insert(std::end(wd.intermediate_trajectory),
+                                                      std::begin(worker_data[i].intermediate_trajectory), std::end(worker_data[i].intermediate_trajectory));
+
+                    wd.intermediate_trajectory_timestamps.insert(std::end(wd.intermediate_trajectory_timestamps),
+                                                                 std::begin(worker_data[i].intermediate_trajectory_timestamps), std::end(worker_data[i].intermediate_trajectory_timestamps));
+
+                    wd.original_points.insert(std::end(wd.original_points),
+                                              std::begin(tmp_data), std::end(tmp_data));
+
+                    pose_offset += worker_data[i].intermediate_trajectory.size();
+
+                    counter++;
+                    if (counter > 50)
+                    {
+                        worker_data_concatenated.push_back(wd);
+                        wd.intermediate_trajectory.clear();
+                        wd.intermediate_trajectory_timestamps.clear();
+                        wd.original_points.clear();
+                        counter = 0;
+                        pose_offset = 0;
+                    }
+                }
+
+                if (counter > 10)
+                {
+                    worker_data_concatenated.push_back(wd);
+                }
+
+                std::vector<Eigen::Affine3d> m_poses;
+                std::vector<std::string> file_names;
+                for (int i = 0; i < worker_data_concatenated.size(); i++)
+                {
+                    std::cout << "------------------------" << std::endl;
+                    fs::path path(working_directory);
+                    std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
+                    path /= filename;
+                    std::cout << "saving to: " << path << std::endl;
+                    saveLaz(path.string(), worker_data_concatenated[i]);
+                    m_poses.push_back(worker_data_concatenated[i].intermediate_trajectory[0]);
+                    file_names.push_back(filename);
+
+                    // save trajectory
+                    std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
+                    fs::path pathtrj(working_directory);
+                    pathtrj /= trajectory_filename;
+                    std::cout << "saving to: " << pathtrj << std::endl;
+
+                    ///
+                    std::ofstream outfile;
+                    outfile.open(pathtrj);
+                    if (!outfile.good())
+                    {
+                        std::cout << "can not save file: " << pathtrj << std::endl;
+                        return;
+                    }
+                    // outfile <<
+                    for (int j = 0; j < worker_data_concatenated[i].intermediate_trajectory.size(); j++)
+                    {
+                        auto pose = worker_data_concatenated[i].intermediate_trajectory[0].inverse() * worker_data_concatenated[i].intermediate_trajectory[j];
+
+                        outfile
+                            << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j] * 1e9 << " " << std::setprecision(10)
+                            << pose(0, 0) << " "
+                            << pose(0, 1) << " "
+                            << pose(0, 2) << " "
+                            << pose(0, 3) << " "
+                            << pose(1, 0) << " "
+                            << pose(1, 1) << " "
+                            << pose(1, 2) << " "
+                            << pose(1, 3) << " "
+                            << pose(2, 0) << " "
+                            << pose(2, 1) << " "
+                            << pose(2, 2) << " "
+                            << pose(2, 3) << std::endl;
+                    }
+                    outfile.close();
+                    //
+                }
+                fs::path path(working_directory);
+                path /= "lio_initial_poses.reg";
+                save_poses(path.string(), m_poses, file_names);
+                fs::path path2(working_directory);
+                path2 /= "poses.reg";
+                save_poses(path2.string(), m_poses, file_names);
+
+                fs::path path3(working_directory);
+                path3 /= "session.json";
+
+                // save session file
+                std::cout << "saving file: '" << path3 << "'" << std::endl;
+
+                nlohmann::json jj;
+                nlohmann::json j;
+
+                j["offset_x"] = 0.0;
+                j["offset_y"] = 0.0;
+                j["offset_z"] = 0.0;
+                j["folder_name"] = working_directory;
+                j["out_folder_name"] = working_directory;
+                j["poses_file_name"] = path2.string();
+                j["initial_poses_file_name"] = path.string();
+                j["out_poses_file_name"] = path2.string();
+
+                jj["Session Settings"] = j;
+
+                nlohmann::json jlaz_file_names;
+                for (int i = 0; i < worker_data_concatenated.size(); i++)
+                {
+                    fs::path path(working_directory);
+                    std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
+                    path /= filename;
+                    std::cout << "adding file: " << path << std::endl;
+
+                    nlohmann::json jfn{
+                        {"file_name", path.string()}};
+                    jlaz_file_names.push_back(jfn);
+                }
+                // for (const auto &pc : point_clouds_container.point_clouds)
+                //{
+                //     nlohmann::json jfn{
+                //         {"file_name", pc.file_name}};
+                //     jlaz_file_names.push_back(jfn);
+                // }
+                jj["laz_file_names"] = jlaz_file_names;
+
+                std::ofstream fs(path3.string());
+                // if (!fs.good())
+                //     return false;
+                fs << jj.dump(2);
+                fs.close();
+                //
+
+                step_3_done = true;
+            }
+            ImGui::SameLine();
+            ImGui::Text("Press this button for saving resulting trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program");
+        }
+        if (step_3_done)
+        {
+            ImGui::Text("-------------------------------------------------------------------------------");
+            ImGui::Text(std::string("All data is saved in folder '" + working_directory + "' You can close this program.").c_str());
+            ImGui::Text("Next step is to load 'session.json' with 'multi_view_tls_registration_step_2' program");
+            ImGui::Text("-------------------------------------------------------------------------------");
+        }
+        if (!simple_gui)
+        {
+            ImGui::SameLine();
+            if (ImGui::Button("save trajectory to ascii (x y z)"))
+            {
+                static std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save trajectory", "C:\\").result();
+                    output_file_name = sel;
+                    std::cout << "file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    ofstream file;
+                    file.open(output_file_name);
+                    for (const auto &wd : worker_data)
+                    {
+                        for (const auto &it : wd.intermediate_trajectory)
+                        {
+                            file << it(0, 3) << " " << it(1, 3) << " " << it(2, 3) << std::endl;
+                        }
+                    }
+                    file.close();
+                }
+            }
+            if (ImGui::Button("load reference point clouds (laz)"))
+            {
+                static std::shared_ptr<pfd::open_file> open_file;
+                std::vector<std::string> input_file_names;
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+                const auto t = [&]()
+                {
+                    std::vector<std::string> filters;
+                    auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
+                    for (int i = 0; i < sel.size(); i++)
+                    {
+                        input_file_names.push_back(sel[i]);
+                    }
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (input_file_names.size() > 0)
+                {
+                    reference_buckets.clear();
+                    reference_points.clear();
+
+                    for (size_t i = 0; i < input_file_names.size(); i++)
+                    {
+                        std::cout << "loading reference point cloud from: " << input_file_names[i] << std::endl;
+                        auto pp = load_point_cloud(input_file_names[i].c_str(), false);
+                        std::cout << "loaded " << pp.size() << " reference points" << std::endl;
+                        reference_points.insert(std::end(reference_points), std::begin(pp), std::end(pp));
+                    }
+
+                    update_rgd(in_out_params, reference_buckets, reference_points);
+                    show_reference_points = true;
+                }
+            }
+
+            ImGui::SameLine();
+            ImGui::Checkbox("show reference points", &show_reference_points);
+            ImGui::Checkbox("show reference buckets", &show_reference_buckets);
+            ImGui::InputInt("decimation reference points", &dec_reference_points);
+
+            if (initial_points.size() > 0)
+            {
+                ImGui::Text("-----manipulate initial transformation begin-------");
+                ImGui::Checkbox("initial transformation gizmo", &initial_transformation_gizmo);
+
+                if (initial_transformation_gizmo)
+                {
+                    m_gizmo[0] = (float)m_g(0, 0);
+                    m_gizmo[1] = (float)m_g(1, 0);
+                    m_gizmo[2] = (float)m_g(2, 0);
+                    m_gizmo[3] = (float)m_g(3, 0);
+                    m_gizmo[4] = (float)m_g(0, 1);
+                    m_gizmo[5] = (float)m_g(1, 1);
+                    m_gizmo[6] = (float)m_g(2, 1);
+                    m_gizmo[7] = (float)m_g(3, 1);
+                    m_gizmo[8] = (float)m_g(0, 2);
+                    m_gizmo[9] = (float)m_g(1, 2);
+                    m_gizmo[10] = (float)m_g(2, 2);
+                    m_gizmo[11] = (float)m_g(3, 2);
+                    m_gizmo[12] = (float)m_g(0, 3);
+                    m_gizmo[13] = (float)m_g(1, 3);
+                    m_gizmo[14] = (float)m_g(2, 3);
+                    m_gizmo[15] = (float)m_g(3, 3);
+                }
+                if (!initial_transformation_gizmo)
+                {
+                    if (ImGui::Button("Align to reference"))
+                    {
+                        for (int i = 0; i < 30; i++)
+                        {
+                            align_to_reference(in_out_params, initial_points, m_g, reference_buckets);
+                        }
+                    }
+                }
+                ImGui::Text("-----manipulate initial transformation end---------");
+            }
+            // show_trajectory
+
+            static int current_scan = -1;
+            int prev = current_scan;
+            ImGui::InputInt("change_current_scan", &current_scan);
+            {
+                int curr = current_scan;
+
+                if (prev != curr)
+                {
+                    for (int k = 0; k < worker_data.size(); k++)
+                    {
+                        worker_data[k].show = false;
+                    }
+                }
+                if (current_scan <= 0)
+                {
+                    current_scan = 0;
+                }
+                if (current_scan >= worker_data.size())
+                {
+                    current_scan = worker_data.size() - 1;
+                }
+                if (current_scan >= 0 && current_scan < worker_data.size())
+                {
+                    worker_data[current_scan].show = true;
+                }
+            }
+            /*ImGui::InputFloat("x_displacement", &x_displacement);
+            int num_sel = 0;
+            for (int k = 0; k < worker_data.size(); k++)
+            {
+                if (worker_data[k].show)
+                {
+                    num_sel++;
+                }
+            }
+
+            if (num_sel == 1)
+            {
+                ImGui::SameLine();
+                if (ImGui::Button("apply x_displacement for current scan"))
+                {
+                    Eigen::Affine3d m_x_displacement = Eigen::Affine3d::Identity();
+                    m_x_displacement(0, 3) = x_displacement;
+                    Eigen::Affine3d m_last = worker_data[current_scan].intermediate_trajectory[worker_data[current_scan].intermediate_trajectory.size() - 1];
+                    auto tmp = worker_data[current_scan].intermediate_trajectory;
+
+                    worker_data[current_scan].intermediate_trajectory[0] = m_last;
+                    for (int k = 1; k < tmp.size(); k++)
+                    {
+                        Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
+                        m_last = m_last * m_update * m_x_displacement;
+                        worker_data[current_scan].intermediate_trajectory[k] = m_last;
+                    }
 
                     // update
-                    for (int j = i + 1; j < worker_data.size(); j++)
+                    for (int j = current_scan + 1; j < worker_data.size(); j++)
                     {
                         Eigen::Affine3d m_last = worker_data[j - 1].intermediate_trajectory[worker_data[j - 1].intermediate_trajectory.size() - 1];
                         auto tmp = worker_data[j].intermediate_trajectory;
@@ -1111,432 +1578,56 @@ void lidar_odometry_gui()
                             worker_data[j].intermediate_trajectory[k] = m_last;
                         }
                     }
-
-                    for (int j = 0; j < worker_data[i].intermediate_points.size(); j++)
-                    {
-                        Point3Di pp = worker_data[i].intermediate_points[j];
-                        pp.point = worker_data[i].intermediate_trajectory[worker_data[i].intermediate_points[j].index_pose] * pp.point;
-                        points_global.push_back(pp);
-                    }
-
-                    // if(reference_points.size() == 0){
-                    if (acc_distance > sliding_window_trajectory_length_threshold)
-                    {
-                        std::chrono::time_point<std::chrono::system_clock> startu, endu;
-                        startu = std::chrono::system_clock::now();
-
-                        if (reference_points.size() == 0)
-                        {
-                            buckets.clear();
-                        }
-
-                        std::vector<Point3Di> points_global_new;
-                        points_global_new.reserve(points_global.size() / 2 + 1);
-                        for (int k = points_global.size() / 2; k < points_global.size(); k++)
-                        {
-                            points_global_new.emplace_back(points_global[k]);
-                        }
-
-                        acc_distance = 0;
-                        points_global = points_global_new;
-
-                        // decimate
-                        if (decimation > 0)
-                        {
-                            decimate(points_global, decimation, decimation, decimation);
-                        }
-                        update_rgd(in_out_params, buckets, points_global);
-                        //
-                        endu = std::chrono::system_clock::now();
-
-                        std::chrono::duration<double> elapsed_secondsu = endu - startu;
-                        std::time_t end_timeu = std::chrono::system_clock::to_time_t(endu);
-
-                        std::cout << "finished computation at " << std::ctime(&end_timeu)
-                                  << "elapsed time update: " << elapsed_secondsu.count() << "s\n";
-                        // std::cout << "update" << std::endl;
-                    }
-                    else
-                    {
-                        std::vector<Point3Di> pg;
-                        for (int j = 0; j < worker_data[i].intermediate_points.size(); j++)
-                        {
-                            Point3Di pp = worker_data[i].intermediate_points[j];
-                            pp.point = worker_data[i].intermediate_trajectory[worker_data[i].intermediate_points[j].index_pose] * pp.point;
-                            pg.push_back(pp);
-                        }
-                        update_rgd(in_out_params, buckets, pg);
-                    }
-
-                    if (i > 1)
-                    {
-                        double translation = (worker_data[i - 1].intermediate_trajectory[0].translation() -
-                                              worker_data[i - 2].intermediate_trajectory[0].translation())
-                                                 .norm();
-                        consecutive_distance += translation;
-                        // std::cout << "consecutive_distance " << consecutive_distance << std::endl;
-                    }
-                    //}
                 }
+            }*/
 
-                for (int i = 0; i < worker_data.size(); i++)
-                {
-                    worker_data[i].intermediate_trajectory_motion_model = worker_data[i].intermediate_trajectory;
-                }
-
-                end = std::chrono::system_clock::now();
-
-                std::chrono::duration<double> elapsed_seconds = end - start;
-                std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-
-                std::cout << "finished computation at " << std::ctime(&end_time)
-                          << "elapsed time: " << elapsed_seconds.count() << "s\n";
-
-                // estimate total lenght of trajectory
-                double length_of_trajectory = 0;
-                for (int i = 1; i < worker_data.size(); i++)
-                {
-                    length_of_trajectory += (worker_data[i].intermediate_trajectory[0].translation() - worker_data[i - 1].intermediate_trajectory[0].translation()).norm();
-                }
-                std::cout << "length_of_trajectory: " << length_of_trajectory << " [m]" << std::endl;
-            }
-        }
-        // if (ImGui::Button("fix pitch roll"))
-        //{
-        //     fix_ptch_roll(worker_data);
-        // }
-        if (ImGui::Button("save result"))
-        {
-            // concatenate data
-
-            std::vector<WorkerData> worker_data_concatenated;
-
-            WorkerData wd;
-            int counter = 0;
-            int pose_offset = 0;
-            for (int i = 0; i < worker_data.size(); i++)
+            if (ImGui::Button("select all scans"))
             {
-                if (i % 1000 == 0)
+                for (int k = 0; k < worker_data.size(); k++)
                 {
-                    printf("processing worker_data [%d] of %d \n", i + 1, worker_data.size());
-                }
-                auto tmp_data = worker_data[i].original_points;
-
-                for (auto &t : tmp_data)
-                {
-                    t.index_pose += pose_offset;
-                }
-
-                wd.intermediate_trajectory.insert(std::end(wd.intermediate_trajectory),
-                                                  std::begin(worker_data[i].intermediate_trajectory), std::end(worker_data[i].intermediate_trajectory));
-
-                wd.intermediate_trajectory_timestamps.insert(std::end(wd.intermediate_trajectory_timestamps),
-                                                             std::begin(worker_data[i].intermediate_trajectory_timestamps), std::end(worker_data[i].intermediate_trajectory_timestamps));
-
-                wd.original_points.insert(std::end(wd.original_points),
-                                          std::begin(tmp_data), std::end(tmp_data));
-
-                pose_offset += worker_data[i].intermediate_trajectory.size();
-
-                counter++;
-                if (counter > 50)
-                {
-                    worker_data_concatenated.push_back(wd);
-                    wd.intermediate_trajectory.clear();
-                    wd.intermediate_trajectory_timestamps.clear();
-                    wd.original_points.clear();
-                    counter = 0;
-                    pose_offset = 0;
+                    worker_data[k].show = true;
                 }
             }
-
-            if (counter > 10)
-            {
-                worker_data_concatenated.push_back(wd);
-            }
-
-            std::vector<Eigen::Affine3d> m_poses;
-            std::vector<std::string> file_names;
-            for (int i = 0; i < worker_data_concatenated.size(); i++)
-            {
-                std::cout << "------------------------" << std::endl;
-                fs::path path(working_directory);
-                std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
-                path /= filename;
-                std::cout << "saving to: " << path << std::endl;
-                saveLaz(path.string(), worker_data_concatenated[i]);
-                m_poses.push_back(worker_data_concatenated[i].intermediate_trajectory[0]);
-                file_names.push_back(filename);
-
-                // save trajectory
-                std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
-                fs::path pathtrj(working_directory);
-                pathtrj /= trajectory_filename;
-                std::cout << "saving to: " << pathtrj << std::endl;
-
-                ///
-                std::ofstream outfile;
-                outfile.open(pathtrj);
-                if (!outfile.good())
-                {
-                    std::cout << "can not save file: " << pathtrj << std::endl;
-                    return;
-                }
-                // outfile <<
-                for (int j = 0; j < worker_data_concatenated[i].intermediate_trajectory.size(); j++)
-                {
-                    auto pose = worker_data_concatenated[i].intermediate_trajectory[0].inverse() * worker_data_concatenated[i].intermediate_trajectory[j];
-
-                    outfile
-                        << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j] * 1e9 << " " << std::setprecision(10)
-                        << pose(0, 0) << " "
-                        << pose(0, 1) << " "
-                        << pose(0, 2) << " "
-                        << pose(0, 3) << " "
-                        << pose(1, 0) << " "
-                        << pose(1, 1) << " "
-                        << pose(1, 2) << " "
-                        << pose(1, 3) << " "
-                        << pose(2, 0) << " "
-                        << pose(2, 1) << " "
-                        << pose(2, 2) << " "
-                        << pose(2, 3) << std::endl;
-                }
-                outfile.close();
-                //
-            }
-            fs::path path(working_directory);
-            path /= "lio_initial_poses.reg";
-            save_poses(path.string(), m_poses, file_names);
-            fs::path path2(working_directory);
-            path2 /= "poses.reg";
-            save_poses(path2.string(), m_poses, file_names);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("save trajectory to ascii (x y z)"))
-        {
-            static std::shared_ptr<pfd::save_file> save_file;
-            std::string output_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::save_file("Save trajectory", "C:\\").result();
-                output_file_name = sel;
-                std::cout << "file to save: '" << output_file_name << "'" << std::endl;
-            };
-            std::thread t1(t);
-            t1.join();
-
-            if (output_file_name.size() > 0)
-            {
-                ofstream file;
-                file.open(output_file_name);
-                for (const auto &wd : worker_data)
-                {
-                    for (const auto &it : wd.intermediate_trajectory)
-                    {
-                        file << it(0, 3) << " " << it(1, 3) << " " << it(2, 3) << std::endl;
-                    }
-                }
-                file.close();
-            }
-        }
-        if (ImGui::Button("load reference point clouds (laz)"))
-        {
-            static std::shared_ptr<pfd::open_file> open_file;
-            std::vector<std::string> input_file_names;
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                std::vector<std::string> filters;
-                auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_names.push_back(sel[i]);
-                }
-            };
-            std::thread t1(t);
-            t1.join();
-
-            if (input_file_names.size() > 0)
-            {
-                reference_buckets.clear();
-                reference_points.clear();
-
-                for (size_t i = 0; i < input_file_names.size(); i++)
-                {
-                    std::cout << "loading reference point cloud from: " << input_file_names[i] << std::endl;
-                    auto pp = load_point_cloud(input_file_names[i].c_str(), false);
-                    std::cout << "loaded " << pp.size() << " reference points" << std::endl;
-                    reference_points.insert(std::end(reference_points), std::begin(pp), std::end(pp));
-                }
-
-                update_rgd(in_out_params, reference_buckets, reference_points);
-                show_reference_points = true;
-            }
-        }
-
-        ImGui::SameLine();
-        ImGui::Checkbox("show reference points", &show_reference_points);
-        ImGui::Checkbox("show reference buckets", &show_reference_buckets);
-        ImGui::InputInt("decimation reference points", &dec_reference_points);
-
-        if (initial_points.size() > 0)
-        {
-            ImGui::Text("-----manipulate initial transformation begin-------");
-            ImGui::Checkbox("initial transformation gizmo", &initial_transformation_gizmo);
-
-            if (initial_transformation_gizmo)
-            {
-                m_gizmo[0] = (float)m_g(0, 0);
-                m_gizmo[1] = (float)m_g(1, 0);
-                m_gizmo[2] = (float)m_g(2, 0);
-                m_gizmo[3] = (float)m_g(3, 0);
-                m_gizmo[4] = (float)m_g(0, 1);
-                m_gizmo[5] = (float)m_g(1, 1);
-                m_gizmo[6] = (float)m_g(2, 1);
-                m_gizmo[7] = (float)m_g(3, 1);
-                m_gizmo[8] = (float)m_g(0, 2);
-                m_gizmo[9] = (float)m_g(1, 2);
-                m_gizmo[10] = (float)m_g(2, 2);
-                m_gizmo[11] = (float)m_g(3, 2);
-                m_gizmo[12] = (float)m_g(0, 3);
-                m_gizmo[13] = (float)m_g(1, 3);
-                m_gizmo[14] = (float)m_g(2, 3);
-                m_gizmo[15] = (float)m_g(3, 3);
-            }
-            if (!initial_transformation_gizmo)
-            {
-                if (ImGui::Button("Align to reference"))
-                {
-                    for (int i = 0; i < 30; i++)
-                    {
-                        align_to_reference(in_out_params, initial_points, m_g, reference_buckets);
-                    }
-                }
-            }
-            ImGui::Text("-----manipulate initial transformation end---------");
-        }
-        // show_trajectory
-
-        static int current_scan = -1;
-        int prev = current_scan;
-        ImGui::InputInt("change_current_scan", &current_scan);
-        {
-            int curr = current_scan;
-
-            if (prev != curr)
+            ImGui::SameLine();
+            if (ImGui::Button("unselect all scans"))
             {
                 for (int k = 0; k < worker_data.size(); k++)
                 {
                     worker_data[k].show = false;
                 }
             }
-            if (current_scan <= 0)
-            {
-                current_scan = 0;
-            }
-            if (current_scan >= worker_data.size())
-            {
-                current_scan = worker_data.size() - 1;
-            }
-            if (current_scan >= 0 && current_scan < worker_data.size())
-            {
-                worker_data[current_scan].show = true;
-            }
-        }
-        /*ImGui::InputFloat("x_displacement", &x_displacement);
-        int num_sel = 0;
-        for (int k = 0; k < worker_data.size(); k++)
-        {
-            if (worker_data[k].show)
-            {
-                num_sel++;
-            }
-        }
 
-        if (num_sel == 1)
-        {
-            ImGui::SameLine();
-            if (ImGui::Button("apply x_displacement for current scan"))
+            if (ImGui::Button("filter reference buckets"))
             {
-                Eigen::Affine3d m_x_displacement = Eigen::Affine3d::Identity();
-                m_x_displacement(0, 3) = x_displacement;
-                Eigen::Affine3d m_last = worker_data[current_scan].intermediate_trajectory[worker_data[current_scan].intermediate_trajectory.size() - 1];
-                auto tmp = worker_data[current_scan].intermediate_trajectory;
-
-                worker_data[current_scan].intermediate_trajectory[0] = m_last;
-                for (int k = 1; k < tmp.size(); k++)
+                NDTBucketMapType reference_buckets_out;
+                for (const auto &b : reference_buckets)
                 {
-                    Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
-                    m_last = m_last * m_update * m_x_displacement;
-                    worker_data[current_scan].intermediate_trajectory[k] = m_last;
-                }
-
-                // update
-                for (int j = current_scan + 1; j < worker_data.size(); j++)
-                {
-                    Eigen::Affine3d m_last = worker_data[j - 1].intermediate_trajectory[worker_data[j - 1].intermediate_trajectory.size() - 1];
-                    auto tmp = worker_data[j].intermediate_trajectory;
-
-                    worker_data[j].intermediate_trajectory[0] = m_last;
-                    for (int k = 1; k < tmp.size(); k++)
+                    if (b.second.number_of_points > 10)
                     {
-                        Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
-                        m_last = m_last * m_update;
-                        worker_data[j].intermediate_trajectory[k] = m_last;
+                        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(b.second.cov, Eigen::ComputeEigenvectors);
+
+                        auto eigen_values = eigen_solver.eigenvalues();
+                        double sum_ev = eigen_values.x() + eigen_values.y() + eigen_values.z();
+                        double ev1 = eigen_values.x();
+                        double ev2 = eigen_values.y();
+                        double ev3 = eigen_values.z();
+
+                        double planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
+                        if (planarity > 0.7)
+                        {
+                            reference_buckets_out[b.first] = b.second;
+                        }
                     }
                 }
+                reference_buckets = reference_buckets_out;
             }
-        }*/
 
-        if (ImGui::Button("select all scans"))
-        {
-            for (int k = 0; k < worker_data.size(); k++)
+            for (int i = 0; i < worker_data.size(); i++)
             {
-                worker_data[k].show = true;
+                std::string text = "show[" + std::to_string(i) + "]";
+                ImGui::Checkbox(text.c_str(), &worker_data[i].show);
             }
         }
-        ImGui::SameLine();
-        if (ImGui::Button("unselect all scans"))
-        {
-            for (int k = 0; k < worker_data.size(); k++)
-            {
-                worker_data[k].show = false;
-            }
-        }
-
-        if (ImGui::Button("filter reference buckets"))
-        {
-            NDTBucketMapType reference_buckets_out;
-            for (const auto &b : reference_buckets)
-            {
-                if (b.second.number_of_points > 10)
-                {
-                    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(b.second.cov, Eigen::ComputeEigenvectors);
-
-                    auto eigen_values = eigen_solver.eigenvalues();
-                    double sum_ev = eigen_values.x() + eigen_values.y() + eigen_values.z();
-                    double ev1 = eigen_values.x();
-                    double ev2 = eigen_values.y();
-                    double ev3 = eigen_values.z();
-
-                    double planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
-                    if (planarity > 0.7)
-                    {
-                        reference_buckets_out[b.first] = b.second;
-                    }
-                }
-            }
-            reference_buckets = reference_buckets_out;
-        }
-
-        for (int i = 0; i < worker_data.size(); i++)
-        {
-            std::string text = "show[" + std::to_string(i) + "]";
-            ImGui::Checkbox(text.c_str(), &worker_data[i].show);
-        }
-
         ImGui::End();
     }
 }

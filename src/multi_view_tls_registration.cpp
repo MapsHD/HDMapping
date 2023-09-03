@@ -107,6 +107,8 @@ float m_ortho_projection[] = {1, 0, 0, 0,
 bool manipulate_only_marked_gizmo = true;
 
 Session session;
+bool simple_gui = true;
+bool session_loaded = false;
 
 void reshape(int w, int h);
 void perform_experiment_on_windows();
@@ -344,8 +346,65 @@ void my_display_code()
 
 void project_gui()
 {
-    ImGui::Begin("Project");
+    static bool calculate_offset = false;
 
+    ImGui::Begin("Single session processing");
+
+    ImGui::Text("This program is second step in MANDEYE process.");
+    ImGui::Text("It refines trajectory e.g with loop closure.");
+    ImGui::Text("It refines trajectory with many approaches e.g. Iterative Closest Point, Normal Distributions Transform.");
+    ImGui::Text("It exports session as rigid point cloud to single LAZ file).");
+
+    ImGui::Checkbox("simple_gui", &simple_gui);
+    if (!session_loaded)
+    {
+        if (ImGui::Button("load session (first step)"))
+        {
+            static std::shared_ptr<pfd::open_file> open_file;
+            std::string input_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+            const auto t = [&]()
+            {
+                auto sel = pfd::open_file("Load session", "C:\\").result();
+                for (int i = 0; i < sel.size(); i++)
+                {
+                    input_file_name = sel[i];
+                    std::cout << "Session file: '" << input_file_name << "'" << std::endl;
+                }
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (input_file_name.size() > 0)
+            {
+                session.load(fs::path(input_file_name).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
+                session_loaded = true;
+            }
+        }
+        ImGui::SameLine();
+    }
+
+    if (ImGui::Button("save session (last step)"))
+    {
+        std::shared_ptr<pfd::save_file> save_file;
+        std::string output_file_name = "";
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+        const auto t = [&]()
+        {
+            auto sel = pfd::save_file("Save session", "C:\\").result();
+            output_file_name = sel;
+            std::cout << "Seesion file to save: '" << output_file_name << "'" << std::endl;
+        };
+        std::thread t1(t);
+        t1.join();
+
+        if (output_file_name.size() > 0)
+        {
+            session.save(fs::path(output_file_name).string());
+            std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
+            session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string());
+        }
+    }
     if (ImGui::Button("reset view"))
     {
         rotate_x = 0.0;
@@ -361,18 +420,24 @@ void project_gui()
         camera_ortho_xy_view_rotation_angle_deg = 0;
         camera_mode_ortho_z_center_h = 0.0;
     }
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-    ImGui::Text("Offset x: %.10f y: %.10f z: %.10f", session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
-    ImGui::SameLine();
-    if (ImGui::Button("print offset to console"))
+    if (!simple_gui)
     {
-        std::cout << "offset:" << std::endl;
-        std::cout << std::setprecision(10) << std::endl;
-        std::cout << session.point_clouds_container.offset << std::endl;
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     }
 
-    ImGui::InputInt("viewer_decmiate_point_cloud", &viewer_decmiate_point_cloud);
+    if (!simple_gui)
+    {
+        ImGui::Text("Offset x: %.10f y: %.10f z: %.10f", session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
+        ImGui::SameLine();
+        if (ImGui::Button("print offset to console"))
+        {
+            std::cout << "offset:" << std::endl;
+            std::cout << std::setprecision(10) << std::endl;
+            std::cout << session.point_clouds_container.offset << std::endl;
+        }
+    }
+
+    ImGui::InputInt("increase for better performance, dercease for see more points", &viewer_decmiate_point_cloud);
     if (viewer_decmiate_point_cloud < 1)
     {
         viewer_decmiate_point_cloud = 1;
@@ -403,307 +468,265 @@ void project_gui()
 
     ImGui::SliderFloat("mouse_sensitivity", &mouse_sensitivity, 0.01f, 10.0f);
 
-    ImGui::Checkbox("decimate during load", &is_decimate);
-    ImGui::InputDouble("bucket_x", &bucket_x);
-    ImGui::InputDouble("bucket_y", &bucket_y);
-    ImGui::InputDouble("bucket_z", &bucket_z);
-
-    ImGui::Text("-----------------------------------------------------------------------------");
-    // common_data
-    // manual_pose_graph_loop_closure_mode
-
-    if (ImGui::Button("load RESSO file (transformation_GroundTruth.reg)"))
+    if (!simple_gui)
     {
-        static std::shared_ptr<pfd::open_file> open_file;
-        std::string input_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-        const auto t = [&]()
+        ImGui::Checkbox("decimate during load", &is_decimate);
+        ImGui::InputDouble("bucket_x", &bucket_x);
+        ImGui::InputDouble("bucket_y", &bucket_y);
+        ImGui::InputDouble("bucket_z", &bucket_z);
+
+        ImGui::Text("-----------------------------------------------------------------------------");
+        // common_data
+        // manual_pose_graph_loop_closure_mode
+
+        if (ImGui::Button("load RESSO file (transformation_GroundTruth.reg)"))
         {
-            auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
-            for (int i = 0; i < sel.size(); i++)
+            static std::shared_ptr<pfd::open_file> open_file;
+            std::string input_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+            const auto t = [&]()
             {
-                input_file_name = sel[i];
-                std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-            }
-        };
-        std::thread t1(t);
-        t1.join();
+                auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
+                for (int i = 0; i < sel.size(); i++)
+                {
+                    input_file_name = sel[i];
+                    std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
+                }
+            };
+            std::thread t1(t);
+            t1.join();
 
-        if (input_file_name.size() > 0)
-        {
-
-            session.working_directory = fs::path(input_file_name).parent_path().string();
-
-            if (!session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
+            if (input_file_name.size() > 0)
             {
-                std::cout << "check input files" << std::endl;
-                return;
-            }
-            else
-            {
-                std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+
+                session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                if (!session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
+                {
+                    std::cout << "check input files" << std::endl;
+                    return;
+                }
+                else
+                {
+                    std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                }
             }
         }
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("save RESSO file"))
-    {
-        std::shared_ptr<pfd::save_file> save_file;
-        std::string output_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-        const auto t = [&]()
+        ImGui::SameLine();
+        if (ImGui::Button("save RESSO file"))
         {
-            auto sel = pfd::save_file("Save RESSO file", "C:\\").result();
-            output_file_name = sel;
-            std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
-        };
-        std::thread t1(t);
-        t1.join();
-
-        if (output_file_name.size() > 0)
-        {
-            session.point_clouds_container.save_poses(fs::path(output_file_name).string());
-        }
-    }
-
-    ImGui::Text("RESSO dataset: https://3d.bk.tudelft.nl/liangliang/publications/2019/plade/resso.html");
-    if (ImGui::Button("load ETH file (pairs.txt)"))
-    {
-        static std::shared_ptr<pfd::open_file> open_file;
-        std::string input_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-        const auto t = [&]()
-        {
-            auto sel = pfd::open_file("Load ETH file", "C:\\").result();
-            for (int i = 0; i < sel.size(); i++)
+            std::shared_ptr<pfd::save_file> save_file;
+            std::string output_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+            const auto t = [&]()
             {
-                input_file_name = sel[i];
-                std::cout << "ETH file: '" << input_file_name << "'" << std::endl;
-            }
-        };
-        std::thread t1(t);
-        t1.join();
+                auto sel = pfd::save_file("Save RESSO file", "C:\\").result();
+                output_file_name = sel;
+                std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
+            };
+            std::thread t1(t);
+            t1.join();
 
-        if (input_file_name.size() > 0)
-        {
-            session.working_directory = fs::path(input_file_name).parent_path().string();
-
-            if (!session.point_clouds_container.load_eth(session.working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
+            if (output_file_name.size() > 0)
             {
-                std::cout << "check input files" << std::endl;
-                return;
-            }
-            else
-            {
-                std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                session.point_clouds_container.save_poses(fs::path(output_file_name).string());
             }
         }
-    }
-    ImGui::Text("ETH dataset: https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
 
-    static bool calculate_offset = false;
-
-    if (ImGui::Button("load AlignedPointCloud from WHU-TLS (select all *.las files in folder 2-AlignedPointCloud)"))
-    {
-        session.point_clouds_container.point_clouds.clear();
-        static std::shared_ptr<pfd::open_file> open_file;
-        std::vector<std::string> input_file_names;
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-        const auto t = [&]()
+        ImGui::Text("RESSO dataset: https://3d.bk.tudelft.nl/liangliang/publications/2019/plade/resso.html");
+        if (ImGui::Button("load ETH file (pairs.txt)"))
         {
-            std::vector<std::string> filters;
-            auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
-            for (int i = 0; i < sel.size(); i++)
+            static std::shared_ptr<pfd::open_file> open_file;
+            std::string input_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+            const auto t = [&]()
             {
-                input_file_names.push_back(sel[i]);
-                // std::cout << "las file: '" << input_file_name << "'" << std::endl;
-            }
-        };
-        std::thread t1(t);
-        t1.join();
+                auto sel = pfd::open_file("Load ETH file", "C:\\").result();
+                for (int i = 0; i < sel.size(); i++)
+                {
+                    input_file_name = sel[i];
+                    std::cout << "ETH file: '" << input_file_name << "'" << std::endl;
+                }
+            };
+            std::thread t1(t);
+            t1.join();
 
-        if (input_file_names.size() > 0)
-        {
-            session.working_directory = fs::path(input_file_names[0]).parent_path().string();
+            if (input_file_name.size() > 0)
+            {
+                session.working_directory = fs::path(input_file_name).parent_path().string();
 
-            std::cout << "Las/Laz files:" << std::endl;
-            for (size_t i = 0; i < input_file_names.size(); i++)
-            {
-                std::cout << input_file_names[i] << std::endl;
-            }
-
-            if (!session.point_clouds_container.load_whu_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset))
-            {
-                std::cout << "check input files laz/las" << std::endl;
-                // return;
-            }
-            else
-            {
-                std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                if (!session.point_clouds_container.load_eth(session.working_directory.c_str(), input_file_name.c_str(), is_decimate, bucket_x, bucket_y, bucket_z))
+                {
+                    std::cout << "check input files" << std::endl;
+                    return;
+                }
+                else
+                {
+                    std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                }
             }
         }
-    }
-    ImGui::SameLine();
-    ImGui::Checkbox("calculate_offset for WHU-TLS", &calculate_offset);
-    ImGui::Text("WHU-TLS dataset: http://3s.whu.edu.cn/ybs/en/benchmark.htm");
+        ImGui::Text("ETH dataset: https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
 
-    if (ImGui::Button("load 3DTK files (select all *.txt files)"))
-    {
-        session.point_clouds_container.point_clouds.clear();
-        static std::shared_ptr<pfd::open_file> open_file;
-        std::vector<std::string> input_file_names;
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-        const auto t = [&]()
+        if (ImGui::Button("load AlignedPointCloud from WHU-TLS (select all *.las files in folder 2-AlignedPointCloud)"))
         {
-            std::vector<std::string> filters;
-            auto sel = pfd::open_file("Load txt files", "C:\\", filters, true).result();
-            for (int i = 0; i < sel.size(); i++)
+            session.point_clouds_container.point_clouds.clear();
+            static std::shared_ptr<pfd::open_file> open_file;
+            std::vector<std::string> input_file_names;
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+            const auto t = [&]()
             {
-                input_file_names.push_back(sel[i]);
-                // std::cout << "las file: '" << input_file_name << "'" << std::endl;
-            }
-        };
-        std::thread t1(t);
-        t1.join();
+                std::vector<std::string> filters;
+                auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
+                for (int i = 0; i < sel.size(); i++)
+                {
+                    input_file_names.push_back(sel[i]);
+                    // std::cout << "las file: '" << input_file_name << "'" << std::endl;
+                }
+            };
+            std::thread t1(t);
+            t1.join();
 
-        if (input_file_names.size() > 0)
-        {
-            session.working_directory = fs::path(input_file_names[0]).parent_path().string();
+            if (input_file_names.size() > 0)
+            {
+                session.working_directory = fs::path(input_file_names[0]).parent_path().string();
 
-            std::cout << "txt files:" << std::endl;
-            for (size_t i = 0; i < input_file_names.size(); i++)
-            {
-                std::cout << input_file_names[i] << std::endl;
-            }
+                std::cout << "Las/Laz files:" << std::endl;
+                for (size_t i = 0; i < input_file_names.size(); i++)
+                {
+                    std::cout << input_file_names[i] << std::endl;
+                }
 
-            if (!session.point_clouds_container.load_3DTK_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z))
-            {
-                std::cout << "check input files" << std::endl;
-                return;
-            }
-            else
-            {
-                std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                if (!session.point_clouds_container.load_whu_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset))
+                {
+                    std::cout << "check input files laz/las" << std::endl;
+                    // return;
+                }
+                else
+                {
+                    std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                }
             }
         }
-    }
-    ImGui::Text("3DTK dataset: http://kos.informatik.uni-osnabrueck.de/3Dscans/ 18: the campus of the Jacobs University Bremen");
+        ImGui::SameLine();
+        ImGui::Checkbox("calculate_offset for WHU-TLS", &calculate_offset);
+        ImGui::Text("WHU-TLS dataset: http://3s.whu.edu.cn/ybs/en/benchmark.htm");
 
-    if (ImGui::Button("update initial poses from RESSO file"))
-    {
-        static std::shared_ptr<pfd::open_file> open_file;
-        std::string input_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-        const auto t = [&]()
+        if (ImGui::Button("load 3DTK files (select all *.txt files)"))
         {
-            auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
-            for (int i = 0; i < sel.size(); i++)
+            session.point_clouds_container.point_clouds.clear();
+            static std::shared_ptr<pfd::open_file> open_file;
+            std::vector<std::string> input_file_names;
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+            const auto t = [&]()
             {
-                input_file_name = sel[i];
-                std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-            }
-        };
-        std::thread t1(t);
-        t1.join();
+                std::vector<std::string> filters;
+                auto sel = pfd::open_file("Load txt files", "C:\\", filters, true).result();
+                for (int i = 0; i < sel.size(); i++)
+                {
+                    input_file_names.push_back(sel[i]);
+                    // std::cout << "las file: '" << input_file_name << "'" << std::endl;
+                }
+            };
+            std::thread t1(t);
+            t1.join();
 
-        if (input_file_name.size() > 0)
-        {
-
-            session.working_directory = fs::path(input_file_name).parent_path().string();
-
-            if (!session.point_clouds_container.update_initial_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
+            if (input_file_names.size() > 0)
             {
+                session.working_directory = fs::path(input_file_names[0]).parent_path().string();
 
-                std::cout << "check input files" << std::endl;
-                return;
-            }
-            else
-            {
-                session.point_clouds_container.initial_poses_file_name = input_file_name;
-                std::cout << "updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-            }
-        }
-    }
-    ImGui::SameLine();
-    ImGui::Text(session.point_clouds_container.initial_poses_file_name.c_str());
+                std::cout << "txt files:" << std::endl;
+                for (size_t i = 0; i < input_file_names.size(); i++)
+                {
+                    std::cout << input_file_names[i] << std::endl;
+                }
 
-    if (ImGui::Button("update poses from RESSO file"))
-    {
-        static std::shared_ptr<pfd::open_file> open_file;
-        std::string input_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-        const auto t = [&]()
-        {
-            auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
-            for (int i = 0; i < sel.size(); i++)
-            {
-                input_file_name = sel[i];
-                std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-            }
-        };
-        std::thread t1(t);
-        t1.join();
-
-        if (input_file_name.size() > 0)
-        {
-            session.working_directory = fs::path(input_file_name).parent_path().string();
-
-            if (!session.point_clouds_container.update_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
-            {
-                std::cout << "check input files" << std::endl;
-                return;
-            }
-            else
-            {
-                std::cout << "updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                session.point_clouds_container.poses_file_name = input_file_name;
+                if (!session.point_clouds_container.load_3DTK_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z))
+                {
+                    std::cout << "check input files" << std::endl;
+                    return;
+                }
+                else
+                {
+                    std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                }
             }
         }
-    }
-    ImGui::SameLine();
-    ImGui::Text(session.point_clouds_container.poses_file_name.c_str());
+        ImGui::Text("3DTK dataset: http://kos.informatik.uni-osnabrueck.de/3Dscans/ 18: the campus of the Jacobs University Bremen");
 
-    if (ImGui::Button("load session"))
-    {
-        static std::shared_ptr<pfd::open_file> open_file;
-        std::string input_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-        const auto t = [&]()
+        if (ImGui::Button("update initial poses from RESSO file"))
         {
-            auto sel = pfd::open_file("Load session", "C:\\").result();
-            for (int i = 0; i < sel.size(); i++)
+            static std::shared_ptr<pfd::open_file> open_file;
+            std::string input_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+            const auto t = [&]()
             {
-                input_file_name = sel[i];
-                std::cout << "Session file: '" << input_file_name << "'" << std::endl;
+                auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
+                for (int i = 0; i < sel.size(); i++)
+                {
+                    input_file_name = sel[i];
+                    std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
+                }
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (input_file_name.size() > 0)
+            {
+
+                session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                if (!session.point_clouds_container.update_initial_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
+                {
+
+                    std::cout << "check input files" << std::endl;
+                    return;
+                }
+                else
+                {
+                    session.point_clouds_container.initial_poses_file_name = input_file_name;
+                    std::cout << "updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                }
             }
-        };
-        std::thread t1(t);
-        t1.join();
-
-        if (input_file_name.size() > 0)
-        {
-            session.load(fs::path(input_file_name).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
         }
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("save session"))
-    {
-        std::shared_ptr<pfd::save_file> save_file;
-        std::string output_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-        const auto t = [&]()
-        {
-            auto sel = pfd::save_file("Save session", "C:\\").result();
-            output_file_name = sel;
-            std::cout << "Seesion file to save: '" << output_file_name << "'" << std::endl;
-        };
-        std::thread t1(t);
-        t1.join();
+        ImGui::SameLine();
+        ImGui::Text(session.point_clouds_container.initial_poses_file_name.c_str());
 
-        if (output_file_name.size() > 0)
+        if (ImGui::Button("update poses from RESSO file"))
         {
-            session.save(fs::path(output_file_name).string());
+            static std::shared_ptr<pfd::open_file> open_file;
+            std::string input_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+            const auto t = [&]()
+            {
+                auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
+                for (int i = 0; i < sel.size(); i++)
+                {
+                    input_file_name = sel[i];
+                    std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
+                }
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (input_file_name.size() > 0)
+            {
+                session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                if (!session.point_clouds_container.update_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
+                {
+                    std::cout << "check input files" << std::endl;
+                    return;
+                }
+                else
+                {
+                    std::cout << "updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                    session.point_clouds_container.poses_file_name = input_file_name;
+                }
+            }
         }
+        ImGui::SameLine();
+        ImGui::Text(session.point_clouds_container.poses_file_name.c_str());
     }
 
     if (ImGui::Button("generate random colors"))
@@ -729,12 +752,18 @@ void project_gui()
     }
 
     ImGui::Text("-----------------------------------------------------------------------------");
-    ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
-    ImGui::Checkbox("Iterative Closest Point", &is_icp_gui);
-    ImGui::Checkbox("Plane Features", &is_registration_plane_feature);
-    ImGui::Checkbox("Pose Graph SLAM", &is_pose_graph_slam);
-    ImGui::Checkbox("Manual Analysis", &is_manual_analisys);
-    ImGui::Checkbox("Manual Pose Graph Loop Closure Mode", &manual_pose_graph_loop_closure_mode);
+    if (!simple_gui)
+    {
+        ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
+        ImGui::Checkbox("Iterative Closest Point", &is_icp_gui);
+        ImGui::Checkbox("Plane Features", &is_registration_plane_feature);
+        ImGui::Checkbox("Pose Graph SLAM", &is_pose_graph_slam);
+        ImGui::Checkbox("Manual Analysis", &is_manual_analisys);
+    }
+    if (session.point_clouds_container.point_clouds.size() > 0)
+    {
+        ImGui::Checkbox("Manual Pose Graph Loop Closure Mode", &manual_pose_graph_loop_closure_mode);
+    }
     ImGui::ColorEdit3("background color", (float *)&clear_color);
 
     if (manual_pose_graph_loop_closure_mode)
@@ -769,229 +798,232 @@ void project_gui()
     }
     else
     {
-        if (ImGui::Button("show all"))
+        if (!simple_gui)
         {
-            session.point_clouds_container.show_all();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("hide all"))
-        {
-            session.point_clouds_container.hide_all();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("reset poses"))
-        {
-            reset_poses();
-            /*for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+            if (ImGui::Button("show all"))
             {
-                point_clouds_container.point_clouds[i].m_pose = point_clouds_container.point_clouds[i].m_initial_pose;
-                point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
-                point_clouds_container.point_clouds[i].gui_translation[0] = (float)point_clouds_container.point_clouds[i].pose.px;
-                point_clouds_container.point_clouds[i].gui_translation[1] = (float)point_clouds_container.point_clouds[i].pose.py;
-                point_clouds_container.point_clouds[i].gui_translation[2] = (float)point_clouds_container.point_clouds[i].pose.pz;
-                point_clouds_container.point_clouds[i].gui_rotation[0] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.om);
-                point_clouds_container.point_clouds[i].gui_rotation[1] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.fi);
-                point_clouds_container.point_clouds[i].gui_rotation[2] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.ka);
-            }*/
-        }
-
-        ImGui::Checkbox("show_with_initial_pose", &session.point_clouds_container.show_with_initial_pose);
-        ImGui::SameLine();
-        ImGui::Checkbox("manipulate_only_marked_gizmo (false: move also succesive nodes)", &manipulate_only_marked_gizmo);
-
-        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-        {
-            ImGui::Separator();
-            ImGui::Checkbox(session.point_clouds_container.point_clouds[i].file_name.c_str(), &session.point_clouds_container.point_clouds[i].visible);
-            ImGui::SameLine();
-            ImGui::Checkbox((std::string("gizmo_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
-            ImGui::SameLine();
-            ImGui::Checkbox((std::string("fixed_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed);
-            ImGui::SameLine();
-            ImGui::PushButtonRepeat(true);
-            float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
-            if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##left").c_str(), ImGuiDir_Left))
-            {
-                (session.point_clouds_container.point_clouds[i].point_size)--;
+                session.point_clouds_container.show_all();
             }
-            ImGui::SameLine(0.0f, spacing);
-            if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##right").c_str(), ImGuiDir_Right))
-            {
-                (session.point_clouds_container.point_clouds[i].point_size)++;
-            }
-            ImGui::PopButtonRepeat();
             ImGui::SameLine();
-            ImGui::Text("point size %d", session.point_clouds_container.point_clouds[i].point_size);
-            if (session.point_clouds_container.point_clouds[i].point_size < 1)
+            if (ImGui::Button("hide all"))
             {
-                session.point_clouds_container.point_clouds[i].point_size = 1;
+                session.point_clouds_container.hide_all();
             }
-
             ImGui::SameLine();
-            if (ImGui::Button(std::string("#" + std::to_string(i) + " save scan(global reference frame)").c_str()))
+            if (ImGui::Button("reset poses"))
             {
-                static std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
+                reset_poses();
+                /*for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
                 {
-                    auto sel = pfd::save_file("Choose folder", "C:\\").result();
-                    output_file_name = sel;
-                    std::cout << "Scan file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
-
-                if (output_file_name.size() > 0)
-                {
-                    session.point_clouds_container.point_clouds[i].save_as_global(output_file_name);
-                }
+                    point_clouds_container.point_clouds[i].m_pose = point_clouds_container.point_clouds[i].m_initial_pose;
+                    point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+                    point_clouds_container.point_clouds[i].gui_translation[0] = (float)point_clouds_container.point_clouds[i].pose.px;
+                    point_clouds_container.point_clouds[i].gui_translation[1] = (float)point_clouds_container.point_clouds[i].pose.py;
+                    point_clouds_container.point_clouds[i].gui_translation[2] = (float)point_clouds_container.point_clouds[i].pose.pz;
+                    point_clouds_container.point_clouds[i].gui_rotation[0] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.om);
+                    point_clouds_container.point_clouds[i].gui_rotation[1] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.fi);
+                    point_clouds_container.point_clouds[i].gui_rotation[2] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.ka);
+                }*/
             }
+
+            ImGui::Checkbox("show_with_initial_pose", &session.point_clouds_container.show_with_initial_pose);
             ImGui::SameLine();
-            if (ImGui::Button(std::string("#" + std::to_string(i) + " shift points to center").c_str()))
-            {
-                session.point_clouds_container.point_clouds[i].shift_to_center();
-            }
-            if (session.point_clouds_container.point_clouds[i].gizmo)
-            {
-                for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                {
-                    if (i != j)
-                    {
-                        session.point_clouds_container.point_clouds[j].gizmo = false;
-                    }
-                }
-                m_gizmo[0] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 0);
-                m_gizmo[1] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 0);
-                m_gizmo[2] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 0);
-                m_gizmo[3] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 0);
-                m_gizmo[4] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 1);
-                m_gizmo[5] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 1);
-                m_gizmo[6] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 1);
-                m_gizmo[7] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 1);
-                m_gizmo[8] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 2);
-                m_gizmo[9] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 2);
-                m_gizmo[10] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 2);
-                m_gizmo[11] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 2);
-                m_gizmo[12] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 3);
-                m_gizmo[13] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 3);
-                m_gizmo[14] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 3);
-                m_gizmo[15] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 3);
-            }
+            ImGui::Checkbox("manipulate_only_marked_gizmo (false: move also succesive nodes)", &manipulate_only_marked_gizmo);
 
-            if (session.point_clouds_container.point_clouds[i].visible)
+            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
             {
-                ImGui::ColorEdit3(std::string(std::to_string(i) + ": pc_color").c_str(), session.point_clouds_container.point_clouds[i].render_color);
+                ImGui::Separator();
+                ImGui::Checkbox(session.point_clouds_container.point_clouds[i].file_name.c_str(), &session.point_clouds_container.point_clouds[i].visible);
                 ImGui::SameLine();
-                if (ImGui::Button(std::string("#" + std::to_string(i) + "_ICP").c_str()))
+                ImGui::Checkbox((std::string("gizmo_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
+                ImGui::SameLine();
+                ImGui::Checkbox((std::string("fixed_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed);
+                ImGui::SameLine();
+                ImGui::PushButtonRepeat(true);
+                float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
+                if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##left").c_str(), ImGuiDir_Left))
                 {
-                    size_t index_target = i;
-                    PointClouds pcs;
-                    for (size_t k = 0; k < index_target; k++)
+                    (session.point_clouds_container.point_clouds[i].point_size)--;
+                }
+                ImGui::SameLine(0.0f, spacing);
+                if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##right").c_str(), ImGuiDir_Right))
+                {
+                    (session.point_clouds_container.point_clouds[i].point_size)++;
+                }
+                ImGui::PopButtonRepeat();
+                ImGui::SameLine();
+                ImGui::Text("point size %d", session.point_clouds_container.point_clouds[i].point_size);
+                if (session.point_clouds_container.point_clouds[i].point_size < 1)
+                {
+                    session.point_clouds_container.point_clouds[i].point_size = 1;
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button(std::string("#" + std::to_string(i) + " save scan(global reference frame)").c_str()))
+                {
+                    static std::shared_ptr<pfd::save_file> save_file;
+                    std::string output_file_name = "";
+                    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                    const auto t = [&]()
                     {
-                        if (session.point_clouds_container.point_clouds[k].visible)
+                        auto sel = pfd::save_file("Choose folder", "C:\\").result();
+                        output_file_name = sel;
+                        std::cout << "Scan file to save: '" << output_file_name << "'" << std::endl;
+                    };
+                    std::thread t1(t);
+                    t1.join();
+
+                    if (output_file_name.size() > 0)
+                    {
+                        session.point_clouds_container.point_clouds[i].save_as_global(output_file_name);
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button(std::string("#" + std::to_string(i) + " shift points to center").c_str()))
+                {
+                    session.point_clouds_container.point_clouds[i].shift_to_center();
+                }
+                if (session.point_clouds_container.point_clouds[i].gizmo)
+                {
+                    for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
+                    {
+                        if (i != j)
                         {
-                            pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[k]);
+                            session.point_clouds_container.point_clouds[j].gizmo = false;
                         }
                     }
+                    m_gizmo[0] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 0);
+                    m_gizmo[1] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 0);
+                    m_gizmo[2] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 0);
+                    m_gizmo[3] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 0);
+                    m_gizmo[4] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 1);
+                    m_gizmo[5] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 1);
+                    m_gizmo[6] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 1);
+                    m_gizmo[7] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 1);
+                    m_gizmo[8] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 2);
+                    m_gizmo[9] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 2);
+                    m_gizmo[10] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 2);
+                    m_gizmo[11] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 2);
+                    m_gizmo[12] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 3);
+                    m_gizmo[13] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 3);
+                    m_gizmo[14] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 3);
+                    m_gizmo[15] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 3);
+                }
 
-                    if (pcs.point_clouds.size() > 0)
+                if (session.point_clouds_container.point_clouds[i].visible)
+                {
+                    ImGui::ColorEdit3(std::string(std::to_string(i) + ": pc_color").c_str(), session.point_clouds_container.point_clouds[i].render_color);
+                    ImGui::SameLine();
+                    if (ImGui::Button(std::string("#" + std::to_string(i) + "_ICP").c_str()))
                     {
-                        for (size_t k = 0; k < pcs.point_clouds.size(); k++)
+                        size_t index_target = i;
+                        PointClouds pcs;
+                        for (size_t k = 0; k < index_target; k++)
                         {
-                            pcs.point_clouds[k].fixed = true;
+                            if (session.point_clouds_container.point_clouds[k].visible)
+                            {
+                                pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[k]);
+                            }
                         }
-                    }
-                    pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[index_target]);
-                    pcs.point_clouds[pcs.point_clouds.size() - 1].fixed = false;
 
-                    ICP icp;
-                    icp.search_radious = 0.3; // ToDo move to params
-                    for (auto &pc : pcs.point_clouds)
-                    {
-                        pc.rgd_params.resolution_X = icp.search_radious;
-                        pc.rgd_params.resolution_Y = icp.search_radious;
-                        pc.rgd_params.resolution_Z = icp.search_radious;
-
-                        pc.build_rgd();
-                        pc.cout_rgd();
-                        pc.compute_normal_vectors(0.5);
-                    }
-
-                    icp.number_of_threads = std::thread::hardware_concurrency();
-
-                    icp.number_of_iterations = 10;
-                    icp.is_adaptive_robust_kernel = false;
-
-                    icp.is_ballanced_horizontal_vs_vertical = false;
-                    icp.is_fix_first_node = false;
-                    icp.is_gauss_newton = true;
-                    icp.is_levenberg_marguardt = false;
-                    icp.is_cw = false;
-                    icp.is_wc = true;
-                    icp.is_tait_bryan_angles = true;
-                    icp.is_quaternion = false;
-                    icp.is_rodrigues = false;
-                    std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                    icp.optimization_point_to_point_source_to_target(pcs);
-
-                    std::cout << "pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
-
-                    std::vector<Eigen::Affine3d> all_m_poses;
-                    for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                    {
-                        all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
-                    }
-
-                    session.point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
-
-                    std::cout << "pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
-
-                    // like gizmo
-                    if (!manipulate_only_marked_gizmo)
-                    {
-                        std::cout << "update all poses after current pose" << std::endl;
-
-                        Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[index_target].m_pose;
-                        for (int j = index_target + 1; j < session.point_clouds_container.point_clouds.size(); j++)
+                        if (pcs.point_clouds.size() > 0)
                         {
-                            curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                            session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
+                            for (size_t k = 0; k < pcs.point_clouds.size(); k++)
+                            {
+                                pcs.point_clouds[k].fixed = true;
+                            }
+                        }
+                        pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[index_target]);
+                        pcs.point_clouds[pcs.point_clouds.size() - 1].fixed = false;
+
+                        ICP icp;
+                        icp.search_radious = 0.3; // ToDo move to params
+                        for (auto &pc : pcs.point_clouds)
+                        {
+                            pc.rgd_params.resolution_X = icp.search_radious;
+                            pc.rgd_params.resolution_Y = icp.search_radious;
+                            pc.rgd_params.resolution_Z = icp.search_radious;
+
+                            pc.build_rgd();
+                            pc.cout_rgd();
+                            pc.compute_normal_vectors(0.5);
+                        }
+
+                        icp.number_of_threads = std::thread::hardware_concurrency();
+
+                        icp.number_of_iterations = 10;
+                        icp.is_adaptive_robust_kernel = false;
+
+                        icp.is_ballanced_horizontal_vs_vertical = false;
+                        icp.is_fix_first_node = false;
+                        icp.is_gauss_newton = true;
+                        icp.is_levenberg_marguardt = false;
+                        icp.is_cw = false;
+                        icp.is_wc = true;
+                        icp.is_tait_bryan_angles = true;
+                        icp.is_quaternion = false;
+                        icp.is_rodrigues = false;
+                        std::cout << "optimization_point_to_point_source_to_target" << std::endl;
+
+                        icp.optimization_point_to_point_source_to_target(pcs);
+
+                        std::cout << "pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+
+                        std::vector<Eigen::Affine3d> all_m_poses;
+                        for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
+                        {
+                            all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
+                        }
+
+                        session.point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
+
+                        std::cout << "pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+
+                        // like gizmo
+                        if (!manipulate_only_marked_gizmo)
+                        {
+                            std::cout << "update all poses after current pose" << std::endl;
+
+                            Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[index_target].m_pose;
+                            for (int j = index_target + 1; j < session.point_clouds_container.point_clouds.size(); j++)
+                            {
+                                curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
+                                session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
+                            }
                         }
                     }
                 }
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str()))
-            {
-                std::cout << session.point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
-            }
-            ImGui::SameLine();
-            ImGui::Checkbox(std::string("#" + std::to_string(i) + " choose_geo").c_str(), &session.point_clouds_container.point_clouds[i].choosing_geo);
-
-            if (session.point_clouds_container.point_clouds[i].choosing_geo)
-            {
-                for (int gp = 0; gp < session.point_clouds_container.point_clouds[i].available_geo_points.size(); gp++)
+                ImGui::SameLine();
+                if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str()))
                 {
-                    ImGui::Checkbox(std::string("#" + std::to_string(i) + " " + std::to_string(gp) + "[" +
-                                                session.point_clouds_container.point_clouds[i].available_geo_points[gp].name + "]")
-                                        .c_str(),
-                                    &session.point_clouds_container.point_clouds[i].available_geo_points[gp].choosen);
+                    std::cout << session.point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
+                }
+                ImGui::SameLine();
+                ImGui::Checkbox(std::string("#" + std::to_string(i) + " choose_geo").c_str(), &session.point_clouds_container.point_clouds[i].choosing_geo);
+
+                if (session.point_clouds_container.point_clouds[i].choosing_geo)
+                {
+                    for (int gp = 0; gp < session.point_clouds_container.point_clouds[i].available_geo_points.size(); gp++)
+                    {
+                        ImGui::Checkbox(std::string("#" + std::to_string(i) + " " + std::to_string(gp) + "[" +
+                                                    session.point_clouds_container.point_clouds[i].available_geo_points[gp].name + "]")
+                                            .c_str(),
+                                        &session.point_clouds_container.point_clouds[i].available_geo_points[gp].choosen);
+                    }
                 }
             }
-        }
-        ImGui::Separator();
-        int total_number_of_points = 0;
-        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-        {
-            total_number_of_points += session.point_clouds_container.point_clouds[i].points_local.size();
-        }
-        std::string point_size_message = "total number of points: " + std::to_string(total_number_of_points);
-        ImGui::Text(point_size_message.c_str());
+            ImGui::Separator();
+            int total_number_of_points = 0;
+            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+            {
+                total_number_of_points += session.point_clouds_container.point_clouds[i].points_local.size();
+            }
+            std::string point_size_message = "total number of points: " + std::to_string(total_number_of_points);
+            ImGui::Text(point_size_message.c_str());
 
-        ImGui::Separator();
-        ImGui::Separator();
+            ImGui::Separator();
+            ImGui::Separator();
+        }
 
         if (ImGui::Button("save all marked scans to laz (as one global scan)"))
         {
@@ -1040,97 +1072,58 @@ void project_gui()
                 }
             }
         }
-
-        if (ImGui::Button("save all marked scans to laz (as separate global scans)"))
+        if (!simple_gui)
         {
-            for (auto &p : session.point_clouds_container.point_clouds)
+
+            if (ImGui::Button("save all marked scans to laz (as separate global scans)"))
             {
-                if (p.visible)
-                {
-
-                    fs::path file_path_in = p.file_name;
-                    // std::cout << filePath.stem() << std::endl;
-                    // std::cout << filePath.extension() << std::endl;
-                    // std::cout << filePath.root_name() << std::endl;
-                    // std::cout << filePath.root_directory() << std::endl;
-                    // std::cout << filePath.root_path() << std::endl;
-                    // std::cout << filePath.relative_path() << std::endl;
-                    // std::cout << filePath.parent_path() << std::endl;
-                    // std::cout << filePath.filename() << std::endl;
-                    fs::path file_path_put = file_path_in.parent_path();
-                    file_path_put /= (file_path_in.stem().string() + "_processed" + file_path_in.extension().string());
-                    std::cout << "file_in: " << file_path_in << std::endl;
-                    std::cout << "file_out: " << file_path_put << std::endl;
-
-                    std::cout << "start save_processed_pc" << std::endl;
-                    save_processed_pc(file_path_in, file_path_put, p.m_pose, session.point_clouds_container.offset);
-                    std::cout << "processed_pc finished" << std::endl;
-                }
-            }
-        }
-
-        if (ImGui::Button("save all marked trajectories to laz (as one global scan)"))
-        {
-            std::shared_ptr<pfd::save_file> save_file;
-            std::string output_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
-                output_file_name = sel;
-                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-            };
-            std::thread t1(t);
-            t1.join();
-
-            if (output_file_name.size() > 0)
-            {
-                std::vector<Eigen::Vector3d> pointcloud;
-                std::vector<unsigned short> intensity;
-
-                // point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
-
                 for (auto &p : session.point_clouds_container.point_clouds)
                 {
                     if (p.visible)
                     {
 
-                        for (int i = 0; i < p.local_trajectory.size(); i++)
-                        {
-                            const auto &pp = p.local_trajectory[i].m_pose.translation();
-                            Eigen::Vector3d vp;
-                            vp = p.m_pose * pp + session.point_clouds_container.offset;
+                        fs::path file_path_in = p.file_name;
+                        // std::cout << filePath.stem() << std::endl;
+                        // std::cout << filePath.extension() << std::endl;
+                        // std::cout << filePath.root_name() << std::endl;
+                        // std::cout << filePath.root_directory() << std::endl;
+                        // std::cout << filePath.root_path() << std::endl;
+                        // std::cout << filePath.relative_path() << std::endl;
+                        // std::cout << filePath.parent_path() << std::endl;
+                        // std::cout << filePath.filename() << std::endl;
+                        fs::path file_path_put = file_path_in.parent_path();
+                        file_path_put /= (file_path_in.stem().string() + "_processed" + file_path_in.extension().string());
+                        std::cout << "file_in: " << file_path_in << std::endl;
+                        std::cout << "file_out: " << file_path_put << std::endl;
 
-                            pointcloud.push_back(vp);
-                            intensity.push_back(0);
-                        }
+                        std::cout << "start save_processed_pc" << std::endl;
+                        save_processed_pc(file_path_in, file_path_put, p.m_pose, session.point_clouds_container.offset);
+                        std::cout << "processed_pc finished" << std::endl;
                     }
                 }
-                if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
-                {
-                    std::cout << "problem with saving file: " << output_file_name << std::endl;
-                }
             }
-        }
-        if (ImGui::Button("save all marked trajectories to csv (x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
-        {
-            std::shared_ptr<pfd::save_file> save_file;
-            std::string output_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::save_file("Save las or csv file", "C:\\").result();
-                output_file_name = sel;
-                std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
-            };
-            std::thread t1(t);
-            t1.join();
 
-            if (output_file_name.size() > 0)
+            if (ImGui::Button("save all marked trajectories to laz (as one global scan)"))
             {
-                std::ofstream outfile(output_file_name);
-                if (outfile.good())
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
                 {
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    output_file_name = sel;
+                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    std::vector<Eigen::Vector3d> pointcloud;
+                    std::vector<unsigned short> intensity;
+
+                    // point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
+
                     for (auto &p : session.point_clouds_container.point_clouds)
                     {
                         if (p.visible)
@@ -1138,19 +1131,60 @@ void project_gui()
 
                             for (int i = 0; i < p.local_trajectory.size(); i++)
                             {
-                                const auto &m = p.local_trajectory[i].m_pose;
-                                Eigen::Affine3d pose = p.m_pose * m;
-                                pose.translation() += session.point_clouds_container.offset;
+                                const auto &pp = p.local_trajectory[i].m_pose.translation();
+                                Eigen::Vector3d vp;
+                                vp = p.m_pose * pp + session.point_clouds_container.offset;
 
-                                outfile << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                pointcloud.push_back(vp);
+                                intensity.push_back(0);
                             }
                         }
                     }
-                    outfile.close();
+                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    {
+                        std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    }
+                }
+            }
+            if (ImGui::Button("save all marked trajectories to csv (x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save las or csv file", "C:\\").result();
+                    output_file_name = sel;
+                    std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    std::ofstream outfile(output_file_name);
+                    if (outfile.good())
+                    {
+                        for (auto &p : session.point_clouds_container.point_clouds)
+                        {
+                            if (p.visible)
+                            {
+
+                                for (int i = 0; i < p.local_trajectory.size(); i++)
+                                {
+                                    const auto &m = p.local_trajectory[i].m_pose;
+                                    Eigen::Affine3d pose = p.m_pose * m;
+                                    pose.translation() += session.point_clouds_container.offset;
+
+                                    outfile << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                }
+                            }
+                        }
+                        outfile.close();
+                    }
                 }
             }
         }
-
         ImGui::Separator();
         ImGui::Separator();
 
@@ -1256,15 +1290,24 @@ void project_gui()
             ImGui::Checkbox("show GNSS correspondences", &gnss.show_correspondences);
         }
 
-        ImGui::Separator();
-        ImGui::Separator();
-        if (ImGui::Button("perform experiment on WIN"))
+        if (!simple_gui)
         {
-            perform_experiment_on_windows();
-        }
-        if (ImGui::Button("perform experiment on LINUX"))
-        {
-            perform_experiment_on_linux();
+            ImGui::Separator();
+            ImGui::Separator();
+            ImGui::Separator();
+            ImGui::Separator();
+            ImGui::Separator();
+            ImGui::Separator();
+            ImGui::Separator();
+            ImGui::Separator();
+            if (ImGui::Button("perform experiment on WIN"))
+            {
+                perform_experiment_on_windows();
+            }
+            if (ImGui::Button("perform experiment on LINUX"))
+            {
+                perform_experiment_on_linux();
+            }
         }
     }
     ImGui::End();
@@ -2733,7 +2776,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration v0.19");
+    glutCreateWindow("multi_view_tls_registration_step_2 v0.20");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

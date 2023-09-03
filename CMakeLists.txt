@@ -150,22 +150,22 @@ set(FUSION
 include_directories(3rdparty/freeglut-3.2.2/include/)
 add_subdirectory(3rdparty/freeglut-3.2.2)
 
-add_executable(multi_view_tls_registration src/multi_view_tls_registration.cpp
+add_executable(multi_view_tls_registration_step_2 src/multi_view_tls_registration.cpp
 ${IMGUI_SRCS}
 ${CORE_SRCS}
 ${GIZMO}
 )
 
 if (WIN32)
-target_link_libraries(multi_view_tls_registration ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	
+target_link_libraries(multi_view_tls_registration_step_2 ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	
 else()
-target_link_libraries(multi_view_tls_registration ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
+target_link_libraries(multi_view_tls_registration_step_2 ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
 endif()
 if (PCL_FOUND)
-    target_link_libraries (multi_view_tls_registration ${PCL_LIBRARIES})
+    target_link_libraries (multi_view_tls_registration_step_2 ${PCL_LIBRARIES})
 endif()
 if (GTSAM_FOUND)
-    target_link_libraries (multi_view_tls_registration gtsam)
+    target_link_libraries (multi_view_tls_registration_step_2 gtsam)
 endif()
 
 add_executable(hd_mapper src/hd_mapper.cpp
@@ -193,7 +193,7 @@ include_directories(
 3rdparty/Fusion/Fusion
 )
 
-add_executable(lidar_odometry src/lidar_odometry.cpp
+add_executable(lidar_odometry_step_1 src/lidar_odometry.cpp
 ${IMGUI_SRCS}
 ${CORE_SRCS}
 ${GIZMO}
@@ -201,27 +201,27 @@ ${FUSION}
 )
 
 if (WIN32)
-target_link_libraries(lidar_odometry ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)
+target_link_libraries(lidar_odometry_step_1 ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)
 else()
-target_link_libraries(lidar_odometry ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
+target_link_libraries(lidar_odometry_step_1 ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
 endif()
 
-add_executable(multi_session_registration src/multi_session_registration.cpp
+add_executable(multi_session_registration_step_3 src/multi_session_registration.cpp
 ${IMGUI_SRCS}
 ${CORE_SRCS}
 ${GIZMO}
 )
 
 if (WIN32)
-target_link_libraries(multi_session_registration ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	
+target_link_libraries(multi_session_registration_step_3 ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	
 else()
-target_link_libraries(multi_session_registration ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
+target_link_libraries(multi_session_registration_step_3 ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
 endif()
 if (PCL_FOUND)
-    target_link_libraries (multi_session_registration ${PCL_LIBRARIES})
+    target_link_libraries (multi_session_registration_step_3 ${PCL_LIBRARIES})
 endif()
 if (GTSAM_FOUND)
-    target_link_libraries (multi_session_registration gtsam)
+    target_link_libraries (multi_session_registration_step_3 gtsam)
 endif()
 
 

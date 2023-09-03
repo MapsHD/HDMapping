@@ -231,8 +231,14 @@ bool save_project_settings(const std::string &file_name, const ProjectSettings &
 
 void project_gui()
 {
-    if (ImGui::Begin("Multi_session_registration v0.19"))
+    if (ImGui::Begin("multi_session_registration_step_3"))
     {
+        ImGui::Text("This program is third step in MANDEYE process.");
+        ImGui::Text("It refines sessions with loop closure.");
+        ImGui::Text("First step: create project by adding sessions: result of 'multi_view_tls_registration_step_2' program.");
+        ImGui::Text("Last step: save project.");
+        ImGui::Text("To produce map use 'multi_view_tls_registration_step_2' export functionality.");
+
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::ColorEdit3("clear color", (float *)&clear_color); // Edit 3 floats representing a color
 
@@ -293,6 +299,29 @@ void project_gui()
 
         ImGui::Text("---------------------------------------------");
         ImGui::Text("-------PROJECT SETTINGS BEGIN----------------");
+        if (ImGui::Button("add session to project"))
+        {
+            static std::shared_ptr<pfd::open_file> open_file;
+            std::string input_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+            const auto t = [&]()
+            {
+                auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
+                for (int i = 0; i < sel.size(); i++)
+                {
+                    input_file_name = sel[i];
+                    std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
+                }
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (input_file_name.size() > 0)
+            {
+                project_settings.session_file_names.push_back(input_file_name);
+            }
+        }
+
         if (ImGui::Button("load project"))
         {
             static std::shared_ptr<pfd::open_file> open_file;
@@ -336,28 +365,7 @@ void project_gui()
             }
         }
 
-        if (ImGui::Button("add session file_name"))
-        {
-            static std::shared_ptr<pfd::open_file> open_file;
-            std::string input_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_name = sel[i];
-                    std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
-
-            if (input_file_name.size() > 0)
-            {
-                project_settings.session_file_names.push_back(input_file_name);
-            }
-        }
+        
         ImGui::Text("-----------session_file_names begin----------");
         int index_gizmo = -1;
 
@@ -2303,7 +2311,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_session_registration v0.19");
+    glutCreateWindow("multi_session_registration_step_3 v0.20");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

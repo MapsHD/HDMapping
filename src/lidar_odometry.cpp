@@ -2021,7 +2021,9 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
         if (laszip_read_point(laszip_reader))
         {
             fprintf(stderr, "DLL ERROR: reading point %u\n", j);
-            std::abort();
+            laszip_close_reader(laszip_reader);
+            return points;
+            //std::abort();
         }
         Point3Di p;
 

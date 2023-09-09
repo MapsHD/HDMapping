@@ -688,7 +688,9 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 		if (laszip_read_point(laszip_reader))
 		{
 			fprintf(stderr, ":DLL ERROR: reading point %u\n", j);
-			continue;
+			laszip_close_reader(laszip_reader);
+			return true;
+			//continue;
 		}
 
 		LAZPoint p;
@@ -705,6 +707,8 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 	laszip_close_reader(laszip_reader);
 	// laszip_clean(laszip_reader);
 	// laszip_destroy(laszip_reader);
+
+	return true;
 }
 
 bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)

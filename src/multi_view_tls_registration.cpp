@@ -1149,6 +1149,285 @@ void project_gui()
                     }
                 }
             }
+            if (ImGui::Button("save scale board for all marked trajectories to laz (as one global scan - dec 0.1)"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    output_file_name = sel;
+                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    std::vector<Eigen::Vector3d> pointcloud;
+                    std::vector<unsigned short> intensity;
+
+                    float min_x = 1000000000.0;
+                    float max_x = -1000000000.0;
+                    float min_y = 1000000000.0;
+                    float max_y = -1000000000.0;
+                    float min_z = 1000000000.0;
+                    float max_z = -1000000000.0;
+
+                    for (auto &p : session.point_clouds_container.point_clouds)
+                    {
+                        if (p.visible)
+                        {
+
+                            for (int i = 0; i < p.local_trajectory.size(); i++)
+                            {
+                                const auto &pp = p.local_trajectory[i].m_pose.translation();
+                                Eigen::Vector3d vp;
+                                vp = p.m_pose * pp + session.point_clouds_container.offset;
+
+                                // pointcloud.push_back(vp);
+                                // intensity.push_back(0);
+                                if (vp.x() < min_x)
+                                {
+                                    min_x = vp.x();
+                                }
+                                if (vp.x() > max_x)
+                                {
+                                    max_x = vp.x();
+                                }
+                                if (vp.y() < min_y)
+                                {
+                                    min_y = vp.y();
+                                }
+                                if (vp.y() > max_y)
+                                {
+                                    max_y = vp.y();
+                                }
+                                if (vp.z() < min_z)
+                                {
+                                    min_z = vp.z();
+                                }
+                                if (vp.z() > max_z)
+                                {
+                                    max_z = vp.z();
+                                }
+                            }
+                        }
+                    }
+
+                    for (float x = min_x - 10.0; x <= max_x + 10.0; x += 0.1)
+                    {
+                        for (float y = min_y - 10.0; y <= max_y + 10.0; y += 0.001)
+                        {
+                            Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+
+                    for (float y = min_y - 10.0; y <= max_y + 10.0; y += 0.1)
+                    {
+                        for (float x = min_x - 10.0; x <= max_x + 10.0; x += 0.001)
+                        {
+                            Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+
+                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    {
+                        std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    }
+                }
+            }
+            if (ImGui::Button("save scale board for all marked trajectories to laz (as one global scan - dec 1.0)"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    output_file_name = sel;
+                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    std::vector<Eigen::Vector3d> pointcloud;
+                    std::vector<unsigned short> intensity;
+
+                    float min_x = 1000000000.0;
+                    float max_x = -1000000000.0;
+                    float min_y = 1000000000.0;
+                    float max_y = -1000000000.0;
+                    float min_z = 1000000000.0;
+                    float max_z = -1000000000.0;
+
+                    for (auto &p : session.point_clouds_container.point_clouds)
+                    {
+                        if (p.visible)
+                        {
+
+                            for (int i = 0; i < p.local_trajectory.size(); i++)
+                            {
+                                const auto &pp = p.local_trajectory[i].m_pose.translation();
+                                Eigen::Vector3d vp;
+                                vp = p.m_pose * pp + session.point_clouds_container.offset;
+
+                                // pointcloud.push_back(vp);
+                                // intensity.push_back(0);
+                                if (vp.x() < min_x)
+                                {
+                                    min_x = vp.x();
+                                }
+                                if (vp.x() > max_x)
+                                {
+                                    max_x = vp.x();
+                                }
+                                if (vp.y() < min_y)
+                                {
+                                    min_y = vp.y();
+                                }
+                                if (vp.y() > max_y)
+                                {
+                                    max_y = vp.y();
+                                }
+                                if (vp.z() < min_z)
+                                {
+                                    min_z = vp.z();
+                                }
+                                if (vp.z() > max_z)
+                                {
+                                    max_z = vp.z();
+                                }
+                            }
+                        }
+                    }
+
+                    for (float x = min_x - 10.0; x <= max_x + 10.0; x += 1.0)
+                    {
+                        for (float y = min_y - 10.0; y <= max_y + 10.0; y += 0.001)
+                        {
+                            Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+
+                    for (float y = min_y - 10.0; y <= max_y + 10.0; y += 1.0)
+                    {
+                        for (float x = min_x - 10.0; x <= max_x + 10.0; x += 0.001)
+                        {
+                            Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+
+                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    {
+                        std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    }
+                }
+            }
+            if (ImGui::Button("save scale board for all marked trajectories to laz (as one global scan - dec 10.0)"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    output_file_name = sel;
+                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    std::vector<Eigen::Vector3d> pointcloud;
+                    std::vector<unsigned short> intensity;
+
+                    float min_x = 1000000000.0;
+                    float max_x = -1000000000.0;
+                    float min_y = 1000000000.0;
+                    float max_y = -1000000000.0;
+                    float min_z = 1000000000.0;
+                    float max_z = -1000000000.0;
+
+                    for (auto &p : session.point_clouds_container.point_clouds)
+                    {
+                        if (p.visible)
+                        {
+
+                            for (int i = 0; i < p.local_trajectory.size(); i++)
+                            {
+                                const auto &pp = p.local_trajectory[i].m_pose.translation();
+                                Eigen::Vector3d vp;
+                                vp = p.m_pose * pp + session.point_clouds_container.offset;
+
+                                // pointcloud.push_back(vp);
+                                // intensity.push_back(0);
+                                if (vp.x() < min_x)
+                                {
+                                    min_x = vp.x();
+                                }
+                                if (vp.x() > max_x)
+                                {
+                                    max_x = vp.x();
+                                }
+                                if (vp.y() < min_y)
+                                {
+                                    min_y = vp.y();
+                                }
+                                if (vp.y() > max_y)
+                                {
+                                    max_y = vp.y();
+                                }
+                                if (vp.z() < min_z)
+                                {
+                                    min_z = vp.z();
+                                }
+                                if (vp.z() > max_z)
+                                {
+                                    max_z = vp.z();
+                                }
+                            }
+                        }
+                    }
+
+                    for (float x = min_x - 10.0; x <= max_x + 10.0; x += 10.0)
+                    {
+                        for (float y = min_y - 10.0; y <= max_y + 10.0; y += 0.001)
+                        {
+                            Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+
+                    for (float y = min_y - 10.0; y <= max_y + 10.0; y += 10.0)
+                    {
+                        for (float x = min_x - 10.0; x <= max_x + 10.0; x += 0.001)
+                        {
+                            Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+
+                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    {
+                        std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    }
+                }
+            }
             if (ImGui::Button("save all marked trajectories to csv (x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
             {
                 std::shared_ptr<pfd::save_file> save_file;

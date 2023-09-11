@@ -87,6 +87,7 @@ namespace plycpp
 				return it->data;
 			else {}
 				//throw Exception("Invalid key.");
+			return nullptr;
 		}
 
 		const std::shared_ptr<const Data> operator[] (const Key& key) const

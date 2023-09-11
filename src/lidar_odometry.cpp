@@ -309,13 +309,13 @@ bool saveLaz(const std::string &filename, const WorkerData &data)
         coordinates[2] = p.point.z();
         if (laszip_set_coordinates(laszip_writer, coordinates))
         {
-            fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);
+            fprintf(stderr, "DLL ERROR: setting coordinates for point %I64ld\n", p_count);
             return false;
         }
 
         if (laszip_write_point(laszip_writer))
         {
-            fprintf(stderr, "DLL ERROR: writing point %I64d\n", p_count);
+            fprintf(stderr, "DLL ERROR: writing point %I64ld\n", p_count);
             return false;
         }
     }
@@ -326,7 +326,7 @@ bool saveLaz(const std::string &filename, const WorkerData &data)
         return false;
     }
 
-    fprintf(stderr, "successfully written %I64d points\n", p_count);
+    fprintf(stderr, "successfully written %I64ld points\n", p_count);
 
     // close the writer
 
@@ -472,13 +472,13 @@ bool saveLaz(const std::string &filename, const std::vector<Point3Di> &points_gl
         coordinates[2] = p.point.z();
         if (laszip_set_coordinates(laszip_writer, coordinates))
         {
-            fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);
+            fprintf(stderr, "DLL ERROR: setting coordinates for point %I64ld\n", p_count);
             return false;
         }
 
         if (laszip_write_point(laszip_writer))
         {
-            fprintf(stderr, "DLL ERROR: writing point %I64d\n", p_count);
+            fprintf(stderr, "DLL ERROR: writing point %I64ld\n", p_count);
             return false;
         }
     }
@@ -489,7 +489,7 @@ bool saveLaz(const std::string &filename, const std::vector<Point3Di> &points_gl
         return false;
     }
 
-    fprintf(stderr, "successfully written %I64d points\n", p_count);
+    fprintf(stderr, "successfully written %I64ld points\n", p_count);
 
     // close the writer
 
@@ -548,7 +548,7 @@ void lidar_odometry_gui()
         {
             ImGui::SliderFloat("mouse_sensitivity_xy", &mouse_sensitivity, 0.1, 10);
         }
-        ImGui::Text(("Working directory ('session.json' will be saved here): '" + working_directory + "'").c_str());
+        ImGui::Text("%s", ("Working directory ('session.json' will be saved here): '" + working_directory + "'").c_str());
         // ImGui::Checkbox("show_all_points", &show_all_points);
         if (!simple_gui)
         {
@@ -621,7 +621,7 @@ void lidar_odometry_gui()
                 const auto t = [&]()
                 {
                     std::vector<std::string> filters;
-                    auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
+                    auto sel = pfd::open_file("Load las files", "C:\\", filters, pfd::opt::multiselect).result();
                     for (int i = 0; i < sel.size(); i++)
                     {
                         input_file_names.push_back(sel[i]);
@@ -743,7 +743,7 @@ void lidar_odometry_gui()
                         counter++;
                         if (counter % 100 == 0)
                         {
-                            printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+                            printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %ld]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
                         }
                     }
 
@@ -1248,7 +1248,7 @@ void lidar_odometry_gui()
                 {
                     if (i % 1000 == 0)
                     {
-                        printf("processing worker_data [%d] of %d \n", i + 1, worker_data.size());
+                        printf("processing worker_data [%d] of %ld \n", i + 1, worker_data.size());
                     }
                     auto tmp_data = worker_data[i].original_points;
 
@@ -1397,7 +1397,7 @@ void lidar_odometry_gui()
         if (step_3_done)
         {
             ImGui::Text("-------------------------------------------------------------------------------");
-            ImGui::Text(std::string("All data is saved in folder '" + working_directory + "' You can close this program.").c_str());
+            ImGui::Text("%s", std::string("All data is saved in folder '" + working_directory + "' You can close this program.").c_str());
             ImGui::Text("Next step is to load 'session.json' with 'multi_view_tls_registration_step_2' program");
             ImGui::Text("-------------------------------------------------------------------------------");
         }
@@ -1440,7 +1440,7 @@ void lidar_odometry_gui()
                 const auto t = [&]()
                 {
                     std::vector<std::string> filters;
-                    auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
+                    auto sel = pfd::open_file("Load las files", "C:\\", filters, pfd::opt::multiselect).result();
                     for (int i = 0; i < sel.size(); i++)
                     {
                         input_file_names.push_back(sel[i]);

@@ -522,7 +522,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
             }
         }
         std::string number_active_edges = "number_edges: " + std::to_string(edges.size());
-        ImGui::Text(number_active_edges.c_str());
+        ImGui::Text("%s", number_active_edges.c_str());
 
         ImGui::Checkbox("manipulate_active_edge", &manipulate_active_edge);
 

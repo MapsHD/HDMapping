@@ -206,6 +206,10 @@ else()
 target_link_libraries(lidar_odometry_step_1 ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip)
 endif()
 
+if (PCL_FOUND)
+    target_link_libraries (lidar_odometry_step_1 ${PCL_LIBRARIES})
+endif()
+
 add_executable(multi_session_registration_step_3 src/multi_session_registration.cpp
 ${IMGUI_SRCS}
 ${CORE_SRCS}

@@ -6,37 +6,39 @@ if (WIN32)
 	add_compile_definitions(_USE_MATH_DEFINES)
 	include_directories(3rdparty/eigen)
 else()
-	find_package( Eigen3 REQUIRED)
-	if(EIGEN3_FOUND)
-    	message("EIGEN3 found")
-    	message ("EIGEN3_INCLUDE_DIR: " ${EIGEN3_INCLUDE_DIR})
-    	message ("EIGEN3_INCLUDE_DIRS: " ${EIGEN3_INCLUDE_DIRS})
-    	message ("Eigen3_DIR: " ${Eigen3_DIR})
-	include_directories(
-	${EIGEN3_INCLUDE_DIR} 
-	${EIGEN3_INCLUDE_DIRS} 
-	${Eigen3_DIR})
+	#find_package( Eigen3 REQUIRED)
+	#if(EIGEN3_FOUND)
+	#    	message("EIGEN3 found")
+	#    	message ("EIGEN3_INCLUDE_DIR: " ${EIGEN3_INCLUDE_DIR})
+	#    	message ("EIGEN3_INCLUDE_DIRS: " ${EIGEN3_INCLUDE_DIRS})
+	#    	message ("Eigen3_DIR: " ${Eigen3_DIR})
+#		include_directories(	
+	#	${EIGEN3_INCLUDE_DIR} 
+	#	${EIGEN3_INCLUDE_DIRS} 
+	#	${Eigen3_DIR})
+	#endif()
+
+	include_directories(3rdparty/eigen)
+	
+	find_package(GLEW REQUIRED)
+	include_directories(${GLEW_INCLUDE_DIRS})
+	link_libraries(${GLEW_LIBRARIES})
+
+	find_package(OpenGL REQUIRED) 
+	find_package(GLUT REQUIRED) 
+	include_directories(library ${OPENGL_INCLUDE_DIRS} ${GLUT_INCLUDE_DIRS})
+
+	set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+	set(CMAKE_HAVE_THREADS_LIBRARY 1)
+	set(CMAKE_USE_WIN32_THREADS_INIT 0)
+	set(CMAKE_USE_PTHREADS_INIT 1)
+	set(THREADS_PREFER_PTHREAD_FLAG ON)
+
+	add_definitions("-DWITH_MANIF")
 endif()
 
-find_package(GLEW REQUIRED)
-include_directories(${GLEW_INCLUDE_DIRS})
-link_libraries(${GLEW_LIBRARIES})
-
-find_package(OpenGL REQUIRED) 
-find_package(GLUT REQUIRED) 
-include_directories(library ${OPENGL_INCLUDE_DIRS} ${GLUT_INCLUDE_DIRS})
-
-set(CMAKE_THREAD_LIBS_INIT "-lpthread")
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
-set(CMAKE_HAVE_THREADS_LIBRARY 1)
-set(CMAKE_USE_WIN32_THREADS_INIT 0)
-set(CMAKE_USE_PTHREADS_INIT 1)
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-
-add_definitions("-DWITH_MANIF")
-endif()
-
-#find_package(PCL)
+find_package(PCL)
 if(PCL_FOUND)
     message("PCL found")
     message ("PCL_LIBRARY_DIRS: " ${PCL_LIBRARY_DIRS})

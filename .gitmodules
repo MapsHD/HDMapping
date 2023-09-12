@@ -13,3 +13,6 @@
 [submodule "3rdparty/Fusion"]
 	path = 3rdparty/Fusion
 	url = https://github.com/xioTechnologies/Fusion.git
+[submodule "3rdparty/eigen"]
+	path = 3rdparty/eigen
+	url = https://gitlab.com/libeigen/eigen.git

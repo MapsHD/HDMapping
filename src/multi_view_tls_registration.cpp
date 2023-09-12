@@ -3362,10 +3362,10 @@ void perform_experiment_on_linux()
         pose_graph_slam.is_lie_algebra_right_jacobian = true;
         pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
-        start = std::chrono::system_clock::now();
+        auto start = std::chrono::system_clock::now();
         pose_graph_slam.optimize_with_GTSAM(session.point_clouds_container);
-        end = std::chrono::system_clock::now();
-        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        auto end = std::chrono::system_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         rms = compute_rms(false);
         id_method = 96;
         append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
@@ -3376,7 +3376,7 @@ void perform_experiment_on_linux()
     {
         std::cout << e.what() << std::endl;
         rms = compute_rms(false);
-        append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
+        //append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
         export_result_to_folder(path_result.string(), id_method);
         session.point_clouds_container = temp_data;
     }
@@ -3388,10 +3388,10 @@ void perform_experiment_on_linux()
         pose_graph_slam.is_lie_algebra_right_jacobian = true;
         pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
-        start = std::chrono::system_clock::now();
+        auto start = std::chrono::system_clock::now();
         pose_graph_slam.optimize_with_GTSAM(session.point_clouds_container);
-        end = std::chrono::system_clock::now();
-        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        auto end = std::chrono::system_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
         rms = compute_rms(false);
         id_method = 97;
@@ -3403,13 +3403,14 @@ void perform_experiment_on_linux()
     {
         std::cout << e.what() << std::endl;
         rms = compute_rms(false);
-        append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
+        //append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
         export_result_to_folder(path_result.string(), id_method);
         session.point_clouds_container = temp_data;
     }
 #endif
 #if WITH_MANIF
     //--98--
+{
     pose_graph_slam.set_all_to_false();
     pose_graph_slam.is_optimize_pcl_ndt = true;
     pose_graph_slam.is_lie_algebra_right_jacobian = true;
@@ -3442,6 +3443,7 @@ void perform_experiment_on_linux()
     append_to_result_file(result_file, "pose_graph_slam (manif pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method);
     session.point_clouds_container = temp_data;
+}
 #endif
 }
 

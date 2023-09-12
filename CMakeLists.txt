@@ -36,7 +36,7 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 add_definitions("-DWITH_MANIF")
 endif()
 
-find_package(PCL)
+#find_package(PCL)
 if(PCL_FOUND)
     message("PCL found")
     message ("PCL_LIBRARY_DIRS: " ${PCL_LIBRARY_DIRS})

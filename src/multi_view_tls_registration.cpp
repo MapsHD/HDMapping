@@ -578,7 +578,7 @@ void project_gui()
             const auto t = [&]()
             {
                 std::vector<std::string> filters;
-                auto sel = pfd::open_file("Load las files", "C:\\", filters, pfd::opt::multiselect).result();
+                auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
                 for (int i = 0; i < sel.size(); i++)
                 {
                     input_file_names.push_back(sel[i]);
@@ -622,7 +622,7 @@ void project_gui()
             const auto t = [&]()
             {
                 std::vector<std::string> filters;
-                auto sel = pfd::open_file("Load txt files", "C:\\", filters, pfd::opt::multiselect).result();
+                auto sel = pfd::open_file("Load txt files", "C:\\", filters, true).result();
                 for (int i = 0; i < sel.size(); i++)
                 {
                     input_file_names.push_back(sel[i]);
@@ -691,7 +691,7 @@ void project_gui()
             }
         }
         ImGui::SameLine();
-        ImGui::Text("%s", session.point_clouds_container.initial_poses_file_name.c_str());
+        ImGui::Text(session.point_clouds_container.initial_poses_file_name.c_str());
 
         if (ImGui::Button("update poses from RESSO file"))
         {
@@ -727,7 +727,7 @@ void project_gui()
             }
         }
         ImGui::SameLine();
-        ImGui::Text("%s", session.point_clouds_container.poses_file_name.c_str());
+        ImGui::Text(session.point_clouds_container.poses_file_name.c_str());
     }
 
     if (ImGui::Button("generate random colors"))
@@ -1020,7 +1020,7 @@ void project_gui()
                 total_number_of_points += session.point_clouds_container.point_clouds[i].points_local.size();
             }
             std::string point_size_message = "total number of points: " + std::to_string(total_number_of_points);
-            ImGui::Text("%s", point_size_message.c_str());
+            ImGui::Text(point_size_message.c_str());
 
             ImGui::Separator();
             ImGui::Separator();
@@ -1549,7 +1549,7 @@ void project_gui()
                 const auto t = [&]()
                 {
                     std::vector<std::string> filters;
-                    auto sel = pfd::open_file("Load gnss files", "C:\\", filters, pfd::opt::multiselect).result();
+                    auto sel = pfd::open_file("Load gnss files", "C:\\", filters, true).result();
                     for (int i = 0; i < sel.size(); i++)
                     {
                         input_file_names.push_back(sel[i]);
@@ -2366,7 +2366,7 @@ void observation_picking_gui()
         }
     }
 
-    ImGui::Text("%s", (std::string("number of observations: ") + std::to_string(observation_picking.observations.size())).c_str());
+    ImGui::Text((std::string("number of observations: ") + std::to_string(observation_picking.observations.size())).c_str());
 
     if (ImGui::Button("load observations"))
     {
@@ -2430,7 +2430,7 @@ void observation_picking_gui()
         }
     }
 
-    ImGui::Text("%s", (std::string("Loaded observations from file: '") + observations_file_name + std::string("'")).c_str());
+    ImGui::Text((std::string("Loaded observations from file: '") + observations_file_name + std::string("'")).c_str());
 
     if (ImGui::Button("compute RMS(xy)"))
     {
@@ -2468,7 +2468,7 @@ void observation_picking_gui()
     for (int i = 0; i < observation_picking.intersections.size(); i++)
     {
         ImGui::Text("--");
-        ImGui::Text("%s", std::string("intersection: '" + std::to_string(i) + "'").c_str());
+        ImGui::Text(std::string("intersection: '" + std::to_string(i) + "'").c_str());
         ImGui::ColorEdit3(std::string(std::to_string(i) + ": color").c_str(), observation_picking.intersections[i].color);
         ImGui::InputFloat3(std::string(std::to_string(i) + ": translation [m]").c_str(), observation_picking.intersections[i].translation);
         ImGui::InputFloat3(std::string(std::to_string(i) + ": rotation [deg]").c_str(), observation_picking.intersections[i].rotation);
@@ -5195,7 +5195,7 @@ bool exportLaz(const std::string &filename,
         coordinates[2] = p.z() + offset_alt;
         if (laszip_set_coordinates(laszip_writer, coordinates))
         {
-            fprintf(stderr, "DLL ERROR: setting coordinates for point %I64ld\n", p_count);
+            fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);
             return false;
         }
 
@@ -5208,7 +5208,7 @@ bool exportLaz(const std::string &filename,
 
         if (laszip_write_point(laszip_writer))
         {
-            fprintf(stderr, "DLL ERROR: writing point %I64ld\n", p_count);
+            fprintf(stderr, "DLL ERROR: writing point %I64d\n", p_count);
             return false;
         }
     }
@@ -5219,7 +5219,7 @@ bool exportLaz(const std::string &filename,
         return false;
     }
 
-    fprintf(stderr, "successfully written %I64ld points\n", p_count);
+    fprintf(stderr, "successfully written %I64d points\n", p_count);
 
     // close the writer
 

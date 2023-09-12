@@ -1582,14 +1582,14 @@ void project_gui()
             ImGui::Separator();
             ImGui::Separator();
             ImGui::Separator();
-            if (ImGui::Button("perform experiment on WIN"))
-            {
-                perform_experiment_on_windows();
-            }
-            if (ImGui::Button("perform experiment on LINUX"))
-            {
-                perform_experiment_on_linux();
-            }
+            // if (ImGui::Button("perform experiment on WIN"))
+            // {
+            //     perform_experiment_on_windows();
+            // }
+            // if (ImGui::Button("perform experiment on LINUX"))
+            // {
+            //     perform_experiment_on_linux();
+            // }
         }
     }
     ImGui::End();

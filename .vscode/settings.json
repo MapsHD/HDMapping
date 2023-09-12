@@ -112,14 +112,6 @@
         "resumable": "cpp",
         "execution": "cpp",
         "variant": "cpp",
-        "eigen": "cpp",
-        "cwctype": "cpp",
-        "*.tcc": "cpp",
-        "memory_resource": "cpp",
-        "string_view": "cpp",
-        "numbers": "cpp",
-        "semaphore": "cpp",
-        "cinttypes": "cpp",
-        "*.ipp": "cpp"
+        "eigen": "cpp"
     }
 }

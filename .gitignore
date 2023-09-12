@@ -56,3 +56,5 @@ data/
 #Clion
 .idea/
 cmake-*
+
+.vscode/

@@ -2208,9 +2208,9 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
     std::vector<Eigen::Triplet<double>> tripletListP;
     std::vector<Eigen::Triplet<double>> tripletListB;
 
-    Eigen::MatrixX<double> AtPAndt(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
+    Eigen::MatrixXd AtPAndt(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
     AtPAndt.setZero();
-    Eigen::MatrixX<double> AtPBndt(intermediate_trajectory.size() * 6, 1);
+    Eigen::MatrixXd AtPBndt(intermediate_trajectory.size() * 6, 1);
     AtPBndt.setZero();
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 

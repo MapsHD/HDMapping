@@ -6,19 +6,17 @@ if (WIN32)
 	add_compile_definitions(_USE_MATH_DEFINES)
 	include_directories(3rdparty/eigen)
 else()
-	#find_package( Eigen3 REQUIRED)
-	#if(EIGEN3_FOUND)
-	#    	message("EIGEN3 found")
-	#    	message ("EIGEN3_INCLUDE_DIR: " ${EIGEN3_INCLUDE_DIR})
-	#    	message ("EIGEN3_INCLUDE_DIRS: " ${EIGEN3_INCLUDE_DIRS})
-	#    	message ("Eigen3_DIR: " ${Eigen3_DIR})
-#		include_directories(	
-	#	${EIGEN3_INCLUDE_DIR} 
-	#	${EIGEN3_INCLUDE_DIRS} 
-	#	${Eigen3_DIR})
-	#endif()
-
-	include_directories(3rdparty/eigen)
+	find_package( Eigen3 REQUIRED)
+	if(EIGEN3_FOUND)
+		message("EIGEN3 found")
+		message ("EIGEN3_INCLUDE_DIR: " ${EIGEN3_INCLUDE_DIR})
+		message ("EIGEN3_INCLUDE_DIRS: " ${EIGEN3_INCLUDE_DIRS})
+		message ("Eigen3_DIR: " ${Eigen3_DIR})
+		include_directories(	
+			${EIGEN3_INCLUDE_DIR} 
+			${EIGEN3_INCLUDE_DIRS} 
+			${Eigen3_DIR})
+	endif()
 	
 	find_package(GLEW REQUIRED)
 	include_directories(${GLEW_INCLUDE_DIRS})

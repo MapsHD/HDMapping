@@ -365,7 +365,6 @@ void project_gui()
             }
         }
 
-        
         ImGui::Text("-----------session_file_names begin----------");
         int index_gizmo = -1;
 
@@ -1709,6 +1708,42 @@ void display()
             sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, 1);
             sessions[second_session_index].point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, 1);
         }
+
+        // sessions[first_session_index].point_clouds_container.render();
+
+        glBegin(GL_LINE_STRIP);
+        for (auto &pc : sessions[first_session_index].point_clouds_container.point_clouds)
+        {
+            glColor3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
+            glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
+        }
+        glEnd();
+
+        int i = 0;
+        for (auto &pc : sessions[first_session_index].point_clouds_container.point_clouds)
+        {
+            glColor3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
+            glRasterPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3) + 0.1);
+            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)std::to_string(i).c_str());
+            i++;
+        }
+
+        glBegin(GL_LINE_STRIP);
+        for (auto &pc : sessions[second_session_index].point_clouds_container.point_clouds)
+        {
+            glColor3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
+            glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
+        }
+        glEnd();
+
+        i = 0;
+        for (auto &pc : sessions[second_session_index].point_clouds_container.point_clouds)
+        {
+            glColor3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
+            glRasterPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3) + 0.1);
+            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)std::to_string(i).c_str());
+            i++;
+        }
     }
     else
     {
@@ -2076,7 +2111,7 @@ void display()
                 glVertex3f(mean.x() + 1, mean.y() + 1, mean.z());
                 glVertex3f(mean.x() - 1, mean.y() + 1, mean.z());
                 glVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
-                glEnd();
+                glEnd();F
             }
         }
 
@@ -2776,11 +2811,11 @@ bool optimize(std::vector<Session> &sessions)
         std::cout << "h_x.size(): " << h_x.size() << std::endl;
 
         std::cout << "AtPA=AtPB SOLVED" << std::endl;
-        //std::cout << "updates:" << std::endl;
-        //for (size_t i = 0; i < h_x.size(); i += 6)
+        // std::cout << "updates:" << std::endl;
+        // for (size_t i = 0; i < h_x.size(); i += 6)
         //{
-        //    std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << std::endl;
-        //}
+        //     std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << std::endl;
+        // }
 
         if (h_x.size() == 6 * poses.size())
         {
@@ -2867,7 +2902,8 @@ bool revert(std::vector<Session> &sessions)
 
 bool save_results(std::vector<Session> &sessions)
 {
-    for(auto &session:sessions){
+    for (auto &session : sessions)
+    {
         std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
         session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string());
     }

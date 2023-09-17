@@ -287,12 +287,12 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                                 tripletListB.emplace_back(ir + 4, 0, normalize_angle(delta(4, 0)));
                                 tripletListB.emplace_back(ir + 5, 0, normalize_angle(delta(5, 0)));
 
-                                //std::cout << "delta(0, 0): " << delta(0, 0) << std::endl;
-                                //std::cout << "delta(1, 0): " << delta(0, 0) << std::endl;
-                                //std::cout << "delta(2, 0): " << delta(0, 0) << std::endl;
-                                //std::cout << "normalize_angle(delta(3, 0)): " << normalize_angle(delta(3, 0)) << std::endl;
-                                //std::cout << "normalize_angle(delta(4, 0)): " << normalize_angle(delta(4, 0)) << std::endl;
-                                //std::cout << "normalize_angle(delta(5, 0)): " << normalize_angle(delta(5, 0)) << std::endl;
+                                // std::cout << "delta(0, 0): " << delta(0, 0) << std::endl;
+                                // std::cout << "delta(1, 0): " << delta(0, 0) << std::endl;
+                                // std::cout << "delta(2, 0): " << delta(0, 0) << std::endl;
+                                // std::cout << "normalize_angle(delta(3, 0)): " << normalize_angle(delta(3, 0)) << std::endl;
+                                // std::cout << "normalize_angle(delta(4, 0)): " << normalize_angle(delta(4, 0)) << std::endl;
+                                // std::cout << "normalize_angle(delta(5, 0)): " << normalize_angle(delta(5, 0)) << std::endl;
 
                                 // for (int r = 0; r < 6; r++) {
                                 //     for (int c = 0; c < 6; c++) {
@@ -450,11 +450,11 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                             std::cout << "h_x.size(): " << h_x.size() << std::endl;
 
                             std::cout << "AtPA=AtPB SOLVED" << std::endl;
-                            //std::cout << "updates:" << std::endl;
-                            //for (size_t i = 0; i < h_x.size(); i += 6)
+                            // std::cout << "updates:" << std::endl;
+                            // for (size_t i = 0; i < h_x.size(); i += 6)
                             //{
-                            //    std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << std::endl;
-                            //}
+                            //     std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << std::endl;
+                            // }
 
                             if (h_x.size() == 6 * point_clouds_container.point_clouds.size())
                             {
@@ -613,7 +613,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                         pc.cout_rgd();
                         pc.compute_normal_vectors(0.5);
                     }
-                   
+
                     icp.number_of_threads = std::thread::hardware_concurrency();
                     icp.number_of_iterations = 10;
                     icp.is_adaptive_robust_kernel = false;
@@ -673,11 +673,20 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
 
     glColor3f(0, 1, 0);
     glBegin(GL_LINE_STRIP);
+
     for (auto &pc : point_clouds_container.point_clouds)
     {
         glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
     }
     glEnd();
+
+    int i = 0;
+    for (auto &pc : point_clouds_container.point_clouds)
+    {
+        glRasterPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3)+ 0.1);
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)std::to_string(i).c_str());
+        i++;
+    }
 
     glColor3f(1, 0, 0);
     glBegin(GL_LINES);

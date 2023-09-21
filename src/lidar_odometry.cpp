@@ -579,9 +579,8 @@ void lidar_odometry_gui()
             ImGui::InputInt("number iterations", &nr_iter);
             ImGui::InputDouble("sliding window trajectory length threshold", &sliding_window_trajectory_length_threshold);
             ImGui::InputInt("threshold initial points", &threshold_initial_points);
-
-            ImGui::Checkbox("fusionConventionNwu", &fusionConventionNwu);
             ImGui::Checkbox("use_multithread", &useMultithread);
+            ImGui::Checkbox("fusionConventionNwu", &fusionConventionNwu);
             if (fusionConventionNwu)
             {
                 // fusionConventionNwu

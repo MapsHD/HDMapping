@@ -72,6 +72,7 @@ int second_session_index = -1;
 double search_radious = 0.3;
 bool loaded_sessions = false;
 bool optimized = false;
+bool gizmo_all_sessions = false;
 
 struct ProjectSettings
 {
@@ -366,6 +367,8 @@ void project_gui()
         }
 
         ImGui::Text("-----------session_file_names begin----------");
+        ImGui::Checkbox("gizmo_all_sessions", &gizmo_all_sessions);
+
         int index_gizmo = -1;
 
         for (int i = 0; i < project_settings.session_file_names.size(); i++)
@@ -380,7 +383,6 @@ void project_gui()
                 ImGui::Checkbox(("gizmo[" + std::to_string(i) + "]").c_str(), &sessions[i].is_gizmo);
                 if (sessions[i].is_gizmo)
                 {
-
                     for (int ii = 0; ii < sessions.size(); ii++)
                     {
                         sessions[ii].is_gizmo = false;
@@ -1841,10 +1843,14 @@ void display()
 
     if (!manual_pose_graph_loop_closure_mode)
     {
+        Eigen::Affine3d prev_pose_manipulated = Eigen::Affine3d::Identity();
+        Eigen::Affine3d prev_pose_after_gismo = Eigen::Affine3d::Identity();
         for (size_t i = 0; i < sessions.size(); i++)
         {
+            // gizmo_all_sessions;
             if (sessions[i].is_gizmo)
             {
+                prev_pose_manipulated = sessions[i].point_clouds_container.point_clouds[0].m_pose;
                 std::vector<Eigen::Affine3d> all_m_poses;
                 for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
                 {
@@ -1888,6 +1894,7 @@ void display()
                 sessions[i].point_clouds_container.point_clouds[0].m_pose(1, 3) = m_gizmo[13];
                 sessions[i].point_clouds_container.point_clouds[0].m_pose(2, 3) = m_gizmo[14];
                 sessions[i].point_clouds_container.point_clouds[0].m_pose(3, 3) = m_gizmo[15];
+                prev_pose_after_gismo = sessions[i].point_clouds_container.point_clouds[0].m_pose;
                 sessions[i].point_clouds_container.point_clouds[0].pose = pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[0].m_pose);
 
                 sessions[i].point_clouds_container.point_clouds[i].gui_translation[0] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.px;
@@ -1914,6 +1921,52 @@ void display()
                     sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
                     sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
                     sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                }
+            }
+        }
+        if (gizmo_all_sessions)
+        {
+            for (size_t i = 0; i < sessions.size(); i++)
+            {
+                // gizmo_all_sessions;
+                if (!sessions[i].is_gizmo)
+                {
+                    std::vector<Eigen::Affine3d> all_m_poses;
+                    for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+                    {
+                        all_m_poses.push_back(sessions[i].point_clouds_container.point_clouds[j].m_pose);
+                    }
+
+                    Eigen::Affine3d m_rel_org = prev_pose_manipulated.inverse() * sessions[i].point_clouds_container.point_clouds[0].m_pose;
+
+                    Eigen::Affine3d m_new = prev_pose_after_gismo * m_rel_org;
+
+                    sessions[i].point_clouds_container.point_clouds[0].m_pose = m_new;
+                    sessions[i].point_clouds_container.point_clouds[0].pose = pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[0].m_pose);
+
+                    sessions[i].point_clouds_container.point_clouds[i].gui_translation[0] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.px;
+                    sessions[i].point_clouds_container.point_clouds[i].gui_translation[1] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.py;
+                    sessions[i].point_clouds_container.point_clouds[i].gui_translation[2] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.pz;
+
+                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.om * 180.0 / M_PI);
+                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * 180.0 / M_PI);
+                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * 180.0 / M_PI);
+
+                    Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
+                    for (int j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+                    {
+                        curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
+                        sessions[i].point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
+                        sessions[i].point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[j].m_pose);
+
+                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[0] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.px;
+                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[1] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.py;
+                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[2] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.pz;
+
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                    }
                 }
             }
         }

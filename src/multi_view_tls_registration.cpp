@@ -1428,7 +1428,7 @@ void project_gui()
                     }
                 }
             }
-            if (ImGui::Button("save scale board -10km + 10km XY to laz (as one global scan - dec 10.0)"))
+            if (ImGui::Button("save scale board 10km x 10km to laz (10m)"))
             {
                 std::shared_ptr<pfd::save_file> save_file;
                 std::string output_file_name = "";
@@ -1447,9 +1447,9 @@ void project_gui()
                     std::vector<Eigen::Vector3d> pointcloud;
                     std::vector<unsigned short> intensity;
 
-                    for (float x = - 10000.0; x <= 10000.0; x += 10.0)
+                    for (float x = -5000.0; x <= 5000.0; x += 10.0)
                     {
-                        for (float y = - 10000.0; y <= 10000.0; y += 0.1)
+                        for (float y = -5000.0; y <= 5000.0; y += 0.2f)
                         {
                             Eigen::Vector3d vp(x, y, 0.0);
                             pointcloud.push_back(vp);
@@ -1457,9 +1457,99 @@ void project_gui()
                         }
                     }
 
-                    for (float y = - 10000.0; y <= 10000.0; y += 10.0)
+                    for (float y = -5000.0; y <= 5000.0; y += 10.0)
                     {
-                        for (float x = - 10000.0; x <= 10000.0; x += 0.1)
+                        for (float x = -5000.0; x <= 5000.0; x += 0.2f)
+                        {
+                            Eigen::Vector3d vp(x, y, 0.0);
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+
+                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    {
+                        std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    }
+                }
+            }
+            if (ImGui::Button("save scale board 10km x 10km to laz (100m)"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    output_file_name = sel;
+                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    std::vector<Eigen::Vector3d> pointcloud;
+                    std::vector<unsigned short> intensity;
+
+                    for (float x = -5000.0; x <= 5000.0; x += 100.0)
+                    {
+                        for (float y = -5000.0; y <= 5000.0; y += 0.2f)
+                        {
+                            Eigen::Vector3d vp(x, y, 0.0);
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+
+                    for (float y = -5000.0; y <= 5000.0; y += 100.0)
+                    {
+                        for (float x = -5000.0; x <= 5000.0; x += 0.2f)
+                        {
+                            Eigen::Vector3d vp(x, y, 0.0);
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+
+                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    {
+                        std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    }
+                }
+            }
+            if (ImGui::Button("save scale board 10km x 10km to laz (1000m)"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    output_file_name = sel;
+                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    std::vector<Eigen::Vector3d> pointcloud;
+                    std::vector<unsigned short> intensity;
+
+                    for (float x = -5000.0; x <= 5000.0; x += 1000.0)
+                    {
+                        for (float y = -5000.0; y <= 5000.0; y += 0.2f)
+                        {
+                            Eigen::Vector3d vp(x, y, 0.0);
+                            pointcloud.push_back(vp);
+                            intensity.push_back(0);
+                        }
+                    }
+
+                    for (float y = -5000.0; y <= 5000.0; y += 1000.0)
+                    {
+                        for (float x = -5000.0; x <= 5000.0; x += 0.2f)
                         {
                             Eigen::Vector3d vp(x, y, 0.0);
                             pointcloud.push_back(vp);

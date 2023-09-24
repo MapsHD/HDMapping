@@ -357,6 +357,7 @@ void project_gui()
     ImGui::Text("LAZ files are the product of MANDEYE process. Open it with Cloud Compare.");
 
     ImGui::Checkbox("simple_gui", &simple_gui);
+    const std::vector<std::string> Session_filter = { "Session, json", "*.json" };
     if (!session_loaded)
     {
         if (ImGui::Button("load session (first step)"))
@@ -366,7 +367,7 @@ void project_gui()
             ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
             const auto t = [&]()
             {
-                auto sel = pfd::open_file("Load session", "C:\\").result();
+                auto sel = pfd::open_file("Load session", "C:\\", Session_filter).result();
                 for (int i = 0; i < sel.size(); i++)
                 {
                     input_file_name = sel[i];
@@ -392,7 +393,7 @@ void project_gui()
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
         const auto t = [&]()
         {
-            auto sel = pfd::save_file("Save session", "C:\\").result();
+            auto sel = pfd::save_file("Save session", "C:\\", Session_filter).result();
             output_file_name = sel;
             std::cout << "Seesion file to save: '" << output_file_name << "'" << std::endl;
         };

@@ -11,6 +11,7 @@
 #include <set>
 #include <filesystem>
 #include <laszip/laszip_api.h>
+#include <execution>
 
 // #include <liblas/liblas.hpp>
 // #include <laszip/laszip_api.h>
@@ -676,9 +677,9 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 	pc.m_pose = Eigen::Affine3d::Identity();
 	pc.m_initial_pose = pc.m_pose;
 	pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-	pc.gui_translation[0] = pc.pose.px;
-	pc.gui_translation[1] = pc.pose.py;
-	pc.gui_translation[2] = pc.pose.pz;
+	pc.gui_translation[0] = static_cast<float>(pc.pose.px);
+	pc.gui_translation[1] = static_cast<float>(pc.pose.py);
+	pc.gui_translation[2] = static_cast<float>(pc.pose.pz);
 	pc.gui_rotation[0] = rad2deg(pc.pose.om);
 	pc.gui_rotation[1] = rad2deg(pc.pose.fi);
 	pc.gui_rotation[2] = rad2deg(pc.pose.ka);
@@ -715,85 +716,98 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 {
 	this->offset = Eigen::Vector3d(0, 0, 0);
 
+	const auto start = std::chrono::system_clock::now();
+	std::vector<PointCloud> point_clouds_nodata;
 	for (size_t i = 0; i < input_file_names.size(); i++)
 	{
 		std::cout << "loading file: " << input_file_names[i] << " [" << i + 1 << "] of " << input_file_names.size() << std::endl;
 		PointCloud pc;
-		if (load_pc(pc, input_file_names[i]))
+
+		pc.file_name = input_file_names[i];
+
+		auto trj_path = std::filesystem::path(input_file_names[i]).parent_path();
+		std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
+
+		trj_path /= trajectory_filename;
+
+		if (std::filesystem::exists(trj_path))
 		{
-			if (is_decimate && pc.points_local.size() > 0)
+			std::cout << "loading trajectory from file: " << trj_path << std::endl;
+
+			std::vector<PointCloud::LocalTrajectoryNode> local_trajectory;
+			//
+			std::ifstream infile(trj_path.string());
+			if (!infile.good())
 			{
-				std::cout << "start downsampling" << std::endl;
-
-				size_t sum_points_before_decimation = pc.points_local.size();
-				pc.decimate(bucket_x, bucket_y, bucket_z);
-				size_t sum_points_after_decimation = pc.points_local.size();
-
-				std::cout << "downsampling finished" << std::endl;
-				std::cout << "all scans, sum_points_before_decimation: " << sum_points_before_decimation << std::endl;
-				std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
-			}
-			pc.file_name = input_file_names[i];
-
-			auto trj_path = std::filesystem::path(input_file_names[i]).parent_path();
-			std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
-
-			trj_path /= trajectory_filename;
-
-			if (std::filesystem::exists(trj_path))
-			{
-				std::cout << "loading trajectory from file: " << trj_path << std::endl;
-
-				std::vector<PointCloud::LocalTrajectoryNode> local_trajectory;
-				//
-				std::ifstream infile(trj_path.string());
-				if (!infile.good())
-				{
-					std::cout << "problem with file: '" << trj_path.string() << "'" << std::endl;
-					return false;
-				}
-
-				std::string s;
-				while (!infile.eof())
-				{
-					getline(infile, s);
-					std::vector<std::string> strs;
-					split(s, ' ', strs);
-
-					if (strs.size() == 13)
-					{
-						PointCloud::LocalTrajectoryNode ltn;
-						std::istringstream(strs[0]) >> ltn.timestamp;
-						std::istringstream(strs[1]) >> ltn.m_pose(0, 0);
-						std::istringstream(strs[2]) >> ltn.m_pose(0, 1);
-						std::istringstream(strs[3]) >> ltn.m_pose(0, 2);
-						std::istringstream(strs[4]) >> ltn.m_pose(0, 3);
-						std::istringstream(strs[5]) >> ltn.m_pose(1, 0);
-						std::istringstream(strs[6]) >> ltn.m_pose(1, 1);
-						std::istringstream(strs[7]) >> ltn.m_pose(1, 2);
-						std::istringstream(strs[8]) >> ltn.m_pose(1, 3);
-						std::istringstream(strs[9]) >> ltn.m_pose(2, 0);
-						std::istringstream(strs[10]) >> ltn.m_pose(2, 1);
-						std::istringstream(strs[11]) >> ltn.m_pose(2, 2);
-						std::istringstream(strs[12]) >> ltn.m_pose(2, 3);
-
-						local_trajectory.push_back(ltn);
-					}
-				}
-
-				std::cout << "loaded: [" << local_trajectory.size() << "] local trajectory nodes" << std::endl;
-				infile.close();
-				///
-				pc.local_trajectory = local_trajectory;
+				std::cout << "problem with file: '" << trj_path.string() << "'" << std::endl;
+				return false;
 			}
 
-			point_clouds.push_back(pc);
+			std::string s;
+			while (!infile.eof())
+			{
+				getline(infile, s);
+				std::vector<std::string> strs;
+				split(s, ' ', strs);
+
+				if (strs.size() == 13)
+				{
+					PointCloud::LocalTrajectoryNode ltn;
+					std::istringstream(strs[0]) >> ltn.timestamp;
+					std::istringstream(strs[1]) >> ltn.m_pose(0, 0);
+					std::istringstream(strs[2]) >> ltn.m_pose(0, 1);
+					std::istringstream(strs[3]) >> ltn.m_pose(0, 2);
+					std::istringstream(strs[4]) >> ltn.m_pose(0, 3);
+					std::istringstream(strs[5]) >> ltn.m_pose(1, 0);
+					std::istringstream(strs[6]) >> ltn.m_pose(1, 1);
+					std::istringstream(strs[7]) >> ltn.m_pose(1, 2);
+					std::istringstream(strs[8]) >> ltn.m_pose(1, 3);
+					std::istringstream(strs[9]) >> ltn.m_pose(2, 0);
+					std::istringstream(strs[10]) >> ltn.m_pose(2, 1);
+					std::istringstream(strs[11]) >> ltn.m_pose(2, 2);
+					std::istringstream(strs[12]) >> ltn.m_pose(2, 3);
+
+					local_trajectory.push_back(ltn);
+				}
+			}
+
+			std::cout << "loaded: [" << local_trajectory.size() << "] local trajectory nodes" << std::endl;
+			infile.close();
+			///
+			pc.local_trajectory = local_trajectory;
 		}
-		else
-		{
-			std::cout << "problem with loading file: " << input_file_names[i] << std::endl;
-		}
+
+		point_clouds_nodata.push_back(pc);
+		
+
 	}
+
+
+	//// load actual pointclouds
+	point_clouds.resize(point_clouds_nodata.size());
+
+	std::transform(std::execution::par_unseq, std::begin(point_clouds_nodata), std::end(point_clouds_nodata), std::begin(point_clouds), [&](auto& pc)
+		{
+
+			if (load_pc(pc, pc.file_name))
+			{
+				if (is_decimate && pc.points_local.size() > 0)
+				{
+					std::cout << "start downsampling" << std::endl;
+
+					size_t sum_points_before_decimation = pc.points_local.size();
+					pc.decimate(bucket_x, bucket_y, bucket_z);
+					size_t sum_points_after_decimation = pc.points_local.size();
+
+					std::cout << "downsampling finished" << std::endl;
+					std::cout << "all scans, sum_points_before_decimation: " << sum_points_before_decimation << std::endl;
+					std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
+				}
+			}
+			return pc;
+		});
+
+
 
 	if (calculate_offset)
 	{
@@ -818,6 +832,9 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 	}
 
 	print_point_cloud_dimention();
+	const auto end = std::chrono::system_clock::now();
+	std::chrono::duration<double> elapsed_seconds = end - start;
+	std::cout << "Load time :" << elapsed_seconds.count() << std::endl;
 	return true;
 }
 

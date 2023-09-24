@@ -870,16 +870,16 @@ void lidar_odometry_gui()
                             {
                                 for (const auto &p : pointsPerFile[index])
                                 {
-                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps.front() && p.timestamp <= wd.intermediate_trajectory_timestamps.back())
                                     {
                                         points.push_back(p);
                                     }
-                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && !found)
+                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps.front() && !found)
                                     {
                                         index_begin = index;
                                         found = true;
                                     }
-                                    if (p.timestamp > wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                                    if (p.timestamp > wd.intermediate_trajectory_timestamps.back())
                                     {
                                         break;
                                     }

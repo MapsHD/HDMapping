@@ -200,10 +200,20 @@ ${GIZMO}
 ${FUSION}
 )
 
+add_executable(lidar_odometry_test lib/lidarOdometryExample.cpp lib/lidarOdometry.cpp lib/lidarOdomIO.cpp
+${IMGUI_SRCS}
+${CORE_SRCS}
+${GIZMO}
+${FUSION}
+)
+
 if (WIN32)
 target_link_libraries(lidar_odometry_step_1 ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)
+target_link_libraries(lidar_odometry_test ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)
 else()
 target_link_libraries(lidar_odometry_step_1 ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip tbb)
+target_link_libraries(lidar_odometry_test ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip tbb)
+
 endif()
 
 if (PCL_FOUND)

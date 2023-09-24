@@ -1216,9 +1216,9 @@ void project_gui()
                         }
                     }
 
-                    for (float x = min_x - 10.0; x <= max_x + 10.0; x += 0.1)
+                    for (float x = min_x - 100.0; x <= max_x + 100.0; x += 0.1)
                     {
-                        for (float y = min_y - 10.0; y <= max_y + 10.0; y += 0.001)
+                        for (float y = min_y - 100.0; y <= max_y + 100.0; y += 0.001)
                         {
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);
@@ -1226,9 +1226,9 @@ void project_gui()
                         }
                     }
 
-                    for (float y = min_y - 10.0; y <= max_y + 10.0; y += 0.1)
+                    for (float y = min_y - 100.0; y <= max_y + 100.0; y += 0.1)
                     {
-                        for (float x = min_x - 10.0; x <= max_x + 10.0; x += 0.001)
+                        for (float x = min_x - 100.0; x <= max_x + 100.0; x += 0.001)
                         {
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);
@@ -1309,9 +1309,9 @@ void project_gui()
                         }
                     }
 
-                    for (float x = min_x - 10.0; x <= max_x + 10.0; x += 1.0)
+                    for (float x = min_x - 100.0; x <= max_x + 100.0; x += 1.0)
                     {
-                        for (float y = min_y - 10.0; y <= max_y + 10.0; y += 0.001)
+                        for (float y = min_y - 100.0; y <= max_y + 100.0; y += 0.001)
                         {
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);
@@ -1319,9 +1319,9 @@ void project_gui()
                         }
                     }
 
-                    for (float y = min_y - 10.0; y <= max_y + 10.0; y += 1.0)
+                    for (float y = min_y - 100.0; y <= max_y + 100.0; y += 1.0)
                     {
-                        for (float x = min_x - 10.0; x <= max_x + 10.0; x += 0.001)
+                        for (float x = min_x - 100.0; x <= max_x + 100.0; x += 0.001)
                         {
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);
@@ -1402,9 +1402,9 @@ void project_gui()
                         }
                     }
 
-                    for (float x = min_x - 10.0; x <= max_x + 10.0; x += 10.0)
+                    for (float x = min_x - 100.0; x <= max_x + 100.0; x += 10.0)
                     {
-                        for (float y = min_y - 10.0; y <= max_y + 10.0; y += 0.001)
+                        for (float y = min_y - 100.0; y <= max_y + 100.0; y += 0.001)
                         {
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);
@@ -1412,9 +1412,9 @@ void project_gui()
                         }
                     }
 
-                    for (float y = min_y - 10.0; y <= max_y + 10.0; y += 10.0)
+                    for (float y = min_y - 100.0; y <= max_y + 100.0; y += 10.0)
                     {
-                        for (float x = min_x - 10.0; x <= max_x + 10.0; x += 0.001)
+                        for (float x = min_x - 100.0; x <= max_x + 100.0; x += 0.001)
                         {
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);

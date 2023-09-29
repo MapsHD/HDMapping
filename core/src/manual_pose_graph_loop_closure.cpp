@@ -688,18 +688,40 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
         i++;
     }
 
-    glColor3f(1, 0, 0);
-    glBegin(GL_LINES);
-    for (auto &edge : edges)
+    
+    
+    for (int i = 0; i < edges.size(); i++)
     {
-        int index_src = edges[index_active_edge].index_from;
-        int index_trg = edges[index_active_edge].index_to;
+        if (i == index_active_edge){
+            glColor3f(1, 0, 0);
+        }else{
+            glColor3f(0, 0, 1);
+        }
+
+        int index_src = edges[i].index_from;
+        int index_trg = edges[i].index_to;
 
         Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
         Eigen::Affine3d m_trg = point_clouds_container.point_clouds.at(index_trg).m_pose;
 
-        glVertex3f(m_src(0, 3), m_src(1, 3), m_src(2, 3));
-        glVertex3f(m_trg(0, 3), m_trg(1, 3), m_trg(2, 3));
+        glBegin(GL_LINES);
+            glVertex3f(m_src(0, 3), m_src(1, 3), m_src(2, 3));
+            glVertex3f(m_trg(0, 3), m_trg(1, 3), m_trg(2, 3));
+        glEnd();
+
+        Eigen::Vector3d m1((m_src(0, 3) + m_trg(0, 3)) * 0.5, (m_src(1, 3) + m_trg(1, 3)) * 0.5, (m_src(2, 3) + m_trg(2, 3))*0.5);
+        Eigen::Vector3d m2((m_src(0, 3) + m_trg(0, 3)) * 0.5, (m_src(1, 3) + m_trg(1, 3)) * 0.5, (m_src(2, 3) + m_trg(2, 3)) * 0.5 + 10);
+
+        glBegin(GL_LINES);
+        glVertex3f(m1.x(), m1.y(), m1.z());
+        glVertex3f(m2.x(), m2.y(), m2.z());
+        glEnd();
+
+        glRasterPos3f(m2.x(), m2.y(), m2.z() + 0.1);
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)std::to_string(i).c_str());
     }
-    glEnd();
+   
+
+
+
 }

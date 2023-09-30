@@ -221,16 +221,23 @@ ${CORE_SRCS}
 ${GIZMO}
 )
 
-add_executable(mandeye_with_gopro_max_manual_coloring src/manual_color.cpp 
-							core/src/color_las_loader.cpp 
-							core/src/pfd_wrapper.cpp 
+add_executable(mandeye_with_gopro_max_manual_coloring src/manual_color.cpp
+							core/src/color_las_loader.cpp
+							core/src/pfd_wrapper.cpp
 							${IMGUI_SRCS}
-							) 
+							)
 
+
+add_executable(split_multi_livox tools/src/split_multi_livox.cpp)
+if (WIN32)
+target_link_libraries(split_multi_livox laszip3)
+else()
+target_link_libraries(split_multi_livox laszip)
+endif()
 
 if (WIN32)
 	target_link_libraries(mandeye_with_gopro_max_manual_coloring ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip3)
-	target_link_libraries(multi_session_registration_step_3 ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	
+	target_link_libraries(multi_session_registration_step_3 ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)
 else()
 	target_link_libraries(mandeye_with_gopro_max_manual_coloring ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip tbb)
 	target_link_libraries(multi_session_registration_step_3 ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip tbb)

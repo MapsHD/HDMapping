@@ -578,7 +578,7 @@ void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eig
     }
 }
 
-std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::string &imu_file)
+std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::string &imu_file, int imuToUse)
 {
     std::vector<std::tuple<double, FusionVector, FusionVector>> all_data;
     std::ifstream myfile(imu_file);
@@ -587,9 +587,17 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
         while (myfile)
         {
             double data[7];
-            myfile >> data[0] >> data[1] >> data[2] >> data[3] >> data[4] >> data[5] >> data[6];
+            int imuId = 0;
+            std::string line;
+            std::getline(myfile, line);
+            std::istringstream iss(line);
+            iss >> data[0] >> data[1] >> data[2] >> data[3] >> data[4] >> data[5] >> data[6];
+            if (!iss.eof())
+            {
+                iss >> imuId;
+            }
             // std::cout << data[0] << " " << data[1] << " " << data[2] << " " << data[3] << " " << data[4] << " " << data[5] << " " << data[6] << std::endl;
-            if (data[0] > 0)
+            if (data[0] > 0 && imuId == imuToUse)
             {
                 FusionVector gyr;
                 gyr.axis.x = data[1];
@@ -609,7 +617,7 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
     return all_data;
 }
 
-std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy)
+std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy, const std::unordered_map<int, Eigen::Affine3d>& calibrations)
 {
     std::vector<Point3Di> points;
     laszip_POINTER laszip_reader;
@@ -654,14 +662,12 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
         }
         Point3Di p;
 
-        double cal_x = 11.0 / 1000.0; // ToDo change if lidar differen than livox mid 360
-        double cal_y = 23.29 / 1000.0;
-        double cal_z = -44.12 / 1000.0;
+        int id = point->user_data;
+        Eigen::Affine3d calibration = calibrations.empty() ? Eigen::Affine3d::Identity() : calibrations.at(id);
 
-        Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
-        p.point.x() = pf.x() - cal_x;
-        p.point.y() = pf.y() - cal_y;
-        p.point.z() = pf.z() - cal_z;
+        const Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
+        p.point = calibration * (pf);
+        p.lidarid = id;
         p.timestamp = point->gps_time;
         p.intensity = point->intensity;
 
@@ -720,3 +726,161 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
     laszip_close_reader(laszip_reader);
     return points;
 }
+
+std::unordered_map<int, std::string> MLvxCalib::GetIdToSnMapping(const std::string& filename)
+{
+    if (!std::filesystem::exists(filename))
+    {
+        return std::unordered_map<int, std::string>();
+    }
+    std::unordered_map<int, std::string> dataMap;
+    std::ifstream fst(filename);
+    std::string line;
+    while (std::getline(fst, line)) {
+        std::istringstream iss(line);
+        int key;
+        std::string value;
+
+        if (iss >> key >> value) {
+            dataMap[key] = value;
+        }
+        else {
+            std::cerr << "Failed to parse line: " << line << std::endl;
+        }
+    }
+    return dataMap;
+}
+
+std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFile(const std::string& filename)
+{
+    if (!std::filesystem::exists(filename))
+    {
+        return std::unordered_map<std::string, Eigen::Affine3d>();
+    }
+    std::unordered_map<std::string, Eigen::Affine3d> dataMap;
+    std::ifstream file(filename);
+
+    using json = nlohmann::json;
+    json jsonData = json::parse(file);
+
+    // Iterate through the JSON object and parse each value into Eigen::Affine3d
+
+    for (auto& calibrationEntry : jsonData["calibration"].items()) {
+        const std::string& lidarSn = calibrationEntry.key();
+        Eigen::Matrix4d value;
+        std::cout << "lidarSn : " << lidarSn << std::endl;
+
+        if (calibrationEntry.value().contains("identity"))
+        {
+            std::string identity = calibrationEntry.value()["identity"].get<std::string>();
+            std::cout << "identity : " << identity << std::endl;
+            std::transform(identity.begin(), identity.end(), identity.begin(), ::toupper);
+            if (identity == "TRUE")
+            {
+                dataMap[lidarSn] = Eigen::Matrix4d::Identity();
+                continue;
+                continue;
+            }
+        }
+
+        assert(kv.value().contains("data"));
+        const auto matrixRawData = calibrationEntry.value()["data"];
+        assert(matrixRawData.size() == 16);
+        // Populate the Eigen::Affine3d matrix from the JSON array
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                value(i, j) = matrixRawData[i * 4 + j]; // default is column-major order
+            }
+        }
+
+        if (calibrationEntry.value().contains("order"))
+        {
+            std::string order = calibrationEntry.value()["order"].get<std::string>();
+            std::cout << "order : " << order << std::endl;
+            std::transform(order.begin(), order.end(), order.begin(), ::toupper);
+            if (order == "COLUMN")
+            {
+                Eigen::Matrix4d valueT = value.transpose();
+                value = valueT;
+            }
+        }
+
+        if (calibrationEntry.value().contains("inverted"))
+        {
+            std::string inverted = calibrationEntry.value()["inverted"].get<std::string>();
+            std::cout << "inverted : " << inverted << std::endl;
+            std::transform(inverted.begin(), inverted.end(), inverted.begin(), ::toupper);
+            if (inverted == "TRUE")
+            {
+                Eigen::Matrix4d valueI = value.inverse();
+                value = valueI;
+            }
+        }
+
+        Eigen::IOFormat HeavyFmt(Eigen::FullPrecision, 0, ", ", ";\n", "[", "]", "[", "]");
+
+        std::cout << "Calibration for " << lidarSn << std::endl;
+        std::cout << value.format(HeavyFmt) << std::endl;
+        // Insert into the map
+        dataMap[lidarSn] = value;
+    }
+    // check for blacklisted
+    if (jsonData.contains("blacklist"))
+    {
+        json blacklist = jsonData["blacklist"];
+        for (const auto& item : blacklist)
+        {
+            std::string blacklistedSn = item.get<std::string>();
+            dataMap[blacklistedSn] = Eigen::Matrix4d::Zero();
+        }
+
+    }
+    return dataMap;
+}
+
+
+std::string MLvxCalib::GetImuSnToUse(const std::string& filename)
+{
+    if (!std::filesystem::exists(filename))
+    {
+        return "";
+    }
+    std::unordered_map<std::string, Eigen::Affine3d> dataMap;
+    std::ifstream file(filename);
+
+    using json = nlohmann::json;
+    json jsonData = json::parse(file);
+
+    return jsonData["imuToUse"];
+}
+
+std::unordered_map<int, Eigen::Affine3d> MLvxCalib::CombineIntoCalibration(const std::unordered_map<int, std::string>& idToSn, const std::unordered_map<std::string, Eigen::Affine3d>& calibration)
+{
+    if (calibration.empty())
+    {
+        return std::unordered_map<int, Eigen::Affine3d>();
+    }
+    std::unordered_map<int, Eigen::Affine3d> dataMap;
+    for (const auto& [id, sn] : idToSn)
+    {
+        const auto& affine = calibration.at(sn);
+        dataMap[id] = affine;
+    }
+    return dataMap;
+}
+
+int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string>& idToSn, const std::string& snToUse )
+{
+    if (snToUse.empty() || idToSn.empty()) {
+        return 0;
+    }
+    for (const auto& [id, sn] : idToSn)
+    {
+        if (snToUse == sn)
+        {
+            return id;
+        }
+    }
+    return 0;
+}
+

@@ -216,6 +216,13 @@ ${CORE_SRCS}
 ${GIZMO}
 )
 
+add_executable(split_multi_livox tools/src/split_multi_livox.cpp)
+if (WIN32)
+target_link_libraries(split_multi_livox laszip3)	
+else()
+target_link_libraries(split_multi_livox laszip)
+endif()
+
 if (WIN32)
 target_link_libraries(multi_session_registration_step_3 ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	
 else()

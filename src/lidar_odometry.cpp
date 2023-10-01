@@ -404,6 +404,17 @@ namespace MLvxCalib {
             // Insert into the map
             dataMap[key] = value;
         }
+        // check for blacklisted
+        if (jsonData.contains("blacklist"))
+        {
+            json blacklist = jsonData["blacklist"];
+            for (const auto& item : blacklist)
+            {
+                std::string blacklistedSn = item.get<std::string>();
+                dataMap[blacklistedSn] = Eigen::Matrix4d::Zero();
+            }
+
+        }
         return dataMap;
     }
 

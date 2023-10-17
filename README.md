@@ -4,9 +4,11 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 ![mandete](softwareX1.png)
 This work is dedicated to educational and research purposes.
 This software is composed of three components: 
+
 - LIDAR odometry,
 - single-session refinement,
 - multi-session refinement.
+
 Data refinement uses a pose-graph loop closure technique and an Iterative Closest Point algorithm to minimize the error of the edge. 
 The results are 3D point clouds in LAZ data format (compressed LAS - LIDAR Aerial Survey).
 It was tested in many real-world scenarios/applications: city-level 3D mapping, culture heritage, creating ground truth data for mobile robots, precise forestry, and large-scale indoor 3D mapping.

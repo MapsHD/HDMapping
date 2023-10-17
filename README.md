@@ -1,5 +1,19 @@
 # TLS registration
 
+This is an open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device.
+This work is dedicated to educational and research purposes.
+This software is composed of three components: LIDAR odometry, single-session refinement and multi-session refinement.
+Data refinement uses a pose-graph loop closure technique and an Iterative Closest Point algorithm to minimize the error of the edge. 
+The results are 3D point clouds in LAZ data format (compressed LAS - LIDAR Aerial Survey).
+It was tested in many real-world scenarios/applications: city-level 3D mapping, culture heritage, creating ground truth data for mobile robots, precise forestry, and large-scale indoor 3D mapping.
+This software can run on Linux and Windows machines, it does not incorporate GPU computing.
+It is advised to use at least 32 GB of RAM to cope with large data sets.
+The optimization framework is implemented from scratch using the Eigen library, thus there is not need to install any additional libraries such as Ceres, g2o, GTSAM, manif, Sophus etc.  
+
+![largescalemapping1](images/100-2.gif)
+![largescalemapping2](images/100.gif)
+
+
 The methodology behing this research is elaborated in following paper:
 ```
 @article{BEDKOWSKI2023113199,

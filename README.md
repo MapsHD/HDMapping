@@ -11,6 +11,26 @@ This software can run on Linux and Windows machines, it does not incorporate GPU
 It is advised to use at least 32 GB of RAM to cope with large data sets.
 The optimization framework is implemented from scratch using the Eigen library, thus there is not need to install any additional libraries such as Ceres, g2o, GTSAM, manif, Sophus etc.  
 
+Possible applications:
+- culture heritage
+- environmental management
+- geology
+- urban search and rescue
+- urban mapping
+- ground truth for AGV (Automated Guided Vehicle)
+- mobile robot navigation
+- precision forestry
+- agricultural robotics
+- underground mining
+- education
+- entertainment
+- forensics
+- critical infrastructure inspection
+- space exploration
+- protection systems
+- digital twin content generation 
+- etc...
+
 ![largescalemapping1](images/100-2.gif)
 ![largescalemapping2](images/100.gif)
 

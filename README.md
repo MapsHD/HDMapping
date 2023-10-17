@@ -1,6 +1,7 @@
 # TLS registration
 
-This is an open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device.
+This is an open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device available at https://github.com/JanuszBedkowski/mandeye_controller.
+![largescalemapping1](images/100-2.gif)
 This work is dedicated to educational and research purposes.
 This software is composed of three components: LIDAR odometry, single-session refinement and multi-session refinement.
 Data refinement uses a pose-graph loop closure technique and an Iterative Closest Point algorithm to minimize the error of the edge. 

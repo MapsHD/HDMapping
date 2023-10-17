@@ -2,7 +2,7 @@
 
 This is an open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device available at https://github.com/JanuszBedkowski/mandeye_controller.
 
-![mandete](softwareX1.png)
+![mandeye](images/softwareX1.png)
 
 This work is dedicated to educational and research purposes.
 This software is composed of three components: 

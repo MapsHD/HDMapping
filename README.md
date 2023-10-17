@@ -19,6 +19,7 @@ It is advised to use at least 32 GB of RAM to cope with large data sets.
 The optimization framework is implemented from scratch https://github.com/JanuszBedkowski/observation_equations using the Eigen library, thus there is not need to install any additional libraries such as Ceres, g2o, GTSAM, manif, Sophus etc. 
 More information can be found in:
 
+```
 @book{DBLP:series/cir/Bedkowski22,
   author       = {Janusz Bedkowski},
   title        = {Large-Scale Simultaneous Localization and Mapping},
@@ -32,6 +33,7 @@ More information can be found in:
   biburl       = {https://dblp.org/rec/series/cir/Bedkowski22.bib},
   bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
+```
 
 Possible applications:
 - culture heritage
@@ -57,7 +59,7 @@ Possible applications:
 ![largescalemapping2](images/100.gif)
 
 
-The methodology behing this research is elaborated in following paper:
+The methodology behing this research is also elaborated in following paper:
 ```
 @article{BEDKOWSKI2023113199,
      title = {Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms},

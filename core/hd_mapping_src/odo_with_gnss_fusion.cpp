@@ -6,6 +6,7 @@
 #include <limits>
 #include <cstddef>
 #include <iostream>
+#include <iterator>
 #include <filesystem>
 
 #include <GL/freeglut.h>

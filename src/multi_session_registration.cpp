@@ -2958,7 +2958,7 @@ bool save_results(std::vector<Session> &sessions)
     for (auto &session : sessions)
     {
         std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
-        session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string());
+        session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false);
     }
     return true;
 }

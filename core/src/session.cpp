@@ -5,7 +5,9 @@ namespace fs = std::filesystem;
 
 bool Session::load(const std::string &file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
 {
-    std::cout << "loading file: '" << file_name << "'" << std::endl;
+    this->session_file_name = file_name;
+    std::cout
+        << "loading file: '" << file_name << "'" << std::endl;
     // point_clouds_container.point_clouds.clear();
 
     double offset_x;
@@ -145,14 +147,15 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             }
         }
 
-		manual_pose_graph_loop_closure.edges = loop_closure_edges;
+        manual_pose_graph_loop_closure.edges = loop_closure_edges;
 
-        //change color
+        // change color
         render_color[0] = float(rand() % 255) / 255.0;
         render_color[1] = float(rand() % 255) / 255.0;
         render_color[2] = float(rand() % 255) / 255.0;
 
-        for (auto &pc:point_clouds_container.point_clouds){
+        for (auto &pc : point_clouds_container.point_clouds)
+        {
             pc.render_color[0] = render_color[0];
             pc.render_color[1] = render_color[1];
             pc.render_color[2] = render_color[2];
@@ -167,7 +170,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
     }
 }
 
-bool Session::save(const std::string &file_name)
+bool Session::save(const std::string &file_name, const std::string &poses_file_name, const std::string &initial_poses_file_name, bool is_subsession)
 {
     std::cout << "saving file: '" << file_name << "'" << std::endl;
 
@@ -179,46 +182,61 @@ bool Session::save(const std::string &file_name)
     j["offset_z"] = point_clouds_container.offset.z();
     j["folder_name"] = point_clouds_container.folder_name;
     j["out_folder_name"] = point_clouds_container.out_folder_name;
-    j["poses_file_name"] = point_clouds_container.poses_file_name;
-    j["initial_poses_file_name"] = point_clouds_container.initial_poses_file_name;
+    j["poses_file_name"] = poses_file_name;                 // point_clouds_container.poses_file_name;
+    j["initial_poses_file_name"] = initial_poses_file_name; // point_clouds_container.initial_poses_file_name;
     j["out_poses_file_name"] = point_clouds_container.out_poses_file_name;
 
     jj["Session Settings"] = j;
 
     nlohmann::json jloop_closure_edges;
-    for (const auto &edge : manual_pose_graph_loop_closure.edges)
+    if (!is_subsession)
     {
-        nlohmann::json jloop_closure_edge{
-            {"px", edge.relative_pose_tb.px},
-            {"py", edge.relative_pose_tb.py},
-            {"pz", edge.relative_pose_tb.pz},
-            {"om", edge.relative_pose_tb.om},
-            {"fi", edge.relative_pose_tb.fi},
-            {"ka", edge.relative_pose_tb.ka},
-            {"w_px", edge.relative_pose_tb_weights.px},
-            {"w_py", edge.relative_pose_tb_weights.py},
-            {"w_pz", edge.relative_pose_tb_weights.pz},
-            {"w_om", edge.relative_pose_tb_weights.om},
-            {"w_fi", edge.relative_pose_tb_weights.fi},
-            {"w_ka", edge.relative_pose_tb_weights.ka},
-            {"index_from", edge.index_from},
-            {"index_to", edge.index_to},
-            {"is_fixed_px", edge.is_fixed_px},
-            {"is_fixed_py", edge.is_fixed_py},
-            {"is_fixed_pz", edge.is_fixed_pz},
-            {"is_fixed_om", edge.is_fixed_om},
-            {"is_fixed_fi", edge.is_fixed_fi},
-            {"is_fixed_ka", edge.is_fixed_ka}};
-        jloop_closure_edges.push_back(jloop_closure_edge);
+        for (const auto &edge : manual_pose_graph_loop_closure.edges)
+        {
+            nlohmann::json jloop_closure_edge{
+                {"px", edge.relative_pose_tb.px},
+                {"py", edge.relative_pose_tb.py},
+                {"pz", edge.relative_pose_tb.pz},
+                {"om", edge.relative_pose_tb.om},
+                {"fi", edge.relative_pose_tb.fi},
+                {"ka", edge.relative_pose_tb.ka},
+                {"w_px", edge.relative_pose_tb_weights.px},
+                {"w_py", edge.relative_pose_tb_weights.py},
+                {"w_pz", edge.relative_pose_tb_weights.pz},
+                {"w_om", edge.relative_pose_tb_weights.om},
+                {"w_fi", edge.relative_pose_tb_weights.fi},
+                {"w_ka", edge.relative_pose_tb_weights.ka},
+                {"index_from", edge.index_from},
+                {"index_to", edge.index_to},
+                {"is_fixed_px", edge.is_fixed_px},
+                {"is_fixed_py", edge.is_fixed_py},
+                {"is_fixed_pz", edge.is_fixed_pz},
+                {"is_fixed_om", edge.is_fixed_om},
+                {"is_fixed_fi", edge.is_fixed_fi},
+                {"is_fixed_ka", edge.is_fixed_ka}};
+            jloop_closure_edges.push_back(jloop_closure_edge);
+        }
     }
     jj["loop_closure_edges"] = jloop_closure_edges;
 
     nlohmann::json jlaz_file_names;
     for (const auto &pc : point_clouds_container.point_clouds)
     {
-        nlohmann::json jfn{
-            {"file_name", pc.file_name}};
-        jlaz_file_names.push_back(jfn);
+        if (is_subsession)
+        {
+            if (pc.visible)
+            {
+                nlohmann::json jfn{
+                    {"file_name", pc.file_name}};
+                jlaz_file_names.push_back(jfn);
+            }
+        }
+        else
+        {
+            nlohmann::json jfn{
+                {"file_name", pc.file_name}};
+            jlaz_file_names.push_back(jfn);
+        }
     }
     jj["laz_file_names"] = jlaz_file_names;
 

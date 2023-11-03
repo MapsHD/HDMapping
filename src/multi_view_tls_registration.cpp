@@ -88,6 +88,9 @@ GNSS gnss;
 int all_point_size = 1;
 int index_loop_closure_source = 0;
 int index_loop_closure_target = 0;
+int index_begin = 0;
+int index_end = 0;
+bool save_subsession = false;
 
 float m_gizmo[] = {1, 0, 0, 0,
                    0, 1, 0, 0,
@@ -357,7 +360,9 @@ void project_gui()
     ImGui::Text("LAZ files are the product of MANDEYE process. Open it with Cloud Compare.");
 
     ImGui::Checkbox("simple_gui", &simple_gui);
-    const std::vector<std::string> Session_filter = { "Session, json", "*.json" };
+    const std::vector<std::string> Session_filter = {"Session, json", "*.json"};
+    const std::vector<std::string> Resso_filter = {"Resso, reg", "*.reg"};
+
     if (!session_loaded)
     {
         if (ImGui::Button("load session (first step)"))
@@ -397,16 +402,60 @@ void project_gui()
             output_file_name = sel;
             std::cout << "Seesion file to save: '" << output_file_name << "'" << std::endl;
         };
-        std::thread t1(t);
-        t1.join();
+        std::thread t_1(t);
+        t_1.join();
 
         if (output_file_name.size() > 0)
         {
-            session.save(fs::path(output_file_name).string());
-            std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
-            session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string());
+            if (!save_subsession){
+                session.save(fs::path(output_file_name).string(), session.point_clouds_container.poses_file_name, session.point_clouds_container.initial_poses_file_name, save_subsession);
+                std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
+                session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), save_subsession);
+            }else{
+                //std::string poses_file_name;
+                //std::string initial_poses_file_name;
+                std::shared_ptr<pfd::save_file> save_file1;
+                std::string poses_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file1);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("poses_file_name", "C:\\", Resso_filter).result();
+                    poses_file_name = sel;
+                    std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                std::shared_ptr<pfd::save_file> save_file2;
+                std::string initial_poses_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file2);
+                const auto tt = [&]()
+                {
+                    auto sel = pfd::save_file("initial_poses_file_name", "C:\\", Resso_filter).result();
+                    initial_poses_file_name = sel;
+                    std::cout << "Resso file to save: '" << initial_poses_file_name << "'" << std::endl;
+                };
+                std::thread t2(tt);
+                t2.join();
+
+                if (poses_file_name.size() > 0 && initial_poses_file_name.size() > 0){
+                    session.save(fs::path(output_file_name).string(), poses_file_name, initial_poses_file_name, save_subsession);
+                    std::cout << "saving poses to: " << poses_file_name << std::endl;
+                    session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), save_subsession);
+                    std::cout << "saving initial poses to: " << initial_poses_file_name << std::endl;
+                    session.point_clouds_container.save_poses(fs::path(initial_poses_file_name).string(), save_subsession);
+                }
+            }
         }
     }
+    ImGui::SameLine();
+    ImGui::Checkbox("save_subsession", &save_subsession);
+    
+    if (session_loaded)
+    {
+        ImGui::Text(std::string("input session file: '" + session.session_file_name + "'").c_str());
+    }
+
     if (ImGui::Button("reset view"))
     {
         rotate_x = 0.0;
@@ -531,7 +580,7 @@ void project_gui()
 
             if (output_file_name.size() > 0)
             {
-                session.point_clouds_container.save_poses(fs::path(output_file_name).string());
+                session.point_clouds_container.save_poses(fs::path(output_file_name).string(), false);
             }
         }
 
@@ -831,6 +880,37 @@ void project_gui()
             ImGui::Checkbox("show_with_initial_pose", &session.point_clouds_container.show_with_initial_pose);
             ImGui::SameLine();
             ImGui::Checkbox("manipulate_only_marked_gizmo (false: move also succesive nodes)", &manipulate_only_marked_gizmo);
+
+            int idx_begin = index_begin;
+            int idx_end = index_end;
+            ImGui::InputInt("index_show_from", &index_begin);
+            if (index_begin < 0)
+            {
+                index_begin = 0;
+            }
+            if (index_begin >= session.point_clouds_container.point_clouds.size() - 1)
+            {
+                index_begin = session.point_clouds_container.point_clouds.size() - 1;
+            }
+            ImGui::InputInt("index_show_to", &index_end);
+            if (index_end < 0)
+            {
+                index_end = 0;
+            }
+            if (index_end >= session.point_clouds_container.point_clouds.size() - 1)
+            {
+                index_end = session.point_clouds_container.point_clouds.size() - 1;
+            }
+            if (idx_begin != index_begin || idx_end != index_end)
+            {
+                session.point_clouds_container.hide_all();
+                session.point_clouds_container.show_all_from_range(index_begin, index_end);
+            }
+            // if (ImGui::Button("mark all pcs from range <index_begin, index_end>"))
+            //{
+            //     session.point_clouds_container.hide_all();
+            //     session.point_clouds_container.show_all_from_range(index_begin, index_end);
+            // }
 
             for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
             {
@@ -1633,9 +1713,7 @@ void project_gui()
                                     pose.translation() += session.point_clouds_container.offset;
                                     Eigen::Quaterniond q(pose.rotation());
                                     outfile << std::setprecision(20);
-                                    outfile << p.local_trajectory[i].timestamp << "," << 
-                                        pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << 
-                                        q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                    outfile << p.local_trajectory[i].timestamp << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
                                 }
                             }
                         }
@@ -1643,8 +1721,8 @@ void project_gui()
                     }
                 }
             }
-        }//simple gui
-        
+        } // simple gui
+
         ImGui::Separator();
         ImGui::Separator();
 
@@ -2487,7 +2565,7 @@ void export_result_to_folder(std::string output_folder_name)
     auto path_poses = path;
     path_poses /= file_name_poses;
     std::cout << "saving poses to: " << path_poses << std::endl;
-    session.point_clouds_container.save_poses(path_poses.string());
+    session.point_clouds_container.save_poses(path_poses.string(), false);
 }
 
 void export_result_to_folder(std::string output_folder_name, int method_id)
@@ -3554,7 +3632,7 @@ void perform_experiment_on_linux()
     {
         std::cout << e.what() << std::endl;
         rms = compute_rms(false);
-        //append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
+        // append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
         export_result_to_folder(path_result.string(), id_method);
         session.point_clouds_container = temp_data;
     }
@@ -3581,47 +3659,47 @@ void perform_experiment_on_linux()
     {
         std::cout << e.what() << std::endl;
         rms = compute_rms(false);
-        //append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
+        // append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
         export_result_to_folder(path_result.string(), id_method);
         session.point_clouds_container = temp_data;
     }
 #endif
 #if WITH_MANIF
     //--98--
-{
-    pose_graph_slam.set_all_to_false();
-    pose_graph_slam.is_optimize_pcl_ndt = true;
-    pose_graph_slam.is_lie_algebra_right_jacobian = true;
-    pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
+    {
+        pose_graph_slam.set_all_to_false();
+        pose_graph_slam.is_optimize_pcl_ndt = true;
+        pose_graph_slam.is_lie_algebra_right_jacobian = true;
+        pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
 
-    auto start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize_with_manif(session.point_clouds_container);
-    auto end = std::chrono::system_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        auto start = std::chrono::system_clock::now();
+        pose_graph_slam.optimize_with_manif(session.point_clouds_container);
+        auto end = std::chrono::system_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-    rms = compute_rms(false);
-    id_method = 98;
-    append_to_result_file(result_file, "pose_graph_slam (manif pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
-    export_result_to_folder(path_result.string(), id_method);
-    session.point_clouds_container = temp_data;
+        rms = compute_rms(false);
+        id_method = 98;
+        append_to_result_file(result_file, "pose_graph_slam (manif pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
+        export_result_to_folder(path_result.string(), id_method);
+        session.point_clouds_container = temp_data;
 
-    //--99--
-    pose_graph_slam.set_all_to_false();
-    pose_graph_slam.is_optimize_pcl_icp = true;
-    pose_graph_slam.is_lie_algebra_right_jacobian = true;
-    pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
+        //--99--
+        pose_graph_slam.set_all_to_false();
+        pose_graph_slam.is_optimize_pcl_icp = true;
+        pose_graph_slam.is_lie_algebra_right_jacobian = true;
+        pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
 
-    start = std::chrono::system_clock::now();
-    pose_graph_slam.optimize_with_manif(session.point_clouds_container);
-    end = std::chrono::system_clock::now();
-    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        start = std::chrono::system_clock::now();
+        pose_graph_slam.optimize_with_manif(session.point_clouds_container);
+        end = std::chrono::system_clock::now();
+        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-    rms = compute_rms(false);
-    id_method = 99;
-    append_to_result_file(result_file, "pose_graph_slam (manif pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
-    export_result_to_folder(path_result.string(), id_method);
-    session.point_clouds_container = temp_data;
-}
+        rms = compute_rms(false);
+        id_method = 99;
+        append_to_result_file(result_file, "pose_graph_slam (manif pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
+        export_result_to_folder(path_result.string(), id_method);
+        session.point_clouds_container = temp_data;
+    }
 #endif
 }
 

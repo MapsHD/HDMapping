@@ -447,8 +447,24 @@ void PointClouds::render(const ObservationPicking &observation_picking, int view
 	}
 }
 
-bool PointClouds::save_poses(const std::string file_name)
+bool PointClouds::save_poses(const std::string file_name, bool is_subsession)
 {
+	int number_pc = 0;
+	if (!is_subsession)
+	{
+		number_pc = this->point_clouds.size();
+	}
+	else
+	{
+		for (size_t i = 0; i < this->point_clouds.size(); i++)
+		{
+			if (this->point_clouds[i].visible)
+			{
+				number_pc++;
+			}
+		}
+	}
+
 	std::ofstream outfile;
 	outfile.open(file_name);
 	if (!outfile.good())
@@ -457,14 +473,28 @@ bool PointClouds::save_poses(const std::string file_name)
 		return false;
 	}
 
-	outfile << this->point_clouds.size() << std::endl;
+	outfile << number_pc << std::endl;
 	for (size_t i = 0; i < this->point_clouds.size(); i++)
 	{
-		outfile << std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl;
-		outfile << this->point_clouds[i].m_pose(0, 0) << " " << this->point_clouds[i].m_pose(0, 1) << " " << this->point_clouds[i].m_pose(0, 2) << " " << this->point_clouds[i].m_pose(0, 3) << std::endl;
-		outfile << this->point_clouds[i].m_pose(1, 0) << " " << this->point_clouds[i].m_pose(1, 1) << " " << this->point_clouds[i].m_pose(1, 2) << " " << this->point_clouds[i].m_pose(1, 3) << std::endl;
-		outfile << this->point_clouds[i].m_pose(2, 0) << " " << this->point_clouds[i].m_pose(2, 1) << " " << this->point_clouds[i].m_pose(2, 2) << " " << this->point_clouds[i].m_pose(2, 3) << std::endl;
-		outfile << "0 0 0 1" << std::endl;
+		if (!is_subsession)
+		{
+			outfile << std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl;
+			outfile << this->point_clouds[i].m_pose(0, 0) << " " << this->point_clouds[i].m_pose(0, 1) << " " << this->point_clouds[i].m_pose(0, 2) << " " << this->point_clouds[i].m_pose(0, 3) << std::endl;
+			outfile << this->point_clouds[i].m_pose(1, 0) << " " << this->point_clouds[i].m_pose(1, 1) << " " << this->point_clouds[i].m_pose(1, 2) << " " << this->point_clouds[i].m_pose(1, 3) << std::endl;
+			outfile << this->point_clouds[i].m_pose(2, 0) << " " << this->point_clouds[i].m_pose(2, 1) << " " << this->point_clouds[i].m_pose(2, 2) << " " << this->point_clouds[i].m_pose(2, 3) << std::endl;
+			outfile << "0 0 0 1" << std::endl;
+		}
+		else
+		{
+			if (this->point_clouds[i].visible)
+			{
+				outfile << std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl;
+				outfile << this->point_clouds[i].m_pose(0, 0) << " " << this->point_clouds[i].m_pose(0, 1) << " " << this->point_clouds[i].m_pose(0, 2) << " " << this->point_clouds[i].m_pose(0, 3) << std::endl;
+				outfile << this->point_clouds[i].m_pose(1, 0) << " " << this->point_clouds[i].m_pose(1, 1) << " " << this->point_clouds[i].m_pose(1, 2) << " " << this->point_clouds[i].m_pose(1, 3) << std::endl;
+				outfile << this->point_clouds[i].m_pose(2, 0) << " " << this->point_clouds[i].m_pose(2, 1) << " " << this->point_clouds[i].m_pose(2, 2) << " " << this->point_clouds[i].m_pose(2, 3) << std::endl;
+				outfile << "0 0 0 1" << std::endl;
+			}
+		}
 	}
 	outfile.close();
 
@@ -488,6 +518,24 @@ void PointClouds::show_all()
 	for (auto &pc : point_clouds)
 	{
 		pc.visible = true;
+	}
+}
+
+void PointClouds::show_all_from_range(int index_begin, int index_end)
+{
+	if (index_end > index_begin)
+	{
+		for (int i = 0; i < point_clouds.size(); i++)
+		{
+			if (i < index_begin || i > index_end)
+			{
+				point_clouds[i].visible = false;
+			}
+			else
+			{
+				point_clouds[i].visible = true;
+			}
+		}
 	}
 }
 
@@ -691,7 +739,7 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 			fprintf(stderr, ":DLL ERROR: reading point %u\n", j);
 			laszip_close_reader(laszip_reader);
 			return true;
-			//continue;
+			// continue;
 		}
 
 		LAZPoint p;
@@ -724,10 +772,11 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		PointCloud pc;
 
 		pc.file_name = input_file_names[i];
-
 		auto trj_path = std::filesystem::path(input_file_names[i]).parent_path();
-		std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
-
+		std::filesystem::path trajectorypath(pc.file_name);
+		std::string fn = (trajectorypath.filename().stem()).string();
+		fn.replace(0, 9, "trajectory_lio_");
+		std::string trajectory_filename = (fn + ".csv");
 		trj_path /= trajectory_filename;
 
 		if (std::filesystem::exists(trj_path))
@@ -778,16 +827,13 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		}
 
 		point_clouds_nodata.push_back(pc);
-		
-
 	}
-
 
 	//// load actual pointclouds
 	point_clouds.resize(point_clouds_nodata.size());
 
-	std::transform(std::execution::par_unseq, std::begin(point_clouds_nodata), std::end(point_clouds_nodata), std::begin(point_clouds), [&](auto& pc)
-		{
+	std::transform(std::execution::par_unseq, std::begin(point_clouds_nodata), std::end(point_clouds_nodata), std::begin(point_clouds), [&](auto &pc)
+				   {
 
 			if (load_pc(pc, pc.file_name))
 			{
@@ -804,10 +850,7 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 					std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
 				}
 			}
-			return pc;
-		});
-
-
+			return pc; });
 
 	if (calculate_offset)
 	{

@@ -26,9 +26,10 @@ public:
 	//std::vector<Eigen::Vector3d> load_points(const std::string& point_clouds_file_name);
 	void render(const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud);
 	//bool save_poses();
-	bool save_poses(const std::string file_name);
+	bool save_poses(const std::string file_name, bool is_subsession);
 	bool save_scans();
 	void show_all();
+	void show_all_from_range(int index_begin, int index_end);
 	void hide_all();
 
 	std::vector<PointCloud> point_clouds;

@@ -532,6 +532,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
             int remove_edge_index = -1;
             if (ImGui::Button("remove active edge"))
             {
+                gizmo = false;
                 remove_edge_index = index_active_edge;
                 // program_params.is_edge_gizmo = false;
             }

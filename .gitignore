@@ -42,7 +42,7 @@ build
 *.log
 *.synctex.gz
 *.toc
-*.pdf
+#*.pdf
 *.bbl
 *.blg
 

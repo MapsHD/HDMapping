@@ -553,6 +553,7 @@ void project_gui()
                                 int remove_edge_index = -1;
                                 if (ImGui::Button("remove active edge"))
                                 {
+                                    edge_gizmo = false;
                                     remove_edge_index = index_active_edge;
                                 }
 

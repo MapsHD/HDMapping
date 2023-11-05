@@ -55,7 +55,7 @@ int dec_reference_points = 100;
 Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &trajectory, double query_time);
 std::vector<Point3Di> decimate(const std::vector<Point3Di> &points, double bucket_x, double bucket_y, double bucket_z);
 void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
-                std::vector<Point3Di> &points_global);
+                std::vector<Point3Di> &points_global, Eigen::Vector3d viewport = Eigen::Vector3d(0, 0, 0));
 
 // bool show_all_points = false;
 bool show_initial_points = true;
@@ -966,7 +966,7 @@ void lidar_odometry_gui()
                     {
                         pp[i].point = m_g * pp[i].point;
                     }
-                    update_rgd(in_out_params, buckets, pp);
+                    update_rgd(in_out_params, buckets, pp, m_g.translation());
 
                     for (int i = 0; i < worker_data.size(); i++)
                     {
@@ -1168,7 +1168,7 @@ void lidar_odometry_gui()
                             {
                                 decimate(points_global, decimation, decimation, decimation);
                             }
-                            update_rgd(in_out_params, buckets, points_global);
+                            update_rgd(in_out_params, buckets, points_global, worker_data[i].intermediate_trajectory[0].translation());
                             //
                             endu = std::chrono::system_clock::now();
 
@@ -1188,7 +1188,7 @@ void lidar_odometry_gui()
                                 pp.point = worker_data[i].intermediate_trajectory[worker_data[i].intermediate_points[j].index_pose] * pp.point;
                                 pg.push_back(pp);
                             }
-                            update_rgd(in_out_params, buckets, pg);
+                            update_rgd(in_out_params, buckets, pg, worker_data[i].intermediate_trajectory[0].translation());
                         }
 
                         if (i > 1)
@@ -1745,6 +1745,16 @@ void display()
     glVertex3f(0.0f, 0.0f, 100);
     glEnd();
 
+    // nv
+    /*glBegin(GL_LINES);
+    for (const auto &b : buckets)
+    {
+        glColor3f(b.second.normal_vector.x(), b.second.normal_vector.y(), b.second.normal_vector.z());
+        glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+        glVertex3f(b.second.mean.x() + b.second.normal_vector.x(), b.second.mean.y() + b.second.normal_vector.y(), b.second.mean.z() + b.second.normal_vector.z());
+    }
+    glEnd();*/
+
     /*if (show_all_points)
     {
         glColor3d(1.0, 0.0, 0.0);
@@ -2022,7 +2032,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
             fprintf(stderr, "DLL ERROR: reading point %u\n", j);
             laszip_close_reader(laszip_reader);
             return points;
-            //std::abort();
+            // std::abort();
         }
         Point3Di p;
 
@@ -2246,6 +2256,14 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
             return;
         }
 
+        // check nv
+        Eigen::Vector3d &nv = this_bucket.normal_vector;
+        Eigen::Vector3d viewport = intermediate_trajectory[intermediate_points_i.index_pose].translation();
+        if (nv.dot(viewport - this_bucket.mean) < 0)
+        {
+            return;
+        }
+        
         const Eigen::Affine3d &m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
         const Eigen::Vector3d &p_s = intermediate_points_i.point;
         const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
@@ -2671,7 +2689,7 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
 }
 
 void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
-                std::vector<Point3Di> &points_global)
+                std::vector<Point3Di> &points_global, Eigen::Vector3d viewport)
 {
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
@@ -2695,8 +2713,45 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
             cov_update.row(1) = mean_diff.y() * mean_diff;
             cov_update.row(2) = mean_diff.z() * mean_diff;
 
-            this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
-                              cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+            // this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+            //                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+
+            if (this_bucket.number_of_points == 2)
+            {
+                this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+                                  cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+            }
+
+            if (this_bucket.number_of_points == 3)
+            {
+                this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+                                  cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+
+                // calculate normal vector
+                Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+                Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
+
+                Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
+                nv.normalize();
+
+                // flip towards viewport
+                if (nv.dot(viewport - this_bucket.mean) < 0.0)
+                {
+                    nv *= -1.0;
+                }
+                this_bucket.normal_vector = nv;
+            }
+
+            if (this_bucket.number_of_points > 3)
+            {
+                Eigen::Vector3d &nv = this_bucket.normal_vector;
+
+                if (nv.dot(viewport - this_bucket.mean) >= 0.0)
+                {
+                    this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+                                      cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+                }
+            }
         }
         else
         {

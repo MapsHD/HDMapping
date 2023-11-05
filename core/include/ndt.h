@@ -40,6 +40,7 @@ public:
 		long long unsigned int number_of_points;
 		Eigen::Vector3d mean;
 		Eigen::Matrix3d cov;
+		Eigen::Vector3d normal_vector;
 	};
 
 	struct Job

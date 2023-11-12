@@ -122,6 +122,7 @@ core/include/wgs84_do_puwg92.h
 core/src/wgs84_do_puwg92.cc
 core/include/session.h
 core/src/session.cpp
+core/src/pfd_wrapper.cpp
 )
 
 set(CORE_HD_MAPPING_SRCS
@@ -221,7 +222,10 @@ ${GIZMO}
 )
 
 add_executable(manual_color src/manual_color.cpp 
-							core/src/color_las_loader.cpp ${IMGUI_SRCS})
+							core/src/color_las_loader.cpp 
+							core/src/pfd_wrapper.cpp 
+							${IMGUI_SRCS}
+							) 
 target_link_libraries(manual_color ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip3)
 
 if (WIN32)

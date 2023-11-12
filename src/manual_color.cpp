@@ -1,5 +1,5 @@
-#include <iostream>
 
+#include <iostream>
 #include <GL/freeglut.h>
 
 #include "imgui.h"
@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "color_las_loader.h"
-
+#include "pfd_wrapper.hpp"
 #include <execution>
 
 #include <structures.h>
@@ -130,30 +130,24 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
     float speed = io.KeyShift ? 10.f : 1.f;
     int transX = 0;
     int transY = 0;
-    if (io.KeysDown[ImGuiKey_UpArrow])
-    {
+    if (io.KeysDown[io.KeyMap[ImGuiKey_UpArrow]]) {
         transY = -10 * speed;
     }
-    if (io.KeysDown[ImGuiKey_DownArrow])
-    {
+    if (io.KeysDown[io.KeyMap[ImGuiKey_DownArrow]]) {
         transY = 10 * speed;
     }
-    if (io.KeysDown[ImGuiKey_LeftArrow])
-    {
+    if (io.KeysDown[io.KeyMap[ImGuiKey_LeftArrow]]) {
         transX = -10 * speed;
     }
-    if (io.KeysDown[ImGuiKey_RightArrow])
-    {
+    if (io.KeysDown[io.KeyMap[ImGuiKey_RightArrow]]) {
         transX = 10 * speed;
     }
-    if (io.KeysDown[ImGuiKey_PageUp])
-    {
-        zoom *= 1.0f + 0.01f * speed;
+    if (io.KeysDown[io.KeyMap[ImGuiKey_PageUp]]) {
+        zoom *= 1.0f+0.01f*speed;
     }
 
-    if (io.KeysDown[ImGuiKey_PageDown])
-    {
-        zoom /= 1.00f + 0.01f * speed;
+    if (io.KeysDown[io.KeyMap[ImGuiKey_PageDown]]) {
+        zoom /= 1.00f + 0.01f *speed;
     }
 
     ImVec2 uv_min = ImVec2(0.0f, 0.0f);                 // Top-left
@@ -343,6 +337,44 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloud(const std::vector<mandeye:
     return newCloud;
 }
 
+void ImGuiLoadSaveButtons() {
+
+    namespace SD = SystemData;
+    if (ImGui::Button("Load Image"))
+    {
+        const auto input_file_names = mandeye::fd::OpenFileDialog("Choose Image", mandeye::fd::ImageFilter, false);
+        if (input_file_names.size())
+        {
+            tex1 = make_tex(input_file_names.front());
+            SD::imageData = stbi_load(input_file_names.front().c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
+        }
+
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Load Poincloud"))
+    {
+        const auto input_file_names = mandeye::fd::OpenFileDialog("Choose Pointcloud", mandeye::fd::LazFilter, false);
+        if (!input_file_names.empty())
+        {
+            auto points = mandeye::load(input_file_names.front());
+            SystemData::points.resize(points.size());
+            std::transform(points.begin(), points.end(), SystemData::points.begin(), [&](const mandeye::Point& p) {return p;});
+        }
+
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Save Poincloud"))
+    {
+        const auto input_file_names = mandeye::fd::SaveFileDialog("Choose Pointcloud", mandeye::fd::LazFilter);
+        if (!input_file_names.empty())
+        {
+            mandeye::saveLaz(input_file_names, SD::points);
+        }
+    }
+    ImGui::SameLine();
+
+}
+
 void display()
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -399,9 +431,10 @@ void display()
     ImGui_ImplGLUT_NewFrame();
 
     std::vector<ImVec2> picked3DPoints(SystemData::pointPickedPointCloud.size());
-    std::transform(SystemData::pointPickedPointCloud.begin(), SystemData::pointPickedPointCloud.end(),
-                   picked3DPoints.begin(), UnprojectPoint);
+    std::transform(SystemData::pointPickedPointCloud.begin(), SystemData::pointPickedPointCloud.end(),picked3DPoints.begin(), UnprojectPoint);
+    
     ImGui::Begin("Image");
+    ImGuiLoadSaveButtons();
     imagePicker("ImagePicker", (ImTextureID)tex1, SystemData::pointPickedImage, picked3DPoints);
 
     // 2D Points Picked
@@ -482,13 +515,6 @@ void display()
         namespace SD = SystemData;
         SD::points = ApplyColorToPointcloud(SD::points, SD::imageData, SD::imageWidth, SD::imageHeight, SD::imageNrChannels, SD::camera_pose);
     }
-    if (ImGui::Button("SaveLaz"))
-    {
-
-        namespace SD = SystemData;
-        mandeye::saveLaz("E:\\test.laz", SD::points);
-    }
-
     if (ImGui::Button("Optimize"))
     {
         if (SystemData::pointPickedPointCloud.size() == SystemData::pointPickedImage.size() && SystemData::pointPickedPointCloud.size() >= 5)
@@ -756,17 +782,6 @@ bool initGL(int *argc, char **argv)
     ImGui_ImplGLUT_Init();
     ImGui_ImplGLUT_InstallFuncs();
     ImGui_ImplOpenGL2_Init();
-    std::string fn = "D:/cv.png";
-    tex1 = make_tex(fn);
-    namespace SD = SystemData;
-    SD::imageData = stbi_load(fn.c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
-
-    auto points = mandeye::load("D:/cloud.laz");
-
-    SystemData::points.resize(points.size());
-    std::transform(points.begin(), points.end(), SystemData::points.begin(), [&](const mandeye::Point &p)
-                   { return p; });
-    SD::points = ApplyColorToPointcloud(SD::points, SD::imageData, SD::imageWidth, SD::imageHeight, SD::imageNrChannels, Eigen::Affine3d::Identity());
 
     return true;
 }

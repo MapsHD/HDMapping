@@ -104,12 +104,12 @@ int main(int argc, char *argv[])
     SystemData::pointPickedPointCloud.emplace_back(-1.17899, -1.12997, 6.16104);
 
     TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
-    pose.om = 0;
+    pose.om = M_PI * 0.5;
     pose.fi = 0;
     pose.ka = M_PI * 0.5;
     pose.px = 0;
     pose.py = 0;
-    pose.pz = -0.25;
+    pose.pz = 0; //-0.25;
 
     SystemData::camera_pose = affine_matrix_from_pose_tait_bryan(pose);
 
@@ -322,25 +322,23 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloud(const std::vector<mandeye:
     std::vector<mandeye::PointRGB> newCloud(pointsRGB.size());
     std::transform(std::execution::par_unseq, pointsRGB.begin(), pointsRGB.end(), newCloud.begin(), [&](mandeye::PointRGB p)
                    {
-
-        const Eigen::Vector3d pt_cam = transfom * p.point;
-        double alpha2 = std::atan2(pt_cam.x(), pt_cam.y());
-        double radius = std::sqrt(pt_cam.x() * pt_cam.x() + pt_cam.y() * pt_cam.y() + pt_cam.z() * pt_cam.z());
-        double omega2 = std::asin(pt_cam.z() / radius);
-
-        double xx2 = 1.0 * imageWidth * alpha2 / (2.0 * M_PI) + imageWidth / 2;
-        double yy2 = 1.0 * imageHeight * (-omega2) / (M_PI)+imageHeight / 2;
-        xx2 = round(xx2);
-        yy2 = round(yy2);
-        if (xx2 > 0 && yy2 > 0 && xx2 < imageWidth && yy2 < imageHeight)
-        {
-            int index = (yy2 * imageWidth + xx2) * nrChannels;
-            unsigned char red = imageData[index];
-            unsigned char green = imageData[index + 1];
-            unsigned char blue = imageData[index + 2];
-            p.rgb = { 1.f * red / 256.f,1.f * green / 256.f, 1.f * blue / 256.f, 1.f };
-        }
-
+            TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(transfom);
+            double du, dv;
+            equrectangular_camera_colinearity_tait_bryan_wc(du,dv, imageHeight, imageWidth,
+                M_PI, pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+                p.point.x(),
+                p.point.y(),
+                p.point.z());
+            int u = std::round(du);
+            int v = std::round(dv);
+            if (u > 0 && v > 0 && u < imageWidth && v < imageHeight)
+            {
+                int index = (v * imageWidth + u) * nrChannels;
+                unsigned char red = imageData[index];
+                unsigned char green = imageData[index + 1];
+                unsigned char blue = imageData[index + 2];
+                p.rgb = { 1.f * red / 256.f,1.f * green / 256.f, 1.f * blue / 256.f, 1.f };
+            }
         return p; });
     return newCloud;
 }
@@ -493,40 +491,8 @@ void display()
 
     if (ImGui::Button("Optimize"))
     {
-        double u;
-        double v;
-        equrectangular_camera_colinearity_tait_bryan_wc(u, v, SystemData::imageHeight, SystemData::imageWidth,
-                                                        M_PI, 0, 0, 0, 0, 0, M_PI * 0.5,
-                                                        10,
-                                                        0,
-                                                        0);
-
-        std::cout << "XXXuv: " << u << " " << v << std::endl;
-
-        equrectangular_camera_colinearity_tait_bryan_wc(u, v, SystemData::imageWidth, SystemData::imageHeight,
-                                                        M_PI, 0, 0, 0, 0, 0, M_PI*0.5,
-                                                        10,
-                                                        0,
-                                                        0);
-
-        std::cout << "YYYuv: " << u << " " << v << std::endl;
-
-        equrectangular_camera_colinearity_tait_bryan_wc(u, v, SystemData::imageWidth, SystemData::imageHeight,
-                                                        M_PI, 0, 0, 0, 0, 0, -M_PI * 0.5,
-                                                        10,
-                                                        0,
-                                                        0);
-
-        std::cout << "ZZZuv: " << u << " " << v << std::endl;
-
         if (SystemData::pointPickedPointCloud.size() == SystemData::pointPickedImage.size() && SystemData::pointPickedPointCloud.size() >= 5)
         {
-            for (int i = 0; i < SystemData::pointPickedImage.size(); i++)
-            {
-                std::cout << SystemData::pointPickedImage[i].x << " " << SystemData::pointPickedImage[i].y << " "
-                          << SystemData::pointPickedPointCloud[i].x() << " " << SystemData::pointPickedPointCloud[i].y() << " " << SystemData::pointPickedPointCloud[i].z() << std::endl;
-            }
-
             std::vector<Eigen::Triplet<double>> tripletListA;
             std::vector<Eigen::Triplet<double>> tripletListP;
             std::vector<Eigen::Triplet<double>> tripletListB;
@@ -534,46 +500,8 @@ void display()
             TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
             for (int i = 0; i < SystemData::pointPickedImage.size(); i++)
             {
-                double u;
-                double v;
-                equrectangular_camera_colinearity_tait_bryan_wc(u, v, SystemData::imageHeight, SystemData::imageWidth,
-                                                                M_PI, pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
-                                                                SystemData::pointPickedPointCloud[i].x(),
-                                                                SystemData::pointPickedPointCloud[i].y(),
-                                                                SystemData::pointPickedPointCloud[i].z());
 
-                std::cout
-                    << "desired1 " << u << " " << v << std::endl;
-
-                equrectangular_camera_colinearity_tait_bryan_wc(u, v, SystemData::imageWidth, SystemData::imageHeight,
-                                                                M_PI, pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
-                                                                SystemData::pointPickedPointCloud[i].x(),
-                                                                SystemData::pointPickedPointCloud[i].y(),
-                                                                SystemData::pointPickedPointCloud[i].z());
-
-                std::cout
-                    << "desired2 " << u << " " << v << std::endl;
-
-                // std::cout << SystemData::camera_pose.matrix() << std::endl;
-                std::cout << "SystemData::imageHeight: " << SystemData::imageHeight << std::endl;
-                std::cout << "SystemData::imageWidth: " << SystemData::imageWidth << std::endl;
-
-                std::cout << "picked1  " << SystemData::pointPickedImage[i].x * SystemData::imageHeight << " " << SystemData::pointPickedImage[i].y * SystemData::imageWidth << std::endl;
-                std::cout << "picked2  " << SystemData::pointPickedImage[i].y * SystemData::imageHeight << " " << SystemData::pointPickedImage[i].x * SystemData::imageWidth << std::endl;
-
-                std::cout << "picked3  " << SystemData::pointPickedImage[i].x * SystemData::imageWidth << " " << SystemData::pointPickedImage[i].y * SystemData::imageHeight << std::endl;
-                std::cout << "picked4  " << SystemData::pointPickedImage[i].y * SystemData::imageWidth << " " << SystemData::pointPickedImage[i].x * SystemData::imageHeight << std::endl;
-                
-                std::cout << "----" << std::endl;
-
-                // if (fabs(std::floor(SystemData::pointPickedImage[i].x) - u) > 100 || std::floor(int(SystemData::pointPickedImage[i].y) - v) > 100)
-                //{
-                //     std::cout << "XXXX" << std::endl;
-                //     continue;
-                // }
-
-                Eigen::Matrix<double, 2, 1>
-                    delta;
+                Eigen::Matrix<double, 2, 1> delta;
                 observation_equation_equrectangular_camera_colinearity_tait_bryan_wc(delta, SystemData::imageHeight, SystemData::imageWidth, M_PI,
                                                                                      pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
                                                                                      SystemData::pointPickedPointCloud[i].x(),
@@ -592,33 +520,21 @@ void display()
 
                 int ir = tripletListB.size();
                 int ic_camera = 0;
-                // int ic_tie_point = cameras.size() * 6 + cameras[i].key_points[j].index_to_tie_point * 3;
-
+               
                 tripletListA.emplace_back(ir, ic_camera, -jacobian(0, 0));
                 tripletListA.emplace_back(ir, ic_camera + 1, -jacobian(0, 1));
                 tripletListA.emplace_back(ir, ic_camera + 2, -jacobian(0, 2));
                 tripletListA.emplace_back(ir, ic_camera + 3, -jacobian(0, 3));
                 tripletListA.emplace_back(ir, ic_camera + 4, -jacobian(0, 4));
                 tripletListA.emplace_back(ir, ic_camera + 5, -jacobian(0, 5));
-
-                // tripletListA.emplace_back(ir, ic_tie_point, -jacobian(0, 6));
-                // tripletListA.emplace_back(ir, ic_tie_point + 1, -jacobian(0, 7));
-                // tripletListA.emplace_back(ir, ic_tie_point + 2, -jacobian(0, 8));
-
                 tripletListA.emplace_back(ir + 1, ic_camera, -jacobian(1, 0));
                 tripletListA.emplace_back(ir + 1, ic_camera + 1, -jacobian(1, 1));
                 tripletListA.emplace_back(ir + 1, ic_camera + 2, -jacobian(1, 2));
                 tripletListA.emplace_back(ir + 1, ic_camera + 3, -jacobian(1, 3));
                 tripletListA.emplace_back(ir + 1, ic_camera + 4, -jacobian(1, 4));
                 tripletListA.emplace_back(ir + 1, ic_camera + 5, -jacobian(1, 5));
-
-                // tripletListA.emplace_back(ir + 1, ic_tie_point, -jacobian(1, 6));
-                // tripletListA.emplace_back(ir + 1, ic_tie_point + 1, -jacobian(1, 7));
-                // tripletListA.emplace_back(ir + 1, ic_tie_point + 2, -jacobian(1, 8));
-
                 tripletListP.emplace_back(ir, ir, cauchy(delta(0, 0), 1));
                 tripletListP.emplace_back(ir + 1, ir + 1, cauchy(delta(1, 0), 1));
-
                 tripletListB.emplace_back(ir, 0, delta(0, 0));
                 tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
             }
@@ -669,7 +585,7 @@ void display()
                 {
                     std::cout << h_x[i] << std::endl;
                 }
-                /*std::cout << "AtPA=AtPB SOLVED" << std::endl;
+                std::cout << "AtPA=AtPB SOLVED" << std::endl;
                 std::cout << "update" << std::endl;
 
                 int counter = 0;
@@ -685,21 +601,17 @@ void display()
                 SystemData::camera_pose = affine_matrix_from_pose_tait_bryan(pose);
 
                 SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
-            */}
-                else
-                {
-                    std::cout << "AtPA=AtPB FAILED" << std::endl;
-                }
+            }
+            else
+            {
+                std::cout << "AtPA=AtPB FAILED" << std::endl;
+            }
         }
         else
         {
-                std::cout << "Please mark at least 5 proper image to cloud correspondances" << std::endl;
+            std::cout << "Please mark at least 5 proper image to cloud correspondances" << std::endl;
         }
     }
-    // for (auto it = SystemData::pointPickedPointCloud.begin(); it != SystemData::pointPickedPointCloud.end(); it++)
-    // {
-    //}
-
     ImGui::End();
 
     ImGui::Render();
@@ -724,26 +636,26 @@ void mouse(int glut_button, int state, int x, int y)
     {
         if (state == GLUT_DOWN)
         {
-                mouse_buttons |= 1 << glut_button;
+            mouse_buttons |= 1 << glut_button;
         }
         else if (state == GLUT_UP)
         {
-                mouse_buttons = 0;
+            mouse_buttons = 0;
         }
         mouse_old_x = x;
         mouse_old_y = y;
 
         if (state == GLUT_DOWN)
         {
-                if (glut_button == GLUT_MIDDLE_BUTTON && io.KeyShift)
-                {
-                    SystemData::clickedRay = GetRay(x, y);
+            if (glut_button == GLUT_MIDDLE_BUTTON && io.KeyShift)
+            {
+                SystemData::clickedRay = GetRay(x, y);
 
-                    std::mutex mtx;
-                    std::pair<double, int> distanceIndexPair{std::numeric_limits<double>::max(), -1};
+                std::mutex mtx;
+                std::pair<double, int> distanceIndexPair{std::numeric_limits<double>::max(), -1};
 
-                    std::for_each(std::execution::par_unseq, SystemData::points.begin(), SystemData::points.end(), [&](const mandeye::PointRGB &p)
-                                  {
+                std::for_each(std::execution::par_unseq, SystemData::points.begin(), SystemData::points.end(), [&](const mandeye::PointRGB &p)
+                              {
                     double D = GetDistanceToRay(p.point, SystemData::clickedRay);
                     std::lock_guard<std::mutex> guard(mtx);
                     if (D < distanceIndexPair.first)
@@ -755,31 +667,21 @@ void mouse(int glut_button, int state, int x, int y)
                         distanceIndexPair = { D, index };
                     } });
 
-                    // Single threaded - implementation
-                    // for (auto it = SystemData::points.cbegin(); it != SystemData::points.end(); it++)
-                    //{
-                    //    double D = GetDistanceToRay(it->point, SystemData::clickedRay);
-                    //    if (D < distanceIndexPair.first)
-                    //    {
-                    //        distanceIndexPair = { D, it - SystemData::points.cbegin() };
-                    //    }
-                    //}
-
-                    if (distanceIndexPair.second > 0)
-                    {
-                        const auto &[distance, index] = distanceIndexPair;
-                        std::cout << "Closest point found, distance " << distance << std::endl;
-                        SystemData::closestPointIndex = distanceIndexPair.second;
-                        SystemData::pointPickedPointCloud.push_back(SystemData::points.at(index).point);
-                    }
-                }
-                if (glut_button == GLUT_RIGHT_BUTTON && io.KeyShift)
+                if (distanceIndexPair.second > 0)
                 {
-                    if (SystemData::pointPickedPointCloud.size() > 0)
-                    {
-                        SystemData::pointPickedPointCloud.pop_back();
-                    }
+                    const auto &[distance, index] = distanceIndexPair;
+                    std::cout << "Closest point found, distance " << distance << std::endl;
+                    SystemData::closestPointIndex = distanceIndexPair.second;
+                    SystemData::pointPickedPointCloud.push_back(SystemData::points.at(index).point);
                 }
+            }
+            if (glut_button == GLUT_RIGHT_BUTTON && io.KeyShift)
+            {
+                if (SystemData::pointPickedPointCloud.size() > 0)
+                {
+                    SystemData::pointPickedPointCloud.pop_back();
+                }
+            }
         }
     }
 }
@@ -797,17 +699,17 @@ void motion(int x, int y)
         gui_mouse_down = mouse_buttons > 0;
         if (mouse_buttons & 1)
         {
-                rotate_x += dy * 0.2f;
-                rotate_y += dx * 0.2f;
+            rotate_x += dy * 0.2f;
+            rotate_y += dx * 0.2f;
         }
         else if (mouse_buttons & 4)
         {
-                translate_z += dy * 0.05f;
+            translate_z += dy * 0.05f;
         }
         else if (mouse_buttons & 3)
         {
-                translate_x += dx * 0.05f;
-                translate_y -= dy * 0.05f;
+            translate_x += dx * 0.05f;
+            translate_y -= dy * 0.05f;
         }
         mouse_old_x = x;
         mouse_old_y = y;

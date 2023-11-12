@@ -122,6 +122,7 @@ core/include/wgs84_do_puwg92.h
 core/src/wgs84_do_puwg92.cc
 core/include/session.h
 core/src/session.cpp
+core/src/pfd_wrapper.cpp
 )
 
 set(CORE_HD_MAPPING_SRCS
@@ -147,6 +148,7 @@ set(FUSION
 3rdparty/Fusion/Fusion/FusionOffset.c
 )
 
+include_directories(3rdparty/)
 include_directories(3rdparty/freeglut-3.2.2/include/)
 add_subdirectory(3rdparty/freeglut-3.2.2)
 
@@ -218,6 +220,13 @@ ${IMGUI_SRCS}
 ${CORE_SRCS}
 ${GIZMO}
 )
+
+add_executable(manual_color src/manual_color.cpp 
+							core/src/color_las_loader.cpp 
+							core/src/pfd_wrapper.cpp 
+							${IMGUI_SRCS}
+							) 
+target_link_libraries(manual_color ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip3)
 
 if (WIN32)
 target_link_libraries(multi_session_registration_step_3 ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	

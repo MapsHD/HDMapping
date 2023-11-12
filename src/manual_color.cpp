@@ -1,0 +1,590 @@
+#include <iostream>
+
+#include <GL/freeglut.h>
+
+#include "imgui.h"
+#include "imgui_impl_glut.h"
+#include "imgui_impl_opengl2.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#include <vector>
+
+#include "color_las_loader.h"
+
+#include <execution>
+
+GLuint tex1;
+
+GLUquadric* sphere;
+
+GLuint make_tex(const std::string & fn )
+{
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+// set the texture wrapping/filtering options (on the currently bound texture object)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+// load and generate the texture
+    int width, height, nrChannels;
+    unsigned char *data = stbi_load(fn.c_str(), &width, &height, &nrChannels, 0);
+    if (data)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        //glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    stbi_image_free(data);
+    return tex;
+}
+
+float rot=0;
+float width=34;
+float height=71;
+const unsigned int window_width = 500;
+const unsigned int window_height = 400;
+int mouse_old_x, mouse_old_y;
+int mouse_buttons = 0;
+float rotate_x = 100.0, rotate_y = -200.0;
+float translate_z = -90.0;
+float translate_x, translate_y = 0.0;
+bool gui_mouse_down{false};
+
+void display();
+void reshape(int w, int h);
+void mouse(int glut_button, int state, int x, int y);
+void motion(int x, int y);
+bool initGL(int *argc, char **argv);
+
+float imgui_co_size{1000.0f};
+bool imgui_draw_co{true};
+
+double CameraRotationZ = 0;
+double CameraHeight = 0;
+
+namespace SystemData
+{
+    std::vector<mandeye::PointRGB> points;
+    std::pair<Eigen::Vector3d, Eigen::Vector3d> clickedRay;
+    int closestPointIndex{ -1 };
+    std::vector<ImVec2> pointPickedImage;
+    std::vector<Eigen::Vector3d> pointPickedPointCloud;
+ 
+    unsigned char* imageData;
+    int imageWidth, imageHeight, imageNrChannels;
+
+}
+
+int main (int argc, char *argv[])
+{
+    initGL(&argc, argv);
+    glutDisplayFunc(display);
+    glutMouseFunc(mouse);
+    glutMotionFunc(motion);
+    glutMainLoop();
+}
+
+
+void imagePicker(const std::string& name, ImTextureID tex1, std::vector<ImVec2>& point_picked, std::vector<ImVec2> point_pickedInPointcloud)
+{
+
+    ImGuiIO& io = ImGui::GetIO();
+    static float zoom = 0.1f;
+    const int Tex_width = 5000;
+    const int Tex_height = 2500;
+
+    float speed = io.KeyShift ? 10.f:1.f;
+    int transX = 0;
+    int transY = 0;
+    if (io.KeysDown[ImGuiKey_UpArrow]) {
+        transY = -10 * speed;
+    }
+    if (io.KeysDown[ImGuiKey_DownArrow]) {
+        transY = 10 * speed;
+    }
+    if (io.KeysDown[ImGuiKey_LeftArrow]) {
+        transX = -10 * speed;
+    }
+    if (io.KeysDown[ImGuiKey_RightArrow]) {
+        transX = 10 * speed;
+    }
+    if (io.KeysDown[ImGuiKey_PageUp]) {
+        zoom *= 1.0f+0.01f*speed;
+    }
+
+    if (io.KeysDown[ImGuiKey_PageDown]) {
+        zoom /= 1.00f + 0.01f *speed;
+    }
+
+
+    ImVec2 uv_min = ImVec2(0.0f, 0.0f);                 // Top-left
+    ImVec2 uv_max = ImVec2(1.0f, 1.0f);                 // Lower-right
+    ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);   // No tint
+    ImVec4 border_col = ImVec4(1.0f, 1.0f, 1.0f, 0.5f); // 50% opaque white
+    
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+
+    ImGui::InputFloat("zoom", &zoom, 0.1f, 0.5f);
+    float my_tex_w = Tex_width * zoom;
+    float my_tex_h = Tex_height * zoom;
+    const ImVec2 child_size{ ImGui::GetWindowWidth()*1.0f, ImGui::GetWindowHeight()*0.5f };
+
+    struct point_pair {
+        ImVec2 p1;
+        bool visible1;
+        ImVec2 p2;
+        bool visible2;
+    };
+
+    auto draw_zoom_pick_point = [my_tex_w, my_tex_h, tint_col, border_col](const ImTextureID& tex, std::vector<ImVec2>& point_picked)
+    {
+        ImVec2 img_start = ImGui::GetItemRectMin();
+        ImGuiIO& io = ImGui::GetIO();
+        ImGui::BeginTooltip();
+        float region_sz = 32.0f;
+        float region_x = io.MousePos.x - img_start.x - region_sz * 0.5f;
+        float region_y = io.MousePos.y - img_start.y - region_sz * 0.5f;
+
+        // add point
+        if (io.MouseClicked[2] && io.KeyShift) {
+            ImVec2 picked_point{ (io.MousePos.x - img_start.x) / my_tex_w ,(io.MousePos.y - img_start.y) / my_tex_h };
+            point_picked.push_back(picked_point);
+        }
+
+        // remove last point
+        if (io.MouseClicked[1] && io.KeyShift && point_picked.size() > 0) {
+            point_picked.pop_back();
+        }
+        float local_zoom = 4.0f;
+        if (region_x < 0.0f) { region_x = 0.0f; }
+        else if (region_x > my_tex_w - region_sz) { region_x = my_tex_w - region_sz; }
+        if (region_y < 0.0f) { region_y = 0.0f; }
+        else if (region_y > my_tex_h - region_sz) { region_y = my_tex_h - region_sz; }
+        ImVec2 uv0 = ImVec2((region_x) / my_tex_w, (region_y) / my_tex_h);
+        ImVec2 uv1 = ImVec2((region_x + region_sz) / my_tex_w, (region_y + region_sz) / my_tex_h);
+        ImGui::Image(tex, ImVec2(region_sz * local_zoom, region_sz * local_zoom), uv0, uv1, tint_col, border_col);
+        ImVec2 img_start_loc = ImGui::GetItemRectMin();
+        ImVec2 img_sz = { ImGui::GetItemRectMax().x - ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y - ImGui::GetItemRectMin().y };
+        ImVec2 window_center = ImVec2(img_start_loc.x + img_sz.x * 0.5f, img_start_loc.y + img_sz.y * 0.5f);
+        ImGui::GetForegroundDrawList()->AddLine({ window_center.x - 10,window_center.y }, { window_center.x + 10,window_center.y }, IM_COL32(0, 255, 0, 200), 1);
+        ImGui::GetForegroundDrawList()->AddLine({ window_center.x,window_center.y - 10 }, { window_center.x,window_center.y + 10 }, IM_COL32(0, 255, 0, 200), 1);
+        ImGui::EndTooltip();
+    };
+
+    ImGui::BeginChild((name + "_child1").c_str(), child_size, false, window_flags);
+    {
+        ImGui::Image(tex1, ImVec2(my_tex_w, my_tex_h), uv_min, uv_max, tint_col, border_col);
+        const ImVec2 view_port_start = ImGui::GetWindowPos();
+        const ImVec2 view_port_end{ view_port_start.x + ImGui::GetWindowWidth(), view_port_start.y + ImGui::GetWindowHeight() };
+        ImVec2 img_start = ImGui::GetItemRectMin();
+        for (int i = 0; i < point_picked.size(); i++) {
+            const auto& p = point_picked[i];
+
+            ImVec2 center{ img_start.x + p.x * my_tex_w,img_start.y + p.y * my_tex_h };
+  
+            if (center.x > view_port_start.x && center.x < view_port_end.x && center.y > view_port_start.y && center.y < view_port_end.y)
+            {
+                char data[16];
+                snprintf(data, 16, "%d", i);
+
+                ImGui::GetForegroundDrawList()->AddLine({ center.x - 10,center.y }, { center.x + 10,center.y }, IM_COL32(255, 255, 0, 200), 1);
+                ImGui::GetForegroundDrawList()->AddLine({ center.x,center.y - 10 }, { center.x,center.y + 10 }, IM_COL32(255, 255, 0, 200), 1);
+                ImGui::GetForegroundDrawList()->AddText({ center.x,center.y + 10 }, IM_COL32(255, 0, 0, 200), data);
+                if (i < point_pickedInPointcloud.size())
+                {
+                    ImGui::GetForegroundDrawList()->AddLine({ center.x,center.y }, point_pickedInPointcloud.at(i), IM_COL32(255, 0, 0, 200), 1);
+                 
+                    ImGui::GetForegroundDrawList()->AddText({ point_pickedInPointcloud.at(i) }, IM_COL32(255, 0, 0, 200), data);
+                }
+
+            }
+        }
+        if (ImGui::IsItemHovered())
+        {
+            draw_zoom_pick_point(tex1, point_picked);
+        }
+    }
+    ImGui::SetScrollX(ImGui::GetScrollX() + transX);
+    ImGui::SetScrollY(ImGui::GetScrollY() + transY);
+    ImGui::EndChild();
+}
+
+ImVec2 UnprojectPoint(const Eigen::Vector3d& point)
+{
+    GLint viewport[4];
+    GLdouble modelview[16];
+    GLdouble projection[16];
+
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+    GLdouble winX, winY, winZ;
+    gluProject(point[0],point[1],point[2], modelview, projection, viewport, &winX, &winY, &winZ );
+    return { static_cast<float>(winX), static_cast<float>(viewport[3] - winY) };
+}
+
+std::pair<Eigen::Vector3d, Eigen::Vector3d> GetRay(int x, int y)
+{
+    GLint viewport[4];
+    GLdouble modelview[16];
+    GLdouble projection[16];
+    GLfloat winX, winY, winZ;
+    GLdouble posXnear, posYnear, posZnear;
+    GLdouble posXfar, posYfar, posZfar;
+
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+    winX = (float)x;
+    winY = (float)viewport[3] - (float)y;
+
+    Eigen::Vector3d position;
+    Eigen::Vector3d direction;
+    gluUnProject(winX, winY, 0, modelview, projection, viewport, &posXnear, &posYnear, &posZnear);
+    gluUnProject(winX, winY, -1000, modelview, projection, viewport, &posXfar, &posYfar, &posZfar);
+
+    position.x() = posXnear;
+    position.y() = posYnear;
+    position.z() = posZnear;
+
+    direction.x() = posXfar - posXnear;
+    direction.y() = posYfar - posYnear;
+    direction.z() = posZfar - posZnear;
+
+    direction.normalize();
+
+    return { position, direction };
+}
+
+double GetDistanceToRay(const Eigen::Vector3d& qureyPoint, const std::pair<Eigen::Vector3d, Eigen::Vector3d>& ray)
+{
+    return ray.second.cross(qureyPoint - ray.first).norm();
+}
+
+std::vector<mandeye::PointRGB> ApplyColorToPointcloud(const std::vector<mandeye::PointRGB>& pointsRGB, const unsigned char* imageData, int imageWidth, int imageHeight, int nrChannels, const Eigen::Affine3d& transfom)
+{
+    std::vector<mandeye::PointRGB> newCloud(pointsRGB.size());
+    std::transform(std::execution::par_unseq, pointsRGB.begin(), pointsRGB.end(), newCloud.begin(), [&](mandeye::PointRGB p) {
+
+        const Eigen::Vector3d pt_cam = transfom * p.point;
+        double alpha2 = std::atan2(pt_cam.x(), pt_cam.y());
+        double radius = std::sqrt(pt_cam.x() * pt_cam.x() + pt_cam.y() * pt_cam.y() + pt_cam.z() * pt_cam.z());
+        double omega2 = std::asin(pt_cam.z() / radius);
+
+        double xx2 = 1.0 * imageWidth * alpha2 / (2.0 * M_PI) + imageWidth / 2;
+        double yy2 = 1.0 * imageHeight * (-omega2) / (M_PI)+imageHeight / 2;
+        xx2 = round(xx2);
+        yy2 = round(yy2);
+        if (xx2 > 0 && yy2 > 0 && xx2 < imageWidth && yy2 < imageHeight)
+        {
+            int index = (yy2 * imageWidth + xx2) * nrChannels;
+            unsigned char red = imageData[index];
+            unsigned char green = imageData[index + 1];
+            unsigned char blue = imageData[index + 2];
+            p.rgb = { 1.f * red / 256.f,1.f * green / 256.f, 1.f * blue / 256.f, 1.f };
+        }
+
+        return p;
+     });
+    return newCloud;
+}
+
+void display() {
+    ImGuiIO& io = ImGui::GetIO();
+    glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+
+    reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glTranslatef(translate_x, translate_y, translate_z);
+    glRotatef(rotate_x, 1.0, 0.0, 0.0);
+    glRotatef(rotate_y, 0.0, 0.0, 1.0);
+
+    //////////
+    glPointSize(1);
+    glBegin(GL_POINTS);
+    for (const auto& p : SystemData::points)
+    {
+        glColor3fv(p.rgb.data());
+        glVertex3dv(p.point.data());
+    }
+    glEnd();
+    //////////////////////////////////
+    glPointSize(10);
+    glBegin(GL_POINTS);
+    for (const auto& p : SystemData::pointPickedPointCloud)
+    {
+        glColor3f(1.f, 0.f, 0.f);
+        glVertex3dv(p.data());
+    }
+    glEnd();
+   
+    if (imgui_draw_co) {
+        glLineWidth(5);
+        glBegin(GL_LINES);
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glVertex3f(0.0f, 0.0f, 0.0f);
+        glVertex3f(imgui_co_size, 0.0f, 0.0f);
+
+        glColor3f(0.0f, 1.0f, 0.0f);
+        glVertex3f(0.0f, 0.0f, 0.0f);
+        glVertex3f(0.0f, imgui_co_size, 0.0f);
+
+        glColor3f(0.0f, 0.0f, 1.0f);
+        glVertex3f(0.0f, 0.0f, 0.0f);
+        glVertex3f(0.0f, 0.0f, imgui_co_size);
+        glEnd();
+    }
+    ImGui_ImplOpenGL2_NewFrame();
+    ImGui_ImplGLUT_NewFrame();
+
+
+    std::vector<ImVec2> picked3DPoints(SystemData::pointPickedPointCloud.size());
+    std::transform(SystemData::pointPickedPointCloud.begin(), SystemData::pointPickedPointCloud.end(),
+        picked3DPoints.begin(), UnprojectPoint);
+    ImGui::Begin("Image");
+    imagePicker("ImagePicker", (ImTextureID)tex1, SystemData::pointPickedImage, picked3DPoints);
+
+    // 2D Points Picked
+    ImGui::BeginChild("2D", ImVec2(300, 0), true);
+    ImGui::Text("2D:");
+    for (auto it = SystemData::pointPickedImage.begin(); it != SystemData::pointPickedImage.end(); it++) {
+        auto index = std::distance(SystemData::pointPickedImage.begin(), it);
+        const auto& p = *it;
+        ImGui::Text("%d : %.1f,%.1f", index, p.x,p.y);
+        ImGui::SameLine();
+        const auto label = std::string("-##2s") + std::to_string(index);
+        if (ImGui::Button(label.c_str()))
+        { 
+            SystemData::pointPickedImage.erase(it); break; 
+        }
+    } 
+
+    ImGui::EndChild();
+    ImGui::SameLine();
+
+
+    // 3D Points Picked
+    ImGui::BeginChild("3D", ImVec2(300, 0), true);
+    ImGui::Text("3D:");
+    for (auto it = SystemData::pointPickedPointCloud.begin(); it != SystemData::pointPickedPointCloud.end(); it++) 
+    {
+        const auto& p = *it;
+        const auto index = std::distance(SystemData::pointPickedPointCloud.begin(), it);
+        auto prev = it != SystemData::pointPickedPointCloud.begin() ? it-1 : SystemData::pointPickedPointCloud.end();
+        auto next = it+1 != SystemData::pointPickedPointCloud.end() ? it+1 : SystemData::pointPickedPointCloud.end();
+ 
+        const auto label = std::string("-##2s") + std::to_string(index);
+
+        if (ImGui::Button(label.c_str()))
+        {
+            SystemData::pointPickedPointCloud.erase(it); 
+            break;
+        }
+        const auto labelUp = std::string("U##2s") + std::to_string(index);
+        const auto labelDn = std::string("D##2s") + std::to_string(index);
+        if (prev != SystemData::pointPickedPointCloud.end())
+        {
+            ImGui::SameLine();
+            if (ImGui::Button(labelUp.c_str()))
+            {
+                std::swap(*it, *prev);
+                break;
+            }
+        }
+        if (next != SystemData::pointPickedPointCloud.end())
+        {
+            ImGui::SameLine();
+            if (ImGui::Button(labelDn.c_str()))
+            {
+                std::swap(*it, *next);
+                break;
+            }
+        }
+        ImGui::SameLine();
+        ImGui::Text("%d: %.1f,%.1f,%.1f", index, p.x(), p.y(), p.z());
+    }
+    ImGui::EndChild();
+
+    ImGui::InputDouble("CameraRotationZ", &CameraRotationZ);
+    ImGui::InputDouble("CameraHeight", &CameraHeight);
+
+    if (ImGui::Button("ApplyColor"))
+    {
+        namespace SD = SystemData;
+        Eigen::Affine3d mat = Eigen::Affine3d::Identity();
+        mat.translate(Eigen::Vector3d::UnitZ() * CameraHeight );
+        mat.rotate(Eigen::AngleAxisd(M_PI*CameraRotationZ/180.0, Eigen::Vector3d::UnitZ()));
+        SD::points = ApplyColorToPointcloud(SD::points, SD::imageData, SD::imageWidth, SD::imageHeight, SD::imageNrChannels, mat);
+    }
+    if (ImGui::Button("SaveLaz"))
+    {
+
+        namespace SD = SystemData;
+        mandeye::saveLaz("E:\\test.laz", SD::points);
+    }
+    ImGui::End();
+
+    ImGui::Render();
+    ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+    glutSwapBuffers();
+    glutPostRedisplay();
+
+}
+
+void mouse(int glut_button, int state, int x, int y) {
+    ImGui_ImplGLUT_MouseFunc(glut_button, state, x, y);
+    ImGuiIO& io = ImGui::GetIO();
+    int button = -1;
+    if (glut_button == GLUT_LEFT_BUTTON) button = 0;
+    if (glut_button == GLUT_RIGHT_BUTTON) button = 1;
+    if (glut_button == GLUT_MIDDLE_BUTTON) button = 2;
+
+    if (!io.WantCaptureMouse)
+    {
+        if (state == GLUT_DOWN) {
+            mouse_buttons |= 1 << glut_button;
+        } else if (state == GLUT_UP) {
+            mouse_buttons = 0;
+        }
+        mouse_old_x = x;
+        mouse_old_y = y;
+
+        if (state == GLUT_DOWN)
+        {
+            if (glut_button == GLUT_MIDDLE_BUTTON && io.KeyShift) {
+                SystemData::clickedRay = GetRay(x, y);
+
+                std::mutex mtx;
+                std::pair<double, int> distanceIndexPair{ std::numeric_limits<double>::max(), -1 };
+
+                std::for_each(std::execution::par_unseq, SystemData::points.begin(), SystemData::points.end(), [&](const mandeye::PointRGB &p) {
+                    double D = GetDistanceToRay(p.point, SystemData::clickedRay);
+                    std::lock_guard<std::mutex> guard(mtx);
+                    if (D < distanceIndexPair.first)
+                    {
+                        // Assume that SystemData::point is an array-like type implementation, naked pointer arithmetic ahead:
+                        const int index = &p - &SystemData::points.front();
+                        assert(index >= 0);
+                        assert(index < SystemData::points.size());
+                        distanceIndexPair = { D, index };
+                    }
+                });
+
+                // Single threaded - implementation
+                //for (auto it = SystemData::points.cbegin(); it != SystemData::points.end(); it++)
+                //{
+                //    double D = GetDistanceToRay(it->point, SystemData::clickedRay);
+                //    if (D < distanceIndexPair.first)
+                //    {
+                //        distanceIndexPair = { D, it - SystemData::points.cbegin() };
+                //    }
+                //}
+
+                if (distanceIndexPair.second > 0)
+                {
+                    const auto& [distance, index] = distanceIndexPair;
+                    std::cout << "Closest point found, distance " << distance << std::endl;
+                    SystemData::closestPointIndex = distanceIndexPair.second;
+                    SystemData::pointPickedPointCloud.push_back(SystemData::points.at(index).point);
+                }
+            }
+            if (glut_button == GLUT_RIGHT_BUTTON && io.KeyShift) {
+                if (SystemData::pointPickedPointCloud.size() > 0)
+                {
+                    SystemData::pointPickedPointCloud.pop_back();
+                }
+            }
+        }
+    }
+}
+
+void motion(int x, int y) {
+    ImGui_ImplGLUT_MotionFunc(x, y);
+    ImGuiIO& io = ImGui::GetIO();
+   
+    if (!io.WantCaptureMouse)
+    {
+        float dx, dy;
+        dx = (float) (x - mouse_old_x);
+        dy = (float) (y - mouse_old_y);
+        gui_mouse_down = mouse_buttons>0;
+        if (mouse_buttons & 1) {
+            rotate_x += dy * 0.2f;
+            rotate_y += dx * 0.2f;
+        } else if (mouse_buttons & 4) {
+            translate_z += dy * 0.05f;
+        } else if (mouse_buttons & 3) {
+            translate_x += dx * 0.05f;
+            translate_y -= dy * 0.05f;
+        }
+        mouse_old_x = x;
+        mouse_old_y = y;
+    }
+    glutPostRedisplay();
+}
+
+void reshape(int w, int h) {
+    glViewport(0, 0, (GLsizei) w, (GLsizei) h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(60.0, (GLfloat) w / (GLfloat) h, 0.01, 10000.0);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+}
+
+bool initGL(int *argc, char **argv) {
+    glutInit(argc, argv);
+    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+    glutInitWindowSize(window_width, window_height);
+    glutCreateWindow("");
+    glutDisplayFunc(display);
+    glutMotionFunc(motion);
+
+
+    // default initialization
+    glClearColor(1.0, 1.0, 1.0, 1.0);
+    //glEnable(GL_DEPTH_TEST);
+    
+    glViewport(0, 0, window_width, window_height);
+
+    // projection
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(60.0, (GLfloat) window_width / (GLfloat) window_height, 0.01,
+                   1000.0);
+    glutReshapeFunc(reshape);
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+    ImGui::StyleColorsDark();
+    ImGui_ImplGLUT_Init();
+    ImGui_ImplGLUT_InstallFuncs();
+    ImGui_ImplOpenGL2_Init();
+    std::string fn = "E:/cv.png";
+    tex1 = make_tex(fn);
+    namespace SD = SystemData;
+    SD::imageData = stbi_load(fn.c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
+
+
+    auto points = mandeye::load("E:/cloud.laz");
+
+    SystemData::points.resize(points.size());
+    std::transform(points.begin(), points.end(), SystemData::points.begin(), [&](const mandeye::Point& p) {
+       return p;
+    });
+    SD::points= ApplyColorToPointcloud(SD::points, SD::imageData, SD::imageWidth, SD::imageHeight, SD::imageNrChannels, Eigen::Affine3d::Identity());
+
+
+    return true;
+}

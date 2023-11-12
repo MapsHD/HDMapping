@@ -2047,6 +2047,15 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
         p.timestamp = point->gps_time;
         p.intensity = point->intensity;
 
+        // add z correction
+        //if (p.point.z() > 0)
+        //{
+        //    double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
+        //    double correction = dist * asin(0.08 / 10.0);
+
+        //    p.point.z() += correction;
+        //}
+
         if (p.timestamp == 0 && ommit_points_with_timestamp_equals_zero)
         {
             counter_ts0++;
@@ -2263,7 +2272,7 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         {
             return;
         }
-        
+
         const Eigen::Affine3d &m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
         const Eigen::Vector3d &p_s = intermediate_points_i.point;
         const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);

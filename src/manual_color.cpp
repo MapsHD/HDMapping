@@ -84,32 +84,25 @@ namespace SystemData
     int imageWidth, imageHeight, imageNrChannels;
 
     Eigen::Affine3d camera_pose = Eigen::Affine3d::Identity();
+
+    int point_size = 1;
 }
 
 int main(int argc, char *argv[])
 {
-    SystemData::pointPickedImage.emplace_back(0.167333, 0.274667);
-    SystemData::pointPickedPointCloud.emplace_back(-3.39334, 5.17905, 5.59375);
-
-    SystemData::pointPickedImage.emplace_back(0.443333, 0.425333);
-    SystemData::pointPickedPointCloud.emplace_back(3.61547, 1.44904, 1.34402);
-
-    SystemData::pointPickedImage.emplace_back(0.688, 0.297333);
-    SystemData::pointPickedPointCloud.emplace_back(0.516962, -1.64109, 1.60765);
-
-    SystemData::pointPickedImage.emplace_back(0.692667, 0.657333);
-    SystemData::pointPickedPointCloud.emplace_back(0.499034, -1.65832, -0.495742);
-
-    SystemData::pointPickedImage.emplace_back(0.901333, 0.0986667);
-    SystemData::pointPickedPointCloud.emplace_back(-1.17899, -1.12997, 6.16104);
-
     TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
+    // pose.om = M_PI * 0.5;
+    // pose.fi = 0;
+    // pose.ka = M_PI * 0.5;
+    // pose.px = 0;
+    // pose.py = 0;
+    // pose.pz = 0; //-0.25;
     pose.om = M_PI * 0.5;
     pose.fi = 0;
     pose.ka = M_PI * 0.5;
-    pose.px = 0;
-    pose.py = 0;
-    pose.pz = 0; //-0.25;
+    pose.px = 0.055;
+    pose.py = 0.13;
+    pose.pz = 0.085; 
 
     SystemData::camera_pose = affine_matrix_from_pose_tait_bryan(pose);
 
@@ -375,6 +368,127 @@ void ImGuiLoadSaveButtons() {
 
 }
 
+void optimize(){
+    if (SystemData::pointPickedPointCloud.size() == SystemData::pointPickedImage.size() && SystemData::pointPickedPointCloud.size() >= 5)
+    {
+        std::vector<Eigen::Triplet<double>> tripletListA;
+        std::vector<Eigen::Triplet<double>> tripletListP;
+        std::vector<Eigen::Triplet<double>> tripletListB;
+
+        TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
+        for (int i = 0; i < SystemData::pointPickedImage.size(); i++)
+        {
+
+            Eigen::Matrix<double, 2, 1> delta;
+            observation_equation_equrectangular_camera_colinearity_tait_bryan_wc(delta, SystemData::imageHeight, SystemData::imageWidth, M_PI,
+                                                                                 pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+                                                                                 SystemData::pointPickedPointCloud[i].x(),
+                                                                                 SystemData::pointPickedPointCloud[i].y(),
+                                                                                 SystemData::pointPickedPointCloud[i].z(),
+                                                                                 SystemData::pointPickedImage[i].x * SystemData::imageWidth,
+                                                                                 SystemData::pointPickedImage[i].y * SystemData::imageHeight);
+
+            Eigen::Matrix<double, 2, 9, Eigen::RowMajor> jacobian;
+            observation_equation_equrectangular_camera_colinearity_tait_bryan_wc_jacobian(jacobian, SystemData::imageHeight, SystemData::imageWidth, M_PI,
+                                                                                          pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+                                                                                          SystemData::pointPickedPointCloud[i].x(),
+                                                                                          SystemData::pointPickedPointCloud[i].y(),
+                                                                                          SystemData::pointPickedPointCloud[i].z(),
+                                                                                          SystemData::pointPickedImage[i].x, SystemData::pointPickedImage[i].y);
+
+            int ir = tripletListB.size();
+            int ic_camera = 0;
+
+            tripletListA.emplace_back(ir, ic_camera, -jacobian(0, 0));
+            tripletListA.emplace_back(ir, ic_camera + 1, -jacobian(0, 1));
+            tripletListA.emplace_back(ir, ic_camera + 2, -jacobian(0, 2));
+            tripletListA.emplace_back(ir, ic_camera + 3, -jacobian(0, 3));
+            tripletListA.emplace_back(ir, ic_camera + 4, -jacobian(0, 4));
+            tripletListA.emplace_back(ir, ic_camera + 5, -jacobian(0, 5));
+            tripletListA.emplace_back(ir + 1, ic_camera, -jacobian(1, 0));
+            tripletListA.emplace_back(ir + 1, ic_camera + 1, -jacobian(1, 1));
+            tripletListA.emplace_back(ir + 1, ic_camera + 2, -jacobian(1, 2));
+            tripletListA.emplace_back(ir + 1, ic_camera + 3, -jacobian(1, 3));
+            tripletListA.emplace_back(ir + 1, ic_camera + 4, -jacobian(1, 4));
+            tripletListA.emplace_back(ir + 1, ic_camera + 5, -jacobian(1, 5));
+            tripletListP.emplace_back(ir, ir, cauchy(delta(0, 0), 1));
+            tripletListP.emplace_back(ir + 1, ir + 1, cauchy(delta(1, 0), 1));
+            tripletListB.emplace_back(ir, 0, delta(0, 0));
+            tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+        }
+
+        Eigen::SparseMatrix<double> matA(tripletListB.size(), 6);
+        Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
+        Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
+
+        matA.setFromTriplets(tripletListA.begin(), tripletListA.end());
+        matP.setFromTriplets(tripletListP.begin(), tripletListP.end());
+        matB.setFromTriplets(tripletListB.begin(), tripletListB.end());
+
+        Eigen::SparseMatrix<double> AtPA(6, 6);
+        Eigen::SparseMatrix<double> AtPB(6, 1);
+
+        {
+            Eigen::SparseMatrix<double> AtP = matA.transpose() * matP;
+            AtPA = (AtP)*matA;
+            AtPB = (AtP)*matB;
+        }
+
+        tripletListA.clear();
+        tripletListP.clear();
+        tripletListB.clear();
+
+        //std::cout << "AtPA.size: " << AtPA.size() << std::endl;
+        //std::cout << "AtPB.size: " << AtPB.size() << std::endl;
+
+        //std::cout << "start solving AtPA=AtPB" << std::endl;
+        Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
+
+        //std::cout << "x = solver.solve(AtPB)" << std::endl;
+        Eigen::SparseMatrix<double> x = solver.solve(AtPB);
+
+        std::vector<double> h_x;
+
+        for (int k = 0; k < x.outerSize(); ++k)
+        {
+            for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
+            {
+                h_x.push_back(it.value());
+            }
+        }
+
+        if (h_x.size() == 6)
+        {
+            //for (size_t i = 0; i < h_x.size(); i++)
+            //{
+            //    std::cout << h_x[i] << std::endl;
+            //}
+            //std::cout << "AtPA=AtPB SOLVED" << std::endl;
+            //std::cout << "update" << std::endl;
+
+            int counter = 0;
+            pose.px += h_x[counter++] * 0.1;
+            pose.py += h_x[counter++] * 0.1;
+            pose.pz += h_x[counter++] * 0.1;
+            pose.om += h_x[counter++] * 0.1;
+            pose.fi += h_x[counter++] * 0.1;
+            pose.ka += h_x[counter++] * 0.1;
+
+            SystemData::camera_pose = affine_matrix_from_pose_tait_bryan(pose);
+
+            SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+        }
+        else
+        {
+            std::cout << "AtPA=AtPB FAILED" << std::endl;
+        }
+    }
+    else
+    {
+        std::cout << "Please mark at least 5 proper image to cloud correspondances" << std::endl;
+    }
+}
+
 void display()
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -392,7 +506,7 @@ void display()
     glRotatef(rotate_y, 0.0, 0.0, 1.0);
 
     //////////
-    glPointSize(1);
+    glPointSize(SystemData::point_size);
     glBegin(GL_POINTS);
     for (const auto &p : SystemData::points)
     {
@@ -435,7 +549,51 @@ void display()
     
     ImGui::Begin("Image");
     ImGuiLoadSaveButtons();
+    if (ImGui::Button("Optimize"))
+    {
+        optimize();
+
+        TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
+        std::cout << "pose" << std::endl;
+        std::cout << "px " << pose.px << std::endl;
+        std::cout << "py " << pose.py << std::endl;
+        std::cout << "pz " << pose.pz << std::endl;
+        std::cout << "om " << pose.om << std::endl;
+        std::cout << "fi " << pose.fi << std::endl;
+        std::cout << "ka " << pose.ka << std::endl;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Optimize x 100"))
+    {
+        for(int i = 0; i < 100; i++){
+            optimize();
+            if(i % 10 == 0){
+                std::cout << "iteration: " << i << " of 100" << std::endl;
+            }
+        }
+        TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
+        std::cout << "pose" << std::endl;
+        std::cout << "px " << pose.px << std::endl;
+        std::cout << "py " << pose.py << std::endl;
+        std::cout << "pz " << pose.pz << std::endl;
+        std::cout << "om " << pose.om << std::endl;
+        std::cout << "fi " << pose.fi << std::endl;
+        std::cout << "ka " << pose.ka << std::endl;
+    }
+    ImGui::InputInt("point_size", &SystemData::point_size);
+
+    if (SystemData::point_size < 1){
+        SystemData::point_size = 1;
+    }
+
     imagePicker("ImagePicker", (ImTextureID)tex1, SystemData::pointPickedImage, picked3DPoints);
+
+    ImGui::Text("!!! SELECT at least 5 image <--> point cloud pairs !!!");
+    ImGui::Text("To pick image: press shift and middle mouse button (cursor on image)");
+    ImGui::Text("To pick point in 3D: press shift and middle mouse button (cursor on point cloud)");
+    ImGui::Text("page up: zoom in");
+    ImGui::Text("page down: zoom out");
+    ImGui::Text("arrows: move image");
 
     // 2D Points Picked
     ImGui::BeginChild("2D", ImVec2(300, 0), true);
@@ -499,145 +657,6 @@ void display()
     }
     ImGui::EndChild();
 
-    ImGui::InputDouble("CameraRotationZ", &CameraRotationZ);
-    ImGui::InputDouble("CameraHeight", &CameraHeight);
-
-    if (ImGui::Button("ApplyColor from gui"))
-    {
-        namespace SD = SystemData;
-        Eigen::Affine3d mat = Eigen::Affine3d::Identity();
-        mat.translate(Eigen::Vector3d::UnitZ() * CameraHeight);
-        mat.rotate(Eigen::AngleAxisd(M_PI * CameraRotationZ / 180.0, Eigen::Vector3d::UnitZ()));
-        SD::points = ApplyColorToPointcloud(SD::points, SD::imageData, SD::imageWidth, SD::imageHeight, SD::imageNrChannels, mat);
-    }
-    if (ImGui::Button("ApplyColor from matrix"))
-    {
-        namespace SD = SystemData;
-        SD::points = ApplyColorToPointcloud(SD::points, SD::imageData, SD::imageWidth, SD::imageHeight, SD::imageNrChannels, SD::camera_pose);
-    }
-    if (ImGui::Button("Optimize"))
-    {
-        if (SystemData::pointPickedPointCloud.size() == SystemData::pointPickedImage.size() && SystemData::pointPickedPointCloud.size() >= 5)
-        {
-            std::vector<Eigen::Triplet<double>> tripletListA;
-            std::vector<Eigen::Triplet<double>> tripletListP;
-            std::vector<Eigen::Triplet<double>> tripletListB;
-
-            TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
-            for (int i = 0; i < SystemData::pointPickedImage.size(); i++)
-            {
-
-                Eigen::Matrix<double, 2, 1> delta;
-                observation_equation_equrectangular_camera_colinearity_tait_bryan_wc(delta, SystemData::imageHeight, SystemData::imageWidth, M_PI,
-                                                                                     pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
-                                                                                     SystemData::pointPickedPointCloud[i].x(),
-                                                                                     SystemData::pointPickedPointCloud[i].y(),
-                                                                                     SystemData::pointPickedPointCloud[i].z(),
-                                                                                     SystemData::pointPickedImage[i].x * SystemData::imageWidth,
-                                                                                     SystemData::pointPickedImage[i].y * SystemData::imageHeight);
-
-                Eigen::Matrix<double, 2, 9, Eigen::RowMajor> jacobian;
-                observation_equation_equrectangular_camera_colinearity_tait_bryan_wc_jacobian(jacobian, SystemData::imageHeight, SystemData::imageWidth, M_PI,
-                                                                                              pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
-                                                                                              SystemData::pointPickedPointCloud[i].x(),
-                                                                                              SystemData::pointPickedPointCloud[i].y(),
-                                                                                              SystemData::pointPickedPointCloud[i].z(),
-                                                                                              SystemData::pointPickedImage[i].x, SystemData::pointPickedImage[i].y);
-
-                int ir = tripletListB.size();
-                int ic_camera = 0;
-               
-                tripletListA.emplace_back(ir, ic_camera, -jacobian(0, 0));
-                tripletListA.emplace_back(ir, ic_camera + 1, -jacobian(0, 1));
-                tripletListA.emplace_back(ir, ic_camera + 2, -jacobian(0, 2));
-                tripletListA.emplace_back(ir, ic_camera + 3, -jacobian(0, 3));
-                tripletListA.emplace_back(ir, ic_camera + 4, -jacobian(0, 4));
-                tripletListA.emplace_back(ir, ic_camera + 5, -jacobian(0, 5));
-                tripletListA.emplace_back(ir + 1, ic_camera, -jacobian(1, 0));
-                tripletListA.emplace_back(ir + 1, ic_camera + 1, -jacobian(1, 1));
-                tripletListA.emplace_back(ir + 1, ic_camera + 2, -jacobian(1, 2));
-                tripletListA.emplace_back(ir + 1, ic_camera + 3, -jacobian(1, 3));
-                tripletListA.emplace_back(ir + 1, ic_camera + 4, -jacobian(1, 4));
-                tripletListA.emplace_back(ir + 1, ic_camera + 5, -jacobian(1, 5));
-                tripletListP.emplace_back(ir, ir, cauchy(delta(0, 0), 1));
-                tripletListP.emplace_back(ir + 1, ir + 1, cauchy(delta(1, 0), 1));
-                tripletListB.emplace_back(ir, 0, delta(0, 0));
-                tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
-            }
-
-            Eigen::SparseMatrix<double> matA(tripletListB.size(), 6);
-            Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
-            Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
-
-            matA.setFromTriplets(tripletListA.begin(), tripletListA.end());
-            matP.setFromTriplets(tripletListP.begin(), tripletListP.end());
-            matB.setFromTriplets(tripletListB.begin(), tripletListB.end());
-
-            Eigen::SparseMatrix<double> AtPA(6, 6);
-            Eigen::SparseMatrix<double> AtPB(6, 1);
-
-            {
-                Eigen::SparseMatrix<double> AtP = matA.transpose() * matP;
-                AtPA = (AtP)*matA;
-                AtPB = (AtP)*matB;
-            }
-
-            tripletListA.clear();
-            tripletListP.clear();
-            tripletListB.clear();
-
-            std::cout << "AtPA.size: " << AtPA.size() << std::endl;
-            std::cout << "AtPB.size: " << AtPB.size() << std::endl;
-
-            std::cout << "start solving AtPA=AtPB" << std::endl;
-            Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
-
-            std::cout << "x = solver.solve(AtPB)" << std::endl;
-            Eigen::SparseMatrix<double> x = solver.solve(AtPB);
-
-            std::vector<double> h_x;
-
-            for (int k = 0; k < x.outerSize(); ++k)
-            {
-                for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
-                {
-                    h_x.push_back(it.value());
-                }
-            }
-
-            if (h_x.size() == 6)
-            {
-                for (size_t i = 0; i < h_x.size(); i++)
-                {
-                    std::cout << h_x[i] << std::endl;
-                }
-                std::cout << "AtPA=AtPB SOLVED" << std::endl;
-                std::cout << "update" << std::endl;
-
-                int counter = 0;
-
-                TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
-                pose.px += h_x[counter++];
-                pose.py += h_x[counter++];
-                pose.pz += h_x[counter++];
-                pose.om += h_x[counter++];
-                pose.fi += h_x[counter++];
-                pose.ka += h_x[counter++];
-
-                SystemData::camera_pose = affine_matrix_from_pose_tait_bryan(pose);
-
-                SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
-            }
-            else
-            {
-                std::cout << "AtPA=AtPB FAILED" << std::endl;
-            }
-        }
-        else
-        {
-            std::cout << "Please mark at least 5 proper image to cloud correspondances" << std::endl;
-        }
-    }
     ImGui::End();
 
     ImGui::Render();

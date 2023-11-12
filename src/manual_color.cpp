@@ -55,7 +55,7 @@ const unsigned int window_width = 500;
 const unsigned int window_height = 400;
 int mouse_old_x, mouse_old_y;
 int mouse_buttons = 0;
-float rotate_x = 100.0, rotate_y = -200.0;
+float rotate_x = 0.0, rotate_y = 0.0;
 float translate_z = -90.0;
 float translate_x, translate_y = 0.0;
 bool gui_mouse_down{false};
@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
     pose.ka = M_PI * 0.5;
     pose.px = 0.055;
     pose.py = 0.13;
-    pose.pz = 0.085; 
+    pose.pz = 0.085;
 
     SystemData::camera_pose = affine_matrix_from_pose_tait_bryan(pose);
 
@@ -123,24 +123,30 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
     float speed = io.KeyShift ? 10.f : 1.f;
     int transX = 0;
     int transY = 0;
-    if (io.KeysDown[io.KeyMap[ImGuiKey_UpArrow]]) {
+    if (io.KeysDown[io.KeyMap[ImGuiKey_UpArrow]])
+    {
         transY = -10 * speed;
     }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_DownArrow]]) {
+    if (io.KeysDown[io.KeyMap[ImGuiKey_DownArrow]])
+    {
         transY = 10 * speed;
     }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_LeftArrow]]) {
+    if (io.KeysDown[io.KeyMap[ImGuiKey_LeftArrow]])
+    {
         transX = -10 * speed;
     }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_RightArrow]]) {
+    if (io.KeysDown[io.KeyMap[ImGuiKey_RightArrow]])
+    {
         transX = 10 * speed;
     }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_PageUp]]) {
-        zoom *= 1.0f+0.01f*speed;
+    if (io.KeysDown[io.KeyMap[ImGuiKey_PageUp]])
+    {
+        zoom *= 1.0f + 0.01f * speed;
     }
 
-    if (io.KeysDown[io.KeyMap[ImGuiKey_PageDown]]) {
-        zoom /= 1.00f + 0.01f *speed;
+    if (io.KeysDown[io.KeyMap[ImGuiKey_PageDown]])
+    {
+        zoom /= 1.00f + 0.01f * speed;
     }
 
     ImVec2 uv_min = ImVec2(0.0f, 0.0f);                 // Top-left
@@ -330,7 +336,8 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloud(const std::vector<mandeye:
     return newCloud;
 }
 
-void ImGuiLoadSaveButtons() {
+void ImGuiLoadSaveButtons()
+{
 
     namespace SD = SystemData;
     if (ImGui::Button("Load Image"))
@@ -341,7 +348,7 @@ void ImGuiLoadSaveButtons() {
             tex1 = make_tex(input_file_names.front());
             SD::imageData = stbi_load(input_file_names.front().c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
         }
-
+        SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
     }
     ImGui::SameLine();
     if (ImGui::Button("Load Poincloud"))
@@ -351,9 +358,10 @@ void ImGuiLoadSaveButtons() {
         {
             auto points = mandeye::load(input_file_names.front());
             SystemData::points.resize(points.size());
-            std::transform(points.begin(), points.end(), SystemData::points.begin(), [&](const mandeye::Point& p) {return p;});
+            std::transform(points.begin(), points.end(), SystemData::points.begin(), [&](const mandeye::Point &p)
+                           { return p; });
         }
-
+        SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
     }
     ImGui::SameLine();
     if (ImGui::Button("Save Poincloud"))
@@ -365,10 +373,10 @@ void ImGuiLoadSaveButtons() {
         }
     }
     ImGui::SameLine();
-
 }
 
-void optimize(){
+void optimize()
+{
     if (SystemData::pointPickedPointCloud.size() == SystemData::pointPickedImage.size() && SystemData::pointPickedPointCloud.size() >= 5)
     {
         std::vector<Eigen::Triplet<double>> tripletListA;
@@ -438,13 +446,13 @@ void optimize(){
         tripletListP.clear();
         tripletListB.clear();
 
-        //std::cout << "AtPA.size: " << AtPA.size() << std::endl;
-        //std::cout << "AtPB.size: " << AtPB.size() << std::endl;
+        // std::cout << "AtPA.size: " << AtPA.size() << std::endl;
+        // std::cout << "AtPB.size: " << AtPB.size() << std::endl;
 
-        //std::cout << "start solving AtPA=AtPB" << std::endl;
+        // std::cout << "start solving AtPA=AtPB" << std::endl;
         Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
 
-        //std::cout << "x = solver.solve(AtPB)" << std::endl;
+        // std::cout << "x = solver.solve(AtPB)" << std::endl;
         Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
         std::vector<double> h_x;
@@ -459,12 +467,12 @@ void optimize(){
 
         if (h_x.size() == 6)
         {
-            //for (size_t i = 0; i < h_x.size(); i++)
+            // for (size_t i = 0; i < h_x.size(); i++)
             //{
-            //    std::cout << h_x[i] << std::endl;
-            //}
-            //std::cout << "AtPA=AtPB SOLVED" << std::endl;
-            //std::cout << "update" << std::endl;
+            //     std::cout << h_x[i] << std::endl;
+            // }
+            // std::cout << "AtPA=AtPB SOLVED" << std::endl;
+            // std::cout << "update" << std::endl;
 
             int counter = 0;
             pose.px += h_x[counter++] * 0.1;
@@ -475,8 +483,6 @@ void optimize(){
             pose.ka += h_x[counter++] * 0.1;
 
             SystemData::camera_pose = affine_matrix_from_pose_tait_bryan(pose);
-
-            SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
         }
         else
         {
@@ -545,8 +551,8 @@ void display()
     ImGui_ImplGLUT_NewFrame();
 
     std::vector<ImVec2> picked3DPoints(SystemData::pointPickedPointCloud.size());
-    std::transform(SystemData::pointPickedPointCloud.begin(), SystemData::pointPickedPointCloud.end(),picked3DPoints.begin(), UnprojectPoint);
-    
+    std::transform(SystemData::pointPickedPointCloud.begin(), SystemData::pointPickedPointCloud.end(), picked3DPoints.begin(), UnprojectPoint);
+
     ImGui::Begin("Image");
     ImGuiLoadSaveButtons();
     if (ImGui::Button("Optimize"))
@@ -561,13 +567,16 @@ void display()
         std::cout << "om " << pose.om << std::endl;
         std::cout << "fi " << pose.fi << std::endl;
         std::cout << "ka " << pose.ka << std::endl;
+        SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
     }
     ImGui::SameLine();
     if (ImGui::Button("Optimize x 100"))
     {
-        for(int i = 0; i < 100; i++){
+        for (int i = 0; i < 100; i++)
+        {
             optimize();
-            if(i % 10 == 0){
+            if (i % 10 == 0)
+            {
                 std::cout << "iteration: " << i << " of 100" << std::endl;
             }
         }
@@ -579,10 +588,12 @@ void display()
         std::cout << "om " << pose.om << std::endl;
         std::cout << "fi " << pose.fi << std::endl;
         std::cout << "ka " << pose.ka << std::endl;
+        SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
     }
     ImGui::InputInt("point_size", &SystemData::point_size);
 
-    if (SystemData::point_size < 1){
+    if (SystemData::point_size < 1)
+    {
         SystemData::point_size = 1;
     }
 
@@ -777,7 +788,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("");
+    glutCreateWindow("MANDEYE with GoPro MAX manual coloring v0.27");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

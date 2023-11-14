@@ -31,7 +31,7 @@
 #include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
 //
 
-#define SAMPLE_PERIOD (1.0 / 200.0)
+#define SAMPLE_PERIOD (1.0 / 400.0)
 // #define NR_ITER 100
 namespace fs = std::filesystem;
 
@@ -908,7 +908,10 @@ void lidar_odometry_gui()
                                 wd.intermediate_points = decimate(wd.intermediate_points, decimation, decimation, decimation);
                             }
 
-                            worker_data.push_back(wd);
+                            if (!wd.intermediate_points.empty())
+                            {
+                                worker_data.push_back(wd);
+                            }
                             wd.intermediate_points.clear();
                             wd.original_points.clear();
                             wd.intermediate_trajectory.clear();
@@ -916,12 +919,12 @@ void lidar_odometry_gui()
                             wd.intermediate_trajectory_timestamps.clear();
                             wd.imu_roll_pitch.clear();
 
-                            wd.intermediate_points.reserve(1000000);
-                            wd.original_points.reserve(1000000);
-                            wd.intermediate_trajectory.reserve(1000);
-                            wd.intermediate_trajectory_motion_model.reserve(1000);
-                            wd.intermediate_trajectory_timestamps.reserve(1000);
-                            wd.imu_roll_pitch.reserve(1000);
+                            //wd.intermediate_points.reserve(1000000);
+                            //wd.original_points.reserve(1000000);
+                            //wd.intermediate_trajectory.reserve(1000);
+                            //wd.intermediate_trajectory_motion_model.reserve(1000);
+                            //wd.intermediate_trajectory_timestamps.reserve(1000);
+                            //wd.imu_roll_pitch.reserve(1000);
 
                             // temp_ts.clear();
                         }
@@ -1043,6 +1046,10 @@ void lidar_odometry_gui()
 
                         for (int iter = 0; iter < nr_iter; iter++)
                         {
+                            if (worker_data[i].intermediate_points.empty())
+                            {
+                                continue;
+                            }
                             optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
                                      in_out_params, buckets, useMultithread, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch);
                         }
@@ -2086,6 +2093,8 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
     std::ifstream myfile(imu_file);
     if (myfile.is_open())
     {
+        Eigen::AngleAxisd rotation(M_PI, Eigen::Vector3d::UnitX());
+
         while (myfile)
         {
             double data[7];
@@ -2093,15 +2102,21 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
             // std::cout << data[0] << " " << data[1] << " " << data[2] << " " << data[3] << " " << data[4] << " " << data[5] << " " << data[6] << std::endl;
             if (data[0] > 0)
             {
+                Eigen::Vector3d gyrV = { data[1] ,data[2], data[3] };
+                Eigen::Vector3d accV = { data[4] ,data[5], data[6] };
+                gyrV = rotation *  gyrV;
+                accV = rotation * accV;
+
                 FusionVector gyr;
-                gyr.axis.x = data[1];
-                gyr.axis.y = data[2];
-                gyr.axis.z = data[3];
+                
+                gyr.axis.x = gyrV.x();
+                gyr.axis.y = gyrV.y();
+                gyr.axis.z = gyrV.z();
 
                 FusionVector acc;
-                acc.axis.x = data[4];
-                acc.axis.y = data[5];
-                acc.axis.z = data[6];
+                acc.axis.x = accV.x();
+                acc.axis.y = accV.y();
+                acc.axis.z = accV.z();
 
                 all_data.emplace_back(data[0] / 1e9, gyr, acc);
             }

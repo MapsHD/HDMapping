@@ -32,6 +32,7 @@
 //
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
+//#define SAMPLE_PERIOD (1.0 / 400.0)
 // #define NR_ITER 100
 namespace fs = std::filesystem;
 
@@ -113,6 +114,8 @@ float m_gizmo[] = {1, 0, 0, 0,
 Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
 double consecutive_distance = 0.0;
 float x_displacement = 0.01;
+
+void alternative_approach();
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z)
 {
@@ -611,6 +614,10 @@ void lidar_odometry_gui()
         }
         if (!step_1_done)
         {
+            if (ImGui::Button("alternative_approach"))
+            {
+                alternative_approach();
+            }
 
             if (ImGui::Button("load data (step 1)"))
             {
@@ -676,13 +683,7 @@ void lidar_odometry_gui()
 
                     std::cout << "start std::transform" << std::endl;
                     std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [](const std::string &fn)
-                                   {
-                                       return load_point_cloud(fn.c_str());
-                                       // std::unique_lock lck(mutex);
-
-                                       // std::cout << fn << std::endl;
-                                       //
-                                   });
+                                   { return load_point_cloud(fn.c_str()); });
                     std::cout << "std::transform finished" << std::endl;
                     // std::cout << "start points.insert" << std::endl;
                     // std::vector<Point3Di> points;
@@ -754,30 +755,6 @@ void lidar_odometry_gui()
                     std::cout << "number of points: " << number_of_points << std::endl;
                     std::cout << "start transforming points" << std::endl;
 
-                    /*counter = 1; // ToDo make it faster
-                    for (auto &p : points)
-                    {
-                        Eigen::Matrix4d t = getInterpolatedPose(trajectory, p.timestamp);
-                        if (!t.isZero())
-                        {
-                            Eigen::Affine3d tt(t);
-                            Eigen::Vector3d tp = tt * p.point;
-                            all_points.push_back(tp);
-                        }
-                        if (counter % 1000000 == 0)
-                        {
-                            printf("tranform point %d of %d \n", counter, points.size());
-                        }
-                        counter++;
-                    }*/
-
-                    // for (int i = 0; i < threshold_initial_points; i++)
-                    //{
-                    //     auto p = points[i];
-                    //     // p.point = all_points[i];
-                    //     initial_points.push_back(p);
-                    // }
-
                     int number_of_initial_points = 0;
                     double timestamp_begin;
                     for (const auto &pp : pointsPerFile)
@@ -798,8 +775,6 @@ void lidar_odometry_gui()
                             break;
                         }
                     }
-
-                    // double timestamp_begin = //points[threshold_initial_points - 1].timestamp;
 
                     std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
 
@@ -2048,7 +2023,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
         p.intensity = point->intensity;
 
         // add z correction
-        //if (p.point.z() > 0)
+        // if (p.point.z() > 0)
         //{
         //    double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
         //    double correction = dist * asin(0.08 / 10.0);
@@ -3145,5 +3120,295 @@ void fix_ptch_roll(std::vector<WorkerData> &worker_data)
                 worker_data[i].intermediate_trajectory[j] = local_result[j];
             }
         }
+    }
+}
+
+std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, int point_count_threshold, std::vector<Point3Di> prev_points)
+{
+    std::vector<std::vector<Point3Di>> res_points;
+    std::vector<Point3Di> points = load_point_cloud(laz_file);
+
+    std::vector<Point3Di> tmp_points = prev_points;
+    int counter = tmp_points.size();
+    for (int i = 0; i < points.size(); i++)
+    {
+        counter ++;
+        tmp_points.push_back(points[i]);
+        if (counter > point_count_threshold){
+            res_points.push_back(tmp_points);
+            tmp_points.clear();
+            counter = 0;
+        }
+    }
+
+    if (tmp_points.size() > 0){
+        res_points.push_back(tmp_points);
+    }
+
+    return res_points;
+}
+
+int get_index(set<int> s, int k)
+{
+    int index = 0;
+    for (auto u : s)
+    {
+        if (u == k){
+            return index;
+        }
+        index++;
+    }
+    return -1;
+}
+
+void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timestamps, std::vector<Eigen::Affine3d> poses, std::string fn1, std::string fn2)
+{
+    for (int i = 0; i < points.size(); i++){
+        auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), points[i].timestamp);
+        points[i].index_pose = std::distance(timestamps.begin(), lower);
+    }
+
+    std::set<int> indexes;
+
+    for (int i = 0; i < points.size(); i++){
+        indexes.insert(points[i].index_pose);
+    }
+    // build trajectory
+    std::vector<Eigen::Affine3d> trajectory;
+    
+    for (auto &s : indexes)
+    {
+        trajectory.push_back(poses[s]);
+    }
+
+    std::vector<Point3Di> points_reindexed = points;
+    for (int i = 0; i < points_reindexed.size(); i++)
+    {
+        points_reindexed[i].index_pose = get_index(indexes, points[i].index_pose);
+    }
+    ///
+    std::vector<Eigen::Affine3d> best_trajectory = trajectory;
+    int min_buckets = 1000000000000;
+
+    for (double x = 0.0; x < 0.2; x += 0.0005)
+    {
+        std::vector<Eigen::Affine3d> trajectory_stretched;
+
+        Eigen::Affine3d m_x_offset = Eigen::Affine3d::Identity();
+        m_x_offset(0,3) = x;
+
+        Eigen::Affine3d m = trajectory[0];
+        trajectory_stretched.push_back(m);
+        for (int i = 1; i < trajectory.size(); i++){
+            Eigen::Affine3d m_update = trajectory[i - 1].inverse() * trajectory[i] * (m_x_offset);
+            m = m * m_update;
+            trajectory_stretched.push_back(m);
+        }
+
+        NDT::GridParameters rgd_params;
+        rgd_params.resolution_X = 0.3;
+        rgd_params.resolution_Y = 0.3;
+        rgd_params.resolution_Z = 0.3;
+        NDTBucketMapType my_buckets;
+
+        std::vector<Point3Di> points_global = points_reindexed;
+
+        std::vector<Point3Di> points_global2;
+
+        for (auto &p : points_global)
+        {
+            if (p.point.z() > 0){
+                p.point = trajectory_stretched[p.index_pose] * p.point;
+                points_global2.push_back(p);
+                //if (p.point.norm() > 6 && p.point.norm() < 15)
+                //{
+                //points_global.push_back(p);
+                //}
+            }
+        }
+        update_rgd(rgd_params, my_buckets, points_global2, trajectory_stretched[0].translation());
+
+        std::cout << "number of buckets [" << x << "]: " << my_buckets.size() << std::endl;
+        if (my_buckets.size()  < min_buckets){
+            min_buckets = my_buckets.size();
+            best_trajectory = trajectory_stretched;
+        }
+    }
+
+    std::vector<Point3Di> points_global = points_reindexed;
+    for (auto &p : points_global)
+    {
+        p.point = best_trajectory[p.index_pose] * p.point;
+    }
+
+    saveLaz(fn1, points_global);
+
+    points_global = points_reindexed;
+    for (auto &p : points_global)
+    {
+        p.point = trajectory[p.index_pose] * p.point;
+    }
+    saveLaz(fn2, points_global);
+}
+
+void alternative_approach()
+{
+    int point_count_threshold = 10000;
+
+    std::cout << "aternative_approach" << std::endl;
+
+    static std::shared_ptr<pfd::open_file> open_file;
+    std::vector<std::string> input_file_names;
+    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+    const auto t = [&]()
+    {
+        std::vector<std::string> filters;
+        auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
+        for (int i = 0; i < sel.size(); i++)
+        {
+            input_file_names.push_back(sel[i]);
+            // std::cout << "las file: '" << input_file_name << "'" << std::endl;
+        }
+    };
+    std::thread t1(t);
+    t1.join();
+
+    std::sort(std::begin(input_file_names), std::end(input_file_names));
+
+    std::vector<std::string> csv_files;
+    std::vector<std::string> laz_files;
+    std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
+                {
+                    if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
+                    {
+                        laz_files.push_back(fileName);
+                    }
+                    if (fileName.ends_with(".csv"))
+                    {
+                        csv_files.push_back(fileName);
+                    } 
+                });
+
+    std::cout << "imu files: " << std::endl;
+    for (const auto &fn : csv_files){
+        std::cout << fn << std::endl;
+    }
+    
+    std::cout << "loading imu" << std::endl;
+    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data;
+
+    std::for_each(std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string &fn)
+                  {
+                    auto imu = load_imu(fn.c_str());
+                    std::cout << fn << std::endl;
+                    imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu)); });
+
+    FusionAhrs ahrs;
+    FusionAhrsInitialise(&ahrs);
+
+    if (fusionConventionNwu)
+    {
+        ahrs.settings.convention = FusionConventionNwu;
+    }
+    if (fusionConventionEnu)
+    {
+        ahrs.settings.convention = FusionConventionEnu;
+    }
+    if (fusionConventionNed)
+    {
+        ahrs.settings.convention = FusionConventionNed;
+    }
+
+    std::map<double, Eigen::Matrix4d> trajectory;
+
+    int counter = 1;
+    for (const auto &[timestamp, gyr, acc] : imu_data)
+    {
+        const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
+        const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
+
+        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
+
+        FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
+
+        Eigen::Quaterniond d{quat.element.w, quat.element.x, quat.element.y, quat.element.z};
+        Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
+        t.rotate(d);
+
+        trajectory[timestamp] = t.matrix();
+        const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+        counter++;
+        if (counter % 100 == 0)
+        {
+            printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    std::cout << "point cloud file names" << std::endl;
+    for (const auto &fn : laz_files){
+        std::cout << fn << std::endl;
+    }
+
+    //for (const auto &fn : laz_files)
+    //{
+        //std::vector<Point3Di> points = load_point_cloud(fn);
+        //std::cout << "points.cloud(): " << points.size() << std::endl;
+    //}
+
+    /*int current_file_index = 0;
+    int current_point_index = 0;
+
+    std::vector<Point3Di> points; 
+    
+    bool do_not_stop = true;
+    while (do_not_stop){
+        bool do_not_stop_internal_loop = true;
+        while (do_not_stop_internal_loop){
+            bool collected_all_points = get_next_batch_of_points(
+                point_count_threshold, laz_files, current_file_index, int &current_point_index_offset,
+                                                                 std::vector<Point3Di> &points)
+        }
+    }*/
+    //get_next_batch_of_points(point_count_threshold, laz_files, current_file_index, current_point_index, points);
+
+    std::vector<Point3Di> prev_points;
+    std::vector<std::vector<Point3Di>> all_points;
+    std::vector<std::vector<Point3Di>> tmp_points = get_batches_of_points(laz_files[0], point_count_threshold, prev_points);
+
+    for (size_t i = 0; i < tmp_points.size() - 1; i++){
+        all_points.push_back(tmp_points[i]);
+    }
+
+    for (int i = 1; i < laz_files.size(); i++){
+        prev_points = tmp_points[tmp_points.size() - 1];
+        tmp_points = get_batches_of_points(laz_files[i], point_count_threshold, prev_points);
+        for (size_t j = 0; j < tmp_points.size() - 1; j++)
+        {
+            all_points.push_back(tmp_points[j]);
+        }
+    }
+       
+    
+    //////////
+
+    std::vector<double> timestamps;
+    std::vector<Eigen::Affine3d> poses;
+    for (const auto &t : trajectory)
+    {
+        timestamps.push_back(t.first);
+        Eigen::Affine3d m;
+        m.matrix() = t.second;
+        poses.push_back(m);
+    }
+
+
+    for (int i = 0; i < all_points.size(); i++)
+    {
+        std::cout << all_points[i].size() << std::endl;
+        std::string fn1 = "C:/data/tmp/" + std::to_string(i) + "_best.laz";
+        std::string fn2 = "C:/data/tmp/" + std::to_string(i) + "_original.laz";
+
+        find_best_stretch(all_points[i], timestamps, poses, fn1, fn2);
     }
 }

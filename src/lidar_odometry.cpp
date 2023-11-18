@@ -737,7 +737,7 @@ void lidar_odometry_gui()
                         // Eigen::Affine3d m_rot_y = affine_matrix_from_pose_tait_bryan(rot_y);
                         // t = t * m_rot_y;
                         //
-
+                        //std::map<double, Eigen::Matrix4d> trajectory;
                         trajectory[timestamp] = t.matrix();
                         const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
                         counter++;
@@ -3166,6 +3166,7 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
     for (int i = 0; i < points.size(); i++){
         auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), points[i].timestamp);
         points[i].index_pose = std::distance(timestamps.begin(), lower);
+        //std::cout << "points[i].timestamp " << points[i].timestamp << " timestamps " << timestamps[points[i].index_pose] << std::endl;
     }
 
     std::set<int> indexes;
@@ -3175,11 +3176,16 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
     }
     // build trajectory
     std::vector<Eigen::Affine3d> trajectory;
-    
+    std::vector<double> ts;
+
     for (auto &s : indexes)
     {
         trajectory.push_back(poses[s]);
+        ts.push_back(timestamps[s]);
     }
+
+    std::cout << "trajectory.size() " << trajectory.size() << std::endl;
+    //Sleep(2000);
 
     std::vector<Point3Di> points_reindexed = points;
     for (int i = 0; i < points_reindexed.size(); i++)
@@ -3235,10 +3241,25 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
         }
     }
 
+    std::map<double, Eigen::Matrix4d> trajectory_for_interpolation;
+    for (int i = 0; i < best_trajectory.size(); i++){
+        trajectory_for_interpolation[ts[i]] = best_trajectory[i].matrix();
+    }
+       
+
     std::vector<Point3Di> points_global = points_reindexed;
     for (auto &p : points_global)
     {
-        p.point = best_trajectory[p.index_pose] * p.point;
+        Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, ts[p.index_pose]);
+
+        //Eigen::Affine3d m = pose.matrix();
+
+        
+        Eigen::Affine3d b;
+        b.matrix() = pose;
+
+        //p.point = best_trajectory[p.index_pose] * p.point;
+        p.point = b * p.point;
     }
 
     saveLaz(fn1, points_global);

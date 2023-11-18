@@ -226,12 +226,14 @@ add_executable(mandeye_with_gopro_max_manual_coloring src/manual_color.cpp
 							core/src/pfd_wrapper.cpp 
 							${IMGUI_SRCS}
 							) 
-target_link_libraries(mandeye_with_gopro_max_manual_coloring ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip3)
+
 
 if (WIN32)
-target_link_libraries(multi_session_registration_step_3 ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	
+	target_link_libraries(mandeye_with_gopro_max_manual_coloring ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip3)
+	target_link_libraries(multi_session_registration_step_3 ${OPENGL_LIBRARIES} ../3rdparty/glew-2.2.0/lib/Release/x64/glew32 freeglut_static laszip3)	
 else()
-target_link_libraries(multi_session_registration_step_3 ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip tbb)
+	target_link_libraries(mandeye_with_gopro_max_manual_coloring ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip tbb)
+	target_link_libraries(multi_session_registration_step_3 ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip tbb)
 endif()
 if (PCL_FOUND)
     target_link_libraries (multi_session_registration_step_3 ${PCL_LIBRARIES})

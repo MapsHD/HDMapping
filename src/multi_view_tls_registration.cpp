@@ -803,6 +803,17 @@ void project_gui()
         }
     }
 
+    if (ImGui::Button("Set initial pose to Identity and update other poses"))
+    {
+        if (session.point_clouds_container.point_clouds.size() > 0){
+            auto m_inv = session.point_clouds_container.point_clouds[0].m_pose.inverse();
+            for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+            {
+                session.point_clouds_container.point_clouds[i].m_pose = m_inv * session.point_clouds_container.point_clouds[i].m_pose;
+            }
+        }
+    }
+
     ImGui::Text("-----------------------------------------------------------------------------");
     if (!simple_gui)
     {
@@ -1857,12 +1868,12 @@ void ndt_gui()
     ImGui::Begin("Normal Distribution Transforms");
 
     ImGui::InputFloat3("bucket_size (x[m],y[m],z[m])", ndt.bucket_size);
-    if (ndt.bucket_size[0] < 0.1)
-        ndt.bucket_size[0] = 0.1f;
-    if (ndt.bucket_size[1] < 0.1)
-        ndt.bucket_size[1] = 0.1f;
-    if (ndt.bucket_size[2] < 0.1)
-        ndt.bucket_size[2] = 0.1f;
+    if (ndt.bucket_size[0] < 0.01)
+        ndt.bucket_size[0] = 0.01f;
+    if (ndt.bucket_size[1] < 0.01)
+        ndt.bucket_size[1] = 0.01f;
+    if (ndt.bucket_size[2] < 0.01)
+        ndt.bucket_size[2] = 0.01f;
 
     ImGui::InputInt("number_of_threads", &ndt.number_of_threads);
     if (ndt.number_of_threads < 1)
@@ -3315,7 +3326,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration_step_2 v0.26");
+    glutCreateWindow("multi_view_tls_registration_step_2 v0.27");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

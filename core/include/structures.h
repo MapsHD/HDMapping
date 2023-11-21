@@ -66,7 +66,7 @@ struct Point3D
 
 struct Point3Di
 {
-    Eigen::Vector3d point;
+	Eigen::Vector3d point;
 	//float x;
 	//float y;
 	//float z;

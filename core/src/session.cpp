@@ -22,6 +22,14 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
     std::vector<ManualPoseGraphLoopClosure::Edge> loop_closure_edges;
     std::vector<std::string> laz_file_names;
 
+    // Get a loaded file directory
+    std::string directory;
+    const size_t last_slash_idx = file_name.rfind('\\');
+    if (std::string::npos != last_slash_idx)
+    {
+        directory = file_name.substr(0, last_slash_idx);
+    }
+
     try
     {
         std::ifstream fs(file_name);

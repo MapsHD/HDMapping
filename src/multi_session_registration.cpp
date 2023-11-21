@@ -232,6 +232,8 @@ bool save_project_settings(const std::string &file_name, const ProjectSettings &
 
 void project_gui()
 {
+    const std::vector<std::string> Session_filter = { "Session, json", "*.json" };
+
     if (ImGui::Begin("multi_session_registration_step_3"))
     {
         ImGui::Text("This program is third step in MANDEYE process.");
@@ -307,7 +309,7 @@ void project_gui()
             ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
             const auto t = [&]()
             {
-                auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
+                auto sel = pfd::open_file("Load RESSO file", "C:\\", Session_filter).result();
                 for (int i = 0; i < sel.size(); i++)
                 {
                     input_file_name = sel[i];

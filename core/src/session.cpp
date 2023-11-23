@@ -143,6 +143,10 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         {
             working_directory = fs::path(laz_file_names[0]).parent_path().string();
 
+            point_clouds_container.folder_name = folder_name;
+            point_clouds_container.out_folder_name = out_folder_name;
+            point_clouds_container.out_poses_file_name = out_poses_file_name;
+
             if (!point_clouds_container.update_initial_poses_from_RESSO(working_directory.c_str(), initial_poses_file_name.c_str()))
             {
                 std::cout << __FILE__ << " " << __LINE__ << std::endl;

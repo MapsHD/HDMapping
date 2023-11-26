@@ -152,7 +152,7 @@ include_directories(3rdparty/)
 include_directories(3rdparty/freeglut-3.2.2/include/)
 add_subdirectory(3rdparty/freeglut-3.2.2)
 
-add_executable(multi_view_tls_registration_step_2 src/multi_view_tls_registration.cpp
+add_executable(multi_view_tls_registration_step_2 src/multi_view_tls_registration.cpp src/perform_experiment.cpp
 ${IMGUI_SRCS}
 ${CORE_SRCS}
 ${GIZMO}

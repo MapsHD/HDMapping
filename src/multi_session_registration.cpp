@@ -105,8 +105,13 @@ std::vector<Session> sessions;
 
 namespace fs = std::filesystem;
 
+//this funciton performs pose graph slam calculations
 bool optimize(std::vector<Session> &sessions);
+
+//this function revert results to previous one
 bool revert(std::vector<Session> &sessions);
+
+//this function saves result (poses) to files
 bool save_results(std::vector<Session> &sessions);
 
 bool load_project_settings(const std::string &file_name, ProjectSettings &_project_settings)

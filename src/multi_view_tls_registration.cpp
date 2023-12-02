@@ -370,6 +370,7 @@ void project_gui()
     ImGui::Checkbox("simple_gui", &simple_gui);
     const std::vector<std::string> Session_filter = {"Session, json", "*.json"};
     const std::vector<std::string> Resso_filter = {"Resso, reg", "*.reg"};
+    const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.las)", "*.las", "LASzip file (*.laz)", "*.laz", "All files", "*" };
 
     if (!session_loaded)
     {
@@ -408,7 +409,7 @@ void project_gui()
         {
             auto sel = pfd::save_file("Save session", "C:\\", Session_filter).result();
             output_file_name = sel;
-            std::cout << "Seesion file to save: '" << output_file_name << "'" << std::endl;
+            std::cout << "Session file to save: '" << output_file_name << "'" << std::endl;
         };
         std::thread t_1(t);
         t_1.join();
@@ -1133,7 +1134,7 @@ void project_gui()
             ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
             const auto t = [&]()
             {
-                auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
                 output_file_name = sel;
                 std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
             };
@@ -1213,7 +1214,7 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
                     output_file_name = sel;
                     std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
                 };
@@ -1256,7 +1257,7 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                        auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
                     output_file_name = sel;
                     std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
                 };
@@ -1349,7 +1350,7 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
                     output_file_name = sel;
                     std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
                 };
@@ -1442,7 +1443,7 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
                     output_file_name = sel;
                     std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
                 };
@@ -1535,7 +1536,7 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
                     output_file_name = sel;
                     std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
                 };
@@ -1580,7 +1581,7 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
                     output_file_name = sel;
                     std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
                 };
@@ -1625,7 +1626,7 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\").result();
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
                     output_file_name = sel;
                     std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
                 };
@@ -1670,7 +1671,7 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or csv file", "C:\\").result();
+                    auto sel = pfd::save_file("Save las or csv file", "C:\\", { "LAS file", "*.las", "Csv file", "*.csv" }).result();
                     output_file_name = sel;
                     std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
                 };

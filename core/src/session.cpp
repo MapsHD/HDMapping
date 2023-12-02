@@ -3,6 +3,19 @@
 
 namespace fs = std::filesystem;
 
+std::string pathUpdater(std::string path, std::string newPath)
+{    
+    if (std::string::npos == path.find('.'))
+    {
+        return newPath;
+    }
+
+    const size_t file_idx = path.rfind('\\');
+    std::string finalPath = newPath + path.substr(file_idx);
+    return finalPath;
+
+}
+
 bool Session::load(const std::string &file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
 {
     this->session_file_name = file_name;
@@ -22,6 +35,14 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
     std::vector<ManualPoseGraphLoopClosure::Edge> loop_closure_edges;
     std::vector<std::string> laz_file_names;
 
+    // Get a loaded file directory
+    std::string directory;
+    const size_t last_slash_idx = file_name.rfind('\\');
+    if (std::string::npos != last_slash_idx)
+    {
+        directory = file_name.substr(0, last_slash_idx);
+    }
+
     try
     {
         std::ifstream fs(file_name);
@@ -34,11 +55,11 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         offset_x = project_settings_json["offset_x"];
         offset_y = project_settings_json["offset_y"];
         offset_z = project_settings_json["offset_z"];
-        folder_name = project_settings_json["folder_name"];
-        out_folder_name = project_settings_json["out_folder_name"];
-        poses_file_name = project_settings_json["poses_file_name"];
-        initial_poses_file_name = project_settings_json["initial_poses_file_name"];
-        out_poses_file_name = project_settings_json["out_poses_file_name"];
+        folder_name = pathUpdater(project_settings_json["folder_name"], directory);
+        out_folder_name = pathUpdater(project_settings_json["out_folder_name"], directory);
+        poses_file_name = pathUpdater(project_settings_json["poses_file_name"], directory);
+        initial_poses_file_name = pathUpdater(project_settings_json["initial_poses_file_name"], directory);
+        out_poses_file_name = pathUpdater(project_settings_json["out_poses_file_name"], directory);
 
         for (const auto &edge_json : data["loop_closure_edges"])
         {
@@ -68,7 +89,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
 
         for (const auto &fn_json : data["laz_file_names"])
         {
-            std::string fn = fn_json["file_name"];
+            std::string fn = pathUpdater(fn_json["file_name"], directory);
             laz_file_names.push_back(fn);
         }
 
@@ -121,6 +142,10 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         if (laz_file_names.size() > 0)
         {
             working_directory = fs::path(laz_file_names[0]).parent_path().string();
+
+            point_clouds_container.folder_name = folder_name;
+            point_clouds_container.out_folder_name = out_folder_name;
+            point_clouds_container.out_poses_file_name = out_poses_file_name;
 
             if (!point_clouds_container.update_initial_poses_from_RESSO(working_directory.c_str(), initial_poses_file_name.c_str()))
             {

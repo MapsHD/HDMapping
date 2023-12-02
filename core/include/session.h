@@ -5,6 +5,8 @@
 #include <point_clouds.h>
 #include <manual_pose_graph_loop_closure.h>
 
+std::string pathUpdater(std::string path, std::string newPath);
+
 class Session
 {
     public:

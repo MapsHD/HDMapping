@@ -264,6 +264,7 @@ double compute_rms(bool initial, Session &session, ObservationPicking &observati
 void perform_experiment_on_windows(Session &session, ObservationPicking &observation_picking, ICP &icp, NDT &ndt,
                                    RegistrationPlaneFeature &registration_plane_feature, PoseGraphSLAM &pose_graph_slam)
 {
+    bool compute_mean_and_cov_for_bucket = false;
     session.point_clouds_container.show_with_initial_pose = false;
     auto temp_data = session.point_clouds_container;
     reset_poses(session);
@@ -569,7 +570,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_lie_algebra_right_jacobian = false;
 
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -585,7 +586,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -599,7 +600,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -617,7 +618,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -631,7 +632,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -646,7 +647,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -667,7 +668,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -682,7 +683,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -697,7 +698,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -715,7 +716,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_quaternion = false;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -730,7 +731,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_quaternion = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -746,7 +747,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_quaternion = false;
     ndt.is_rodrigues = true;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -771,7 +772,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_lie_algebra_left_jacobian = true;
     ndt.is_lie_algebra_right_jacobian = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -789,7 +790,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_levenberg_marguardt = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -808,7 +809,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_gauss_newton = true;
     ndt.is_levenberg_marguardt = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -824,7 +825,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     ndt.is_levenberg_marguardt = true;
     ndt.is_rodrigues = false;
     start = std::chrono::system_clock::now();
-    ndt.optimize(session.point_clouds_container.point_clouds, true);
+    ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);

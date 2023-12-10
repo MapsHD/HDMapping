@@ -1694,7 +1694,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
 				ndt.number_of_threads = number_of_threads;
 				ndt.number_of_iterations = number_of_iterations_pair_wise_matching;
 
-				ndt.optimize(pcs.point_clouds, true);
+				ndt.optimize(pcs.point_clouds, true, false);
 				
 				edges[i].m_relative_pose = pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose;
 			}
@@ -1952,7 +1952,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
                 ndt.number_of_threads = number_of_threads;
                 ndt.number_of_iterations = number_of_iterations_pair_wise_matching;
 
-                ndt.optimize(pcs.point_clouds, true);
+                ndt.optimize(pcs.point_clouds, true, false);
 
                 edges[i].m_relative_pose = pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose;
             }
@@ -1977,7 +1977,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
                 ndt.number_of_threads = number_of_threads;
                 ndt.number_of_iterations = number_of_iterations_pair_wise_matching;
 
-                ndt.optimize(pcs.point_clouds, true);
+                ndt.optimize(pcs.point_clouds, true, false);
 
                 edges[i].m_relative_pose = pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose;
             }

@@ -1910,6 +1910,7 @@ void project_gui()
 
 void ndt_gui()
 {
+    static bool compute_mean_and_cov_for_bucket = false;
     ImGui::Begin("Normal Distribution Transforms");
 
     ImGui::InputFloat3("bucket_size (x[m],y[m],z[m])", ndt.bucket_size);
@@ -1985,7 +1986,7 @@ void ndt_gui()
         double mui = 0.0;
         // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
         // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
-        ndt.optimize(session.point_clouds_container.point_clouds, false);
+        ndt.optimize(session.point_clouds_container.point_clouds, false, compute_mean_and_cov_for_bucket);
     }
 
     if (ImGui::Button("compute mean mahalanobis distance"))
@@ -1995,7 +1996,7 @@ void ndt_gui()
         double mui = 0.0;
         // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
         // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
-        ndt.optimize(session.point_clouds_container.point_clouds, true);
+        ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     }
 
     ImGui::Text("--------------------------------------------------------------------------------------------------------");
@@ -2003,12 +2004,12 @@ void ndt_gui()
     if (ImGui::Button("ndt_optimization(Lie-algebra left Jacobian)"))
     {
         // icp.optimize_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
-        ndt.optimize_lie_algebra_left_jacobian(session.point_clouds_container.point_clouds);
+        ndt.optimize_lie_algebra_left_jacobian(session.point_clouds_container.point_clouds, compute_mean_and_cov_for_bucket);
     }
     if (ImGui::Button("ndt_optimization(Lie-algebra right Jacobian)"))
     {
         // icp.optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
-        ndt.optimize_lie_algebra_right_jacobian(session.point_clouds_container.point_clouds);
+        ndt.optimize_lie_algebra_right_jacobian(session.point_clouds_container.point_clouds, compute_mean_and_cov_for_bucket);
     }
 
     ImGui::Text("--------------------------------------------------------------------------------------------------------");
@@ -2021,6 +2022,8 @@ void ndt_gui()
         ImGui::InputDouble("sigma_polar_angle_rad", &ndt.sigma_polar_angle, 0.0001, 0.0001);
         ImGui::InputDouble("sigma_azimuthal_angle_rad", &ndt.sigma_azimuthal_angle, 0.0001, 0.0001);
         ImGui::InputInt("num_extended_points", &ndt.num_extended_points, 1, 1);
+
+        ImGui::Checkbox("compute_mean_and_cov_for_bucket", &compute_mean_and_cov_for_bucket);
     }
 
     if (ImGui::Button("Set Zoller+Fröhlich TLS Imager 5006i errors"))

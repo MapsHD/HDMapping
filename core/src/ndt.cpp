@@ -517,7 +517,7 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 			 std::vector<Eigen::Affine3d> *mposes, std::vector<Eigen::Affine3d> *mposes_inv, size_t trajectory_size,
 			 NDT::PoseConvention pose_convention, NDT::RotationMatrixParametrization rotation_matrix_parametrization, int number_of_unknowns, double *sumssr, int *sums_obs,
 			 bool is_generalized, double sigma_r, double sigma_polar_angle, double sigma_azimuthal_angle, int num_extended_points, double *md_out, double *md_count_out,
-			 bool compute_only_mean_and_cov)
+			 bool compute_only_mean_and_cov, bool compute_mean_and_cov_for_bucket)
 {
 	std::vector<Eigen::Triplet<double>> tripletListA;
 	std::vector<Eigen::Triplet<double>> tripletListP;
@@ -549,7 +549,7 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 
 		for (int index = b.index_begin; index < b.index_end; index++)
 		{
-			if (is_generalized)
+			if (is_generalized && compute_mean_and_cov_for_bucket)
 			{
 				const auto &p = (*pp)[(*index_pair_internal)[index].index_of_point];
 				int index_pose = p.index_pose;
@@ -611,7 +611,7 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 			const auto &m = (*mposes)[p.index_pose];
 			const auto &minv = (*mposes_inv)[p.index_pose];
 
-			if (is_generalized)
+			if (is_generalized && compute_mean_and_cov_for_bucket)
 			{
 				int index_pose = p.index_pose;
 
@@ -1824,7 +1824,7 @@ void ndt_jobi(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Sp
 #endif
 }
 
-bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance)
+bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance, bool compute_mean_and_cov_for_bucket)
 {
 	auto start = std::chrono::system_clock::now();
 
@@ -2068,7 +2068,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_maha
 				threads.push_back(std::thread(ndt_job, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
 											  &index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization,
 											  number_of_unknowns, &(sumrmss[k]), &(sums[k]),
-											  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points, &(md_out[k]), &(md_count_out[k]), false));
+											  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points, &(md_out[k]), &(md_count_out[k]), false, compute_mean_and_cov_for_bucket));
 			}
 
 			for (size_t j = 0; j < threads.size(); j++)
@@ -2486,6 +2486,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_maha
 
 std::vector<Eigen::SparseMatrix<double>> NDT::compute_covariance_matrices_and_rms(std::vector<PointCloud> &point_clouds, double &rms)
 {
+	
 	OptimizationAlgorithm optimization_algorithm;
 	if (is_gauss_newton)
 	{
@@ -2618,7 +2619,8 @@ std::vector<Eigen::SparseMatrix<double>> NDT::compute_covariance_matrices_and_rm
 		threads.push_back(std::thread(ndt_job, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
 									  &index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization,
 									  number_of_unknowns, &(sumrmss[k]), &(sums[k]),
-									  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points, &(md_out[k]), &(md_count_out[k]), false));
+									  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points, &(md_out[k]),
+									  &(md_count_out[k]), false, false));
 	}
 
 	for (size_t j = 0; j < threads.size(); j++)
@@ -2689,13 +2691,13 @@ std::vector<Eigen::SparseMatrix<double>> NDT::compute_covariance_matrices_and_rm
 	return covariance_matrices;
 }
 
-bool NDT::optimize(std::vector<PointCloud> &point_clouds, double &rms_initial, double &rms_final, double &mui)
+bool NDT::optimize(std::vector<PointCloud> &point_clouds, double &rms_initial, double &rms_final, double &mui, bool compute_mean_and_cov_for_bucket)
 {
 	// double rms;
 	// std::vector<Eigen::SparseMatrix<double>> cm_before = compute_covariance_matrices_and_rms(point_clouds, rms);
 	// rms_initial = rms;
 	//--
-	bool res = optimize(point_clouds, false);
+	bool res = optimize(point_clouds, false, compute_mean_and_cov_for_bucket);
 	//--
 	// std::vector<Eigen::SparseMatrix<double>> cm_after = compute_covariance_matrices_and_rms(point_clouds, rms);
 	// rms_final = rms;
@@ -2703,7 +2705,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, double &rms_initial, d
 	return res;
 }
 
-bool NDT::optimize_lie_algebra_left_jacobian(std::vector<PointCloud> &point_clouds)
+bool NDT::optimize_lie_algebra_left_jacobian(std::vector<PointCloud> &point_clouds, bool compute_mean_and_cov_for_bucket)
 {
 	is_tait_bryan_angles = false;
 	is_quaternion = false;
@@ -2711,7 +2713,7 @@ bool NDT::optimize_lie_algebra_left_jacobian(std::vector<PointCloud> &point_clou
 	is_lie_algebra_left_jacobian = true;
 	is_lie_algebra_right_jacobian = false;
 
-	bool res = optimize(point_clouds, false);
+	bool res = optimize(point_clouds, false, compute_mean_and_cov_for_bucket);
 
 	is_tait_bryan_angles = true;
 	is_quaternion = false;
@@ -2721,7 +2723,7 @@ bool NDT::optimize_lie_algebra_left_jacobian(std::vector<PointCloud> &point_clou
 	return true;
 }
 
-bool NDT::optimize_lie_algebra_right_jacobian(std::vector<PointCloud> &point_clouds)
+bool NDT::optimize_lie_algebra_right_jacobian(std::vector<PointCloud> &point_clouds, bool compute_mean_and_cov_for_bucket)
 {
 	is_tait_bryan_angles = false;
 	is_quaternion = false;
@@ -2729,7 +2731,7 @@ bool NDT::optimize_lie_algebra_right_jacobian(std::vector<PointCloud> &point_clo
 	is_lie_algebra_left_jacobian = false;
 	is_lie_algebra_right_jacobian = true;
 
-	bool res = optimize(point_clouds, false);
+	bool res = optimize(point_clouds, false, compute_mean_and_cov_for_bucket);
 
 	is_tait_bryan_angles = true;
 	is_quaternion = false;
@@ -2790,7 +2792,7 @@ bool NDT::compute_cov_mean(std::vector<Point3D> &points, std::vector<PointBucket
 									  PoseConvention::wc, RotationMatrixParametrization::tait_bryan_xyz,
 									  number_of_unknowns, &(sumrmss[k]), &(sums[k]),
 									  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle,
-									  num_extended_points, &(md_out[k]), &(md_count_out[k]), true));
+									  num_extended_points, &(md_out[k]), &(md_count_out[k]), true, false));
 	}
 
 	for (size_t j = 0; j < threads.size(); j++)

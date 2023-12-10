@@ -549,7 +549,7 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 
 		for (int index = b.index_begin; index < b.index_end; index++)
 		{
-			/*if (is_generalized)
+			if (is_generalized)
 			{
 				const auto &p = (*pp)[(*index_pair_internal)[index].index_of_point];
 				int index_pose = p.index_pose;
@@ -594,7 +594,7 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 					}
 				}
 			}
-			else*/
+			else
 			{
 				const auto &p = (*pp)[(*index_pair_internal)[index].index_of_point];
 				mean += Eigen::Vector3d(p.x, p.y, p.z);
@@ -608,10 +608,10 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 		for (int index = b.index_begin; index < b.index_end; index++)
 		{
 			const auto &p = (*pp)[(*index_pair_internal)[index].index_of_point];
-			//const auto &m = (*mposes)[p.index_pose];
-			//const auto &minv = (*mposes_inv)[p.index_pose];
+			const auto &m = (*mposes)[p.index_pose];
+			const auto &minv = (*mposes_inv)[p.index_pose];
 
-			/*if (is_generalized)
+			if (is_generalized)
 			{
 				int index_pose = p.index_pose;
 
@@ -670,7 +670,7 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 					}
 				}
 			}
-			else*/
+			else
 			{
 				cov(0, 0) += (mean.x() - p.x) * (mean.x() - p.x);
 				cov(0, 1) += (mean.x() - p.x) * (mean.y() - p.y);

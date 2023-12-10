@@ -2039,7 +2039,7 @@ void ndt_gui()
 
     if (ImGui::Button("Set Zoller+Fröhlich TLS Imager 5016 errors"))
     {
-        ndt.sigma_r = 0.0025;
+        ndt.sigma_r = 0.00025;
         ndt.sigma_polar_angle = 0.004 / 180.0 * M_PI;
         ndt.sigma_azimuthal_angle = 0.004 / 180.0 * M_PI;
     }

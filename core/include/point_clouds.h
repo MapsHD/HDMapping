@@ -21,6 +21,7 @@ public:
 	
 	bool load(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z);
 	bool update_poses_from_RESSO(const std::string& folder_with_point_clouds, const std::string& poses_file_name);
+	bool update_poses_from_RESSO_inverse(const std::string &folder_with_point_clouds, const std::string &poses_file_name);
 	bool update_initial_poses_from_RESSO(const std::string &folder_with_point_clouds, const std::string &poses_file_name);
 	bool load_eth(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z);
 	//std::vector<Eigen::Vector3d> load_points(const std::string& point_clouds_file_name);

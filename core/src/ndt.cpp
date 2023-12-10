@@ -385,7 +385,6 @@ void NDT::build_rgd(std::vector<Point3D> &points, std::vector<NDT::PointBucketIn
 	if (num_threads < 1)
 		num_threads = 1;
 
-
 	std::cout << "points.size(): " << points.size() << std::endl;
 
 	index_pair.resize(points.size());
@@ -517,7 +516,7 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 			 Eigen::SparseMatrix<double> *AtPB, std::vector<NDT::PointBucketIndexPair> *index_pair_internal, std::vector<Point3D> *pp,
 			 std::vector<Eigen::Affine3d> *mposes, std::vector<Eigen::Affine3d> *mposes_inv, size_t trajectory_size,
 			 NDT::PoseConvention pose_convention, NDT::RotationMatrixParametrization rotation_matrix_parametrization, int number_of_unknowns, double *sumssr, int *sums_obs,
-			 bool is_generalized, double sigma_r, double sigma_polar_angle, double sigma_azimuthal_angle, int num_extended_points, double *md_out, double *md_count_out, 
+			 bool is_generalized, double sigma_r, double sigma_polar_angle, double sigma_azimuthal_angle, int num_extended_points, double *md_out, double *md_count_out,
 			 bool compute_only_mean_and_cov)
 {
 	std::vector<Eigen::Triplet<double>> tripletListA;
@@ -544,48 +543,58 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 		cov.setZero();
 
 		int counter = 0;
+
+		const auto &p_ = (*pp)[(*index_pair_internal)[b.index_begin].index_of_point];
+		int index_first_pose = p_.index_pose;
+
 		for (int index = b.index_begin; index < b.index_end; index++)
 		{
-			if (is_generalized)
+			/*if (is_generalized)
 			{
 				const auto &p = (*pp)[(*index_pair_internal)[index].index_of_point];
-				const auto &m = (*mposes)[p.index_pose];
-				const auto &minv = (*mposes_inv)[p.index_pose];
+				int index_pose = p.index_pose;
 
-				Eigen::Vector3d point_local(p.x, p.y, p.z);
-				point_local = minv * point_local;
-
-				double norm = point_local.norm();
-				double r = norm;
-				double polar_angle = acos(point_local.z() / norm);
-				double azimuthal_angle = atan(point_local.y() / point_local.x());
-
-				Eigen::Matrix<double, 3, 3> j;
-				elementary_error_theory_for_terrestrial_laser_scanner_jacobian(j, r, polar_angle, azimuthal_angle);
-
-				Eigen::Matrix<double, 3, 3> cov_r_alpha_theta;
-				cov_r_alpha_theta(0, 0) = sigma_r * sigma_r;
-				cov_r_alpha_theta(0, 1) = 0.0;
-				cov_r_alpha_theta(0, 2) = 0.0;
-
-				cov_r_alpha_theta(1, 0) = 0.0;
-				cov_r_alpha_theta(1, 1) = sigma_polar_angle * sigma_polar_angle;
-				cov_r_alpha_theta(1, 2) = 0.0;
-
-				cov_r_alpha_theta(2, 0) = 0.0;
-				cov_r_alpha_theta(2, 1) = 0.0;
-				cov_r_alpha_theta(2, 2) = sigma_azimuthal_angle * sigma_azimuthal_angle;
-
-				Eigen::Matrix<double, 3, 3> cov_xyz = j * cov_r_alpha_theta * j.transpose();
-				std::vector<Eigen::Vector3d> points = get_points_normal_distribution(cov_xyz, point_local, num_extended_points);
-
-				for (const auto &ppl : points)
+				if (index_pose == index_first_pose)
 				{
-					mean += m * ppl;
-					counter++;
+
+					const auto &m = (*mposes)[p.index_pose];
+					const auto &minv = (*mposes_inv)[p.index_pose];
+
+					Eigen::Vector3d point_local(p.x, p.y, p.z);
+					point_local = minv * point_local;
+
+					double norm = point_local.norm();
+					double r = norm;
+					double polar_angle = acos(point_local.z() / norm);
+					double azimuthal_angle = atan(point_local.y() / point_local.x());
+
+					Eigen::Matrix<double, 3, 3> j;
+					elementary_error_theory_for_terrestrial_laser_scanner_jacobian(j, r, polar_angle, azimuthal_angle);
+
+					Eigen::Matrix<double, 3, 3> cov_r_alpha_theta;
+					cov_r_alpha_theta(0, 0) = sigma_r * sigma_r;
+					cov_r_alpha_theta(0, 1) = 0.0;
+					cov_r_alpha_theta(0, 2) = 0.0;
+
+					cov_r_alpha_theta(1, 0) = 0.0;
+					cov_r_alpha_theta(1, 1) = sigma_polar_angle * sigma_polar_angle;
+					cov_r_alpha_theta(1, 2) = 0.0;
+
+					cov_r_alpha_theta(2, 0) = 0.0;
+					cov_r_alpha_theta(2, 1) = 0.0;
+					cov_r_alpha_theta(2, 2) = sigma_azimuthal_angle * sigma_azimuthal_angle;
+
+					Eigen::Matrix<double, 3, 3> cov_xyz = j * cov_r_alpha_theta * j.transpose();
+					std::vector<Eigen::Vector3d> points = get_points_normal_distribution(cov_xyz, point_local, num_extended_points);
+
+					for (const auto &ppl : points)
+					{
+						mean += m * ppl;
+						counter++;
+					}
 				}
 			}
-			else
+			else*/
 			{
 				const auto &p = (*pp)[(*index_pair_internal)[index].index_of_point];
 				mean += Eigen::Vector3d(p.x, p.y, p.z);
@@ -599,55 +608,69 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 		for (int index = b.index_begin; index < b.index_end; index++)
 		{
 			const auto &p = (*pp)[(*index_pair_internal)[index].index_of_point];
-			const auto &m = (*mposes)[p.index_pose];
-			const auto &minv = (*mposes_inv)[p.index_pose];
+			//const auto &m = (*mposes)[p.index_pose];
+			//const auto &minv = (*mposes_inv)[p.index_pose];
 
-			if (is_generalized)
+			/*if (is_generalized)
 			{
-				Eigen::Vector3d point_local(p.x, p.y, p.z);
-				point_local = minv * point_local;
+				int index_pose = p.index_pose;
 
-				double norm = point_local.norm();
-				double r = norm;
-				double polar_angle = acos(point_local.z() / norm);
-				double azimuthal_angle = atan(point_local.y() / point_local.x());
-
-				Eigen::Matrix<double, 3, 3> j;
-				elementary_error_theory_for_terrestrial_laser_scanner_jacobian(j, r, polar_angle, azimuthal_angle);
-
-				Eigen::Matrix<double, 3, 3> cov_r_alpha_theta;
-				cov_r_alpha_theta(0, 0) = sigma_r * sigma_r;
-				cov_r_alpha_theta(0, 1) = 0.0;
-				cov_r_alpha_theta(0, 2) = 0.0;
-
-				cov_r_alpha_theta(1, 0) = 0.0;
-				cov_r_alpha_theta(1, 1) = sigma_polar_angle * sigma_polar_angle;
-				cov_r_alpha_theta(1, 2) = 0.0;
-
-				cov_r_alpha_theta(2, 0) = 0.0;
-				cov_r_alpha_theta(2, 1) = 0.0;
-				cov_r_alpha_theta(2, 2) = sigma_azimuthal_angle * sigma_azimuthal_angle;
-
-				Eigen::Matrix<double, 3, 3> cov_xyz = j * cov_r_alpha_theta * j.transpose();
-				std::vector<Eigen::Vector3d> points = get_points_normal_distribution(cov_xyz, point_local, num_extended_points);
-
-				for (const auto &pp : points)
+				if (index_pose == index_first_pose)
 				{
-					auto ppg = m * pp;
 
-					cov(0, 0) += (mean.x() - ppg.x()) * (mean.x() - ppg.x());
-					cov(0, 1) += (mean.x() - ppg.x()) * (mean.y() - ppg.y());
-					cov(0, 2) += (mean.x() - ppg.x()) * (mean.z() - ppg.z());
-					cov(1, 0) += (mean.y() - ppg.y()) * (mean.x() - ppg.x());
-					cov(1, 1) += (mean.y() - ppg.y()) * (mean.y() - ppg.y());
-					cov(1, 2) += (mean.y() - ppg.y()) * (mean.z() - ppg.z());
-					cov(2, 0) += (mean.z() - ppg.z()) * (mean.x() - ppg.x());
-					cov(2, 1) += (mean.z() - ppg.z()) * (mean.y() - ppg.y());
-					cov(2, 2) += (mean.z() - ppg.z()) * (mean.z() - ppg.z());
-					counter++;
+					Eigen::Vector3d point_local(p.x, p.y, p.z);
+					point_local = minv * point_local;
+
+					double norm = point_local.norm();
+					double r = norm;
+					double polar_angle = acos(point_local.z() / norm);
+					double azimuthal_angle = atan(point_local.y() / point_local.x());
+
+					Eigen::Matrix<double, 3, 3> j;
+					elementary_error_theory_for_terrestrial_laser_scanner_jacobian(j, r, polar_angle, azimuthal_angle);
+
+					Eigen::Matrix<double, 3, 3> cov_r_alpha_theta;
+					cov_r_alpha_theta(0, 0) = sigma_r * sigma_r;
+					cov_r_alpha_theta(0, 1) = 0.0;
+					cov_r_alpha_theta(0, 2) = 0.0;
+
+					cov_r_alpha_theta(1, 0) = 0.0;
+					cov_r_alpha_theta(1, 1) = sigma_polar_angle * sigma_polar_angle;
+					cov_r_alpha_theta(1, 2) = 0.0;
+
+					cov_r_alpha_theta(2, 0) = 0.0;
+					cov_r_alpha_theta(2, 1) = 0.0;
+					cov_r_alpha_theta(2, 2) = sigma_azimuthal_angle * sigma_azimuthal_angle;
+
+					Eigen::Matrix<double, 3, 3> cov_xyz = j * cov_r_alpha_theta * j.transpose();
+					std::vector<Eigen::Vector3d> points = get_points_normal_distribution(cov_xyz, point_local, num_extended_points);
+
+
+					//for (const auto &ppp : points)
+					//{
+					//	std::cout << "---" << std::endl;
+					//	std::cout << ppp << std::endl;
+					//}
+					//exit(1);
+
+					for (const auto &pp : points)
+					{
+						auto ppg = m * pp;
+
+						cov(0, 0) += (mean.x() - ppg.x()) * (mean.x() - ppg.x());
+						cov(0, 1) += (mean.x() - ppg.x()) * (mean.y() - ppg.y());
+						cov(0, 2) += (mean.x() - ppg.x()) * (mean.z() - ppg.z());
+						cov(1, 0) += (mean.y() - ppg.y()) * (mean.x() - ppg.x());
+						cov(1, 1) += (mean.y() - ppg.y()) * (mean.y() - ppg.y());
+						cov(1, 2) += (mean.y() - ppg.y()) * (mean.z() - ppg.z());
+						cov(2, 0) += (mean.z() - ppg.z()) * (mean.x() - ppg.x());
+						cov(2, 1) += (mean.z() - ppg.z()) * (mean.y() - ppg.y());
+						cov(2, 2) += (mean.z() - ppg.z()) * (mean.z() - ppg.z());
+						counter++;
+					}
 				}
 			}
-			else
+			else*/
 			{
 				cov(0, 0) += (mean.x() - p.x) * (mean.x() - p.x);
 				cov(0, 1) += (mean.x() - p.x) * (mean.y() - p.y);
@@ -661,12 +684,60 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 				counter++;
 			}
 		}
+
+		if (counter < 5)
+		{
+			continue;
+		}
+
+		if (is_generalized)
+		{
+			Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(cov, Eigen::ComputeEigenvectors);
+			// Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
+			Eigen::Vector3d eigen_values = eigen_solver.eigenvalues();
+
+			double min_eigen_value = eigen_values.x();
+			if (eigen_values.y() < min_eigen_value)
+			{
+				min_eigen_value = eigen_values.y();
+			}
+
+			if (eigen_values.z() < min_eigen_value)
+			{
+				min_eigen_value = eigen_values.z();
+			}
+
+			if (min_eigen_value > 3 * sigma_r)
+			{
+				continue;
+			} // else{
+			  // std::cout << min_eigen_value << " ";
+			  //}
+			  // std::cout << min_eigen_value << " ";
+
+			Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
+			Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
+			nv.normalize();
+
+			const auto &p = (*pp)[(*index_pair_internal)[b.index_begin].index_of_point];
+			const auto &m = (*mposes)[p.index_pose];
+
+			//  flip towards viewport
+			if (nv.dot(m.translation() - mean) < 0.0)
+			{
+				nv *= -1.0;
+			}
+			//this_bucket.normal_vector = nv;
+			(*buckets)[ii].normal_vector = nv;
+		}
+
 		cov /= counter;
 
 		(*buckets)[ii].mean = mean;
 		(*buckets)[ii].cov = cov;
 
-		if(compute_only_mean_and_cov){
+		if (compute_only_mean_and_cov)
+		{
 			continue;
 		}
 
@@ -693,7 +764,7 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 		if (!(infm(2, 2) == infm(2, 2)))
 			continue;
 
-		double threshold = 10000.0;
+		double threshold = 1000000.0;
 
 		if (infm(0, 0) > threshold)
 			continue;
@@ -742,6 +813,11 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 				const auto &p = (*pp)[(*index_pair_internal)[index].index_of_point];
 				const auto &m = (*mposes)[p.index_pose];
 				const auto &minv = (*mposes_inv)[p.index_pose];
+
+				if ((*buckets)[ii].normal_vector.dot(m.translation() - (*buckets)[ii].mean) < 0.0)
+				{
+					continue;
+				}
 
 				Eigen::Vector3d point_local(p.x, p.y, p.z);
 				point_local = minv * point_local;
@@ -1126,11 +1202,11 @@ void ndt_job(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Spa
 }
 
 void ndt_jobi(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::SparseMatrix<double> *AtPA,
-			 Eigen::SparseMatrix<double> *AtPB, std::vector<NDT::PointBucketIndexPair> *index_pair_internal, std::vector<Point3Di> *pp,
-			 std::vector<Eigen::Affine3d> *mposes, std::vector<Eigen::Affine3d> *mposes_inv, size_t trajectory_size,
-			 NDT::PoseConvention pose_convention, NDT::RotationMatrixParametrization rotation_matrix_parametrization, int number_of_unknowns, double *sumssr, int *sums_obs,
-			 bool is_generalized, double sigma_r, double sigma_polar_angle, double sigma_azimuthal_angle, int num_extended_points, double *md_out, double *md_count_out, 
-			 bool compute_only_mean_and_cov)
+			  Eigen::SparseMatrix<double> *AtPB, std::vector<NDT::PointBucketIndexPair> *index_pair_internal, std::vector<Point3Di> *pp,
+			  std::vector<Eigen::Affine3d> *mposes, std::vector<Eigen::Affine3d> *mposes_inv, size_t trajectory_size,
+			  NDT::PoseConvention pose_convention, NDT::RotationMatrixParametrization rotation_matrix_parametrization, int number_of_unknowns, double *sumssr, int *sums_obs,
+			  bool is_generalized, double sigma_r, double sigma_polar_angle, double sigma_azimuthal_angle, int num_extended_points, double *md_out, double *md_count_out,
+			  bool compute_only_mean_and_cov)
 {
 	std::vector<Eigen::Triplet<double>> tripletListA;
 	std::vector<Eigen::Triplet<double>> tripletListP;
@@ -1147,9 +1223,10 @@ void ndt_jobi(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Sp
 
 	for (size_t ii = job->index_begin_inclusive; ii < job->index_end_exclusive; ii++)
 	{
-		//std::cout << ii << " ";
+		// std::cout << ii << " ";
 		NDT::Bucket &b = (*buckets)[ii];
-		if (b.number_of_points < 5){
+		if (b.number_of_points < 5)
+		{
 			continue;
 		}
 
@@ -1166,7 +1243,7 @@ void ndt_jobi(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Sp
 				const auto &m = (*mposes)[p.index_pose];
 				const auto &minv = (*mposes_inv)[p.index_pose];
 
-				//Eigen::Vector3d point_local(p.x, p.y, p.z);
+				// Eigen::Vector3d point_local(p.x, p.y, p.z);
 				Eigen::Vector3d point_local = p.point;
 				point_local = minv * point_local;
 
@@ -1203,9 +1280,9 @@ void ndt_jobi(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Sp
 			else
 			{
 				const auto &p = (*pp)[(*index_pair_internal)[index].index_of_point];
-				mean += p.point;//::Vector3d(p.x, p.y, p.z);
+				mean += p.point; //::Vector3d(p.x, p.y, p.z);
 				counter++;
-				//std::cout << counter << " ";
+				// std::cout << counter << " ";
 			}
 		}
 
@@ -1220,7 +1297,7 @@ void ndt_jobi(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Sp
 
 			if (is_generalized)
 			{
-				Eigen::Vector3d point_local = p.point;//(p.x, p.y, p.z);
+				Eigen::Vector3d point_local = p.point; //(p.x, p.y, p.z);
 				point_local = minv * point_local;
 
 				double norm = point_local.norm();
@@ -1282,7 +1359,7 @@ void ndt_jobi(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Sp
 		(*buckets)[ii].mean = mean;
 		(*buckets)[ii].cov = cov;
 
-		//std::cout << mean << " ";
+		// std::cout << mean << " ";
 #if 0
 		if(compute_only_mean_and_cov){
 			continue;
@@ -1694,10 +1771,10 @@ void ndt_jobi(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Sp
 				tripletListB.clear();
 			}
 		}
-		#endif
+#endif
 	}
 
-	#if 0
+#if 0
 	(*sumssr) = ssr;
 	(*sums_obs) = sum_obs;
 	(*md_out) = md;
@@ -1744,7 +1821,7 @@ void ndt_jobi(int i, NDT::Job *job, std::vector<NDT::Bucket> *buckets, Eigen::Sp
 		(*AtPA) = AtPAt_tmp;
 		(*AtPB) = AtPBt_tmp;
 	}
-	#endif
+#endif
 }
 
 bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance)
@@ -1925,10 +2002,12 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_maha
 
 		for (int bi = 0; bi < buckets_external.size(); bi++)
 		{
-			if(compute_only_mahalanobis_distance){
+			if (compute_only_mahalanobis_distance)
+			{
 				std::cout << "bucket [" << bi + 1 << "] of " << buckets_external.size() << std::endl;
-			
-			}else{
+			}
+			else
+			{
 				std::cout << "bucket [" << bi + 1 << "] of " << buckets_external.size() << " | iteration [" << iter + 1 << "] of " << number_of_iterations << " | number of points: " << buckets_external[bi].number_of_points << std::endl;
 			}
 			std::vector<Point3D> points_global;
@@ -2400,7 +2479,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_maha
 	auto elapsed =
 		std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-	std::cout << "ndt execution time [ms]: " << elapsed.count()  << std::endl;
+	std::cout << "ndt execution time [ms]: " << elapsed.count() << std::endl;
 
 	return true;
 }
@@ -2537,7 +2616,7 @@ std::vector<Eigen::SparseMatrix<double>> NDT::compute_covariance_matrices_and_rm
 	for (size_t k = 0; k < jobs.size(); k++)
 	{
 		threads.push_back(std::thread(ndt_job, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
-									  &index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization, 
+									  &index_pair, &points_global, &mposes, &mposes_inv, point_clouds.size(), pose_convention, rotation_matrix_parametrization,
 									  number_of_unknowns, &(sumrmss[k]), &(sums[k]),
 									  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, num_extended_points, &(md_out[k]), &(md_count_out[k]), false));
 	}
@@ -2661,7 +2740,7 @@ bool NDT::optimize_lie_algebra_right_jacobian(std::vector<PointCloud> &point_clo
 }
 
 bool NDT::compute_cov_mean(std::vector<Point3D> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
-		double min_x, double max_x, double min_y, double max_y, double min_z, double max_z, int num_threads)
+						   double min_x, double max_x, double min_y, double max_y, double min_z, double max_z, int num_threads)
 {
 	int number_of_unknowns = 6;
 
@@ -2697,21 +2776,21 @@ bool NDT::compute_cov_mean(std::vector<Point3D> &points, std::vector<PointBucket
 	mposes.push_back(Eigen::Affine3d::Identity());
 	mposes_inv.push_back(Eigen::Affine3d::Identity());
 
-	//for (size_t i = 0; i < points.size(); i++)
+	// for (size_t i = 0; i < points.size(); i++)
 	//{
 	//	mposes.push_back(points[i].m_pose);
 	//	mposes_inv.push_back(points[i].m_pose.inverse());
-	//}
+	// }
 
 	std::cout << "computing cov mean start" << std::endl;
 	for (size_t k = 0; k < jobs.size(); k++)
 	{
 		threads.push_back(std::thread(ndt_job, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
-										&index_pair, &points, &mposes, &mposes_inv, points.size(), 
-										PoseConvention::wc, RotationMatrixParametrization::tait_bryan_xyz,
-										number_of_unknowns, &(sumrmss[k]), &(sums[k]),
-										is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, 
-										num_extended_points, &(md_out[k]), &(md_count_out[k]), true));
+									  &index_pair, &points, &mposes, &mposes_inv, points.size(),
+									  PoseConvention::wc, RotationMatrixParametrization::tait_bryan_xyz,
+									  number_of_unknowns, &(sumrmss[k]), &(sums[k]),
+									  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle,
+									  num_extended_points, &(md_out[k]), &(md_count_out[k]), true));
 	}
 
 	for (size_t j = 0; j < threads.size(); j++)
@@ -2720,48 +2799,51 @@ bool NDT::compute_cov_mean(std::vector<Point3D> &points, std::vector<PointBucket
 	}
 	std::cout << "computing cov mean finished" << std::endl;
 
-	//for(int i = 0; i < buckets.size(); i++){
+	// for(int i = 0; i < buckets.size(); i++){
 	//	if(buckets[i].number_of_points > 5){
 	//		std::cout << i << " " << buckets[i].cov << std::endl;
 	//	}
-	//}
+	// }
 	buckets[0].number_of_points = 0;
-	for(auto &b:buckets){
-		if(b.number_of_points < 5){
+	for (auto &b : buckets)
+	{
+		if (b.number_of_points < 5)
+		{
 			b.number_of_points = 0;
 		}
 	}
 	return true;
 }
 
-bool NDT::compute_cov_mean(std::vector<Point3Di> &points, 
-		std::vector<PointBucketIndexPair> &index_pair, 
-		std::vector<Bucket> &buckets, GridParameters &rgd_params,
-		int num_threads)
+bool NDT::compute_cov_mean(std::vector<Point3Di> &points,
+						   std::vector<PointBucketIndexPair> &index_pair,
+						   std::vector<Bucket> &buckets, GridParameters &rgd_params,
+						   int num_threads)
 {
 	int number_of_unknowns = 6;
 
-	std::cout << "grid_calculate_params start" << std::endl;	
+	std::cout << "grid_calculate_params start" << std::endl;
 	grid_calculate_params(points, rgd_params);
-	//for(auto &p:points){
+	// for(auto &p:points){
 	//	std::cout << p.point;
-	//}
-	std::cout << "grid_calculate_params finished" << std::endl;	
+	// }
+	std::cout << "grid_calculate_params finished" << std::endl;
 
-	//grid_calculate_params(rgd_params, min_x, max_x, min_y, max_y, min_z, max_z);
-	std::cout << "build_rgd start" << std::endl;	
+	// grid_calculate_params(rgd_params, min_x, max_x, min_y, max_y, min_z, max_z);
+	std::cout << "build_rgd start" << std::endl;
 	build_rgd(points, index_pair, buckets, rgd_params);
 	std::cout << "build_rgd finished" << std::endl;
 
 	std::cout << "check" << std::endl;
-	int counter_active_buckets = 0; 
-	for(int i = 0; i < buckets.size(); i++){
-		if(buckets[i].number_of_points > 5){
-			counter_active_buckets ++;
+	int counter_active_buckets = 0;
+	for (int i = 0; i < buckets.size(); i++)
+	{
+		if (buckets[i].number_of_points > 5)
+		{
+			counter_active_buckets++;
 		}
 	}
 	std::cout << "check: counter_active_buckets: " << counter_active_buckets << std::endl;
-
 
 	std::cout << "buckets.size() " << buckets.size() << std::endl;
 
@@ -2793,21 +2875,21 @@ bool NDT::compute_cov_mean(std::vector<Point3Di> &points,
 	mposes.push_back(Eigen::Affine3d::Identity());
 	mposes_inv.push_back(Eigen::Affine3d::Identity());
 
-	//for (size_t i = 0; i < points.size(); i++)
+	// for (size_t i = 0; i < points.size(); i++)
 	//{
 	//	mposes.push_back(points[i].m_pose);
 	//	mposes_inv.push_back(points[i].m_pose.inverse());
-	//}
+	// }
 
 	std::cout << "computing cov mean ndt_jobi start" << std::endl;
 	for (size_t k = 0; k < jobs.size(); k++)
 	{
 		threads.push_back(std::thread(ndt_jobi, k, &jobs[k], &buckets, &(AtPAtmp[k]), &(AtPBtmp[k]),
-										&index_pair, &points, &mposes, &mposes_inv, points.size(), 
-										PoseConvention::wc, RotationMatrixParametrization::tait_bryan_xyz,
-										number_of_unknowns, &(sumrmss[k]), &(sums[k]),
-										is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle, 
-										num_extended_points, &(md_out[k]), &(md_count_out[k]), true));
+									  &index_pair, &points, &mposes, &mposes_inv, points.size(),
+									  PoseConvention::wc, RotationMatrixParametrization::tait_bryan_xyz,
+									  number_of_unknowns, &(sumrmss[k]), &(sums[k]),
+									  is_generalized, sigma_r, sigma_polar_angle, sigma_azimuthal_angle,
+									  num_extended_points, &(md_out[k]), &(md_count_out[k]), true));
 	}
 
 	for (size_t j = 0; j < threads.size(); j++)
@@ -2816,31 +2898,35 @@ bool NDT::compute_cov_mean(std::vector<Point3Di> &points,
 	}
 	std::cout << "computing cov mean ndt_jobi finished" << std::endl;
 
-	//for(int i = 0; i < buckets.size(); i++){
+	// for(int i = 0; i < buckets.size(); i++){
 	//	if(buckets[i].number_of_points > 5){
 	//		std::cout << i << " " << buckets[i].cov << std::endl;
 	//	}
-	//}
+	// }
 	buckets[0].number_of_points = 0;
 
-	//int counter_active_buckets = 0;
-	for(auto &b:buckets){
-		if(b.number_of_points < 5){
+	// int counter_active_buckets = 0;
+	for (auto &b : buckets)
+	{
+		if (b.number_of_points < 5)
+		{
 			b.number_of_points = 0;
-		}else{
-			//counter_active_buckets ++;
+		}
+		else
+		{
+			// counter_active_buckets ++;
 		}
 	}
-	//std::cout << "counter_active_buckets: " << counter_active_buckets << std::endl;
+	// std::cout << "counter_active_buckets: " << counter_active_buckets << std::endl;
 	return true;
 }
 
-bool NDT::compute_cov_mean(std::vector<Point3Di> &points, 
-		std::vector<PointBucketIndexPair> &index_pair, 
-		std::map<unsigned long long int, NDT::Bucket> &buckets, GridParameters &rgd_params,
-		int num_threads)
+bool NDT::compute_cov_mean(std::vector<Point3Di> &points,
+						   std::vector<PointBucketIndexPair> &index_pair,
+						   std::map<unsigned long long int, NDT::Bucket> &buckets, GridParameters &rgd_params,
+						   int num_threads)
 {
-	#if 0
+#if 0
 	int number_of_unknowns = 6;
 
 	std::cout << "grid_calculate_params start" << std::endl;	
@@ -2947,7 +3033,7 @@ bool NDT::compute_cov_mean(std::vector<Point3Di> &points,
 	}
 
 	//std::cout << "counter_active_buckets: " << counter_active_buckets << std::endl;
-	#endif
+#endif
 	return true;
 }
 
@@ -2961,54 +3047,54 @@ void NDT::build_rgd(std::vector<Point3Di> &points, std::vector<NDT::PointBucketI
 	reindex(points, index_pair, rgd_params, num_threads);
 	std::cout << "reindex finished" << std::endl;
 
-	//buckets.resize(rgd_params.number_of_buckets);
+	// buckets.resize(rgd_params.number_of_buckets);
 
-	//std::vector<NDT::Job> jobs = get_jobs(buckets.size(), num_threads);
-	//std::vector<std::thread> threads;
+	// std::vector<NDT::Job> jobs = get_jobs(buckets.size(), num_threads);
+	// std::vector<std::thread> threads;
 
-	//std::cout << "build_rgd_init_jobs start" << std::endl;
-	//for (size_t i = 0; i < jobs.size(); i++)
+	// std::cout << "build_rgd_init_jobs start" << std::endl;
+	// for (size_t i = 0; i < jobs.size(); i++)
 	//{
 	//	threads.push_back(std::thread(build_rgd_init_job, i, &jobs[i], &buckets));
-	//}
+	// }
 
-	//for (size_t j = 0; j < threads.size(); j++)
+	// for (size_t j = 0; j < threads.size(); j++)
 	//{
 	//	threads[j].join();
-	//}
-	//threads.clear();
-	//std::cout << "build_rgd_init_jobs finished" << std::endl;
+	// }
+	// threads.clear();
+	// std::cout << "build_rgd_init_jobs finished" << std::endl;
 
-	//jobs = get_jobs(points.size(), num_threads);
+	// jobs = get_jobs(points.size(), num_threads);
 
-	//std::cout << "build_rgd_jobs start jobs.size():" << jobs.size() << std::endl;
-	//std::cout << "points.size() " << points.size() << std::endl;
-	//std::cout << "index_pair.size() " << index_pair.size() << std::endl;
-	//std::cout << "buckets.size() " << buckets.size() << std::endl;
+	// std::cout << "build_rgd_jobs start jobs.size():" << jobs.size() << std::endl;
+	// std::cout << "points.size() " << points.size() << std::endl;
+	// std::cout << "index_pair.size() " << index_pair.size() << std::endl;
+	// std::cout << "buckets.size() " << buckets.size() << std::endl;
 
-	//for (size_t i = 0; i < jobs.size(); i++)
+	// for (size_t i = 0; i < jobs.size(); i++)
 	//{
 	//	threads.push_back(std::thread(build_rgd_job, i, &jobs[i], &index_pair, &buckets));
-	//}
-	//for (size_t j = 0; j < threads.size(); j++)
+	// }
+	// for (size_t j = 0; j < threads.size(); j++)
 	//{
 	//	threads[j].join();
-	//}
-	//threads.clear();
-	//std::cout << "build_rgd_jobs finished" << std::endl;
+	// }
+	// threads.clear();
+	// std::cout << "build_rgd_jobs finished" << std::endl;
 
-	//jobs = get_jobs(buckets.size(), num_threads);
+	// jobs = get_jobs(buckets.size(), num_threads);
 
-	//std::cout << "build_rgd_final_jobs start" << std::endl;
-	//for (size_t i = 0; i < jobs.size(); i++)
+	// std::cout << "build_rgd_final_jobs start" << std::endl;
+	// for (size_t i = 0; i < jobs.size(); i++)
 	//{
 	//	threads.push_back(std::thread(build_rgd_final_job, i, &jobs[i], &buckets));
-	//}
+	// }
 
-	//for (size_t j = 0; j < threads.size(); j++)
+	// for (size_t j = 0; j < threads.size(); j++)
 	//{
 	//	threads[j].join();
-	//}
-	//threads.clear();
-	//std::cout << "build_rgd_final_jobs finished" << std::endl;
+	// }
+	// threads.clear();
+	// std::cout << "build_rgd_final_jobs finished" << std::endl;
 }

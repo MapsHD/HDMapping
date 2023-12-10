@@ -370,7 +370,7 @@ void project_gui()
     ImGui::Checkbox("simple_gui", &simple_gui);
     const std::vector<std::string> Session_filter = {"Session, json", "*.json"};
     const std::vector<std::string> Resso_filter = {"Resso, reg", "*.reg"};
-    const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.las)", "*.las", "LASzip file (*.laz)", "*.laz", "All files", "*" };
+    const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*" };
 
     if (!session_loaded)
     {
@@ -786,8 +786,45 @@ void project_gui()
             }
         }
         ImGui::SameLine();
+
+        if (ImGui::Button("update poses from RESSO file (inverse)"))
+        {
+            static std::shared_ptr<pfd::open_file> open_file;
+            std::string input_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+            const auto t = [&]()
+            {
+                auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
+                for (int i = 0; i < sel.size(); i++)
+                {
+                    input_file_name = sel[i];
+                    std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
+                }
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (input_file_name.size() > 0)
+            {
+                session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                if (!session.point_clouds_container.update_poses_from_RESSO_inverse(session.working_directory.c_str(), input_file_name.c_str()))
+                {
+                    std::cout << "check input files" << std::endl;
+                    return;
+                }
+                else
+                {
+                    std::cout << "updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                    session.point_clouds_container.poses_file_name = input_file_name;
+                }
+            }
+        }
+        ImGui::SameLine();
         ImGui::Text(session.point_clouds_container.poses_file_name.c_str());
     }
+
+    
 
     if (ImGui::Button("generate random colors"))
     {
@@ -1976,7 +2013,7 @@ void ndt_gui()
 
     ImGui::Text("--------------------------------------------------------------------------------------------------------");
 
-    ImGui::Checkbox("generelized", &ndt.is_generalized);
+    ImGui::Checkbox("generalized", &ndt.is_generalized);
 
     if (ndt.is_generalized)
     {
@@ -1992,11 +2029,19 @@ void ndt_gui()
         ndt.sigma_polar_angle = 0.007 / 180.0 * M_PI;
         ndt.sigma_azimuthal_angle = 0.007 / 180.0 * M_PI;
     }
+
     if (ImGui::Button("Set Zoller+Fröhlich TLS Imager 5010C errors"))
     {
         ndt.sigma_r = 0.01;
         ndt.sigma_polar_angle = 0.007 / 180.0 * M_PI;
         ndt.sigma_azimuthal_angle = 0.007 / 180.0 * M_PI;
+    }
+
+    if (ImGui::Button("Set Zoller+Fröhlich TLS Imager 5016 errors"))
+    {
+        ndt.sigma_r = 0.0025;
+        ndt.sigma_polar_angle = 0.004 / 180.0 * M_PI;
+        ndt.sigma_azimuthal_angle = 0.004 / 180.0 * M_PI;
     }
     if (ImGui::Button("Set Faro Focus3D errors"))
     {

@@ -4,7 +4,8 @@
 namespace fs = std::filesystem;
 
 std::string pathUpdater(std::string path, std::string newPath)
-{    
+{   
+    std::replace(path.begin(), path.end(), '/', '\\');
     if (std::string::npos == path.find('.'))
     {
         return newPath;

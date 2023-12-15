@@ -23,6 +23,7 @@ class Session
     bool is_gizmo = false;
     float render_color[3];
     std::string session_file_name = "";
+    bool is_ground_truth = 0;
 };
 
 #endif

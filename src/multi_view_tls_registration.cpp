@@ -368,7 +368,11 @@ void project_gui()
     ImGui::Text("LAZ files are the product of MANDEYE process. Open it with Cloud Compare.");
 
     ImGui::Checkbox("simple_gui", &simple_gui);
-    const std::vector<std::string> Session_filter = {"Session, json", "*.json"};
+    ImGui::SameLine();
+    ImGui::Checkbox("is ground truth", &session.is_ground_truth);
+
+    const std::vector<std::string>
+        Session_filter = {"Session, json", "*.json"};
     const std::vector<std::string> Resso_filter = {"Resso, reg", "*.reg"};
     const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*" };
 
@@ -1163,6 +1167,10 @@ void project_gui()
             ImGui::Separator();
             ImGui::Separator();
         }
+        //gnss.offset_x, gnss.offset_y, gnss.offset_alt
+        ImGui::InputDouble("offset_x", &gnss.offset_x);
+        ImGui::InputDouble("offset_y", &gnss.offset_y);
+        ImGui::InputDouble("offset_z", &gnss.offset_alt);
 
         if (ImGui::Button("save all marked scans to laz (as one global scan)"))
         {

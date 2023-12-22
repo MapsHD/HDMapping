@@ -873,8 +873,6 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 
 bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
 {
-	this->offset = Eigen::Vector3d(0, 0, 0);
-
 	const auto start = std::chrono::system_clock::now();
 	std::vector<PointCloud> point_clouds_nodata;
 	for (size_t i = 0; i < input_file_names.size(); i++)

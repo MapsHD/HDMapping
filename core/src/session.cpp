@@ -24,9 +24,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         << "loading file: '" << file_name << "'" << std::endl;
     // point_clouds_container.point_clouds.clear();
 
-    double offset_x;
-    double offset_y;
-    double offset_z;
+    
     std::string folder_name;
     std::string out_folder_name;
     std::string poses_file_name;
@@ -53,14 +51,19 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         fs.close();
 
         auto project_settings_json = data["Session Settings"];
-        offset_x = project_settings_json["offset_x"];
-        offset_y = project_settings_json["offset_y"];
-        offset_z = project_settings_json["offset_z"];
+        point_clouds_container.offset.x() = project_settings_json["offset_x"];
+        point_clouds_container.offset.y() = project_settings_json["offset_y"];
+        point_clouds_container.offset.z() = project_settings_json["offset_z"];
         folder_name = pathUpdater(project_settings_json["folder_name"], directory);
         out_folder_name = pathUpdater(project_settings_json["out_folder_name"], directory);
         poses_file_name = pathUpdater(project_settings_json["poses_file_name"], directory);
         initial_poses_file_name = pathUpdater(project_settings_json["initial_poses_file_name"], directory);
         out_poses_file_name = pathUpdater(project_settings_json["out_poses_file_name"], directory);
+        if (project_settings_json.contains("ground_truth")){
+            is_ground_truth = project_settings_json["ground_truth"];
+        }else{
+            is_ground_truth = false;
+        }
 
         for (const auto &edge_json : data["loop_closure_edges"])
         {
@@ -95,9 +98,9 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         }
 
         std::cout << "loaded from json: " << file_name << std::endl;
-        std::cout << "offset_x: " << offset_x << std::endl;
-        std::cout << "offset_y: " << offset_y << std::endl;
-        std::cout << "offset_z: " << offset_z << std::endl;
+        std::cout << "offset_x: " << point_clouds_container.offset.x() << std::endl;
+        std::cout << "offset_y: " << point_clouds_container.offset.y() << std::endl;
+        std::cout << "offset_z: " << point_clouds_container.offset.z() << std::endl;
         std::cout << "folder_name: '" << folder_name << "'" << std::endl;
         std::cout << "out_folder_name: '" << out_folder_name << "'" << std::endl;
         std::cout << "poses_file_name: '" << poses_file_name << "'" << std::endl;
@@ -211,7 +214,7 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
     j["poses_file_name"] = poses_file_name;                 // point_clouds_container.poses_file_name;
     j["initial_poses_file_name"] = initial_poses_file_name; // point_clouds_container.initial_poses_file_name;
     j["out_poses_file_name"] = point_clouds_container.out_poses_file_name;
-
+    j["ground_truth"] = is_ground_truth;
     jj["Session Settings"] = j;
 
     nlohmann::json jloop_closure_edges;

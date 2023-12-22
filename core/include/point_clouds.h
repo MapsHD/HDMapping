@@ -12,7 +12,7 @@ public:
 	PointClouds() { ; };
 	~PointClouds() { ; };
 
-	Eigen::Vector3d offset;
+	Eigen::Vector3d offset = Eigen::Vector3d(0, 0, 0);
 	std::string folder_name;
 	std::string out_folder_name;
 	std::string poses_file_name;

@@ -40,6 +40,8 @@
 
 namespace fs = std::filesystem;
 
+std::vector<bool> checkboxes;
+
 static bool show_demo_window = true;
 static bool show_another_window = false;
 static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -958,9 +960,8 @@ void project_gui()
             {
                 index_end = session.point_clouds_container.point_clouds.size() - 1;
             }
-            if (idx_begin != index_begin || idx_end != index_end)
+            if (ImGui::Button("Show selected"))
             {
-                session.point_clouds_container.hide_all();
                 session.point_clouds_container.show_all_from_range(index_begin, index_end);
             }
             // if (ImGui::Button("mark all pcs from range <index_begin, index_end>"))

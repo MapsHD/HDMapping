@@ -550,7 +550,7 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_step_1 v0.28"))
+    if (ImGui::Begin("lidar_odometry_step_1 v0.29"))
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
@@ -624,10 +624,10 @@ void lidar_odometry_gui()
         }
         if (!step_1_done)
         {
-            if (ImGui::Button("alternative_approach"))
-            {
-                alternative_approach();
-            }
+            //if (ImGui::Button("alternative_approach"))
+            //{
+            //    alternative_approach();
+            //}
 
             if (ImGui::Button("load data (step 1)"))
             {

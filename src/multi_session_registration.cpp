@@ -462,6 +462,42 @@ void project_gui()
                         sessions.push_back(session);
                     }
                     loaded_sessions = true;
+
+                    //reorder
+                    std::vector<Session> sessions_reorder;
+                    std::vector<std::string> session_file_names_reordered;
+
+                    std::map<int, int> map_reorder;
+                    //project_settings.session_file_names.
+                    int new_index = 0;
+                    for (int i = 0; i < sessions.size(); i++)
+                    {
+                        if(sessions[i].is_ground_truth){
+                            sessions_reorder.push_back(sessions[i]);
+                            session_file_names_reordered.push_back(project_settings.session_file_names[i]);
+                            map_reorder[i] = new_index++;
+                        }
+                    }
+                    for (int i = 0; i < sessions.size(); i++)
+                    {
+                        if (!sessions[i].is_ground_truth)
+                        {
+                            sessions_reorder.push_back(sessions[i]);
+                            session_file_names_reordered.push_back(project_settings.session_file_names[i]);
+                            map_reorder[i] = new_index++;
+                        }
+                    }
+                    sessions = sessions_reorder;
+                    project_settings.session_file_names = session_file_names_reordered;
+                    
+                    for(auto &e:edges){
+                        e.index_session_from = map_reorder[e.index_session_from];
+                        e.index_session_to = map_reorder[e.index_session_to];
+                    }
+                    
+                    std::cout << "sessions reordered, ground truth should be in front" << std::endl;
+
+
                 }
             }
 
@@ -972,6 +1008,60 @@ void display()
             glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)std::to_string(i).c_str());
             i++;
         }
+
+        for (int i = 0; i < sessions.size(); i++)
+        {
+            for (int j = 0; j < sessions[i].manual_pose_graph_loop_closure.edges.size(); j++)
+            {
+                int index_src = sessions[i].manual_pose_graph_loop_closure.edges[j].index_from;
+                int index_trg = sessions[i].manual_pose_graph_loop_closure.edges[j].index_to;
+
+                glColor3f(0.0f, 0.0f, 1.0f);
+                glBegin(GL_LINES);
+                auto v1 = sessions[i].point_clouds_container.point_clouds.at(index_src).m_pose.translation();
+                auto v2 = sessions[i].point_clouds_container.point_clouds.at(index_trg).m_pose.translation();
+                glVertex3f(v1.x(), v1.y(), v1.z());
+                glVertex3f(v2.x(), v2.y(), v2.z());
+
+                glVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5);
+                glVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10);
+                glEnd();
+
+                glRasterPos3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10 + 0.1);
+                glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)std::to_string(j).c_str());
+            }
+        }
+       
+        for (int i = 0; i < edges.size(); i++)
+        {
+            int index_src = edges[i].index_from;
+            int index_trg = edges[i].index_to;
+
+            int index_session_from = edges[i].index_session_from;
+            int index_session_to = edges[i].index_session_to;
+
+            if (sessions[index_session_from].is_ground_truth || sessions[index_session_to].is_ground_truth)
+            {
+                glColor3f(0.0f, 1.0f, 1.0f);
+            }
+            else
+            {
+                glColor3f(1.0f, 1.0f, 0.0f);
+            }
+
+            glBegin(GL_LINES);
+            auto v1 = sessions[index_session_from].point_clouds_container.point_clouds.at(index_src).m_pose.translation();
+            auto v2 = sessions[index_session_to].point_clouds_container.point_clouds.at(index_trg).m_pose.translation();
+            glVertex3f(v1.x(), v1.y(), v1.z());
+            glVertex3f(v2.x(), v2.y(), v2.z());
+
+            glVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5);
+            glVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10);
+            glEnd();
+
+            glRasterPos3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10 + 0.1);
+            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)std::to_string(i).c_str());
+        }
     }
     else
     {
@@ -1074,7 +1164,7 @@ void display()
         for (size_t i = 0; i < sessions.size(); i++)
         {
             // gizmo_all_sessions;
-            if (sessions[i].is_gizmo)
+            if (sessions[i].is_gizmo && !sessions[i].is_ground_truth)
             {
                 prev_pose_manipulated = sessions[i].point_clouds_container.point_clouds[0].m_pose;
                 std::vector<Eigen::Affine3d> all_m_poses;
@@ -1155,7 +1245,7 @@ void display()
             for (size_t i = 0; i < sessions.size(); i++)
             {
                 // gizmo_all_sessions;
-                if (!sessions[i].is_gizmo)
+                if (!sessions[i].is_gizmo && !sessions[i].is_ground_truth)
                 {
                     std::vector<Eigen::Affine3d> all_m_poses;
                     for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
@@ -1625,7 +1715,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_session_registration_step_3 v0.28");
+    glutCreateWindow("multi_session_registration_step_3 v0.29");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -1734,7 +1824,8 @@ bool optimize(std::vector<Session> &sessions)
             {
                 poses.push_back(pose_tait_bryan_from_affine_matrix(sessions[j].point_clouds_container.point_clouds[i].m_pose.inverse()));
             }
-            if (sessions[j].is_ground_truth){
+            if (sessions[j].is_ground_truth)
+            {
                 indexes_ground_truth.push_back(poses.size() - 1);
             }
         }
@@ -1986,7 +2077,7 @@ bool optimize(std::vector<Session> &sessions)
         {
             int ir = tripletListB.size();
             int ic = indexes_ground_truth[index] * 6;
-            tripletListA.emplace_back(ir    , ic + 0, 1);
+            tripletListA.emplace_back(ir, ic + 0, 1);
             tripletListA.emplace_back(ir + 1, ic + 1, 1);
             tripletListA.emplace_back(ir + 2, ic + 2, 1);
             tripletListA.emplace_back(ir + 3, ic + 3, 1);
@@ -2008,74 +2099,74 @@ bool optimize(std::vector<Session> &sessions)
             tripletListB.emplace_back(ir + 5, 0, 0);
         }
 
-            // gnss
-            // for (const auto &pc : point_clouds_container.point_clouds)
-            /*for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
+        // gnss
+        // for (const auto &pc : point_clouds_container.point_clouds)
+        /*for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
+        {
+            const auto &pc = point_clouds_container.point_clouds[index_pose];
+            for (int i = 0; i < gnss.gnss_poses.size(); i++)
             {
-                const auto &pc = point_clouds_container.point_clouds[index_pose];
-                for (int i = 0; i < gnss.gnss_poses.size(); i++)
+                double time_stamp = gnss.gnss_poses[i].timestamp;
+
+                auto it = std::lower_bound(pc.local_trajectory.begin(), pc.local_trajectory.end(),
+                                           time_stamp, [](const PointCloud::LocalTrajectoryNode &lhs, const double &time) -> bool
+                                           { return lhs.timestamp < time; });
+
+                int index = it - pc.local_trajectory.begin();
+
+                if (index > 0 && index < pc.local_trajectory.size())
                 {
-                    double time_stamp = gnss.gnss_poses[i].timestamp;
 
-                    auto it = std::lower_bound(pc.local_trajectory.begin(), pc.local_trajectory.end(),
-                                               time_stamp, [](const PointCloud::LocalTrajectoryNode &lhs, const double &time) -> bool
-                                               { return lhs.timestamp < time; });
-
-                    int index = it - pc.local_trajectory.begin();
-
-                    if (index > 0 && index < pc.local_trajectory.size())
+                    if (fabs(time_stamp - pc.local_trajectory[index].timestamp) < 10e12)
                     {
 
-                        if (fabs(time_stamp - pc.local_trajectory[index].timestamp) < 10e12)
+                        Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+                        TaitBryanPose pose_s;
+                        pose_s = pose_tait_bryan_from_affine_matrix(m_poses[index_pose]);
+                        Eigen::Vector3d p_s = pc.local_trajectory[index].m_pose.translation();
+                        point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                               p_s.x(), p_s.y(), p_s.z());
+
+                        double delta_x;
+                        double delta_y;
+                        double delta_z;
+                        Eigen::Vector3d p_t(gnss.gnss_poses[i].x - gnss.offset_x, gnss.gnss_poses[i].y - gnss.offset_y, gnss.gnss_poses[i].alt - gnss.offset_alt);
+                        point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                                      pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                      p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+
+                        std::cout << " delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
+
+                        int ir = tripletListB.size();
+                        int ic = index_pose * 6;
+                        for (int row = 0; row < 3; row++)
                         {
-
-                            Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
-                            TaitBryanPose pose_s;
-                            pose_s = pose_tait_bryan_from_affine_matrix(m_poses[index_pose]);
-                            Eigen::Vector3d p_s = pc.local_trajectory[index].m_pose.translation();
-                            point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                                   p_s.x(), p_s.y(), p_s.z());
-
-                            double delta_x;
-                            double delta_y;
-                            double delta_z;
-                            Eigen::Vector3d p_t(gnss.gnss_poses[i].x - gnss.offset_x, gnss.gnss_poses[i].y - gnss.offset_y, gnss.gnss_poses[i].alt - gnss.offset_alt);
-                            point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                                                                          pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                          p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
-
-                            std::cout << " delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
-
-                            int ir = tripletListB.size();
-                            int ic = index_pose * 6;
-                            for (int row = 0; row < 3; row++)
+                            for (int col = 0; col < 6; col++)
                             {
-                                for (int col = 0; col < 6; col++)
+                                if (jacobian(row, col) != 0.0)
                                 {
-                                    if (jacobian(row, col) != 0.0)
-                                    {
-                                        tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
-                                    }
+                                    tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
                                 }
                             }
-                            tripletListP.emplace_back(ir, ir, get_cauchy_w(delta_x, 1));
-                            tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta_y, 1));
-                            tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta_z, 1));
-
-                            tripletListB.emplace_back(ir, 0, delta_x);
-                            tripletListB.emplace_back(ir + 1, 0, delta_y);
-                            tripletListB.emplace_back(ir + 2, 0, delta_z);
-
-                            // jacobian3x6 = get_point_to_point_jacobian_tait_bryan(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
-
-                            // auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
-                            // glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-                            // glVertex3f(gnss_poses[i].x - offset_x, gnss_poses[i].y - offset_y, gnss_poses[i].alt - offset_alt);
                         }
+                        tripletListP.emplace_back(ir, ir, get_cauchy_w(delta_x, 1));
+                        tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta_y, 1));
+                        tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta_z, 1));
+
+                        tripletListB.emplace_back(ir, 0, delta_x);
+                        tripletListB.emplace_back(ir + 1, 0, delta_y);
+                        tripletListB.emplace_back(ir + 2, 0, delta_z);
+
+                        // jacobian3x6 = get_point_to_point_jacobian_tait_bryan(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
+
+                        // auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
+                        // glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+                        // glVertex3f(gnss_poses[i].x - offset_x, gnss_poses[i].y - offset_y, gnss_poses[i].alt - offset_alt);
                     }
                 }
-            }*/
-            //
+            }
+        }*/
+        //
 
         Eigen::SparseMatrix<double> matA(tripletListB.size(), poses.size() * 6);
         Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
@@ -2183,7 +2274,8 @@ bool optimize(std::vector<Session> &sessions)
                         index = 0;
                     }
                 }
-                if (!sessions[index_trajectory[i]].is_ground_truth){
+                if (!sessions[index_trajectory[i]].is_ground_truth)
+                {
                     sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].m_pose = m_poses[i];
                     sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose = pose_tait_bryan_from_affine_matrix(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].m_pose);
                     sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_translation[0] = sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.px;

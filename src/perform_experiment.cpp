@@ -1976,7 +1976,7 @@ void perform_experiment_on_linux(Session &session, ObservationPicking &observati
     auto elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-    rms = compute_rms(false);
+    rms = compute_rms(false, session, observation_picking);
     id_method = 94;
     append_to_result_file(result_file, "pose_graph_slam (pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method, observation_picking, session);
@@ -1993,7 +1993,7 @@ void perform_experiment_on_linux(Session &session, ObservationPicking &observati
     elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-    rms = compute_rms(false);
+    rms = compute_rms(false, session, observation_picking);
     id_method = 95;
     append_to_result_file(result_file, "pose_graph_slam (pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method, observation_picking, session);

@@ -19,6 +19,18 @@ abstract = {This paper presents open-source software for large-scale 3D mapping 
 ```
 ![mandeye](images/softwareX1.png)
 
+Mobile mapping systems is based on LiVOX MID360 - laser scanner with non repetetive scanning pattern.
+Specification is available at https://www.livoxtech.com/mid-360/specs
+Important parameters:
+- weight: less than 1kg,
+- battery life: up to 5 hours,
+- suggested speed during data acquisition: walking speed (4km/h),
+- LiDAR type: Livox MID360,
+- LiDAR non-repetitive scanning pattern,
+- LiDAR range 40m @ 10\% reflectivity, 70 m @ 80\% reflectivity,
+- Range Precision (1 $\sigma$): up to 2cm (@ 10m),
+- Integrated IMU (Inertial Measurement Unit).
+
 This work is dedicated to educational and research purposes.
 Core of the software is composed of three components: 
 
@@ -68,11 +80,18 @@ Possible applications:
 - space exploration
 - protection systems
 - digital twin content generation 
+- automation in construction
 - etc...
 
 ![largescalemapping1](images/100-2.gif)
 ![largescalemapping2](images/100.gif)
 
+![largescalemapping1](images/a.jpg)
+![largescalemapping2](images/b.jpg)
+
+![largescalemapping1](images/a0.jpg)
+![largescalemapping2](images/a6.jpg)
+![largescalemapping2](images/change.jpg)
 
 The methodology behing this research is also elaborated in following paper:
 ```

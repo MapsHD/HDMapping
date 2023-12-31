@@ -83,8 +83,9 @@ Possible applications:
 - etc...
 
 ![largescalemapping1](images/100-2.gif)
+City level survey (perspective view).
 ![largescalemapping2](images/100.gif)
-City level survey.
+City level survey (top view).
 
 ![largescalemapping1](images/a.jpg)
 3D data from aerial LiDAR mapping. 

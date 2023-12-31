@@ -2028,6 +2028,19 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
 
         //    p.point.z() += correction;
         //}
+        /*if (p.point.z() > 0)
+        {
+            double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
+            double correction = 0;//dist * asin(0.08 / 10.0);
+
+            if (dist < 11.0){
+                correction = 0.005;
+            }else{
+                correction = -0.015;
+            }
+
+            p.point.z() += correction;
+        }*/
 
         if (p.timestamp == 0 && ommit_points_with_timestamp_equals_zero)
         {

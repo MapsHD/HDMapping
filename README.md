@@ -1,11 +1,26 @@
 # Open source, open hardware hand-held mobile mapping system for large scale surveys.
 
 This is an open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device available at https://github.com/JanuszBedkowski/mandeye_controller.
-
+Recent publication:
+```
+@article{BEDKOWSKI2024101618,
+title = {Open source, open hardware hand-held mobile mapping system for large scale surveys},
+journal = {SoftwareX},
+volume = {25},
+pages = {101618},
+year = {2024},
+issn = {2352-7110},
+doi = {https://doi.org/10.1016/j.softx.2023.101618},
+url = {https://www.sciencedirect.com/science/article/pii/S235271102300314X},
+author = {Janusz Będkowski},
+keywords = {A mobile mapping, Lidar odometry, Loop closure, Iterative closest point, Data registration, SLAM},
+abstract = {This paper presents open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device. This work is dedicated to educational and research purposes. This software is composed of three components: LIDAR odometry, single-session refinement and multi-session refinement. Data refinement uses a pose-graph loop closure technique and an Iterative Closest Point algorithm to minimize the error of the edge. The results are 3D point clouds in LAZ data format (compressed LAS - LIDAR Aerial Survey). It was tested in many real-world scenarios/applications: city-level 3D mapping, culture heritage, creating ground truth data for mobile robots, precise forestry, and large-scale indoor 3D mapping. This software can run on Linux and Windows machines, it does not incorporate GPU computing. It is advised to use at least 32 GB of RAM to cope with large data sets. The optimization framework is implemented from scratch using the Eigen library, thus there is not need to install any additional libraries such as Ceres, g2o, GTSAM, manif, Sophus etc.}
+}
+```
 ![mandeye](images/softwareX1.png)
 
 This work is dedicated to educational and research purposes.
-This software is composed of three components: 
+Core of the software is composed of three components: 
 
 - LIDAR odometry,
 - single-session refinement,

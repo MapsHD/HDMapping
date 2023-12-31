@@ -20,8 +20,7 @@ abstract = {This paper presents open-source software for large-scale 3D mapping 
 ![mandeye](images/softwareX1.png)
 
 Mobile mapping systems is based on LiVOX MID360 - laser scanner with non repetetive scanning pattern.
-Specification is available at https://www.livoxtech.com/mid-360/specs
-Important parameters:
+Specification is available at https://www.livoxtech.com/mid-360/specs. Important parameters:
 - weight: less than 1kg,
 - battery life: up to 5 hours,
 - suggested speed during data acquisition: walking speed (4km/h),

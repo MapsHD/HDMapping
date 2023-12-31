@@ -1,7 +1,7 @@
 # Open source, open hardware hand-held mobile mapping system for large scale surveys.
 
 This is an open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device available at https://github.com/JanuszBedkowski/mandeye_controller.
-Recent publication:
+Recent publication https://www.sciencedirect.com/science/article/pii/S235271102300314X
 ```
 @article{BEDKOWSKI2024101618,
 title = {Open source, open hardware hand-held mobile mapping system for large scale surveys},

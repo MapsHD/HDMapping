@@ -33,9 +33,10 @@ Specification is available at https://www.livoxtech.com/mid-360/specs. Important
 This work is dedicated to educational and research purposes.
 Core of the software is composed of three components: 
 
-- LIDAR odometry,
+- LiDAR odometry,
 - single-session refinement,
-- multi-session refinement.
+- multi-session refinement,
+- georeferencing.
 
 Data refinement uses a pose-graph loop closure technique and an Iterative Closest Point algorithm to minimize the error of the edge. 
 The results are 3D point clouds in LAZ data format (compressed LAS - LIDAR Aerial Survey).

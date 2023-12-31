@@ -84,13 +84,19 @@ Possible applications:
 
 ![largescalemapping1](images/100-2.gif)
 ![largescalemapping2](images/100.gif)
+City level survey.
 
 ![largescalemapping1](images/a.jpg)
+3D data from aerial LiDAR mapping. 
 ![largescalemapping2](images/b.jpg)
+Aerial LiDAR fused with ground MANDEYE data (fixed issue with missing elevations).
 
 ![largescalemapping1](images/a0.jpg)
+Construction site.
 ![largescalemapping2](images/a6.jpg)
+Construction site augmented with MANDEYE 3D data.
 ![largescalemapping2](images/change.jpg)
+Construction progress monitoring, scale blue - smallest changes, red - largest changes.
 
 The methodology behing this research is also elaborated in following paper:
 ```

@@ -550,7 +550,7 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_step_1 v0.28"))
+    if (ImGui::Begin("lidar_odometry_step_1 v0.29"))
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
@@ -624,10 +624,10 @@ void lidar_odometry_gui()
         }
         if (!step_1_done)
         {
-            if (ImGui::Button("alternative_approach"))
-            {
-                alternative_approach();
-            }
+            //if (ImGui::Button("alternative_approach"))
+            //{
+            //    alternative_approach();
+            //}
 
             if (ImGui::Button("load data (step 1)"))
             {
@@ -2028,6 +2028,19 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
 
         //    p.point.z() += correction;
         //}
+        /*if (p.point.z() > 0)
+        {
+            double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
+            double correction = 0;//dist * asin(0.08 / 10.0);
+
+            if (dist < 11.0){
+                correction = 0.005;
+            }else{
+                correction = -0.015;
+            }
+
+            p.point.z() += correction;
+        }*/
 
         if (p.timestamp == 0 && ommit_points_with_timestamp_equals_zero)
         {

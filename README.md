@@ -1,15 +1,42 @@
 # Open source, open hardware hand-held mobile mapping system for large scale surveys.
 
 This is an open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device available at https://github.com/JanuszBedkowski/mandeye_controller.
-
+Recent publication https://www.sciencedirect.com/science/article/pii/S235271102300314X
+```
+@article{BEDKOWSKI2024101618,
+title = {Open source, open hardware hand-held mobile mapping system for large scale surveys},
+journal = {SoftwareX},
+volume = {25},
+pages = {101618},
+year = {2024},
+issn = {2352-7110},
+doi = {https://doi.org/10.1016/j.softx.2023.101618},
+url = {https://www.sciencedirect.com/science/article/pii/S235271102300314X},
+author = {Janusz Będkowski},
+keywords = {A mobile mapping, Lidar odometry, Loop closure, Iterative closest point, Data registration, SLAM},
+abstract = {This paper presents open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device. This work is dedicated to educational and research purposes. This software is composed of three components: LIDAR odometry, single-session refinement and multi-session refinement. Data refinement uses a pose-graph loop closure technique and an Iterative Closest Point algorithm to minimize the error of the edge. The results are 3D point clouds in LAZ data format (compressed LAS - LIDAR Aerial Survey). It was tested in many real-world scenarios/applications: city-level 3D mapping, culture heritage, creating ground truth data for mobile robots, precise forestry, and large-scale indoor 3D mapping. This software can run on Linux and Windows machines, it does not incorporate GPU computing. It is advised to use at least 32 GB of RAM to cope with large data sets. The optimization framework is implemented from scratch using the Eigen library, thus there is not need to install any additional libraries such as Ceres, g2o, GTSAM, manif, Sophus etc.}
+}
+```
 ![mandeye](images/softwareX1.png)
 
-This work is dedicated to educational and research purposes.
-This software is composed of three components: 
+Mobile mapping systems is based on LiVOX MID360 - laser scanner with non repetetive scanning pattern.
+Specification is available at https://www.livoxtech.com/mid-360/specs. Important parameters:
+- weight: less than 1kg,
+- battery life: up to 5 hours,
+- suggested speed during data acquisition: walking speed (4km/h),
+- LiDAR type: Livox MID360,
+- LiDAR non-repetitive scanning pattern,
+- LiDAR range 40m @ 10\% reflectivity, 70 m @ 80\% reflectivity,
+- Range Precision (1 $\sigma$): up to 2cm (@ 10m),
+- Integrated IMU (Inertial Measurement Unit).
 
-- LIDAR odometry,
+This work is dedicated to educational and research purposes.
+Core of the software is composed of three components: 
+
+- LiDAR odometry,
 - single-session refinement,
-- multi-session refinement.
+- multi-session refinement,
+- georeferencing.
 
 Data refinement uses a pose-graph loop closure technique and an Iterative Closest Point algorithm to minimize the error of the edge. 
 The results are 3D point clouds in LAZ data format (compressed LAS - LIDAR Aerial Survey).
@@ -53,11 +80,25 @@ Possible applications:
 - space exploration
 - protection systems
 - digital twin content generation 
+- automation in construction
 - etc...
 
 ![largescalemapping1](images/100-2.gif)
+City level survey (perspective view).
 ![largescalemapping2](images/100.gif)
+City level survey (top view).
 
+![largescalemapping1](images/a.jpg)
+3D data from aerial LiDAR mapping. 
+![largescalemapping2](images/b.jpg)
+Aerial LiDAR fused with ground MANDEYE data (fixed issue with missing elevations).
+
+![largescalemapping1](images/a0.jpg)
+Construction site.
+![largescalemapping2](images/a6.jpg)
+Construction site augmented with MANDEYE 3D data.
+![largescalemapping2](images/change.jpg)
+Construction progress monitoring, scale blue - smallest changes, red - largest changes.
 
 The methodology behing this research is also elaborated in following paper:
 ```

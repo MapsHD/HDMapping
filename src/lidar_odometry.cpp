@@ -2102,6 +2102,7 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &tra
     Eigen::Matrix4d ret(Eigen::Matrix4d::Zero());
     auto it_lower = trajectory.lower_bound(query_time);
     auto it_next = it_lower;
+
     if (it_lower == trajectory.begin())
     {
         return ret;
@@ -2118,6 +2119,8 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &tra
     {
         return ret;
     }
+    //std::cout << std::setprecision(10);
+    //std::cout << it_lower->first << " " << query_time << " " << it_next->first << " " << std::next(it_lower)->first << std::endl;
 
     double t1 = it_lower->first;
     double t2 = it_next->first;
@@ -3261,18 +3264,13 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
     std::vector<Point3Di> points_global = points_reindexed;
     for (auto &p : points_global)
     {
-        Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, ts[p.index_pose]);
-
-        //Eigen::Affine3d m = pose.matrix();
-
-        
+        Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, /*ts[p.index_pose]*/p.timestamp);
         Eigen::Affine3d b;
         b.matrix() = pose;
-
-        //p.point = best_trajectory[p.index_pose] * p.point;
         p.point = b * p.point;
     }
 
+    std::cout << "saving file: " << fn1 << std::endl;
     saveLaz(fn1, points_global);
 
     points_global = points_reindexed;
@@ -3420,10 +3418,8 @@ void alternative_approach()
             all_points.push_back(tmp_points[j]);
         }
     }
-       
     
     //////////
-
     std::vector<double> timestamps;
     std::vector<Eigen::Affine3d> poses;
     for (const auto &t : trajectory)
@@ -3433,7 +3429,6 @@ void alternative_approach()
         m.matrix() = t.second;
         poses.push_back(m);
     }
-
 
     for (int i = 0; i < all_points.size(); i++)
     {

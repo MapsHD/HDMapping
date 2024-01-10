@@ -62,3 +62,66 @@ timestamp lat lon alt hdop satelites-tracked height age time fix-quality\\
 	\caption{Georeferencing step 4: Check Manual Pose Graph Loop Closure Mode, then set initial poses as motion model, then Compute Pose Graph SLAM.}
 	\label{fig:geo3}
 \end{figure}
+\pagebreak
+
+\textbf{Below is an example of how to download and create ground truth data from exemplary ALS data (free polish ALS data available as part of ISOK: \url{http://www.gugik.gov.pl/projekty/isok/produkty}) with scans prepared through HDMapping software.}
+Figures from \ref{fig:34} to \ref{fig:38} serve only as an example of how the process of gathering and preparing ALS data may look like.
+
+To download ALS data Geoportal site will be used - \url{https://www.geoportal.gov.pl}.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{ISOK1.png}
+	\caption{After \url{https://www.geoportal.gov.pl} site is loaded choose Geoportal krajowy tab.}
+	\label{fig:34}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{ISOK2.png}
+	\caption{After Geoportal has loaded, on the right side of the screen select Dane do pobrania, then Dane pomiarowe NMT, where 2 options are possible.}
+	\label{fig:35}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{ISOK3.png}
+	\caption{Whenever it is possible EVRF LIDAR version should be chosen over KRON36 version, as the former is more current than the latter. As can be seen on the screen there are parts without EVRF version and in such cases KRON86 is the only option.}
+	\label{fig:36}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{ISOK4.png}
+	\caption{When LIDAR has been chosen zoom in to the map until tiles are seen. To download simply click on the tile with left mouse button and choose WMS, LIDAR.}
+	\label{fig:37}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{ISOK5.png}
+	\caption{Then choose the newest version (usually the highest one) and use the link to download .laz file. Repeat this and previous step for every tile that covers your area of interest.}
+	\label{fig:38}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{ISOK6.png}
+	\caption{If merging of downloaded tiles is needed, I recommend using LAStools software. Download LAStools.zip from release page (\url{https://github.com/LAStools/LAStools/releases}). From folder bin/ extract lasmerge64.exe and put it in the folder where tile .laz files are stored. Open windows command prompt, move to directory with .laz files and write command: 
+		\textit{lasmerge64.exe -i *.laz -o <your output .laz file name>.laz}}
+	\label{fig:39}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{ISOK7.png}
+	\caption{Open step 2 of this manual (\ref{fig:10}), unmatch simple gui, select calculate offset and load WHU-TLS data (many laz./las. files may be chosen).}
+	\label{fig:40}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{ISOK8.png}
+	\caption{After loading scans successfully check ground truth option and save session as new .json file that contains all loaded scans. Now these scans may be loaded to serve as ground truth session that other scans can be aligned to.}
+	\label{fig:41}
+\end{figure}

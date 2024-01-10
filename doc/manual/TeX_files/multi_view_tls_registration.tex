@@ -31,7 +31,7 @@
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=\textwidth]{16.png}
-	\caption{Once You are not capable align more accurate, then turn off gizmo and repetitively use ICP until scans align to the level at which nothing can change anymore.}
+	\caption{Once You are not capable of aligning more accurately, then turn off gizmo and repetitively use ICP until scans align to the level at which nothing can change anymore.}
 	\label{fig:16}
 \end{figure}
 
@@ -56,7 +56,7 @@
 	\label{fig:19}
 \end{figure}
 \pagebreak
-{\large \textbf{Should division of the session be needed, follow the steps below that describe how to do this using step 2 of the HDMapping program:}}
+{\large \textbf{Should a division of a session be needed, follow the steps below that describe how to do this in multi view tls registration step 2 program which is part of the HDMapping software:}}
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=\textwidth]{Cut_session1.png}
@@ -154,52 +154,4 @@
 	\includegraphics[width=\textwidth]{27.png}
 	\caption{At the end or in the middle of work you can save your project to .json file, which can be loaded next time multi session registration step 3 is used.}
 	\label{fig:33}
-\end{figure}
-\pagebreak
-\textbf{Last part describes the process of downloading, preparing and synchronizing ISOK ALS data (\url{http://www.gugik.gov.pl/projekty/isok/produkty}) with scans prepared through HDMapping software.}
-Figures from \ref{fig:34} to \ref{fig:38} serve only as an example of how the process of gathering and preparing ALS data may look like.
-
-To download ALS data Geoportal site will be used - \url{https://www.geoportal.gov.pl}.
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{ISOK1.png}
-	\caption{After \url{https://www.geoportal.gov.pl} site is loaded choose Geoportal krajowy tab.}
-	\label{fig:34}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{ISOK2.png}
-	\caption{After Geoportal has loaded, on the right side of the screen select Dane do pobrania, then Dane pomiarowe NMT, where 2 options are possible.}
-	\label{fig:35}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{ISOK3.png}
-	\caption{Whenever it is possible EVRF LIDAR version should be chosen over KRON36 version, as the former is more current than the latter. As can be seen on the screen there are parts without EVRF version and in such cases KRON86 is the only option.}
-	\label{fig:36}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{ISOK4.png}
-	\caption{When LIDAR has been chosen zoom in to the map until tiles are seen. To download simply click on the tile with left mouse button and choose WMS, LIDAR.}
-	\label{fig:37}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{ISOK5.png}
-	\caption{Then choose the newest version (usually the highest one) and use the link to download .laz file. Repeat this and previous step for every tile that covers your area of interest.}
-	\label{fig:38}
-\end{figure}
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{ISOK6.png}
-	\caption{If merging downloaded tiles is needed, I recommend using LAStools software. Download LAStools.zip from release page (\url{https://github.com/LAStools/LAStools/releases/tag/v2.0.2}). From folder bin/ extract lasmerge64.exe and put it in the folder where tile .laz files are stored. Open windows command prompt, move to directory with .laz files and write command: 
-	\textit{lasmerge64.exe -i *.laz -o <your output .laz file name>.laz}}
-	\label{fig:39}
 \end{figure}

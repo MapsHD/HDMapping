@@ -1890,7 +1890,40 @@ void project_gui()
                 }
             }
 
-            ImGui::SameLine();
+            ImGui::InputDouble("WGS84ReferenceLatitude", &gnss.WGS84ReferenceLatitude);
+            ImGui::InputDouble("WGS84ReferenceLongitude", &gnss.WGS84ReferenceLongitude);
+            ImGui::InputDouble("OffsetAltitude", &gnss.offset_alt);
+
+            ImGui::Checkbox("setWGS84ReferenceFromFirstPose", &gnss.setWGS84ReferenceFromFirstPose);
+
+            if (ImGui::Button("load gnss files and convert from wgs84 to Cartesian using Mercator projection"))
+            {
+                static std::shared_ptr<pfd::open_file> open_file;
+                std::vector<std::string> input_file_names;
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+                const auto t = [&]()
+                {
+                    std::vector<std::string> filters;
+                    auto sel = pfd::open_file("Load gnss files", "C:\\", filters, true).result();
+                    for (int i = 0; i < sel.size(); i++)
+                    {
+                        input_file_names.push_back(sel[i]);
+                        // std::cout << "las file: '" << input_file_name << "'" << std::endl;
+                    }
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (input_file_names.size() > 0)
+                {
+                    if (!gnss.load_mercator_projection(input_file_names))
+                    {
+                        std::cout << "problem with loading gnss files" << std::endl;
+                    }
+                }
+            }
+        }
+        if (gnss.gnss_poses.size() > 0){
             ImGui::Checkbox("show GNSS correspondences", &gnss.show_correspondences);
         }
 
@@ -3256,7 +3289,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration_step_2 v0.29");
+    glutCreateWindow("multi_view_tls_registration_step_2 v0.30");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <GL/freeglut.h>
+#include <WGS84toCartesian.hpp>
 
 inline void split(std::string &str, char delim, std::vector<std::string> &out)
 {
@@ -91,6 +92,86 @@ bool GNSS::load(const std::vector<std::string> &input_file_names)
     offset_y /= gnss_poses.size();
     offset_alt /= gnss_poses.size();
 
+    return true;
+}
+
+bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_names)
+{
+    gnss_poses.clear();
+
+    std::cout << "loading GNSS data from following files:" << std::endl;
+    for (const auto &fn : input_file_names)
+    {
+        std::cout << fn << std::endl;
+    }
+
+    for (const auto &fn : input_file_names)
+    {
+        std::ifstream infile(fn);
+        if (!infile.good())
+        {
+            std::cout << "problem with file: '" << fn << "'" << std::endl;
+            return false;
+        }
+        std::string s;
+        while (!infile.eof())
+        {
+            getline(infile, s);
+            std::vector<std::string> strs;
+            split(s, ' ', strs);
+
+            if (strs.size() == 10)
+            {
+                GlobalPose gp;
+                std::istringstream(strs[0]) >> gp.timestamp;
+                std::istringstream(strs[1]) >> gp.lat;
+                std::istringstream(strs[2]) >> gp.lon;
+                std::istringstream(strs[3]) >> gp.alt;
+                std::istringstream(strs[4]) >> gp.hdop;
+                std::istringstream(strs[5]) >> gp.satelites_tracked;
+                std::istringstream(strs[6]) >> gp.height;
+                std::istringstream(strs[7]) >> gp.age;
+                std::istringstream(strs[8]) >> gp.time;
+                std::istringstream(strs[9]) >> gp.fix_quality;
+                gnss_poses.push_back(gp);
+            }
+        }
+        infile.close();
+    }
+
+    std::sort(gnss_poses.begin(), gnss_poses.end(), [](GNSS::GlobalPose &a, GNSS::GlobalPose &b)
+              { return (a.timestamp < b.timestamp); });
+
+    std::array<double, 2> WGS84Reference{0,0};
+
+    if (gnss_poses.size() > 0){
+        if (setWGS84ReferenceFromFirstPose){
+            WGS84Reference[0] = gnss_poses[0].lat;
+            WGS84Reference[1] = gnss_poses[0].lon;
+            WGS84ReferenceLatitude = gnss_poses[0].lat;
+            WGS84ReferenceLongitude = gnss_poses[0].lon;
+            offset_alt = gnss_poses[0].alt;
+        }else{
+            WGS84Reference[0] = WGS84ReferenceLatitude;
+            WGS84Reference[1] = WGS84ReferenceLongitude;
+        }
+    }
+  
+    for (int i = 0; i < gnss_poses.size(); i++){
+        std::array<double, 2> WGS84Position{gnss_poses[i].lat, gnss_poses[i].lon};
+        std::array<double, 2> result{wgs84::toCartesian(WGS84Reference, WGS84Position)};
+        gnss_poses[i].x = result[0];
+        gnss_poses[i].y = result[1];
+    }
+
+    /*constexpr std::array<double, 2> WGS84Reference1{52.247041, 10.575830};
+    constexpr std::array<double, 2> WGS84Position1{52.248091, 10.57417};
+    constexpr std::array<double, 2> expectedResult1{-113.3742031902, 116.8369533306};
+
+    std::array<double, 2> result1{wgs84::toCartesian(WGS84Reference1, WGS84Position1)};
+
+    std::cout << "--------" << std::endl;
+    std::cout << result1[0] << " " << result1[1] << std::endl;*/
     return true;
 }
 

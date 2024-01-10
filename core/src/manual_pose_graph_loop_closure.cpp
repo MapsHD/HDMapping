@@ -85,7 +85,8 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                 index_active_edge = edges.size() - 1;
             }
 
-            if (edges.size() > 0 && !manipulate_active_edge)
+            //if (edges.size() > 0 && !manipulate_active_edge)
+            if (!manipulate_active_edge)
             {
 
                 if (ImGui::Button("Set initial poses as motion model"))
@@ -374,7 +375,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                                                                                           pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
                                                                                           p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
 
-                                            std::cout << " delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
+                                            //std::cout << " delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
 
                                             int ir = tripletListB.size();
                                             int ic = index_pose * 6;

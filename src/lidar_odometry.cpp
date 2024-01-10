@@ -30,6 +30,7 @@
 #include <common/include/cauchy.h>
 #include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
 
+#include "lidar_odometry_utils.h"
 // This is LiDAR odometry (step 1)
 // This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system https://github.com/JanuszBedkowski/mandeye_controller
 // The output is a session proving trajekctory and point clouds that can be  further processed by "multi_view_tls_registration" program.
@@ -66,17 +67,6 @@ bool step_1_done = false;
 bool step_2_done = false;
 bool step_3_done = false;
 
-struct WorkerData
-{
-    std::vector<Point3Di> intermediate_points;
-    std::vector<Point3Di> original_points;
-    std::vector<Eigen::Affine3d> intermediate_trajectory;
-    std::vector<Eigen::Affine3d> intermediate_trajectory_motion_model;
-    std::vector<double> intermediate_trajectory_timestamps;
-    std::vector<std::pair<double, double>> imu_roll_pitch;
-    bool show = false;
-};
-
 std::vector<WorkerData> worker_data;
 
 float rotate_x = 0.0, rotate_y = 0.0;
@@ -105,22 +95,7 @@ float x_displacement = 0.01;
 
 void alternative_approach();
 
-//this function provides unique index
-unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z)
-{
-    return ((static_cast<unsigned long long int>(x) << 32) & (0x0000FFFF00000000ull)) |
-           ((static_cast<unsigned long long int>(y) << 16) & (0x00000000FFFF0000ull)) |
-           ((static_cast<unsigned long long int>(z) << 0) & (0x000000000000FFFFull));
-}
 
-//this function provides unique index for input point p and 3D space decomposition into buckets b
-unsigned long long int get_rgd_index(const Eigen::Vector3d p, const Eigen::Vector3d b)
-{
-    int16_t x = static_cast<int16_t>(p.x() / b.x());
-    int16_t y = static_cast<int16_t>(p.y() / b.y());
-    int16_t z = static_cast<int16_t>(p.z() / b.z());
-    return get_index(x, y, z);
-}
 
 // this function finds interpolated pose between two poses according to query_time
 Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &trajectory, double query_time);

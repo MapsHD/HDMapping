@@ -195,7 +195,7 @@ include_directories(
 3rdparty/Fusion/Fusion
 )
 
-add_executable(lidar_odometry_step_1 src/lidar_odometry.cpp
+add_executable(lidar_odometry_step_1 src/lidar_odometry.cpp src/lidar_odometry_utils.h src/lidar_odometry_utils.cpp
 ${IMGUI_SRCS}
 ${CORE_SRCS}
 ${GIZMO}

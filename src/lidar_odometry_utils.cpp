@@ -608,3 +608,105 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
     }
     return all_data;
 }
+
+std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy)
+{
+    std::vector<Point3Di> points;
+    laszip_POINTER laszip_reader;
+    if (laszip_create(&laszip_reader))
+    {
+        fprintf(stderr, "DLL ERROR: creating laszip reader\n");
+        std::abort();
+    }
+
+    laszip_BOOL is_compressed = 0;
+    if (laszip_open_reader(laszip_reader, lazFile.c_str(), &is_compressed))
+    {
+        fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", lazFile.c_str());
+        std::abort();
+    }
+    std::cout << "compressed : " << is_compressed << std::endl;
+    laszip_header *header;
+
+    if (laszip_get_header_pointer(laszip_reader, &header))
+    {
+        fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
+        std::abort();
+    }
+    fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
+    laszip_point *point;
+    if (laszip_get_point_pointer(laszip_reader, &point))
+    {
+        fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
+        std::abort();
+    }
+
+    int counter_ts0 = 0;
+    int counter_filtered_points = 0;
+    for (laszip_U32 j = 0; j < header->number_of_point_records; j++)
+    {
+        if (laszip_read_point(laszip_reader))
+        {
+            fprintf(stderr, "DLL ERROR: reading point %u\n", j);
+            laszip_close_reader(laszip_reader);
+            return points;
+            // std::abort();
+        }
+        Point3Di p;
+
+        double cal_x = 11.0 / 1000.0; // ToDo change if lidar differen than livox mid 360
+        double cal_y = 23.29 / 1000.0;
+        double cal_z = -44.12 / 1000.0;
+
+        Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
+        p.point.x() = pf.x() - cal_x;
+        p.point.y() = pf.y() - cal_y;
+        p.point.z() = pf.z() - cal_z;
+        p.timestamp = point->gps_time;
+        p.intensity = point->intensity;
+
+        // add z correction
+        // if (p.point.z() > 0)
+        //{
+        //    double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
+        //    double correction = dist * asin(0.08 / 10.0);
+
+        //    p.point.z() += correction;
+        //}
+        /*if (p.point.z() > 0)
+        {
+            double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
+            double correction = 0;//dist * asin(0.08 / 10.0);
+
+            if (dist < 11.0){
+                correction = 0.005;
+            }else{
+                correction = -0.015;
+            }
+
+            p.point.z() += correction;
+        }*/
+
+        if (p.timestamp == 0 && ommit_points_with_timestamp_equals_zero)
+        {
+            counter_ts0++;
+        }
+        else
+        {
+            if (sqrt(pf.x() * pf.x() + pf.y() * pf.y()) > filter_threshold_xy)
+            {
+                points.emplace_back(p);
+            }
+            else
+            {
+                counter_filtered_points++;
+            }
+        }
+    }
+
+    std::cout << "number points with ts == 0: " << counter_ts0 << std::endl;
+    std::cout << "counter_filtered_points: " << counter_filtered_points << std::endl;
+    std::cout << "total number points: " << points.size() << std::endl;
+    laszip_close_reader(laszip_reader);
+    return points;
+}

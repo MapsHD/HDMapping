@@ -7,7 +7,6 @@
 #include <iostream>
 
 #include <Eigen/Eigen>
-
 struct PerspectiveCameraParams {
 	double cx;
 	double cy;
@@ -73,6 +72,8 @@ struct Point3Di
 	double timestamp;
     float intensity;
     int index_pose;
+	uint8_t lidarid;
+	
 };
 
 struct Point

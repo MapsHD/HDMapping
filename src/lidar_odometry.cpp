@@ -389,20 +389,65 @@ namespace MLvxCalib {
         json jsonData = json::parse(file);
 
         // Iterate through the JSON object and parse each value into Eigen::Affine3d
-        for (auto& kv : jsonData["calibration"].items()) {
-            const std::string& key = kv.key();
+        
+        for (auto& calibrationEntry : jsonData["calibration"].items()) {
+            const std::string& lidarSn = calibrationEntry.key();
             Eigen::Matrix4d value;
+            std::cout << "lidarSn : " << lidarSn << std::endl;
 
-            // Populate the Eigen::Affine3d matrix from the JSON array
-            for (int i = 0; i < 4; ++i) {
-                for (int j = 0; j < 4; ++j) {
-                    value(i, j) = kv.value()[i * 4 + j];
+            if (calibrationEntry.value().contains("identity"))
+            {
+                std::string identity = calibrationEntry.value()["identity"].get<std::string>();
+                std::cout << "identity : " << identity << std::endl;
+                std::transform(identity.begin(), identity.end(), identity.begin(), ::toupper);
+                if (identity == "TRUE")
+                {
+                    dataMap[lidarSn] = Eigen::Matrix4d::Identity();
+                    continue;
+                    continue;
                 }
             }
 
+            assert(kv.value().contains("data"));
+            const auto matrixRawData = calibrationEntry.value()["data"];
+            assert(matrixRawData.size() == 16);
+            // Populate the Eigen::Affine3d matrix from the JSON array
+            for (int i = 0; i < 4; ++i) {
+                for (int j = 0; j < 4; ++j) {
+                    value(i, j) = matrixRawData[i * 4 + j]; // default is column-major order
+                }
+            }
 
+            if (calibrationEntry.value().contains("order"))
+            {
+                std::string order = calibrationEntry.value()["order"].get<std::string>();
+                std::cout << "order : " << order << std::endl;
+                std::transform(order.begin(), order.end(), order.begin(), ::toupper);
+                if (order == "COLUMN")
+                {
+                    Eigen::Matrix4d valueT = value.transpose();
+                    value = valueT;
+                }
+            }
+
+            if (calibrationEntry.value().contains("inverted"))
+            {
+                std::string inverted = calibrationEntry.value()["inverted"].get<std::string>();
+                std::cout << "inverted : " << inverted << std::endl;
+                std::transform(inverted.begin(), inverted.end(), inverted.begin(), ::toupper);
+                if (inverted == "TRUE")
+                {
+                    Eigen::Matrix4d valueI = value.inverse();
+                    value = valueI;
+                }
+            }
+
+            Eigen::IOFormat HeavyFmt(Eigen::FullPrecision, 0, ", ", ";\n", "[", "]", "[", "]");
+
+            std::cout << "Calibration for " << lidarSn << std::endl;
+            std::cout << value.format(HeavyFmt) << std::endl;
             // Insert into the map
-            dataMap[key] = value;
+            dataMap[lidarSn] = value;
         }
         // check for blacklisted
         if (jsonData.contains("blacklist"))
@@ -826,10 +871,25 @@ void lidar_odometry_gui()
 							// Load mapping from id to sn
 							fs::path fnSn(fn);
                             fnSn.replace_extension(".sn");
+
                             // GetId of Imu to use
 							const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
                             auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
 							auto data= load_point_cloud(fn.c_str(), true, calibration);
+
+                            if (fn == laz_files.front())
+                            {
+                                fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
+
+                                std::ofstream testPointcloud{ calibrationValidtationFile.c_str() };
+                                for (const auto& p : data)
+                                {
+                                    testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int) p.lidarid << "\n";
+
+                                }
+                            }
+
+                 
 							std::unique_lock lck(mtx);
                             for (const auto& [id, calib] : calibration)
                             {
@@ -2190,6 +2250,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
 
         const Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
         p.point = calibration * (pf);
+        p.lidarid = id;
         p.timestamp = point->gps_time;
         p.intensity = point->intensity;
 

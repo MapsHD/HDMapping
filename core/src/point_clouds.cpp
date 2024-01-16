@@ -642,6 +642,10 @@ void PointClouds::show_all_from_range(int index_begin, int index_end)
 	{
 		for (int i = 0; i < point_clouds.size(); i++)
 		{
+			point_clouds[i].visible = false;
+		}
+		for (int i = 0; i < point_clouds.size(); i++)
+		{
 			if (i >= index_begin && i <= index_end)
 			{
 				point_clouds[i].visible = true;

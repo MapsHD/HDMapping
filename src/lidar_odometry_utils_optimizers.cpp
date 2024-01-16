@@ -236,6 +236,8 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
                                                                  1000000,
                                                                  100000000,
                                                                  100000000,
+                                                                 //100000000, underground mining 
+                                                                 //1000000, underground mining 
                                                                  1000000);
         Eigen::Matrix<double, 12, 1> AtPBodo;
         relative_pose_obs_eq_tait_bryan_wc_case1_AtPB_simplified(AtPBodo,
@@ -262,6 +264,8 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
                                                                  1000000,
                                                                  100000000,
                                                                  100000000,
+                                                                 // 100000000, underground mining
+                                                                 // 1000000, underground mining
                                                                  1000000);
         int ic_1 = odo_edges[i].first * 6;
         int ic_2 = odo_edges[i].second * 6;
@@ -427,8 +431,12 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         }
     }
 
-    double angle = 0.01 / 180.0 * M_PI;
+//underground mining
+    /*double angle = 1.0 / 180.0 * M_PI;
     double w_angle = 1.0 / (angle * angle);
+
+    double angle01 = 0.1 / 180.0 * M_PI;
+    double w_angle01 = 1.0 / (angle01 * angle01);
 
     for (int ic = 0; ic < intermediate_trajectory.size(); ic ++){
         int ir = tripletListB.size();
@@ -442,9 +450,9 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         tripletListP.emplace_back(ir, ir, 0);
         tripletListP.emplace_back(ir + 1, ir + 1, 0);
         tripletListP.emplace_back(ir + 2, ir + 2, 0);
-        tripletListP.emplace_back(ir + 3, ir + 3, w_angle);
-        tripletListP.emplace_back(ir + 4, ir + 4, w_angle);
-        tripletListP.emplace_back(ir + 5, ir + 5, 1);
+        tripletListP.emplace_back(ir + 3, ir + 3, w_angle01);
+        tripletListP.emplace_back(ir + 4, ir + 4, w_angle01);
+        tripletListP.emplace_back(ir + 5, ir + 5, 0);
 
         tripletListB.emplace_back(ir, 0, 0);
         tripletListB.emplace_back(ir + 1, 0, 0);
@@ -452,7 +460,7 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         tripletListB.emplace_back(ir + 3, 0, 0);
         tripletListB.emplace_back(ir + 4, 0, 0);
         tripletListB.emplace_back(ir + 5, 0, 0);
-    }
+    }*/
 
         
 
@@ -946,10 +954,12 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                                              worker_data[i - 1].intermediate_trajectory[0];
 
                 mean_shift = m_relative.translation() / (worker_data[i].intermediate_trajectory.size());
+                //mean_shift.z() = 0.0; underground mining
 
                 if (mean_shift.norm() > 1.0)
                 {
-                    mean_shift = Eigen::Vector3d(1.0, 1.0, 1.0);
+                    //mean_shift = Eigen::Vector3d(1.0, 1.0, 1.0);
+                    mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
                 }
                 std::cout << "mean_shift " << mean_shift << std::endl;
 
@@ -1010,22 +1020,23 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             std::chrono::time_point<std::chrono::system_clock> start1, end1;
             start1 = std::chrono::system_clock::now();
 
-            /*// XXX
+            // XXX underground mining
+            /*
             for (int k = 0; k < worker_data[i].intermediate_trajectory.size(); k++)
             {
                 TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[k]);
-                tb.om = worker_data[i].imu_roll_pitch[k].first;
-                tb.fi = worker_data[i].imu_roll_pitch[k].second;
+                //tb.om = 0;//worker_data[i].imu_roll_pitch[k].first;
+                //tb.fi = 0;//worker_data[i].imu_roll_pitch[k].second;
                 worker_data[i].intermediate_trajectory[k] = affine_matrix_from_pose_tait_bryan(tb);
             }
             for (int k = 0; k < worker_data[i].intermediate_trajectory_motion_model.size(); k++)
             {
                 TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory_motion_model[k]);
-                tb.om = worker_data[i].imu_roll_pitch[k].first;
-                tb.fi = worker_data[i].imu_roll_pitch[k].second;
+                tb.om = 0;//worker_data[i].imu_roll_pitch[k].first;
+                tb.fi = 0;//worker_data[i].imu_roll_pitch[k].second;
                 worker_data[i].intermediate_trajectory_motion_model[k] = affine_matrix_from_pose_tait_bryan(tb);
-            }
-            // XXX*/
+            }*/
+            // XXX
 
             for (int iter = 0; iter < params.nr_iter; iter++)
             {

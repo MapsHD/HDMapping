@@ -1,9 +1,22 @@
 #include <iostream>
 #include <fstream>
 #include <Eigen/Eigen>
+#include <structures.h>
+#include <transformations.h>
 
 int main(int argc, char *argv[])
 {
+    TaitBryanPose pose;
+    pose.px = 0;
+    pose.py = 0;
+    pose.pz = 0;
+    pose.om = -90.0 / 180.0 * M_PI;
+    pose.fi = 0;
+    pose.ka = 0;
+    Eigen::Affine3d mpose = affine_matrix_from_pose_tait_bryan(pose);
+
+    std::cout << mpose.matrix() << std::endl;
+
     if (argc != 3)
     {
         std::cout << "USAGE: " << argv[0] << "file_with_4x4_matrix file_with_4x4_matrix" << std::endl;
@@ -57,7 +70,7 @@ int main(int argc, char *argv[])
             infile.close();
         }
 
-        std::cout << (m1*m2).matrix() << std::endl;
+        std::cout << (m1 * m2).matrix() << std::endl;
     }
     return 0;
 }

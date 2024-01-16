@@ -693,6 +693,16 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
         }
         else
         {
+            /* underground mining
+            if (sqrt(pf.x() * pf.x()) < 4.5 && sqrt(pf.y() * pf.y()) < 2){
+                counter_filtered_points++;
+            }else{
+                
+
+                points.emplace_back(p);
+            }
+            */
+
             if (sqrt(pf.x() * pf.x() + pf.y() * pf.y()) > filter_threshold_xy)
             {
                 points.emplace_back(p);

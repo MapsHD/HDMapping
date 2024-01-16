@@ -962,9 +962,8 @@ void project_gui()
             {
                 index_end = session.point_clouds_container.point_clouds.size() - 1;
             }
-            if (idx_begin != index_begin || idx_end != index_end)
+            if (ImGui::Button("Show selected"))
             {
-                session.point_clouds_container.hide_all();
                 session.point_clouds_container.show_all_from_range(index_begin, index_end);
             }
             // if (ImGui::Button("mark all pcs from range <index_begin, index_end>"))

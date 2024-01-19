@@ -1151,8 +1151,12 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
                     pose.fi += h_x[counter++] * 0.5;
                     pose.ka += h_x[counter++] * 0.5;
 
-                    if (i == 0 && is_fix_first_node && point_clouds_container.point_clouds[i].fixed)
+                    if (i == 0 && is_fix_first_node)
                     {
+                        continue;
+                    }
+                    if (point_clouds_container.point_clouds[i].fixed){
+                        std::cout << "point cloud " << i << " is fixed, continue" << std::endl;
                         continue;
                     }
 

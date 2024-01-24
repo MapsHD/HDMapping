@@ -29,6 +29,7 @@ class GNSS{
     bool load(const std::vector<std::string> &input_file_names);
     bool load_mercator_projection(const std::vector<std::string> &input_file_names);
     void render(const PointClouds &point_clouds_container);
+    bool save_to_laz(const std::string &output_file_names);
 
     std::vector<GlobalPose> gnss_poses;
     double offset_x = 0;

@@ -1294,6 +1294,27 @@ void project_gui()
                     }
                 }
             }
+
+            if (ImGui::Button("save gnss data to laz file"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
+                    output_file_name = sel;
+                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    gnss.save_to_laz(output_file_name);
+                }
+            }
+
             if (ImGui::Button("save scale board for all marked trajectories to laz (as one global scan - dec 0.1)"))
             {
                 std::shared_ptr<pfd::save_file> save_file;

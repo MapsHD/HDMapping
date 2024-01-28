@@ -67,7 +67,7 @@ void alternative_approach();
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_step_1 v0.30"))
+    if (ImGui::Begin("lidar_odometry_step_1 v0.31"))
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
@@ -168,6 +168,8 @@ void lidar_odometry_gui()
 
                 std::vector<std::string> csv_files;
                 std::vector<std::string> laz_files;
+                std::vector<std::string> sn_files;
+
                 std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
                               {
                     if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
@@ -177,11 +179,52 @@ void lidar_odometry_gui()
                     if (fileName.ends_with(".csv"))
                     {
                         csv_files.push_back(fileName);
-                    } });
+                    }
+                    if (fileName.ends_with(".sn"))
+                    {
+                        sn_files.push_back(fileName);
+                    }
+                    });
 
                 if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
                 {
                     working_directory = fs::path(input_file_names[0]).parent_path().string();
+
+                    const auto calibrationFile = (fs::path(working_directory) / "calibration.json").string();
+                    const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
+                    const std::string imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
+                    if (!preloadedCalibration.empty())
+                    {
+                        std::cout << "Loaded calibration for: \n";
+                        for (const auto& [sn, _] : preloadedCalibration)
+                        {
+                            std::cout << " -> " << sn << std::endl;
+                        }
+                    }else{
+                        std::cout << "There is no calibration.json file in folder (check comment in source code) file: " << __FILE__ << " line: " << __LINE__ << std::endl;
+                        //example file for 2x livox";
+                        /*
+                        {
+                            "calibration" : {
+                                "47MDL9T0020193" : {
+                                    "identity" : "true"
+                                },
+                                "47MDL9S0020300" :
+                                    {
+                                        "order" : "ROW",
+                                        "inverted" : "TRUE",
+                                        "data" : [
+                                            0.999824, 0.00466397, -0.0181595, -0.00425984,
+                                            -0.0181478, -0.00254457, -0.999832, -0.151599,
+                                            -0.0047094, 0.999986, -0.00245948, -0.146408,
+                                            0, 0, 0, 1
+                                        ]
+                                    }
+                            },
+                                            "imuToUse" : "47MDL9T0020193"
+                        }*/
+                    }
+
                     fs::path wdp = fs::path(input_file_names[0]).parent_path();
                     wdp /= "preview";
                     if (!fs::exists(wdp))
@@ -198,21 +241,61 @@ void lidar_odometry_gui()
                     std::cout << "loading imu" << std::endl;
                     std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data;
 
-                    std::for_each(std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string &fn)
-                                  {
-                    auto imu = load_imu(fn.c_str());
-                    std::cout << fn << std::endl;
-                    imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu)); });
+                    for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
+                    {
+                        const std::string& imufn = csv_files.at(fileNo);
+                        const std::string snFn = (fileNo>= sn_files.size())? ("") : (sn_files.at(fileNo));
+                        const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
+                        // GetId of Imu to use
+                        int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
+                        std::cout << "imuNumberToUse  " << imuNumberToUse <<  " at" << imufn << std::endl;
+                        auto imu = load_imu(imufn.c_str(), imuNumberToUse);
+                        std::cout << imufn <<" with mapping " << snFn << std::endl;
+                        imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
+                    }
 
                     std::cout << "loading points" << std::endl;
                     std::vector<std::vector<Point3Di>> pointsPerFile;
                     pointsPerFile.resize(laz_files.size());
-
+                    std::mutex mtx;
                     std::cout << "start std::transform" << std::endl;
-                    std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [](const std::string &fn)
-                                   { return load_point_cloud(fn.c_str(), true, params.filter_threshold_xy); });
+
+                    std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [&](const std::string& fn)
+                    {
+                            // Load mapping from id to sn
+                            fs::path fnSn(fn);
+                            fnSn.replace_extension(".sn");
+
+                            // GetId of Imu to use
+                            const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
+                            auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
+                            auto data= load_point_cloud(fn.c_str(), true, params.filter_threshold_xy, calibration);
+
+                            if (fn == laz_files.front())
+                            {
+                                fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
+
+                                std::ofstream testPointcloud{ calibrationValidtationFile.c_str() };
+                                for (const auto& p : data)
+                                {
+                                    testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int) p.lidarid << "\n";
+
+                                }
+                            }
+
+
+							std::unique_lock lck(mtx);
+                            for (const auto& [id, calib] : calibration)
+                            {
+                                std::cout << " id : " << id << std::endl;
+                                std::cout << calib.matrix() << std::endl;
+                            }
+                            return data;
+							// std::cout << fn << std::endl;
+							//
+                    });
                     std::cout << "std::transform finished" << std::endl;
-                    
+
                     FusionAhrs ahrs;
                     FusionAhrsInitialise(&ahrs);
 
@@ -663,7 +746,7 @@ void lidar_odometry_gui()
                     for (size_t i = 0; i < input_file_names.size(); i++)
                     {
                         std::cout << "loading reference point cloud from: " << input_file_names[i] << std::endl;
-                        auto pp = load_point_cloud(input_file_names[i].c_str(), false, 0);
+                        auto pp = load_point_cloud(input_file_names[i].c_str(), false, 0, {});
                         std::cout << "loaded " << pp.size() << " reference points" << std::endl;
                         params.reference_points.insert(std::end(params.reference_points), std::begin(pp), std::end(pp));
                     }
@@ -1222,7 +1305,7 @@ int main(int argc, char *argv[])
 std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, int point_count_threshold, std::vector<Point3Di> prev_points)
 {
     std::vector<std::vector<Point3Di>> res_points;
-    std::vector<Point3Di> points = load_point_cloud(laz_file, false, 0);
+    std::vector<Point3Di> points = load_point_cloud(laz_file, false, 0, {});
 
     std::vector<Point3Di> tmp_points = prev_points;
     int counter = tmp_points.size();
@@ -1341,7 +1424,7 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
     for (int i = 0; i < best_trajectory.size(); i++){
         trajectory_for_interpolation[ts[i]] = best_trajectory[i].matrix();
     }
-       
+
 
     std::vector<Point3Di> points_global = points_reindexed;
     for (auto &p : points_global)
@@ -1398,20 +1481,20 @@ void alternative_approach()
                     if (fileName.ends_with(".csv"))
                     {
                         csv_files.push_back(fileName);
-                    } 
+                    }
                 });
 
     std::cout << "imu files: " << std::endl;
     for (const auto &fn : csv_files){
         std::cout << fn << std::endl;
     }
-    
+
     std::cout << "loading imu" << std::endl;
     std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data;
 
     std::for_each(std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string &fn)
                   {
-                    auto imu = load_imu(fn.c_str());
+                    auto imu = load_imu(fn.c_str(), 0);
                     std::cout << fn << std::endl;
                     imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu)); });
 
@@ -1471,8 +1554,8 @@ void alternative_approach()
     /*int current_file_index = 0;
     int current_point_index = 0;
 
-    std::vector<Point3Di> points; 
-    
+    std::vector<Point3Di> points;
+
     bool do_not_stop = true;
     while (do_not_stop){
         bool do_not_stop_internal_loop = true;
@@ -1500,7 +1583,7 @@ void alternative_approach()
             all_points.push_back(tmp_points[j]);
         }
     }
-    
+
     //////////
     std::vector<double> timestamps;
     std::vector<Eigen::Affine3d> poses;

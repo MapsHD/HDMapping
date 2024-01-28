@@ -71,8 +71,9 @@ struct Point3Di
 	//float y;
 	//float z;
 	double timestamp;
-    float intensity;
-    int index_pose;
+        float intensity;
+        int index_pose;
+        uint8_t lidarid;
 };
 
 struct Point

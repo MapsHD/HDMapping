@@ -67,7 +67,7 @@ void alternative_approach();
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_step_1 v0.30"))
+    if (ImGui::Begin("lidar_odometry_step_1 v0.31"))
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
@@ -200,6 +200,29 @@ void lidar_odometry_gui()
                         {
                             std::cout << " -> " << sn << std::endl;
                         }
+                    }else{
+                        std::cout << "There is no calibration.json file in folder (check comment in source code) file: " << __FILE__ << " line: " << __LINE__ << std::endl;
+                        //example file for 2x livox";
+                        /*
+                        {
+                            "calibration" : {
+                                "47MDL9T0020193" : {
+                                    "identity" : "true"
+                                },
+                                "47MDL9S0020300" :
+                                    {
+                                        "order" : "ROW",
+                                        "inverted" : "TRUE",
+                                        "data" : [
+                                            0.999824, 0.00466397, -0.0181595, -0.00425984,
+                                            -0.0181478, -0.00254457, -0.999832, -0.151599,
+                                            -0.0047094, 0.999986, -0.00245948, -0.146408,
+                                            0, 0, 0, 1
+                                        ]
+                                    }
+                            },
+                                            "imuToUse" : "47MDL9T0020193"
+                        }*/
                     }
 
                     fs::path wdp = fs::path(input_file_names[0]).parent_path();

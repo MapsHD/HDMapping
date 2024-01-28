@@ -20,7 +20,7 @@ struct Point3Dil
     int livoxId;
 };
 
-std::vector<Point3Dil> load_point_cloud(const std::string& lazFile, bool ommit_points_with_timestamp_equals_zero)
+std::vector<Point3Dil> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero)
 {
     std::vector<Point3Dil> points;
     laszip_POINTER laszip_reader;
@@ -37,7 +37,7 @@ std::vector<Point3Dil> load_point_cloud(const std::string& lazFile, bool ommit_p
         std::abort();
     }
     std::cout << "compressed : " << is_compressed << std::endl;
-    laszip_header* header;
+    laszip_header *header;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
@@ -45,7 +45,7 @@ std::vector<Point3Dil> load_point_cloud(const std::string& lazFile, bool ommit_p
         std::abort();
     }
     fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
-    laszip_point* point;
+    laszip_point *point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
         fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
@@ -61,7 +61,7 @@ std::vector<Point3Dil> load_point_cloud(const std::string& lazFile, bool ommit_p
             fprintf(stderr, "DLL ERROR: reading point %u\n", j);
             laszip_close_reader(laszip_reader);
             return points;
-            //std::abort();
+            // std::abort();
         }
         Point3Dil p;
 
@@ -83,7 +83,7 @@ std::vector<Point3Dil> load_point_cloud(const std::string& lazFile, bool ommit_p
         }
         else
         {
-             points.emplace_back(p);
+            points.emplace_back(p);
         }
     }
 
@@ -93,19 +93,20 @@ std::vector<Point3Dil> load_point_cloud(const std::string& lazFile, bool ommit_p
     laszip_close_reader(laszip_reader);
     return points;
 }
-bool saveLaz(const std::string& filename, const std::vector<Point3Di>& points_global)
+
+bool saveLaz(const std::string &filename, const std::vector<Point3Di> &points_global)
 {
 
     constexpr float scale = 0.0001f; // one tenth of milimeter
     // find max
-    double max_x{ std::numeric_limits<double>::lowest() };
-    double max_y{ std::numeric_limits<double>::lowest() };
-    double max_z{ std::numeric_limits<double>::lowest() };
+    double max_x{std::numeric_limits<double>::lowest()};
+    double max_y{std::numeric_limits<double>::lowest()};
+    double max_z{std::numeric_limits<double>::lowest()};
     double min_x = 1000000000000.0;
     double min_y = 1000000000000.0;
     double min_z = 1000000000000.0;
 
-    for (auto& p : points_global)
+    for (auto &p : points_global)
     {
         if (p.point.x() < min_x)
         {
@@ -146,7 +147,7 @@ bool saveLaz(const std::string& filename, const std::vector<Point3Di>& points_gl
 
     // get a pointer to the header of the writer so we can populate it
 
-    laszip_header* header;
+    laszip_header *header;
 
     if (laszip_get_header_pointer(laszip_writer, &header))
     {
@@ -193,7 +194,7 @@ bool saveLaz(const std::string& filename, const std::vector<Point3Di>& points_gl
 
     // get a pointer to the point of the writer that we will populate and write
 
-    laszip_point* point;
+    laszip_point *point;
     if (laszip_get_point_pointer(laszip_writer, &point))
     {
         fprintf(stderr, "DLL ERROR: getting point pointer from laszip writer\n");
@@ -205,7 +206,7 @@ bool saveLaz(const std::string& filename, const std::vector<Point3Di>& points_gl
 
     for (int i = 0; i < points_global.size(); i++)
     {
-        const auto& p = points_global[i];
+        const auto &p = points_global[i];
         point->intensity = p.intensity;
         point->gps_time = p.timestamp * 1e9;
         // std::cout << p.timestamp << std::endl;
@@ -256,43 +257,45 @@ bool saveLaz(const std::string& filename, const std::vector<Point3Di>& points_gl
     return true;
 }
 
-
-std::unordered_map<int, std::string> GetIdToStringMapping(const std::string& filename)
+std::unordered_map<int, std::string> GetIdToStringMapping(const std::string &filename)
 {
     std::unordered_map<int, std::string> dataMap;
     std::ifstream fst(filename);
     std::string line;
-    while (std::getline(fst, line)) {
+    while (std::getline(fst, line))
+    {
         std::istringstream iss(line);
         int key;
         std::string value;
 
-        if (iss >> key >> value) {
+        if (iss >> key >> value)
+        {
             dataMap[key] = value;
         }
-        else {
+        else
+        {
             std::cerr << "Failed to parse line: " << line << std::endl;
         }
     }
     return dataMap;
 }
 
-
-
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     std::vector<std::string> arguments;
-    for (int i = 1; i < argc; i++) {
+    for (int i = 1; i < argc; i++)
+    {
         arguments.push_back(argv[i]);
     }
-    if (arguments.size() != 2) {
+    if (arguments.size() != 2)
+    {
         std::cout << "Usage \n";
-        std::cout << " " << argv[0] << "<input_file_from_mandaye> <output>\n";
+        std::cout << " " << argv[0] << " <input_file_from_mandeye> <output>\n";
         return 0;
     }
-    const std::filesystem::path inputLazFile{ arguments[0]};
-    const std::filesystem::path inputSnFile = inputLazFile.parent_path()/inputLazFile.stem().concat(".sn");
-    const std::filesystem::path outputFile{ arguments[1] };
+    const std::filesystem::path inputLazFile{arguments[0]};
+    const std::filesystem::path inputSnFile = inputLazFile.parent_path() / inputLazFile.stem().concat(".sn");
+    const std::filesystem::path outputFile{arguments[1]};
     std::cout << "Input Laz file " << inputLazFile << std::endl;
     std::cout << "Input Sn file " << inputSnFile << std::endl;
 
@@ -311,7 +314,7 @@ int main(int argc, char* argv[])
 
     std::unordered_map<int, std::vector<Point3Di>> data_separated;
 
-    for (const auto& pInput : data)
+    for (const auto &pInput : data)
     {
         const int id = pInput.livoxId;
 
@@ -322,10 +325,10 @@ int main(int argc, char* argv[])
         data_separated[id].push_back(pOutput);
     }
 
-    for (const auto& [id, sn] : mapping)
+    for (const auto &[id, sn] : mapping)
     {
         const std::filesystem::path outputFileSn = outputFile.parent_path() / outputFile.stem().concat("_" + sn + ".laz");
-        const auto& lidarData = data_separated[id];
+        const auto &lidarData = data_separated[id];
         saveLaz(outputFileSn.string(), lidarData);
     }
 

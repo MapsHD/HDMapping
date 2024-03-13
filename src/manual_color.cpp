@@ -8,6 +8,7 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include <mutex>
 #include <vector>
 
 #include "color_las_loader.h"

@@ -67,7 +67,7 @@ void alternative_approach();
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_step_1 v0.31"))
+    if (ImGui::Begin("lidar_odometry_step_1 v0.32"))
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");

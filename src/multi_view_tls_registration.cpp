@@ -112,20 +112,20 @@ bool session_loaded = false;
 void export_result_to_folder(std::string output_folder_name, ObservationPicking &observation_picking, Session &session);
 void reshape(int w, int h);
 
-//this functions performs experiment from paper
+// this functions performs experiment from paper
 //@article
 //{BEDKOWSKI2023113199,
-//     title = {Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms},
-//     journal = {Measurement},
-//     pages = {113199},
-//     year = {2023},
-//     issn = {0263-2241},
-//     doi = {https://doi.org/10.1016/j.measurement.2023.113199},
-//     url = {https://www.sciencedirect.com/science/article/pii/S0263224123007637},
-//     author = {Janusz Będkowski},
-//     keywords = {TLS, Point cloud, Open-source, Multi-view data registration, LiDAR data metrics, Robust loss function, Tait-bryan angles, Quaternions, Rodrigues’ formula, Lie algebra, Rotation matrix parameterization},
-//     abstract = {This study addresses multi-view Terrestrial Laser Scanning Point Cloud data registration methods. Multiple rigid point cloud data registration is mandatory for aligning all scans into a common reference frame and it is still considered a challenge looking from a large-scale surveys point of view. The goal of this work is to support the development of cutting-edge registration methods in geoscience and mobile robotics domains. This work evaluates 3 data sets of total 20 scenes available in the literature. This paper provides a novel open-source framework for multi-view Terrestrial Laser Scanning Point Cloud data registration benchmarks. The goal was to verify experimentally which registration variant can improve the open-source data looking from the quantitative and qualitative points of view. In particular, the following scanners provided measurement data: Z+F TLS Imager 5006i, Z+F TLS Imager 5010C, Leica ScanStation C5, Leica ScanStation C10, Leica P40 and Riegl VZ-400. The benchmark shows an impact of the metric e.g. point to point, point to projection onto a plane, plane to plane etc..., rotation matrix parameterization (Tait-Bryan, quaternion, Rodrigues) and other implementation variations (e.g. multi-view Normal Distributions Transform, Pose Graph SLAM approach) onto the multi-view data registration accuracy and performance. An open-source project is created and it can be used for improving existing data sets reported in the literature, it is the added value of the presented research. The combination of metrics, rotation matrix parameterization and optimization algorithms creates hundreds of possible approaches. It is shown that chosen metric is a dominant factor in data registration. The rotation parameterization and other degrees of freedom of proposed variants are rather negligible compared with chosen metric. Most of the proposed approaches improve registered reference data provided by other researchers. Only for 2 from 20 scenes it was not possible to provide significant improvement. The largest improvements are evident for large-scale scenes. The project is available and maintained at https://github.com/MapsHD/HDMapping.}
-//}
+//      title = {Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms},
+//      journal = {Measurement},
+//      pages = {113199},
+//      year = {2023},
+//      issn = {0263-2241},
+//      doi = {https://doi.org/10.1016/j.measurement.2023.113199},
+//      url = {https://www.sciencedirect.com/science/article/pii/S0263224123007637},
+//      author = {Janusz Będkowski},
+//      keywords = {TLS, Point cloud, Open-source, Multi-view data registration, LiDAR data metrics, Robust loss function, Tait-bryan angles, Quaternions, Rodrigues’ formula, Lie algebra, Rotation matrix parameterization},
+//      abstract = {This study addresses multi-view Terrestrial Laser Scanning Point Cloud data registration methods. Multiple rigid point cloud data registration is mandatory for aligning all scans into a common reference frame and it is still considered a challenge looking from a large-scale surveys point of view. The goal of this work is to support the development of cutting-edge registration methods in geoscience and mobile robotics domains. This work evaluates 3 data sets of total 20 scenes available in the literature. This paper provides a novel open-source framework for multi-view Terrestrial Laser Scanning Point Cloud data registration benchmarks. The goal was to verify experimentally which registration variant can improve the open-source data looking from the quantitative and qualitative points of view. In particular, the following scanners provided measurement data: Z+F TLS Imager 5006i, Z+F TLS Imager 5010C, Leica ScanStation C5, Leica ScanStation C10, Leica P40 and Riegl VZ-400. The benchmark shows an impact of the metric e.g. point to point, point to projection onto a plane, plane to plane etc..., rotation matrix parameterization (Tait-Bryan, quaternion, Rodrigues) and other implementation variations (e.g. multi-view Normal Distributions Transform, Pose Graph SLAM approach) onto the multi-view data registration accuracy and performance. An open-source project is created and it can be used for improving existing data sets reported in the literature, it is the added value of the presented research. The combination of metrics, rotation matrix parameterization and optimization algorithms creates hundreds of possible approaches. It is shown that chosen metric is a dominant factor in data registration. The rotation parameterization and other degrees of freedom of proposed variants are rather negligible compared with chosen metric. Most of the proposed approaches improve registered reference data provided by other researchers. Only for 2 from 20 scenes it was not possible to provide significant improvement. The largest improvements are evident for large-scale scenes. The project is available and maintained at https://github.com/MapsHD/HDMapping.}
+// }
 void perform_experiment_on_windows(Session &session, ObservationPicking &observation_picking, ICP &icp, NDT &ndt,
                                    RegistrationPlaneFeature &registration_plane_feature, PoseGraphSLAM &pose_graph_slam);
 void perform_experiment_on_linux(Session &session, ObservationPicking &observation_picking, ICP &icp, NDT &ndt,
@@ -142,13 +142,13 @@ void adjustHeader(laszip_header *header, const Eigen::Affine3d &m_pose, const Ei
 {
     Eigen::Vector3d max{header->max_x, header->max_y, header->max_z};
     Eigen::Vector3d min{header->min_x, header->min_y, header->min_z};
- 
+
     max -= offset_in;
     min -= offset_in;
- 
+
     Eigen::Vector3d adj_max = m_pose * max + offset_in;
     Eigen::Vector3d adj_min = m_pose * min + offset_in;
-  
+
     header->max_x = adj_max.x();
     header->max_y = adj_max.y();
     header->max_z = adj_max.z();
@@ -169,7 +169,7 @@ void adjustPoint(laszip_F64 output_coordinates[3], laszip_F64 input_coordinates[
     output_coordinates[2] = o.z();
 }
 
-void save_processed_pc(const fs::path &file_path_in, const fs::path &file_path_put, const Eigen::Affine3d &m_pose, const Eigen::Vector3d &offset)
+void save_processed_pc(const fs::path &file_path_in, const fs::path &file_path_put, const Eigen::Affine3d &m_pose, const Eigen::Vector3d &offset, bool override_compressed = false)
 {
     std::cout << "processing: " << file_path_in << std::endl;
 
@@ -215,6 +215,12 @@ void save_processed_pc(const fs::path &file_path_in, const fs::path &file_path_p
     }
 
     fprintf(stderr, "file '%s' contains %u points\n", file_name_in.c_str(), header->number_of_point_records);
+
+    if (override_compressed)
+    {
+        is_compressed = 0;
+        std::cout << "compressed : " << is_compressed << std::endl;
+    }
 
     if (laszip_open_writer(laszip_writer, file_name_out.c_str(), is_compressed))
     {
@@ -374,7 +380,7 @@ void project_gui()
     const std::vector<std::string>
         Session_filter = {"Session, json", "*.json"};
     const std::vector<std::string> Resso_filter = {"Resso, reg", "*.reg"};
-    const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*" };
+    const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
 
     if (!session_loaded)
     {
@@ -420,13 +426,16 @@ void project_gui()
 
         if (output_file_name.size() > 0)
         {
-            if (!save_subsession){
+            if (!save_subsession)
+            {
                 session.save(fs::path(output_file_name).string(), session.point_clouds_container.poses_file_name, session.point_clouds_container.initial_poses_file_name, save_subsession);
                 std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
                 session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), save_subsession);
-            }else{
-                //std::string poses_file_name;
-                //std::string initial_poses_file_name;
+            }
+            else
+            {
+                // std::string poses_file_name;
+                // std::string initial_poses_file_name;
                 std::shared_ptr<pfd::save_file> save_file1;
                 std::string poses_file_name = "";
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file1);
@@ -451,7 +460,8 @@ void project_gui()
                 std::thread t2(tt);
                 t2.join();
 
-                if (poses_file_name.size() > 0 && initial_poses_file_name.size() > 0){
+                if (poses_file_name.size() > 0 && initial_poses_file_name.size() > 0)
+                {
                     session.save(fs::path(output_file_name).string(), poses_file_name, initial_poses_file_name, save_subsession);
                     std::cout << "saving poses to: " << poses_file_name << std::endl;
                     session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), save_subsession);
@@ -463,7 +473,7 @@ void project_gui()
     }
     ImGui::SameLine();
     ImGui::Checkbox("save_subsession", &save_subsession);
-    
+
     if (session_loaded)
     {
         ImGui::Text(std::string("input session file: '" + session.session_file_name + "'").c_str());
@@ -828,8 +838,6 @@ void project_gui()
         ImGui::Text(session.point_clouds_container.poses_file_name.c_str());
     }
 
-    
-
     if (ImGui::Button("generate random colors"))
     {
         for (auto &pc : session.point_clouds_container.point_clouds)
@@ -854,7 +862,8 @@ void project_gui()
 
     if (ImGui::Button("Set initial pose to Identity and update other poses"))
     {
-        if (session.point_clouds_container.point_clouds.size() > 0){
+        if (session.point_clouds_container.point_clouds.size() > 0)
+        {
             auto m_inv = session.point_clouds_container.point_clouds[0].m_pose.inverse();
             for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
             {
@@ -1166,7 +1175,7 @@ void project_gui()
             ImGui::Separator();
             ImGui::Separator();
         }
-        //gnss.offset_x, gnss.offset_y, gnss.offset_alt
+        // gnss.offset_x, gnss.offset_y, gnss.offset_alt
         ImGui::InputDouble("offset_x", &gnss.offset_x);
         ImGui::InputDouble("offset_y", &gnss.offset_y);
         ImGui::InputDouble("offset_z", &gnss.offset_alt);
@@ -1245,7 +1254,33 @@ void project_gui()
                         std::cout << "file_out: " << file_path_put << std::endl;
 
                         std::cout << "start save_processed_pc" << std::endl;
-                        save_processed_pc(file_path_in, file_path_put, p.m_pose, session.point_clouds_container.offset);
+                        save_processed_pc(file_path_in, file_path_put, p.m_pose, session.point_clouds_container.offset, false);
+                        std::cout << "processed_pc finished" << std::endl;
+                    }
+                }
+            }
+            if (ImGui::Button("save all marked scans to las (as separate global scans)"))
+            {
+                for (auto &p : session.point_clouds_container.point_clouds)
+                {
+                    if (p.visible)
+                    {
+                        fs::path file_path_in = p.file_name;
+                        // std::cout << filePath.stem() << std::endl;
+                        // std::cout << filePath.extension() << std::endl;
+                        // std::cout << filePath.root_name() << std::endl;
+                        // std::cout << filePath.root_directory() << std::endl;
+                        // std::cout << filePath.root_path() << std::endl;
+                        // std::cout << filePath.relative_path() << std::endl;
+                        // std::cout << filePath.parent_path() << std::endl;
+                        // std::cout << filePath.filename() << std::endl;
+                        fs::path file_path_put = file_path_in.parent_path();
+                        file_path_put /= (file_path_in.stem().string() + "_processed.las" /*+ file_path_in.extension().string()*/);
+                        std::cout << "file_in: " << file_path_in << std::endl;
+                        std::cout << "file_out: " << file_path_put << std::endl;
+
+                        std::cout << "start save_processed_pc" << std::endl;
+                        save_processed_pc(file_path_in, file_path_put, p.m_pose, session.point_clouds_container.offset, true);
                         std::cout << "processed_pc finished" << std::endl;
                     }
                 }
@@ -1322,7 +1357,7 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                        auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
                     output_file_name = sel;
                     std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
                 };
@@ -1736,7 +1771,7 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or csv file", "C:\\", { "LAS file", "*.las", "Csv file", "*.csv" }).result();
+                    auto sel = pfd::save_file("Save las or csv file", "C:\\", {"LAS file", "*.las", "Csv file", "*.csv"}).result();
                     output_file_name = sel;
                     std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
                 };
@@ -1942,7 +1977,8 @@ void project_gui()
                 }
             }
         }
-        if (gnss.gnss_poses.size() > 0){
+        if (gnss.gnss_poses.size() > 0)
+        {
             ImGui::Checkbox("show GNSS correspondences", &gnss.show_correspondences);
         }
 
@@ -3308,7 +3344,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration_step_2 v0.31");
+    glutCreateWindow("multi_view_tls_registration_step_2 v0.32");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

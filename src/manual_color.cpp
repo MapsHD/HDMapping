@@ -20,6 +20,17 @@
 #include <observation_equations/codes/python-scripts/camera-metrics/equirectangular_camera_colinearity_tait_bryan_wc_jacobian.h>
 #include <Eigen/Eigen>
 #include <observation_equations/codes/common/include/cauchy.h>
+#include <observation_equations/codes/python-scripts/camera-metrics/fisheye_camera_calibRT_tait_bryan_wc_jacobian.h>
+
+double fx = 2141.3412300023847;
+double fy = 2141.3412300023847;
+double cx = 1982.4503600047012;
+double cy = 1472.7228631802407;
+double k1 = -0.00042559601894193817;
+double k2 = 0.003534402929232146;
+double k3 = -0.0022518302398800826;
+double k4 = 0.0001842010188374431;
+double alpha = 0;
 
 GLuint tex1;
 
@@ -38,9 +49,28 @@ GLuint make_tex(const std::string &fn)
     // load and generate the texture
     int width, height, nrChannels;
     unsigned char *data = stbi_load(fn.c_str(), &width, &height, &nrChannels, 0);
+
     if (data)
     {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        if (nrChannels == 1)
+        {
+            unsigned char *data3 = (unsigned char *)malloc(width * height * 3);
+
+            int counter = 0;
+            for (int wh = 0; wh < width * height; wh++)
+            {
+                data3[counter++] = data[wh];
+                data3[counter++] = data[wh];
+                data3[counter++] = data[wh];
+            }
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data3);
+            stbi_image_free(data3);
+        }
+        else
+        {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        }
+
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         // glGenerateMipmap(GL_TEXTURE_2D);
@@ -337,6 +367,37 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloud(const std::vector<mandeye:
     return newCloud;
 }
 
+std::vector<mandeye::PointRGB> ApplyColorToPointcloudFishEye(const std::vector<mandeye::PointRGB> &pointsRGB, const unsigned char *imageData, int imageWidth, int imageHeight, int nrChannels, const Eigen::Affine3d &transfom)
+{
+    std::vector<mandeye::PointRGB> newCloud(pointsRGB.size());
+    std::transform(std::execution::par_unseq, pointsRGB.begin(), pointsRGB.end(), newCloud.begin(), [&](mandeye::PointRGB p)
+                   {
+            TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(transfom);
+            double du, dv;
+            //equrectangular_camera_colinearity_tait_bryan_wc(du,dv, imageHeight, imageWidth,
+            //    M_PI, pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+            //    p.point.x(),
+            //    p.point.y(),
+            //    p.point.z());
+
+            projection_fisheye_camera_tait_bryan_wc(du, dv, fx, fy, cx, cy,
+                                                    pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+                                                    p.point.x(), p.point.y(), p.point.z(), k1, k2, k3, k4, alpha);
+
+            int u = std::round(du);
+            int v = std::round(dv);
+            if (u > 0 && v > 0 && u < imageWidth && v < imageHeight)
+            {
+                int index = (v * imageWidth + u) * nrChannels;
+                unsigned char red = imageData[index];
+                unsigned char green = imageData[index + 1];
+                unsigned char blue = imageData[index + 2];
+                p.rgb = { 1.f * red / 256.f,1.f * green / 256.f, 1.f * blue / 256.f, 1.f };
+            }
+        return p; });
+    return newCloud;
+}
+
 void ImGuiLoadSaveButtons()
 {
 
@@ -346,10 +407,15 @@ void ImGuiLoadSaveButtons()
         const auto input_file_names = mandeye::fd::OpenFileDialog("Choose Image", mandeye::fd::ImageFilter, false);
         if (input_file_names.size())
         {
+            //std::cout << "1" << std::endl;
             tex1 = make_tex(input_file_names.front());
+            //std::cout << "2" << std::endl;
             SD::imageData = stbi_load(input_file_names.front().c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
+            //std::cout << "3" << std::endl;
         }
+        //std::cout << "4" << std::endl;
         SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+        //std::cout << "5" << std::endl;
     }
     ImGui::SameLine();
     if (ImGui::Button("Load Poincloud"))
@@ -496,6 +562,145 @@ void optimize()
     }
 }
 
+void optimize_fish_eye()
+{
+    if (SystemData::pointPickedPointCloud.size() == SystemData::pointPickedImage.size() && SystemData::pointPickedPointCloud.size() >= 5)
+    {
+        std::vector<Eigen::Triplet<double>> tripletListA;
+        std::vector<Eigen::Triplet<double>> tripletListP;
+        std::vector<Eigen::Triplet<double>> tripletListB;
+
+        TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
+        for (int i = 0; i < SystemData::pointPickedImage.size(); i++)
+        {
+
+            Eigen::Matrix<double, 2, 1> delta;
+            // observation_equation_equrectangular_camera_colinearity_tait_bryan_wc(delta, SystemData::imageHeight, SystemData::imageWidth, M_PI,
+            //                                                                      pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+            //                                                                      SystemData::pointPickedPointCloud[i].x(),
+            //                                                                      SystemData::pointPickedPointCloud[i].y(),
+            //                                                                      SystemData::pointPickedPointCloud[i].z(),
+            //                                                                      SystemData::pointPickedImage[i].x * SystemData::imageWidth,
+            //                                                                      SystemData::pointPickedImage[i].y * SystemData::imageHeight);
+           
+
+            observation_equation_fisheye_camera_tait_bryan_wc(delta, fx, fy, cx, cy,
+                                                              pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+                                                              SystemData::pointPickedPointCloud[i].x(),
+                                                              SystemData::pointPickedPointCloud[i].y(),
+                                                              SystemData::pointPickedPointCloud[i].z(),
+                                                              SystemData::pointPickedImage[i].x * SystemData::imageWidth,
+                                                              SystemData::pointPickedImage[i].y * SystemData::imageHeight,
+                                                              k1, k2, k3, k4, alpha);
+
+            Eigen::Matrix<double, 2, 6> jacobian;
+            // observation_equation_equrectangular_camera_colinearity_tait_bryan_wc_jacobian(jacobian, SystemData::imageHeight, SystemData::imageWidth, M_PI,
+            //                                                                               pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+            //                                                                               SystemData::pointPickedPointCloud[i].x(),
+            //                                                                               SystemData::pointPickedPointCloud[i].y(),
+            //                                                                               SystemData::pointPickedPointCloud[i].z(),
+            //                                                                               SystemData::pointPickedImage[i].x, SystemData::pointPickedImage[i].y);
+
+            observation_equation_fisheye_camera_tait_bryan_wc_jacobian(jacobian, fx, fy,
+                                                                       pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+                                                                       SystemData::pointPickedPointCloud[i].x(),
+                                                                       SystemData::pointPickedPointCloud[i].y(),
+                                                                       SystemData::pointPickedPointCloud[i].z(),
+                                                                       k1, k2, k3, k4, alpha);
+
+            int ir = tripletListB.size();
+            int ic_camera = 0;
+
+            tripletListA.emplace_back(ir, ic_camera, -jacobian(0, 0));
+            tripletListA.emplace_back(ir, ic_camera + 1, -jacobian(0, 1));
+            tripletListA.emplace_back(ir, ic_camera + 2, -jacobian(0, 2));
+            tripletListA.emplace_back(ir, ic_camera + 3, -jacobian(0, 3));
+            tripletListA.emplace_back(ir, ic_camera + 4, -jacobian(0, 4));
+            tripletListA.emplace_back(ir, ic_camera + 5, -jacobian(0, 5));
+            tripletListA.emplace_back(ir + 1, ic_camera, -jacobian(1, 0));
+            tripletListA.emplace_back(ir + 1, ic_camera + 1, -jacobian(1, 1));
+            tripletListA.emplace_back(ir + 1, ic_camera + 2, -jacobian(1, 2));
+            tripletListA.emplace_back(ir + 1, ic_camera + 3, -jacobian(1, 3));
+            tripletListA.emplace_back(ir + 1, ic_camera + 4, -jacobian(1, 4));
+            tripletListA.emplace_back(ir + 1, ic_camera + 5, -jacobian(1, 5));
+
+            tripletListP.emplace_back(ir, ir, cauchy(delta(0, 0), 1));
+            tripletListP.emplace_back(ir + 1, ir + 1, cauchy(delta(1, 0), 1));
+
+            tripletListB.emplace_back(ir, 0, delta(0, 0));
+            tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+        }
+
+        Eigen::SparseMatrix<double> matA(tripletListB.size(), 6);
+        Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
+        Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
+
+        matA.setFromTriplets(tripletListA.begin(), tripletListA.end());
+        matP.setFromTriplets(tripletListP.begin(), tripletListP.end());
+        matB.setFromTriplets(tripletListB.begin(), tripletListB.end());
+
+        Eigen::SparseMatrix<double> AtPA(6, 6);
+        Eigen::SparseMatrix<double> AtPB(6, 1);
+
+        {
+            Eigen::SparseMatrix<double> AtP = matA.transpose() * matP;
+            AtPA = (AtP)*matA;
+            AtPB = (AtP)*matB;
+        }
+
+        tripletListA.clear();
+        tripletListP.clear();
+        tripletListB.clear();
+
+        // std::cout << "AtPA.size: " << AtPA.size() << std::endl;
+        // std::cout << "AtPB.size: " << AtPB.size() << std::endl;
+
+        // std::cout << "start solving AtPA=AtPB" << std::endl;
+        Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
+
+        // std::cout << "x = solver.solve(AtPB)" << std::endl;
+        Eigen::SparseMatrix<double> x = solver.solve(AtPB);
+
+        std::vector<double> h_x;
+
+        for (int k = 0; k < x.outerSize(); ++k)
+        {
+            for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
+            {
+                h_x.push_back(it.value());
+            }
+        }
+
+        if (h_x.size() == 6)
+        {
+            // for (size_t i = 0; i < h_x.size(); i++)
+            //{
+            //     std::cout << h_x[i] << std::endl;
+            // }
+            // std::cout << "AtPA=AtPB SOLVED" << std::endl;
+            // std::cout << "update" << std::endl;
+
+            int counter = 0;
+            pose.px += h_x[counter++] * 0.1;
+            pose.py += h_x[counter++] * 0.1;
+            pose.pz += h_x[counter++] * 0.1;
+            pose.om += h_x[counter++] * 0.1;
+            pose.fi += h_x[counter++] * 0.1;
+            pose.ka += h_x[counter++] * 0.1;
+
+            SystemData::camera_pose = affine_matrix_from_pose_tait_bryan(pose);
+        }
+        else
+        {
+            std::cout << "AtPA=AtPB FAILED" << std::endl;
+        }
+    }
+    else
+    {
+        std::cout << "Please mark at least 5 proper image to cloud correspondances" << std::endl;
+    }
+}
+
 void display()
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -556,6 +761,11 @@ void display()
 
     ImGui::Begin("Image");
     ImGuiLoadSaveButtons();
+    if (ImGui::Button("apply color to PC (fishEye)"))
+    {
+        SystemData::points = ApplyColorToPointcloudFishEye(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+    }
+
     if (ImGui::Button("Optimize"))
     {
         optimize();
@@ -571,6 +781,23 @@ void display()
         SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
     }
     ImGui::SameLine();
+
+    if (ImGui::Button("Optimize(fisheye)"))
+    {
+        optimize_fish_eye();
+
+        TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
+        std::cout << "pose" << std::endl;
+        std::cout << "px " << pose.px << std::endl;
+        std::cout << "py " << pose.py << std::endl;
+        std::cout << "pz " << pose.pz << std::endl;
+        std::cout << "om " << pose.om << std::endl;
+        std::cout << "fi " << pose.fi << std::endl;
+        std::cout << "ka " << pose.ka << std::endl;
+        SystemData::points = ApplyColorToPointcloudFishEye(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+    }
+    ImGui::SameLine();
+
     if (ImGui::Button("Optimize x 100"))
     {
         for (int i = 0; i < 100; i++)

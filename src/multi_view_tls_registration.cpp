@@ -45,6 +45,7 @@ static bool show_another_window = false;
 static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 float rotate_x = 0.0, rotate_y = 0.0;
 float translate_x, translate_y = 0.0;
+Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
 float translate_z = -50.0;
 const unsigned int window_width = 800;
 const unsigned int window_height = 600;
@@ -131,6 +132,8 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
 void perform_experiment_on_linux(Session &session, ObservationPicking &observation_picking, ICP &icp, NDT &ndt,
                                  RegistrationPlaneFeature &registration_plane_feature, PoseGraphSLAM &pose_graph_slam);
 
+LaserBeam GetLaserBeam(int x, int y);
+Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane);
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking);
 bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity, double offset_x,
                double offset_y,
@@ -542,6 +545,7 @@ void project_gui()
 
     ImGui::SliderFloat("mouse_sensitivity", &mouse_sensitivity, 0.01f, 10.0f);
 
+    ImGui::InputFloat3("rotation center", rotation_center.data());
     if (!simple_gui)
     {
         ImGui::Checkbox("decimate during load", &is_decimate);
@@ -2857,9 +2861,23 @@ void display()
     if (!is_ortho)
     {
         reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-        glTranslatef(translate_x, translate_y, translate_z);
+    
+        Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
+        viewTranslation.translate(rotation_center);
+        Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
+        viewLocal.translate(Eigen::Vector3f( translate_x, translate_y, translate_z));
+        viewLocal.rotate(Eigen::AngleAxisf(M_PI*rotate_x / 180.f, Eigen::Vector3f::UnitX()));
+        viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
+
+        Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
+        viewTranslation2.translate(-rotation_center);
+
+        Eigen::Affine3f result = viewTranslation * viewLocal * viewTranslation2;
+
+        glLoadMatrixf(result.matrix().data());
+  /*      glTranslatef(translate_x, translate_y, translate_z);
         glRotatef(rotate_x, 1.0, 0.0, 0.0);
-        glRotatef(rotate_y, 0.0, 0.0, 1.0);
+        glRotatef(rotate_y, 0.0, 0.0, 1.0);*/
     }
     else
     {
@@ -2867,7 +2885,26 @@ void display()
         glLoadIdentity();
     }
 
-    if (show_axes)
+    if (show_axes || ImGui::GetIO().KeyCtrl)
+    {
+        glBegin(GL_LINES);
+        glColor3f(1.f, 1.f, 1.f);
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x() + 1.f, rotation_center.y(), rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x() - 1.f, rotation_center.y(), rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y() - 1.f, rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y() + 1.f, rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() - 1.f);
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() + 1.f);
+    }
+
+
+    if (show_axes || ImGui::GetIO().KeyCtrl)
     {
         glBegin(GL_LINES);
         glColor3f(1.0f, 0.0f, 0.0f);
@@ -3250,6 +3287,26 @@ void mouse(int glut_button, int state, int x, int y)
 
     if (!io.WantCaptureMouse)
     {
+
+        if (glut_button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN && io.KeyCtrl)
+        {
+            const auto laser_beam = GetLaserBeam(x, y);
+
+            RegistrationPlaneFeature::Plane pl;
+
+            pl.a = 0;
+            pl.b = 0;
+            pl.c = 1;
+            pl.d = 0;
+            auto old_Totation_center = rotation_center;
+            rotation_center = rayIntersection(laser_beam, pl).cast<float>();
+
+            std::cout << "setting new rotation center to " << rotation_center << std::endl;
+                
+            rotate_x = 0.f;
+            rotate_y = 0.f;
+        }
+
         if (state == GLUT_DOWN)
         {
             mouse_buttons |= 1 << glut_button;
@@ -3417,7 +3474,7 @@ Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationP
     return out_point;
 }
 
-Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking)
+LaserBeam GetLaserBeam(int x, int y)
 {
     GLint viewport[4];
     GLdouble modelview[16];
@@ -3445,7 +3502,12 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observ
     laser_beam.direction.y() = posYfar - posYnear;
     laser_beam.direction.z() = posZfar - posZnear;
 
-    laser_beam.direction.normalize();
+    return laser_beam;
+}
+
+Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking)
+{
+    const auto laser_beam = GetLaserBeam(x, y);
 
     RegistrationPlaneFeature::Plane pl;
 

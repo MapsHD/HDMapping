@@ -1,4 +1,6 @@
 #include "lidar_odometry_utils.h"
+#include <registration_plane_feature.h>
+
 // This is LiDAR odometry (step 1)
 // This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system https://github.com/JanuszBedkowski/mandeye_controller
 // The output is a session proving trajekctory and point clouds that can be  further processed by "multi_view_tls_registration" program.
@@ -38,6 +40,7 @@ bool step_3_done = false;
 std::vector<WorkerData> worker_data;
 
 float rotate_x = 0.0, rotate_y = 0.0;
+Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
 float translate_x, translate_y = 0.0;
 float translate_z = -50.0;
 const unsigned int window_width = 800;
@@ -62,12 +65,18 @@ float m_gizmo[] = {1, 0, 0, 0,
 float x_displacement = 0.01;
 
 LidarOdometryParams params;
+const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
 
 void alternative_approach();
+LaserBeam GetLaserBeam(int x, int y);
+Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane);
+bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity, double offset_x,
+               double offset_y,
+               double offset_alt);
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_step_1 v0.32"))
+    if (ImGui::Begin("lidar_odometry_step_1 v0.33"))
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
@@ -80,6 +89,7 @@ void lidar_odometry_gui()
         }
         ImGui::Text(("Working directory ('session.json' will be saved here): '" + working_directory + "'").c_str());
         // ImGui::Checkbox("show_all_points", &show_all_points);
+        ImGui::InputFloat3("rotation center", rotation_center.data());
         if (!simple_gui)
         {
             ImGui::Checkbox("show_initial_points", &show_initial_points);
@@ -689,6 +699,64 @@ void lidar_odometry_gui()
             ImGui::Text(std::string("All data is saved in folder '" + working_directory + "' You can close this program.").c_str());
             ImGui::Text("Next step is to load 'session.json' with 'multi_view_tls_registration_step_2' program");
             ImGui::Text("-------------------------------------------------------------------------------");
+
+            if (ImGui::Button("save all point clouds to single '*.las or *.laz' file"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
+                    output_file_name = sel;
+                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    std::vector<Eigen::Vector3d> pointcloud;
+                    std::vector<unsigned short> intensity;
+
+                    for (int i = 0; i < worker_data.size(); i++)
+                    {
+                        for (const auto &p : worker_data[i].intermediate_points)
+                        {
+                            Eigen::Vector3d pt = worker_data[i].intermediate_trajectory[p.index_pose] * p.point;
+                            pointcloud.push_back(pt);
+                            intensity.push_back(p.intensity);
+                        }
+                    }
+                    if (!exportLaz(output_file_name, pointcloud, intensity, 0, 0, 0))
+                    {
+                        std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    }
+                    /*for (auto &p : session.point_clouds_container.point_clouds)
+                    {
+                        if (p.visible)
+                        {
+                            for (int i = 0; i < p.points_local.size(); i++)
+                            {
+                                const auto &pp = p.points_local[i];
+                                Eigen::Vector3d vp;
+                                vp = p.m_pose * pp + session.point_clouds_container.offset;
+
+                                pointcloud.push_back(vp);
+                                if (i < p.intensities.size())
+                                {
+                                    intensity.push_back(p.intensities[i]);
+                                }
+                                else
+                                {
+                                    intensity.push_back(0);
+                                }
+                            }
+                        }
+                    }
+                    */
+                }
+            }
         }
         if (!simple_gui)
         {
@@ -939,6 +1007,25 @@ void mouse(int glut_button, int state, int x, int y)
 
     if (!io.WantCaptureMouse)
     {
+        if (glut_button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN && io.KeyCtrl)
+        {
+            const auto laser_beam = GetLaserBeam(x, y);
+
+            RegistrationPlaneFeature::Plane pl;
+
+            pl.a = 0;
+            pl.b = 0;
+            pl.c = 1;
+            pl.d = 0;
+            auto old_Totation_center = rotation_center;
+            rotation_center = rayIntersection(laser_beam, pl).cast<float>();
+
+            std::cout << "setting new rotation center to " << rotation_center << std::endl;
+
+            rotate_x = 0.f;
+            rotate_y = 0.f;
+        }
+
         if (state == GLUT_DOWN)
         {
             mouse_buttons |= 1 << glut_button;
@@ -1016,10 +1103,25 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
+    //reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+    //glTranslatef(translate_x, translate_y, translate_z);
+    //glRotatef(rotate_x, 1.0, 0.0, 0.0);
+    //glRotatef(rotate_y, 0.0, 0.0, 1.0);
+
     reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-    glTranslatef(translate_x, translate_y, translate_z);
-    glRotatef(rotate_x, 1.0, 0.0, 0.0);
-    glRotatef(rotate_y, 0.0, 0.0, 1.0);
+    Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
+    viewTranslation.translate(rotation_center);
+    Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
+    viewLocal.translate(Eigen::Vector3f( translate_x, translate_y, translate_z));
+    viewLocal.rotate(Eigen::AngleAxisf(M_PI*rotate_x / 180.f, Eigen::Vector3f::UnitX()));
+    viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
+
+    Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
+    viewTranslation2.translate(-rotation_center);
+
+    Eigen::Affine3f result = viewTranslation * viewLocal * viewTranslation2;
+
+    glLoadMatrixf(result.matrix().data());
 
     glBegin(GL_LINES);
     glColor3f(1.0f, 0.0f, 0.0f);
@@ -1197,6 +1299,25 @@ void display()
         {
             glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
         }
+        glEnd();
+    }
+
+    if (ImGui::GetIO().KeyCtrl)
+    {
+        glBegin(GL_LINES);
+        glColor3f(1.f, 1.f, 1.f);
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x() + 1.f, rotation_center.y(), rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x() - 1.f, rotation_center.y(), rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y() - 1.f, rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y() + 1.f, rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() - 1.f);
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() + 1.f);
         glEnd();
     }
 
@@ -1603,4 +1724,245 @@ void alternative_approach()
 
         find_best_stretch(all_points[i], timestamps, poses, fn1, fn2);
     }
+}
+
+
+LaserBeam GetLaserBeam(int x, int y)
+{
+    GLint viewport[4];
+    GLdouble modelview[16];
+    GLdouble projection[16];
+    GLfloat winX, winY, winZ;
+    GLdouble posXnear, posYnear, posZnear;
+    GLdouble posXfar, posYfar, posZfar;
+
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+    winX = (float)x;
+    winY = (float)viewport[3] - (float)y;
+
+    LaserBeam laser_beam;
+    gluUnProject(winX, winY, 0, modelview, projection, viewport, &posXnear, &posYnear, &posZnear);
+    gluUnProject(winX, winY, -1000, modelview, projection, viewport, &posXfar, &posYfar, &posZfar);
+
+    laser_beam.position.x() = posXnear;
+    laser_beam.position.y() = posYnear;
+    laser_beam.position.z() = posZnear;
+
+    laser_beam.direction.x() = posXfar - posXnear;
+    laser_beam.direction.y() = posYfar - posYnear;
+    laser_beam.direction.z() = posZfar - posZnear;
+
+    return laser_beam;
+}
+
+Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking)
+{
+    const auto laser_beam = GetLaserBeam(x, y);
+
+    RegistrationPlaneFeature::Plane pl;
+
+    pl.a = 0;
+    pl.b = 0;
+    pl.c = 1;
+    pl.d = -observation_picking.picking_plane_height;
+
+    Eigen::Vector3d pos = rayIntersection(laser_beam, pl);
+
+    std::cout << "intersection: " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;
+
+    return pos;
+}
+
+float distanceToPlane(const RegistrationPlaneFeature::Plane &plane, const Eigen::Vector3d &p)
+{
+    return (plane.a * p.x() + plane.b * p.y() + plane.c * p.z() + plane.d);
+}
+
+Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane)
+{
+    float TOLERANCE = 0.0001;
+    Eigen::Vector3d out_point;
+    out_point.x() = laser_beam.position.x();
+    out_point.y() = laser_beam.position.y();
+    out_point.z() = laser_beam.position.z();
+
+    float a = plane.a * laser_beam.direction.x() + plane.b * laser_beam.direction.y() + plane.c * laser_beam.direction.z();
+
+    if (a > -TOLERANCE && a < TOLERANCE)
+    {
+        return out_point;
+    }
+
+    float distance = distanceToPlane(plane, out_point);
+
+    out_point.x() = laser_beam.position.x() - laser_beam.direction.x() * (distance / a);
+    out_point.y() = laser_beam.position.y() - laser_beam.direction.y() * (distance / a);
+    out_point.z() = laser_beam.position.z() - laser_beam.direction.z() * (distance / a);
+
+    return out_point;
+}
+
+bool exportLaz(const std::string &filename,
+               const std::vector<Eigen::Vector3d> &pointcloud,
+               const std::vector<unsigned short> &intensity, double offset_x, double offset_y, double offset_alt)
+{
+
+    constexpr float scale = 0.0001f; // one tenth of milimeter
+    // find max
+    Eigen::Vector3d _max(-1000000000.0, -1000000000.0, -1000000000.0);
+    Eigen::Vector3d _min(1000000000.0, 1000000000.0, 1000000000.0);
+
+    for (auto &p : pointcloud)
+    {
+        if(p.x() < _min.x()){
+            _min.x() = p.x();
+        }
+        if(p.y() < _min.y()){
+            _min.y() = p.y();
+        }
+        if(p.z() < _min.z()){
+            _min.z() = p.z();
+        }
+
+        if(p.x() > _max.x()){
+            _max.x() = p.x();
+        }
+        if(p.y() > _max.y()){
+            _max.y() = p.y();
+        }
+        if(p.z() > _max.z()){
+            _max.z() = p.z();
+        }
+    }
+
+    // create the writer
+    laszip_POINTER laszip_writer;
+    if (laszip_create(&laszip_writer))
+    {
+        fprintf(stderr, "DLL ERROR: creating laszip writer\n");
+        return false;
+    }
+
+    // get a pointer to the header of the writer so we can populate it
+
+    laszip_header *header;
+
+    if (laszip_get_header_pointer(laszip_writer, &header))
+    {
+        fprintf(stderr, "DLL ERROR: getting header pointer from laszip writer\n");
+        return false;
+    }
+
+    // populate the header
+
+    header->file_source_ID = 4711;
+    header->global_encoding = (1 << 0); // see LAS specification for details
+    header->version_major = 1;
+    header->version_minor = 2;
+    //    header->file_creation_day = 120;
+    //    header->file_creation_year = 2013;
+    header->point_data_format = 1;
+    header->point_data_record_length = 0;
+    header->number_of_point_records = pointcloud.size();
+    header->number_of_points_by_return[0] = pointcloud.size();
+    header->number_of_points_by_return[1] = 0;
+    header->point_data_record_length = 28;
+    header->x_scale_factor = scale;
+    header->y_scale_factor = scale;
+    header->z_scale_factor = scale;
+
+    header->max_x = _max.x() + offset_x;
+    header->min_x = _min.x() + offset_x;
+    header->max_y = _max.y() + offset_y;
+    header->min_y = _min.y() + offset_y;
+    header->max_z = _max.z() + offset_alt;
+    header->min_z = _min.z() + offset_alt;
+
+    header->x_offset = offset_x;
+    header->y_offset = offset_y;
+    header->z_offset = offset_alt;
+
+    // optional: use the bounding box and the scale factor to create a "good" offset
+    // open the writer
+    laszip_BOOL compress = (strstr(filename.c_str(), ".laz") != 0);
+
+    if (laszip_open_writer(laszip_writer, filename.c_str(), compress))
+    {
+        fprintf(stderr, "DLL ERROR: opening laszip writer for '%s'\n", filename.c_str());
+        return false;
+    }
+
+    fprintf(stderr, "writing file '%s' %scompressed\n", filename.c_str(), (compress ? "" : "un"));
+
+    // get a pointer to the point of the writer that we will populate and write
+
+    laszip_point *point;
+    if (laszip_get_point_pointer(laszip_writer, &point))
+    {
+        fprintf(stderr, "DLL ERROR: getting point pointer from laszip writer\n");
+        return false;
+    }
+
+    laszip_I64 p_count = 0;
+    laszip_F64 coordinates[3];
+
+    for (int i = 0; i < pointcloud.size(); i++)
+    {
+        point->intensity = intensity[i];
+
+        const auto &p = pointcloud[i];
+        p_count++;
+        coordinates[0] = p.x() + offset_x;
+        coordinates[1] = p.y() + offset_y;
+        coordinates[2] = p.z() + offset_alt;
+        if (laszip_set_coordinates(laszip_writer, coordinates))
+        {
+            fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);
+            return false;
+        }
+
+        // p.SetIntensity(pp.intensity);
+
+        // if (i < intensity.size()) {
+        //     point->intensity = intensity[i];
+        // }
+        // laszip_set_point
+
+        if (laszip_write_point(laszip_writer))
+        {
+            fprintf(stderr, "DLL ERROR: writing point %I64d\n", p_count);
+            return false;
+        }
+    }
+
+    if (laszip_get_point_count(laszip_writer, &p_count))
+    {
+        fprintf(stderr, "DLL ERROR: getting point count\n");
+        return false;
+    }
+
+    fprintf(stderr, "successfully written %I64d points\n", p_count);
+
+    // close the writer
+
+    if (laszip_close_writer(laszip_writer))
+    {
+        fprintf(stderr, "DLL ERROR: closing laszip writer\n");
+        return false;
+    }
+
+    // destroy the writer
+
+    if (laszip_destroy(laszip_writer))
+    {
+        fprintf(stderr, "DLL ERROR: destroying laszip writer\n");
+        return false;
+    }
+
+    std::cout << "exportLaz DONE" << std::endl;
+
+    return true;
 }

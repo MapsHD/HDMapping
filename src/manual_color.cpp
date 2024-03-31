@@ -1016,7 +1016,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("MANDEYE with GoPro MAX manual coloring v0.27");
+    glutCreateWindow("MANDEYE with GoPro MAX manual coloring v0.33");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

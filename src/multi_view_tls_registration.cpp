@@ -371,6 +371,7 @@ void project_gui()
     ImGui::Begin("Single session processing");
 
     ImGui::Text("This program is second step in MANDEYE process.");
+    ImGui::Text("To change centre of rotation press 'ctrl + middle mouse button'");
     ImGui::Text("It refines trajectory e.g with loop closure.");
     ImGui::Text("It refines trajectory with many approaches e.g. Iterative Closest Point, Normal Distributions Transform.");
     ImGui::Text("It exports session as rigid point cloud to single LAZ file).");
@@ -2901,6 +2902,7 @@ void display()
         glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() - 1.f);
         glVertex3fv(rotation_center.data());
         glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() + 1.f);
+        glEnd();
     }
 
 
@@ -3401,7 +3403,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration_step_2 v0.32");
+    glutCreateWindow("multi_view_tls_registration_step_2 v0.33");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

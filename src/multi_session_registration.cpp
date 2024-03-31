@@ -25,6 +25,8 @@
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_cw_jacobian.h>
 
+#include <registration_plane_feature.h>
+
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
 double camera_ortho_xy_view_shift_y = 0.0;
@@ -45,6 +47,7 @@ float m_gizmo[] = {1, 0, 0, 0,
                    0, 0, 0, 1};
 
 static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
 float rotate_x = 0.0, rotate_y = 0.0;
 float translate_x, translate_y = 0.0;
 float translate_z = -50.0;
@@ -113,6 +116,9 @@ bool revert(std::vector<Session> &sessions);
 
 // this function saves result (poses) to files
 bool save_results(std::vector<Session> &sessions);
+
+LaserBeam GetLaserBeam(int x, int y);
+Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
 
 bool load_project_settings(const std::string &file_name, ProjectSettings &_project_settings)
 {
@@ -243,6 +249,7 @@ void project_gui()
     if (ImGui::Begin("multi_session_registration_step_3"))
     {
         ImGui::Text("This program is third step in MANDEYE process.");
+        ImGui::Text("To change centre of rotation press 'ctrl + middle mouse button'");
         ImGui::Text("It refines sessions with loop closure.");
         ImGui::Text("First step: create project by adding sessions: result of 'multi_view_tls_registration_step_2' program.");
         ImGui::Text("Last step: save project.");
@@ -300,7 +307,7 @@ void project_gui()
         ImGui::SameLine();
 
         ImGui::SliderFloat("mouse_sensitivity", &mouse_sensitivity, 0.01f, 25.0f);
-
+        ImGui::InputFloat3("rotation center", rotation_center.data());
         ImGui::Checkbox("decimate during load", &is_decimate);
         ImGui::InputDouble("bucket_x", &bucket_x);
         ImGui::InputDouble("bucket_y", &bucket_y);
@@ -463,16 +470,17 @@ void project_gui()
                     }
                     loaded_sessions = true;
 
-                    //reorder
+                    // reorder
                     std::vector<Session> sessions_reorder;
                     std::vector<std::string> session_file_names_reordered;
 
                     std::map<int, int> map_reorder;
-                    //project_settings.session_file_names.
+                    // project_settings.session_file_names.
                     int new_index = 0;
                     for (int i = 0; i < sessions.size(); i++)
                     {
-                        if(sessions[i].is_ground_truth){
+                        if (sessions[i].is_ground_truth)
+                        {
                             sessions_reorder.push_back(sessions[i]);
                             session_file_names_reordered.push_back(project_settings.session_file_names[i]);
                             map_reorder[i] = new_index++;
@@ -489,15 +497,14 @@ void project_gui()
                     }
                     sessions = sessions_reorder;
                     project_settings.session_file_names = session_file_names_reordered;
-                    
-                    for(auto &e:edges){
+
+                    for (auto &e : edges)
+                    {
                         e.index_session_from = map_reorder[e.index_session_from];
                         e.index_session_to = map_reorder[e.index_session_to];
                     }
-                    
+
                     std::cout << "sessions reordered, ground truth should be in front" << std::endl;
-
-
                 }
             }
 
@@ -924,8 +931,24 @@ void display()
     {
         reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
         glTranslatef(translate_x, translate_y, translate_z);
-        glRotatef(rotate_x, 1.0, 0.0, 0.0);
-        glRotatef(rotate_y, 0.0, 0.0, 1.0);
+
+        Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
+        viewTranslation.translate(rotation_center);
+        Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
+        viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
+        viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
+        viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
+
+        Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
+        viewTranslation2.translate(-rotation_center);
+
+        Eigen::Affine3f result = viewTranslation * viewLocal * viewTranslation2;
+
+        glLoadMatrixf(result.matrix().data());
+        // reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+        // glTranslatef(translate_x, translate_y, translate_z);
+        // glRotatef(rotate_x, 1.0, 0.0, 0.0);
+        // glRotatef(rotate_y, 0.0, 0.0, 1.0);
     }
     else
     {
@@ -933,7 +956,29 @@ void display()
         glLoadIdentity();
     }
 
-    if (show_axes)
+    //if (show_axes)
+    if (show_axes || ImGui::GetIO().KeyCtrl)
+    {
+        glBegin(GL_LINES);
+        glColor3f(1.f, 1.f, 1.f);
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x() + 1.f, rotation_center.y(), rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x() - 1.f, rotation_center.y(), rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y() - 1.f, rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y() + 1.f, rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() - 1.f);
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() + 1.f);
+        glEnd();
+    }
+
+
+    //if (show_axes || ImGui::GetIO().KeyCtrl)
+    if (show_axes || ImGui::GetIO().KeyCtrl)
     {
         glBegin(GL_LINES);
         glColor3f(1.0f, 0.0f, 0.0f);
@@ -1031,7 +1076,7 @@ void display()
                 glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)std::to_string(j).c_str());
             }
         }
-       
+
         for (int i = 0; i < edges.size(); i++)
         {
             int index_src = edges[i].index_from;
@@ -1621,6 +1666,25 @@ void mouse(int glut_button, int state, int x, int y)
 
     if (!io.WantCaptureMouse)
     {
+        if (glut_button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN && io.KeyCtrl)
+        {
+            const auto laser_beam = GetLaserBeam(x, y);
+
+            RegistrationPlaneFeature::Plane pl;
+
+            pl.a = 0;
+            pl.b = 0;
+            pl.c = 1;
+            pl.d = 0;
+            auto old_Totation_center = rotation_center;
+            rotation_center = rayIntersection(laser_beam, pl).cast<float>();
+
+            std::cout << "setting new rotation center to " << rotation_center << std::endl;
+
+            rotate_x = 0.f;
+            rotate_y = 0.f;
+        }
+
         if (state == GLUT_DOWN)
         {
             mouse_buttons |= 1 << glut_button;
@@ -1715,7 +1779,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_session_registration_step_3 v0.32");
+    glutCreateWindow("multi_session_registration_step_3 v0.33");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -2315,4 +2379,82 @@ bool save_results(std::vector<Session> &sessions)
         }
     }
     return true;
+}
+
+LaserBeam GetLaserBeam(int x, int y)
+{
+    GLint viewport[4];
+    GLdouble modelview[16];
+    GLdouble projection[16];
+    GLfloat winX, winY, winZ;
+    GLdouble posXnear, posYnear, posZnear;
+    GLdouble posXfar, posYfar, posZfar;
+
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+    winX = (float)x;
+    winY = (float)viewport[3] - (float)y;
+
+    LaserBeam laser_beam;
+    gluUnProject(winX, winY, 0, modelview, projection, viewport, &posXnear, &posYnear, &posZnear);
+    gluUnProject(winX, winY, -1000, modelview, projection, viewport, &posXfar, &posYfar, &posZfar);
+
+    laser_beam.position.x() = posXnear;
+    laser_beam.position.y() = posYnear;
+    laser_beam.position.z() = posZnear;
+
+    laser_beam.direction.x() = posXfar - posXnear;
+    laser_beam.direction.y() = posYfar - posYnear;
+    laser_beam.direction.z() = posZfar - posZnear;
+
+    return laser_beam;
+}
+
+Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking)
+{
+    const auto laser_beam = GetLaserBeam(x, y);
+
+    RegistrationPlaneFeature::Plane pl;
+
+    pl.a = 0;
+    pl.b = 0;
+    pl.c = 1;
+    pl.d = -observation_picking.picking_plane_height;
+
+    Eigen::Vector3d pos = rayIntersection(laser_beam, pl);
+
+    std::cout << "intersection: " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;
+
+    return pos;
+}
+
+float distanceToPlane(const RegistrationPlaneFeature::Plane &plane, const Eigen::Vector3d &p)
+{
+    return (plane.a * p.x() + plane.b * p.y() + plane.c * p.z() + plane.d);
+}
+
+Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane)
+{
+    float TOLERANCE = 0.0001;
+    Eigen::Vector3d out_point;
+    out_point.x() = laser_beam.position.x();
+    out_point.y() = laser_beam.position.y();
+    out_point.z() = laser_beam.position.z();
+
+    float a = plane.a * laser_beam.direction.x() + plane.b * laser_beam.direction.y() + plane.c * laser_beam.direction.z();
+
+    if (a > -TOLERANCE && a < TOLERANCE)
+    {
+        return out_point;
+    }
+
+    float distance = distanceToPlane(plane, out_point);
+
+    out_point.x() = laser_beam.position.x() - laser_beam.direction.x() * (distance / a);
+    out_point.y() = laser_beam.position.y() - laser_beam.direction.y() * (distance / a);
+    out_point.z() = laser_beam.position.z() - laser_beam.direction.z() * (distance / a);
+
+    return out_point;
 }

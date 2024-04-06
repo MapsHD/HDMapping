@@ -39,7 +39,7 @@
 #include <session.h>
 
 namespace fs = std::filesystem;
-
+bool use_hardware_ts = false;
 static bool show_demo_window = true;
 static bool show_another_window = false;
 static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -74,6 +74,7 @@ double camera_ortho_xy_view_shift_y = 0.0;
 double camera_ortho_xy_view_rotation_angle_deg = 0;
 double camera_mode_ortho_z_center_h = 0.0;
 
+float gnssOffset = 0;
 std::vector<GeoPoint> available_geo_points;
 NDT ndt;
 ICP icp;
@@ -866,7 +867,6 @@ void project_gui()
             }
         }
     }
-
     ImGui::Text("-----------------------------------------------------------------------------");
     if (!simple_gui)
     {
@@ -882,6 +882,10 @@ void project_gui()
     }
     ImGui::ColorEdit3("background color", (float *)&clear_color);
 
+    ImGui::Text("--------Experimental-----------------");
+    ImGui::DragFloat("offsetGnssTime", &gnssOffset, 0.05);
+    ImGui::Checkbox("Use PPS instead of software sync", &use_hardware_ts);
+    ImGui::Text("--------Experimental-----------------");
     if (manual_pose_graph_loop_closure_mode)
     {
         session.manual_pose_graph_loop_closure.Gui(session.point_clouds_container, index_loop_closure_source, index_loop_closure_target, m_gizmo, gnss);
@@ -2946,7 +2950,7 @@ void display()
         }
     }
 
-    gnss.render(session.point_clouds_container);
+    gnss.render(session.point_clouds_container, gnssOffset,use_hardware_ts);
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();

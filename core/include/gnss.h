@@ -17,10 +17,11 @@ class GNSS{
         double satelites_tracked;
         double height;
         double age;
-        double time;
+        double pps_time;
         double fix_quality;
         double x;
         double y;
+        double epoch;
     };
 
     GNSS(){;};
@@ -28,7 +29,7 @@ class GNSS{
 
     bool load(const std::vector<std::string> &input_file_names);
     bool load_mercator_projection(const std::vector<std::string> &input_file_names);
-    void render(const PointClouds &point_clouds_container);
+    void render(const PointClouds &point_clouds_container, float offset, bool use_hardware);
     bool save_to_laz(const std::string &output_file_names);
 
     std::vector<GlobalPose> gnss_poses;

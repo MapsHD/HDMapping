@@ -21,10 +21,41 @@ inline void split(std::string &str, char delim, std::vector<std::string> &out)
     }
 }
 
+double GetTimestamp(std::string nmeaTime)
+{
+    std::chrono::system_clock::time_point specific_time;
+    std::vector<std::string> splitted;
+    split(nmeaTime, ':', splitted);
+    assert(splitted.size() == 3);
+    if (splitted.size() == 3)
+    {
+        // Set the specific time
+        std::tm timeinfo;
+        timeinfo.tm_year = 2024 - 1900;
+        timeinfo.tm_mday = 6;
+        timeinfo.tm_mon = 4 - 1; // january is zero
+        std::istringstream(splitted[0]) >> timeinfo.tm_hour;
+        std::istringstream(splitted[1]) >> timeinfo.tm_min;
+        std::istringstream(splitted[2]) >> timeinfo.tm_sec;
+        {
+         
+#ifdef WIN32
+            uint64_t time_utc = _mkgmtime64(&timeinfo);
+#else
+            uint64_t time_utc = timegm(&timeinfo);
+#endif
+            return static_cast<double>(time_utc) * 1e9;
+        }
+    }
+    return 0;
+
+}
+
 bool GNSS::load(const std::vector<std::string> &input_file_names)
 {
     // 54651848940 5156.43798828125 2009.1610107421875 122.1999969482421875 1.25 8 35.799999237060546875 nan 14:51:42 1
     // timestamp lat lon alt hdop satelites_tracked height age time fix_quality
+
 
     gnss_poses.clear();
 
@@ -48,8 +79,8 @@ bool GNSS::load(const std::vector<std::string> &input_file_names)
             getline(infile, s);
             std::vector<std::string> strs;
             split(s, ' ', strs);
-
-            if (strs.size() == 10)
+            std::cout << strs.size() << std::endl;
+            if (strs.size() >= 10)
             {
                 GlobalPose gp;
                 std::istringstream(strs[0]) >> gp.timestamp;
@@ -60,8 +91,10 @@ bool GNSS::load(const std::vector<std::string> &input_file_names)
                 std::istringstream(strs[5]) >> gp.satelites_tracked;
                 std::istringstream(strs[6]) >> gp.height;
                 std::istringstream(strs[7]) >> gp.age;
-                std::istringstream(strs[8]) >> gp.time;
+                gp.pps_time = GetTimestamp(strs[8]);
                 std::istringstream(strs[9]) >> gp.fix_quality;
+
+     
 
                 double L = gp.lon;
                 double B = gp.lat;
@@ -95,6 +128,7 @@ bool GNSS::load(const std::vector<std::string> &input_file_names)
 
     return true;
 }
+ 
 
 bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_names)
 {
@@ -121,7 +155,7 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
             std::vector<std::string> strs;
             split(s, ' ', strs);
 
-            if (strs.size() == 10)
+            if (strs.size() >= 10)
             {
                 GlobalPose gp;
                 std::istringstream(strs[0]) >> gp.timestamp;
@@ -132,9 +166,10 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
                 std::istringstream(strs[5]) >> gp.satelites_tracked;
                 std::istringstream(strs[6]) >> gp.height;
                 std::istringstream(strs[7]) >> gp.age;
-                std::istringstream(strs[8]) >> gp.time;
+                gp.pps_time = GetTimestamp(strs[8]);
                 std::istringstream(strs[9]) >> gp.fix_quality;
-
+                double diff = (gp.timestamp - gp.pps_time);
+                std::cout << "Difference PPS to software  " << diff << std::endl;
                 if (gp.lat == gp.lat){
                     if (gp.lon == gp.lon){
                         if (gp.alt == gp.alt){
@@ -151,6 +186,7 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
             }
         }
         infile.close();
+
     }
 
     std::sort(gnss_poses.begin(), gnss_poses.end(), [](GNSS::GlobalPose &a, GNSS::GlobalPose &b)
@@ -190,7 +226,7 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
     return true;
 }
 
-void GNSS::render(const PointClouds &point_clouds_container)
+void GNSS::render(const PointClouds &point_clouds_container, float offset, bool use_hardware)
 {
     glColor3f(1, 1, 1);
     glBegin(GL_LINE_STRIP);
@@ -208,7 +244,7 @@ void GNSS::render(const PointClouds &point_clouds_container)
         {
             for (int i = 0; i < gnss_poses.size(); i++)
             {
-                double time_stamp = gnss_poses[i].timestamp;
+                double time_stamp = (use_hardware? gnss_poses[i].pps_time:gnss_poses[i].timestamp) + offset * 1e9;
 
                 auto it = std::lower_bound(pc.local_trajectory.begin(), pc.local_trajectory.end(),
                                            time_stamp, [](const PointCloud::LocalTrajectoryNode &lhs, const double &time) -> bool
@@ -218,8 +254,9 @@ void GNSS::render(const PointClouds &point_clouds_container)
 
                 if (index > 0 && index < pc.local_trajectory.size())
                 {
-
-                    if (fabs(time_stamp - pc.local_trajectory[index].timestamp) < 10e12)
+                    double error = fabs(time_stamp - pc.local_trajectory[index].timestamp) / 1e9;
+          
+                    if (error < 0.1)
                     {
                         auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
                         glVertex3f(m(0, 3), m(1, 3), m(2, 3));

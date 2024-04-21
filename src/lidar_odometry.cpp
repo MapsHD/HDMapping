@@ -401,7 +401,7 @@ void lidar_odometry_gui()
 
                     std::cout << "poses.size(): " << poses.size() << std::endl;
 
-                    if (poses.size() == 0) {
+                    if (poses.empty()) {
                         std::cerr << "Loading poses went wrong! Could not load poses!" << std::endl;
                         return;
                     }

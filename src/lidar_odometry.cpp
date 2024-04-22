@@ -401,6 +401,11 @@ void lidar_odometry_gui()
 
                     std::cout << "poses.size(): " << poses.size() << std::endl;
 
+                    if (poses.empty()) {
+                        std::cerr << "Loading poses went wrong! Could not load poses!" << std::endl;
+                        return;
+                    }
+
                     int thershold = 20;
                     WorkerData wd;
                     // std::vector<double> temp_ts;

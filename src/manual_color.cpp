@@ -32,6 +32,8 @@ double k3 = -0.0022518302398800826;
 double k4 = 0.0001842010188374431;
 double alpha = 0;
 
+bool color = false;
+
 GLuint tex1;
 
 GLUquadric *sphere;
@@ -191,6 +193,8 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
     float my_tex_w = Tex_width * zoom;
     float my_tex_h = Tex_height * zoom;
     const ImVec2 child_size{ImGui::GetWindowWidth() * 1.0f, ImGui::GetWindowHeight() * 0.5f};
+
+    ImGui::Checkbox("color", &color);
 
     struct point_pair
     {
@@ -718,11 +722,18 @@ void display()
     glRotatef(rotate_y, 0.0, 0.0, 1.0);
 
     //////////
+    //glColor3f(p.rgb.data());
     glPointSize(SystemData::point_size);
     glBegin(GL_POINTS);
     for (const auto &p : SystemData::points)
     {
-        glColor3fv(p.rgb.data());
+        if (color){
+            glColor3fv(p.rgb.data());
+        }else{
+            glColor3f(p.intensity - 100, p.intensity - 100, p.intensity - 100);
+            //p.intensity
+        }
+            
         glVertex3dv(p.point.data());
     }
     glEnd();

@@ -961,7 +961,7 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                     //mean_shift = Eigen::Vector3d(1.0, 1.0, 1.0);
                     mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
                 }
-                std::cout << "mean_shift " << mean_shift << std::endl;
+                //std::cout << "mean_shift " << mean_shift << std::endl;
 
                 Eigen::Affine3d m_mean_shift = Eigen::Affine3d::Identity();
                 m_mean_shift.translation() = mean_shift;

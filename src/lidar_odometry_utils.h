@@ -39,7 +39,7 @@ struct WorkerData
     std::vector<Point3Di> original_points;
     std::vector<Eigen::Affine3d> intermediate_trajectory;
     std::vector<Eigen::Affine3d> intermediate_trajectory_motion_model;
-    std::vector<double> intermediate_trajectory_timestamps;
+    std::vector<std::pair<double, double>> intermediate_trajectory_timestamps;
     std::vector<std::pair<double, double>> imu_roll_pitch;
     bool show = false;
 };
@@ -83,8 +83,8 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
 //! @note imu_id is an optional column, if not present, it is assumed that all data comes from the same IMU.
 //! @param imu_file - path to file with IMU data
 //! @param imuToUse - id number of IMU to use, the same index as in pointcloud return by @ref load_point_cloud
-//! @return vector of tuples (timestamp, angular_velocity, linear_acceleration)
-std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::string &imu_file, int imuToUse);
+//! @return vector of tuples (std::pair<timestamp, timestampUnix>, angular_velocity, linear_acceleration)
+std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> load_imu(const std::string &imu_file, int imuToUse);
 
 //! This function load point cloud from LAS/LAZ file.
 //! Optionally it can apply extrinsic calibration to each point.

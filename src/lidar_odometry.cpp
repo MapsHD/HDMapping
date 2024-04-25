@@ -76,7 +76,7 @@ bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_step_1 v0.33"))
+    if (ImGui::Begin("lidar_odometry_step_1 v0.34"))
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
@@ -158,6 +158,7 @@ void lidar_odometry_gui()
 
             if (ImGui::Button("load data (step 1)"))
             {
+
                 static std::shared_ptr<pfd::open_file> open_file;
                 std::vector<std::string> input_file_names;
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
@@ -249,7 +250,7 @@ void lidar_odometry_gui()
                         std::cout << input_file_names[i] << std::endl;
                     }
                     std::cout << "loading imu" << std::endl;
-                    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data;
+                    std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
 
                     for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
                     {
@@ -322,10 +323,10 @@ void lidar_odometry_gui()
                         ahrs.settings.convention = FusionConventionNed;
                     }
 
-                    std::map<double, Eigen::Matrix4d> trajectory;
+                    std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;
 
                     int counter = 1;
-                    for (const auto &[timestamp, gyr, acc] : imu_data)
+                    for (const auto &[timestamp_pair, gyr, acc] : imu_data)
                     {
                         const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
                         const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
@@ -346,7 +347,7 @@ void lidar_odometry_gui()
                         // t = t * m_rot_y;
                         //
                         //std::map<double, Eigen::Matrix4d> trajectory;
-                        trajectory[timestamp] = t.matrix();
+                        trajectory[timestamp_pair.first] = std::pair(t.matrix(), timestamp_pair.second);
                         const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
                         counter++;
                         if (counter % 100 == 0)
@@ -386,15 +387,15 @@ void lidar_odometry_gui()
 
                     std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
 
-                    std::vector<double> timestamps;
+                    std::vector<std::pair<double, double>> timestamps;
                     std::vector<Eigen::Affine3d> poses;
                     for (const auto &t : trajectory)
                     {
                         if (t.first >= timestamp_begin)
                         {
-                            timestamps.push_back(t.first);
+                            timestamps.emplace_back(t.first, t.second.second);
                             Eigen::Affine3d m;
-                            m.matrix() = t.second;
+                            m.matrix() = t.second.first;
                             poses.push_back(m);
                         }
                     }
@@ -453,25 +454,27 @@ void lidar_odometry_gui()
                             //     }
                             // }
                             bool found = false;
+                           
                             for (int index = index_begin; index < pointsPerFile.size(); index++)
                             {
                                 for (const auto &p : pointsPerFile[index])
                                 {
-                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps[0].first && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first)
                                     {
                                         points.push_back(p);
                                     }
-                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && !found)
+                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps[0].first && !found)
                                     {
                                         index_begin = index;
                                         found = true;
                                     }
-                                    if (p.timestamp > wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
+                                    if (p.timestamp > wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first)
                                     {
                                         break;
                                     }
                                 }
                             }
+                           
 
                             // for (unsigned long long int k = i_begin; k < i_end; k++)
                             // if (i % 1000 == 0)
@@ -484,7 +487,10 @@ void lidar_odometry_gui()
                                 // if (points[k].timestamp > wd.intermediate_trajectory_timestamps[0] && points[k].timestamp < wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
                                 //{
                                 auto p = points[k];
-                                auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp);
+                                auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp,
+                                                              [](std::pair<double, double> lhs, double rhs) -> bool
+                                                              { return lhs.first < rhs; });
+
                                 p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
                                 wd.intermediate_points.emplace_back(p);
                                 wd.original_points.emplace_back(p);
@@ -513,7 +519,9 @@ void lidar_odometry_gui()
 
                             // temp_ts.clear();
                         }
+                       
                     }
+                
                     params.m_g = worker_data[0].intermediate_trajectory[0];
                     step_1_done = true;
                 }
@@ -521,6 +529,8 @@ void lidar_odometry_gui()
                 {
                     std::cout << "please select files correctly" << std::endl;
                 }
+
+
             }
             ImGui::SameLine();
             ImGui::Text("Select all imu *.csv and lidar *.laz files produced by MANDEYE saved in 'continousScanning_*' folder");
@@ -626,13 +636,14 @@ void lidar_odometry_gui()
                         std::cout << "can not save file: " << pathtrj << std::endl;
                         return;
                     }
-                    // outfile <<
+
+                    outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 timestampUnix_nanoseconds" << std::endl;
                     for (int j = 0; j < worker_data_concatenated[i].intermediate_trajectory.size(); j++)
                     {
                         auto pose = worker_data_concatenated[i].intermediate_trajectory[0].inverse() * worker_data_concatenated[i].intermediate_trajectory[j];
 
                         outfile
-                            << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j] * 1e9 << " " << std::setprecision(10)
+                            << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].first * 1e9 << " " << std::setprecision(10)
                             << pose(0, 0) << " "
                             << pose(0, 1) << " "
                             << pose(0, 2) << " "
@@ -644,7 +655,8 @@ void lidar_odometry_gui()
                             << pose(2, 0) << " "
                             << pose(2, 1) << " "
                             << pose(2, 2) << " "
-                            << pose(2, 3) << std::endl;
+                            << pose(2, 3) << " "
+                            << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].second * 1e9 << std::endl;
                     }
                     outfile.close();
                     //
@@ -1449,7 +1461,6 @@ std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, i
     if (tmp_points.size() > 0){
         res_points.push_back(tmp_points);
     }
-
     return res_points;
 }
 
@@ -1616,7 +1627,7 @@ void alternative_approach()
     }
 
     std::cout << "loading imu" << std::endl;
-    std::vector<std::tuple<double, FusionVector, FusionVector>> imu_data;
+    std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
 
     std::for_each(std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string &fn)
                   {
@@ -1643,7 +1654,7 @@ void alternative_approach()
     std::map<double, Eigen::Matrix4d> trajectory;
 
     int counter = 1;
-    for (const auto &[timestamp, gyr, acc] : imu_data)
+    for (const auto &[timestamp_pair, gyr, acc] : imu_data)
     {
         const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
         const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
@@ -1656,7 +1667,7 @@ void alternative_approach()
         Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
         t.rotate(d);
 
-        trajectory[timestamp] = t.matrix();
+        trajectory[timestamp_pair.first] = t.matrix();
         const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
         counter++;
         if (counter % 100 == 0)

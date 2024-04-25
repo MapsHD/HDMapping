@@ -580,9 +580,9 @@ void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eig
     }
 }
 
-std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::string& imu_file, int imuToUse)
+std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> load_imu(const std::string& imu_file, int imuToUse)
 {
-    std::vector<std::tuple<double, FusionVector, FusionVector>> all_data;
+    std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> all_data;
 
     csv::CSVFormat format;
     format.delimiter({' ', ',', '\t'});
@@ -593,7 +593,7 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
     
     //mandatory columns
     const bool hasTsColumn = columnsSet.contains("timestamp");
-    const bool hasGyrosColumns = columnsSet.contains("gyroX")&& columnsSet.contains("gyroY") && columnsSet.contains("gyroZ");
+    const bool hasGyrosColumns = columnsSet.contains("gyroX") && columnsSet.contains("gyroY") && columnsSet.contains("gyroZ");
     const bool hasAccsColumns = columnsSet.contains("accX") && columnsSet.contains("accY") && columnsSet.contains("accZ");
 
     //optional
@@ -626,6 +626,7 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
             if (imu_id < 0 || imuToUse == imu_id)
             {
                 double timestamp = row["timestamp"].get<double>();
+                double timestampUnix = row["timestampUnix"].get<double>();
                 FusionVector gyr;
                 gyr.axis.x = row["gyroX"].get<double>();
                 gyr.axis.y = row["gyroY"].get<double>();
@@ -634,7 +635,7 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
                 acc.axis.x = row["accX"].get<double>();
                 acc.axis.y = row["accY"].get<double>();
                 acc.axis.z = row["accZ"].get<double>();
-                all_data.emplace_back(timestamp / 1e9, gyr, acc);
+                all_data.emplace_back(std::pair(timestamp / 1e9, timestampUnix / 1e9), gyr, acc);
             }
         }
     }
@@ -646,6 +647,7 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
             while (myfile)
             {
                 double data[7];
+                double timestampUnix = 0.0;
                 int imuId = 0;
                 std::string line;
                 std::getline(myfile, line);
@@ -654,6 +656,10 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
                 if (!iss.eof())
                 {
                     iss >> imuId;
+                }
+                if (!iss.eof())
+                {
+                    iss >> timestampUnix;
                 }
                 // std::cout << data[0] << " " << data[1] << " " << data[2] << " " << data[3] << " " << data[4] << " " << data[5] << " " << data[6] << std::endl;
                 if (data[0] > 0 && imuId == imuToUse)
@@ -668,15 +674,12 @@ std::vector<std::tuple<double, FusionVector, FusionVector>> load_imu(const std::
                     acc.axis.y = data[5];
                     acc.axis.z = data[6];
 
-                    all_data.emplace_back(data[0] / 1e9, gyr, acc);
+                    all_data.emplace_back(std::pair(data[0] / 1e9, timestampUnix / 1e9), gyr, acc);
                 }
             }
             myfile.close();
         }
-
-
     }
-
     return all_data;
 }
 

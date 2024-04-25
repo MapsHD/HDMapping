@@ -350,14 +350,14 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
 
                                     auto it = std::lower_bound(pc.local_trajectory.begin(), pc.local_trajectory.end(),
                                                                time_stamp, [](const PointCloud::LocalTrajectoryNode &lhs, const double &time) -> bool
-                                                               { return lhs.timestamp < time; });
+                                                               { return lhs.timestamps.first < time; });
 
                                     int index = it - pc.local_trajectory.begin();
 
                                     if (index > 0 && index < pc.local_trajectory.size())
                                     {
 
-                                        if (fabs(time_stamp - pc.local_trajectory[index].timestamp) < 10e12)
+                                        if (fabs(time_stamp - pc.local_trajectory[index].timestamps.first) < 10e12)
                                         {
 
                                             Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;

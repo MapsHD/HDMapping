@@ -182,8 +182,8 @@ bool PointClouds::update_poses_from_RESSO(const std::string &folder_with_point_c
 		pc.m_pose(2, 3) = t34;
 		// pc.m_initial_pose = pc.m_pose;
 
-		std::cout << "update pose: " << std::endl;
-		std::cout << pc.m_pose.matrix() << std::endl;
+		//std::cout << "update pose: " << std::endl;
+		//std::cout << pc.m_pose.matrix() << std::endl;
 
 		pcs.push_back(pc);
 	}
@@ -197,12 +197,12 @@ bool PointClouds::update_poses_from_RESSO(const std::string &folder_with_point_c
 			{
 				if (std::filesystem::path(point_clouds[i].file_name).filename().string() == pcs[j].file_name)
 				{
-					std::cout << "-------------------------" << std::endl;
-					std::cout << "update pose: " << i << std::endl;
-					std::cout << "previous pose: " << std::endl
-							  << point_clouds[i].m_pose.matrix() << std::endl;
-					std::cout << "current pose: " << std::endl
-							  << pcs[j].m_pose.matrix() << std::endl;
+					//std::cout << "-------------------------" << std::endl;
+					//std::cout << "update pose: " << i << std::endl;
+					//std::cout << "previous pose: " << std::endl
+					//		  << point_clouds[i].m_pose.matrix() << std::endl;
+					//std::cout << "current pose: " << std::endl
+					//		  << pcs[j].m_pose.matrix() << std::endl;
 
 					point_clouds[i].m_pose = pcs[j].m_pose;
 					point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds[i].m_pose);
@@ -312,12 +312,12 @@ bool PointClouds::update_poses_from_RESSO_inverse(const std::string &folder_with
 			{
 				if (std::filesystem::path(point_clouds[i].file_name).filename().string() == pcs[j].file_name)
 				{
-					std::cout << "-------------------------" << std::endl;
-					std::cout << "update pose: " << i << std::endl;
-					std::cout << "previous pose: " << std::endl
-							  << point_clouds[i].m_pose.matrix() << std::endl;
-					std::cout << "current pose: " << std::endl
-							  << pcs[j].m_pose.matrix() << std::endl;
+					//std::cout << "-------------------------" << std::endl;
+					//std::cout << "update pose: " << i << std::endl;
+					//std::cout << "previous pose: " << std::endl
+					//		  << point_clouds[i].m_pose.matrix() << std::endl;
+					//std::cout << "current pose: " << std::endl
+					//		  << pcs[j].m_pose.matrix() << std::endl;
 
 					point_clouds[i].m_pose = pcs[j].m_pose;
 					point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds[i].m_pose);
@@ -422,12 +422,12 @@ bool PointClouds::update_initial_poses_from_RESSO(const std::string &folder_with
 			{
 				if (std::filesystem::path(point_clouds[i].file_name).filename().string() == pcs[j].file_name)
 				{
-					std::cout << "-------------------------" << std::endl;
-					std::cout << "update pose: " << i << std::endl;
-					std::cout << "previous pose: " << std::endl
-							  << point_clouds[i].m_initial_pose.matrix() << std::endl;
-					std::cout << "current pose: " << std::endl
-							  << pcs[j].m_initial_pose.matrix() << std::endl;
+					//std::cout << "-------------------------" << std::endl;
+					//std::cout << "update pose: " << i << std::endl;
+					//std::cout << "previous pose: " << std::endl
+					//		  << point_clouds[i].m_initial_pose.matrix() << std::endl;
+					//std::cout << "current pose: " << std::endl
+					//		  << pcs[j].m_initial_pose.matrix() << std::endl;
 
 					point_clouds[i].m_initial_pose = pcs[j].m_initial_pose;
 				}
@@ -906,6 +906,7 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 			}
 
 			std::string s;
+			getline(infile, s); //csv header
 			while (!infile.eof())
 			{
 				getline(infile, s);
@@ -915,7 +916,7 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 				if (strs.size() == 13)
 				{
 					PointCloud::LocalTrajectoryNode ltn;
-					std::istringstream(strs[0]) >> ltn.timestamp;
+					std::istringstream(strs[0]) >> ltn.timestamps.first;
 					std::istringstream(strs[1]) >> ltn.m_pose(0, 0);
 					std::istringstream(strs[2]) >> ltn.m_pose(0, 1);
 					std::istringstream(strs[3]) >> ltn.m_pose(0, 2);
@@ -928,6 +929,28 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 					std::istringstream(strs[10]) >> ltn.m_pose(2, 1);
 					std::istringstream(strs[11]) >> ltn.m_pose(2, 2);
 					std::istringstream(strs[12]) >> ltn.m_pose(2, 3);
+
+					ltn.timestamps.second = 0.0;
+					local_trajectory.push_back(ltn);
+				}
+
+				if (strs.size() == 14)
+				{
+					PointCloud::LocalTrajectoryNode ltn;
+					std::istringstream(strs[0]) >> ltn.timestamps.first;
+					std::istringstream(strs[1]) >> ltn.m_pose(0, 0);
+					std::istringstream(strs[2]) >> ltn.m_pose(0, 1);
+					std::istringstream(strs[3]) >> ltn.m_pose(0, 2);
+					std::istringstream(strs[4]) >> ltn.m_pose(0, 3);
+					std::istringstream(strs[5]) >> ltn.m_pose(1, 0);
+					std::istringstream(strs[6]) >> ltn.m_pose(1, 1);
+					std::istringstream(strs[7]) >> ltn.m_pose(1, 2);
+					std::istringstream(strs[8]) >> ltn.m_pose(1, 3);
+					std::istringstream(strs[9]) >> ltn.m_pose(2, 0);
+					std::istringstream(strs[10]) >> ltn.m_pose(2, 1);
+					std::istringstream(strs[11]) >> ltn.m_pose(2, 2);
+					std::istringstream(strs[12]) >> ltn.m_pose(2, 3);
+					std::istringstream(strs[13]) >> ltn.timestamps.second;
 
 					local_trajectory.push_back(ltn);
 				}

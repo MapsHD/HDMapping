@@ -52,7 +52,7 @@ public:
 	};
 
 	struct LocalTrajectoryNode{
-		double timestamp;
+		std::pair<double, double> timestamps;
 		Eigen::Affine3d m_pose;
 	};
 

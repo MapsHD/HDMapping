@@ -1779,7 +1779,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_session_registration_step_3 v0.33");
+    glutCreateWindow("multi_session_registration_step_3 v0.34");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

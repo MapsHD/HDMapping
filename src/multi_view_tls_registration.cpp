@@ -1769,7 +1769,7 @@ void project_gui()
                     }
                 }
             }
-            if (ImGui::Button("save all marked trajectories to csv (timestamp_lidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
+            if (ImGui::Button("save all marked trajectories to csv (timestampLidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
             {
                 std::shared_ptr<pfd::save_file> save_file;
                 std::string output_file_name = "";
@@ -1799,7 +1799,7 @@ void project_gui()
                                     Eigen::Affine3d pose = p.m_pose * m;
                                     pose.translation() += session.point_clouds_container.offset;
                                     outfile << std::setprecision(20);
-                                    outfile << p.local_trajectory[i].timestamp << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                    outfile << p.local_trajectory[i].timestamps.first << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
                                 }
                             }
                         }
@@ -1807,7 +1807,7 @@ void project_gui()
                     }
                 }
             }
-            /*if (ImGui::Button("save all marked trajectories to csv (timestamp_OS,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
+            if (ImGui::Button("save all marked trajectories to csv (timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
             {
                 std::shared_ptr<pfd::save_file> save_file;
                 std::string output_file_name = "";
@@ -1837,15 +1837,53 @@ void project_gui()
                                     Eigen::Affine3d pose = p.m_pose * m;
                                     pose.translation() += session.point_clouds_container.offset;
                                     outfile << std::setprecision(20);
-                                    outfile << p.local_trajectory[i].timestamp << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                    outfile << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
                                 }
                             }
                         }
                         outfile.close();
                     }
                 }
-            }*/
-            if (ImGui::Button("save all marked trajectories to csv (timestamp_lidar,x,y,z,qx,qy,qz,qw)"))
+            }
+            if (ImGui::Button("save all marked trajectories to csv (timestampLidar,timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save las or csv file", "C:\\", {"LAS file", "*.las", "Csv file", "*.csv"}).result();
+                    output_file_name = sel;
+                    std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    std::ofstream outfile(output_file_name);
+                    if (outfile.good())
+                    {
+                        for (auto &p : session.point_clouds_container.point_clouds)
+                        {
+                            if (p.visible)
+                            {
+
+                                for (int i = 0; i < p.local_trajectory.size(); i++)
+                                {
+                                    const auto &m = p.local_trajectory[i].m_pose;
+                                    Eigen::Affine3d pose = p.m_pose * m;
+                                    pose.translation() += session.point_clouds_container.offset;
+                                    outfile << std::setprecision(20);
+                                    outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                }
+                            }
+                        }
+                        outfile.close();
+                    }
+                }
+            }
+            if (ImGui::Button("save all marked trajectories to csv (timestampLidar,x,y,z,qx,qy,qz,qw)"))
             {
                 std::shared_ptr<pfd::save_file> save_file;
                 std::string output_file_name = "";
@@ -1876,7 +1914,7 @@ void project_gui()
                                     pose.translation() += session.point_clouds_container.offset;
                                     Eigen::Quaterniond q(pose.rotation());
                                     outfile << std::setprecision(20);
-                                    outfile << p.local_trajectory[i].timestamp << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                    outfile << p.local_trajectory[i].timestamps.first << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
                                 }
                             }
                         }
@@ -1884,7 +1922,7 @@ void project_gui()
                     }
                 }
             }
-            /*if (ImGui::Button("save all marked trajectories to csv (timestamp_OS,x,y,z,qx,qy,qz,qw)"))
+            if (ImGui::Button("save all marked trajectories to csv (timestampUnix,x,y,z,qx,qy,qz,qw)"))
             {
                 std::shared_ptr<pfd::save_file> save_file;
                 std::string output_file_name = "";
@@ -1915,14 +1953,54 @@ void project_gui()
                                     pose.translation() += session.point_clouds_container.offset;
                                     Eigen::Quaterniond q(pose.rotation());
                                     outfile << std::setprecision(20);
-                                    outfile << p.local_trajectory[i].timestamp << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                    outfile << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
                                 }
                             }
                         }
                         outfile.close();
                     }
                 }
-            }*/
+            }
+            if (ImGui::Button("save all marked trajectories to csv (timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw)"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save las or csv file", "C:\\").result();
+                    output_file_name = sel;
+                    std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    std::ofstream outfile(output_file_name);
+                    if (outfile.good())
+                    {
+                        for (auto &p : session.point_clouds_container.point_clouds)
+                        {
+                            if (p.visible)
+                            {
+
+                                for (int i = 0; i < p.local_trajectory.size(); i++)
+                                {
+                                    const auto &m = p.local_trajectory[i].m_pose;
+                                    Eigen::Affine3d pose = p.m_pose * m;
+                                    pose.translation() += session.point_clouds_container.offset;
+                                    Eigen::Quaterniond q(pose.rotation());
+                                    outfile << std::setprecision(20);
+                                    outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                }
+                            }
+                        }
+                        outfile.close();
+                    }
+                }
+            }
+
         } // simple gui
 
         ImGui::Separator();
@@ -3480,7 +3558,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration_step_2 v0.33");
+    glutCreateWindow("multi_view_tls_registration_step_2 v0.34");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

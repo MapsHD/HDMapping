@@ -7,8 +7,9 @@ int main(int argc, char** argv)
 {
 	if (argc != 2)
 	{
-		printf("usage: DisplayImage.out <Image_Path>\n");
-		return -1;
+		//printf("usage: DisplayImage.out <Image_Path>\n");
+		std::cout << "USAGE: " << argv[0] << " <Image_Path>" << std::endl;
+		return 1;
 	}
 
 	Mat image;
@@ -17,7 +18,7 @@ int main(int argc, char** argv)
 	if (!image.data)
 	{
 		printf("No image data \n");
-		return -1;
+		return 2;
 	}
 	namedWindow("Display Image", WINDOW_AUTOSIZE);
 	imshow("Display Image", image);

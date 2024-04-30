@@ -196,6 +196,7 @@ std::unordered_map<int, Eigen::Affine3d> CombineIntoCalibration(const std::unord
 //! @param snToUse serial number of the Livox to use for IMU
 //! @return id of the IMU to use
 int GetImuIdToUse(const std::unordered_map<int, std::string>& idToSn, const std::string& snToUse );
-
 }
+
+void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &params);
 #endif

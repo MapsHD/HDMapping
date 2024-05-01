@@ -1701,7 +1701,7 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
         poses_desired.push_back(pose_tait_bryan_from_affine_matrix(trajectory_motion_model[i]));
     }
 
-    double angle = 1.0 / 180.0 * M_PI;
+    double angle = 0.01 / 180.0 * M_PI;
     double wangle = 1.0 / (angle * angle);
 
     /*for (size_t i = 0; i < odo_edges.size(); i++)
@@ -1870,9 +1870,9 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
         tripletListB.emplace_back(ir + 4, 0, delta(4, 0));
         tripletListB.emplace_back(ir + 5, 0, delta(5, 0));
 
-        tripletListP.emplace_back(ir, ir, 1000000);
-        tripletListP.emplace_back(ir + 1, ir + 1, 1000000);
-        tripletListP.emplace_back(ir + 2, ir + 2, 1000000);
+        tripletListP.emplace_back(ir    , ir    , 100000000);
+        tripletListP.emplace_back(ir + 1, ir + 1, 100000000);
+        tripletListP.emplace_back(ir + 2, ir + 2, 100000000);
         tripletListP.emplace_back(ir + 3, ir + 3, wangle);
         tripletListP.emplace_back(ir + 4, ir + 4, wangle);
         tripletListP.emplace_back(ir + 5, ir + 5, wangle);

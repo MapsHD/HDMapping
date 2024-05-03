@@ -63,6 +63,7 @@ float m_gizmo[] = {1, 0, 0, 0,
 //Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
 //double consecutive_distance = 0.0;
 float x_displacement = 0.01;
+int num_constistency_iter = 10;
 
 LidarOdometryParams params;
 const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
@@ -76,7 +77,7 @@ bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_step_1 v0.35"))
+    if (ImGui::Begin("lidar_odometry_step_1 v0.36"))
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
@@ -561,41 +562,14 @@ void lidar_odometry_gui()
         }*/
         if (step_1_done && step_2_done && !step_3_done)
         {
-            if (ImGui::Button("Consistency (step_4 optional)"))
-            {
-                std::cout << "Consistency START" << std::endl;
-                for (int i = 0; i < worker_data.size(); i++)
-                {
-                    worker_data[i].intermediate_trajectory_motion_model = worker_data[i].intermediate_trajectory;
-                }
-                Consistency(worker_data, params);
-                std::cout << "Consistency FINISHED" << std::endl;
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Consistency x 10 (step_4 optional)"))
+            ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
+            if (ImGui::Button("Consistency"))
             {
                 std::cout << "Consistency START" << std::endl;
 
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < num_constistency_iter; i++)
                 {
-                    std::cout << "Iteration " << i + 1 << " of 10" << std::endl;
-                    for (int ii = 0; ii < worker_data.size(); ii++)
-                    {
-                        worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
-                    }
-                    Consistency(worker_data, params);
-                }
-                std::cout << "Consistency FINISHED" << std::endl;
-            }
-
-            static int num_iter = 100;
-            if (ImGui::Button("Consistency x Iterations (step_4 optional)"))
-            {
-                std::cout << "Consistency START" << std::endl;
-
-                for (int i = 0; i < num_iter; i++)
-                {
-                    std::cout << "Iteration " << i + 1 << " of " << num_iter << std::endl;
+                    std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
                     for (int ii = 0; ii < worker_data.size(); ii++)
                     {
                         worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
@@ -605,8 +579,7 @@ void lidar_odometry_gui()
                 std::cout << "Consistency FINISHED" << std::endl;
             }
             ImGui::SameLine();
-
-            ImGui::InputInt("Iterations", &num_iter);
+            ImGui::Text("Press this button optionally before pressing 'save result (step 3)'");
 
             if (ImGui::Button("save result (step 3)"))
             {

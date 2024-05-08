@@ -77,7 +77,7 @@ bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_step_1 v0.36"))
+    if (ImGui::Begin("lidar_odometry_step_1 v0.37"))
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");

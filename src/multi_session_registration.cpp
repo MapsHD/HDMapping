@@ -27,6 +27,8 @@
 
 #include <registration_plane_feature.h>
 
+#include <m_estimators.h>
+
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
 double camera_ortho_xy_view_shift_y = 0.0;
@@ -1779,7 +1781,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_session_registration_step_3 v0.36");
+    glutCreateWindow("multi_session_registration_step_3 v0.37");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -1859,6 +1861,7 @@ bool optimize(std::vector<Session> &sessions)
         {
             m_poses.push_back(sessions[j].point_clouds_container.point_clouds[i].m_pose);
             poses_motion_model.push_back(sessions[j].point_clouds_container.point_clouds[i].m_initial_pose);
+            //poses_motion_model.push_back(sessions[j].point_clouds_container.point_clouds[i].m_pose);
             index_trajectory.push_back(j);
         }
     }
@@ -1898,6 +1901,9 @@ bool optimize(std::vector<Session> &sessions)
     std::vector<Edge> all_edges;
 
     // motion model edges;
+    double angle = 0.1 / 180.0 * M_PI;
+    double wangle = 1.0 / (angle * angle);
+
     for (int i = 1; i < poses_motion_model.size(); i++)
     {
         if (index_trajectory[i - 1] == index_trajectory[i])
@@ -1907,12 +1913,12 @@ bool optimize(std::vector<Session> &sessions)
             edge.index_from = i - 1;
             edge.index_to = i;
             edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_rel);
-            edge.relative_pose_tb_weights.om = 10000.0;
-            edge.relative_pose_tb_weights.fi = 10000.0;
-            edge.relative_pose_tb_weights.ka = 10000.0;
-            edge.relative_pose_tb_weights.px = 10000.0;
-            edge.relative_pose_tb_weights.py = 10000.0;
-            edge.relative_pose_tb_weights.pz = 10000.0;
+            edge.relative_pose_tb_weights.om = wangle;
+            edge.relative_pose_tb_weights.fi = wangle;
+            edge.relative_pose_tb_weights.ka = wangle;
+            edge.relative_pose_tb_weights.px = 1000000.0;
+            edge.relative_pose_tb_weights.py = 1000000.0;
+            edge.relative_pose_tb_weights.pz = 1000000.0;
             all_edges.push_back(edge);
         }
     }
@@ -2077,12 +2083,12 @@ bool optimize(std::vector<Session> &sessions)
             // tripletListP.emplace_back(ir + 3, ir + 3, get_cauchy_w(delta(3, 0), 10));
             // tripletListP.emplace_back(ir + 4, ir + 4, get_cauchy_w(delta(4, 0), 10));
             // tripletListP.emplace_back(ir + 5, ir + 5, get_cauchy_w(delta(5, 0), 10));
-            tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
-            tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
-            tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
-            tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
-            tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
-            tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
+            tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px * get_cauchy_w(delta(0, 0), 1));
+            tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py * get_cauchy_w(delta(1, 0), 1));
+            tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz * get_cauchy_w(delta(2, 0), 1));
+            tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om * get_cauchy_w(delta(3, 0), 1));
+            tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi * get_cauchy_w(delta(4, 0), 1));
+            tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka * get_cauchy_w(delta(5, 0), 1));
         }
         if (is_fix_first_node)
         {
@@ -2137,6 +2143,9 @@ bool optimize(std::vector<Session> &sessions)
             }
         }
 
+        double angle = 1.0 / 180.0 * M_PI;
+        double wangle = 1.0 / (angle * angle);
+
         for (int index = 0; index < indexes_ground_truth.size(); index++)
         {
             int ir = tripletListB.size();
@@ -2148,12 +2157,12 @@ bool optimize(std::vector<Session> &sessions)
             tripletListA.emplace_back(ir + 4, ic + 4, 1);
             tripletListA.emplace_back(ir + 5, ic + 5, 1);
 
-            tripletListP.emplace_back(ir, ir, 1000000000000.0);
-            tripletListP.emplace_back(ir + 1, ir + 1, 1000000000000.0);
-            tripletListP.emplace_back(ir + 2, ir + 2, 1000000000000.0);
-            tripletListP.emplace_back(ir + 3, ir + 3, 1000000000000.0);
-            tripletListP.emplace_back(ir + 4, ir + 4, 1000000000000.0);
-            tripletListP.emplace_back(ir + 5, ir + 5, 1000000000000.0);
+            tripletListP.emplace_back(ir    , ir    , 10000.0);
+            tripletListP.emplace_back(ir + 1, ir + 1, 10000.0);
+            tripletListP.emplace_back(ir + 2, ir + 2, 10000.0);
+            tripletListP.emplace_back(ir + 3, ir + 3, wangle);
+            tripletListP.emplace_back(ir + 4, ir + 4, wangle);
+            tripletListP.emplace_back(ir + 5, ir + 5, wangle);
 
             tripletListB.emplace_back(ir, 0, 0);
             tripletListB.emplace_back(ir + 1, 0, 0);

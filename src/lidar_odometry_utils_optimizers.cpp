@@ -927,51 +927,26 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
         for (int i = 0; i < worker_data.size(); i++)
         {
-            // XXX
-            /*for (int k = 0; k < worker_data[i].intermediate_trajectory.size(); k++)
-            {
-                TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[k]);
-                tb.om = worker_data[i].imu_roll_pitch[k].first;
-                tb.fi = worker_data[i].imu_roll_pitch[k].second;
-                worker_data[i].intermediate_trajectory[k] = affine_matrix_from_pose_tait_bryan(tb);
-            }
-            for (int k = 0; k < worker_data[i].intermediate_trajectory_motion_model.size(); k++)
-            {
-                TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory_motion_model[k]);
-                tb.om = worker_data[i].imu_roll_pitch[k].first;
-                tb.fi = worker_data[i].imu_roll_pitch[k].second;
-                worker_data[i].intermediate_trajectory_motion_model[k] = affine_matrix_from_pose_tait_bryan(tb);
-            }*/
-            // XXX
-
-            // std::cout << "computing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << std::endl;
             Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
             if (i > 1 && params.use_motion_from_previous_step)
             {
-                Eigen::Affine3d m_relative = worker_data[i - 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].inverse() *
-                                             worker_data[i - 1].intermediate_trajectory[0];
-
-                mean_shift = m_relative.translation() / (worker_data[i].intermediate_trajectory.size());
-                // mean_shift.z() = 0.0; underground mining
-
+                mean_shift = worker_data[i - 1].intermediate_trajectory[0].translation() - worker_data[i - 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].translation();
+                mean_shift /= ((worker_data[i - 2].intermediate_trajectory.size()) - 2);
+               
                 if (mean_shift.norm() > 1.0)
                 {
-                    // mean_shift = Eigen::Vector3d(1.0, 1.0, 1.0);
+                    std::cout << "!!!mean_shift.norm() > 1.0!!!" << std::endl;
                     mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
                 }
-                // std::cout << "mean_shift " << mean_shift << std::endl;
-
-                Eigen::Affine3d m_mean_shift = Eigen::Affine3d::Identity();
-                m_mean_shift.translation() = mean_shift;
-
+                
                 std::vector<Eigen::Affine3d> new_trajectory;
                 Eigen::Affine3d current_node = worker_data[i].intermediate_trajectory[0];
                 new_trajectory.push_back(current_node);
 
                 for (int tr = 1; tr < worker_data[i].intermediate_trajectory.size(); tr++)
                 {
-                    current_node = current_node * (worker_data[i].intermediate_trajectory[tr - 1].inverse() * worker_data[i].intermediate_trajectory[tr]);
-                    current_node = current_node * m_mean_shift;
+                    current_node.linear() = worker_data[i].intermediate_trajectory[tr].linear();
+                    current_node.translation() += mean_shift;
                     new_trajectory.push_back(current_node);
                 }
 
@@ -981,10 +956,12 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 Eigen::Affine3d current_node_motion_model = worker_data[i].intermediate_trajectory_motion_model[0];
                 new_trajectory_motion_model.push_back(current_node_motion_model);
 
+                Eigen::Vector3d mean_shift_t = worker_data[i].intermediate_trajectory_motion_model[0].linear() * ((worker_data[i].intermediate_trajectory[0].linear()).inverse() * mean_shift);
+
                 for (int tr = 1; tr < worker_data[i].intermediate_trajectory_motion_model.size(); tr++)
                 {
-                    current_node_motion_model = current_node_motion_model * (worker_data[i].intermediate_trajectory_motion_model[tr - 1].inverse() * worker_data[i].intermediate_trajectory_motion_model[tr]);
-                    current_node_motion_model = current_node_motion_model * m_mean_shift;
+                    current_node_motion_model.linear() = worker_data[i].intermediate_trajectory_motion_model[tr].linear();
+                    current_node_motion_model.translation() += mean_shift_t;
                     new_trajectory_motion_model.push_back(current_node_motion_model);
                 }
 
@@ -992,49 +969,31 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             }
 
             bool add_pitch_roll_constraint = false;
-            TaitBryanPose pose;
-            pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
+            //TaitBryanPose pose;
+            //pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
 
-            double residual1;
-            double residual2;
-            residual_constraint_fixed_optimization_parameter(residual1, normalize_angle(worker_data[i].imu_roll_pitch[0].first), normalize_angle(pose.om));
-            residual_constraint_fixed_optimization_parameter(residual2, normalize_angle(worker_data[i].imu_roll_pitch[0].second), normalize_angle(pose.fi));
+            //double residual1;
+            //double residual2;
+           // residual_constraint_fixed_optimization_parameter(residual1, normalize_angle(worker_data[i].imu_roll_pitch[0].first), normalize_angle(pose.om));
+            //residual_constraint_fixed_optimization_parameter(residual2, normalize_angle(worker_data[i].imu_roll_pitch[0].second), normalize_angle(pose.fi));
 
-            if (fabs(worker_data[i].imu_roll_pitch[0].first) < 30.0 / 180.0 * M_PI && fabs(worker_data[i].imu_roll_pitch[0].second) < 30.0 / 180.0 * M_PI)
-            {
-                if (params.consecutive_distance > 10.0)
-                {
-                    add_pitch_roll_constraint = true;
-                    params.consecutive_distance = 0.0;
-                }
-            }
+            //if (fabs(worker_data[i].imu_roll_pitch[0].first) < 30.0 / 180.0 * M_PI && fabs(worker_data[i].imu_roll_pitch[0].second) < 30.0 / 180.0 * M_PI)
+            //{
+            //    if (params.consecutive_distance > 10.0)
+           //     {
+            //        add_pitch_roll_constraint = true;
+            //        params.consecutive_distance = 0.0;
+            //    }
+            //}
 
-            if (add_pitch_roll_constraint)
-            {
-                std::cout << "residual_imu_roll_deg before: " << residual1 / M_PI * 180.0 << std::endl;
-                std::cout << "residual_imu_pitch_deg before: " << residual2 / M_PI * 180.0 << std::endl;
-            }
+            //if (add_pitch_roll_constraint)
+            //{
+            //    std::cout << "residual_imu_roll_deg before: " << residual1 / M_PI * 180.0 << std::endl;
+            //    std::cout << "residual_imu_pitch_deg before: " << residual2 / M_PI * 180.0 << std::endl;
+            //}
 
             std::chrono::time_point<std::chrono::system_clock> start1, end1;
             start1 = std::chrono::system_clock::now();
-
-            // XXX underground mining
-            /*
-            for (int k = 0; k < worker_data[i].intermediate_trajectory.size(); k++)
-            {
-                TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[k]);
-                //tb.om = 0;//worker_data[i].imu_roll_pitch[k].first;
-                //tb.fi = 0;//worker_data[i].imu_roll_pitch[k].second;
-                worker_data[i].intermediate_trajectory[k] = affine_matrix_from_pose_tait_bryan(tb);
-            }
-            for (int k = 0; k < worker_data[i].intermediate_trajectory_motion_model.size(); k++)
-            {
-                TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory_motion_model[k]);
-                tb.om = 0;//worker_data[i].imu_roll_pitch[k].first;
-                tb.fi = 0;//worker_data[i].imu_roll_pitch[k].second;
-                worker_data[i].intermediate_trajectory_motion_model[k] = affine_matrix_from_pose_tait_bryan(tb);
-            }*/
-            // XXX
 
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
@@ -1045,16 +1004,16 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             std::chrono::duration<double> elapsed_seconds1 = end1 - start1;
             std::cout << "optimizing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << " elapsed time: " << elapsed_seconds1.count() << std::endl;
 
-            if (add_pitch_roll_constraint)
-            {
-                pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
+            //if (add_pitch_roll_constraint)
+            //{
+            //    pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
 
-                residual_constraint_fixed_optimization_parameter(residual1, normalize_angle(worker_data[i].imu_roll_pitch[0].first), normalize_angle(pose.om));
-                residual_constraint_fixed_optimization_parameter(residual2, normalize_angle(worker_data[i].imu_roll_pitch[0].second), normalize_angle(pose.fi));
+            //    residual_constraint_fixed_optimization_parameter(residual1, normalize_angle(worker_data[i].imu_roll_pitch[0].first), normalize_angle(pose.om));
+            //    residual_constraint_fixed_optimization_parameter(residual2, normalize_angle(worker_data[i].imu_roll_pitch[0].second), normalize_angle(pose.fi));
 
-                std::cout << "residual_imu_roll_deg after: " << residual1 / M_PI * 180.0 << std::endl;
-                std::cout << "residual_imu_pitch_deg after: " << residual2 / M_PI * 180.0 << std::endl;
-            }
+            //    std::cout << "residual_imu_roll_deg after: " << residual1 / M_PI * 180.0 << std::endl;
+            //    std::cout << "residual_imu_pitch_deg after: " << residual2 / M_PI * 180.0 << std::endl;
+            //}
 
             // align to reference
             if (params.reference_points.size() > 0)
@@ -1123,13 +1082,6 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
                 worker_data[j].intermediate_trajectory[0] = m_last;
 
-                // TaitBryanPose tb_last = pose_tait_bryan_from_affine_matrix(m_last);
-                // TaitBryanPose tb_last_mm = pose_tait_bryan_from_affine_matrix(mm_poses[j]);
-                // tb_last.om = tb_last_mm.om;
-                // tb_last.fi = tb_last_mm.fi;
-
-                // worker_data[j].intermediate_trajectory[0] = affine_matrix_from_pose_tait_bryan(tb_last);
-
                 for (int k = 1; k < tmp.size(); k++)
                 {
                     Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
@@ -1180,7 +1132,6 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
                 std::cout << "finished computation at " << std::ctime(&end_timeu)
                           << "elapsed time update: " << elapsed_secondsu.count() << "s\n";
-                // std::cout << "update" << std::endl;
             }
             else
             {
@@ -1200,9 +1151,7 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                                       worker_data[i - 2].intermediate_trajectory[0].translation())
                                          .norm();
                 params.consecutive_distance += translation;
-                // std::cout << "consecutive_distance " << consecutive_distance << std::endl;
             }
-            //}
         }
 
         for (int i = 0; i < worker_data.size(); i++)
@@ -1674,12 +1623,12 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     std::vector<Eigen::Triplet<double>> tripletListP;
     std::vector<Eigen::Triplet<double>> tripletListB;
 
-    //Eigen::MatrixXd AtPAndt(trajectory.size() * 6, trajectory.size() * 6);
-    //AtPAndt.setZero();
-    //Eigen::MatrixXd AtPBndt(trajectory.size() * 6, 1);
-    //AtPBndt.setZero();
+    // Eigen::MatrixXd AtPAndt(trajectory.size() * 6, trajectory.size() * 6);
+    // AtPAndt.setZero();
+    // Eigen::MatrixXd AtPBndt(trajectory.size() * 6, 1);
+    // AtPBndt.setZero();
     Eigen::Vector3d b(params.in_out_params.resolution_X, params.in_out_params.resolution_Y, params.in_out_params.resolution_Z);
-    //std::vector<std::mutex> mutexes(trajectory.size());
+    // std::vector<std::mutex> mutexes(trajectory.size());
 
     std::vector<std::mutex> my_mutex(1);
 
@@ -1870,7 +1819,7 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
         tripletListB.emplace_back(ir + 4, 0, delta(4, 0));
         tripletListB.emplace_back(ir + 5, 0, delta(5, 0));
 
-        tripletListP.emplace_back(ir    , ir    , 100000000);
+        tripletListP.emplace_back(ir, ir, 100000000);
         tripletListP.emplace_back(ir + 1, ir + 1, 100000000);
         tripletListP.emplace_back(ir + 2, ir + 2, 100000000);
         tripletListP.emplace_back(ir + 3, ir + 3, wangle);
@@ -1921,8 +1870,8 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     tripletListP.clear();
     tripletListB.clear();
 
-    //ndt
-    
+    // ndt
+
     std::cout << "NDT observations START" << std::endl;
     for (size_t index_point_begin = 0; index_point_begin < all_points_local.size(); index_point_begin += 10000000)
     {
@@ -2000,23 +1949,23 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
 
                 //
 
-                //Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
-                //point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
-                //    AtPA,
-                //    pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                //    p_s.x(), p_s.y(), p_s.z(),
-                //    infm(0, 0), infm(0, 1), infm(0, 2), infm(1, 0), infm(1, 1), infm(1, 2), infm(2, 0), infm(2, 1), infm(2, 2));
+                // Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
+                // point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
+                //     AtPA,
+                //     pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                //     p_s.x(), p_s.y(), p_s.z(),
+                //     infm(0, 0), infm(0, 1), infm(0, 2), infm(1, 0), infm(1, 1), infm(1, 2), infm(2, 0), infm(2, 1), infm(2, 2));
 
-                //Eigen::Matrix<double, 6, 1> AtPB;
-                //point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
-                //    AtPB,
-                //    pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                //    p_s.x(), p_s.y(), p_s.z(),
-                //    infm(0, 0), infm(0, 1), infm(0, 2), infm(1, 0), infm(1, 1), infm(1, 2), infm(2, 0), infm(2, 1), infm(2, 2),
-                //    this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
+                // Eigen::Matrix<double, 6, 1> AtPB;
+                // point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
+                //     AtPB,
+                //     pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                //     p_s.x(), p_s.y(), p_s.z(),
+                //     infm(0, 0), infm(0, 1), infm(0, 2), infm(1, 0), infm(1, 1), infm(1, 2), infm(2, 0), infm(2, 1), infm(2, 2),
+                //     this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
 
                 Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
-                //TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix((*mposes)[p.index_pose]);
+                // TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix((*mposes)[p.index_pose]);
 
                 point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
                                                               pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
@@ -2028,7 +1977,7 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
 
                 int c = intermediate_points_i.index_pose * 6;
 
-                std::mutex &m = my_mutex[0];//mutexes[intermediate_points_i.index_pose];
+                std::mutex &m = my_mutex[0]; // mutexes[intermediate_points_i.index_pose];
                 std::unique_lock lck(m);
                 int ir = tripletListB.size();
 

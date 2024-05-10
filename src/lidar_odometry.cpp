@@ -77,7 +77,7 @@ bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &
 
 void lidar_odometry_gui()
 {
-    if (ImGui::Begin("lidar_odometry_step_1 v0.37"))
+    if (ImGui::Begin("lidar_odometry_step_1 v0.38"))
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
@@ -705,6 +705,7 @@ void lidar_odometry_gui()
                 j["poses_file_name"] = path2.string();
                 j["initial_poses_file_name"] = path.string();
                 j["out_poses_file_name"] = path2.string();
+                j["lidar_odometry_version"] = 0.38;
 
                 jj["Session Settings"] = j;
 
@@ -1249,7 +1250,7 @@ void display()
             glVertex3f(it(0, 3), it(1, 3), it(2, 3));
             glVertex3f(it(0, 3) + it(0, 1), it(1, 3) + it(1, 1), it(2, 3) + it(2, 1));
 
-            glColor3f(0, 0, 1);
+            /*glColor3f(0, 0, 1);
             glVertex3f(it(0, 3), it(1, 3), it(2, 3));
             glVertex3f(it(0, 3) + it(0, 2), it(1, 3) + it(1, 2), it(2, 3) + it(2, 2));
             glEnd();
@@ -1276,7 +1277,7 @@ void display()
 
                 glEnd();
                 glLineWidth(1);
-            }
+            }*/
         }
     }
 

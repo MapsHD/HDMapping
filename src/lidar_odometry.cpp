@@ -795,8 +795,6 @@ void lidar_odometry_gui()
                     */
                 }
             }
-            
-            
         }
         if (!simple_gui)
         {
@@ -1240,15 +1238,19 @@ void display()
             glEnd();
             glPointSize(1);
 
+            glLineWidth(1);
             glBegin(GL_LINES);
-            const auto &it = worker_data[i].intermediate_trajectory[0];
-            glColor3f(1, 0, 0);
-            glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-            glVertex3f(it(0, 3) + it(0, 0), it(1, 3) + it(1, 0), it(2, 3) + it(2, 0));
+                const auto &it = worker_data[i].intermediate_trajectory[0];
+                glColor3f(1, 0, 0);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + it(0, 0), it(1, 3) + it(1, 0), it(2, 3) + it(2, 0));
 
-            glColor3f(0, 1, 0);
-            glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-            glVertex3f(it(0, 3) + it(0, 1), it(1, 3) + it(1, 1), it(2, 3) + it(2, 1));
+                glColor3f(0, 1, 0);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + it(0, 1), it(1, 3) + it(1, 1), it(2, 3) + it(2, 1));
+            
+            glEnd();
+            //glLineWidth(1);
 
             /*glColor3f(0, 0, 1);
             glVertex3f(it(0, 3), it(1, 3), it(2, 3));

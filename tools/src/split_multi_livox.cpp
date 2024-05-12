@@ -65,14 +65,10 @@ std::vector<Point3Dil> load_point_cloud(const std::string &lazFile, bool ommit_p
         }
         Point3Dil p;
 
-        double cal_x = 11.0 / 1000.0; // ToDo change if lidar differen than livox mid 360
-        double cal_y = 23.29 / 1000.0;
-        double cal_z = -44.12 / 1000.0;
-
         Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
-        p.point.x() = pf.x() - cal_x;
-        p.point.y() = pf.y() - cal_y;
-        p.point.z() = pf.z() - cal_z;
+        p.point.x() = pf.x();
+        p.point.y() = pf.y();
+        p.point.z() = pf.z();
         p.timestamp = point->gps_time;
         p.intensity = point->intensity;
         p.livoxId = point->user_data;

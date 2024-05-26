@@ -1,20 +1,20 @@
 #include <session.h>
 #include <nlohmann/json.hpp>
-
+#include <filesystem>
 namespace fs = std::filesystem;
 
 std::string pathUpdater(std::string path, std::string newPath)
-{   
-    std::replace(path.begin(), path.end(), '/', '\\');
-    if (std::string::npos == path.find('.'))
-    {
-        return newPath;
-    }
+{
+  fs::path p(path);
+  fs::path newpath(newPath);
+  if (is_directory(p))
+  {
+    return p.string();
+  }
 
-    const size_t file_idx = path.rfind('\\');
-    std::string finalPath = newPath + path.substr(file_idx);
-    return finalPath;
-
+  //get filename
+  fs::path filename = p.filename();
+  return (newpath / filename).string();
 }
 
 bool Session::load(const std::string &file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
@@ -35,12 +35,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
     std::vector<std::string> laz_file_names;
 
     // Get a loaded file directory
-    std::string directory;
-    const size_t last_slash_idx = file_name.rfind('\\');
-    if (std::string::npos != last_slash_idx)
-    {
-        directory = file_name.substr(0, last_slash_idx);
-    }
+    std::string directory = fs::path(file_name).parent_path().string();
 
     try
     {

@@ -537,7 +537,9 @@ void project_gui()
                 {
                     if (ImGui::Button("Optimize"))
                     {
-                        optimize(sessions);
+                        for(int i = 0; i < 10; i++){
+                            optimize(sessions);
+                        }
                         optimized = true;
                     }
                     if (optimized)
@@ -1781,7 +1783,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_session_registration_step_3 v0.38");
+    glutCreateWindow("multi_session_registration_step_3 v0.40");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -2143,7 +2145,7 @@ bool optimize(std::vector<Session> &sessions)
             }
         }
 
-        double angle = 1.0 / 180.0 * M_PI;
+        /*double angle = 1.0 / 180.0 * M_PI;
         double wangle = 1.0 / (angle * angle);
 
         for (int index = 0; index < indexes_ground_truth.size(); index++)
@@ -2170,7 +2172,7 @@ bool optimize(std::vector<Session> &sessions)
             tripletListB.emplace_back(ir + 3, 0, 0);
             tripletListB.emplace_back(ir + 4, 0, 0);
             tripletListB.emplace_back(ir + 5, 0, 0);
-        }
+        }*/
 
         // gnss
         // for (const auto &pc : point_clouds_container.point_clouds)
@@ -2298,12 +2300,12 @@ bool optimize(std::vector<Session> &sessions)
             {
 
                 TaitBryanPose pose = poses[i];
-                poses[i].px += h_x[counter++];
-                poses[i].py += h_x[counter++];
-                poses[i].pz += h_x[counter++];
-                poses[i].om += h_x[counter++];
-                poses[i].fi += h_x[counter++];
-                poses[i].ka += h_x[counter++];
+                poses[i].px += h_x[counter++] * 0.1;
+                poses[i].py += h_x[counter++] * 0.1;
+                poses[i].pz += h_x[counter++] * 0.1;
+                poses[i].om += h_x[counter++] * 0.1;
+                poses[i].fi += h_x[counter++] * 0.1;
+                poses[i].ka += h_x[counter++] * 0.1;
 
                 if (i == 0 && is_fix_first_node)
                 {

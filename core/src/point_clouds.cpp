@@ -829,7 +829,9 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 		point_clouds.push_back(pc);*/
 		return false;
 	}
-	fprintf(stderr, "file '%s' contains %u points\n", input_file_name.c_str(), header->number_of_point_records);
+	
+	//fprintf(stderr, "file '%s' contains %u points\n", input_file_name.c_str(), header->number_of_point_records);
+	
 	laszip_point *point;
 	if (laszip_get_point_pointer(laszip_reader, &point))
 	{
@@ -847,7 +849,7 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 	pc.gui_rotation[1] = rad2deg(pc.pose.fi);
 	pc.gui_rotation[2] = rad2deg(pc.pose.ka);
 
-	for (int j = 0; j < header->number_of_point_records; j++)
+	/*for (int j = 0; j < header->number_of_point_records; j++)
 	{
 		if (laszip_read_point(laszip_reader))
 		{
@@ -867,7 +869,37 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 		pc.points_local.push_back(pp);
 		pc.intensities.push_back(point->intensity);
 		pc.timestamps.push_back(p.timestamp);
+	}*/
+
+	laszip_I64 npoints = (header->number_of_point_records ? header->number_of_point_records : header->extended_number_of_point_records);
+
+	fprintf(stderr, "file '%s' contains %I64d points\n", input_file_name.c_str(), npoints);
+
+	laszip_I64 p_count = 0;
+
+	while (p_count < npoints)
+	{
+		if (laszip_read_point(laszip_reader))
+		{
+			fprintf(stderr, "DLL ERROR: reading point %I64d\n", p_count);
+			laszip_close_reader(laszip_reader);
+			return false;
+		}
+
+		LAZPoint p;
+		p.x = header->x_offset + header->x_scale_factor * static_cast<double>(point->X);
+		p.y = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y);
+		p.z = header->z_offset + header->z_scale_factor * static_cast<double>(point->Z);
+		p.timestamp = point->gps_time;
+
+		Eigen::Vector3d pp(p.x, p.y, p.z);
+		pc.points_local.push_back(pp);
+		pc.intensities.push_back(point->intensity);
+		pc.timestamps.push_back(p.timestamp);
+
+		p_count++;
 	}
+
 	laszip_close_reader(laszip_reader);
 	// laszip_clean(laszip_reader);
 	// laszip_destroy(laszip_reader);

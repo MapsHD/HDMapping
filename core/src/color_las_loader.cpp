@@ -2,37 +2,47 @@
 #include <iostream>
 #include <vector>
 
-
-std::vector<mandeye::Point> mandeye::load(const std::string& lazFile) {
+std::vector<mandeye::Point> mandeye::load(const std::string &lazFile)
+{
 	std::vector<Point> points;
 	laszip_POINTER laszip_reader;
-	if (laszip_create(&laszip_reader)) {
+	if (laszip_create(&laszip_reader))
+	{
 		fprintf(stderr, "DLL ERROR: creating laszip reader\n");
 		std::abort();
 	}
 
 	laszip_BOOL is_compressed = 0;
-	if (laszip_open_reader(laszip_reader, lazFile.c_str(), &is_compressed)) {
+	if (laszip_open_reader(laszip_reader, lazFile.c_str(), &is_compressed))
+	{
 		fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", lazFile.c_str());
 		std::abort();
 	}
 	std::cout << "compressed : " << is_compressed << std::endl;
-	laszip_header* header;
+	laszip_header *header;
 
-	if (laszip_get_header_pointer(laszip_reader, &header)) {
+	if (laszip_get_header_pointer(laszip_reader, &header))
+	{
 		fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
 		std::abort();
 	}
-	fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
-	laszip_point* point;
-	if (laszip_get_point_pointer(laszip_reader, &point)) {
-		fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
-		std::abort();
-	}
+	// fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
 
+	// laszip_point *point;
+	// if (laszip_get_point_pointer(laszip_reader, &point))
+	//{
+	//	fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
+	//	std::abort();
+	// }
 
-	for (int j = 0; j < header->number_of_point_records; j++) {
-		if (laszip_read_point(laszip_reader)) {
+	/*std::cout << "header->number_of_point_records: " << header->number_of_point_records << std::endl;
+	std::cout << "header->extended_number_of_point_records: " << header->extended_number_of_point_records << std::endl;
+
+	//for (int j = 0; j < header->number_of_point_records; j++)
+	for (int j = 0; j < header->extended_number_of_point_records; j++)
+	{
+		if (laszip_read_point(laszip_reader))
+		{
 			fprintf(stderr, "DLL ERROR: reading point %u\n", j);
 			std::abort();
 		}
@@ -45,24 +55,57 @@ std::vector<mandeye::Point> mandeye::load(const std::string& lazFile) {
 		p.intensity = point->intensity;
 
 		points.emplace_back(p);
+	}*/
 
+	laszip_I64 npoints = (header->number_of_point_records ? header->number_of_point_records : header->extended_number_of_point_records);
+
+	// report how many points the file has
+
+	fprintf(stderr, "file '%s' contains %I64d points\n", lazFile.c_str(), npoints);
+
+	laszip_point *point;
+
+	if (laszip_get_point_pointer(laszip_reader, &point))
+	{
+		fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
+	}
+
+	laszip_I64 p_count = 0;
+
+	while (p_count < npoints)
+	{
+		if (laszip_read_point(laszip_reader))
+		{
+			fprintf(stderr, "DLL ERROR: reading point %I64d\n", p_count);
+	
+		}
+		Point p;
+		p.point.x() = header->x_offset + header->x_scale_factor * static_cast<double>(point->X);
+		p.point.y() = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y);
+		p.point.z() = header->z_offset + header->z_scale_factor * static_cast<double>(point->Z);
+		p.timestamp = point->gps_time;
+		p.intensity = point->intensity;
+
+		points.emplace_back(p);
+
+		p_count++;
 	}
 
 	return points;
 }
 
-bool mandeye::saveLaz(const std::string& filename, const std::vector<mandeye::PointRGB>& buffer)
+bool mandeye::saveLaz(const std::string &filename, const std::vector<mandeye::PointRGB> &buffer)
 {
 
 	constexpr float scale = 0.0001f; // one tenth of milimeter
 	// find max
-	double max_x{ std::numeric_limits<double>::lowest() };
-	double max_y{ std::numeric_limits<double>::lowest() };
-	double max_z{ std::numeric_limits<double>::lowest() };
+	double max_x{std::numeric_limits<double>::lowest()};
+	double max_y{std::numeric_limits<double>::lowest()};
+	double max_z{std::numeric_limits<double>::lowest()};
 
-	double min_x{ std::numeric_limits<double>::max() };
-	double min_y{ std::numeric_limits<double>::max() };
-	double min_z{ std::numeric_limits<double>::max() };
+	double min_x{std::numeric_limits<double>::max()};
+	double min_y{std::numeric_limits<double>::max()};
+	double min_z{std::numeric_limits<double>::max()};
 
 	for (auto p : buffer)
 	{
@@ -90,7 +133,7 @@ bool mandeye::saveLaz(const std::string& filename, const std::vector<mandeye::Po
 
 	// get a pointer to the header of the writer so we can populate it
 
-	laszip_header* header;
+	laszip_header *header;
 
 	if (laszip_get_header_pointer(laszip_writer, &header))
 	{
@@ -137,7 +180,7 @@ bool mandeye::saveLaz(const std::string& filename, const std::vector<mandeye::Po
 
 	// get a pointer to the point of the writer that we will populate and write
 
-	laszip_point* point;
+	laszip_point *point;
 	if (laszip_get_point_pointer(laszip_writer, &point))
 	{
 		fprintf(stderr, "DLL ERROR: getting point pointer from laszip writer\n");
@@ -150,13 +193,12 @@ bool mandeye::saveLaz(const std::string& filename, const std::vector<mandeye::Po
 	for (int i = 0; i < buffer.size(); i++)
 	{
 
-		const auto& p = buffer.at(i);
+		const auto &p = buffer.at(i);
 		point->intensity = p.intensity;
-		point->rgb[0] = 255*p.rgb[0];
+		point->rgb[0] = 255 * p.rgb[0];
 		point->rgb[1] = 255 * p.rgb[1];
 		point->rgb[2] = 255 * p.rgb[2];
 		point->rgb[3] = 255 * p.rgb[3];
-
 
 		point->gps_time = p.timestamp * 1e-9;
 		//		point->user_data = p.line_id;

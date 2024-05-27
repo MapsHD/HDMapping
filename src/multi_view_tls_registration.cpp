@@ -847,6 +847,7 @@ void project_gui()
     {
         for (auto &pc : session.point_clouds_container.point_clouds)
         {
+            pc.show_color = false;
             pc.render_color[0] = float(rand() % 255) / 255.0f;
             pc.render_color[1] = float(rand() % 255) / 255.0f;
             pc.render_color[2] = float(rand() % 255) / 255.0f;
@@ -859,6 +860,7 @@ void project_gui()
         float color = float(rand() % 255) / 255.0f;
         for (auto &pc : session.point_clouds_container.point_clouds)
         {
+            pc.show_color = false;
             pc.render_color[0] = color;
             pc.render_color[1] = color;
             pc.render_color[2] = color;

@@ -415,13 +415,27 @@ void project_gui()
                     }
                     index_gizmo = i;
                 }
-                // ImGui::SameLine();
-                ImGui::ColorEdit3(("color[" + std::to_string(i) + "]").c_str(), (float *)&sessions[i].render_color);
-                for (auto &pc : sessions[i].point_clouds_container.point_clouds)
+                ImGui::SameLine();
+                ImGui::Checkbox(("show_rgb[" + std::to_string(i) + "]").c_str(), &sessions[i].show_rgb);
+
+                if (!sessions[i].show_rgb)
                 {
-                    pc.render_color[0] = sessions[i].render_color[0];
-                    pc.render_color[1] = sessions[i].render_color[1];
-                    pc.render_color[2] = sessions[i].render_color[2];
+                    //ImGui::SameLine();
+                    ImGui::ColorEdit3(("color[" + std::to_string(i) + "]").c_str(), (float *)&sessions[i].render_color);
+                    for (auto &pc : sessions[i].point_clouds_container.point_clouds)
+                    {
+                        pc.render_color[0] = sessions[i].render_color[0];
+                        pc.render_color[1] = sessions[i].render_color[1];
+                        pc.render_color[2] = sessions[i].render_color[2];
+                        pc.show_color = sessions[i].show_rgb;
+                    }
+                }
+                else
+                {
+                    for (auto &pc : sessions[i].point_clouds_container.point_clouds)
+                    {
+                        pc.show_color = sessions[i].show_rgb;
+                    }
                 }
             }
         }
@@ -537,7 +551,8 @@ void project_gui()
                 {
                     if (ImGui::Button("Optimize"))
                     {
-                        for(int i = 0; i < 10; i++){
+                        for (int i = 0; i < 10; i++)
+                        {
                             optimize(sessions);
                         }
                         optimized = true;
@@ -960,7 +975,7 @@ void display()
         glLoadIdentity();
     }
 
-    //if (show_axes)
+    // if (show_axes)
     if (show_axes || ImGui::GetIO().KeyCtrl)
     {
         glBegin(GL_LINES);
@@ -980,8 +995,7 @@ void display()
         glEnd();
     }
 
-
-    //if (show_axes || ImGui::GetIO().KeyCtrl)
+    // if (show_axes || ImGui::GetIO().KeyCtrl)
     if (show_axes || ImGui::GetIO().KeyCtrl)
     {
         glBegin(GL_LINES);
@@ -1783,7 +1797,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_session_registration_step_3 v0.40");
+    glutCreateWindow("multi_session_registration_step_3 v0.41");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -1863,7 +1877,7 @@ bool optimize(std::vector<Session> &sessions)
         {
             m_poses.push_back(sessions[j].point_clouds_container.point_clouds[i].m_pose);
             poses_motion_model.push_back(sessions[j].point_clouds_container.point_clouds[i].m_initial_pose);
-            //poses_motion_model.push_back(sessions[j].point_clouds_container.point_clouds[i].m_pose);
+            // poses_motion_model.push_back(sessions[j].point_clouds_container.point_clouds[i].m_pose);
             index_trajectory.push_back(j);
         }
     }

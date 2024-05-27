@@ -897,6 +897,13 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 		pc.intensities.push_back(point->intensity);
 		pc.timestamps.push_back(p.timestamp);
 
+		Eigen::Vector3d color(
+			static_cast<uint8_t>(0xFFU * ((point->rgb[0] > 0) ? static_cast<float>(point->rgb[0]) / static_cast<float>(0xFFFFU) : 1.0f)) / 256.0,
+			static_cast<uint8_t>(0xFFU * ((point->rgb[1] > 0) ? static_cast<float>(point->rgb[1]) / static_cast<float>(0xFFFFU) : 1.0f)) / 256.0,
+			static_cast<uint8_t>(0xFFU * ((point->rgb[2] > 0) ? static_cast<float>(point->rgb[2]) / static_cast<float>(0xFFFFU) : 1.0f)) / 256.0);
+
+		pc.colors.push_back(color);
+
 		p_count++;
 	}
 

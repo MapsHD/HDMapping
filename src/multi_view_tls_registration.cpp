@@ -1068,7 +1068,14 @@ void project_gui()
 
                 if (session.point_clouds_container.point_clouds[i].visible)
                 {
-                    ImGui::ColorEdit3(std::string(std::to_string(i) + ": pc_color").c_str(), session.point_clouds_container.point_clouds[i].render_color);
+                    //ImGui::SameLine();
+                    ImGui::Checkbox(std::string(std::to_string(i) + ": show_color").c_str(), &session.point_clouds_container.point_clouds[i].show_color); //
+
+                    if (!session.point_clouds_container.point_clouds[i].show_color){
+                        ImGui::SameLine();
+                        ImGui::ColorEdit3(std::string(std::to_string(i) + ": pc_color").c_str(), session.point_clouds_container.point_clouds[i].render_color);
+                    }
+                        
                     ImGui::SameLine();
                     if (ImGui::Button(std::string("#" + std::to_string(i) + "_ICP").c_str()))
                     {
@@ -3558,7 +3565,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration_step_2 v0.40");
+    glutCreateWindow("multi_view_tls_registration_step_2 v0.41");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

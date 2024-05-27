@@ -77,6 +77,7 @@ public:
 	std::string file_name;
 	std::vector<Eigen::Vector3d> points_local;
 	std::vector<Eigen::Vector3d> normal_vectors_local;
+	std::vector<Eigen::Vector3d> colors;
 	std::vector <int> points_type;
 	std::vector <unsigned short> intensities;
 	std::vector<double> timestamps;
@@ -92,6 +93,7 @@ public:
 	bool choosing_geo = false;
 	std::vector<LocalTrajectoryNode> local_trajectory;
 	bool show_local_trajectory = false;
+	bool show_color = true;
 
 	TaitBryanPose pose;
 	float gui_translation[3];

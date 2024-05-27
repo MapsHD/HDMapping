@@ -24,6 +24,7 @@ class Session
     float render_color[3];
     std::string session_file_name = "";
     bool is_ground_truth = 0;
+    bool show_rgb = true;
 };
 
 #endif

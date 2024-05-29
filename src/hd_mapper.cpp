@@ -4,7 +4,7 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
-#include <glew.h>
+#include <GL/glew.h>
 #include <GL/freeglut.h>
 
 #include <Eigen/Eigen>

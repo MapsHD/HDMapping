@@ -27,3 +27,10 @@ target_include_directories(
 target_link_libraries(
   lidar_odometry_step_1 PRIVATE Fusion freeglut laszip3 ${CORE_LIBRARIES}
                                 ${GUI_LIBRARIES})
+
+add_custom_command(
+  TARGET lidar_odometry_step_1
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:lidar_odometry_step_1>
+          $<TARGET_FILE_DIR:lidar_odometry_step_1>
+  COMMAND_EXPAND_LISTS)

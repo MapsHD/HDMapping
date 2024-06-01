@@ -23,3 +23,12 @@ target_include_directories(
 target_link_libraries(
   mandeye_with_gopro_max_manual_coloring
   PRIVATE freeglut laszip3 ${CORE_LIBRARIES} ${GUI_LIBRARIES})
+
+add_custom_command(
+  TARGET mandeye_with_gopro_max_manual_coloring
+  POST_BUILD
+  COMMAND
+    ${CMAKE_COMMAND} -E copy
+    $<TARGET_RUNTIME_DLLS:mandeye_with_gopro_max_manual_coloring>
+    $<TARGET_FILE_DIR:mandeye_with_gopro_max_manual_coloring>
+  COMMAND_EXPAND_LISTS)

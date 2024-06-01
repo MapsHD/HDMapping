@@ -20,3 +20,10 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
           ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip/include)
+
+add_custom_command(
+  TARGET hd_mapper
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:hd_mapper>
+          $<TARGET_FILE_DIR:hd_mapper>
+  COMMAND_EXPAND_LISTS)

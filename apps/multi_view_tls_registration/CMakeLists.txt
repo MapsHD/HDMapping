@@ -21,3 +21,12 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
           ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip/include)
+
+add_custom_command(
+  TARGET multi_view_tls_registration_step_2
+  POST_BUILD
+  COMMAND
+    ${CMAKE_COMMAND} -E copy
+    $<TARGET_RUNTIME_DLLS:multi_view_tls_registration_step_2>
+    $<TARGET_FILE_DIR:multi_view_tls_registration_step_2>
+  COMMAND_EXPAND_LISTS)

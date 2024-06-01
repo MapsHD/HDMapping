@@ -21,3 +21,10 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
           ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include)
 target_link_libraries(split_multi_livox PRIVATE laszip3)
+
+add_custom_command(
+  TARGET split_multi_livox
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:split_multi_livox>
+          $<TARGET_FILE_DIR:split_multi_livox>
+  COMMAND_EXPAND_LISTS)

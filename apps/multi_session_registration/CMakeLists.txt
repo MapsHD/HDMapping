@@ -21,3 +21,12 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include)
 target_link_libraries(multi_session_registration_step_3 freeglut laszip3
                       ${CORE_LIBRARIES} ${GUI_LIBRARIES})
+
+add_custom_command(
+  TARGET multi_session_registration_step_3
+  POST_BUILD
+  COMMAND
+    ${CMAKE_COMMAND} -E copy
+    $<TARGET_RUNTIME_DLLS:multi_session_registration_step_3>
+    $<TARGET_FILE_DIR:multi_session_registration_step_3>
+  COMMAND_EXPAND_LISTS)

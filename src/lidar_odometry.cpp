@@ -8,15 +8,15 @@
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
-//std::vector<Point3Di> initial_points;
+// std::vector<Point3Di> initial_points;
 NDT ndt;
-//NDT::GridParameters in_out_params;
+// NDT::GridParameters in_out_params;
 
-//NDTBucketMapType buckets;
-//NDTBucketMapType reference_buckets;
+// NDTBucketMapType buckets;
+// NDTBucketMapType reference_buckets;
 bool show_reference_buckets = true;
 
-//std::vector<Point3Di> reference_points;
+// std::vector<Point3Di> reference_points;
 bool show_reference_points = false;
 int dec_reference_points = 100;
 bool show_initial_points = true;
@@ -24,14 +24,14 @@ bool show_trajectory = true;
 bool show_trajectory_as_axes = false;
 bool show_covs = false;
 int dec_covs = 10;
-//double filter_threshold_xy = 0.5;
-//int nr_iter = 100;
-//double sliding_window_trajectory_length_threshold = 50.0;
+// double filter_threshold_xy = 0.5;
+// int nr_iter = 100;
+// double sliding_window_trajectory_length_threshold = 50.0;
 bool fusionConventionNwu = true;
 bool fusionConventionEnu = false;
 bool fusionConventionNed = false;
-//bool use_motion_from_previous_step = true;
-//bool useMultithread = true;
+// bool use_motion_from_previous_step = true;
+// bool useMultithread = true;
 bool simple_gui = true;
 bool step_1_done = false;
 bool step_2_done = false;
@@ -51,8 +51,8 @@ bool gui_mouse_down{false};
 int mouse_buttons = 0;
 float mouse_sensitivity = 1.0;
 std::string working_directory = "";
-//std::string working_directory_preview = "";
-//double decimation = 0.1;
+// std::string working_directory_preview = "";
+// double decimation = 0.1;
 int threshold_initial_points = 100000;
 bool initial_transformation_gizmo = false;
 
@@ -60,17 +60,21 @@ float m_gizmo[] = {1, 0, 0, 0,
                    0, 1, 0, 0,
                    0, 0, 1, 0,
                    0, 0, 0, 1};
-//Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
-//double consecutive_distance = 0.0;
+// Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
+// double consecutive_distance = 0.0;
 float x_displacement = 0.01;
 int num_constistency_iter = 10;
+
+int index_from_inclusive = -1;
+int index_to_inclusive = -1;
+bool gizmo_stretch_interval = false;
 
 LidarOdometryParams params;
 const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
 
 void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
-Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane);
+Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
 bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity, double offset_x,
                double offset_y,
                double offset_alt);
@@ -152,10 +156,10 @@ void lidar_odometry_gui()
         }
         if (!step_1_done)
         {
-            //if (ImGui::Button("alternative_approach"))
+            // if (ImGui::Button("alternative_approach"))
             //{
-            //    alternative_approach();
-            //}
+            //     alternative_approach();
+            // }
 
             if (ImGui::Button("load data (step 1)"))
             {
@@ -195,8 +199,7 @@ void lidar_odometry_gui()
                     if (fileName.ends_with(".sn"))
                     {
                         sn_files.push_back(fileName);
-                    }
-                    });
+                    } });
 
                 if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
                 {
@@ -208,13 +211,15 @@ void lidar_odometry_gui()
                     if (!preloadedCalibration.empty())
                     {
                         std::cout << "Loaded calibration for: \n";
-                        for (const auto& [sn, _] : preloadedCalibration)
+                        for (const auto &[sn, _] : preloadedCalibration)
                         {
                             std::cout << " -> " << sn << std::endl;
                         }
-                    }else{
+                    }
+                    else
+                    {
                         std::cout << "There is no calibration.json file in folder (check comment in source code) file: " << __FILE__ << " line: " << __LINE__ << std::endl;
-                        //example file for 2x livox";
+                        // example file for 2x livox";
                         /*
                         {
                             "calibration" : {
@@ -255,14 +260,14 @@ void lidar_odometry_gui()
 
                     for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
                     {
-                        const std::string& imufn = csv_files.at(fileNo);
-                        const std::string snFn = (fileNo>= sn_files.size())? ("") : (sn_files.at(fileNo));
+                        const std::string &imufn = csv_files.at(fileNo);
+                        const std::string snFn = (fileNo >= sn_files.size()) ? ("") : (sn_files.at(fileNo));
                         const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
                         // GetId of Imu to use
                         int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
-                        std::cout << "imuNumberToUse  " << imuNumberToUse <<  " at" << imufn << std::endl;
+                        std::cout << "imuNumberToUse  " << imuNumberToUse << " at" << imufn << std::endl;
                         auto imu = load_imu(imufn.c_str(), imuNumberToUse);
-                        std::cout << imufn <<" with mapping " << snFn << std::endl;
+                        std::cout << imufn << " with mapping " << snFn << std::endl;
                         imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
                     }
 
@@ -272,40 +277,38 @@ void lidar_odometry_gui()
                     std::mutex mtx;
                     std::cout << "start std::transform" << std::endl;
 
-                    std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [&](const std::string& fn)
-                    {
-                            // Load mapping from id to sn
-                            fs::path fnSn(fn);
-                            fnSn.replace_extension(".sn");
+                    std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [&](const std::string &fn)
+                                   {
+                                       // Load mapping from id to sn
+                                       fs::path fnSn(fn);
+                                       fnSn.replace_extension(".sn");
 
-                            // GetId of Imu to use
-                            const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
-                            auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
-                            auto data= load_point_cloud(fn.c_str(), true, params.filter_threshold_xy, calibration);
+                                       // GetId of Imu to use
+                                       const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
+                                       auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
+                                       auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy, calibration);
 
-                            if (fn == laz_files.front())
-                            {
-                                fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
+                                       if (fn == laz_files.front())
+                                       {
+                                           fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
 
-                                std::ofstream testPointcloud{ calibrationValidtationFile.c_str() };
-                                for (const auto& p : data)
-                                {
-                                    testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int) p.lidarid << "\n";
+                                           std::ofstream testPointcloud{calibrationValidtationFile.c_str()};
+                                           for (const auto &p : data)
+                                           {
+                                               testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int)p.lidarid << "\n";
+                                           }
+                                       }
 
-                                }
-                            }
-
-
-							std::unique_lock lck(mtx);
-                            for (const auto& [id, calib] : calibration)
-                            {
-                                std::cout << " id : " << id << std::endl;
-                                std::cout << calib.matrix() << std::endl;
-                            }
-                            return data;
-							// std::cout << fn << std::endl;
-							//
-                    });
+                                       std::unique_lock lck(mtx);
+                                       for (const auto &[id, calib] : calibration)
+                                       {
+                                           std::cout << " id : " << id << std::endl;
+                                           std::cout << calib.matrix() << std::endl;
+                                       }
+                                       return data;
+                                       // std::cout << fn << std::endl;
+                                       //
+                                   });
                     std::cout << "std::transform finished" << std::endl;
 
                     FusionAhrs ahrs;
@@ -347,7 +350,7 @@ void lidar_odometry_gui()
                         // Eigen::Affine3d m_rot_y = affine_matrix_from_pose_tait_bryan(rot_y);
                         // t = t * m_rot_y;
                         //
-                        //std::map<double, Eigen::Matrix4d> trajectory;
+                        // std::map<double, Eigen::Matrix4d> trajectory;
                         trajectory[timestamp_pair.first] = std::pair(t.matrix(), timestamp_pair.second);
                         const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
                         counter++;
@@ -403,7 +406,8 @@ void lidar_odometry_gui()
 
                     std::cout << "poses.size(): " << poses.size() << std::endl;
 
-                    if (poses.empty()) {
+                    if (poses.empty())
+                    {
                         std::cerr << "Loading poses went wrong! Could not load poses!" << std::endl;
                         return;
                     }
@@ -455,7 +459,7 @@ void lidar_odometry_gui()
                             //     }
                             // }
                             bool found = false;
-                           
+
                             for (int index = index_begin; index < pointsPerFile.size(); index++)
                             {
                                 for (const auto &p : pointsPerFile[index])
@@ -475,7 +479,6 @@ void lidar_odometry_gui()
                                     }
                                 }
                             }
-                           
 
                             // for (unsigned long long int k = i_begin; k < i_end; k++)
                             // if (i % 1000 == 0)
@@ -520,9 +523,8 @@ void lidar_odometry_gui()
 
                             // temp_ts.clear();
                         }
-                       
                     }
-                
+
                     params.m_g = worker_data[0].intermediate_trajectory[0];
                     step_1_done = true;
                 }
@@ -530,8 +532,6 @@ void lidar_odometry_gui()
                 {
                     std::cout << "please select files correctly" << std::endl;
                 }
-
-
             }
             ImGui::SameLine();
             ImGui::Text("Select all imu *.csv and lidar *.laz files produced by MANDEYE saved in 'continousScanning_*' folder");
@@ -871,7 +871,7 @@ void lidar_odometry_gui()
             {
                 ImGui::Text("-----manipulate initial transformation begin-------");
                 ImGui::Checkbox("initial transformation gizmo", &initial_transformation_gizmo);
-
+                // gizmo_stretch_interval
                 if (initial_transformation_gizmo)
                 {
                     m_gizmo[0] = (float)params.m_g(0, 0);
@@ -903,78 +903,6 @@ void lidar_odometry_gui()
                 }
                 ImGui::Text("-----manipulate initial transformation end---------");
             }
-            // show_trajectory
-
-            static int current_scan = -1;
-            int prev = current_scan;
-            ImGui::InputInt("change_current_scan", &current_scan);
-            {
-                int curr = current_scan;
-
-                if (prev != curr)
-                {
-                    for (int k = 0; k < worker_data.size(); k++)
-                    {
-                        worker_data[k].show = false;
-                    }
-                }
-                if (current_scan <= 0)
-                {
-                    current_scan = 0;
-                }
-                if (current_scan >= worker_data.size())
-                {
-                    current_scan = worker_data.size() - 1;
-                }
-                if (current_scan >= 0 && current_scan < worker_data.size())
-                {
-                    worker_data[current_scan].show = true;
-                }
-            }
-            /*ImGui::InputFloat("x_displacement", &x_displacement);
-            int num_sel = 0;
-            for (int k = 0; k < worker_data.size(); k++)
-            {
-                if (worker_data[k].show)
-                {
-                    num_sel++;
-                }
-            }
-
-            if (num_sel == 1)
-            {
-                ImGui::SameLine();
-                if (ImGui::Button("apply x_displacement for current scan"))
-                {
-                    Eigen::Affine3d m_x_displacement = Eigen::Affine3d::Identity();
-                    m_x_displacement(0, 3) = x_displacement;
-                    Eigen::Affine3d m_last = worker_data[current_scan].intermediate_trajectory[worker_data[current_scan].intermediate_trajectory.size() - 1];
-                    auto tmp = worker_data[current_scan].intermediate_trajectory;
-
-                    worker_data[current_scan].intermediate_trajectory[0] = m_last;
-                    for (int k = 1; k < tmp.size(); k++)
-                    {
-                        Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
-                        m_last = m_last * m_update * m_x_displacement;
-                        worker_data[current_scan].intermediate_trajectory[k] = m_last;
-                    }
-
-                    // update
-                    for (int j = current_scan + 1; j < worker_data.size(); j++)
-                    {
-                        Eigen::Affine3d m_last = worker_data[j - 1].intermediate_trajectory[worker_data[j - 1].intermediate_trajectory.size() - 1];
-                        auto tmp = worker_data[j].intermediate_trajectory;
-
-                        worker_data[j].intermediate_trajectory[0] = m_last;
-                        for (int k = 1; k < tmp.size(); k++)
-                        {
-                            Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
-                            m_last = m_last * m_update;
-                            worker_data[j].intermediate_trajectory[k] = m_last;
-                        }
-                    }
-                }
-            }*/
 
             if (ImGui::Button("select all scans"))
             {
@@ -990,6 +918,76 @@ void lidar_odometry_gui()
                 {
                     worker_data[k].show = false;
                 }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("select scans from range <index_from_inclusive, index_to_inclusive>"))
+            {
+                for (int k = 0; k < worker_data.size(); k++)
+                {
+                    if (k >= index_from_inclusive && k <= index_to_inclusive)
+                    {
+                        worker_data[k].show = true;
+                    }
+                    else
+                    {
+                        worker_data[k].show = false;
+                    }
+                }
+            }
+            //
+            ImGui::InputInt("index_from_inclusive", &index_from_inclusive);
+            if (index_from_inclusive < 0)
+            {
+                index_from_inclusive = 0;
+            }
+            if (index_from_inclusive >= worker_data.size())
+            {
+                index_from_inclusive = worker_data.size() - 1;
+            }
+
+            ImGui::InputInt("index_to_inclusive", &index_to_inclusive);
+            if (index_to_inclusive < 0)
+            {
+                index_to_inclusive = 0;
+            }
+            if (index_to_inclusive >= worker_data.size())
+            {
+                index_to_inclusive = worker_data.size() - 1;
+            }
+
+            ImGui::Checkbox("gizmo_stretch_interval", &gizmo_stretch_interval);
+
+            // gizmo_stretch_interval
+            if (gizmo_stretch_interval)
+            {
+                if (index_to_inclusive < worker_data.size())
+                {
+                    if (worker_data[index_to_inclusive].intermediate_trajectory.size() > 0)
+                    {
+                        m_gizmo[0] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](0, 0);
+                        m_gizmo[1] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](1, 0);
+                        m_gizmo[2] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](2, 0);
+                        m_gizmo[3] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](3, 0);
+                        m_gizmo[4] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](0, 1);
+                        m_gizmo[5] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](1, 1);
+                        m_gizmo[6] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](2, 1);
+                        m_gizmo[7] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](3, 1);
+                        m_gizmo[8] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](0, 2);
+                        m_gizmo[9] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](1, 2);
+                        m_gizmo[10] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](2, 2);
+                        m_gizmo[11] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](3, 2);
+                        m_gizmo[12] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](0, 3);
+                        m_gizmo[13] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](1, 3);
+                        m_gizmo[14] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](2, 3);
+                        m_gizmo[15] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](3, 3);
+                    }
+                }
+            }
+
+            for (int i = 0; i < worker_data.size(); i++)
+            {
+                std::string text = "show[" + std::to_string(i) + "]";
+                ImGui::Checkbox(text.c_str(), &worker_data[i].show);
             }
 
             if (ImGui::Button("filter reference buckets"))
@@ -1016,14 +1014,6 @@ void lidar_odometry_gui()
                 }
                 params.reference_buckets = reference_buckets_out;
             }
-
-            for (int i = 0; i < worker_data.size(); i++)
-            {
-                std::string text = "show[" + std::to_string(i) + "]";
-                ImGui::Checkbox(text.c_str(), &worker_data[i].show);
-            }
-
-            
         }
         ImGui::End();
     }
@@ -1143,17 +1133,17 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
-    //reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-    //glTranslatef(translate_x, translate_y, translate_z);
-    //glRotatef(rotate_x, 1.0, 0.0, 0.0);
-    //glRotatef(rotate_y, 0.0, 0.0, 1.0);
+    // reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+    // glTranslatef(translate_x, translate_y, translate_z);
+    // glRotatef(rotate_x, 1.0, 0.0, 0.0);
+    // glRotatef(rotate_y, 0.0, 0.0, 1.0);
 
     reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
     viewTranslation.translate(rotation_center);
     Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
-    viewLocal.translate(Eigen::Vector3f( translate_x, translate_y, translate_z));
-    viewLocal.rotate(Eigen::AngleAxisf(M_PI*rotate_x / 180.f, Eigen::Vector3f::UnitX()));
+    viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
+    viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
     viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
 
     Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
@@ -1240,17 +1230,17 @@ void display()
 
             glLineWidth(1);
             glBegin(GL_LINES);
-                const auto &it = worker_data[i].intermediate_trajectory[0];
-                glColor3f(1, 0, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + it(0, 0), it(1, 3) + it(1, 0), it(2, 3) + it(2, 0));
+            const auto &it = worker_data[i].intermediate_trajectory[0];
+            glColor3f(1, 0, 0);
+            glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+            glVertex3f(it(0, 3) + it(0, 0), it(1, 3) + it(1, 0), it(2, 3) + it(2, 0));
 
-                glColor3f(0, 1, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + it(0, 1), it(1, 3) + it(1, 1), it(2, 3) + it(2, 1));
-            
+            glColor3f(0, 1, 0);
+            glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+            glVertex3f(it(0, 3) + it(0, 1), it(1, 3) + it(1, 1), it(2, 3) + it(2, 1));
+
             glEnd();
-            //glLineWidth(1);
+            // glLineWidth(1);
 
             /*glColor3f(0, 0, 1);
             glVertex3f(it(0, 3), it(1, 3), it(2, 3));
@@ -1346,6 +1336,57 @@ void display()
         glEnd();
     }
 
+    //
+    if (worker_data.size() > 0)
+    {
+        if (index_from_inclusive < worker_data.size())
+        {
+            glColor3f(1, 1, 0);
+            glBegin(GL_LINES);
+            if (worker_data[index_from_inclusive].intermediate_trajectory.size() > 0)
+            {
+                auto p = worker_data[index_from_inclusive].intermediate_trajectory[0].translation();
+                glVertex3f(p.x() - 1, p.y(), p.z());
+                glVertex3f(p.x() + 1, p.y(), p.z());
+
+                glVertex3f(p.x(), p.y() - 1, p.z());
+                glVertex3f(p.x(), p.y() + 1, p.z());
+
+                glVertex3f(p.x(), p.y(), p.z() - 1);
+                glVertex3f(p.x(), p.y(), p.z() + 1);
+            }
+            glEnd();
+        }
+
+        if (index_to_inclusive < worker_data.size())
+        {
+            glColor3f(0, 1, 1);
+            glBegin(GL_LINES);
+            if (worker_data[index_to_inclusive].intermediate_trajectory.size() > 0)
+            {
+                auto p = worker_data[index_to_inclusive].intermediate_trajectory[0].translation();
+                glVertex3f(p.x() - 1, p.y(), p.z());
+                glVertex3f(p.x() + 1, p.y(), p.z());
+
+                glVertex3f(p.x(), p.y() - 1, p.z());
+                glVertex3f(p.x(), p.y() + 1, p.z());
+
+                glVertex3f(p.x(), p.y(), p.z() - 1);
+                glVertex3f(p.x(), p.y(), p.z() + 1);
+            }
+            glEnd();
+        }
+    }
+    // int index_from_inclusive = -1;
+    // int index_to_inclusive = -1;
+
+    /*{
+        for (int k = 0; k < worker_data.size(); k++)
+        {
+            worker_data[k].show = false;
+        }
+    }*/
+
     if (ImGui::GetIO().KeyCtrl)
     {
         glBegin(GL_LINES);
@@ -1404,6 +1445,133 @@ void display()
         params.m_g(1, 3) = m_gizmo[13];
         params.m_g(2, 3) = m_gizmo[14];
         params.m_g(3, 3) = m_gizmo[15];
+    }
+
+    if (gizmo_stretch_interval)
+    {
+        ImGuiIO &io = ImGui::GetIO();
+        // ImGuizmo -----------------------------------------------
+        ImGuizmo::BeginFrame();
+        ImGuizmo::Enable(true);
+        ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+        GLfloat projection[16];
+        glGetFloatv(GL_PROJECTION_MATRIX, projection);
+
+        GLfloat modelview[16];
+        glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+
+        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::LOCAL, m_gizmo, NULL);
+
+        if (index_to_inclusive < worker_data.size())
+        {
+            if (worker_data[index_to_inclusive].intermediate_trajectory.size() > 0)
+            {
+                // auto tmp_worker_data = worker_data;
+                std::vector<std::vector<Eigen::Affine3d>> all_poses;
+                for (int i = 0; i < worker_data.size(); i++)
+                {
+                    std::vector<Eigen::Affine3d> poses;
+                    for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
+                    {
+                        poses.push_back(worker_data[i].intermediate_trajectory[j]);
+                    }
+                    all_poses.push_back(poses);
+                }
+
+                auto prev_m = worker_data[index_to_inclusive].intermediate_trajectory[0];
+
+                /*worker_data[index_to_inclusive].intermediate_trajectory[0](0, 0) = m_gizmo[0];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](1, 0) = m_gizmo[1];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](2, 0) = m_gizmo[2];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](3, 0) = m_gizmo[3];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](0, 1) = m_gizmo[4];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](1, 1) = m_gizmo[5];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](2, 1) = m_gizmo[6];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](3, 1) = m_gizmo[7];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](0, 2) = m_gizmo[8];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](1, 2) = m_gizmo[9];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](2, 2) = m_gizmo[10];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](3, 2) = m_gizmo[11];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](0, 3) = m_gizmo[12];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](1, 3) = m_gizmo[13];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](2, 3) = m_gizmo[14];
+                worker_data[index_to_inclusive].intermediate_trajectory[0](3, 3) = m_gizmo[15];*/
+
+                Eigen::Affine3d current_gizmo = Eigen::Affine3d::Identity();
+                current_gizmo(0, 0) = m_gizmo[0];
+                current_gizmo(1, 0) = m_gizmo[1];
+                current_gizmo(2, 0) = m_gizmo[2];
+                current_gizmo(3, 0) = m_gizmo[3];
+                current_gizmo(0, 1) = m_gizmo[4];
+                current_gizmo(1, 1) = m_gizmo[5];
+                current_gizmo(2, 1) = m_gizmo[6];
+                current_gizmo(3, 1) = m_gizmo[7];
+                current_gizmo(0, 2) = m_gizmo[8];
+                current_gizmo(1, 2) = m_gizmo[9];
+                current_gizmo(2, 2) = m_gizmo[10];
+                current_gizmo(3, 2) = m_gizmo[11];
+                current_gizmo(0, 3) = m_gizmo[12];
+                current_gizmo(1, 3) = m_gizmo[13];
+                current_gizmo(2, 3) = m_gizmo[14];
+                current_gizmo(3, 3) = m_gizmo[15];
+
+                auto diff_m = prev_m.inverse() * current_gizmo;
+                // std::cout << diff_m.matrix() << std::endl;
+
+                TaitBryanPose pose_diff = pose_tait_bryan_from_affine_matrix(diff_m);
+
+                float number_all_nodes_inside_interval = 0;
+                for (int i = index_from_inclusive; i < index_to_inclusive; i++)
+                {
+                    number_all_nodes_inside_interval += (float)worker_data[i].intermediate_trajectory.size();
+                }
+
+                // std::cout << number_all_nodes_inside_interval << " ";
+                float counter = 1;
+
+                for (int i = index_from_inclusive; i < index_to_inclusive; i++)
+                {
+                    for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
+                    {
+                        TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[j]);
+
+                        pose.px += pose_diff.px * (counter / number_all_nodes_inside_interval);
+                        pose.py += pose_diff.py * (counter / number_all_nodes_inside_interval);
+                        pose.pz += pose_diff.pz * (counter / number_all_nodes_inside_interval);
+
+                        pose.om += pose_diff.om * (counter / number_all_nodes_inside_interval);
+                        pose.fi += pose_diff.fi * (counter / number_all_nodes_inside_interval);
+                        pose.ka += pose_diff.ka * (counter / number_all_nodes_inside_interval);
+
+                        counter += 1.0f;
+
+                        worker_data[i].intermediate_trajectory[j] = affine_matrix_from_pose_tait_bryan(pose);
+                    }
+                }
+
+                Eigen::Affine3d last_m = worker_data[index_to_inclusive - 1].intermediate_trajectory[worker_data[index_to_inclusive - 1].intermediate_trajectory.size() - 1];
+
+                for (int i = index_to_inclusive; i < worker_data.size(); i++)
+                {
+                    for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
+                    {
+                        Eigen::Affine3d m_update = Eigen::Affine3d::Identity();
+
+                        if (j == 0)
+                        {
+                            m_update = all_poses[i - 1][all_poses[i - 1].size() - 1].inverse() * all_poses[i][0];
+                        }
+                        else
+                        {
+                            m_update = all_poses[i][j-1].inverse() * all_poses[i][j];
+                        }
+                        last_m = last_m * m_update;
+                        worker_data[i].intermediate_trajectory[j] = last_m;
+                    }
+                }
+            }
+        }
     }
 
     ImGui::Render();
@@ -1476,16 +1644,18 @@ std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, i
     int counter = tmp_points.size();
     for (int i = 0; i < points.size(); i++)
     {
-        counter ++;
+        counter++;
         tmp_points.push_back(points[i]);
-        if (counter > point_count_threshold){
+        if (counter > point_count_threshold)
+        {
             res_points.push_back(tmp_points);
             tmp_points.clear();
             counter = 0;
         }
     }
 
-    if (tmp_points.size() > 0){
+    if (tmp_points.size() > 0)
+    {
         res_points.push_back(tmp_points);
     }
     return res_points;
@@ -1496,7 +1666,8 @@ int get_index(set<int> s, int k)
     int index = 0;
     for (auto u : s)
     {
-        if (u == k){
+        if (u == k)
+        {
             return index;
         }
         index++;
@@ -1506,15 +1677,17 @@ int get_index(set<int> s, int k)
 
 void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timestamps, std::vector<Eigen::Affine3d> poses, std::string fn1, std::string fn2)
 {
-    for (int i = 0; i < points.size(); i++){
+    for (int i = 0; i < points.size(); i++)
+    {
         auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), points[i].timestamp);
         points[i].index_pose = std::distance(timestamps.begin(), lower);
-        //std::cout << "points[i].timestamp " << points[i].timestamp << " timestamps " << timestamps[points[i].index_pose] << std::endl;
+        // std::cout << "points[i].timestamp " << points[i].timestamp << " timestamps " << timestamps[points[i].index_pose] << std::endl;
     }
 
     std::set<int> indexes;
 
-    for (int i = 0; i < points.size(); i++){
+    for (int i = 0; i < points.size(); i++)
+    {
         indexes.insert(points[i].index_pose);
     }
     // build trajectory
@@ -1528,7 +1701,7 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
     }
 
     std::cout << "trajectory.size() " << trajectory.size() << std::endl;
-    //Sleep(2000);
+    // Sleep(2000);
 
     std::vector<Point3Di> points_reindexed = points;
     for (int i = 0; i < points_reindexed.size(); i++)
@@ -1544,11 +1717,12 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
         std::vector<Eigen::Affine3d> trajectory_stretched;
 
         Eigen::Affine3d m_x_offset = Eigen::Affine3d::Identity();
-        m_x_offset(0,3) = x;
+        m_x_offset(0, 3) = x;
 
         Eigen::Affine3d m = trajectory[0];
         trajectory_stretched.push_back(m);
-        for (int i = 1; i < trajectory.size(); i++){
+        for (int i = 1; i < trajectory.size(); i++)
+        {
             Eigen::Affine3d m_update = trajectory[i - 1].inverse() * trajectory[i] * (m_x_offset);
             m = m * m_update;
             trajectory_stretched.push_back(m);
@@ -1566,34 +1740,36 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
 
         for (auto &p : points_global)
         {
-            if (p.point.z() > 0){
+            if (p.point.z() > 0)
+            {
                 p.point = trajectory_stretched[p.index_pose] * p.point;
                 points_global2.push_back(p);
-                //if (p.point.norm() > 6 && p.point.norm() < 15)
+                // if (p.point.norm() > 6 && p.point.norm() < 15)
                 //{
-                //points_global.push_back(p);
-                //}
+                // points_global.push_back(p);
+                // }
             }
         }
         update_rgd(rgd_params, my_buckets, points_global2, trajectory_stretched[0].translation());
 
         std::cout << "number of buckets [" << x << "]: " << my_buckets.size() << std::endl;
-        if (my_buckets.size()  < min_buckets){
+        if (my_buckets.size() < min_buckets)
+        {
             min_buckets = my_buckets.size();
             best_trajectory = trajectory_stretched;
         }
     }
 
     std::map<double, Eigen::Matrix4d> trajectory_for_interpolation;
-    for (int i = 0; i < best_trajectory.size(); i++){
+    for (int i = 0; i < best_trajectory.size(); i++)
+    {
         trajectory_for_interpolation[ts[i]] = best_trajectory[i].matrix();
     }
-
 
     std::vector<Point3Di> points_global = points_reindexed;
     for (auto &p : points_global)
     {
-        Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, /*ts[p.index_pose]*/p.timestamp);
+        Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, /*ts[p.index_pose]*/ p.timestamp);
         Eigen::Affine3d b;
         b.matrix() = pose;
         p.point = b * p.point;
@@ -1637,7 +1813,7 @@ void alternative_approach()
     std::vector<std::string> csv_files;
     std::vector<std::string> laz_files;
     std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
-                {
+                  {
                     if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
                     {
                         laz_files.push_back(fileName);
@@ -1645,11 +1821,11 @@ void alternative_approach()
                     if (fileName.ends_with(".csv"))
                     {
                         csv_files.push_back(fileName);
-                    }
-                });
+                    } });
 
     std::cout << "imu files: " << std::endl;
-    for (const auto &fn : csv_files){
+    for (const auto &fn : csv_files)
+    {
         std::cout << fn << std::endl;
     }
 
@@ -1705,14 +1881,15 @@ void alternative_approach()
 
     ///////////////////////////////////////////////////////////////////////////////
     std::cout << "point cloud file names" << std::endl;
-    for (const auto &fn : laz_files){
+    for (const auto &fn : laz_files)
+    {
         std::cout << fn << std::endl;
     }
 
-    //for (const auto &fn : laz_files)
+    // for (const auto &fn : laz_files)
     //{
-        //std::vector<Point3Di> points = load_point_cloud(fn);
-        //std::cout << "points.cloud(): " << points.size() << std::endl;
+    // std::vector<Point3Di> points = load_point_cloud(fn);
+    // std::cout << "points.cloud(): " << points.size() << std::endl;
     //}
 
     /*int current_file_index = 0;
@@ -1729,17 +1906,19 @@ void alternative_approach()
                                                                  std::vector<Point3Di> &points)
         }
     }*/
-    //get_next_batch_of_points(point_count_threshold, laz_files, current_file_index, current_point_index, points);
+    // get_next_batch_of_points(point_count_threshold, laz_files, current_file_index, current_point_index, points);
 
     std::vector<Point3Di> prev_points;
     std::vector<std::vector<Point3Di>> all_points;
     std::vector<std::vector<Point3Di>> tmp_points = get_batches_of_points(laz_files[0], point_count_threshold, prev_points);
 
-    for (size_t i = 0; i < tmp_points.size() - 1; i++){
+    for (size_t i = 0; i < tmp_points.size() - 1; i++)
+    {
         all_points.push_back(tmp_points[i]);
     }
 
-    for (int i = 1; i < laz_files.size(); i++){
+    for (int i = 1; i < laz_files.size(); i++)
+    {
         prev_points = tmp_points[tmp_points.size() - 1];
         tmp_points = get_batches_of_points(laz_files[i], point_count_threshold, prev_points);
         for (size_t j = 0; j < tmp_points.size() - 1; j++)
@@ -1768,7 +1947,6 @@ void alternative_approach()
         find_best_stretch(all_points[i], timestamps, poses, fn1, fn2);
     }
 }
-
 
 LaserBeam GetLaserBeam(int x, int y)
 {
@@ -1860,23 +2038,29 @@ bool exportLaz(const std::string &filename,
 
     for (auto &p : pointcloud)
     {
-        if(p.x() < _min.x()){
+        if (p.x() < _min.x())
+        {
             _min.x() = p.x();
         }
-        if(p.y() < _min.y()){
+        if (p.y() < _min.y())
+        {
             _min.y() = p.y();
         }
-        if(p.z() < _min.z()){
+        if (p.z() < _min.z())
+        {
             _min.z() = p.z();
         }
 
-        if(p.x() > _max.x()){
+        if (p.x() > _max.x())
+        {
             _max.x() = p.x();
         }
-        if(p.y() > _max.y()){
+        if (p.y() > _max.y())
+        {
             _max.y() = p.y();
         }
-        if(p.z() > _max.z()){
+        if (p.z() > _max.z())
+        {
             _max.z() = p.z();
         }
     }

@@ -420,7 +420,7 @@ void project_gui()
 
                 if (!sessions[i].show_rgb)
                 {
-                    //ImGui::SameLine();
+                    // ImGui::SameLine();
                     ImGui::ColorEdit3(("color[" + std::to_string(i) + "]").c_str(), (float *)&sessions[i].render_color);
                     for (auto &pc : sessions[i].point_clouds_container.point_clouds)
                     {
@@ -637,15 +637,29 @@ void project_gui()
                                 }
 
                                 int prev_index_active_edge = index_active_edge;
-                                ImGui::InputInt("index_active_edge", &index_active_edge);
 
-                                if (index_active_edge < 0)
+                                if (!edge_gizmo)
                                 {
-                                    index_active_edge = 0;
-                                }
-                                if (index_active_edge >= (int)edges.size())
-                                {
-                                    index_active_edge = (int)edges.size() - 1;
+                                    bool is_gizmo = false;
+                                    
+                                    for(const auto &s:sessions){
+                                        if(s.is_gizmo){
+                                            is_gizmo = true;
+                                        }
+                                    }
+
+                                    if (!is_gizmo){
+                                        ImGui::InputInt("index_active_edge", &index_active_edge);
+
+                                        if (index_active_edge < 0)
+                                        {
+                                            index_active_edge = 0;
+                                        }
+                                        if (index_active_edge >= (int)edges.size())
+                                        {
+                                            index_active_edge = (int)edges.size() - 1;
+                                        }
+                                    }
                                 }
 
                                 std::string txt = "index_session_from: " + std::to_string(edges[index_active_edge].index_session_from);

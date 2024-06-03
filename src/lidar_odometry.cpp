@@ -68,6 +68,7 @@ int num_constistency_iter = 10;
 int index_from_inclusive = -1;
 int index_to_inclusive = -1;
 bool gizmo_stretch_interval = false;
+Eigen::Affine3d stretch_gizmo_m = Eigen::Affine3d::Identity();
 
 LidarOdometryParams params;
 const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
@@ -945,6 +946,7 @@ void lidar_odometry_gui()
                 index_from_inclusive = worker_data.size() - 1;
             }
 
+            int prev = index_to_inclusive;
             ImGui::InputInt("index_to_inclusive", &index_to_inclusive);
             if (index_to_inclusive < 0)
             {
@@ -954,8 +956,17 @@ void lidar_odometry_gui()
             {
                 index_to_inclusive = worker_data.size() - 1;
             }
+            if (prev != index_to_inclusive)
+            {
+                stretch_gizmo_m = worker_data[index_to_inclusive].intermediate_trajectory[0];
+            }
 
-            ImGui::Checkbox("gizmo_stretch_interval", &gizmo_stretch_interval);
+
+            if (index_to_inclusive > index_from_inclusive)
+            {
+                ImGui::Text("-------------------------");
+                ImGui::Checkbox("gizmo_stretch_interval", &gizmo_stretch_interval);
+            }
 
             // gizmo_stretch_interval
             if (gizmo_stretch_interval)
@@ -964,24 +975,137 @@ void lidar_odometry_gui()
                 {
                     if (worker_data[index_to_inclusive].intermediate_trajectory.size() > 0)
                     {
-                        m_gizmo[0] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](0, 0);
-                        m_gizmo[1] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](1, 0);
-                        m_gizmo[2] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](2, 0);
-                        m_gizmo[3] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](3, 0);
-                        m_gizmo[4] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](0, 1);
-                        m_gizmo[5] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](1, 1);
-                        m_gizmo[6] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](2, 1);
-                        m_gizmo[7] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](3, 1);
-                        m_gizmo[8] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](0, 2);
-                        m_gizmo[9] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](1, 2);
-                        m_gizmo[10] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](2, 2);
-                        m_gizmo[11] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](3, 2);
-                        m_gizmo[12] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](0, 3);
-                        m_gizmo[13] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](1, 3);
-                        m_gizmo[14] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](2, 3);
-                        m_gizmo[15] = (float)worker_data[index_to_inclusive].intermediate_trajectory[0](3, 3);
+                        m_gizmo[0] = (float)stretch_gizmo_m(0, 0);
+                        m_gizmo[1] = (float)stretch_gizmo_m(1, 0);
+                        m_gizmo[2] = (float)stretch_gizmo_m(2, 0);
+                        m_gizmo[3] = (float)stretch_gizmo_m(3, 0);
+                        m_gizmo[4] = (float)stretch_gizmo_m(0, 1);
+                        m_gizmo[5] = (float)stretch_gizmo_m(1, 1);
+                        m_gizmo[6] = (float)stretch_gizmo_m(2, 1);
+                        m_gizmo[7] = (float)stretch_gizmo_m(3, 1);
+                        m_gizmo[8] = (float)stretch_gizmo_m(0, 2);
+                        m_gizmo[9] = (float)stretch_gizmo_m(1, 2);
+                        m_gizmo[10] = (float)stretch_gizmo_m(2, 2);
+                        m_gizmo[11] = (float)stretch_gizmo_m(3, 2);
+                        m_gizmo[12] = (float)stretch_gizmo_m(0, 3);
+                        m_gizmo[13] = (float)stretch_gizmo_m(1, 3);
+                        m_gizmo[14] = (float)stretch_gizmo_m(2, 3);
+                        m_gizmo[15] = (float)stretch_gizmo_m(3, 3);
                     }
                 }
+                /*if (index_to_inclusive < worker_data.size())
+                {
+                    if (index_from_inclusive < index_to_inclusive)
+                    {
+                        if (ImGui::Button("Accept_Gizmo"))
+                        {
+                            std::vector<std::vector<Eigen::Affine3d>> all_poses;
+                            for (int i = 0; i < worker_data.size(); i++)
+                            {
+                                std::vector<Eigen::Affine3d> poses;
+                                for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
+                                {
+                                    poses.push_back(worker_data[i].intermediate_trajectory[j]);
+                                }
+                                all_poses.push_back(poses);
+                            }
+                        }
+                    }
+                }*/
+
+                if (ImGui::Button("Accept_Gizmo (only translation)"))
+                {
+                    if (index_to_inclusive < worker_data.size())
+                    {
+                        if (worker_data[index_to_inclusive].intermediate_trajectory.size() > 0)
+                        {
+                            Eigen::Affine3d current_gizmo = Eigen::Affine3d::Identity();
+                            current_gizmo(0, 0) = m_gizmo[0];
+                            current_gizmo(1, 0) = m_gizmo[1];
+                            current_gizmo(2, 0) = m_gizmo[2];
+                            current_gizmo(3, 0) = m_gizmo[3];
+                            current_gizmo(0, 1) = m_gizmo[4];
+                            current_gizmo(1, 1) = m_gizmo[5];
+                            current_gizmo(2, 1) = m_gizmo[6];
+                            current_gizmo(3, 1) = m_gizmo[7];
+                            current_gizmo(0, 2) = m_gizmo[8];
+                            current_gizmo(1, 2) = m_gizmo[9];
+                            current_gizmo(2, 2) = m_gizmo[10];
+                            current_gizmo(3, 2) = m_gizmo[11];
+                            current_gizmo(0, 3) = m_gizmo[12];
+                            current_gizmo(1, 3) = m_gizmo[13];
+                            current_gizmo(2, 3) = m_gizmo[14];
+                            current_gizmo(3, 3) = m_gizmo[15];
+
+                            auto first_pose = worker_data[index_from_inclusive].intermediate_trajectory[0];
+
+                            Eigen::Vector3d translation = current_gizmo.translation() - first_pose.translation();
+
+                            float number_all_nodes_inside_interval = 0;
+                            for (int i = index_from_inclusive; i < index_to_inclusive; i++)
+                            {
+                                number_all_nodes_inside_interval += (float)worker_data[i].intermediate_trajectory.size();
+                            }
+
+                            std::vector<std::vector<Eigen::Affine3d>> all_poses;
+                            for (int i = 0; i < worker_data.size(); i++)
+                            {
+                                std::vector<Eigen::Affine3d> poses;
+                                for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
+                                {
+                                    poses.push_back(worker_data[i].intermediate_trajectory[j]);
+                                }
+                                all_poses.push_back(poses);
+                            }
+
+                            float counter = 0;
+
+                            Eigen::Affine3d last_m = Eigen::Affine3d::Identity();
+
+                            for (int i = index_from_inclusive; i < index_to_inclusive; i++)
+                            {
+                                for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
+                                {
+                                    TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[j]);
+
+                                    pose.px = first_pose.translation().x() + translation.x() * (counter / number_all_nodes_inside_interval);
+                                    pose.py = first_pose.translation().y() + translation.y() * (counter / number_all_nodes_inside_interval);
+                                    pose.pz = first_pose.translation().z() + translation.z() * (counter / number_all_nodes_inside_interval);
+
+                                    // pose.om += pose_diff.om * (counter / number_all_nodes_inside_interval);
+                                    // pose.fi += pose_diff.fi * (counter / number_all_nodes_inside_interval);
+                                    // pose.ka += pose_diff.ka * (counter / number_all_nodes_inside_interval);
+
+                                    counter += 1.0f;
+
+                                    worker_data[i].intermediate_trajectory[j] = affine_matrix_from_pose_tait_bryan(pose);
+
+                                    last_m = worker_data[i].intermediate_trajectory[j];
+                                }
+                            }
+
+                            for (int i = index_to_inclusive; i < worker_data.size(); i++)
+                            {
+                                for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
+                                {
+                                    Eigen::Affine3d m_update = Eigen::Affine3d::Identity();
+
+                                    if (j == 0)
+                                    {
+                                        m_update = all_poses[i - 1][all_poses[i - 1].size() - 1].inverse() * all_poses[i][0];
+                                    }
+                                    else
+                                    {
+                                        m_update = all_poses[i][j - 1].inverse() * all_poses[i][j];
+                                    }
+                                    last_m = last_m * m_update;
+                                    worker_data[i].intermediate_trajectory[j] = last_m;
+                                }
+                            }
+                        }
+                    }
+                }
+                ImGui::Text("-------------------------");
             }
 
             for (int i = 0; i < worker_data.size(); i++)
@@ -1461,117 +1585,24 @@ void display()
         GLfloat modelview[16];
         glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::LOCAL, m_gizmo, NULL);
+        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
 
-        if (index_to_inclusive < worker_data.size())
-        {
-            if (worker_data[index_to_inclusive].intermediate_trajectory.size() > 0)
-            {
-                // auto tmp_worker_data = worker_data;
-                std::vector<std::vector<Eigen::Affine3d>> all_poses;
-                for (int i = 0; i < worker_data.size(); i++)
-                {
-                    std::vector<Eigen::Affine3d> poses;
-                    for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
-                    {
-                        poses.push_back(worker_data[i].intermediate_trajectory[j]);
-                    }
-                    all_poses.push_back(poses);
-                }
-
-                auto prev_m = worker_data[index_to_inclusive].intermediate_trajectory[0];
-
-                /*worker_data[index_to_inclusive].intermediate_trajectory[0](0, 0) = m_gizmo[0];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](1, 0) = m_gizmo[1];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](2, 0) = m_gizmo[2];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](3, 0) = m_gizmo[3];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](0, 1) = m_gizmo[4];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](1, 1) = m_gizmo[5];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](2, 1) = m_gizmo[6];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](3, 1) = m_gizmo[7];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](0, 2) = m_gizmo[8];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](1, 2) = m_gizmo[9];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](2, 2) = m_gizmo[10];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](3, 2) = m_gizmo[11];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](0, 3) = m_gizmo[12];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](1, 3) = m_gizmo[13];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](2, 3) = m_gizmo[14];
-                worker_data[index_to_inclusive].intermediate_trajectory[0](3, 3) = m_gizmo[15];*/
-
-                Eigen::Affine3d current_gizmo = Eigen::Affine3d::Identity();
-                current_gizmo(0, 0) = m_gizmo[0];
-                current_gizmo(1, 0) = m_gizmo[1];
-                current_gizmo(2, 0) = m_gizmo[2];
-                current_gizmo(3, 0) = m_gizmo[3];
-                current_gizmo(0, 1) = m_gizmo[4];
-                current_gizmo(1, 1) = m_gizmo[5];
-                current_gizmo(2, 1) = m_gizmo[6];
-                current_gizmo(3, 1) = m_gizmo[7];
-                current_gizmo(0, 2) = m_gizmo[8];
-                current_gizmo(1, 2) = m_gizmo[9];
-                current_gizmo(2, 2) = m_gizmo[10];
-                current_gizmo(3, 2) = m_gizmo[11];
-                current_gizmo(0, 3) = m_gizmo[12];
-                current_gizmo(1, 3) = m_gizmo[13];
-                current_gizmo(2, 3) = m_gizmo[14];
-                current_gizmo(3, 3) = m_gizmo[15];
-
-                auto diff_m = prev_m.inverse() * current_gizmo;
-                // std::cout << diff_m.matrix() << std::endl;
-
-                TaitBryanPose pose_diff = pose_tait_bryan_from_affine_matrix(diff_m);
-
-                float number_all_nodes_inside_interval = 0;
-                for (int i = index_from_inclusive; i < index_to_inclusive; i++)
-                {
-                    number_all_nodes_inside_interval += (float)worker_data[i].intermediate_trajectory.size();
-                }
-
-                // std::cout << number_all_nodes_inside_interval << " ";
-                float counter = 1;
-
-                for (int i = index_from_inclusive; i < index_to_inclusive; i++)
-                {
-                    for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
-                    {
-                        TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[j]);
-
-                        pose.px += pose_diff.px * (counter / number_all_nodes_inside_interval);
-                        pose.py += pose_diff.py * (counter / number_all_nodes_inside_interval);
-                        pose.pz += pose_diff.pz * (counter / number_all_nodes_inside_interval);
-
-                        pose.om += pose_diff.om * (counter / number_all_nodes_inside_interval);
-                        pose.fi += pose_diff.fi * (counter / number_all_nodes_inside_interval);
-                        pose.ka += pose_diff.ka * (counter / number_all_nodes_inside_interval);
-
-                        counter += 1.0f;
-
-                        worker_data[i].intermediate_trajectory[j] = affine_matrix_from_pose_tait_bryan(pose);
-                    }
-                }
-
-                Eigen::Affine3d last_m = worker_data[index_to_inclusive - 1].intermediate_trajectory[worker_data[index_to_inclusive - 1].intermediate_trajectory.size() - 1];
-
-                for (int i = index_to_inclusive; i < worker_data.size(); i++)
-                {
-                    for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
-                    {
-                        Eigen::Affine3d m_update = Eigen::Affine3d::Identity();
-
-                        if (j == 0)
-                        {
-                            m_update = all_poses[i - 1][all_poses[i - 1].size() - 1].inverse() * all_poses[i][0];
-                        }
-                        else
-                        {
-                            m_update = all_poses[i][j-1].inverse() * all_poses[i][j];
-                        }
-                        last_m = last_m * m_update;
-                        worker_data[i].intermediate_trajectory[j] = last_m;
-                    }
-                }
-            }
-        }
+        stretch_gizmo_m(0, 0) = m_gizmo[0];
+        stretch_gizmo_m(1, 0) = m_gizmo[1];
+        stretch_gizmo_m(2, 0) = m_gizmo[2];
+        stretch_gizmo_m(3, 0) = m_gizmo[3];
+        stretch_gizmo_m(0, 1) = m_gizmo[4];
+        stretch_gizmo_m(1, 1) = m_gizmo[5];
+        stretch_gizmo_m(2, 1) = m_gizmo[6];
+        stretch_gizmo_m(3, 1) = m_gizmo[7];
+        stretch_gizmo_m(0, 2) = m_gizmo[8];
+        stretch_gizmo_m(1, 2) = m_gizmo[9];
+        stretch_gizmo_m(2, 2) = m_gizmo[10];
+        stretch_gizmo_m(3, 2) = m_gizmo[11];
+        stretch_gizmo_m(0, 3) = m_gizmo[12];
+        stretch_gizmo_m(1, 3) = m_gizmo[13];
+        stretch_gizmo_m(2, 3) = m_gizmo[14];
+        stretch_gizmo_m(3, 3) = m_gizmo[15];
     }
 
     ImGui::Render();

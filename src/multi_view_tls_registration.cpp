@@ -133,7 +133,7 @@ void perform_experiment_on_linux(Session &session, ObservationPicking &observati
                                  RegistrationPlaneFeature &registration_plane_feature, PoseGraphSLAM &pose_graph_slam);
 
 LaserBeam GetLaserBeam(int x, int y);
-Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane);
+Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking);
 bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity, double offset_x,
                double offset_y,
@@ -1070,14 +1070,15 @@ void project_gui()
 
                 if (session.point_clouds_container.point_clouds[i].visible)
                 {
-                    //ImGui::SameLine();
+                    // ImGui::SameLine();
                     ImGui::Checkbox(std::string(std::to_string(i) + ": show_color").c_str(), &session.point_clouds_container.point_clouds[i].show_color); //
 
-                    if (!session.point_clouds_container.point_clouds[i].show_color){
+                    if (!session.point_clouds_container.point_clouds[i].show_color)
+                    {
                         ImGui::SameLine();
                         ImGui::ColorEdit3(std::string(std::to_string(i) + ": pc_color").c_str(), session.point_clouds_container.point_clouds[i].render_color);
                     }
-                        
+
                     ImGui::SameLine();
                     if (ImGui::Button(std::string("#" + std::to_string(i) + "_ICP").c_str()))
                     {
@@ -1300,6 +1301,18 @@ void project_gui()
                 }
             }
 
+            static bool is_trajectory_export_downsampling = false;
+            ImGui::Checkbox("is_trajectory_export_downsampling", &is_trajectory_export_downsampling);
+
+            static float not_curve_consecutive_distance_meters = 1.0f;
+            static float curve_consecutive_distance_meters = 0.05f;
+
+            if (is_trajectory_export_downsampling)
+            {
+                ImGui::InputFloat("curve_consecutive_distance_meters", &curve_consecutive_distance_meters);
+                ImGui::InputFloat("not_curve_consecutive_distance_meters", &not_curve_consecutive_distance_meters);
+            }
+
             if (ImGui::Button("save all marked trajectories to laz (as one global scan)"))
             {
                 std::shared_ptr<pfd::save_file> save_file;
@@ -1320,20 +1333,55 @@ void project_gui()
                     std::vector<unsigned short> intensity;
 
                     // point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
-
+                    float consecutive_distance = 0;
+                   
                     for (auto &p : session.point_clouds_container.point_clouds)
                     {
                         if (p.visible)
                         {
-
                             for (int i = 0; i < p.local_trajectory.size(); i++)
                             {
                                 const auto &pp = p.local_trajectory[i].m_pose.translation();
                                 Eigen::Vector3d vp;
                                 vp = p.m_pose * pp + session.point_clouds_container.offset;
 
-                                pointcloud.push_back(vp);
-                                intensity.push_back(0);
+                                if(i > 0){
+                                    double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
+                                    consecutive_distance += dist;
+                                }
+
+                                bool is_curve = false;
+
+                                if (i > 100 && i < p.local_trajectory.size() - 100)
+                                {
+                                    Eigen::Vector3d position_prev = p.local_trajectory[i - 100].m_pose.translation();
+                                    Eigen::Vector3d position_curr = p.local_trajectory[i].m_pose.translation();
+                                    Eigen::Vector3d position_next = p.local_trajectory[i + 100].m_pose.translation();
+
+                                    Eigen::Vector3d v1 = position_curr - position_prev;
+                                    Eigen::Vector3d v2 = position_next - position_curr;
+
+                                    if (v1.norm() > 0 && v2.norm() > 0){
+                                        double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+                                        
+                                        if (angle_deg > 10.0)
+                                        {
+                                            is_curve = true;
+                                        }
+                                    }
+                                }
+                                double tol = not_curve_consecutive_distance_meters;
+
+                                if (is_curve){
+                                    tol = curve_consecutive_distance_meters;
+                                }
+
+                                if (consecutive_distance >= tol)
+                                {
+                                    consecutive_distance = 0;
+                                    pointcloud.push_back(vp);
+                                    intensity.push_back(0);
+                                }
                             }
                         }
                     }
@@ -1785,9 +1833,9 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or csv file", "C:\\", {"LAS file", "*.las", "Csv file", "*.csv"}).result();
+                    auto sel = pfd::save_file("Save csv file", "C:\\", {"csv file", "*.csv"}).result();
                     output_file_name = sel;
-                    std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
+                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
                 };
                 std::thread t1(t);
                 t1.join();
@@ -1797,18 +1845,55 @@ void project_gui()
                     std::ofstream outfile(output_file_name);
                     if (outfile.good())
                     {
+                        float consecutive_distance = 0;
+
                         for (auto &p : session.point_clouds_container.point_clouds)
                         {
                             if (p.visible)
                             {
-
                                 for (int i = 0; i < p.local_trajectory.size(); i++)
                                 {
                                     const auto &m = p.local_trajectory[i].m_pose;
                                     Eigen::Affine3d pose = p.m_pose * m;
                                     pose.translation() += session.point_clouds_container.offset;
-                                    outfile << std::setprecision(20);
-                                    outfile << p.local_trajectory[i].timestamps.first << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+
+                                    if(i > 0){
+                                        double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
+                                        consecutive_distance += dist;
+                                    }
+
+                                    bool is_curve = false;
+
+                                    if (i > 100 && i < p.local_trajectory.size() - 100)
+                                    {
+                                        Eigen::Vector3d position_prev = p.local_trajectory[i - 100].m_pose.translation();
+                                        Eigen::Vector3d position_curr = p.local_trajectory[i].m_pose.translation();
+                                        Eigen::Vector3d position_next = p.local_trajectory[i + 100].m_pose.translation();
+
+                                        Eigen::Vector3d v1 = position_curr - position_prev;
+                                        Eigen::Vector3d v2 = position_next - position_curr;
+
+                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                            double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+                                            
+                                            if (angle_deg > 10.0)
+                                            {
+                                                is_curve = true;
+                                            }
+                                        }
+                                    }
+                                    double tol = not_curve_consecutive_distance_meters;
+
+                                    if (is_curve){
+                                        tol = curve_consecutive_distance_meters;
+                                    }
+
+                                    if (consecutive_distance >= tol)
+                                    {
+                                        consecutive_distance = 0;
+                                        outfile << std::setprecision(20);
+                                        outfile << p.local_trajectory[i].timestamps.first << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                    }
                                 }
                             }
                         }
@@ -1823,9 +1908,9 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or csv file", "C:\\", {"LAS file", "*.las", "Csv file", "*.csv"}).result();
+                    auto sel = pfd::save_file("Save csv file", "C:\\", {"csv file", "*.csv"}).result();
                     output_file_name = sel;
-                    std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
+                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
                 };
                 std::thread t1(t);
                 t1.join();
@@ -1835,6 +1920,8 @@ void project_gui()
                     std::ofstream outfile(output_file_name);
                     if (outfile.good())
                     {
+                        float consecutive_distance = 0;
+
                         for (auto &p : session.point_clouds_container.point_clouds)
                         {
                             if (p.visible)
@@ -1845,8 +1932,44 @@ void project_gui()
                                     const auto &m = p.local_trajectory[i].m_pose;
                                     Eigen::Affine3d pose = p.m_pose * m;
                                     pose.translation() += session.point_clouds_container.offset;
-                                    outfile << std::setprecision(20);
-                                    outfile << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+
+                                    if(i > 0){
+                                        double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
+                                        consecutive_distance += dist;
+                                    }
+
+                                    bool is_curve = false;
+
+                                    if (i > 100 && i < p.local_trajectory.size() - 100)
+                                    {
+                                        Eigen::Vector3d position_prev = p.local_trajectory[i - 100].m_pose.translation();
+                                        Eigen::Vector3d position_curr = p.local_trajectory[i].m_pose.translation();
+                                        Eigen::Vector3d position_next = p.local_trajectory[i + 100].m_pose.translation();
+
+                                        Eigen::Vector3d v1 = position_curr - position_prev;
+                                        Eigen::Vector3d v2 = position_next - position_curr;
+
+                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                            double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+                                            
+                                            if (angle_deg > 10.0)
+                                            {
+                                                is_curve = true;
+                                            }
+                                        }
+                                    }
+                                    double tol = not_curve_consecutive_distance_meters;
+
+                                    if (is_curve){
+                                        tol = curve_consecutive_distance_meters;
+                                    }
+
+                                    if (consecutive_distance >= tol)
+                                    {
+                                        consecutive_distance = 0;
+                                        outfile << std::setprecision(20);
+                                        outfile << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                    }
                                 }
                             }
                         }
@@ -1861,9 +1984,9 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or csv file", "C:\\", {"LAS file", "*.las", "Csv file", "*.csv"}).result();
+                    auto sel = pfd::save_file("Save csv file", "C:\\", {"csv file", "*.csv"}).result();
                     output_file_name = sel;
-                    std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
+                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
                 };
                 std::thread t1(t);
                 t1.join();
@@ -1873,6 +1996,8 @@ void project_gui()
                     std::ofstream outfile(output_file_name);
                     if (outfile.good())
                     {
+                        float consecutive_distance = 0;
+
                         for (auto &p : session.point_clouds_container.point_clouds)
                         {
                             if (p.visible)
@@ -1883,8 +2008,47 @@ void project_gui()
                                     const auto &m = p.local_trajectory[i].m_pose;
                                     Eigen::Affine3d pose = p.m_pose * m;
                                     pose.translation() += session.point_clouds_container.offset;
-                                    outfile << std::setprecision(20);
-                                    outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                    
+                                    if(i > 0){
+                                        double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
+                                        consecutive_distance += dist;
+                                    }
+
+                                    bool is_curve = false;
+
+                                    if (i > 100 && i < p.local_trajectory.size() - 100)
+                                    {
+                                        Eigen::Vector3d position_prev = p.local_trajectory[i - 100].m_pose.translation();
+                                        Eigen::Vector3d position_curr = p.local_trajectory[i].m_pose.translation();
+                                        Eigen::Vector3d position_next = p.local_trajectory[i + 100].m_pose.translation();
+
+                                        Eigen::Vector3d v1 = position_curr - position_prev;
+                                        Eigen::Vector3d v2 = position_next - position_curr;
+
+                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                            double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+                                            
+                                            if (angle_deg > 10.0)
+                                            {
+                                                is_curve = true;
+                                            }
+                                        }
+                                    }
+
+                                    double tol = not_curve_consecutive_distance_meters;
+
+                                    if (is_curve){
+                                        tol = curve_consecutive_distance_meters;
+                                    }
+
+
+                                    if (consecutive_distance >= tol)
+                                    {
+                                        consecutive_distance = 0;
+
+                                        outfile << std::setprecision(20);
+                                        outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                    }
                                 }
                             }
                         }
@@ -1899,9 +2063,9 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or csv file", "C:\\").result();
+                    auto sel = pfd::save_file("csv file", "C:\\").result();
                     output_file_name = sel;
-                    std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
+                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
                 };
                 std::thread t1(t);
                 t1.join();
@@ -1911,6 +2075,8 @@ void project_gui()
                     std::ofstream outfile(output_file_name);
                     if (outfile.good())
                     {
+                        float consecutive_distance = 0;
+
                         for (auto &p : session.point_clouds_container.point_clouds)
                         {
                             if (p.visible)
@@ -1922,8 +2088,44 @@ void project_gui()
                                     Eigen::Affine3d pose = p.m_pose * m;
                                     pose.translation() += session.point_clouds_container.offset;
                                     Eigen::Quaterniond q(pose.rotation());
-                                    outfile << std::setprecision(20);
-                                    outfile << p.local_trajectory[i].timestamps.first << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+
+                                    if(i > 0){
+                                        double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
+                                        consecutive_distance += dist;
+                                    }
+
+                                    bool is_curve = false;
+
+                                    if (i > 100 && i < p.local_trajectory.size() - 100)
+                                    {
+                                        Eigen::Vector3d position_prev = p.local_trajectory[i - 100].m_pose.translation();
+                                        Eigen::Vector3d position_curr = p.local_trajectory[i].m_pose.translation();
+                                        Eigen::Vector3d position_next = p.local_trajectory[i + 100].m_pose.translation();
+
+                                        Eigen::Vector3d v1 = position_curr - position_prev;
+                                        Eigen::Vector3d v2 = position_next - position_curr;
+
+                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                            double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+                                            
+                                            if (angle_deg > 10.0)
+                                            {
+                                                is_curve = true;
+                                            }
+                                        }
+                                    }
+                                    double tol = not_curve_consecutive_distance_meters;
+
+                                    if (is_curve){
+                                        tol = curve_consecutive_distance_meters;
+                                    }
+
+                                    if (consecutive_distance >= tol)
+                                    {
+                                        consecutive_distance = 0;
+                                        outfile << std::setprecision(20);
+                                        outfile << p.local_trajectory[i].timestamps.first << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                    }
                                 }
                             }
                         }
@@ -1938,9 +2140,9 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or csv file", "C:\\").result();
+                    auto sel = pfd::save_file("Save csv file", "C:\\").result();
                     output_file_name = sel;
-                    std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
+                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
                 };
                 std::thread t1(t);
                 t1.join();
@@ -1950,6 +2152,8 @@ void project_gui()
                     std::ofstream outfile(output_file_name);
                     if (outfile.good())
                     {
+                        float consecutive_distance = 0;
+
                         for (auto &p : session.point_clouds_container.point_clouds)
                         {
                             if (p.visible)
@@ -1961,8 +2165,44 @@ void project_gui()
                                     Eigen::Affine3d pose = p.m_pose * m;
                                     pose.translation() += session.point_clouds_container.offset;
                                     Eigen::Quaterniond q(pose.rotation());
-                                    outfile << std::setprecision(20);
-                                    outfile << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+
+                                    if(i > 0){
+                                        double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
+                                        consecutive_distance += dist;
+                                    }
+
+                                    bool is_curve = false;
+
+                                    if (i > 100 && i < p.local_trajectory.size() - 100)
+                                    {
+                                        Eigen::Vector3d position_prev = p.local_trajectory[i - 100].m_pose.translation();
+                                        Eigen::Vector3d position_curr = p.local_trajectory[i].m_pose.translation();
+                                        Eigen::Vector3d position_next = p.local_trajectory[i + 100].m_pose.translation();
+
+                                        Eigen::Vector3d v1 = position_curr - position_prev;
+                                        Eigen::Vector3d v2 = position_next - position_curr;
+
+                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                            double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+                                            
+                                            if (angle_deg > 10.0)
+                                            {
+                                                is_curve = true;
+                                            }
+                                        }
+                                    }
+                                    double tol = not_curve_consecutive_distance_meters;
+
+                                    if (is_curve){
+                                        tol = curve_consecutive_distance_meters;
+                                    }
+
+                                    if (consecutive_distance >= tol)
+                                    {
+                                        consecutive_distance = 0;
+                                        outfile << std::setprecision(20);
+                                        outfile << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                    }
                                 }
                             }
                         }
@@ -1977,9 +2217,9 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or csv file", "C:\\").result();
+                    auto sel = pfd::save_file("Save csv file", "C:\\").result();
                     output_file_name = sel;
-                    std::cout << "las or csv file to save: '" << output_file_name << "'" << std::endl;
+                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
                 };
                 std::thread t1(t);
                 t1.join();
@@ -1989,6 +2229,7 @@ void project_gui()
                     std::ofstream outfile(output_file_name);
                     if (outfile.good())
                     {
+                        float consecutive_distance = 0;
                         for (auto &p : session.point_clouds_container.point_clouds)
                         {
                             if (p.visible)
@@ -2000,8 +2241,44 @@ void project_gui()
                                     Eigen::Affine3d pose = p.m_pose * m;
                                     pose.translation() += session.point_clouds_container.offset;
                                     Eigen::Quaterniond q(pose.rotation());
-                                    outfile << std::setprecision(20);
-                                    outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+
+                                    if(i > 0){
+                                        double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
+                                        consecutive_distance += dist;
+                                    }
+
+                                    bool is_curve = false;
+
+                                    if (i > 100 && i < p.local_trajectory.size() - 100)
+                                    {
+                                        Eigen::Vector3d position_prev = p.local_trajectory[i - 100].m_pose.translation();
+                                        Eigen::Vector3d position_curr = p.local_trajectory[i].m_pose.translation();
+                                        Eigen::Vector3d position_next = p.local_trajectory[i + 100].m_pose.translation();
+
+                                        Eigen::Vector3d v1 = position_curr - position_prev;
+                                        Eigen::Vector3d v2 = position_next - position_curr;
+
+                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                            double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+                                            
+                                            if (angle_deg > 10.0)
+                                            {
+                                                is_curve = true;
+                                            }
+                                        }
+                                    }
+                                    double tol = not_curve_consecutive_distance_meters;
+
+                                    if (is_curve){
+                                        tol = curve_consecutive_distance_meters;
+                                    }
+
+                                    if (consecutive_distance >= tol)
+                                    {
+                                        consecutive_distance = 0;
+                                        outfile << std::setprecision(20);
+                                        outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                    }
                                 }
                             }
                         }
@@ -3026,12 +3303,12 @@ void display()
     if (!is_ortho)
     {
         reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-    
+
         Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
         viewTranslation.translate(rotation_center);
         Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
-        viewLocal.translate(Eigen::Vector3f( translate_x, translate_y, translate_z));
-        viewLocal.rotate(Eigen::AngleAxisf(M_PI*rotate_x / 180.f, Eigen::Vector3f::UnitX()));
+        viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
+        viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
         viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
 
         Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
@@ -3040,9 +3317,9 @@ void display()
         Eigen::Affine3f result = viewTranslation * viewLocal * viewTranslation2;
 
         glLoadMatrixf(result.matrix().data());
-  /*      glTranslatef(translate_x, translate_y, translate_z);
-        glRotatef(rotate_x, 1.0, 0.0, 0.0);
-        glRotatef(rotate_y, 0.0, 0.0, 1.0);*/
+        /*      glTranslatef(translate_x, translate_y, translate_z);
+              glRotatef(rotate_x, 1.0, 0.0, 0.0);
+              glRotatef(rotate_y, 0.0, 0.0, 1.0);*/
     }
     else
     {
@@ -3068,7 +3345,6 @@ void display()
         glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() + 1.f);
         glEnd();
     }
-
 
     if (show_axes || ImGui::GetIO().KeyCtrl)
     {
@@ -3468,7 +3744,7 @@ void mouse(int glut_button, int state, int x, int y)
             rotation_center = rayIntersection(laser_beam, pl).cast<float>();
 
             std::cout << "setting new rotation center to " << rotation_center << std::endl;
-                
+
             rotate_x = 0.f;
             rotate_y = 0.f;
         }
@@ -3567,7 +3843,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration_step_2 v0.41");
+    glutCreateWindow("multi_view_tls_registration_step_2 v0.42");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

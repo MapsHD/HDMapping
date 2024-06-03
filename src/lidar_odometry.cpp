@@ -528,6 +528,7 @@ void lidar_odometry_gui()
 
                     params.m_g = worker_data[0].intermediate_trajectory[0];
                     step_1_done = true;
+                    std::cout << "step_1_done please click 'compute_all (step 2)' to continue calculations" << std::endl; 
                 }
                 else
                 {

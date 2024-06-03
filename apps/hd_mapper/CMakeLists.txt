@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.15.0)
 
 project(hd_mapper)
 
 add_executable(hd_mapper hd_mapper.cpp)
-target_link_libraries(hd_mapper PRIVATE freeglut ${PLATFORM_LASZIP_LIB} ${CORE_LIBRARIES}
+target_link_libraries(hd_mapper PRIVATE freeglut OpenGL::OpenGL OpenGL::GLU ${PLATFORM_LASZIP_LIB} ${CORE_LIBRARIES}
         ${GUI_LIBRARIES})
 target_include_directories(
         hd_mapper
@@ -21,9 +21,11 @@ target_include_directories(
         ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
         ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip/include)
 
-add_custom_command(
-        TARGET hd_mapper
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:hd_mapper>
-        $<TARGET_FILE_DIR:hd_mapper>
-        COMMAND_EXPAND_LISTS)
+if(WIN32)
+        add_custom_command(
+                TARGET hd_mapper
+                POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:hd_mapper>
+                $<TARGET_FILE_DIR:hd_mapper>
+                COMMAND_EXPAND_LISTS)
+endif()

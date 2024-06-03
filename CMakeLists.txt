@@ -1,8 +1,11 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.15.0)
 
 project(hd-mapping)
 
+set(OpenGL_GL_PREFERENCE GLVND)
 set(CMAKE_CXX_STANDARD 20)
+
+find_package(OpenGL REQUIRED COMPONENTS OpenGL)
 
 add_definitions(-D_USE_MATH_DEFINES)
 

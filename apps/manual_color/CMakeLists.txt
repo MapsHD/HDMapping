@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.15.0)
 
 project(mandeye_with_gopro_max_manual_coloring)
 
@@ -10,7 +10,7 @@ target_include_directories(
   ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
   ${EXTERNAL_LIBRARIES_DIRECTORY}
   ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
-  ${EXTERNAL_LIBRARIES_DIRECTORY}/Eigen
+  ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen
   ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui
   ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
   ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo
@@ -22,7 +22,7 @@ target_include_directories(
   ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include)
 target_link_libraries(
   mandeye_with_gopro_max_manual_coloring
-  PRIVATE freeglut ${PLATFORM_LASZIP_LIB} ${CORE_LIBRARIES} ${GUI_LIBRARIES})
+  PRIVATE freeglut glu ${PLATFORM_LASZIP_LIB} ${CORE_LIBRARIES} ${GUI_LIBRARIES})
 
 add_custom_command(
   TARGET mandeye_with_gopro_max_manual_coloring

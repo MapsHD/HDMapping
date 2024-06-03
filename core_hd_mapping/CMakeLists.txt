@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.15.0)
 
 project(core-hd-mapping)
 
@@ -15,6 +15,8 @@ set(CORE_HD_MAPPING_FILES ${CORE_HD_MAPPING_SOURCE_FILES}
                           ${CORE_HD_MAPPING_INCLUDE_FILES})
 
 add_library(core-hd-mapping STATIC ${CORE_HD_MAPPING_FILES})
+
+target_link_libraries(core-hd-mapping PRIVATE core)
 
 target_include_directories(
   core-hd-mapping

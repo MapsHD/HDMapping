@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.15.0)
 
 project(lidar_odometry_step_1)
 
@@ -25,12 +25,14 @@ target_include_directories(
   ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
   ${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
 target_link_libraries(
-  lidar_odometry_step_1 PRIVATE Fusion freeglut ${PLATFORM_LASZIP_LIB} ${CORE_LIBRARIES}
+  lidar_odometry_step_1 PRIVATE Fusion freeglut OpenGL::OpenGL OpenGL::GLU ${PLATFORM_LASZIP_LIB} ${CORE_LIBRARIES}
   ${GUI_LIBRARIES})
 
-add_custom_command(
-  TARGET lidar_odometry_step_1
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:lidar_odometry_step_1>
-  $<TARGET_FILE_DIR:lidar_odometry_step_1>
-  COMMAND_EXPAND_LISTS)
+if(WIN32)
+  add_custom_command(
+    TARGET lidar_odometry_step_1
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:lidar_odometry_step_1>
+    $<TARGET_FILE_DIR:lidar_odometry_step_1>
+    COMMAND_EXPAND_LISTS)
+endif()

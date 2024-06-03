@@ -1,6 +1,8 @@
 #include "lidar_odometry_utils.h"
 #include <registration_plane_feature.h>
 
+#include <mutex>
+
 // This is LiDAR odometry (step 1)
 // This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system https://github.com/JanuszBedkowski/mandeye_controller
 // The output is a session proving trajekctory and point clouds that can be  further processed by "multi_view_tls_registration" program.

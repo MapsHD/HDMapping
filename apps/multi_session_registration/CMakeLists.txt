@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.15.0)
 
 project(multi_session_registration_step_3)
 
@@ -10,7 +10,7 @@ target_include_directories(
   ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
   ${EXTERNAL_LIBRARIES_DIRECTORY}
   ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
-  ${EXTERNAL_LIBRARIES_DIRECTORY}/Eigen
+  ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen
   ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui
   ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
   ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.15.0)
 
 project(core)
 
@@ -47,9 +47,11 @@ set(CORE_INCLUDE_FILES
     include/wgs84_do_puwg92.h
     include/WGS84toCartesian.hpp)
 
-set(CORE_FILES ${CORE_SOURCE_FILES} ${CORE_INCLUDE_FILES})
+set(CORE_FILES  ${CORE_SOURCE_FILES} ${CORE_INCLUDE_FILES})
 
 add_library(core STATIC ${CORE_FILES})
+
+target_link_libraries(core PRIVATE ${PLATFORM_LASZIP_LIB})
 
 target_include_directories(
   core

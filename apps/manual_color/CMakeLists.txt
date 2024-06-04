@@ -22,13 +22,15 @@ target_include_directories(
   ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include)
 target_link_libraries(
   mandeye_with_gopro_max_manual_coloring
-  PRIVATE freeglut glu ${PLATFORM_LASZIP_LIB} ${CORE_LIBRARIES} ${GUI_LIBRARIES})
+  PRIVATE freeglut OpenGL::OpenGL OpenGL::GLU ${PLATFORM_LASZIP_LIB} ${CORE_LIBRARIES} ${GUI_LIBRARIES})
 
-add_custom_command(
-  TARGET mandeye_with_gopro_max_manual_coloring
-  POST_BUILD
-  COMMAND
-  ${CMAKE_COMMAND} -E copy
-  $<TARGET_RUNTIME_DLLS:mandeye_with_gopro_max_manual_coloring>
-  $<TARGET_FILE_DIR:mandeye_with_gopro_max_manual_coloring>
-  COMMAND_EXPAND_LISTS)
+if(WIN32)
+  add_custom_command(
+    TARGET mandeye_with_gopro_max_manual_coloring
+    POST_BUILD
+    COMMAND
+    ${CMAKE_COMMAND} -E copy
+    $<TARGET_RUNTIME_DLLS:mandeye_with_gopro_max_manual_coloring>
+    $<TARGET_FILE_DIR:mandeye_with_gopro_max_manual_coloring>
+    COMMAND_EXPAND_LISTS)
+endif()

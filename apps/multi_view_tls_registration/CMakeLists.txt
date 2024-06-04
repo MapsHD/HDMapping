@@ -5,7 +5,7 @@ project(multi_view_tls_registration_step_2)
 add_executable(multi_view_tls_registration_step_2
   multi_view_tls_registration.cpp perform_experiment.cpp)
 target_link_libraries(
-  multi_view_tls_registration_step_2 PRIVATE freeglut ${PLATFORM_LASZIP_LIB} ${CORE_LIBRARIES}
+  multi_view_tls_registration_step_2 PRIVATE freeglut OpenGL::OpenGL OpenGL::GLU ${PLATFORM_LASZIP_LIB} ${CORE_LIBRARIES}
   ${GUI_LIBRARIES})
 target_include_directories(
   multi_view_tls_registration_step_2
@@ -22,11 +22,13 @@ target_include_directories(
   ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
   ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip/include)
 
-add_custom_command(
-  TARGET multi_view_tls_registration_step_2
-  POST_BUILD
-  COMMAND
-  ${CMAKE_COMMAND} -E copy
-  $<TARGET_RUNTIME_DLLS:multi_view_tls_registration_step_2>
-  $<TARGET_FILE_DIR:multi_view_tls_registration_step_2>
-  COMMAND_EXPAND_LISTS)
+if(WIN32)
+  add_custom_command(
+    TARGET multi_view_tls_registration_step_2
+    POST_BUILD
+    COMMAND
+    ${CMAKE_COMMAND} -E copy
+    $<TARGET_RUNTIME_DLLS:multi_view_tls_registration_step_2>
+    $<TARGET_FILE_DIR:multi_view_tls_registration_step_2>
+    COMMAND_EXPAND_LISTS)
+endif()

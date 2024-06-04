@@ -19,14 +19,16 @@ target_include_directories(
   ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
   ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
   ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include)
-target_link_libraries(multi_session_registration_step_3 freeglut ${PLATFORM_LASZIP_LIB}
+target_link_libraries(multi_session_registration_step_3 freeglut OpenGL::OpenGL OpenGL::GLU ${PLATFORM_LASZIP_LIB}
   ${CORE_LIBRARIES} ${GUI_LIBRARIES})
 
-add_custom_command(
-  TARGET multi_session_registration_step_3
-  POST_BUILD
-  COMMAND
-  ${CMAKE_COMMAND} -E copy
-  $<TARGET_RUNTIME_DLLS:multi_session_registration_step_3>
-  $<TARGET_FILE_DIR:multi_session_registration_step_3>
-  COMMAND_EXPAND_LISTS)
+if(WIN32)
+  add_custom_command(
+    TARGET multi_session_registration_step_3
+    POST_BUILD
+    COMMAND
+    ${CMAKE_COMMAND} -E copy
+    $<TARGET_RUNTIME_DLLS:multi_session_registration_step_3>
+    $<TARGET_FILE_DIR:multi_session_registration_step_3>
+    COMMAND_EXPAND_LISTS)
+endif()

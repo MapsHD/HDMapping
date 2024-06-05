@@ -5,4 +5,4 @@ project(matrix_mul)
 add_executable(matrix_mul matrix_mul.cpp)
 target_include_directories(
   matrix_mul PRIVATE include ${REPOSITORY_DIRECTORY}/core/include
-  ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)
+                     ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)

@@ -5,7 +5,7 @@ project(hd-mapping)
 set(OpenGL_GL_PREFERENCE GLVND)
 set(CMAKE_CXX_STANDARD 20)
 
-find_package(OpenGL REQUIRED COMPONENTS OpenGL)
+find_package(OpenGL REQUIRED)
 
 add_definitions(-D_USE_MATH_DEFINES)
 

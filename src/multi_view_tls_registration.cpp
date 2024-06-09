@@ -1376,12 +1376,18 @@ void project_gui()
                                     tol = curve_consecutive_distance_meters;
                                 }
 
-                                if (consecutive_distance >= tol)
-                                {
-                                    consecutive_distance = 0;
+                                if (!is_trajectory_export_downsampling){
                                     pointcloud.push_back(vp);
                                     intensity.push_back(0);
+                                }else{
+                                    if (consecutive_distance >= tol)
+                                    {
+                                        consecutive_distance = 0;
+                                        pointcloud.push_back(vp);
+                                        intensity.push_back(0);
+                                    }
                                 }
+                                   
                             }
                         }
                     }
@@ -1888,12 +1894,21 @@ void project_gui()
                                         tol = curve_consecutive_distance_meters;
                                     }
 
-                                    if (consecutive_distance >= tol)
+                                    if (!is_trajectory_export_downsampling)
                                     {
-                                        consecutive_distance = 0;
                                         outfile << std::setprecision(20);
                                         outfile << p.local_trajectory[i].timestamps.first << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
                                     }
+                                    else
+                                    {
+                                        if (consecutive_distance >= tol)
+                                        {
+                                            consecutive_distance = 0;
+                                            outfile << std::setprecision(20);
+                                            outfile << p.local_trajectory[i].timestamps.first << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                        }
+                                    }
+                                    
                                 }
                             }
                         }
@@ -1964,11 +1979,19 @@ void project_gui()
                                         tol = curve_consecutive_distance_meters;
                                     }
 
-                                    if (consecutive_distance >= tol)
+                                    if (!is_trajectory_export_downsampling)
                                     {
-                                        consecutive_distance = 0;
                                         outfile << std::setprecision(20);
                                         outfile << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                    }
+                                    else
+                                    {
+                                        if (consecutive_distance >= tol)
+                                        {
+                                            consecutive_distance = 0;
+                                            outfile << std::setprecision(20);
+                                            outfile << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                        }
                                     }
                                 }
                             }
@@ -2041,13 +2064,19 @@ void project_gui()
                                         tol = curve_consecutive_distance_meters;
                                     }
 
-
-                                    if (consecutive_distance >= tol)
+                                    if (!is_trajectory_export_downsampling)
                                     {
-                                        consecutive_distance = 0;
-
                                         outfile << std::setprecision(20);
                                         outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                    }
+                                    else
+                                    {
+                                        if (consecutive_distance >= tol)
+                                        {
+                                            consecutive_distance = 0;
+                                            outfile << std::setprecision(20);
+                                            outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+                                        }
                                     }
                                 }
                             }
@@ -2120,11 +2149,19 @@ void project_gui()
                                         tol = curve_consecutive_distance_meters;
                                     }
 
-                                    if (consecutive_distance >= tol)
+                                    if (!is_trajectory_export_downsampling)
                                     {
-                                        consecutive_distance = 0;
                                         outfile << std::setprecision(20);
                                         outfile << p.local_trajectory[i].timestamps.first << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                    }
+                                    else
+                                    {
+                                        if (consecutive_distance >= tol)
+                                        {
+                                            consecutive_distance = 0;
+                                            outfile << std::setprecision(20);
+                                            outfile << p.local_trajectory[i].timestamps.first << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                        }
                                     }
                                 }
                             }
@@ -2197,11 +2234,19 @@ void project_gui()
                                         tol = curve_consecutive_distance_meters;
                                     }
 
-                                    if (consecutive_distance >= tol)
+                                    if (!is_trajectory_export_downsampling)
                                     {
-                                        consecutive_distance = 0;
                                         outfile << std::setprecision(20);
                                         outfile << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                    }
+                                    else
+                                    {
+                                        if (consecutive_distance >= tol)
+                                        {
+                                            consecutive_distance = 0;
+                                            outfile << std::setprecision(20);
+                                            outfile << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                        }
                                     }
                                 }
                             }
@@ -2273,11 +2318,19 @@ void project_gui()
                                         tol = curve_consecutive_distance_meters;
                                     }
 
-                                    if (consecutive_distance >= tol)
+                                    if (!is_trajectory_export_downsampling)
                                     {
-                                        consecutive_distance = 0;
                                         outfile << std::setprecision(20);
                                         outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                    }
+                                    else
+                                    {
+                                        if (consecutive_distance >= tol)
+                                        {
+                                            consecutive_distance = 0;
+                                            outfile << std::setprecision(20);
+                                            outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                        }
                                     }
                                 }
                             }

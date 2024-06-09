@@ -1457,6 +1457,7 @@ void display()
         for (const auto &b : params.reference_buckets)
         {
             glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            //std::cout << b.second.mean << " ";
         }
         glEnd();
     }

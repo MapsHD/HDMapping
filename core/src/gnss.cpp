@@ -121,7 +121,7 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
             std::vector<std::string> strs;
             split(s, ' ', strs);
 
-            if (strs.size() == 10)
+            if (strs.size() >= 10)
             {
                 GlobalPose gp;
                 std::istringstream(strs[0]) >> gp.timestamp;

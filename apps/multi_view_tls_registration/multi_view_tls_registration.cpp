@@ -4046,17 +4046,31 @@ bool initGL(int *argc, char **argv)
 
 int main(int argc, char *argv[])
 {
-    initGL(&argc, argv);
-    glutDisplayFunc(display);
-    glutMouseFunc(mouse);
-    glutMotionFunc(motion);
-    glutMouseWheelFunc(wheel);
-    glutMainLoop();
+    try {
+        initGL(&argc, argv);
+        glutDisplayFunc(display);
+        glutMouseFunc(mouse);
+        glutMotionFunc(motion);
+        glutMouseWheelFunc(wheel);
+        glutMainLoop();
 
-    ImGui_ImplOpenGL2_Shutdown();
-    ImGui_ImplGLUT_Shutdown();
+        ImGui_ImplOpenGL2_Shutdown();
+        ImGui_ImplGLUT_Shutdown();
 
-    ImGui::DestroyContext();
+        ImGui::DestroyContext();
+    }
+    catch (const std::bad_alloc e)
+    {
+        std::cerr << "System is out of memory : " << e.what() << std::endl;
+        std::cerr << "Adjust paging / swap memory with tips available here : https://github.com/MapsHD/HDMapping/tree/main/doc/virtual_memory.md " << std::endl;
+        pfd::message::message("System is out of memory", "System is out memory, make sure that virtual memory is set correctly, and try again. Application will be terminated."
+            "Please follow guidlines available here : https://github.com/MapsHD/HDMapping/tree/main/doc/virtual_memory.md", pfd::choice::ok, pfd::icon::error);
+
+    }
+    catch (const std::exception e)
+    {
+        std::cout << e.what();
+    }
     return 0;
 }
 

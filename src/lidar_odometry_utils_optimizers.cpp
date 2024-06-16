@@ -890,7 +890,7 @@ void fix_ptch_roll(std::vector<WorkerData> &worker_data)
     }
 }
 
-void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params)
+bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure)
 {
     // std::vector<Eigen::Affine3d> mm_poses;
     // for (int i = 0; i < worker_data.size(); i++)
@@ -932,13 +932,13 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             {
                 mean_shift = worker_data[i - 1].intermediate_trajectory[0].translation() - worker_data[i - 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].translation();
                 mean_shift /= ((worker_data[i - 2].intermediate_trajectory.size()) - 2);
-               
+
                 if (mean_shift.norm() > 1.0)
                 {
                     std::cout << "!!!mean_shift.norm() > 1.0!!!" << std::endl;
                     mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
                 }
-                
+
                 std::vector<Eigen::Affine3d> new_trajectory;
                 Eigen::Affine3d current_node = worker_data[i].intermediate_trajectory[0];
                 new_trajectory.push_back(current_node);
@@ -969,31 +969,33 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             }
 
             bool add_pitch_roll_constraint = false;
-            //TaitBryanPose pose;
-            //pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
+            // TaitBryanPose pose;
+            // pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
 
-            //double residual1;
-            //double residual2;
-           // residual_constraint_fixed_optimization_parameter(residual1, normalize_angle(worker_data[i].imu_roll_pitch[0].first), normalize_angle(pose.om));
-            //residual_constraint_fixed_optimization_parameter(residual2, normalize_angle(worker_data[i].imu_roll_pitch[0].second), normalize_angle(pose.fi));
+            // double residual1;
+            // double residual2;
+            // residual_constraint_fixed_optimization_parameter(residual1, normalize_angle(worker_data[i].imu_roll_pitch[0].first), normalize_angle(pose.om));
+            // residual_constraint_fixed_optimization_parameter(residual2, normalize_angle(worker_data[i].imu_roll_pitch[0].second), normalize_angle(pose.fi));
 
-            //if (fabs(worker_data[i].imu_roll_pitch[0].first) < 30.0 / 180.0 * M_PI && fabs(worker_data[i].imu_roll_pitch[0].second) < 30.0 / 180.0 * M_PI)
+            // if (fabs(worker_data[i].imu_roll_pitch[0].first) < 30.0 / 180.0 * M_PI && fabs(worker_data[i].imu_roll_pitch[0].second) < 30.0 / 180.0 * M_PI)
             //{
-            //    if (params.consecutive_distance > 10.0)
-           //     {
+            //     if (params.consecutive_distance > 10.0)
+            //     {
             //        add_pitch_roll_constraint = true;
             //        params.consecutive_distance = 0.0;
             //    }
             //}
 
-            //if (add_pitch_roll_constraint)
+            // if (add_pitch_roll_constraint)
             //{
-            //    std::cout << "residual_imu_roll_deg before: " << residual1 / M_PI * 180.0 << std::endl;
-            //    std::cout << "residual_imu_pitch_deg before: " << residual2 / M_PI * 180.0 << std::endl;
-            //}
+            //     std::cout << "residual_imu_roll_deg before: " << residual1 / M_PI * 180.0 << std::endl;
+            //     std::cout << "residual_imu_pitch_deg before: " << residual2 / M_PI * 180.0 << std::endl;
+            // }
 
             std::chrono::time_point<std::chrono::system_clock> start1, end1;
             start1 = std::chrono::system_clock::now();
+
+            auto tmp_worker_data = worker_data[i].intermediate_trajectory;
 
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
@@ -1004,9 +1006,9 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             std::chrono::duration<double> elapsed_seconds1 = end1 - start1;
             std::cout << "optimizing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << " elapsed time: " << elapsed_seconds1.count() << std::endl;
 
-            //if (add_pitch_roll_constraint)
+            // if (add_pitch_roll_constraint)
             //{
-            //    pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
+            //     pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
 
             //    residual_constraint_fixed_optimization_parameter(residual1, normalize_angle(worker_data[i].imu_roll_pitch[0].first), normalize_angle(pose.om));
             //    residual_constraint_fixed_optimization_parameter(residual2, normalize_angle(worker_data[i].imu_roll_pitch[0].second), normalize_angle(pose.fi));
@@ -1069,12 +1071,25 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 std::string fn = params.working_directory_preview + "/temp_point_cloud_" + std::to_string(i) + ".laz";
                 saveLaz(fn.c_str(), global_points);
             }
+            auto acc_distance_tmp = acc_distance;
             acc_distance += ((worker_data[i].intermediate_trajectory[0].inverse()) *
                              worker_data[i].intermediate_trajectory[worker_data[i].intermediate_trajectory.size() - 1])
                                 .translation()
                                 .norm();
 
+            if (!(acc_distance == acc_distance))
+            {
+                worker_data[i].intermediate_trajectory = tmp_worker_data;
+                std::cout << "CHALLENGING DATA OCCURED!!!" << std::endl;
+                acc_distance = acc_distance_tmp;
+                std::cout << "please split data set into subsets" << std::endl;
+                ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
+                // std::cout << "calculations canceled for TIMESTAMP: " << (long long int)worker_data[i].intermediate_trajectory_timestamps[0].first << std::endl;
+                return false;
+            }
+
             // update
+
             for (int j = i + 1; j < worker_data.size(); j++)
             {
                 Eigen::Affine3d m_last = worker_data[j - 1].intermediate_trajectory[worker_data[j - 1].intermediate_trajectory.size() - 1];
@@ -1175,6 +1190,8 @@ void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
         }
         std::cout << "length_of_trajectory: " << length_of_trajectory << " [m]" << std::endl;
     }
+
+    return true;
 }
 
 void compute_step_2_fast_forward_motion(std::vector<WorkerData> &worker_data, LidarOdometryParams &params)

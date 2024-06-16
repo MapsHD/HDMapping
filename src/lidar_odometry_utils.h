@@ -119,7 +119,7 @@ void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &
 // this function apply correction to pitch and roll
 void fix_ptch_roll(std::vector<WorkerData> &worker_data);
 
-void compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams& params);
+bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure);
 void compute_step_2_fast_forward_motion(std::vector<WorkerData> &worker_data, LidarOdometryParams &params);
 
 //! This namespace contains functions for loading calibration file (.json and .sn).

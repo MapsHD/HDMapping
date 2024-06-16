@@ -36,6 +36,7 @@ bool simple_gui = true;
 bool step_1_done = false;
 bool step_2_done = false;
 bool step_3_done = false;
+bool calculations_failed = false;
 
 std::vector<WorkerData> worker_data;
 
@@ -53,7 +54,7 @@ float mouse_sensitivity = 1.0;
 std::string working_directory = "";
 // std::string working_directory_preview = "";
 // double decimation = 0.1;
-int threshold_initial_points = 100000;
+int threshold_initial_points = 10000;
 bool initial_transformation_gizmo = false;
 
 float m_gizmo[] = {1, 0, 0, 0,
@@ -72,8 +73,12 @@ Eigen::Affine3d stretch_gizmo_m = Eigen::Affine3d::Identity();
 
 LidarOdometryParams params;
 const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
+std::vector<std::string> csv_files;
+std::vector<std::string> sn_files;
+std::string imuSnToUse;
 
-void alternative_approach();
+    void
+    alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
 bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity, double offset_x,
@@ -96,6 +101,14 @@ void lidar_odometry_gui()
         ImGui::Text(("Working directory ('session.json' will be saved here): '" + working_directory + "'").c_str());
         // ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::InputFloat3("rotation center", rotation_center.data());
+
+        if (calculations_failed)
+        {
+            ImGui::Text("CALCULATIONS FAILED... please read infomration in console");
+            ImGui::End();
+            return;
+        }
+
         if (!simple_gui)
         {
             ImGui::Checkbox("show_initial_points", &show_initial_points);
@@ -183,9 +196,9 @@ void lidar_odometry_gui()
 
                 std::sort(std::begin(input_file_names), std::end(input_file_names));
 
-                std::vector<std::string> csv_files;
+                //std::vector<std::string> csv_files;
                 std::vector<std::string> laz_files;
-                std::vector<std::string> sn_files;
+                //std::vector<std::string> sn_files;
 
                 std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
                               {
@@ -208,7 +221,7 @@ void lidar_odometry_gui()
 
                     const auto calibrationFile = (fs::path(working_directory) / "calibration.json").string();
                     const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
-                    const std::string imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
+                    imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
                     if (!preloadedCalibration.empty())
                     {
                         std::cout << "Loaded calibration for: \n";
@@ -528,7 +541,7 @@ void lidar_odometry_gui()
 
                     params.m_g = worker_data[0].intermediate_trajectory[0];
                     step_1_done = true;
-                    std::cout << "step_1_done please click 'compute_all (step 2)' to continue calculations" << std::endl; 
+                    std::cout << "step_1_done please click 'compute_all (step 2)' to continue calculations" << std::endl;
                 }
                 else
                 {
@@ -542,8 +555,32 @@ void lidar_odometry_gui()
         {
             if (ImGui::Button("compute_all (step 2)"))
             {
-                compute_step_2(worker_data, params);
-                step_2_done = true;
+                double ts_failure = 0.0;
+                if (compute_step_2(worker_data, params, ts_failure))
+                {
+                    step_2_done = true;
+                }
+                else
+                {
+                    for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
+                    {
+                        const std::string &imufn = csv_files.at(fileNo);
+                        const std::string snFn = (fileNo >= sn_files.size()) ? ("") : (sn_files.at(fileNo));
+                        const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
+                        // GetId of Imu to use
+                        int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
+                        auto imu = load_imu(imufn.c_str(), imuNumberToUse);
+                        
+                        if (imu.size() > 0){
+                            if (std::get<0>(imu[imu.size() - 1]).first > ts_failure)
+                            {
+                                break;
+                            }
+                        }
+                        std::cout << "file: '" << imufn << "' [OK]" << std::endl;
+                    }
+                    calculations_failed = true;
+                }
             }
             ImGui::SameLine();
             ImGui::Text("Press this button for automatic lidar odometry calculation -> it will produce trajectory");
@@ -961,7 +998,6 @@ void lidar_odometry_gui()
             {
                 stretch_gizmo_m = worker_data[index_to_inclusive].intermediate_trajectory[0];
             }
-
 
             if (index_to_inclusive > index_from_inclusive)
             {
@@ -1457,7 +1493,7 @@ void display()
         for (const auto &b : params.reference_buckets)
         {
             glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            //std::cout << b.second.mean << " ";
+            // std::cout << b.second.mean << " ";
         }
         glEnd();
     }

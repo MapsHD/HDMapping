@@ -54,26 +54,19 @@ struct QuaternionPose
 
 struct Point3D
 {
-	//double x;
-	//double y;
-	//double z;
 	float x;
 	float y;
 	float z;
 	int index_pose;
-	//double timestamp;
 };
 
 struct Point3Di
 {
 	Eigen::Vector3d point;
-	//float x;
-	//float y;
-	//float z;
 	double timestamp;
-        float intensity;
-        int index_pose;
-        uint8_t lidarid;
+    float intensity;
+    int index_pose;
+    uint8_t lidarid;
 };
 
 struct Point

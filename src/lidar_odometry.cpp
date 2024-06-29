@@ -111,25 +111,33 @@ void lidar_odometry_gui()
 
         if (!simple_gui)
         {
+            /*if (ImGui::Button("set cave mapping parameters")){
+                params.decimation = 0.03;
+                params.in_out_params.resolution_X = 0.1;
+                params.in_out_params.resolution_Y = 0.1;
+                params.in_out_params.resolution_Z = 0.1;
+                params.filter_threshold_xy = 0.1;
+            }*/
+
             ImGui::Checkbox("show_initial_points", &show_initial_points);
             ImGui::Checkbox("show_trajectory", &show_trajectory);
             ImGui::SameLine();
             ImGui::Checkbox("show_trajectory_as_axes", &show_trajectory_as_axes);
             // ImGui::Checkbox("show_covs", &show_covs);
             ImGui::InputDouble("normal distributions transform bucket size X", &params.in_out_params.resolution_X);
-            if (params.in_out_params.resolution_X < 0.2)
+            if (params.in_out_params.resolution_X < 0.1)
             {
-                params.in_out_params.resolution_X = 0.2;
+                params.in_out_params.resolution_X = 0.1;
             }
             ImGui::InputDouble("normal distributions transform bucket size Y", &params.in_out_params.resolution_Y);
-            if (params.in_out_params.resolution_Y < 0.2)
+            if (params.in_out_params.resolution_Y < 0.1)
             {
-                params.in_out_params.resolution_Y = 0.2;
+                params.in_out_params.resolution_Y = 0.1;
             }
             ImGui::InputDouble("normal distributions transform bucket size Z", &params.in_out_params.resolution_Z);
-            if (params.in_out_params.resolution_Z < 0.2)
+            if (params.in_out_params.resolution_Z < 0.1)
             {
-                params.in_out_params.resolution_Z = 0.2;
+                params.in_out_params.resolution_Z = 0.1;
             }
 
             ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed)", &params.filter_threshold_xy);
@@ -546,6 +554,11 @@ void lidar_odometry_gui()
                 else
                 {
                     std::cout << "please select files correctly" << std::endl;
+                    std::cout << "input_file_names.size(): " << input_file_names.size() << std::endl;
+                    std::cout << "laz_files.size(): " << laz_files.size() << std::endl;
+                    std::cout << "csv_files.size(): " << csv_files.size() << std::endl;
+
+                    std::cout << "condition: input_file_names.size() > 0 && laz_files.size() == csv_files.size() NOT SATISFIED!!!" << std::endl;
                 }
             }
             ImGui::SameLine();

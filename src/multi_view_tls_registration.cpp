@@ -890,13 +890,19 @@ void project_gui()
     }
     if (session.point_clouds_container.point_clouds.size() > 0)
     {
+        ImGui::Checkbox("Show ground control points gui", &session.ground_control_points.is_imgui);
         ImGui::Checkbox("Manual Pose Graph Loop Closure Mode", &manual_pose_graph_loop_closure_mode);
     }
     ImGui::ColorEdit3("background color", (float *)&clear_color);
 
     if (manual_pose_graph_loop_closure_mode)
     {
-        session.manual_pose_graph_loop_closure.Gui(session.point_clouds_container, index_loop_closure_source, index_loop_closure_target, m_gizmo, gnss);
+        session.manual_pose_graph_loop_closure.Gui(session.point_clouds_container, 
+            index_loop_closure_source, 
+            index_loop_closure_target, 
+            m_gizmo, 
+            gnss,
+            session.ground_control_points);
 
         /*if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size()> 0)
         {
@@ -1334,7 +1340,7 @@ void project_gui()
 
                     // point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
                     float consecutive_distance = 0;
-                   
+
                     for (auto &p : session.point_clouds_container.point_clouds)
                     {
                         if (p.visible)
@@ -1345,7 +1351,8 @@ void project_gui()
                                 Eigen::Vector3d vp;
                                 vp = p.m_pose * pp + session.point_clouds_container.offset;
 
-                                if(i > 0){
+                                if (i > 0)
+                                {
                                     double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
                                     consecutive_distance += dist;
                                 }
@@ -1361,9 +1368,10 @@ void project_gui()
                                     Eigen::Vector3d v1 = position_curr - position_prev;
                                     Eigen::Vector3d v2 = position_next - position_curr;
 
-                                    if (v1.norm() > 0 && v2.norm() > 0){
+                                    if (v1.norm() > 0 && v2.norm() > 0)
+                                    {
                                         double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
-                                        
+
                                         if (angle_deg > 10.0)
                                         {
                                             is_curve = true;
@@ -1372,14 +1380,18 @@ void project_gui()
                                 }
                                 double tol = not_curve_consecutive_distance_meters;
 
-                                if (is_curve){
+                                if (is_curve)
+                                {
                                     tol = curve_consecutive_distance_meters;
                                 }
 
-                                if (!is_trajectory_export_downsampling){
+                                if (!is_trajectory_export_downsampling)
+                                {
                                     pointcloud.push_back(vp);
                                     intensity.push_back(0);
-                                }else{
+                                }
+                                else
+                                {
                                     if (consecutive_distance >= tol)
                                     {
                                         consecutive_distance = 0;
@@ -1387,7 +1399,6 @@ void project_gui()
                                         intensity.push_back(0);
                                     }
                                 }
-                                   
                             }
                         }
                     }
@@ -1863,7 +1874,8 @@ void project_gui()
                                     Eigen::Affine3d pose = p.m_pose * m;
                                     pose.translation() += session.point_clouds_container.offset;
 
-                                    if(i > 0){
+                                    if (i > 0)
+                                    {
                                         double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
                                         consecutive_distance += dist;
                                     }
@@ -1879,9 +1891,10 @@ void project_gui()
                                         Eigen::Vector3d v1 = position_curr - position_prev;
                                         Eigen::Vector3d v2 = position_next - position_curr;
 
-                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                        if (v1.norm() > 0 && v2.norm() > 0)
+                                        {
                                             double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
-                                            
+
                                             if (angle_deg > 10.0)
                                             {
                                                 is_curve = true;
@@ -1890,7 +1903,8 @@ void project_gui()
                                     }
                                     double tol = not_curve_consecutive_distance_meters;
 
-                                    if (is_curve){
+                                    if (is_curve)
+                                    {
                                         tol = curve_consecutive_distance_meters;
                                     }
 
@@ -1908,7 +1922,6 @@ void project_gui()
                                             outfile << p.local_trajectory[i].timestamps.first << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
                                         }
                                     }
-                                    
                                 }
                             }
                         }
@@ -1948,7 +1961,8 @@ void project_gui()
                                     Eigen::Affine3d pose = p.m_pose * m;
                                     pose.translation() += session.point_clouds_container.offset;
 
-                                    if(i > 0){
+                                    if (i > 0)
+                                    {
                                         double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
                                         consecutive_distance += dist;
                                     }
@@ -1964,9 +1978,10 @@ void project_gui()
                                         Eigen::Vector3d v1 = position_curr - position_prev;
                                         Eigen::Vector3d v2 = position_next - position_curr;
 
-                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                        if (v1.norm() > 0 && v2.norm() > 0)
+                                        {
                                             double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
-                                            
+
                                             if (angle_deg > 10.0)
                                             {
                                                 is_curve = true;
@@ -1975,7 +1990,8 @@ void project_gui()
                                     }
                                     double tol = not_curve_consecutive_distance_meters;
 
-                                    if (is_curve){
+                                    if (is_curve)
+                                    {
                                         tol = curve_consecutive_distance_meters;
                                     }
 
@@ -2031,8 +2047,9 @@ void project_gui()
                                     const auto &m = p.local_trajectory[i].m_pose;
                                     Eigen::Affine3d pose = p.m_pose * m;
                                     pose.translation() += session.point_clouds_container.offset;
-                                    
-                                    if(i > 0){
+
+                                    if (i > 0)
+                                    {
                                         double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
                                         consecutive_distance += dist;
                                     }
@@ -2048,9 +2065,10 @@ void project_gui()
                                         Eigen::Vector3d v1 = position_curr - position_prev;
                                         Eigen::Vector3d v2 = position_next - position_curr;
 
-                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                        if (v1.norm() > 0 && v2.norm() > 0)
+                                        {
                                             double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
-                                            
+
                                             if (angle_deg > 10.0)
                                             {
                                                 is_curve = true;
@@ -2060,7 +2078,8 @@ void project_gui()
 
                                     double tol = not_curve_consecutive_distance_meters;
 
-                                    if (is_curve){
+                                    if (is_curve)
+                                    {
                                         tol = curve_consecutive_distance_meters;
                                     }
 
@@ -2118,7 +2137,8 @@ void project_gui()
                                     pose.translation() += session.point_clouds_container.offset;
                                     Eigen::Quaterniond q(pose.rotation());
 
-                                    if(i > 0){
+                                    if (i > 0)
+                                    {
                                         double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
                                         consecutive_distance += dist;
                                     }
@@ -2134,9 +2154,10 @@ void project_gui()
                                         Eigen::Vector3d v1 = position_curr - position_prev;
                                         Eigen::Vector3d v2 = position_next - position_curr;
 
-                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                        if (v1.norm() > 0 && v2.norm() > 0)
+                                        {
                                             double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
-                                            
+
                                             if (angle_deg > 10.0)
                                             {
                                                 is_curve = true;
@@ -2145,7 +2166,8 @@ void project_gui()
                                     }
                                     double tol = not_curve_consecutive_distance_meters;
 
-                                    if (is_curve){
+                                    if (is_curve)
+                                    {
                                         tol = curve_consecutive_distance_meters;
                                     }
 
@@ -2203,7 +2225,8 @@ void project_gui()
                                     pose.translation() += session.point_clouds_container.offset;
                                     Eigen::Quaterniond q(pose.rotation());
 
-                                    if(i > 0){
+                                    if (i > 0)
+                                    {
                                         double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
                                         consecutive_distance += dist;
                                     }
@@ -2219,9 +2242,10 @@ void project_gui()
                                         Eigen::Vector3d v1 = position_curr - position_prev;
                                         Eigen::Vector3d v2 = position_next - position_curr;
 
-                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                        if (v1.norm() > 0 && v2.norm() > 0)
+                                        {
                                             double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
-                                            
+
                                             if (angle_deg > 10.0)
                                             {
                                                 is_curve = true;
@@ -2230,7 +2254,8 @@ void project_gui()
                                     }
                                     double tol = not_curve_consecutive_distance_meters;
 
-                                    if (is_curve){
+                                    if (is_curve)
+                                    {
                                         tol = curve_consecutive_distance_meters;
                                     }
 
@@ -2287,7 +2312,8 @@ void project_gui()
                                     pose.translation() += session.point_clouds_container.offset;
                                     Eigen::Quaterniond q(pose.rotation());
 
-                                    if(i > 0){
+                                    if (i > 0)
+                                    {
                                         double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
                                         consecutive_distance += dist;
                                     }
@@ -2303,9 +2329,10 @@ void project_gui()
                                         Eigen::Vector3d v1 = position_curr - position_prev;
                                         Eigen::Vector3d v2 = position_next - position_curr;
 
-                                        if (v1.norm() > 0 && v2.norm() > 0){
+                                        if (v1.norm() > 0 && v2.norm() > 0)
+                                        {
                                             double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
-                                            
+
                                             if (angle_deg > 10.0)
                                             {
                                                 is_curve = true;
@@ -2314,7 +2341,8 @@ void project_gui()
                                     }
                                     double tol = not_curve_consecutive_distance_meters;
 
-                                    if (is_curve){
+                                    if (is_curve)
+                                    {
                                         tol = curve_consecutive_distance_meters;
                                     }
 
@@ -3478,25 +3506,40 @@ void display()
     }
 
     gnss.render(session.point_clouds_container);
+    session.ground_control_points.render(session.point_clouds_container);
 
-    ImGui_ImplOpenGL2_NewFrame();
+        ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
 
     // my_display_code();
     if (is_ndt_gui)
+    {
         ndt_gui();
+    }
     if (is_icp_gui)
+    {
         icp_gui();
+    }
     if (is_pose_graph_slam)
+    {
         pose_graph_slam_gui();
+    }
     if (is_registration_plane_feature)
+    {
         registration_plane_feature_gui();
+    }
     if (is_manual_analisys)
+    {
         observation_picking_gui();
-    // if (manual_pose_graph_loop_closure_mode)
+    }
+    if (session.ground_control_points.is_imgui)
+    {
+        session.ground_control_points.imgui(session.point_clouds_container);
+    }
+    //if (manual_pose_graph_loop_closure_mode)
     //{
     //     manual_pose_graph_loop_closure.Gui();
-    // }
+    //}
     project_gui();
 
     if (!manual_pose_graph_loop_closure_mode)
@@ -3764,6 +3807,14 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
+double distance_point_to_line(const Eigen::Vector3d &point, const LaserBeam &line)
+{
+    Eigen::Vector3d AP = point - line.position;
+
+    double dist = (AP.cross(line.direction)).norm();
+    return dist;
+}
+
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -3785,21 +3836,86 @@ void mouse(int glut_button, int state, int x, int y)
 
         if (glut_button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN && io.KeyCtrl)
         {
-            const auto laser_beam = GetLaserBeam(x, y);
+            if(session.ground_control_points.picking_mode){
+                std::cout << "gcp picking" << std::endl;
+                const auto laser_beam = GetLaserBeam(x, y);
+                double min_distance = 10000000000;
+                int index_i = -1;
+                int index_j = -1;
 
-            RegistrationPlaneFeature::Plane pl;
+                for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++){
+                    for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++){
+                        const auto &p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+                        Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
 
-            pl.a = 0;
-            pl.b = 0;
-            pl.c = 1;
-            pl.d = 0;
-            auto old_Totation_center = rotation_center;
-            rotation_center = rayIntersection(laser_beam, pl).cast<float>();
+                        double dist = distance_point_to_line(vp, laser_beam);
 
-            std::cout << "setting new rotation center to " << rotation_center << std::endl;
+                        if (dist < min_distance)
+                        {
+                            min_distance = dist;
+                            index_i = i;
+                            index_j = j;
 
-            rotate_x = 0.f;
-            rotate_y = 0.f;
+                            rotation_center.x() = vp.x();
+                            rotation_center.y() = vp.y();
+                            rotation_center.z() = vp.z();
+
+                            session.ground_control_points.picking_mode_index_to_node_inner = index_i;
+                            session.ground_control_points.picking_mode_index_to_node_outer = index_j;
+
+                            //if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
+                        }
+                    }
+                }
+
+                //std::cout << "i: " << index_i << " j: " << index_j << std::endl;
+                //rotation_center
+
+                /*
+                int PointPicking::pick_point(int x, int y, const std::vector<underground_mining::PointInsideROI>& points_global) {
+    underground_mining::LaserBeam lb = GLWidgetGetOGLPos(x, y);
+
+    double min_distance = 10000000000;
+    int index = -1;
+    for (size_t j = 0; j < points_global.size(); j++) {
+        double dist = distance_point_to_line(points_global[j].coordinates_global, lb);
+        if (dist < min_distance) {
+            min_distance = dist;
+            index = j;
+            //if (dist < 0.0005) {
+            //	return index;
+            //}
+        }
+    }
+
+    if (index != -1) {
+        std::cout << "min_distance_to_line: " << min_distance << std::endl;
+    }
+
+    if (min_distance > 0.1) {
+        return -1;
+    }
+
+    return index;
+}
+                */
+            }else{
+                const auto laser_beam = GetLaserBeam(x, y);
+
+                RegistrationPlaneFeature::Plane pl;
+
+                pl.a = 0;
+                pl.b = 0;
+                pl.c = 1;
+                pl.d = 0;
+                auto old_Totation_center = rotation_center;
+                rotation_center = rayIntersection(laser_beam, pl).cast<float>();
+
+                std::cout << "setting new rotation center to " << rotation_center << std::endl;
+
+                rotate_x = 0.f;
+                rotate_y = 0.f;
+            }
         }
 
         if (state == GLUT_DOWN)

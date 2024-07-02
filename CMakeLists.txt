@@ -123,6 +123,8 @@ core/src/wgs84_do_puwg92.cc
 core/include/session.h
 core/src/session.cpp
 core/src/pfd_wrapper.cpp
+core/include/ground_control_points.h
+core/src/ground_control_points.cpp
 )
 
 set(CORE_HD_MAPPING_SRCS

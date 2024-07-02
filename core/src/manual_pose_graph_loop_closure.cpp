@@ -37,7 +37,8 @@
     }
 }*/
 
-void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss)
+void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
+                                     int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss, GroundControlPoints &gcps)
 {
     if (point_clouds_container.point_clouds.size() > 0)
     {
@@ -85,7 +86,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                 index_active_edge = edges.size() - 1;
             }
 
-            //if (edges.size() > 0 && !manipulate_active_edge)
+            // if (edges.size() > 0 && !manipulate_active_edge)
             if (!manipulate_active_edge)
             {
 
@@ -314,29 +315,32 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                                 tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
                                 tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
                             }
-                            if (is_fix_first_node)
-                            {
-                                int ir = tripletListB.size();
-                                tripletListA.emplace_back(ir, 0, 1);
-                                tripletListA.emplace_back(ir + 1, 1, 1);
-                                tripletListA.emplace_back(ir + 2, 2, 1);
-                                tripletListA.emplace_back(ir + 3, 3, 1);
-                                tripletListA.emplace_back(ir + 4, 4, 1);
-                                tripletListA.emplace_back(ir + 5, 5, 1);
 
-                                tripletListP.emplace_back(ir, ir, 1);
-                                tripletListP.emplace_back(ir + 1, ir + 1, 1);
-                                tripletListP.emplace_back(ir + 2, ir + 2, 1);
-                                tripletListP.emplace_back(ir + 3, ir + 3, 1);
-                                tripletListP.emplace_back(ir + 4, ir + 4, 1);
-                                tripletListP.emplace_back(ir + 5, ir + 5, 1);
+                            if (gcps.gpcs.size() == 0){
+                                if (is_fix_first_node)
+                                {
+                                    int ir = tripletListB.size();
+                                    tripletListA.emplace_back(ir, 0, 1);
+                                    tripletListA.emplace_back(ir + 1, 1, 1);
+                                    tripletListA.emplace_back(ir + 2, 2, 1);
+                                    tripletListA.emplace_back(ir + 3, 3, 1);
+                                    tripletListA.emplace_back(ir + 4, 4, 1);
+                                    tripletListA.emplace_back(ir + 5, 5, 1);
 
-                                tripletListB.emplace_back(ir, 0, 0);
-                                tripletListB.emplace_back(ir + 1, 0, 0);
-                                tripletListB.emplace_back(ir + 2, 0, 0);
-                                tripletListB.emplace_back(ir + 3, 0, 0);
-                                tripletListB.emplace_back(ir + 4, 0, 0);
-                                tripletListB.emplace_back(ir + 5, 0, 0);
+                                    tripletListP.emplace_back(ir, ir, 1);
+                                    tripletListP.emplace_back(ir + 1, ir + 1, 1);
+                                    tripletListP.emplace_back(ir + 2, ir + 2, 1);
+                                    tripletListP.emplace_back(ir + 3, ir + 3, 1);
+                                    tripletListP.emplace_back(ir + 4, ir + 4, 1);
+                                    tripletListP.emplace_back(ir + 5, ir + 5, 1);
+
+                                    tripletListB.emplace_back(ir, 0, 0);
+                                    tripletListB.emplace_back(ir + 1, 0, 0);
+                                    tripletListB.emplace_back(ir + 2, 0, 0);
+                                    tripletListB.emplace_back(ir + 3, 0, 0);
+                                    tripletListB.emplace_back(ir + 4, 0, 0);
+                                    tripletListB.emplace_back(ir + 5, 0, 0);
+                                }
                             }
 
                             // gnss
@@ -375,7 +379,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                                                                                           pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
                                                                                           p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
 
-                                            //std::cout << " delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
+                                            // std::cout << " delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
 
                                             int ir = tripletListB.size();
                                             int ic = index_pose * 6;
@@ -408,7 +412,53 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container, int &i
                             }
                             //
 
-                            Eigen::SparseMatrix<double> matA(tripletListB.size(), point_clouds_container.point_clouds.size() * 6);
+                            // GCPs
+                            for (int i = 0; i < gcps.gpcs.size(); i++)
+                            {
+                                Eigen::Vector3d p_s = point_clouds_container.point_clouds[gcps.gpcs[i].index_to_node_inner].local_trajectory[gcps.gpcs[i].index_to_node_outer].m_pose.translation();
+                                
+                                Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+                                TaitBryanPose pose_s;
+                                pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[gcps.gpcs[i].index_to_node_inner].m_pose);
+                                
+                                point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                                       p_s.x(), p_s.y(), p_s.z());
+
+                                double delta_x;
+                                double delta_y;
+                                double delta_z;
+                                Eigen::Vector3d p_t(gcps.gpcs[i].x, gcps.gpcs[i].y, gcps.gpcs[i].z + gcps.gpcs[i].lidar_height_above_ground);
+                                point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                                              pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                              p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+
+                               
+                                int ir = tripletListB.size();
+                                int ic = gcps.gpcs[i].index_to_node_inner * 6;
+                                
+                                for (int row = 0; row < 3; row++)
+                                {
+                                    for (int col = 0; col < 6; col++)
+                                    {
+                                        if (jacobian(row, col) != 0.0)
+                                        {
+                                            tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
+                                        }
+                                    }
+                                }
+                                tripletListP.emplace_back(ir + 0, ir + 0, 1.0 / (gcps.gpcs[i].sigma_x * gcps.gpcs[i].sigma_x));
+                                tripletListP.emplace_back(ir + 1, ir + 1, 1.0 / (gcps.gpcs[i].sigma_y * gcps.gpcs[i].sigma_y));
+                                tripletListP.emplace_back(ir + 2, ir + 2, 1.0 / (gcps.gpcs[i].sigma_z * gcps.gpcs[i].sigma_z));
+
+                                tripletListB.emplace_back(ir, 0, delta_x);
+                                tripletListB.emplace_back(ir + 1, 0, delta_y);
+                                tripletListB.emplace_back(ir + 2, 0, delta_z);
+
+                                std::cout << "gcp: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
+                            }
+
+                            Eigen::SparseMatrix<double>
+                                matA(tripletListB.size(), point_clouds_container.point_clouds.size() * 6);
                             Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
                             Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
 
@@ -685,18 +735,19 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
     int i = 0;
     for (auto &pc : point_clouds_container.point_clouds)
     {
-        glRasterPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3)+ 0.1);
+        glRasterPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3) + 0.1);
         glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)std::to_string(i).c_str());
         i++;
     }
 
-    
-    
     for (int i = 0; i < edges.size(); i++)
     {
-        if (i == index_active_edge){
+        if (i == index_active_edge)
+        {
             glColor3f(1, 0, 0);
-        }else{
+        }
+        else
+        {
             glColor3f(0, 0, 1);
         }
 
@@ -707,11 +758,11 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
         Eigen::Affine3d m_trg = point_clouds_container.point_clouds.at(index_trg).m_pose;
 
         glBegin(GL_LINES);
-            glVertex3f(m_src(0, 3), m_src(1, 3), m_src(2, 3));
-            glVertex3f(m_trg(0, 3), m_trg(1, 3), m_trg(2, 3));
+        glVertex3f(m_src(0, 3), m_src(1, 3), m_src(2, 3));
+        glVertex3f(m_trg(0, 3), m_trg(1, 3), m_trg(2, 3));
         glEnd();
 
-        Eigen::Vector3d m1((m_src(0, 3) + m_trg(0, 3)) * 0.5, (m_src(1, 3) + m_trg(1, 3)) * 0.5, (m_src(2, 3) + m_trg(2, 3))*0.5);
+        Eigen::Vector3d m1((m_src(0, 3) + m_trg(0, 3)) * 0.5, (m_src(1, 3) + m_trg(1, 3)) * 0.5, (m_src(2, 3) + m_trg(2, 3)) * 0.5);
         Eigen::Vector3d m2((m_src(0, 3) + m_trg(0, 3)) * 0.5, (m_src(1, 3) + m_trg(1, 3)) * 0.5, (m_src(2, 3) + m_trg(2, 3)) * 0.5 + 10);
 
         glBegin(GL_LINES);
@@ -722,8 +773,4 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
         glRasterPos3f(m2.x(), m2.y(), m2.z() + 0.1);
         glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)std::to_string(i).c_str());
     }
-   
-
-
-
 }

@@ -7,6 +7,10 @@ set(CMAKE_CXX_STANDARD 20)
 
 find_package(OpenGL REQUIRED)
 
+if(NOT WIN32)
+    find_package(TBB REQUIRED)
+endif()
+
 add_definitions(-D_USE_MATH_DEFINES)
 
 get_filename_component(REPOSITORY_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} ABSOLUTE)

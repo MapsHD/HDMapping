@@ -251,5 +251,16 @@ if (GTSAM_FOUND)
     target_link_libraries (multi_session_registration_step_3 gtsam)
 endif()
 
+add_executable(precision_forestry_tools tools/src/precision_forestry_tools.cpp ${IMGUI_SRCS})
+if (WIN32)
+target_link_libraries(precision_forestry_tools laszip3)
+else()
+target_link_libraries(precision_forestry_tools laszip)
+endif()
 
+if (WIN32)
+	target_link_libraries(precision_forestry_tools ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip3)
+else()
+	target_link_libraries(precision_forestry_tools ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip tbb)
+endif()
 

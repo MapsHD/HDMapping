@@ -446,9 +446,9 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                         }
                                     }
                                 }
-                                tripletListP.emplace_back(ir + 0, ir + 0, 1.0 / (gcps.gpcs[i].sigma_x * gcps.gpcs[i].sigma_x));
-                                tripletListP.emplace_back(ir + 1, ir + 1, 1.0 / (gcps.gpcs[i].sigma_y * gcps.gpcs[i].sigma_y));
-                                tripletListP.emplace_back(ir + 2, ir + 2, 1.0 / (gcps.gpcs[i].sigma_z * gcps.gpcs[i].sigma_z));
+                                tripletListP.emplace_back(ir + 0, ir + 0, (1.0 / (gcps.gpcs[i].sigma_x * gcps.gpcs[i].sigma_x)) * get_cauchy_w(delta_x, 1));
+                                tripletListP.emplace_back(ir + 1, ir + 1, (1.0 / (gcps.gpcs[i].sigma_y * gcps.gpcs[i].sigma_y)) * get_cauchy_w(delta_y, 1));
+                                tripletListP.emplace_back(ir + 2, ir + 2, (1.0 / (gcps.gpcs[i].sigma_z * gcps.gpcs[i].sigma_z)) * get_cauchy_w(delta_z, 1));
 
                                 tripletListB.emplace_back(ir, 0, delta_x);
                                 tripletListB.emplace_back(ir + 1, 0, delta_y);
@@ -521,10 +521,10 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                     poses[i].fi += h_x[counter++];
                                     poses[i].ka += h_x[counter++];
 
-                                    if (i == 0 && is_fix_first_node)
-                                    {
-                                        poses[i] = pose;
-                                    }
+                                    //if (i == 0 && is_fix_first_node)
+                                    //{
+                                    //    poses[i] = pose;
+                                    //}
                                 }
                                 std::cout << "optimizing with tait bryan finished" << std::endl;
                             }

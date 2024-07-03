@@ -1197,6 +1197,7 @@ void project_gui()
             ImGui::Separator();
         }
         // gnss.offset_x, gnss.offset_y, gnss.offset_alt
+        ImGui::Text("Set offsets x y z to export point cloud in global coordinate system (each local coordinate of the point += offset)");
         ImGui::InputDouble("offset_x", &gnss.offset_x);
         ImGui::InputDouble("offset_y", &gnss.offset_y);
         ImGui::InputDouble("offset_z", &gnss.offset_alt);
@@ -4012,7 +4013,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration_step_2 v0.44");
+    glutCreateWindow("multi_view_tls_registration_step_2 v0.45");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

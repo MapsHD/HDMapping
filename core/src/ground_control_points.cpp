@@ -84,7 +84,7 @@ void GroundControlPoints::render(const PointClouds &point_clouds_container)
         Eigen::Vector3d c = point_clouds_container.point_clouds[gpcs[i].index_to_node_inner].m_pose * p;
         Eigen::Vector3d g(gpcs[i].x, gpcs[i].y, gpcs[i].z);
 
-        glColor3f(1.0f, 0.0f, 0.0f);
+        glColor3f(0.7f, 0.3f, 0.5f);
         glBegin(GL_LINES);
         glVertex3f(g.x() - 0.05, g.y(), g.z());
         glVertex3f(g.x() + 0.05, g.y(), g.z());
@@ -92,11 +92,11 @@ void GroundControlPoints::render(const PointClouds &point_clouds_container)
         glVertex3f(g.x(), g.y() - 0.05, g.z());
         glVertex3f(g.x(), g.y() + 0.05, g.z());
 
-        glVertex3f(g.x() - 0.05, g.y(), g.z() + gpcs[i].lidar_height_above_ground);
-        glVertex3f(g.x() + 0.05, g.y(), g.z() + gpcs[i].lidar_height_above_ground);
+        glVertex3f(g.x() - 0.01, g.y(), g.z() + gpcs[i].lidar_height_above_ground);
+        glVertex3f(g.x() + 0.01, g.y(), g.z() + gpcs[i].lidar_height_above_ground);
 
-        glVertex3f(g.x(), g.y() - 0.05, g.z() + gpcs[i].lidar_height_above_ground);
-        glVertex3f(g.x(), g.y() + 0.05, g.z() + gpcs[i].lidar_height_above_ground);
+        glVertex3f(g.x(), g.y() - 0.01, g.z() + gpcs[i].lidar_height_above_ground);
+        glVertex3f(g.x(), g.y() + 0.01, g.z() + gpcs[i].lidar_height_above_ground);
 
         glVertex3f(g.x(), g.y(), g.z());
         glVertex3f(g.x(), g.y(), g.z() + gpcs[i].lidar_height_above_ground);
@@ -123,8 +123,25 @@ void GroundControlPoints::render(const PointClouds &point_clouds_container)
             covar(2, 1) = 0;
             covar(2, 2) = gpcs[i].sigma_z * gpcs[i].sigma_z;
 
-            draw_ellipse(covar, c, Eigen::Vector3f(0.5, 0.5, 0.5), 1.0f);
+            Eigen::Vector3d gcp(gpcs[i].x, gpcs[i].y, gpcs[i].z + gpcs[i].lidar_height_above_ground);
+            draw_ellipse(covar, gcp, Eigen::Vector3f(0.5, 0.5, 0.5), 1.0f);
         }
+
+        glColor3f(0,0,0);
+        glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z + gpcs[i].lidar_height_above_ground + 0.1);
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)gpcs[i].name);
+
+        glColor3f(0, 0, 0);
+        glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z + gpcs[i].lidar_height_above_ground);
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)("LiDAR center"));
+
+        glColor3f(0, 0, 0);
+        glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z);
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)("GCP 'plane on the ground'"));
+
+        glColor3f(0, 0, 0);
+        glRasterPos3f(c.x(), c.y(), c.z());
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)("trajectory node assigned to GCP"));
     }
 
     return;

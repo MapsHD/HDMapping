@@ -5,16 +5,16 @@ namespace fs = std::filesystem;
 
 std::string pathUpdater(std::string path, std::string newPath)
 {
-  fs::path p(path);
-  fs::path newpath(newPath);
-  if (is_directory(p))
-  {
-    return p.string();
-  }
+    fs::path p(path);
+    fs::path newpath(newPath);
+    if (is_directory(p))
+    {
+        return p.string();
+    }
 
-  //get filename
-  fs::path filename = p.filename();
-  return (newpath / filename).string();
+    // get filename
+    fs::path filename = p.filename();
+    return (newpath / filename).string();
 }
 
 bool Session::load(const std::string &file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
@@ -24,7 +24,6 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         << "loading file: '" << file_name << "'" << std::endl;
     // point_clouds_container.point_clouds.clear();
 
-    
     std::string folder_name;
     std::string out_folder_name;
     std::string poses_file_name;
@@ -54,9 +53,12 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         poses_file_name = pathUpdater(project_settings_json["poses_file_name"], directory);
         initial_poses_file_name = pathUpdater(project_settings_json["initial_poses_file_name"], directory);
         out_poses_file_name = pathUpdater(project_settings_json["out_poses_file_name"], directory);
-        if (project_settings_json.contains("ground_truth")){
+        if (project_settings_json.contains("ground_truth"))
+        {
             is_ground_truth = project_settings_json["ground_truth"];
-        }else{
+        }
+        else
+        {
             is_ground_truth = false;
         }
 
@@ -134,6 +136,24 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         {
             std::cout << "'" << fn << "'" << std::endl;
         }
+
+        for (const auto &gcp_json : data["ground_control_points"])
+        {
+            GroundControlPoint gcp;
+            //gcp.name = gcp_json["name"];
+            std::string name = gcp_json["name"];
+            strcpy(gcp.name, name.c_str());
+            gcp.x = gcp_json["x"];
+            gcp.y = gcp_json["y"];
+            gcp.z = gcp_json["z"];
+            gcp.sigma_x = gcp_json["sigma_x"];
+            gcp.sigma_y = gcp_json["sigma_y"];
+            gcp.sigma_z = gcp_json["sigma_z"];
+            gcp.lidar_height_above_ground = gcp_json["lidar_height_above_ground"];
+            gcp.index_to_node_inner = gcp_json["index_to_node_inner"];
+            gcp.index_to_node_outer = gcp_json["index_to_node_outer"];
+            ground_control_points.gpcs.push_back(gcp);
+        };
 
         // loading all data
         point_clouds_container.load_whu_tls(laz_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
@@ -264,6 +284,24 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
     }
     jj["laz_file_names"] = jlaz_file_names;
 
+    nlohmann::json jgcps;
+    for (const auto &gcp : ground_control_points.gpcs)
+    {
+        nlohmann::json jgcp{
+            {"name", gcp.name},
+            {"x", gcp.x},
+            {"y", gcp.y},
+            {"z", gcp.z},
+            {"sigma_x", gcp.sigma_x},
+            {"sigma_y", gcp.sigma_y},
+            {"sigma_z", gcp.sigma_z},
+            {"lidar_height_above_ground", gcp.lidar_height_above_ground},
+            {"index_to_node_inner", gcp.index_to_node_inner},
+            {"index_to_node_outer", gcp.index_to_node_outer}};
+        jgcps.push_back(jgcp);
+    }
+    jj["ground_control_points"] = jgcps;
+    
     std::ofstream fs(file_name);
     if (!fs.good())
         return false;

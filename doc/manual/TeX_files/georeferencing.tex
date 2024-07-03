@@ -125,3 +125,117 @@ To download ALS data Geoportal site will be used - \url{https://www.geoportal.go
 	\caption{After loading scans successfully check ground truth option and save session as new .json file that contains all loaded scans. Now these scans may be loaded to serve as ground truth session that other scans can be aligned to.}
 	\label{fig:41}
 \end{figure}
+
+\section{Georeferencing with ground control points (GCP)}
+\label{GCPs}
+Prepare at least 3 ground control points with e.g. GPS receiver (Longitude, Latitude, Altitude), see figures \ref{fig:GCP1}, \ref{fig:GCP2}, \ref{fig:GCP3}.
+Prepare GCP in local coordinate system using arbitrary chosen projection, thus each one has x, y, z coordinates.
+Please apply offset to GSPs and store it to export data in global coordinate system.
+
+
+During survey please place MANDEYE on top of each GCP (for at least 30 seconds) that LiDAR xy center will be exactly in the xy center of GCP (see figures \ref{fig:GCP4} and \ref{fig:GCP5}).
+The resulting trajectory should be as shown in figure \ref{fig:trj}.
+Measure LiDAR optic center height above ground as shown in figure \ref{fig:GCP6}.
+Adding GCPs to the system is done via trajectory node picking (see figure \ref{fig:picking}).
+First, check box 'Show ground control point gui' in 'Single session processing' window.
+Second, check box 'picking trajectory node and adding GCP mode'.
+Third, read GUI help and pick GCP corresponding node of the trajectory with middle mouse button and pressing 'ctrl'.
+Fourth, add GCP observation to the system by clicking 'Add Ground Control Point' (see figure \ref{fig:addgcp}).
+Now it is possible to change GCP name, uncertainty (sigma x, sigma y, sigma z), coordinates (x, y, z) and LiDAR height above ground.
+Now it is time to manual transformation of the trajectory using GIZMO (see figures \ref{fig:gcp1} and \ref{fig:gcp2}). 
+Uncheck 'manipulate only marked gizmo' to move all nodes of the trajectory that all GPCs are in proper positions.
+You can save session to json to store all GPS in the project file.
+All GPCs are considered in 'Manual Pose Graph Loop Closure Mode', so they will converge assuming assigned uncertainty. 
+To export point cloud to global reference system applied offset has to be provided in GUI (see figure \ref{fig:offset}).
+Thus, for all point the offset transformation will applied during export.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{0137d3b0-79f7-4e83-98f8-d4a5737f573b.jpeg}
+	\caption{Ground control points - example 1.}
+	\label{fig:GCP1}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{e02cbef6-16e1-43c4-86fd-ac824ed8dc9f.jpeg}
+	\caption{Ground control points - example 2.}
+	\label{fig:GCP2}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{e5c6464b-4e01-4560-b464-c316ffd281db.jpeg}
+	\caption{Ground control points - example 3.}
+	\label{fig:GCP3}
+\end{figure}
+
+
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{IMG_1123.png}
+	\caption{LiDAR xy center is exactly in the xy center of GCP.}
+	\label{fig:GCP4}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{IMG_1124.png}
+	\caption{LiDAR xy center is exactly in the xy center of GCP.}
+	\label{fig:GCP5}
+\end{figure}
+
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{IMG_1122.png}
+	\caption{Measurement of LiDAR optic center height above ground (GCP ground plane).}
+	\label{fig:GCP6}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{trj.png}
+	\caption{Trajectory with ground control point. }
+	\label{fig:trj}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{trj.png}
+	\caption{GCP picking.}
+	\label{fig:picking}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{addgcp.png}
+	\caption{Adding GCP observation.}
+	\label{fig:addgcp}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{gcp1.png}
+	\caption{Manual transformation of the trajectory using GIZMO (un-check manipulate only marked gizmo to move all nodes of the trajectory).}
+	\label{fig:gcp1}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{gcp2.png}
+	\caption{Found proper transformation GCPs to trajectory nodes.}
+	\label{fig:gcp2}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{offset.png}
+	\caption{Applying offset to export point cloud in global reference system.}
+	\label{fig:offset}
+\end{figure}
+
+

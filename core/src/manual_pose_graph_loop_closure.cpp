@@ -118,7 +118,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     if (ImGui::Button("Compute Pose Graph SLAM"))
                     {
                         std::cout << "Compute Pose Graph SLAM" << std::endl;
-                        // exit(1);
+                       
                         ///////////////////////////////////////////////////////////////////
                         // graph slam
                         bool is_ok = true;
@@ -568,10 +568,37 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                         }
 
                         ///////////////////////////////////////////////////////////////////
+                        // GCP report
+                        std::cout << "----------------------------" << std::endl;
+                        std::cout << "Ground control points report" << std::endl;
+                        for (int i = 0; i < gcps.gpcs.size(); i++)
+                        {
+                            std::cout << "--" << std::endl;
+                            Eigen::Vector3d p_s = point_clouds_container.point_clouds[gcps.gpcs[i].index_to_node_inner].local_trajectory[gcps.gpcs[i].index_to_node_outer].m_pose.translation();
+                            TaitBryanPose pose_s;
+                            pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[gcps.gpcs[i].index_to_node_inner].m_pose);
+
+                            double delta_x;
+                            double delta_y;
+                            double delta_z;
+                            Eigen::Vector3d p_t(gcps.gpcs[i].x, gcps.gpcs[i].y, gcps.gpcs[i].z + gcps.gpcs[i].lidar_height_above_ground);
+                            point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                                          pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                          p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+                            
+                            std::cout << "GCP[" << i << "] name: '" << gcps.gpcs[i].name << "'" << std::endl;
+                            std::cout << "delta_x: " << delta_x << " [m], delta_y: " << delta_y << " [m], delta_z: " << delta_z << " [m]"<< std::endl;
+                            std::cout << "GCP-> x:" << gcps.gpcs[i].x << " [m], y:" << gcps.gpcs[i].y << " [m], z:" << gcps.gpcs[i].z << " [m]"<<std::endl;
+
+                            Eigen::Vector3d pp = point_clouds_container.point_clouds[gcps.gpcs[i].index_to_node_inner].m_pose * p_s;
+                            std::cout << "TrajectoryNode-> x:" << gcps.gpcs[i].x << " [m], y:" << gcps.gpcs[i].y << " [m], z:" << gcps.gpcs[i].z << " "<< std::endl;
+                            std::cout << "--" << std::endl;
+                        }
                     }
                 }
             }
         }
+
         std::string number_active_edges = "number_edges: " + std::to_string(edges.size());
         ImGui::Text(number_active_edges.c_str());
 

@@ -258,7 +258,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("precision_forestry_tools v0.46");
+    glutCreateWindow("precision_forestry_tools v0.48");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

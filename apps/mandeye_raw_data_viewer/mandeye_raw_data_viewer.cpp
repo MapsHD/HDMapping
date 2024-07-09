@@ -4,7 +4,7 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
-#include <glew.h>
+#include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
@@ -16,7 +16,7 @@
 #include <portable-file-dialogs.h>
 
 #include <filesystem>
-#include "../../../src/lidar_odometry_utils.h"
+#include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;

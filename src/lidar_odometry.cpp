@@ -77,8 +77,7 @@ std::vector<std::string> csv_files;
 std::vector<std::string> sn_files;
 std::string imuSnToUse;
 
-    void
-    alternative_approach();
+void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
 bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity, double offset_x,
@@ -204,9 +203,9 @@ void lidar_odometry_gui()
 
                 std::sort(std::begin(input_file_names), std::end(input_file_names));
 
-                //std::vector<std::string> csv_files;
+                // std::vector<std::string> csv_files;
                 std::vector<std::string> laz_files;
-                //std::vector<std::string> sn_files;
+                // std::vector<std::string> sn_files;
 
                 std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
                               {
@@ -583,8 +582,9 @@ void lidar_odometry_gui()
                         // GetId of Imu to use
                         int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
                         auto imu = load_imu(imufn.c_str(), imuNumberToUse);
-                        
-                        if (imu.size() > 0){
+
+                        if (imu.size() > 0)
+                        {
                             if (std::get<0>(imu[imu.size() - 1]).first > ts_failure)
                             {
                                 break;
@@ -983,6 +983,88 @@ void lidar_odometry_gui()
                     else
                     {
                         worker_data[k].show = false;
+                    }
+                }
+            }
+
+            if (ImGui::Button("select scans from range <index_from_inclusive - 1, index_to_inclusive - 1>"))
+            {
+                if (index_from_inclusive > 1 && index_to_inclusive > 1){
+                    index_from_inclusive --;
+                    index_to_inclusive --;
+
+                    for (int k = 0; k < worker_data.size(); k++)
+                    {
+                        if (k >= index_from_inclusive && k <= index_to_inclusive)
+                        {
+                            worker_data[k].show = true;
+                        }
+                        else
+                        {
+                            worker_data[k].show = false;
+                        }
+                    }
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("select scans from range <index_from_inclusive + 1, index_to_inclusive + 1>"))
+            {
+                if (index_from_inclusive + 1 < worker_data.size() && index_to_inclusive + 1 < worker_data.size())
+                {
+                    index_from_inclusive++;
+                    index_to_inclusive++;
+
+                    for (int k = 0; k < worker_data.size(); k++)
+                    {
+                        if (k >= index_from_inclusive && k <= index_to_inclusive)
+                        {
+                            worker_data[k].show = true;
+                        }
+                        else
+                        {
+                            worker_data[k].show = false;
+                        }
+                    }
+                }
+            }
+            if (ImGui::Button("select scans from range <index_from_inclusive - 10, index_to_inclusive - 10>"))
+            {
+                if (index_from_inclusive > 10 && index_to_inclusive > 10)
+                {
+                    index_from_inclusive-=10;
+                    index_to_inclusive-=10;
+
+                    for (int k = 0; k < worker_data.size(); k++)
+                    {
+                        if (k >= index_from_inclusive && k <= index_to_inclusive)
+                        {
+                            worker_data[k].show = true;
+                        }
+                        else
+                        {
+                            worker_data[k].show = false;
+                        }
+                    }
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("select scans from range <index_from_inclusive + 10, index_to_inclusive + 10>"))
+            {
+                if (index_from_inclusive + 10 < worker_data.size() && index_to_inclusive + 10 < worker_data.size())
+                {
+                    index_from_inclusive += 10;
+                    index_to_inclusive += 10;
+
+                    for (int k = 0; k < worker_data.size(); k++)
+                    {
+                        if (k >= index_from_inclusive && k <= index_to_inclusive)
+                        {
+                            worker_data[k].show = true;
+                        }
+                        else
+                        {
+                            worker_data[k].show = false;
+                        }
                     }
                 }
             }

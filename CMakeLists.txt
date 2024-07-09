@@ -264,3 +264,16 @@ else()
 	target_link_libraries(precision_forestry_tools ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip tbb)
 endif()
 
+add_executable(mandeye_raw_data_viewer tools/src/mandeye_raw_data_viewer.cpp ${IMGUI_SRCS} ${FUSION} src/lidar_odometry_utils.cpp)
+if (WIN32)
+target_link_libraries(mandeye_raw_data_viewer laszip3)
+else()
+target_link_libraries(mandeye_raw_data_viewer laszip)
+endif()
+
+if (WIN32)
+	target_link_libraries(mandeye_raw_data_viewer ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip3)
+else()
+	target_link_libraries(mandeye_raw_data_viewer ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} freeglut_static laszip tbb)
+endif()
+

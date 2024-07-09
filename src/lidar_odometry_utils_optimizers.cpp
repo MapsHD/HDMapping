@@ -503,13 +503,20 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         for (size_t i = 0; i < intermediate_trajectory.size(); i++)
         {
             TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(intermediate_trajectory[i]);
+            auto prev_pose = pose;
             pose.px += h_x[counter++];
             pose.py += h_x[counter++];
             pose.pz += h_x[counter++];
             pose.om += h_x[counter++];
             pose.fi += h_x[counter++];
             pose.ka += h_x[counter++];
-            intermediate_trajectory[i] = affine_matrix_from_pose_tait_bryan(pose);
+
+            Eigen::Vector3d p1(prev_pose.px, prev_pose.py, prev_pose.pz);
+            Eigen::Vector3d p2(pose.px, pose.py, pose.pz);
+
+            if((p1 - p2).norm() < 1.0){
+                intermediate_trajectory[i] = affine_matrix_from_pose_tait_bryan(pose);
+            }
         }
     }
     return;

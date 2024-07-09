@@ -1,7 +1,7 @@
 #ifndef _OBSERVATION_PICKING_H_
 #define _OBSERVATION_PICKING_H_
 
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <Eigen/Eigen>
 #include <map>
 #include <imgui.h>

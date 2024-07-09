@@ -1,5 +1,7 @@
 #include "lidar_odometry_utils.h"
 
+#include <mutex>
+
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
               NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool multithread,

@@ -713,7 +713,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("mandeye raw data viewer v0.46");
+    glutCreateWindow("mandeye raw data viewer v0.47");
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

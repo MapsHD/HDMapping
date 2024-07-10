@@ -16,6 +16,8 @@
 #include <laz_wrapper.h>
 #include <transformations.h>
 
+#include <HDMapping/Version.hpp>
+
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, float picking_plane_height);
 
 static bool show_demo_window = true;
@@ -262,7 +264,7 @@ bool initGL(int* argc, char** argv) {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("hd_mapper");
+    glutCreateWindow("hd_mapper " HDMAPPING_VERSION_STRING);
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

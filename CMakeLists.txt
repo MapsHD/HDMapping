@@ -2,6 +2,12 @@ cmake_minimum_required(VERSION 3.15.0)
 
 project(hd-mapping)
 
+add_definitions(-DHDMAPPING_VERSION_MAJOR=0)
+add_definitions(-DHDMAPPING_VERSION_MINOR=48)
+add_definitions(-DHDMAPPING_VERSION_PATCH=0)
+
+include_directories(shared/include)
+
 set(OpenGL_GL_PREFERENCE GLVND)
 set(CMAKE_CXX_STANDARD 20)
 

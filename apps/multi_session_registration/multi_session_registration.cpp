@@ -29,6 +29,8 @@
 
 #include <m_estimators.h>
 
+#include <HDMapping/Version.hpp>
+
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
 double camera_ortho_xy_view_shift_y = 0.0;
@@ -1811,7 +1813,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_session_registration_step_3 v0.48");
+    glutCreateWindow("multi_session_registration_step_3 " HDMAPPING_VERSION_STRING);
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

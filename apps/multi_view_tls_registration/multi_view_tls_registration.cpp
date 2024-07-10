@@ -38,6 +38,8 @@
 #include <gnss.h>
 #include <session.h>
 
+#include <HDMapping/Version.hpp>
+
 namespace fs = std::filesystem;
 
 static bool show_demo_window = true;
@@ -4014,7 +4016,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_view_tls_registration_step_2 v0.48");
+    glutCreateWindow("multi_view_tls_registration_step_2 " HDMAPPING_VERSION_STRING);
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

@@ -16,9 +16,13 @@
 
 #include <transformations.h>
 
+
+#include <HDMapping/Version.hpp>
+
 #include <portable-file-dialogs.h>
 
 #include <session.h>
+
 
 const unsigned int window_width = 800;
 const unsigned int window_height = 600;
@@ -349,7 +353,9 @@ bool initGL(int *argc, char **argv)
   glutInit(argc, argv);
   glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
   glutInitWindowSize(window_width, window_height);
-  glutCreateWindow("precision_forestry_tools v0.48");
+
+  glutCreateWindow("precision_forestry_tools " HDMAPPING_VERSION_STRING);
+
   glutDisplayFunc(display);
   glutMotionFunc(motion);
 

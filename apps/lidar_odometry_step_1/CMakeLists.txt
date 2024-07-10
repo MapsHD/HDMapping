@@ -24,6 +24,7 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
           ${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
+          
 target_link_libraries(
   lidar_odometry_step_1
   PRIVATE Fusion
@@ -31,6 +32,7 @@ target_link_libraries(
           ${OPENGL_gl_LIBRARY}
           OpenGL::GLU
           ${PLATFORM_LASZIP_LIB}
+          ${PLATFORM_MISCELLANEOUS_LIBS}
           ${CORE_LIBRARIES}
           ${GUI_LIBRARIES})
 

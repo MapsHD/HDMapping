@@ -1076,7 +1076,8 @@ void project_gui()
 
                 if (session.point_clouds_container.point_clouds[i].visible)
                 {
-                    // ImGui::SameLine();
+                    ImGui::Text("--");
+                    ImGui::SameLine();
                     ImGui::Checkbox(std::string(std::to_string(i) + ": show_color").c_str(), &session.point_clouds_container.point_clouds[i].show_color); //
 
                     if (!session.point_clouds_container.point_clouds[i].show_color)
@@ -3509,7 +3510,7 @@ void display()
     gnss.render(session.point_clouds_container);
     session.ground_control_points.render(session.point_clouds_container);
 
-        ImGui_ImplOpenGL2_NewFrame();
+    ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
 
     // my_display_code();

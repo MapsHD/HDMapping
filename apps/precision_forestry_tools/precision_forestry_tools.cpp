@@ -16,13 +16,11 @@
 
 #include <transformations.h>
 
-
 #include <HDMapping/Version.hpp>
 
 #include <portable-file-dialogs.h>
 
 #include <session.h>
-
 
 const unsigned int window_width = 800;
 const unsigned int window_height = 600;
@@ -54,8 +52,63 @@ double bucket_z = 0.05;
 bool calculate_offset = false;
 Session session;
 int viewer_decmiate_point_cloud = 100;
+std::vector<int> lowest_points_indexes;
 
 namespace fs = std::filesystem;
+
+unsigned long long int get_index_2D(const int16_t x, const int16_t y /*, const int16_t z*/)
+{
+  // return ((static_cast<unsigned long long int>(x) << 32) & (0x0000FFFF00000000ull)) |
+  //        ((static_cast<unsigned long long int>(y) << 16) & (0x00000000FFFF0000ull)) |
+  //        ((static_cast<unsigned long long int>(z) << 0) & (0x000000000000FFFFull));
+  return ((static_cast<unsigned long long int>(x) << 16) & (0x00000000FFFF0000ull)) |
+         ((static_cast<unsigned long long int>(y) << 0) & (0x000000000000FFFFull));
+}
+
+unsigned long long int get_rgd_index_2D(const Eigen::Vector3d p, const Eigen::Vector2d b)
+{
+  int16_t x = static_cast<int16_t>(p.x() / b.x());
+  int16_t y = static_cast<int16_t>(p.y() / b.y());
+  // int16_t z = static_cast<int16_t>(p.z() / b.z());
+  return get_index_2D(x, y);
+}
+
+std::vector<int> get_lowest_points_indexes(const PointCloud &pc, Eigen::Vector2d bucket_dim_xy)
+{
+  std::vector<int> indexes;
+
+  std::vector<std::tuple<unsigned long long int, unsigned int, double>> indexes_tuple;
+
+  for (size_t i = 0; i < pc.points_local.size(); i++)
+  {
+    unsigned long long int index = get_rgd_index_2D(pc.points_local[i], bucket_dim_xy);
+    indexes_tuple.emplace_back(index, i, pc.points_local[i].z());
+  }
+
+  std::sort(indexes_tuple.begin(), indexes_tuple.end(),
+            [](const std::tuple<unsigned long long int, unsigned int, unsigned int> &a, const std::tuple<unsigned long long int, unsigned int, unsigned int> &b)
+            { return (std::get<0>(a) == std::get<0>(b)) ? (std::get<2>(a) > std::get<2>(b)) : (std::get<0>(a) < std::get<0>(b)); });
+
+  // for (const auto &t : indexes_tuple){
+  //   std::cout << std::get<0>(t) << " " << std::get<1>(t) << " " << std::get<2>(t) << std::endl;
+  // }
+
+  for (int i = 0; i < indexes_tuple.size(); i++)
+  {
+    if (i == 0)
+    {
+      indexes.push_back(std::get<1>(indexes_tuple[i]));
+    }
+    else
+    {
+      if (std::get<0>(indexes_tuple[i - 1]) != std::get<0>(indexes_tuple[i]))
+      {
+        indexes.push_back(std::get<1>(indexes_tuple[i]));
+      }
+    }
+  }
+  return indexes;
+}
 
 void reshape(int w, int h)
 {
@@ -174,7 +227,7 @@ void project_gui()
 
       if (input_file_names.size() == 1)
       {
-        //std::cout << "Las/Laz file (only 1):" << std::endl;
+        // std::cout << "Las/Laz file (only 1):" << std::endl;
         for (size_t i = 0; i < input_file_names.size(); i++)
         {
           std::cout << input_file_names[i] << std::endl;
@@ -190,13 +243,23 @@ void project_gui()
         {
           std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
         }
-      }else{
+      }
+      else
+      {
         std::cout << "please mark only 1 file" << std::endl;
       }
     }
 
-    if (ImGui::Button("get indexes lowest points")){
-      
+    if (ImGui::Button("get indexes lowest points"))
+    {
+      if (session.point_clouds_container.point_clouds.size() > 0)
+      {
+        lowest_points_indexes = get_lowest_points_indexes(session.point_clouds_container.point_clouds[0], Eigen::Vector2d(0.3, 0.3));
+      }
+      else
+      {
+        std::cout << "point cloud data is empty, please load data" << std::endl;
+      }
     }
 
     ImGui::End();
@@ -333,6 +396,24 @@ void display()
   for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
   {
     session.point_clouds_container.point_clouds[i].render(false, ObservationPicking(), viewer_decmiate_point_cloud);
+  }
+
+  if (session.point_clouds_container.point_clouds.size() == 1){
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glPointSize(3);
+    glBegin(GL_POINTS);
+    for (int i = 0; i < lowest_points_indexes.size(); i++)
+    {
+      glVertex3f(session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].x(),
+                 session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].y(),
+                 session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].z());
+
+      //std::cout << session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].x() << " " <<
+      //    session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].y() << " " <<
+      //    session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].z() << std::endl;
+    }
+    glEnd();
+    glPointSize(1);
   }
   // void render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud);
 

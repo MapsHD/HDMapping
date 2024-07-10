@@ -5,6 +5,8 @@
 #include <iostream>
 #include <filesystem>
 
+#include <HDMapping/Version.hpp>
+
 struct Point3Di
 {
     Eigen::Vector3d point;
@@ -278,7 +280,7 @@ std::unordered_map<int, std::string> GetIdToStringMapping(const std::string &fil
 
 int main(int argc, char *argv[])
 {
-    std::cout << "Version v0.41" << std::endl;
+    std::cout << "Version " HDMAPPING_VERSION_STRING << std::endl;
     std::vector<std::string> arguments;
     for (int i = 1; i < argc; i++)
     {

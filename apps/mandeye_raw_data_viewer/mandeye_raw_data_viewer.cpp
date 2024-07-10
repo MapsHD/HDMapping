@@ -18,6 +18,8 @@
 #include <filesystem>
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 
+#include <HDMapping/Version.hpp>
+
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
@@ -713,7 +715,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("mandeye raw data viewer v0.48");
+    glutCreateWindow("mandeye raw data viewer " HDMAPPING_VERSION_STRING);
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

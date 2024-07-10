@@ -22,6 +22,8 @@
 #include <observation_equations/codes/common/include/cauchy.h>
 #include <observation_equations/codes/python-scripts/camera-metrics/fisheye_camera_calibRT_tait_bryan_wc_jacobian.h>
 
+#include <HDMapping/Version.hpp>
+
 double fx = 2141.3412300023847;
 double fy = 2141.3412300023847;
 double cx = 1982.4503600047012;
@@ -1027,7 +1029,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("MANDEYE with GoPro MAX manual coloring v0.48");
+    glutCreateWindow("MANDEYE with GoPro MAX manual coloring " HDMAPPING_VERSION_STRING);
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

@@ -16,6 +16,8 @@
 
 #include <transformations.h>
 
+#include <HDMapping/Version.hpp>
+
 const unsigned int window_width = 800;
 const unsigned int window_height = 600;
 double camera_ortho_xy_view_zoom = 10;
@@ -248,7 +250,7 @@ bool initGL(int *argc, char **argv) {
   glutInit(argc, argv);
   glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
   glutInitWindowSize(window_width, window_height);
-  glutCreateWindow("precision_forestry_tools v0.46");
+  glutCreateWindow("precision_forestry_tools " HDMAPPING_VERSION_STRING);
   glutDisplayFunc(display);
   glutMotionFunc(motion);
 

@@ -16,7 +16,13 @@
 
 #include <transformations.h>
 
+
 #include <HDMapping/Version.hpp>
+
+#include <portable-file-dialogs.h>
+
+#include <session.h>
+
 
 const unsigned int window_width = 800;
 const unsigned int window_height = 600;
@@ -41,13 +47,27 @@ float m_ortho_projection[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
 float m_ortho_gizmo_view[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
-void reshape(int w, int h) {
+bool is_decimate = true;
+double bucket_x = 0.05;
+double bucket_y = 0.05;
+double bucket_z = 0.05;
+bool calculate_offset = false;
+Session session;
+int viewer_decmiate_point_cloud = 100;
+
+namespace fs = std::filesystem;
+
+void reshape(int w, int h)
+{
   glViewport(0, 0, (GLsizei)w, (GLsizei)h);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  if (!is_ortho) {
+  if (!is_ortho)
+  {
     gluPerspective(60.0, (GLfloat)w / (GLfloat)h, 0.01, 10000.0);
-  } else {
+  }
+  else
+  {
     ImGuiIO &io = ImGui::GetIO();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
@@ -61,17 +81,21 @@ void reshape(int w, int h) {
   glLoadIdentity();
 }
 
-void motion(int x, int y) {
+void motion(int x, int y)
+{
   ImGuiIO &io = ImGui::GetIO();
   io.MousePos = ImVec2((float)x, (float)y);
 
-  if (!io.WantCaptureMouse) {
+  if (!io.WantCaptureMouse)
+  {
     float dx, dy;
     dx = (float)(x - mouse_old_x);
     dy = (float)(y - mouse_old_y);
 
-    if (is_ortho) {
-      if (mouse_buttons & 1) {
+    if (is_ortho)
+    {
+      if (mouse_buttons & 1)
+      {
         float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
         Eigen::Vector3d v(
             dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
@@ -90,13 +114,17 @@ void motion(int x, int y) {
         camera_ortho_xy_view_shift_x += v_t.x();
         camera_ortho_xy_view_shift_y += v_t.y();
       }
-    } else {
+    }
+    else
+    {
       gui_mouse_down = mouse_buttons > 0;
-      if (mouse_buttons & 1) {
+      if (mouse_buttons & 1)
+      {
         rotate_x += dy * 0.2f; // * mouse_sensitivity;
         rotate_y += dx * 0.2f; // * mouse_sensitivity;
       }
-      if (mouse_buttons & 4) {
+      if (mouse_buttons & 4)
+      {
         translate_x += dx * 0.05f * mouse_sensitivity;
         translate_y -= dy * 0.05f * mouse_sensitivity;
       }
@@ -108,21 +136,84 @@ void motion(int x, int y) {
   glutPostRedisplay();
 }
 
-void project_gui() {
-  if (ImGui::Begin("main gui window")) {
+void project_gui()
+{
+  if (ImGui::Begin("main gui window"))
+  {
+    ImGui::Checkbox("is_decimate", &is_decimate);
+    if (is_decimate)
+    {
+      ImGui::InputDouble("bucket_x", &bucket_x);
+      ImGui::InputDouble("bucket_y", &bucket_y);
+      ImGui::InputDouble("bucket_z", &bucket_z);
+    }
+    ImGui::Checkbox("calculate_offset", &calculate_offset);
+
+    ImGui::InputInt("viewer_decmiate_point_cloud", &viewer_decmiate_point_cloud);
+    if (viewer_decmiate_point_cloud < 1)
+    {
+      viewer_decmiate_point_cloud = 1;
+    }
+
+    if (ImGui::Button("Load *.laz file"))
+    {
+      static std::shared_ptr<pfd::open_file> open_file;
+      std::vector<std::string> input_file_names;
+      ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+      const auto t = [&]()
+      {
+        std::vector<std::string> filters;
+        auto sel = pfd::open_file("Load laz files", "C:\\", filters, true).result();
+        for (int i = 0; i < sel.size(); i++)
+        {
+          input_file_names.push_back(sel[i]);
+        }
+      };
+      std::thread t1(t);
+      t1.join();
+
+      if (input_file_names.size() == 1)
+      {
+        //std::cout << "Las/Laz file (only 1):" << std::endl;
+        for (size_t i = 0; i < input_file_names.size(); i++)
+        {
+          std::cout << input_file_names[i] << std::endl;
+        }
+
+        session.working_directory = fs::path(input_file_names[0]).parent_path().string();
+
+        if (!session.point_clouds_container.load_whu_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset))
+        {
+          std::cout << "check input files laz/las" << std::endl;
+        }
+        else
+        {
+          std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+        }
+      }else{
+        std::cout << "please mark only 1 file" << std::endl;
+      }
+    }
+
+    if (ImGui::Button("get indexes lowest points")){
+      
+    }
+
     ImGui::End();
   }
   return;
 }
 
-void display() {
+void display()
+{
   ImGuiIO &io = ImGui::GetIO();
   glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
-  if (is_ortho) {
+  if (is_ortho)
+  {
 
     glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
             -camera_ortho_xy_view_zoom / ratio,
@@ -168,7 +259,8 @@ void display() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glEnable(GL_DEPTH_TEST);
 
-  if (!is_ortho) {
+  if (!is_ortho)
+  {
     reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
 
     Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
@@ -189,12 +281,15 @@ void display() {
     /*      glTranslatef(translate_x, translate_y, translate_z);
           glRotatef(rotate_x, 1.0, 0.0, 0.0);
           glRotatef(rotate_y, 0.0, 0.0, 1.0);*/
-  } else {
+  }
+  else
+  {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
   }
 
-  if (ImGui::GetIO().KeyCtrl) {
+  if (ImGui::GetIO().KeyCtrl)
+  {
     glBegin(GL_LINES);
     glColor3f(1.f, 1.f, 1.f);
     glVertex3fv(rotation_center.data());
@@ -218,7 +313,8 @@ void display() {
     glEnd();
   }
 
-  if (show_axes) {
+  if (show_axes)
+  {
     glBegin(GL_LINES);
     glColor3f(1.0f, 0.0f, 0.0f);
     glVertex3f(0.0f, 0.0f, 0.0f);
@@ -234,6 +330,12 @@ void display() {
     glEnd();
   }
 
+  for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+  {
+    session.point_clouds_container.point_clouds[i].render(false, ObservationPicking(), viewer_decmiate_point_cloud);
+  }
+  // void render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud);
+
   ImGui_ImplOpenGL2_NewFrame();
   ImGui_ImplGLUT_NewFrame();
 
@@ -246,11 +348,14 @@ void display() {
   glutPostRedisplay();
 }
 
-bool initGL(int *argc, char **argv) {
+bool initGL(int *argc, char **argv)
+{
   glutInit(argc, argv);
   glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
   glutInitWindowSize(window_width, window_height);
+
   glutCreateWindow("precision_forestry_tools " HDMAPPING_VERSION_STRING);
+
   glutDisplayFunc(display);
   glutMotionFunc(motion);
 
@@ -280,7 +385,8 @@ bool initGL(int *argc, char **argv) {
   return true;
 }
 
-void mouse(int glut_button, int state, int x, int y) {
+void mouse(int glut_button, int state, int x, int y)
+{
   ImGuiIO &io = ImGui::GetIO();
   io.MousePos = ImVec2((float)x, (float)y);
   int button = -1;
@@ -295,13 +401,18 @@ void mouse(int glut_button, int state, int x, int y) {
   if (button != -1 && state == GLUT_UP)
     io.MouseDown[button] = false;
 
-  if (!io.WantCaptureMouse) {
-    if (glut_button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN && io.KeyCtrl) {
+  if (!io.WantCaptureMouse)
+  {
+    if (glut_button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN && io.KeyCtrl)
+    {
     }
 
-    if (state == GLUT_DOWN) {
+    if (state == GLUT_DOWN)
+    {
       mouse_buttons |= 1 << glut_button;
-    } else if (state == GLUT_UP) {
+    }
+    else if (state == GLUT_UP)
+    {
       mouse_buttons = 0;
     }
     mouse_old_x = x;
@@ -309,21 +420,32 @@ void mouse(int glut_button, int state, int x, int y) {
   }
 }
 
-void wheel(int button, int dir, int x, int y) {
-  if (dir > 0) {
-    if (is_ortho) {
+void wheel(int button, int dir, int x, int y)
+{
+  if (dir > 0)
+  {
+    if (is_ortho)
+    {
       camera_ortho_xy_view_zoom -= 0.1f * camera_ortho_xy_view_zoom;
 
-      if (camera_ortho_xy_view_zoom < 0.1) {
+      if (camera_ortho_xy_view_zoom < 0.1)
+      {
         camera_ortho_xy_view_zoom = 0.1;
       }
-    } else {
+    }
+    else
+    {
       translate_z -= 0.05f * translate_z;
     }
-  } else {
-    if (is_ortho) {
+  }
+  else
+  {
+    if (is_ortho)
+    {
       camera_ortho_xy_view_zoom += 0.1 * camera_ortho_xy_view_zoom;
-    } else {
+    }
+    else
+    {
       translate_z += 0.05f * translate_z;
     }
   }
@@ -331,7 +453,8 @@ void wheel(int button, int dir, int x, int y) {
   return;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
   initGL(&argc, argv);
   glutDisplayFunc(display);
   glutMouseFunc(mouse);

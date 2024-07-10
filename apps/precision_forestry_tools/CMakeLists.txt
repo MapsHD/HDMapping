@@ -7,7 +7,7 @@ add_executable(precision_forestry_tools
 target_link_libraries(
   precision_forestry_tools
   PRIVATE ${PLATFORM_LASZIP_LIB} freeglut ${OPENGL_gl_LIBRARY} OpenGL::GLU
-  ${GUI_LIBRARIES} ${PLATFORM_MISCELLANEOUS_LIBS})
+  ${GUI_LIBRARIES} ${PLATFORM_MISCELLANEOUS_LIBS} ${CORE_LIBRARIES})
 target_include_directories(
   precision_forestry_tools
   PRIVATE include

@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.15.0)
 project(split_multi_livox)
 
 add_executable(split_multi_livox split_multi_livox.cpp)
+
 target_include_directories(
   split_multi_livox
   PRIVATE include
@@ -20,7 +21,9 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
           ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include)
-target_link_libraries(split_multi_livox PRIVATE core ${PLATFORM_LASZIP_LIB})
+
+target_link_libraries(split_multi_livox PRIVATE core ${PLATFORM_LASZIP_LIB}
+                                                ${PLATFORM_MISCELLANEOUS_LIBS})
 
 if(WIN32)
   add_custom_command(

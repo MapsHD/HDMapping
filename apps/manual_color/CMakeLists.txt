@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.15.0)
 project(mandeye_with_gopro_max_manual_coloring)
 
 add_executable(mandeye_with_gopro_max_manual_coloring manual_color.cpp)
+
 target_include_directories(
   mandeye_with_gopro_max_manual_coloring
   PRIVATE include
@@ -20,10 +21,16 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
           ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include)
+
 target_link_libraries(
   mandeye_with_gopro_max_manual_coloring
-  PRIVATE freeglut ${OPENGL_gl_LIBRARY} OpenGL::GLU ${PLATFORM_LASZIP_LIB}
-          ${CORE_LIBRARIES} ${GUI_LIBRARIES})
+  PRIVATE freeglut
+          ${OPENGL_gl_LIBRARY}
+          OpenGL::GLU
+          ${PLATFORM_LASZIP_LIB}
+          ${PLATFORM_MISCELLANEOUS_LIBS}
+          ${CORE_LIBRARIES}
+          ${GUI_LIBRARIES})
 
 if(WIN32)
   add_custom_command(

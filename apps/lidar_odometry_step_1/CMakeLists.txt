@@ -6,6 +6,7 @@ add_executable(
   lidar_odometry_step_1
   lidar_odometry.cpp lidar_odometry_utils.h lidar_odometry_utils.cpp
   lidar_odometry_utils_optimizers.cpp)
+
 target_include_directories(
   lidar_odometry_step_1
   PRIVATE include
@@ -24,7 +25,7 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
           ${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
-          
+
 target_link_libraries(
   lidar_odometry_step_1
   PRIVATE Fusion

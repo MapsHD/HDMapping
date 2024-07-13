@@ -4,8 +4,15 @@ project(hd_mapper)
 
 add_executable(hd_mapper hd_mapper.cpp)
 target_link_libraries(
-  hd_mapper PRIVATE freeglut ${OPENGL_gl_LIBRARY} OpenGL::GLU
-                    ${PLATFORM_LASZIP_LIB} ${CORE_LIBRARIES} ${GUI_LIBRARIES})
+  hd_mapper
+  PRIVATE freeglut
+          ${OPENGL_gl_LIBRARY}
+          OpenGL::GLU
+          ${PLATFORM_LASZIP_LIB}
+          ${PLATFORM_MISCELLANEOUS_LIBS}
+          ${CORE_LIBRARIES}
+          ${GUI_LIBRARIES})
+
 target_include_directories(
   hd_mapper
   PRIVATE include

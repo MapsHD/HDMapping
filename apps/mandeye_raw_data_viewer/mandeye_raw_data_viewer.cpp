@@ -68,6 +68,8 @@ int number_of_points_threshold = 20000;
 bool is_init = true;
 int index_rendered_points_local = -1;
 std::vector<std::vector<Eigen::Vector3d>> all_points_local;
+std::vector<int> indexes_to_filename;
+std::vector<std::string> all_file_names;
 
 void reshape(int w, int h)
 {
@@ -190,6 +192,7 @@ void project_gui()
                     for (int i = 0; i < sel.size(); i++)
                     {
                         input_file_names.push_back(sel[i]);
+                        
                     }
                 };
                 std::thread t1(t);
@@ -202,6 +205,7 @@ void project_gui()
                     if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
                     {
                         laz_files.push_back(fileName);
+                        all_file_names.push_back(fileName);
                     }
                     if (fileName.ends_with(".csv"))
                     {
@@ -285,6 +289,9 @@ void project_gui()
                     std::cout << "loading points" << std::endl;
                     std::vector<std::vector<Point3Di>> pointsPerFile;
                     pointsPerFile.resize(laz_files.size());
+                    //std::vector<std::vector<int>> indexesPerFile;
+                    
+
                     std::mutex mtx;
                     std::cout << "start std::transform" << std::endl;
 
@@ -363,6 +370,17 @@ void project_gui()
                         }
                     }
 
+                    //indexes_to_filename.resize(laz_files.size());
+                    //for (int i = 0; i < pointsPerFile.size(); i++){
+                    //    indexes_to_filename.push_back(i);
+
+                        //for (int j = 0; j < pointsPerFile[i].size(); j++)
+                        //{
+                        //    indexes_to_filename[i][j] = i;
+                        //}
+                    //}
+                        //indexesPerFile
+
                     int number_of_points = 0;
                     for (const auto &pp : pointsPerFile)
                     {
@@ -372,14 +390,15 @@ void project_gui()
 
                     std::vector<Eigen::Vector3d> points_local;
 
-                    for (const auto &p : pointsPerFile)
+                    for (/*const auto &p : pointsPerFile*/ int i = 0; i < pointsPerFile.size(); i++)
                     {
-                        for (const auto &pp : p)
+                        for (const auto &pp : pointsPerFile[i])
                         {
                             points_local.push_back(pp.point);
                             if (points_local.size() > number_of_points_threshold)
                             {
                                 all_points_local.push_back(points_local);
+                                indexes_to_filename.push_back(i);
                                 points_local.clear();
                             }
                         }
@@ -568,6 +587,13 @@ void project_gui()
             }
         }
 
+        if (all_file_names.size() > 0){
+            if (index_rendered_points_local >= 0 && index_rendered_points_local < indexes_to_filename.size())
+            {
+                std::string fn = all_file_names[indexes_to_filename[index_rendered_points_local]];
+                ImGui::Text(fn.c_str());
+            }
+        }
         ImGui::End();
     }
     return;

@@ -4,10 +4,17 @@ project(multi_view_tls_registration_step_2)
 
 add_executable(multi_view_tls_registration_step_2
                multi_view_tls_registration.cpp perform_experiment.cpp)
+
 target_link_libraries(
   multi_view_tls_registration_step_2
-  PRIVATE freeglut ${OPENGL_gl_LIBRARY} OpenGL::GLU ${PLATFORM_LASZIP_LIB}
-          ${CORE_LIBRARIES} ${GUI_LIBRARIES})
+  PRIVATE freeglut
+          ${OPENGL_gl_LIBRARY}
+          OpenGL::GLU
+          ${PLATFORM_LASZIP_LIB}
+          ${PLATFORM_MISCELLANEOUS_LIBS}
+          ${CORE_LIBRARIES}
+          ${GUI_LIBRARIES})
+
 target_include_directories(
   multi_view_tls_registration_step_2
   PRIVATE include

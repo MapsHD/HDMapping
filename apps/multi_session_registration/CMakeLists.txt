@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.15.0)
 project(multi_session_registration_step_3)
 
 add_executable(multi_session_registration_step_3 multi_session_registration.cpp)
+
 target_include_directories(
   multi_session_registration_step_3
   PRIVATE include
@@ -19,12 +20,14 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
           ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include)
+
 target_link_libraries(
   multi_session_registration_step_3
   freeglut
   ${OPENGL_gl_LIBRARY}
   OpenGL::GLU
   ${PLATFORM_LASZIP_LIB}
+  ${PLATFORM_MISCELLANEOUS_LIBS}
   ${CORE_LIBRARIES}
   ${GUI_LIBRARIES})
 

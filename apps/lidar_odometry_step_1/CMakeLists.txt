@@ -5,7 +5,8 @@ project(lidar_odometry_step_1)
 add_executable(
   lidar_odometry_step_1
   lidar_odometry.cpp lidar_odometry_utils.h lidar_odometry_utils.cpp
-  lidar_odometry_utils_optimizers.cpp)
+  lidar_odometry_utils_optimizers.cpp
+  )
 
 target_include_directories(
   lidar_odometry_step_1

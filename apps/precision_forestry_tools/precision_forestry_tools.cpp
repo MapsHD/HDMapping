@@ -1,26 +1,22 @@
 #include <GL/glew.h>
-
 #include <GL/freeglut.h>
+#include <glm.hpp>
+#include <gtc/matrix_transform.hpp>
 
 #include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
 #include <imgui_internal.h>
-
 #include <ImGuizmo.h>
-
-#include <glm.hpp>
-#include <gtc/matrix_transform.hpp>
 
 #include <Eigen/Eigen>
 
-#include <transformations.h>
-
-#include <HDMapping/Version.hpp>
-
 #include <portable-file-dialogs.h>
 
+#include <HDMapping/Version.hpp>
 #include <session.h>
+#include <transformations.h>
+#include <local_shape_features.h>
 
 const unsigned int window_width = 800;
 const unsigned int window_height = 600;
@@ -53,6 +49,7 @@ bool calculate_offset = false;
 Session session;
 int viewer_decmiate_point_cloud = 100;
 std::vector<int> lowest_points_indexes;
+std::vector<LocalShapeFeatures::PointWithLocalShapeFeatures> points_with_lsf;
 
 namespace fs = std::filesystem;
 
@@ -262,6 +259,38 @@ void project_gui()
       }
     }
 
+    if (ImGui::Button("get local shape features"))
+    {
+      std::cout << "get local shape features" << std::endl;
+      if (session.point_clouds_container.point_clouds.size() > 0)
+      {
+        // std::vector<LocalShapeFeatures::PointWithLocalShapeFeatures> points_with_lsf;
+        points_with_lsf.clear();
+        LocalShapeFeatures::Params params;
+        params.search_radious = Eigen::Vector3d(0.5, 0.5, 0.5);
+        params.radious = 0.5;
+
+        for (int i = 0; i < session.point_clouds_container.point_clouds[0].points_local.size(); i++)
+        {
+          LocalShapeFeatures::PointWithLocalShapeFeatures point;
+          point.coordinates_global = session.point_clouds_container.point_clouds[0].points_local[i];
+          points_with_lsf.push_back(point);
+        }
+
+        LocalShapeFeatures lsf;
+        lsf.calculate_local_shape_features(points_with_lsf, params);
+
+        // for (const auto &p : points_with_lsf)
+        //{
+        //   if (p.valid)
+        //     std::cout << p.planarity << "," << p.cylindrical_likeness << "," << p.plane_likeness << "," << p.sphericity << "," << p.change_of_curvature << "," << p.omnivariance << "," << p.eigen_entropy << std::endl;
+        // }
+      }
+      else
+      {
+        std::cout << "please load point cloud" << std::endl;
+      }
+    }
     ImGui::End();
   }
   return;
@@ -398,7 +427,8 @@ void display()
     session.point_clouds_container.point_clouds[i].render(false, ObservationPicking(), viewer_decmiate_point_cloud);
   }
 
-  if (session.point_clouds_container.point_clouds.size() == 1){
+  if (session.point_clouds_container.point_clouds.size() == 1)
+  {
     glColor3f(1.0f, 0.0f, 0.0f);
     glPointSize(3);
     glBegin(GL_POINTS);
@@ -408,14 +438,26 @@ void display()
                  session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].y(),
                  session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].z());
 
-      //std::cout << session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].x() << " " <<
-      //    session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].y() << " " <<
-      //    session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].z() << std::endl;
+      // std::cout << session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].x() << " " <<
+      //     session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].y() << " " <<
+      //     session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].z() << std::endl;
     }
     glEnd();
     glPointSize(1);
   }
   // void render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud);
+
+  glBegin(GL_LINES);
+  for (const auto &p : points_with_lsf)
+  {
+    if (p.valid)
+    {
+      glColor3f(fabs(p.normal_vector.x()), fabs(p.normal_vector.y()), fabs(p.normal_vector.z()));
+      glVertex3f(p.coordinates_global.x(), p.coordinates_global.y(), p.coordinates_global.z());
+      glVertex3f(p.coordinates_global.x() + p.normal_vector.x(), p.coordinates_global.y() + p.normal_vector.y(), p.coordinates_global.z() + p.normal_vector.z());
+    }
+  }
+  glEnd();
 
   ImGui_ImplOpenGL2_NewFrame();
   ImGui_ImplGLUT_NewFrame();

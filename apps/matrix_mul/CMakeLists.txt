@@ -8,4 +8,4 @@ target_include_directories(
   matrix_mul PRIVATE include ${REPOSITORY_DIRECTORY}/core/include
                      ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)
 
-target_link_libraries(mnatrix_mul PRIVATE ${PLATFORM_MISCELLANEOUS_LIBS})
+target_link_libraries(matrix_mul PRIVATE ${PLATFORM_MISCELLANEOUS_LIBS})

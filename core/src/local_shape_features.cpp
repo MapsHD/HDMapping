@@ -1,6 +1,7 @@
 #include <local_shape_features.h>
 #include <hash_utils.h>
 #include <iostream>
+#include <execution>
 
 bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLocalShapeFeatures> &points, const Params &params)
 {
@@ -32,9 +33,9 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
         }
     }
 
-    for (unsigned int i = 0; i < indexes.size(); i++)
+    const auto hessian_fun = [&](const std::pair<unsigned long long int, unsigned int> &index)
     {
-        int index_element_source = indexes[i].second;
+        int index_element_source = index.second; 
         Eigen::Vector3d source = points[index_element_source].coordinates_global;
         Eigen::Vector3d mean(0.0, 0.0, 0.0);
         Eigen::Matrix3d cov;
@@ -119,6 +120,15 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
         {
             points[index_element_source].valid = false;
         }
+    };
+
+    if (params.multithread)
+    {
+        std::for_each(std::execution::par_unseq, std::begin(indexes), std::end(indexes), hessian_fun);
+    }
+    else
+    {
+        std::for_each(std::begin(indexes), std::end(indexes), hessian_fun);
     }
 
     return true;

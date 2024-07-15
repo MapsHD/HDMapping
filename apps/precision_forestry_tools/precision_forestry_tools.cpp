@@ -50,6 +50,7 @@ Session session;
 int viewer_decmiate_point_cloud = 100;
 std::vector<int> lowest_points_indexes;
 std::vector<LocalShapeFeatures::PointWithLocalShapeFeatures> points_with_lsf;
+bool show_normal_vectors = false;
 
 namespace fs = std::filesystem;
 
@@ -291,6 +292,8 @@ void project_gui()
         std::cout << "please load point cloud" << std::endl;
       }
     }
+
+    ImGui::Checkbox("show_normal_vectors", &show_normal_vectors);
     ImGui::End();
   }
   return;
@@ -447,17 +450,22 @@ void display()
   }
   // void render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud);
 
-  glBegin(GL_LINES);
-  for (const auto &p : points_with_lsf)
+  if (show_normal_vectors)
   {
-    if (p.valid)
+    glBegin(GL_LINES);
+
+    for (int i = 0; i < points_with_lsf.size(); i += viewer_decmiate_point_cloud)
     {
-      glColor3f(fabs(p.normal_vector.x()), fabs(p.normal_vector.y()), fabs(p.normal_vector.z()));
-      glVertex3f(p.coordinates_global.x(), p.coordinates_global.y(), p.coordinates_global.z());
-      glVertex3f(p.coordinates_global.x() + p.normal_vector.x(), p.coordinates_global.y() + p.normal_vector.y(), p.coordinates_global.z() + p.normal_vector.z());
+      const auto &p = points_with_lsf[i];
+      if (p.valid)
+      {
+        glColor3f(fabs(p.normal_vector.x()), fabs(p.normal_vector.y()), fabs(p.normal_vector.z()));
+        glVertex3f(p.coordinates_global.x(), p.coordinates_global.y(), p.coordinates_global.z());
+        glVertex3f(p.coordinates_global.x() + p.normal_vector.x(), p.coordinates_global.y() + p.normal_vector.y(), p.coordinates_global.z() + p.normal_vector.z());
+      }
     }
+    glEnd();
   }
-  glEnd();
 
   ImGui_ImplOpenGL2_NewFrame();
   ImGui_ImplGLUT_NewFrame();

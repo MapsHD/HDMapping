@@ -24,8 +24,9 @@ public:
     };
 
     struct Params{
-        Eigen::Vector3d search_radious;
-        double radious;
+        Eigen::Vector3d search_radious = {0.5, 0.5, 0.5};
+        double radious = 0.5;
+        bool multithread = true;
     };
 
     LocalShapeFeatures(){;};

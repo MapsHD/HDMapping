@@ -52,7 +52,7 @@ set(CORE_FILES  ${CORE_SOURCE_FILES} ${CORE_INCLUDE_FILES})
 
 add_library(core STATIC ${CORE_FILES})
 
-target_link_libraries(core PRIVATE ${PLATFORM_LASZIP_LIB})
+target_link_libraries(core PRIVATE ${PLATFORM_LASZIP_LIB} ${PLATFORM_MISCELLANEOUS_LIBS})
 
 target_include_directories(
   core

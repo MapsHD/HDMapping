@@ -16,7 +16,7 @@ set(CORE_HD_MAPPING_FILES ${CORE_HD_MAPPING_SOURCE_FILES}
 
 add_library(core-hd-mapping STATIC ${CORE_HD_MAPPING_FILES})
 
-target_link_libraries(core-hd-mapping PRIVATE core)
+target_link_libraries(core-hd-mapping PRIVATE core ${PLATFORM_MISCELLANEOUS_LIBS})
 
 target_include_directories(
   core-hd-mapping

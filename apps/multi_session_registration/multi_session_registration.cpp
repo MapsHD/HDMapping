@@ -19,6 +19,7 @@
 #include <session.h>
 
 #include <portable-file-dialogs.h>
+#include <pfd_wrapper.hpp>
 
 #include <icp.h>
 
@@ -1859,10 +1860,7 @@ int main(int argc, char *argv[])
     catch (const std::bad_alloc e)
     {
         std::cerr << "System is out of memory : " << e.what() << std::endl;
-        std::cerr << "Adjust paging / swap memory with tips available here : https://github.com/MapsHD/HDMapping/tree/main/doc/virtual_memory.md " << std::endl;
-        pfd::message::message("System is out of memory", "System is out memory, make sure that virtual memory is set correctly, and try again. Application will be terminated."
-            "Please follow guidlines available here : https://github.com/MapsHD/HDMapping/tree/main/doc/virtual_memory.md", pfd::choice::ok, pfd::icon::error);
-
+        mandeye::fd::OutOfMemMessage();
     }
     catch (const std::exception e)
     {

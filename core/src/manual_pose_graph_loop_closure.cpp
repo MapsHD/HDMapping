@@ -14,6 +14,11 @@
 #include <gnss.h>
 
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
+#include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
+
+#include <common/include/cauchy.h>
+
+//#include "lidar_odometry_utils.h"
 
 // std::random_device rd;
 // std::mt19937 gen(rd());
@@ -87,9 +92,9 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
             }
 
             // if (edges.size() > 0 && !manipulate_active_edge)
+            static bool fuse_inclination_from_imu = true;
             if (!manipulate_active_edge)
             {
-
                 if (ImGui::Button("Set initial poses as motion model"))
                 {
                     poses_motion_model.clear();
@@ -457,6 +462,79 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 std::cout << "gcp: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
                             }
 
+                            // fuse_inclination_from_imu
+                            if (fuse_inclination_from_imu)
+                            {
+                                //
+                                for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
+                                {
+
+                                    const auto &pc = point_clouds_container.point_clouds[index_pose];
+                                    if (pc.local_trajectory.size() == 0)
+                                    {
+                                        continue;
+                                    }
+                                    TaitBryanPose current_pose = pose_tait_bryan_from_affine_matrix(pc.m_pose); // poses[i];
+                                    TaitBryanPose desired_pose = current_pose;
+                                    desired_pose.om = pc.local_trajectory[0].imu_om_fi_ka.x();
+                                    // imu_om_fi_ka
+                                    // imu_roll_pitch[i]
+                                    //     .first;
+                                    desired_pose.fi = pc.local_trajectory[0].imu_om_fi_ka.y();
+                                    // imu_roll_pitch[i].second;
+
+                                    Eigen::Affine3d desired_mpose = affine_matrix_from_pose_tait_bryan(desired_pose);
+                                    Eigen::Vector3d vx(desired_mpose(0, 0), desired_mpose(1, 0), desired_mpose(2, 0));
+                                    Eigen::Vector3d vy(desired_mpose(0, 1), desired_mpose(1, 1), desired_mpose(2, 1));
+                                    Eigen::Vector3d point_on_target_line(desired_mpose(0, 3), desired_mpose(1, 3), desired_mpose(2, 3));
+
+                                    Eigen::Vector3d point_source_local(0, 0, 1);
+
+                                    Eigen::Matrix<double, 2, 1> delta;
+                                    point_to_line_tait_bryan_wc(delta,
+                                                                current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                                                point_source_local.x(), point_source_local.y(), point_source_local.z(),
+                                                                point_on_target_line.x(), point_on_target_line.y(), point_on_target_line.z(),
+                                                                vx.x(), vx.y(), vx.z(), vy.x(), vy.y(), vy.z());
+
+                                    Eigen::Matrix<double, 2, 6> delta_jacobian;
+                                    point_to_line_tait_bryan_wc_jacobian(delta_jacobian,
+                                                                         current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                                                         point_source_local.x(), point_source_local.y(), point_source_local.z(),
+                                                                         point_on_target_line.x(), point_on_target_line.y(), point_on_target_line.z(),
+                                                                         vx.x(), vx.y(), vx.z(), vy.x(), vy.y(), vy.z());
+
+                                    int ir = tripletListB.size();
+
+                                    /*for (int ii = 0; ii < 2; ii++)
+                                    {
+                                        for (int jj = 0; jj < 6; jj++)
+                                        {
+                                            int ic = index_pose * 6;
+                                            if (delta_jacobian(ii, jj) != 0.0)
+                                            {
+                                                tripletListA.emplace_back(ir + ii, ic + jj, -delta_jacobian(ii, jj));
+                                            }
+                                        }
+                                    }*/
+                                    int ic = index_pose * 6;
+                                    tripletListA.emplace_back(ir + 0, ic + 3, -delta_jacobian(0, 3));
+                                    tripletListA.emplace_back(ir + 0, ic + 4, -delta_jacobian(0, 4));
+
+                                    tripletListA.emplace_back(ir + 1, ic + 3, -delta_jacobian(1, 3));
+                                    tripletListA.emplace_back(ir + 1, ic + 4, -delta_jacobian(1, 4));
+
+                                    tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1));
+                                    tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 1));
+                                    //tripletListP.emplace_back(ir, ir, 1);
+                                    //tripletListP.emplace_back(ir + 1, ir + 1, 1);
+
+                                    tripletListB.emplace_back(ir, 0, delta(0, 0));
+                                    tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+                                }
+                                //
+                            }
+
                             Eigen::SparseMatrix<double>
                                 matA(tripletListB.size(), point_clouds_container.point_clouds.size() * 6);
                             Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
@@ -598,6 +676,8 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                             std::cout << "--" << std::endl;
                         }
                     }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Fuse inclination from IMU", &fuse_inclination_from_imu);
                 }
             }
         }

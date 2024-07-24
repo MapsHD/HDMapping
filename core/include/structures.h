@@ -67,6 +67,7 @@ struct Point3Di
     float intensity;
     int index_pose;
     uint8_t lidarid;
+	int index_point;
 };
 
 struct Point

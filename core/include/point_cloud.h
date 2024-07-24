@@ -54,6 +54,7 @@ public:
 	struct LocalTrajectoryNode{
 		std::pair<double, double> timestamps;
 		Eigen::Affine3d m_pose;
+		Eigen::Vector3d imu_om_fi_ka;
 	};
 
 	PointCloud() {

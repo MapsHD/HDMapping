@@ -40,7 +40,7 @@ struct WorkerData
     std::vector<Eigen::Affine3d> intermediate_trajectory;
     std::vector<Eigen::Affine3d> intermediate_trajectory_motion_model;
     std::vector<std::pair<double, double>> intermediate_trajectory_timestamps;
-    std::vector<std::pair<double, double>> imu_roll_pitch;
+    std::vector<Eigen::Vector3d> imu_om_fi_ka;
     bool show = false;
 };
 
@@ -111,14 +111,19 @@ void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eig
 // this function performs main LiDAR odometry calculations
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread,
-              bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch);
+              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread/*,
+              bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/);
+
+void optimize_icp(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
+              std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
+              NDT::GridParameters &rgd_params, /*NDTBucketMapType &buckets*/ std::vector<Point3Di> points_global, bool useMultithread/*,
+              bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/);
 
 // this function registers initial point cloud to geoferenced point cloud
 void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &initial_points, Eigen::Affine3d &m_g, NDTBucketMapType &buckets);
 
 // this function apply correction to pitch and roll
-void fix_ptch_roll(std::vector<WorkerData> &worker_data);
+//void fix_ptch_roll(std::vector<WorkerData> &worker_data);
 
 bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure);
 void compute_step_2_fast_forward_motion(std::vector<WorkerData> &worker_data, LidarOdometryParams &params);

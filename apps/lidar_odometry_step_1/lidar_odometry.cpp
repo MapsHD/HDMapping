@@ -5,6 +5,8 @@
 
 #include <HDMapping/Version.hpp>
 
+#include <session.h>
+
 // This is LiDAR odometry (step 1)
 // This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system https://github.com/JanuszBedkowski/mandeye_controller
 // The output is a session proving trajekctory and point clouds that can be  further processed by "multi_view_tls_registration" program.
@@ -80,6 +82,7 @@ const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "L
 std::vector<std::string> csv_files;
 std::vector<std::string> sn_files;
 std::string imuSnToUse;
+Session session;
 
 void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
@@ -114,13 +117,14 @@ void lidar_odometry_gui()
 
         if (!simple_gui)
         {
-            /*if (ImGui::Button("set cave mapping parameters")){
-                params.decimation = 0.03;
+            if (ImGui::Button("set 'narrow spaces' mapping parameters (slow motion upto 2km/h, gentle rotations, e.g. caves, indoor layouts)"))
+            {
+                params.decimation = 0.01;
                 params.in_out_params.resolution_X = 0.1;
                 params.in_out_params.resolution_Y = 0.1;
                 params.in_out_params.resolution_Z = 0.1;
-                params.filter_threshold_xy = 0.1;
-            }*/
+                params.filter_threshold_xy = 0.3;
+            }
 
             ImGui::Checkbox("show_initial_points", &show_initial_points);
             ImGui::Checkbox("show_trajectory", &show_trajectory);
@@ -128,19 +132,19 @@ void lidar_odometry_gui()
             ImGui::Checkbox("show_trajectory_as_axes", &show_trajectory_as_axes);
             // ImGui::Checkbox("show_covs", &show_covs);
             ImGui::InputDouble("normal distributions transform bucket size X", &params.in_out_params.resolution_X);
-            if (params.in_out_params.resolution_X < 0.1)
+            if (params.in_out_params.resolution_X < 0.01)
             {
-                params.in_out_params.resolution_X = 0.1;
+                params.in_out_params.resolution_X = 0.01;
             }
             ImGui::InputDouble("normal distributions transform bucket size Y", &params.in_out_params.resolution_Y);
-            if (params.in_out_params.resolution_Y < 0.1)
+            if (params.in_out_params.resolution_Y < 0.01)
             {
-                params.in_out_params.resolution_Y = 0.1;
+                params.in_out_params.resolution_Y = 0.01;
             }
             ImGui::InputDouble("normal distributions transform bucket size Z", &params.in_out_params.resolution_Z);
-            if (params.in_out_params.resolution_Z < 0.1)
+            if (params.in_out_params.resolution_Z < 0.01)
             {
-                params.in_out_params.resolution_Z = 0.1;
+                params.in_out_params.resolution_Z = 0.01;
             }
 
             ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed)", &params.filter_threshold_xy);
@@ -244,6 +248,8 @@ void lidar_odometry_gui()
                     else
                     {
                         std::cout << "There is no calibration.json file in folder (check comment in source code) file: " << __FILE__ << " line: " << __LINE__ << std::endl;
+                        std::cout << "IGNORE THIS MESSAGE IF YOU HAVE ONLY 1 LIDAR" << std::endl;
+
                         // example file for 2x livox";
                         /*
                         {
@@ -457,7 +463,8 @@ void lidar_odometry_gui()
 
                         //
                         TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(poses[i]);
-                        wd.imu_roll_pitch.emplace_back(tb.om, tb.fi);
+                        // wd.imu_roll_pitch.emplace_back(tb.om, tb.fi);
+                        wd.imu_om_fi_ka.emplace_back(tb.om, tb.fi, tb.ka);
 
                         // temp_ts.emplace_back(timestamps[i]);
 
@@ -537,14 +544,16 @@ void lidar_odometry_gui()
                             wd.intermediate_trajectory.clear();
                             wd.intermediate_trajectory_motion_model.clear();
                             wd.intermediate_trajectory_timestamps.clear();
-                            wd.imu_roll_pitch.clear();
+                            // wd.imu_roll_pitch.clear();
+                            wd.imu_om_fi_ka.clear();
 
                             wd.intermediate_points.reserve(1000000);
                             wd.original_points.reserve(1000000);
                             wd.intermediate_trajectory.reserve(1000);
                             wd.intermediate_trajectory_motion_model.reserve(1000);
                             wd.intermediate_trajectory_timestamps.reserve(1000);
-                            wd.imu_roll_pitch.reserve(1000);
+                            // wd.imu_roll_pitch.reserve(1000);
+                            wd.imu_om_fi_ka.reserve(1000);
 
                             // temp_ts.clear();
                         }
@@ -666,6 +675,8 @@ void lidar_odometry_gui()
                     wd.original_points.insert(std::end(wd.original_points),
                                               std::begin(tmp_data), std::end(tmp_data));
 
+                    wd.imu_om_fi_ka.insert(std::end(wd.imu_om_fi_ka), std::begin(worker_data[i].imu_om_fi_ka), std::end(worker_data[i].imu_om_fi_ka));
+
                     pose_offset += worker_data[i].intermediate_trajectory.size();
 
                     counter++;
@@ -675,6 +686,8 @@ void lidar_odometry_gui()
                         wd.intermediate_trajectory.clear();
                         wd.intermediate_trajectory_timestamps.clear();
                         wd.original_points.clear();
+                        wd.imu_om_fi_ka.clear();
+
                         counter = 0;
                         pose_offset = 0;
                     }
@@ -732,7 +745,11 @@ void lidar_odometry_gui()
                             << pose(2, 1) << " "
                             << pose(2, 2) << " "
                             << pose(2, 3) << " "
-                            << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].second * 1e9 << std::endl;
+                            << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].second * 1e9 << " "
+                            << worker_data_concatenated[i].imu_om_fi_ka[j].x() << " "
+                            << worker_data_concatenated[i].imu_om_fi_ka[j].y() << " "
+                            << worker_data_concatenated[i].imu_om_fi_ka[j].z() << " "
+                            << std::endl;
                     }
                     outfile.close();
                     //
@@ -915,6 +932,8 @@ void lidar_odometry_gui()
 
                     update_rgd(params.in_out_params, params.reference_buckets, params.reference_points);
                     show_reference_points = true;
+
+                    params.buckets = params.reference_buckets;
                 }
             }
 
@@ -993,9 +1012,10 @@ void lidar_odometry_gui()
 
             if (ImGui::Button("select scans from range <index_from_inclusive - 1, index_to_inclusive - 1>"))
             {
-                if (index_from_inclusive > 1 && index_to_inclusive > 1){
-                    index_from_inclusive --;
-                    index_to_inclusive --;
+                if (index_from_inclusive > 1 && index_to_inclusive > 1)
+                {
+                    index_from_inclusive--;
+                    index_to_inclusive--;
 
                     for (int k = 0; k < worker_data.size(); k++)
                     {
@@ -1035,8 +1055,8 @@ void lidar_odometry_gui()
             {
                 if (index_from_inclusive > 10 && index_to_inclusive > 10)
                 {
-                    index_from_inclusive-=10;
-                    index_to_inclusive-=10;
+                    index_from_inclusive -= 10;
+                    index_to_inclusive -= 10;
 
                     for (int k = 0; k < worker_data.size(); k++)
                     {
@@ -1096,6 +1116,106 @@ void lidar_odometry_gui()
             if (prev != index_to_inclusive)
             {
                 stretch_gizmo_m = worker_data[index_to_inclusive].intermediate_trajectory[0];
+            }
+
+            if (ImGui::Button("export selected scans"))
+            {
+                std::vector<Point3Di> intermediate_points_to_save;
+                Eigen::Affine3d pose;
+                for (int i = 0; i < worker_data.size(); i++)
+                {
+                    if (worker_data[i].show)
+                    {
+                        for (const auto &p : worker_data[i].intermediate_points)
+                        {
+                            intermediate_points_to_save.push_back(p);
+                            pose = worker_data[i].intermediate_trajectory[p.index_pose];
+                        }
+                    }
+                }
+
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
+                    output_file_name = sel;
+                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    std::vector<Eigen::Vector3d> pointcloud;
+                    std::vector<unsigned short> intensity;
+
+                    for (const auto &p : intermediate_points_to_save)
+                    {
+                        Eigen::Vector3d pt = p.point;
+                        pointcloud.push_back(pt);
+                        intensity.push_back(p.intensity);
+                    }
+
+                    if (!exportLaz(output_file_name, pointcloud, intensity, 0, 0, 0))
+                    {
+                        std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    }
+                    else
+                    {
+                        PointCloud pc;
+                        pc.file_name = output_file_name;
+                        pc.m_pose = pose;
+                        session.point_clouds_container.point_clouds.push_back(pc);
+                    }
+                }
+
+                std::cout << "----------------------------------------" << std::endl;
+                std::cout << "please add following lines to RESSO file:" << std::endl;
+                std::cout << fs::path(output_file_name).filename() << "(!!!please remove brackets!!!)" << std::endl;
+                std::cout << pose.matrix() << std::endl;
+
+                std::cout << "example RESSO file" << std::endl;
+                std::cout << ".................................................." << std::endl;
+                std::cout << "3" << std::endl
+                          << "scan_0.laz" << std::endl
+                          << "0.999775 0.000552479 -0.0212158 -0.0251188" << std::endl
+                          << "0.000834612 0.997864 0.0653156 -0.0381429" << std::endl
+                          << "0.0212066 - 0.0653186 0.997639 -0.000757752" << "0 0 0 1" << std::endl
+                          << "scan_1.laz" << std::endl
+                          << "0.999783 0.00178963 -0.0207603 -0.0309683" << std::endl
+                          << "-0.000467341 0.99798 0.0635239 -0.0517512" << std::endl
+                          << "0.0208321 -0.0635004 0.997764 0.00331449" << std::endl
+                          << "0 0 0 1" << std::endl
+                          << "scan_2.laz" << std::endl
+                          << "0.999783 0.00163449 -0.0207736 -0.0309985" << std::endl
+                          << "-0.000312224 0.997982 0.0634957 -0.0506113" << std::endl
+                          << "0.0208355 -0.0634754 0.997766 0.0028499" << std::endl
+                          << "0 0 0 1" << std::endl;
+                std::cout << "................................................." << std::endl;
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("save RESSO file"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save RESSO file", "C:\\").result();
+                    output_file_name = sel;
+                    std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
+                if (output_file_name.size() > 0)
+                {
+                    session.point_clouds_container.save_poses(fs::path(output_file_name).string(), false);
+                }
             }
 
             if (index_to_inclusive > index_from_inclusive)
@@ -1686,7 +1806,7 @@ void display()
         GLfloat modelview[16];
         glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::LOCAL, m_gizmo, NULL);
+        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
 
         // Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
 

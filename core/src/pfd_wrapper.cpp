@@ -28,4 +28,20 @@ namespace mandeye::fd{
         return file;
     }
 
+      void OutOfMemMessage()
+      {
+        std::cerr << "Adjust paging / swap memory with tips available here : "
+                     "https://github.com/MapsHD/HDMapping/tree/main/doc/"
+                     "virtual_memory.md "
+                  << std::endl;
+        [[maybe_unused]] pfd::message message(
+            "System is out of memory",
+            "System is out memory, make sure that virtual memory is set "
+            "correctly, and try again. Application will be terminated"
+            "Please follow guidlines available here : "
+            "https://github.com/MapsHD/HDMapping/tree/main/doc/"
+            "virtual_memory.md",
+            pfd::choice::ok, pfd::icon::error);
+        message.result();
+      }
 }

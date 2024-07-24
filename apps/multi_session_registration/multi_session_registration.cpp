@@ -19,6 +19,7 @@
 #include <session.h>
 
 #include <portable-file-dialogs.h>
+#include <pfd_wrapper.hpp>
 
 #include <icp.h>
 
@@ -1843,17 +1844,28 @@ bool initGL(int *argc, char **argv)
 
 int main(int argc, char *argv[])
 {
-    initGL(&argc, argv);
-    glutDisplayFunc(display);
-    glutMouseFunc(mouse);
-    glutMotionFunc(motion);
-    glutMouseWheelFunc(wheel);
-    glutMainLoop();
+    try {
+        initGL(&argc, argv);
+        glutDisplayFunc(display);
+        glutMouseFunc(mouse);
+        glutMotionFunc(motion);
+        glutMouseWheelFunc(wheel);
+        glutMainLoop();
 
-    ImGui_ImplOpenGL2_Shutdown();
-    ImGui_ImplGLUT_Shutdown();
+        ImGui_ImplOpenGL2_Shutdown();
+        ImGui_ImplGLUT_Shutdown();
 
-    ImGui::DestroyContext();
+        ImGui::DestroyContext();
+    }
+    catch (const std::bad_alloc e)
+    {
+        std::cerr << "System is out of memory : " << e.what() << std::endl;
+        mandeye::fd::OutOfMemMessage();
+    }
+    catch (const std::exception e)
+    {
+        std::cout << e.what();
+    }
     return 0;
 }
 

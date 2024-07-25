@@ -1297,6 +1297,9 @@ void project_gui()
                 ImGui::SameLine();
                 ImGui::Checkbox(std::string("#" + std::to_string(i) + " choose_geo").c_str(), &session.point_clouds_container.point_clouds[i].choosing_geo);
 
+                ImGui::SameLine();
+                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fuse inclination from IMU").c_str(), &session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU);
+
                 if (session.point_clouds_container.point_clouds[i].choosing_geo)
                 {
                     for (int gp = 0; gp < session.point_clouds_container.point_clouds[i].available_geo_points.size(); gp++)

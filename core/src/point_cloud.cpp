@@ -149,8 +149,8 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 		}
 		glEnd();
 
-
-		if(this->local_trajectory.size() > 0){
+		if (this->local_trajectory.size() > 0 && this->fuse_inclination_from_IMU)
+		{
 			Eigen::Vector3d a1(-0.2, -0.2, 0);
 			Eigen::Vector3d a2( 0.2, -0.2, 0);
 			Eigen::Vector3d a3( 0.2,  0.2, 0);

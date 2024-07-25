@@ -18,7 +18,7 @@
 
 #include <common/include/cauchy.h>
 
-//#include "lidar_odometry_utils.h"
+// #include "lidar_odometry_utils.h"
 
 // std::random_device rd;
 // std::mt19937 gen(rd());
@@ -92,7 +92,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
             }
 
             // if (edges.size() > 0 && !manipulate_active_edge)
-            static bool fuse_inclination_from_imu = true;
+            //static bool fuse_inclination_from_imu = true;
             if (!manipulate_active_edge)
             {
                 if (ImGui::Button("Set initial poses as motion model"))
@@ -463,13 +463,17 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                             }
 
                             // fuse_inclination_from_imu
-                            if (fuse_inclination_from_imu)
-                            {
+                            //if (fuse_inclination_from_imu)
+                            //{
                                 //
                                 for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
                                 {
 
                                     const auto &pc = point_clouds_container.point_clouds[index_pose];
+                                    if (!pc.fuse_inclination_from_IMU)
+                                    {
+                                        continue;
+                                    }
                                     if (pc.local_trajectory.size() == 0)
                                     {
                                         continue;
@@ -526,14 +530,14 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
 
                                     tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1));
                                     tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 1));
-                                    //tripletListP.emplace_back(ir, ir, 1);
-                                    //tripletListP.emplace_back(ir + 1, ir + 1, 1);
+                                    // tripletListP.emplace_back(ir, ir, 1);
+                                    // tripletListP.emplace_back(ir + 1, ir + 1, 1);
 
                                     tripletListB.emplace_back(ir, 0, delta(0, 0));
                                     tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
                                 }
                                 //
-                            }
+                            //}
 
                             Eigen::SparseMatrix<double>
                                 matA(tripletListB.size(), point_clouds_container.point_clouds.size() * 6);
@@ -676,8 +680,8 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                             std::cout << "--" << std::endl;
                         }
                     }
-                    ImGui::SameLine();
-                    ImGui::Checkbox("Fuse inclination from IMU", &fuse_inclination_from_imu);
+                    //ImGui::SameLine();
+                    //ImGui::Checkbox("Fuse inclination from IMU", &fuse_inclination_from_imu);
                 }
             }
         }

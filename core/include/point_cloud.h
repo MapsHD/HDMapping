@@ -95,6 +95,7 @@ public:
 	std::vector<LocalTrajectoryNode> local_trajectory;
 	bool show_local_trajectory = false;
 	bool show_color = true;
+	bool fuse_inclination_from_IMU = false;
 
 	TaitBryanPose pose;
 	float gui_translation[3];

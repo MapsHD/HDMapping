@@ -9,4 +9,6 @@ namespace mandeye::fd{
 
     std::vector<std::string> OpenFileDialog(const std::string& title, const std::vector<std::string>&filter, bool multiselect);
     std::string SaveFileDialog(const std::string& title, const std::vector<std::string>&filter);
+
+    void OutOfMemMessage();
 }

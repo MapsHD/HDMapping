@@ -32,6 +32,7 @@
 #include <python-scripts/constraints/constraint_fixed_parameter_jacobian.h>
 #include <common/include/cauchy.h>
 #include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
+#include <pfd_wrapper.hpp>
 
 struct WorkerData
 {

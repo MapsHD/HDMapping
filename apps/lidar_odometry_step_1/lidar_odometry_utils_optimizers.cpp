@@ -49,60 +49,60 @@ std::vector<std::pair<int, int>> nns(std::vector<Point3Di> points_global, const 
             indexes_target.push_back(-1);
         }
 
-        //if (source.index_point >= 0)
+        // if (source.index_point >= 0)
         //{
-            for (double x = -search_radious.x(); x <= search_radious.x(); x += search_radious.x())
+        for (double x = -search_radious.x(); x <= search_radious.x(); x += search_radious.x())
+        {
+            for (double y = -search_radious.y(); y <= search_radious.y(); y += search_radious.y())
             {
-                for (double y = -search_radious.y(); y <= search_radious.y(); y += search_radious.y())
+                for (double z = -search_radious.z(); z <= search_radious.z(); z += search_radious.z())
                 {
-                    for (double z = -search_radious.z(); z <= search_radious.z(); z += search_radious.z())
+                    Eigen::Vector3d position_global = source.point + Eigen::Vector3d(x, y, z);
+                    unsigned long long int index_of_bucket = get_rgd_index(position_global, search_radious);
+
+                    if (buckets.contains(index_of_bucket))
                     {
-                        Eigen::Vector3d position_global = source.point + Eigen::Vector3d(x, y, z);
-                        unsigned long long int index_of_bucket = get_rgd_index(position_global, search_radious);
-
-                        if (buckets.contains(index_of_bucket))
+                        for (int index = buckets[index_of_bucket].first; index < buckets[index_of_bucket].second; index++)
                         {
-                            for (int index = buckets[index_of_bucket].first; index < buckets[index_of_bucket].second; index++)
-                            {
-                                int index_element_target = indexes[index].second;
-                                auto target = points_global[index_element_target];
+                            int index_element_target = indexes[index].second;
+                            auto target = points_global[index_element_target];
 
-                                if (source.index_point != target.index_point)
+                            if (source.index_point != target.index_point)
+                            {
+                                double dist = (target.point - source.point).norm();
+                                if (dist < search_radious.norm())
                                 {
-                                    double dist = (target.point - source.point).norm();
-                                    if (dist < search_radious.norm())
+                                    if (dist < min_distances[target.index_pose + 1])
                                     {
-                                        if (dist < min_distances[target.index_pose + 1])
-                                        {
-                                            min_distances[target.index_pose + 1] = dist;
-                                            indexes_target[target.index_pose + 1] = index_element_target;
-                                        }
+                                        min_distances[target.index_pose + 1] = dist;
+                                        indexes_target[target.index_pose + 1] = index_element_target;
                                     }
                                 }
-
-                                /*if ((source - target).norm() < params.radious)
-                                {
-                                    mean += target;
-                                    number_of_points_nn++;
-                                    batch_of_points.push_back(target);
-                                }*/
                             }
+
+                            /*if ((source - target).norm() < params.radious)
+                            {
+                                mean += target;
+                                number_of_points_nn++;
+                                batch_of_points.push_back(target);
+                            }*/
                         }
                     }
                 }
             }
+        }
 
-            // std::cout << "------------" << std::endl;
-            for (size_t y = 0; y < min_distances.size(); y++)
+        // std::cout << "------------" << std::endl;
+        for (size_t y = 0; y < min_distances.size(); y++)
+        {
+            // std::cout << min_distances[y] << " " << indexes_target[y] << " " << index_element_source << std::endl;
+
+            if (indexes_target[y] != -1)
             {
-                // std::cout << min_distances[y] << " " << indexes_target[y] << " " << index_element_source << std::endl;
-
-                if (indexes_target[y] != -1)
-                {
-                    nn.emplace_back(index_element_source, indexes_target[y]);
-                }
+                nn.emplace_back(index_element_source, indexes_target[y]);
             }
         }
+    }
     //}
 
     return nn;
@@ -110,8 +110,9 @@ std::vector<std::pair<int, int>> nns(std::vector<Point3Di> points_global, const 
 
 void optimize_icp(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
                   std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-                  NDT::GridParameters &rgd_params, /*NDTBucketMapType &buckets*/ std::vector<Point3Di> points_global, bool useMultithread/*,
-                  bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/)
+                  NDT::GridParameters &rgd_params, /*NDTBucketMapType &buckets*/ std::vector<Point3Di> points_global, bool useMultithread /*,
+                   bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
+)
 {
 
     std::vector<Point3Di> all_points_global = points_global;
@@ -140,9 +141,9 @@ void optimize_icp(std::vector<Point3Di> &intermediate_points, std::vector<Eigen:
     // all_points_global_target[i].index_pose is never 0!!!! ToDo check it why
 
     std::vector<std::pair<int, int>> nn = nns(all_points_global, indexes_for_nn);
-    
-    //std::cout << "nn.size(): " << nn.size() << std::endl;
-    //return;
+
+    // std::cout << "nn.size(): " << nn.size() << std::endl;
+    // return;
 
     std::vector<Eigen::Triplet<double>> tripletListA;
     std::vector<Eigen::Triplet<double>> tripletListP;
@@ -414,8 +415,9 @@ void optimize_icp(std::vector<Point3Di> &intermediate_points, std::vector<Eigen:
 
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool multithread/*,
-              bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/)
+              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool multithread /*,
+               bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
+)
 {
     std::vector<Eigen::Triplet<double>> tripletListA;
     std::vector<Eigen::Triplet<double>> tripletListP;
@@ -874,6 +876,30 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         tripletListB.emplace_back(ir + 5, 0, 0);
     }*/
 
+    // exit(1);
+    int ic = 0;
+    int ir = tripletListB.size();
+    tripletListA.emplace_back(ir, ic * 6 + 0, 1);
+    tripletListA.emplace_back(ir + 1, ic * 6 + 1, 1);
+    tripletListA.emplace_back(ir + 2, ic * 6 + 2, 1);
+    tripletListA.emplace_back(ir + 3, ic * 6 + 3, 1);
+    tripletListA.emplace_back(ir + 4, ic * 6 + 4, 1);
+    tripletListA.emplace_back(ir + 5, ic * 6 + 5, 1);
+
+    tripletListP.emplace_back(ir, ir, 1000000);
+    tripletListP.emplace_back(ir + 1, ir + 1, 1000000);
+    tripletListP.emplace_back(ir + 2, ir + 2, 1000000);
+    tripletListP.emplace_back(ir + 3, ir + 3, 1000000);
+    tripletListP.emplace_back(ir + 4, ir + 4, 1000000);
+    tripletListP.emplace_back(ir + 5, ir + 5, 1000000);
+
+    tripletListB.emplace_back(ir, 0, 0);
+    tripletListB.emplace_back(ir + 1, 0, 0);
+    tripletListB.emplace_back(ir + 2, 0, 0);
+    tripletListB.emplace_back(ir + 3, 0, 0);
+    tripletListB.emplace_back(ir + 4, 0, 0);
+    tripletListB.emplace_back(ir + 5, 0, 0);
+    
     Eigen::SparseMatrix<double> matA(tripletListB.size(), intermediate_trajectory.size() * 6);
     Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
     Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
@@ -897,7 +923,9 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
 
     AtPA += AtPAndt.sparseView();
     AtPB += AtPBndt.sparseView();
-    Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
+
+    Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>>
+        solver(AtPA);
     Eigen::SparseMatrix<double> x = solver.solve(AtPB);
     std::vector<double> h_x;
     for (int k = 0; k < x.outerSize(); ++k)
@@ -1597,7 +1625,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
                 optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
-                         params.in_out_params, params.buckets, params.useMultithread/*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
+                         params.in_out_params, params.buckets, params.useMultithread /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
             }
             end1 = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds1 = end1 - start1;

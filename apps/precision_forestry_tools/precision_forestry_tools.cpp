@@ -18,6 +18,204 @@
 #include <transformations.h>
 #include <local_shape_features.h>
 
+struct Pose
+{
+  Eigen::Vector3d position;
+  Eigen::Vector3d orientation;
+  Eigen::Vector3d position_uncertainty;
+  Eigen::Vector3d orientation_uncertainty;
+};
+
+struct WeightsEdge
+{
+  Eigen::Vector3d position;
+  Eigen::Vector3d orientation;
+};
+
+struct Edge
+{
+  int index_from;
+  int index_to;
+  Pose relative_pose;
+  WeightsEdge w;
+};
+
+enum action_node
+{
+  to_compute,
+  to_ommit
+};
+
+struct TrajectoryNode
+{
+  Pose pose;
+  int index_node;
+  int index_trajectory;
+  double timestamp;
+  int index_begin_inclusive;
+  int index_end_exclusive;
+  bool is_fixed;
+  action_node action;
+  int index_segment;
+};
+
+struct GroundMesh
+{
+  std::vector<TrajectoryNode> nodes;
+  std::vector<PointMesh> points;
+  std::vector<Edge> edges;
+  int cols_x;
+  int rows_y;
+};
+
+struct GroundMeshParams
+{
+  double distance_step_x = 1.0;
+  double distance_step_y = 1.0;
+};
+
+GroundMesh generate_ground_mesh(std::vector<PointMesh> &points, const GroundMeshParams &ground_mesh_params)
+{
+  std::cout << "generate_ground_mesh" << std::endl;
+  GroundMesh mesh;
+
+  float min_x = std::numeric_limits<float>::max();
+  float max_x = std::numeric_limits<float>::lowest();
+
+  float min_y = std::numeric_limits<float>::max();
+  float max_y = std::numeric_limits<float>::lowest();
+
+  float mean_z = 0.0;
+  float sum = 0;
+
+  for (size_t i = 0; i < points.size(); i += 100)
+  {
+    if (points[i].coordinates.x() < min_x)
+      min_x = points[i].coordinates.x();
+    if (points[i].coordinates.x() > max_x)
+      max_x = points[i].coordinates.x();
+
+    if (points[i].coordinates.y() < min_y)
+      min_y = points[i].coordinates.y();
+    if (points[i].coordinates.y() > max_y)
+      max_y = points[i].coordinates.y();
+
+    mean_z += points[i].coordinates.z();
+    sum++;
+  }
+
+  if (sum > 0)
+  {
+    mean_z /= sum;
+  }
+
+  min_x -= 10;
+  max_x += 10;
+
+  min_y -= 10;
+  max_y += 10;
+
+  Eigen::Vector3d origin(min_x, min_y, 0);
+  Eigen::Vector3d step_x(max_x - min_x, 0, 0);
+  Eigen::Vector3d step_y(0, max_y - min_y, 0);
+
+  mesh.cols_x = step_x.norm() / ground_mesh_params.distance_step_x + 1;
+  mesh.rows_y = step_y.norm() / ground_mesh_params.distance_step_y + 1;
+
+  step_x /= step_x.norm();
+  step_x *= ground_mesh_params.distance_step_x;
+  step_y /= step_y.norm();
+  step_y *= ground_mesh_params.distance_step_y;
+  ;
+
+  int index_node = 0;
+  int index_begin_inclusive = 0;
+  int index_end_exclusive = 0;
+
+  for (size_t x = 0; x < mesh.cols_x; x++)
+  {
+    for (size_t y = 0; y < mesh.rows_y; y++)
+    {
+      PointMesh point;
+      point.coordinates = Eigen::Vector3d(0, 0, 0);
+      point.normal_vector = Eigen::Vector3d(0, 0, 1);
+
+      point.index_pose = index_node;
+      mesh.points.push_back(point);
+      index_end_exclusive++;
+
+      Eigen::Vector3d offset = step_x * x + step_y * y;
+
+      TrajectoryNode tr;
+      tr.index_node = index_node;
+      tr.index_begin_inclusive = index_begin_inclusive;
+      tr.index_end_exclusive = index_end_exclusive;
+      tr.pose.orientation.x() = 0;
+      tr.pose.orientation.y() = 0;
+      tr.pose.orientation.z() = 0;
+
+      tr.pose.position = origin + offset;
+      tr.pose.position.z() = mean_z;
+
+      tr.index_trajectory = 0;
+      tr.timestamp = 0;
+      tr.action = action_node::to_ommit;
+
+      mesh.nodes.push_back(tr);
+
+      index_node++;
+      index_begin_inclusive = index_end_exclusive;
+    }
+  }
+
+  WeightsEdge w;
+  w.position.x() = 1;
+  w.position.y() = 1;
+  w.position.z() = 1;
+  w.orientation.x() = 1;
+  w.orientation.y() = 1;
+  w.orientation.z() = 1;
+
+  for (size_t x = 0; x < mesh.cols_x - 1; x++)
+  {
+    for (size_t y = 0; y < mesh.rows_y - 1; y++)
+    {
+      Edge edg;
+      edg.w = w;
+
+      edg.index_from = x * mesh.rows_y + y;
+      edg.index_to = (x + 1) * mesh.rows_y + y;
+      mesh.edges.push_back(edg);
+
+      edg.index_from = x * mesh.rows_y + y;
+      edg.index_to = x * mesh.rows_y + y + 1;
+      mesh.edges.push_back(edg);
+    }
+  }
+
+  for (size_t x = 0; x < mesh.cols_x - 1; x++)
+  {
+    size_t y = mesh.rows_y - 1;
+    Edge edg;
+    edg.w = w;
+    edg.index_from = x * mesh.rows_y + y;
+    edg.index_to = (x + 1) * mesh.rows_y + y;
+    mesh.edges.push_back(edg);
+  }
+
+  size_t x = mesh.cols_x - 1;
+  for (size_t y = 0; y < mesh.rows_y - 1; y++)
+  {
+    Edge edg;
+    edg.w = w;
+    edg.index_from = x * mesh.rows_y + y;
+    edg.index_to = x * mesh.rows_y + y + 1;
+    mesh.edges.push_back(edg);
+  }
+
+  return mesh;
+}
+
 const unsigned int window_width = 800;
 const unsigned int window_height = 600;
 double camera_ortho_xy_view_zoom = 10;
@@ -51,6 +249,9 @@ int viewer_decmiate_point_cloud = 100;
 std::vector<int> lowest_points_indexes;
 std::vector<LocalShapeFeatures::PointWithLocalShapeFeatures> points_with_lsf;
 bool show_normal_vectors = false;
+
+GroundMesh ground_mesh;
+// GroundMesh generate_ground_mesh(std::vector<Eigen::Vector3d> &points, const GroundMeshParams &ground_mesh_params)
 
 namespace fs = std::filesystem;
 
@@ -293,6 +494,21 @@ void project_gui()
       }
     }
 
+    if (ImGui::Button("generate_ground_mesh"))
+    {
+      std::cout << "ImGui::Button(generate_ground_mesh)" << std::endl;
+      GroundMeshParams ground_mesh_params;
+      std::vector<PointMesh> points;
+      for (const auto &p : session.point_clouds_container.point_clouds[0].points_local)
+      {
+        PointMesh pp;
+        pp.coordinates = p;
+        points.push_back(pp);
+      }
+      // session.point_clouds_container.point_clouds[0].points_local
+      ground_mesh = generate_ground_mesh(points, ground_mesh_params);
+    }
+
     ImGui::Checkbox("show_normal_vectors", &show_normal_vectors);
     ImGui::End();
   }
@@ -466,6 +682,18 @@ void display()
     }
     glEnd();
   }
+
+  //
+  glColor3f(0, 0, 0);
+  glBegin(GL_LINES);
+  for (const auto &edge : ground_mesh.edges)
+  {
+    glVertex3f(ground_mesh.nodes[edge.index_from].pose.position.x(), ground_mesh.nodes[edge.index_from].pose.position.y(), ground_mesh.nodes[edge.index_from].pose.position.z());
+    glVertex3f(ground_mesh.nodes[edge.index_to].pose.position.x(), ground_mesh.nodes[edge.index_to].pose.position.y(), ground_mesh.nodes[edge.index_to].pose.position.z());
+  }
+  glEnd();
+
+  //
 
   ImGui_ImplOpenGL2_NewFrame();
   ImGui_ImplGLUT_NewFrame();

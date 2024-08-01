@@ -72,11 +72,18 @@ struct Point3Di
 
 struct Point
 {
-	float x = 0.0f;
-	float y = 0.0f;
-	float z = 0.0f;
+	double x = 0.0f;
+	double y = 0.0f;
+	double z = 0.0f;
 	uint32_t intensity = 0;
 	double time = 0.0;
+};
+
+struct PointMesh
+{
+	Eigen::Vector3d coordinates;
+	Eigen::Vector3d normal_vector;
+	int index_pose;
 };
 
 struct ChunkFile {

@@ -2664,7 +2664,7 @@ void project_gui()
 void ndt_gui()
 {
     static bool compute_mean_and_cov_for_bucket = false;
-    ImGui::Begin("Normal Distribution Transforms");
+    ImGui::Begin("Normal Distributions Transform");
 
     ImGui::InputFloat3("bucket_size (x[m],y[m],z[m])", ndt.bucket_size);
     if (ndt.bucket_size[0] < 0.01)

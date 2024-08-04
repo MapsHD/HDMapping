@@ -43,6 +43,23 @@ public:
 		Eigen::Vector3d normal_vector;
 	};
 
+	struct BucketCoef
+	{
+		Eigen::Vector3d mean;
+		Eigen::Matrix3d cov;
+		Eigen::Vector3d normal_vector;
+		std::vector<long long unsigned int> point_indexes;
+		bool valid = false;
+	};
+
+	struct Bucket2
+	{
+		long long unsigned int index_begin_inclusive;
+		long long unsigned int index_end_exclusive;
+		// long long unsigned int number_of_points;
+		std::unordered_map<long long unsigned int, BucketCoef> buckets;
+	};
+
 	struct Job
 	{
 		long long unsigned int index_begin_inclusive;
@@ -84,7 +101,7 @@ public:
 	void grid_calculate_params(const std::vector<Point3D> &point_cloud_global, GridParameters &in_out_params);
 	void grid_calculate_params(const std::vector<Point3Di> &point_cloud_global, GridParameters &in_out_params);
 	void grid_calculate_params(GridParameters &in_out_params, double min_x, double max_x, double min_y, double max_y, double min_z, double max_z);
-	
+
 	void build_rgd(std::vector<Point3D> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
 				   int num_threads = std::thread::hardware_concurrency());
 	void build_rgd(std::vector<Point3Di> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
@@ -103,20 +120,20 @@ public:
 	// std::vector<Eigen::Matrix<double, 7, 7, Eigen::RowMajor>> compute_covariance_matrices7x7(PointClouds& point_clouds_container);
 
 	bool compute_cov_mean(std::vector<Point3D> &points, std::vector<PointBucketIndexPair> &index_pair, std::vector<Bucket> &buckets, GridParameters &rgd_params,
-					double min_x, double max_x, double min_y, double max_y, double min_z, double max_z, int num_threads = std::thread::hardware_concurrency());
+						  double min_x, double max_x, double min_y, double max_y, double min_z, double max_z, int num_threads = std::thread::hardware_concurrency());
 
-	bool compute_cov_mean(std::vector<Point3Di> &points, 
-		std::vector<PointBucketIndexPair> &index_pair, 
-		std::vector<Bucket> &buckets, GridParameters &rgd_params,
-		int num_threads = std::thread::hardware_concurrency());
+	bool compute_cov_mean(std::vector<Point3Di> &points,
+						  std::vector<PointBucketIndexPair> &index_pair,
+						  std::vector<Bucket> &buckets, GridParameters &rgd_params,
+						  int num_threads = std::thread::hardware_concurrency());
 
-	bool compute_cov_mean(std::vector<Point3Di> &points, 
-		std::vector<PointBucketIndexPair> &index_pair, 
-		std::map<unsigned long long int, NDT::Bucket> &buckets, GridParameters &rgd_params,
-		int num_threads = std::thread::hardware_concurrency());
+	bool compute_cov_mean(std::vector<Point3Di> &points,
+						  std::vector<PointBucketIndexPair> &index_pair,
+						  std::map<unsigned long long int, NDT::Bucket> &buckets, GridParameters &rgd_params,
+						  int num_threads = std::thread::hardware_concurrency());
 
 	void build_rgd(std::vector<Point3Di> &points, std::vector<PointBucketIndexPair> &index_pair, std::map<unsigned long long int, NDT::Bucket> &buckets, GridParameters &rgd_params,
-		int num_threads = std::thread::hardware_concurrency());
+				   int num_threads = std::thread::hardware_concurrency());
 
 	float bucket_size[3];
 	float bucket_size_external[3];

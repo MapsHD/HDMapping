@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.15.0)
 project(hd-mapping)
 
 add_definitions(-DHDMAPPING_VERSION_MAJOR=0)
-add_definitions(-DHDMAPPING_VERSION_MINOR=52)
+add_definitions(-DHDMAPPING_VERSION_MINOR=53)
 add_definitions(-DHDMAPPING_VERSION_PATCH=0)
 
 include_directories(shared/include)

@@ -46,6 +46,7 @@ struct WorkerData
 };
 
 using NDTBucketMapType = std::unordered_map<uint64_t, NDT::Bucket>;
+using NDTBucketMapType2 = std::unordered_map<uint64_t, NDT::Bucket2>;
 
 struct LidarOdometryParams
 {
@@ -64,7 +65,6 @@ struct LidarOdometryParams
     std::string working_directory_preview = "";
     double sliding_window_trajectory_length_threshold = 50.0;
 };
-
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);
 unsigned long long int get_rgd_index(const Eigen::Vector3d p, const Eigen::Vector3d b);
@@ -98,13 +98,11 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
 //! @param calibrations - map of calibrations for each scanner key is scanner id.
 //! @return vector of points of @ref Point3Di type
 std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy,
-                                       const std::unordered_map<int, Eigen::Affine3d>& calibrations);
-
+                                       const std::unordered_map<int, Eigen::Affine3d> &calibrations);
 
 bool saveLaz(const std::string &filename, const WorkerData &data);
 bool saveLaz(const std::string &filename, const std::vector<Point3Di> &points_global);
 bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_poses, std::vector<std::string> filenames);
-
 
 // this function draws ellipse for each bucket
 void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd = 3);
@@ -112,19 +110,21 @@ void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eig
 // this function performs main LiDAR odometry calculations
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread/*,
-              bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/);
+              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread /*,
+               bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
+);
 
 void optimize_icp(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
-              std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, /*NDTBucketMapType &buckets*/ std::vector<Point3Di> points_global, bool useMultithread/*,
-              bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/);
+                  std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
+                  NDT::GridParameters &rgd_params, /*NDTBucketMapType &buckets*/ std::vector<Point3Di> points_global, bool useMultithread /*,
+                   bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
+);
 
 // this function registers initial point cloud to geoferenced point cloud
 void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &initial_points, Eigen::Affine3d &m_g, NDTBucketMapType &buckets);
 
 // this function apply correction to pitch and roll
-//void fix_ptch_roll(std::vector<WorkerData> &worker_data);
+// void fix_ptch_roll(std::vector<WorkerData> &worker_data);
 
 bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure);
 void compute_step_2_fast_forward_motion(std::vector<WorkerData> &worker_data, LidarOdometryParams &params);
@@ -172,38 +172,40 @@ void compute_step_2_fast_forward_motion(std::vector<WorkerData> &worker_data, Li
 //! The first column is sensor id, the second column is serial number.
 //! It is a mapping from lidarid (used in LAZ file) to serial number.
 //! Those two files allows to apply calibration to each point in LAZ file.
-namespace MLvxCalib {
+namespace MLvxCalib
+{
 
-//! Parse the calibration file and return a map from sensor id to serial number.
-//! Sensor id is the id is id of the point in laz file.
-//! Serial number is the serial number of the Livox.
-//! @param filename calibration file
-//! @return map of serial number, where key is sensor id.
-std::unordered_map<int, std::string> GetIdToSnMapping(const std::string& filename);
+    //! Parse the calibration file and return a map from sensor id to serial number.
+    //! Sensor id is the id is id of the point in laz file.
+    //! Serial number is the serial number of the Livox.
+    //! @param filename calibration file
+    //! @return map of serial number, where key is sensor id.
+    std::unordered_map<int, std::string> GetIdToSnMapping(const std::string &filename);
 
-//! Parse the calibration file and return a map from serial number to calibration.
-//! @param filename calibration file
-//! @return map of extrinsic calibration, where key is serial number of the lidar.
-std::unordered_map<std::string, Eigen::Affine3d> GetCalibrationFromFile(const std::string& filename);
+    //! Parse the calibration file and return a map from serial number to calibration.
+    //! @param filename calibration file
+    //! @return map of extrinsic calibration, where key is serial number of the lidar.
+    std::unordered_map<std::string, Eigen::Affine3d> GetCalibrationFromFile(const std::string &filename);
 
-//! Parse the calibration file and return a serial number of the Livox to use for IMU.
-//! @param filename calibration file
-//! @return serial number of the Livox to use for IMU
-std::string GetImuSnToUse(const std::string& filename);
+    //! Parse the calibration file and return a serial number of the Livox to use for IMU.
+    //! @param filename calibration file
+    //! @return serial number of the Livox to use for IMU
+    std::string GetImuSnToUse(const std::string &filename);
 
-//! Combine the id to serial number mapping and the calibration into a single map.
-//! The single map is from sensor id to calibration.
-//! @param idToSn mapping from serial number to Id number in pointcloud or IMU CSV
-//! @param calibration map of extrinsic calibration, where key is serial number of the lidar.
-//! @return map from sensor id to extrinsic calibration
-std::unordered_map<int, Eigen::Affine3d> CombineIntoCalibration(const std::unordered_map<int, std::string>& idToSn,
-                                                                const std::unordered_map<std::string, Eigen::Affine3d>& calibration);
-//! Get the id of the IMU to use.
-//! @param idToSn mapping from serial number to Id number in pointcloud or IMU CSV
-//! @param snToUse serial number of the Livox to use for IMU
-//! @return id of the IMU to use
-int GetImuIdToUse(const std::unordered_map<int, std::string>& idToSn, const std::string& snToUse );
+    //! Combine the id to serial number mapping and the calibration into a single map.
+    //! The single map is from sensor id to calibration.
+    //! @param idToSn mapping from serial number to Id number in pointcloud or IMU CSV
+    //! @param calibration map of extrinsic calibration, where key is serial number of the lidar.
+    //! @return map from sensor id to extrinsic calibration
+    std::unordered_map<int, Eigen::Affine3d> CombineIntoCalibration(const std::unordered_map<int, std::string> &idToSn,
+                                                                    const std::unordered_map<std::string, Eigen::Affine3d> &calibration);
+    //! Get the id of the IMU to use.
+    //! @param idToSn mapping from serial number to Id number in pointcloud or IMU CSV
+    //! @param snToUse serial number of the Livox to use for IMU
+    //! @return id of the IMU to use
+    int GetImuIdToUse(const std::unordered_map<int, std::string> &idToSn, const std::string &snToUse);
 }
 
 void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &params);
+void Consistency2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params);
 #endif

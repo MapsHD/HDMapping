@@ -84,6 +84,8 @@ std::vector<std::string> sn_files;
 std::string imuSnToUse;
 Session session;
 
+//std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> global_tmp;
+
 void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
@@ -131,17 +133,17 @@ void lidar_odometry_gui()
             ImGui::SameLine();
             ImGui::Checkbox("show_trajectory_as_axes", &show_trajectory_as_axes);
             // ImGui::Checkbox("show_covs", &show_covs);
-            ImGui::InputDouble("normal distributions transform bucket size X", &params.in_out_params.resolution_X);
+            ImGui::InputDouble("normal distribution transforms bucket size X", &params.in_out_params.resolution_X);
             if (params.in_out_params.resolution_X < 0.01)
             {
                 params.in_out_params.resolution_X = 0.01;
             }
-            ImGui::InputDouble("normal distributions transform bucket size Y", &params.in_out_params.resolution_Y);
+            ImGui::InputDouble("normal distribution transforms bucket size Y", &params.in_out_params.resolution_Y);
             if (params.in_out_params.resolution_Y < 0.01)
             {
                 params.in_out_params.resolution_Y = 0.01;
             }
-            ImGui::InputDouble("normal distributions transform bucket size Z", &params.in_out_params.resolution_Z);
+            ImGui::InputDouble("normal distribution transforms bucket size Z", &params.in_out_params.resolution_Z);
             if (params.in_out_params.resolution_Z < 0.01)
             {
                 params.in_out_params.resolution_Z = 0.01;
@@ -644,6 +646,22 @@ void lidar_odometry_gui()
                 std::cout << "Consistency FINISHED" << std::endl;
             }
             ImGui::SameLine();
+            if (ImGui::Button("Consistency2"))
+            {
+                std::cout << "Consistency2 START" << std::endl;
+
+                for (int i = 0; i < num_constistency_iter; i++)
+                {
+                    std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
+                    for (int ii = 0; ii < worker_data.size(); ii++)
+                    {
+                        worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
+                    }
+                    Consistency2(worker_data, params);
+                }
+                std::cout << "Consistency2 FINISHED" << std::endl;
+            }
+            ImGui::SameLine();
             ImGui::Text("Press this button optionally before pressing 'save result (step 3)'");
 
             if (ImGui::Button("save result (step 3)"))
@@ -871,7 +889,43 @@ void lidar_odometry_gui()
         }
         if (!simple_gui)
         {
+            if (step_1_done && step_2_done){
+                ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
+            if (ImGui::Button("Consistency"))
+            {
+                std::cout << "Consistency START" << std::endl;
+
+                for (int i = 0; i < num_constistency_iter; i++)
+                {
+                    std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
+                    for (int ii = 0; ii < worker_data.size(); ii++)
+                    {
+                        worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
+                    }
+                    Consistency(worker_data, params);
+                }
+                std::cout << "Consistency FINISHED" << std::endl;
+            }
             ImGui::SameLine();
+            if (ImGui::Button("Consistency2"))
+            {
+                std::cout << "Consistency2 START" << std::endl;
+
+                for (int i = 0; i < num_constistency_iter; i++)
+                {
+                    std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
+                    for (int ii = 0; ii < worker_data.size(); ii++)
+                    {
+                        worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
+                    }
+                    Consistency2(worker_data, params);
+                }
+                std::cout << "Consistency2 FINISHED" << std::endl;
+            }
+            ImGui::SameLine();
+            ImGui::Text("Press this button optionally before pressing 'save result (step 3)'");
+            }
+            //ImGui::SameLine();
             if (ImGui::Button("save trajectory to ascii (x y z)"))
             {
                 static std::shared_ptr<pfd::save_file> save_file;
@@ -1862,6 +1916,18 @@ void display()
         stretch_gizmo_m(3, 3) = m_gizmo[15];
     }
 
+    /*for (int i = 0; i < global_tmp.size(); i++)
+    {
+        glColor3f(global_tmp[i].second.x(), global_tmp[i].second.y(), global_tmp[i].second.z());
+        glBegin(GL_LINES);
+            glVertex3f(global_tmp[i].first.x(), global_tmp[i].first.y(), global_tmp[i].first.z());
+            
+            glVertex3f(global_tmp[i].first.x() + global_tmp[i].second.x(),
+                       global_tmp[i].first.y() + global_tmp[i].second.y(), 
+                       global_tmp[i].first.z() + global_tmp[i].second.z());
+        glEnd();
+    }*/
+
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 
@@ -1904,7 +1970,8 @@ bool initGL(int *argc, char **argv)
 
 int main(int argc, char *argv[])
 {
-    try {
+    try
+    {
         params.in_out_params.resolution_X = 0.3;
         params.in_out_params.resolution_Y = 0.3;
         params.in_out_params.resolution_Z = 0.3;
@@ -1926,7 +1993,6 @@ int main(int argc, char *argv[])
     {
         std::cerr << "System is out of memory : " << e.what() << std::endl;
         mandeye::fd::OutOfMemMessage();
-
     }
     catch (const std::exception e)
     {

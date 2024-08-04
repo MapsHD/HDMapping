@@ -850,7 +850,7 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
     for (auto &pc : point_clouds_container.point_clouds)
     {
         glRasterPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3) + 0.1);
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)std::to_string(i).c_str());
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)std::to_string(i).c_str());
         i++;
     }
 

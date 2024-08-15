@@ -435,6 +435,72 @@ void project_gui()
         {
             if (!save_subsession)
             {
+                if (session.point_clouds_container.initial_poses_file_name.empty())
+                {
+                    std::cout << "Please assign initial_poses_file_name to session" << std::endl;
+                    std::cout << "Session is not saved" << std::endl;
+
+                    [[maybe_unused]] pfd::message message(
+                        "Please assign initial_poses_file_name to session",
+                        "Session is not saved. Please assign initial_poses_file_name to session. "
+                        "Follow guidlines available here : "
+                        "https://github.com/MapsHD/HDMapping/tree/main/doc/, "
+                        "You can do this using button 'update initial poses from RESSO file'",
+                        pfd::choice::ok, pfd::icon::error);
+                    message.result();
+
+                    std::shared_ptr<pfd::save_file> save_file2;
+                    std::string initial_poses_file_name = "";
+                    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file2);
+                    const auto tt = [&]()
+                    {
+                        auto sel = pfd::save_file("initial_poses_file_name", "C:\\", Resso_filter).result();
+                        initial_poses_file_name = sel;
+                        std::cout << "Resso file to save: '" << initial_poses_file_name << "'" << std::endl;
+                    };
+                    std::thread t2(tt);
+                    t2.join();
+
+                    if (initial_poses_file_name.size() > 0)
+                    {
+                        std::cout << "saving initial poses to: " << initial_poses_file_name << std::endl;
+                        session.point_clouds_container.save_poses(fs::path(initial_poses_file_name).string(), save_subsession);
+                    }
+                }
+
+                if (session.point_clouds_container.poses_file_name.empty())
+                {
+                    std::cout << "Please assign poses_file_name to session" << std::endl;
+                    std::cout << "Session is not saved" << std::endl;
+
+                    [[maybe_unused]] pfd::message message(
+                        "Please assign poses_file_name to session",
+                        "Session is not saved. Please assign poses_file_name to session. "
+                        "Follow guidlines available here : "
+                        "https://github.com/MapsHD/HDMapping/tree/main/doc/,"
+                        "You can do this using button 'update poses from RESSO file'",
+                        pfd::choice::ok, pfd::icon::error);
+                    message.result();
+
+                    std::shared_ptr<pfd::save_file> save_file1;
+                    std::string poses_file_name = "";
+                    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file1);
+                    const auto t = [&]()
+                    {
+                        auto sel = pfd::save_file("poses_file_name", "C:\\", Resso_filter).result();
+                        poses_file_name = sel;
+                        std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
+                    };
+                    std::thread t1(t);
+                    t1.join();
+
+                    if (poses_file_name.size() > 0)
+                    {
+                        std::cout << "saving poses to: " << poses_file_name << std::endl;
+                        session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), save_subsession);
+                    }
+                }
+
                 session.save(fs::path(output_file_name).string(), session.point_clouds_container.poses_file_name, session.point_clouds_container.initial_poses_file_name, save_subsession);
                 std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
                 session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), save_subsession);
@@ -518,7 +584,7 @@ void project_gui()
         }
     }
 
-    ImGui::InputInt("increase for better performance, decrease for rendering more points", &viewer_decmiate_point_cloud);
+    ImGui::InputInt("'Points render subsampling': increase for better performance, decrease for rendering more points", &viewer_decmiate_point_cloud);
     if (viewer_decmiate_point_cloud < 1)
     {
         viewer_decmiate_point_cloud = 1;
@@ -689,6 +755,21 @@ void project_gui()
                     std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
                 }
             }
+
+            int number_of_point = 0;
+            for (const auto &pc : session.point_clouds_container.point_clouds)
+            {
+                number_of_point += pc.points_local.size();
+            }
+
+            session.point_clouds_container.print_point_cloud_dimention();
+
+            [[maybe_unused]]
+            pfd::message message(
+                "Information",
+                "If You can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
+                pfd::choice::ok, pfd::icon::error);
+            message.result();
         }
         ImGui::SameLine();
         ImGui::Checkbox("calculate_offset for WHU-TLS", &calculate_offset);
@@ -900,12 +981,12 @@ void project_gui()
 
     if (manual_pose_graph_loop_closure_mode)
     {
-        session.manual_pose_graph_loop_closure.Gui(session.point_clouds_container, 
-            index_loop_closure_source, 
-            index_loop_closure_target, 
-            m_gizmo, 
-            gnss,
-            session.ground_control_points);
+        session.manual_pose_graph_loop_closure.Gui(session.point_clouds_container,
+                                                   index_loop_closure_source,
+                                                   index_loop_closure_target,
+                                                   m_gizmo,
+                                                   gnss,
+                                                   session.ground_control_points);
 
         /*if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size()> 0)
         {
@@ -998,7 +1079,8 @@ void project_gui()
                 index_begin -= step;
                 index_end -= step;
 
-                if (index_begin < 0){
+                if (index_begin < 0)
+                {
                     index_begin = 0;
                 }
                 if (index_end < 0)
@@ -1210,84 +1292,84 @@ void project_gui()
                             }
                         }
                     }
-                    //ImGui::SameLine();
-                    //if (ImGui::Button(std::string("#" + std::to_string(i) + "_IMU").c_str()))
+                    // ImGui::SameLine();
+                    // if (ImGui::Button(std::string("#" + std::to_string(i) + "_IMU").c_str()))
                     //{
-                        /*size_t index_target = i;
-                        PointClouds pcs;
-                        for (size_t k = 0; k < index_target; k++)
+                    /*size_t index_target = i;
+                    PointClouds pcs;
+                    for (size_t k = 0; k < index_target; k++)
+                    {
+                        if (session.point_clouds_container.point_clouds[k].visible)
                         {
-                            if (session.point_clouds_container.point_clouds[k].visible)
-                            {
-                                pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[k]);
-                            }
+                            pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[k]);
                         }
+                    }
 
-                        if (pcs.point_clouds.size() > 0)
+                    if (pcs.point_clouds.size() > 0)
+                    {
+                        for (size_t k = 0; k < pcs.point_clouds.size(); k++)
                         {
-                            for (size_t k = 0; k < pcs.point_clouds.size(); k++)
-                            {
-                                pcs.point_clouds[k].fixed = true;
-                            }
+                            pcs.point_clouds[k].fixed = true;
                         }
-                        pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[index_target]);
-                        pcs.point_clouds[pcs.point_clouds.size() - 1].fixed = false;
+                    }
+                    pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[index_target]);
+                    pcs.point_clouds[pcs.point_clouds.size() - 1].fixed = false;
 
-                        ICP icp;
-                        icp.search_radious = 0.3; // ToDo move to params
-                        for (auto &pc : pcs.point_clouds)
+                    ICP icp;
+                    icp.search_radious = 0.3; // ToDo move to params
+                    for (auto &pc : pcs.point_clouds)
+                    {
+                        pc.rgd_params.resolution_X = icp.search_radious;
+                        pc.rgd_params.resolution_Y = icp.search_radious;
+                        pc.rgd_params.resolution_Z = icp.search_radious;
+
+                        pc.build_rgd();
+                        pc.cout_rgd();
+                        pc.compute_normal_vectors(0.5);
+                    }
+
+                    icp.number_of_threads = std::thread::hardware_concurrency();
+
+                    icp.number_of_iterations = 10;
+                    icp.is_adaptive_robust_kernel = false;
+
+                    icp.is_ballanced_horizontal_vs_vertical = false;
+                    icp.is_fix_first_node = false;
+                    icp.is_gauss_newton = true;
+                    icp.is_levenberg_marguardt = false;
+                    icp.is_cw = false;
+                    icp.is_wc = true;
+                    icp.is_tait_bryan_angles = true;
+                    icp.is_quaternion = false;
+                    icp.is_rodrigues = false;
+                    std::cout << "optimization_point_to_point_source_to_target" << std::endl;
+
+                    icp.optimization_point_to_point_source_to_target(pcs);
+
+                    std::cout << "pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+
+                    std::vector<Eigen::Affine3d> all_m_poses;
+                    for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
+                    {
+                        all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
+                    }
+
+                    session.point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
+
+                    std::cout << "pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+
+                    // like gizmo
+                    if (!manipulate_only_marked_gizmo)
+                    {
+                        std::cout << "update all poses after current pose" << std::endl;
+
+                        Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[index_target].m_pose;
+                        for (int j = index_target + 1; j < session.point_clouds_container.point_clouds.size(); j++)
                         {
-                            pc.rgd_params.resolution_X = icp.search_radious;
-                            pc.rgd_params.resolution_Y = icp.search_radious;
-                            pc.rgd_params.resolution_Z = icp.search_radious;
-
-                            pc.build_rgd();
-                            pc.cout_rgd();
-                            pc.compute_normal_vectors(0.5);
+                            curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
+                            session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
                         }
-
-                        icp.number_of_threads = std::thread::hardware_concurrency();
-
-                        icp.number_of_iterations = 10;
-                        icp.is_adaptive_robust_kernel = false;
-
-                        icp.is_ballanced_horizontal_vs_vertical = false;
-                        icp.is_fix_first_node = false;
-                        icp.is_gauss_newton = true;
-                        icp.is_levenberg_marguardt = false;
-                        icp.is_cw = false;
-                        icp.is_wc = true;
-                        icp.is_tait_bryan_angles = true;
-                        icp.is_quaternion = false;
-                        icp.is_rodrigues = false;
-                        std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                        icp.optimization_point_to_point_source_to_target(pcs);
-
-                        std::cout << "pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
-
-                        std::vector<Eigen::Affine3d> all_m_poses;
-                        for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                        {
-                            all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
-                        }
-
-                        session.point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
-
-                        std::cout << "pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
-
-                        // like gizmo
-                        if (!manipulate_only_marked_gizmo)
-                        {
-                            std::cout << "update all poses after current pose" << std::endl;
-
-                            Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[index_target].m_pose;
-                            for (int j = index_target + 1; j < session.point_clouds_container.point_clouds.size(); j++)
-                            {
-                                curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                                session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                            }
-                        }*/
+                    }*/
                     //}
                 }
                 ImGui::SameLine();
@@ -1326,9 +1408,12 @@ void project_gui()
         }
         // gnss.offset_x, gnss.offset_y, gnss.offset_alt
         ImGui::Text("Set offsets x y z to export point cloud in global coordinate system (each local coordinate of the point += offset)");
-        ImGui::InputDouble("offset_x", &gnss.offset_x);
-        ImGui::InputDouble("offset_y", &gnss.offset_y);
-        ImGui::InputDouble("offset_z", &gnss.offset_alt);
+        // ImGui::InputDouble("offset_x", &gnss.offset_x);
+        // ImGui::InputDouble("offset_y", &gnss.offset_y);
+        // ImGui::InputDouble("offset_z", &gnss.offset_alt);
+        ImGui::InputDouble("offset_x", &session.point_clouds_container.offset.x());
+        ImGui::InputDouble("offset_y", &session.point_clouds_container.offset.y());
+        ImGui::InputDouble("offset_z", &session.point_clouds_container.offset.z());
 
         if (ImGui::Button("save all marked scans to laz (as one global scan)"))
         {
@@ -1358,7 +1443,7 @@ void project_gui()
                             const auto &pp = p.points_local[i];
                             Eigen::Vector3d vp;
                             vp = p.m_pose * pp + session.point_clouds_container.offset;
-
+                            // std::cout << vp << std::endl;
                             pointcloud.push_back(vp);
                             if (i < p.intensities.size())
                             {
@@ -1371,7 +1456,14 @@ void project_gui()
                         }
                     }
                 }
-                if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+
+                // for (int i = 0; i < 10; i++)
+                //{
+                //     std::cout << pointcloud[i].x() << " " << pointcloud[i].y() << " " << pointcloud[i].z() << std::endl;
+                // }
+
+                // if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                 {
                     std::cout << "problem with saving file: " << output_file_name << std::endl;
                 }
@@ -1531,7 +1623,8 @@ void project_gui()
                             }
                         }
                     }
-                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    // if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1554,7 +1647,7 @@ void project_gui()
 
                 if (output_file_name.size() > 0)
                 {
-                    gnss.save_to_laz(output_file_name);
+                    gnss.save_to_laz(output_file_name, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
                 }
             }
 
@@ -1645,7 +1738,7 @@ void project_gui()
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1738,7 +1831,7 @@ void project_gui()
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1831,7 +1924,7 @@ void project_gui()
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1876,7 +1969,7 @@ void project_gui()
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1921,7 +2014,7 @@ void project_gui()
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1966,7 +2059,7 @@ void project_gui()
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -2600,9 +2693,9 @@ void project_gui()
                 }
             }
 
-            ImGui::InputDouble("WGS84ReferenceLatitude", &gnss.WGS84ReferenceLatitude);
-            ImGui::InputDouble("WGS84ReferenceLongitude", &gnss.WGS84ReferenceLongitude);
-            ImGui::InputDouble("OffsetAltitude", &gnss.offset_alt);
+            //ImGui::InputDouble("WGS84ReferenceLatitude", &gnss.WGS84ReferenceLatitude);
+            //ImGui::InputDouble("WGS84ReferenceLongitude", &gnss.WGS84ReferenceLongitude);
+            //ImGui::InputDouble("OffsetAltitude", &gnss.offset_alt);
 
             ImGui::Checkbox("setWGS84ReferenceFromFirstPose", &gnss.setWGS84ReferenceFromFirstPose);
 
@@ -3665,10 +3758,10 @@ void display()
     {
         session.ground_control_points.imgui(session.point_clouds_container);
     }
-    //if (manual_pose_graph_loop_closure_mode)
+    // if (manual_pose_graph_loop_closure_mode)
     //{
-    //     manual_pose_graph_loop_closure.Gui();
-    //}
+    //      manual_pose_graph_loop_closure.Gui();
+    // }
     project_gui();
 
     if (!manual_pose_graph_loop_closure_mode)
@@ -3965,15 +4058,18 @@ void mouse(int glut_button, int state, int x, int y)
 
         if (glut_button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN && io.KeyCtrl)
         {
-            if(session.ground_control_points.picking_mode){
+            if (session.ground_control_points.picking_mode)
+            {
                 std::cout << "gcp picking" << std::endl;
                 const auto laser_beam = GetLaserBeam(x, y);
                 double min_distance = 10000000000;
                 int index_i = -1;
                 int index_j = -1;
 
-                for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++){
-                    for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++){
+                for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                {
+                    for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+                    {
                         const auto &p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
                         Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
 
@@ -3992,13 +4088,13 @@ void mouse(int glut_button, int state, int x, int y)
                             session.ground_control_points.picking_mode_index_to_node_inner = index_i;
                             session.ground_control_points.picking_mode_index_to_node_outer = index_j;
 
-                            //if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
+                            // if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
                         }
                     }
                 }
 
-                //std::cout << "i: " << index_i << " j: " << index_j << std::endl;
-                //rotation_center
+                // std::cout << "i: " << index_i << " j: " << index_j << std::endl;
+                // rotation_center
 
                 /*
                 int PointPicking::pick_point(int x, int y, const std::vector<underground_mining::PointInsideROI>& points_global) {
@@ -4028,7 +4124,9 @@ void mouse(int glut_button, int state, int x, int y)
     return index;
 }
                 */
-            }else{
+            }
+            else
+            {
                 const auto laser_beam = GetLaserBeam(x, y);
 
                 RegistrationPlaneFeature::Plane pl;
@@ -4170,7 +4268,8 @@ bool initGL(int *argc, char **argv)
 
 int main(int argc, char *argv[])
 {
-    try {
+    try
+    {
         initGL(&argc, argv);
         glutDisplayFunc(display);
         glutMouseFunc(mouse);

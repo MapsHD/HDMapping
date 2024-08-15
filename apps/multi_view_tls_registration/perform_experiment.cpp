@@ -2118,6 +2118,11 @@ bool exportLaz(const std::string &filename,
         min.z() = std::min(min.z(), p.z());
     }
 
+    std::cout << "exportLaz to file: '" << filename << "'" << std::endl;
+    std::cout << std::setprecision(20) << "min.x " << min.x() << " " << max.x() << std::endl;
+    std::cout << "min.y " << min.y() << " " << max.y() << std::endl;
+    std::cout << "min.z " << min.z() << " " << max.z() << std::endl;
+
     // create the writer
     laszip_POINTER laszip_writer;
     if (laszip_create(&laszip_writer))
@@ -2195,9 +2200,9 @@ bool exportLaz(const std::string &filename,
 
         const auto &p = pointcloud[i];
         p_count++;
-        coordinates[0] = p.x() + offset_x;
-        coordinates[1] = p.y() + offset_y;
-        coordinates[2] = p.z() + offset_alt;
+        coordinates[0] = p.x();// + offset_x;
+        coordinates[1] = p.y();// + offset_y;
+        coordinates[2] = p.z();// + offset_alt;
         if (laszip_set_coordinates(laszip_writer, coordinates))
         {
             fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);

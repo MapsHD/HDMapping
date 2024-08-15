@@ -585,6 +585,10 @@ bool PointClouds::save_poses(const std::string file_name, bool is_subsession)
 	if (!outfile.good())
 	{
 		std::cout << "can not save file: " << file_name << std::endl;
+		std::cout << "if You can see only '' it means there is no filename assigned to poses, please read manual or contact me januszbedkowski@gmail.com" << std::endl;
+		std::cout << "To assign filename to poses please use following two buttons in multi_view_tls_registration_step_2" << std::endl;
+		std::cout << "1: update initial poses from RESSO file" << std::endl;
+		std::cout << "2: update poses from RESSO file" << std::endl;
 		return false;
 	}
 
@@ -1083,6 +1087,7 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 
 void PointClouds::print_point_cloud_dimention()
 {
+	std::cout << "------------------------" << std::endl;
 	double x_min = std::numeric_limits<double>::max();
 	double x_max = std::numeric_limits<double>::lowest();
 	double y_min = std::numeric_limits<double>::max();
@@ -1126,6 +1131,14 @@ void PointClouds::print_point_cloud_dimention()
 	std::cout << "x: " << x_max - x_min << std::endl;
 	std::cout << "y: " << y_max - y_min << std::endl;
 	std::cout << "z: " << z_max - z_min << std::endl;
+
+	std::cout << "--------min max coordinates----------" << std::endl;
+	std::cout << "x_min: " << x_min << std::endl;
+	std::cout << "x_max: " << x_max << std::endl;
+	std::cout << "y_max: " << y_max << std::endl;
+	std::cout << "y_max: " << y_max << std::endl;
+	std::cout << "z_max: " << z_max << std::endl;
+	std::cout << "z_max: " << z_max << std::endl;
 }
 
 bool PointClouds::load_3DTK_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z)

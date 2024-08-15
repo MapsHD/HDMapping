@@ -380,7 +380,9 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                             double delta_x;
                                             double delta_y;
                                             double delta_z;
-                                            Eigen::Vector3d p_t(gnss.gnss_poses[i].x - gnss.offset_x, gnss.gnss_poses[i].y - gnss.offset_y, gnss.gnss_poses[i].alt - gnss.offset_alt);
+                                            //Eigen::Vector3d p_t(gnss.gnss_poses[i].x - gnss.offset_x, gnss.gnss_poses[i].y - gnss.offset_y, gnss.gnss_poses[i].alt - gnss.offset_alt);
+                                            Eigen::Vector3d p_t(gnss.gnss_poses[i].x - point_clouds_container.offset.x(), gnss.gnss_poses[i].y - point_clouds_container.offset.y(), gnss.gnss_poses[i].alt - point_clouds_container.offset.z());
+
                                             point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
                                                                                           pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
                                                                                           p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());

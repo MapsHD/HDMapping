@@ -279,7 +279,7 @@ void project_gui()
             camera_mode_ortho_z_center_h = 0.0;
         }
 
-        ImGui::InputInt("increase for better performance, decrease for rendering more points", &viewer_decmiate_point_cloud);
+        ImGui::InputInt("'Points render subsampling': increase for better performance, decrease for rendering more points", &viewer_decmiate_point_cloud);
         if (viewer_decmiate_point_cloud < 1)
         {
             viewer_decmiate_point_cloud = 1;
@@ -644,14 +644,17 @@ void project_gui()
                                 if (!edge_gizmo)
                                 {
                                     bool is_gizmo = false;
-                                    
-                                    for(const auto &s:sessions){
-                                        if(s.is_gizmo){
+
+                                    for (const auto &s : sessions)
+                                    {
+                                        if (s.is_gizmo)
+                                        {
                                             is_gizmo = true;
                                         }
                                     }
 
-                                    if (!is_gizmo){
+                                    if (!is_gizmo)
+                                    {
                                         ImGui::InputInt("index_active_edge", &index_active_edge);
 
                                         if (index_active_edge < 0)
@@ -1844,7 +1847,8 @@ bool initGL(int *argc, char **argv)
 
 int main(int argc, char *argv[])
 {
-    try {
+    try
+    {
         initGL(&argc, argv);
         glutDisplayFunc(display);
         glutMouseFunc(mouse);
@@ -1956,6 +1960,8 @@ bool optimize(std::vector<Session> &sessions)
             Edge edge;
             edge.index_from = i - 1;
             edge.index_to = i;
+            edge.index_session_from = -1;
+            edge.index_session_to = -1;
             edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_rel);
             edge.relative_pose_tb_weights.om = wangle;
             edge.relative_pose_tb_weights.fi = wangle;
@@ -2127,12 +2133,35 @@ bool optimize(std::vector<Session> &sessions)
             // tripletListP.emplace_back(ir + 3, ir + 3, get_cauchy_w(delta(3, 0), 10));
             // tripletListP.emplace_back(ir + 4, ir + 4, get_cauchy_w(delta(4, 0), 10));
             // tripletListP.emplace_back(ir + 5, ir + 5, get_cauchy_w(delta(5, 0), 10));
-            tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px * get_cauchy_w(delta(0, 0), 1));
-            tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py * get_cauchy_w(delta(1, 0), 1));
-            tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz * get_cauchy_w(delta(2, 0), 1));
-            tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om * get_cauchy_w(delta(3, 0), 1));
-            tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi * get_cauchy_w(delta(4, 0), 1));
-            tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka * get_cauchy_w(delta(5, 0), 1));
+
+            //if (sessions[all_edges[i].index_session_from].is_ground_truth || sessions[all_edges[i].index_session_to].is_ground_truth)
+            //{
+            //    tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
+            //    tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
+            //    tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
+            //    tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
+            //    tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
+            //    tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
+           // }
+           // else
+            //{
+
+           
+            tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
+            tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
+            tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
+            tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
+            tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
+            tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
+            
+            
+            //tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px * get_cauchy_w(delta(0, 0), 1));
+            //tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py * get_cauchy_w(delta(1, 0), 1));
+            //tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz * get_cauchy_w(delta(2, 0), 1));
+            //tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om * get_cauchy_w(delta(3, 0), 1));
+            //tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi * get_cauchy_w(delta(4, 0), 1));
+            //tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka * get_cauchy_w(delta(5, 0), 1));
+            //}
         }
         if (is_fix_first_node)
         {

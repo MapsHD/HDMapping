@@ -523,7 +523,11 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
     outfile.open(file_name);
     if (!outfile.good())
     {
-        std::cout << "can not save file: " << file_name << std::endl;
+        std::cout << "can not save file: '" << file_name <<  "'" << std::endl;
+        std::cout << "if You can see only '' it means there is no filename assigned to poses, please read manual or contact me januszbedkowski@gmail.com" << std::endl;
+        std::cout << "To assign filename to poses please use following two buttons in multi_view_tls_registration_step_2" << std::endl;
+        std::cout << "1: update initial poses from RESSO file" << std::endl;
+        std::cout << "2: update poses from RESSO file" << std::endl;
         return false;
     }
 

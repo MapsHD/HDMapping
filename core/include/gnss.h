@@ -29,12 +29,12 @@ class GNSS{
     bool load(const std::vector<std::string> &input_file_names);
     bool load_mercator_projection(const std::vector<std::string> &input_file_names);
     void render(const PointClouds &point_clouds_container);
-    bool save_to_laz(const std::string &output_file_names);
+    bool save_to_laz(const std::string &output_file_names, double offset_x, double offset_y, double offset_alt);
 
     std::vector<GlobalPose> gnss_poses;
-    double offset_x = 0;
-    double offset_y = 0;
-    double offset_alt = 0;
+    //double offset_x = 0;
+    //double offset_y = 0;
+    //double offset_alt = 0;
     bool show_correspondences = false;
 
     double WGS84ReferenceLatitude = 0;

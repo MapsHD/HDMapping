@@ -80,18 +80,18 @@ bool GNSS::load(const std::vector<std::string> &input_file_names)
     std::sort(gnss_poses.begin(), gnss_poses.end(), [](GNSS::GlobalPose &a, GNSS::GlobalPose &b)
               { return (a.timestamp < b.timestamp); });
 
-    offset_x = 0;
-    offset_y = 0;
-    offset_alt = 0;
-    for (int i = 0; i < gnss_poses.size(); i++)
-    {
-        offset_x += gnss_poses[i].x;
-        offset_y += gnss_poses[i].y;
-        offset_alt += gnss_poses[i].alt;
-    }
-    offset_x /= gnss_poses.size();
-    offset_y /= gnss_poses.size();
-    offset_alt /= gnss_poses.size();
+    //offset_x = 0;
+    //offset_y = 0;
+    //offset_alt = 0;
+    //for (int i = 0; i < gnss_poses.size(); i++)
+    //{
+    //    offset_x += gnss_poses[i].x;
+    //    offset_y += gnss_poses[i].y;
+    //    offset_alt += gnss_poses[i].alt;
+    //}
+    //offset_x /= gnss_poses.size();
+    //offset_y /= gnss_poses.size();
+    //offset_alt /= gnss_poses.size();
 
     return true;
 }
@@ -164,7 +164,7 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
             WGS84Reference[1] = gnss_poses[0].lon;
             WGS84ReferenceLatitude = gnss_poses[0].lat;
             WGS84ReferenceLongitude = gnss_poses[0].lon;
-            offset_alt = gnss_poses[0].alt;
+            //offset_alt = gnss_poses[0].alt;
         }else{
             WGS84Reference[0] = WGS84ReferenceLatitude;
             WGS84Reference[1] = WGS84ReferenceLongitude;
@@ -196,7 +196,8 @@ void GNSS::render(const PointClouds &point_clouds_container)
     glBegin(GL_LINE_STRIP);
     for (int i = 0; i < gnss_poses.size(); i++)
     {
-        glVertex3f(gnss_poses[i].x - offset_x, gnss_poses[i].y - offset_y, gnss_poses[i].alt - offset_alt);
+        //glVertex3f(gnss_poses[i].x - offset_x, gnss_poses[i].y - offset_y, gnss_poses[i].alt - offset_alt);
+        glVertex3f(gnss_poses[i].x - point_clouds_container.offset.x(), gnss_poses[i].y - point_clouds_container.offset.y(), gnss_poses[i].alt - point_clouds_container.offset.z());
     }
     glEnd();
 
@@ -223,7 +224,8 @@ void GNSS::render(const PointClouds &point_clouds_container)
                     {
                         auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
                         glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-                        glVertex3f(gnss_poses[i].x - offset_x, gnss_poses[i].y - offset_y, gnss_poses[i].alt - offset_alt);
+                        //glVertex3f(gnss_poses[i].x - offset_x, gnss_poses[i].y - offset_y, gnss_poses[i].alt - offset_alt);
+                        glVertex3f(gnss_poses[i].x - point_clouds_container.offset.x(), gnss_poses[i].y - point_clouds_container.offset.y(), gnss_poses[i].alt - point_clouds_container.offset.z());
                     }
                 }
             }
@@ -232,7 +234,7 @@ void GNSS::render(const PointClouds &point_clouds_container)
     }
 }
 
-bool GNSS::save_to_laz(const std::string &output_file_names)
+bool GNSS::save_to_laz(const std::string &output_file_names, double offset_x, double offset_y, double offset_alt)
 {
     constexpr float scale = 0.0001f; // one tenth of milimeter
     // find max

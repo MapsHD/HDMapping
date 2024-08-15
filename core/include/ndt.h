@@ -54,6 +54,7 @@ public:
 
 	struct Bucket2
 	{
+		int classification = 0; // 1 - ceiling, 2 - floor
 		long long unsigned int index_begin_inclusive;
 		long long unsigned int index_end_exclusive;
 		// long long unsigned int number_of_points;

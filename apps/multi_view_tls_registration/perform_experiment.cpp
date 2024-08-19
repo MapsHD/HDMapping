@@ -2098,6 +2098,7 @@ void perform_experiment_on_linux(Session &session, ObservationPicking &observati
 #endif
 }
 
+#if 0
 bool exportLaz(const std::string &filename,
                const std::vector<Eigen::Vector3d> &pointcloud,
                const std::vector<unsigned short> &intensity, double offset_x, double offset_y, double offset_alt)
@@ -2250,6 +2251,7 @@ bool exportLaz(const std::string &filename,
     std::cout << "exportLaz DONE" << std::endl;
     return true;
 }
+#endif
 
 #if 0
 //void export_result_to_folder(std::string output_folder_name, ObservationPicking &observation_picking, Session &session);

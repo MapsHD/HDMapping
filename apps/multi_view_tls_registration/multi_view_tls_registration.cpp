@@ -41,6 +41,8 @@
 
 #include <HDMapping/Version.hpp>
 
+#include <export_laz.h>
+
 namespace fs = std::filesystem;
 
 static bool show_demo_window = true;
@@ -138,194 +140,8 @@ void perform_experiment_on_linux(Session &session, ObservationPicking &observati
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking);
-bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity, double offset_x,
-               double offset_y,
-               double offset_alt);
 double compute_rms(bool initial, Session &session, ObservationPicking &observation_picking);
 void reset_poses(Session &session);
-
-void adjustHeader(laszip_header *header, const Eigen::Affine3d &m_pose, const Eigen::Vector3d &offset_in)
-{
-    Eigen::Vector3d max{header->max_x, header->max_y, header->max_z};
-    Eigen::Vector3d min{header->min_x, header->min_y, header->min_z};
-
-    max -= offset_in;
-    min -= offset_in;
-
-    Eigen::Vector3d adj_max = m_pose * max + offset_in;
-    Eigen::Vector3d adj_min = m_pose * min + offset_in;
-
-    header->max_x = adj_max.x();
-    header->max_y = adj_max.y();
-    header->max_z = adj_max.z();
-
-    header->min_x = adj_min.x();
-    header->min_y = adj_min.y();
-    header->min_z = adj_min.z();
-}
-
-void adjustPoint(laszip_F64 output_coordinates[3], laszip_F64 input_coordinates[3], const Eigen::Affine3d &m_pose, const Eigen::Vector3d &offset)
-{
-    Eigen::Vector3d i{input_coordinates[0], input_coordinates[1], input_coordinates[2]};
-    i -= offset;
-    Eigen::Vector3d o = m_pose * i;
-    o += offset;
-    output_coordinates[0] = o.x();
-    output_coordinates[1] = o.y();
-    output_coordinates[2] = o.z();
-}
-
-void save_processed_pc(const fs::path &file_path_in, const fs::path &file_path_put, const Eigen::Affine3d &m_pose, const Eigen::Vector3d &offset, bool override_compressed = false)
-{
-    std::cout << "processing: " << file_path_in << std::endl;
-
-    laszip_POINTER laszip_reader;
-    if (laszip_create(&laszip_reader))
-    {
-        fprintf(stderr, "DLL ERROR: creating laszip reader\n");
-        std::abort();
-    }
-
-    laszip_POINTER laszip_writer;
-    if (laszip_create(&laszip_writer))
-    {
-        fprintf(stderr, "DLL ERROR: creating laszip reader\n");
-        std::abort();
-    }
-
-    const std::string file_name_in = file_path_in.string();
-    const std::string file_name_out = file_path_put.string();
-
-    laszip_BOOL is_compressed = 0;
-    if (laszip_open_reader(laszip_reader, file_name_in.c_str(), &is_compressed))
-    {
-        fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", file_name_in.c_str());
-        std::abort();
-    }
-    std::cout << "compressed : " << is_compressed << std::endl;
-
-    laszip_header *header;
-
-    if (laszip_get_header_pointer(laszip_reader, &header))
-    {
-        fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
-        std::abort();
-    }
-
-    adjustHeader(header, m_pose, offset);
-
-    if (laszip_set_header(laszip_writer, header))
-    {
-        fprintf(stderr, "DLL ERROR: setting header pointer from laszip reader\n");
-        std::abort();
-    }
-
-    fprintf(stderr, "file '%s' contains %u points\n", file_name_in.c_str(), header->number_of_point_records);
-
-    if (override_compressed)
-    {
-        is_compressed = 0;
-        std::cout << "compressed : " << is_compressed << std::endl;
-    }
-
-    if (laszip_open_writer(laszip_writer, file_name_out.c_str(), is_compressed))
-    {
-        fprintf(stderr, "DLL ERROR: opening laszip writer for '%s'\n", file_name_out.c_str());
-        return;
-    }
-
-    laszip_point *input_point;
-    if (laszip_get_point_pointer(laszip_reader, &input_point))
-    {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
-        std::abort();
-    }
-
-    laszip_point *output_point;
-    if (laszip_get_point_pointer(laszip_writer, &output_point))
-    {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
-        std::abort();
-    }
-
-    for (int i = 0; i < header->number_of_point_records; i++)
-    {
-        if (laszip_read_point(laszip_reader))
-        {
-            fprintf(stderr, "DLL ERROR: reading point %u\n", i);
-            std::abort();
-        }
-
-        laszip_F64 input_coordinates[3];
-        if (laszip_get_coordinates(laszip_reader, input_coordinates))
-        {
-            fprintf(stderr, "DLL ERROR: laszip_set_coordinates %u\n", i);
-            std::abort();
-        }
-
-        laszip_F64 output_coordinates[3];
-        adjustPoint(output_coordinates, input_coordinates, m_pose, offset);
-
-        if (laszip_set_coordinates(laszip_writer, output_coordinates))
-        {
-            fprintf(stderr, "DLL ERROR: laszip_set_coordinates %u\n", i);
-            std::abort();
-        }
-        output_point->intensity = input_point->intensity;
-        output_point->classification = input_point->classification;
-        output_point->num_extra_bytes = input_point->num_extra_bytes;
-        memcpy(output_point->extra_bytes, input_point->extra_bytes, output_point->num_extra_bytes);
-
-        if (laszip_write_point(laszip_writer))
-        {
-            fprintf(stderr, "DLL ERROR: writing point %I64d\n", i);
-            return;
-        }
-    }
-
-    // close the reader
-    if (laszip_close_reader(laszip_reader))
-    {
-        fprintf(stderr, "DLL ERROR: closing laszip reader\n");
-        return;
-    }
-
-    // destroy the reader
-
-    if (laszip_destroy(laszip_reader))
-    {
-        fprintf(stderr, "DLL ERROR: destroying laszip reader\n");
-        return;
-    }
-
-    laszip_I64 p_count{0};
-    if (laszip_get_point_count(laszip_writer, &p_count))
-    {
-        fprintf(stderr, "DLL ERROR: getting point count\n");
-        return;
-    }
-
-    fprintf(stderr, "successfully written %ld points\n", p_count);
-
-    // close the writer
-
-    if (laszip_close_writer(laszip_writer))
-    {
-        fprintf(stderr, "DLL ERROR: closing laszip writer\n");
-        return;
-    }
-
-    // destroy the writer
-
-    // ToDo --> solve it
-    if (laszip_destroy(laszip_writer))
-    {
-        fprintf(stderr, "DLL ERROR: destroying laszip writer\n");
-        return;
-    }
-
-    std::cout << "saving to " << file_path_put << std::endl;
-}
 
 void my_display_code()
 {
@@ -1433,6 +1249,7 @@ void project_gui()
             {
                 std::vector<Eigen::Vector3d> pointcloud;
                 std::vector<unsigned short> intensity;
+                std::vector<double> timestamps;
 
                 for (auto &p : session.point_clouds_container.point_clouds)
                 {
@@ -1453,6 +1270,8 @@ void project_gui()
                             {
                                 intensity.push_back(0);
                             }
+
+                            timestamps.push_back(p.timestamps[i]);
                         }
                     }
                 }
@@ -1463,7 +1282,7 @@ void project_gui()
                 // }
 
                 // if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
-                if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
+                if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                 {
                     std::cout << "problem with saving file: " << output_file_name << std::endl;
                 }
@@ -1558,6 +1377,7 @@ void project_gui()
                 {
                     std::vector<Eigen::Vector3d> pointcloud;
                     std::vector<unsigned short> intensity;
+                    std::vector<double> timestamps;
 
                     // point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
                     float consecutive_distance = 0;
@@ -1610,6 +1430,7 @@ void project_gui()
                                 {
                                     pointcloud.push_back(vp);
                                     intensity.push_back(0);
+                                    timestamps.push_back(p.local_trajectory[i].timestamps.first);
                                 }
                                 else
                                 {
@@ -1618,13 +1439,14 @@ void project_gui()
                                         consecutive_distance = 0;
                                         pointcloud.push_back(vp);
                                         intensity.push_back(0);
+                                        timestamps.push_back(p.local_trajectory[i].timestamps.first);
                                     }
                                 }
                             }
                         }
                     }
                     // if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
-                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1669,6 +1491,7 @@ void project_gui()
                 {
                     std::vector<Eigen::Vector3d> pointcloud;
                     std::vector<unsigned short> intensity;
+                    std::vector<double> timestamps;
 
                     float min_x = 1000000000.0;
                     float max_x = -1000000000.0;
@@ -1725,6 +1548,7 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0.0);
                         }
                     }
 
@@ -1735,10 +1559,11 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0.0);
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1762,6 +1587,7 @@ void project_gui()
                 {
                     std::vector<Eigen::Vector3d> pointcloud;
                     std::vector<unsigned short> intensity;
+                    std::vector<double> timestamps;
 
                     float min_x = 1000000000.0;
                     float max_x = -1000000000.0;
@@ -1818,6 +1644,7 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0);
                         }
                     }
 
@@ -1828,10 +1655,11 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0);
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1855,6 +1683,7 @@ void project_gui()
                 {
                     std::vector<Eigen::Vector3d> pointcloud;
                     std::vector<unsigned short> intensity;
+                    std::vector<double> timestamps;
 
                     float min_x = 1000000000.0;
                     float max_x = -1000000000.0;
@@ -1911,6 +1740,7 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0);
                         }
                     }
 
@@ -1921,10 +1751,11 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, (max_z + min_z) / 2.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0);
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1948,6 +1779,7 @@ void project_gui()
                 {
                     std::vector<Eigen::Vector3d> pointcloud;
                     std::vector<unsigned short> intensity;
+                    std::vector<double> timestamps;
 
                     for (float x = -5000.0; x <= 5000.0; x += 10.0)
                     {
@@ -1956,6 +1788,7 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, 0.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0.0);
                         }
                     }
 
@@ -1966,10 +1799,11 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, 0.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0.0);
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1993,6 +1827,7 @@ void project_gui()
                 {
                     std::vector<Eigen::Vector3d> pointcloud;
                     std::vector<unsigned short> intensity;
+                    std::vector<double> timestamps;
 
                     for (float x = -5000.0; x <= 5000.0; x += 100.0)
                     {
@@ -2001,6 +1836,7 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, 0.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0);
                         }
                     }
 
@@ -2011,10 +1847,11 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, 0.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0);
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -2038,6 +1875,7 @@ void project_gui()
                 {
                     std::vector<Eigen::Vector3d> pointcloud;
                     std::vector<unsigned short> intensity;
+                    std::vector<double> timestamps;
 
                     for (float x = -5000.0; x <= 5000.0; x += 1000.0)
                     {
@@ -2046,6 +1884,7 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, 0.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0);
                         }
                     }
 
@@ -2056,10 +1895,11 @@ void project_gui()
                             Eigen::Vector3d vp(x, y, 0.0);
                             pointcloud.push_back(vp);
                             intensity.push_back(0);
+                            timestamps.push_back(0);
                         }
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }

@@ -7,6 +7,8 @@
 
 #include <session.h>
 
+#include <export_laz.h>
+
 // This is LiDAR odometry (step 1)
 // This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system https://github.com/JanuszBedkowski/mandeye_controller
 // The output is a session proving trajekctory and point clouds that can be  further processed by "multi_view_tls_registration" program.
@@ -89,9 +91,10 @@ Session session;
 void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
-bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity, double offset_x,
-               double offset_y,
-               double offset_alt);
+//bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity,
+//               const std::vector<double> &timestamps, double offset_x,
+//               double offset_y,
+//               double offset_alt);
 
 void lidar_odometry_gui()
 {
@@ -847,6 +850,7 @@ void lidar_odometry_gui()
                 {
                     std::vector<Eigen::Vector3d> pointcloud;
                     std::vector<unsigned short> intensity;
+                    std::vector<double> timestamps;
 
                     for (int i = 0; i < worker_data.size(); i++)
                     {
@@ -855,9 +859,10 @@ void lidar_odometry_gui()
                             Eigen::Vector3d pt = worker_data[i].intermediate_trajectory[p.index_pose] * p.point;
                             pointcloud.push_back(pt);
                             intensity.push_back(p.intensity);
+                            timestamps.push_back(p.timestamp);
                         }
                     }
-                    if (!exportLaz(output_file_name, pointcloud, intensity, 0, 0, 0))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -1204,15 +1209,17 @@ void lidar_odometry_gui()
                 {
                     std::vector<Eigen::Vector3d> pointcloud;
                     std::vector<unsigned short> intensity;
+                    std::vector<double> timestamps;
 
                     for (const auto &p : intermediate_points_to_save)
                     {
                         Eigen::Vector3d pt = p.point;
                         pointcloud.push_back(pt);
                         intensity.push_back(p.intensity);
+                        timestamps.push_back(p.timestamp);
                     }
 
-                    if (!exportLaz(output_file_name, pointcloud, intensity, 0, 0, 0))
+                    if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
                     {
                         std::cout << "problem with saving file: " << output_file_name << std::endl;
                     }
@@ -2392,9 +2399,12 @@ Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationP
     return out_point;
 }
 
+#if 0
 bool exportLaz(const std::string &filename,
                const std::vector<Eigen::Vector3d> &pointcloud,
-               const std::vector<unsigned short> &intensity, double offset_x, double offset_y, double offset_alt)
+               const std::vector<unsigned short> &intensity,
+               const std::vector<double> &timestamps,
+               double offset_x, double offset_y, double offset_alt)
 {
 
     constexpr float scale = 0.0001f; // one tenth of milimeter
@@ -2505,8 +2515,10 @@ bool exportLaz(const std::string &filename,
     for (int i = 0; i < pointcloud.size(); i++)
     {
         point->intensity = intensity[i];
-
+        
         const auto &p = pointcloud[i];
+        point->gps_time = timestamps[i] * 1e9;
+
         p_count++;
         coordinates[0] = p.x() + offset_x;
         coordinates[1] = p.y() + offset_y;
@@ -2559,3 +2571,4 @@ bool exportLaz(const std::string &filename,
 
     return true;
 }
+#endif

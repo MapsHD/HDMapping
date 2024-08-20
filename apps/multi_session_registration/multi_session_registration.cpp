@@ -552,14 +552,25 @@ void project_gui()
 
                 if (!manual_pose_graph_loop_closure_mode)
                 {
-                    if (ImGui::Button("Optimize"))
+                    static int nr_iter = 100;
+                    ImGui::InputInt("number of iterations", &nr_iter);
+                    if (nr_iter < 1)
                     {
-                        for (int i = 0; i < 10; i++)
+                        nr_iter = 1;
+                    }
+
+                    std::string bn = "Optimize (number of iterations: " + std::to_string(nr_iter) + ")";
+
+                    if (ImGui::Button(bn.c_str()))
+                    {
+                        for (int i = 0; i < nr_iter; i++)
                         {
+                            std::cout << "Iteration [" << i + 1 << "] of: " << nr_iter << std::endl;
                             optimize(sessions);
                         }
                         optimized = true;
                     }
+
                     if (optimized)
                     {
                         ImGui::SameLine();
@@ -1894,7 +1905,7 @@ bool optimize(std::vector<Session> &sessions)
         sums.push_back(sum);
     }
 
-    std::cout << "Compute Pose Graph SLAM" << std::endl;
+    //std::cout << "Compute Pose Graph SLAM" << std::endl;
 
     ///////////////////////////////////////////////////////////////////
     // graph slam
@@ -1918,7 +1929,7 @@ bool optimize(std::vector<Session> &sessions)
 
     bool is_wc = true;
     bool is_cw = false;
-    int iterations = 10;
+    int iterations = 1;
     bool is_fix_first_node = true;
 
     // if (gnss.gnss_poses.size() > 0)
@@ -2002,7 +2013,7 @@ bool optimize(std::vector<Session> &sessions)
 
     for (int iter = 0; iter < iterations; iter++)
     {
-        std::cout << "iteration " << iter + 1 << " of " << iterations << std::endl;
+        // std::cout << "iteration " << iter + 1 << " of " << iterations << std::endl;
         std::vector<Eigen::Triplet<double>> tripletListA;
         std::vector<Eigen::Triplet<double>> tripletListP;
         std::vector<Eigen::Triplet<double>> tripletListB;
@@ -2134,34 +2145,32 @@ bool optimize(std::vector<Session> &sessions)
             // tripletListP.emplace_back(ir + 4, ir + 4, get_cauchy_w(delta(4, 0), 10));
             // tripletListP.emplace_back(ir + 5, ir + 5, get_cauchy_w(delta(5, 0), 10));
 
-            //if (sessions[all_edges[i].index_session_from].is_ground_truth || sessions[all_edges[i].index_session_to].is_ground_truth)
+            // if (sessions[all_edges[i].index_session_from].is_ground_truth || sessions[all_edges[i].index_session_to].is_ground_truth)
             //{
-            //    tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
-            //    tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
-            //    tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
-            //    tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
-            //    tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
-            //    tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
-           // }
-           // else
+            //     tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
+            //     tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
+            //     tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
+            //     tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
+            //     tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
+            //     tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
+            // }
+            // else
             //{
 
-           
             tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
             tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
             tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
             tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
             tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
             tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
-            
-            
-            //tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px * get_cauchy_w(delta(0, 0), 1));
-            //tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py * get_cauchy_w(delta(1, 0), 1));
-            //tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz * get_cauchy_w(delta(2, 0), 1));
-            //tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om * get_cauchy_w(delta(3, 0), 1));
-            //tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi * get_cauchy_w(delta(4, 0), 1));
-            //tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka * get_cauchy_w(delta(5, 0), 1));
-            //}
+
+            // tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px * get_cauchy_w(delta(0, 0), 1));
+            // tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py * get_cauchy_w(delta(1, 0), 1));
+            // tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz * get_cauchy_w(delta(2, 0), 1));
+            // tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om * get_cauchy_w(delta(3, 0), 1));
+            // tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi * get_cauchy_w(delta(4, 0), 1));
+            // tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka * get_cauchy_w(delta(5, 0), 1));
+            // }
         }
         if (is_fix_first_node)
         {
@@ -2335,13 +2344,13 @@ bool optimize(std::vector<Session> &sessions)
         tripletListP.clear();
         tripletListB.clear();
 
-        std::cout << "AtPA.size: " << AtPA.size() << std::endl;
-        std::cout << "AtPB.size: " << AtPB.size() << std::endl;
+        // std::cout << "AtPA.size: " << AtPA.size() << std::endl;
+        // std::cout << "AtPB.size: " << AtPB.size() << std::endl;
 
-        std::cout << "start solving AtPA=AtPB" << std::endl;
+        // std::cout << "start solving AtPA=AtPB" << std::endl;
         Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
 
-        std::cout << "x = solver.solve(AtPB)" << std::endl;
+        // std::cout << "x = solver.solve(AtPB)" << std::endl;
         Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
         std::vector<double> h_x;
@@ -2354,14 +2363,14 @@ bool optimize(std::vector<Session> &sessions)
             }
         }
 
-        std::cout << "h_x.size(): " << h_x.size() << std::endl;
+        // std::cout << "h_x.size(): " << h_x.size() << std::endl;
 
-        std::cout << "AtPA=AtPB SOLVED" << std::endl;
-        // std::cout << "updates:" << std::endl;
-        // for (size_t i = 0; i < h_x.size(); i += 6)
+        // std::cout << "AtPA=AtPB SOLVED" << std::endl;
+        //  std::cout << "updates:" << std::endl;
+        //  for (size_t i = 0; i < h_x.size(); i += 6)
         //{
-        //     std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << std::endl;
-        // }
+        //      std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << std::endl;
+        //  }
 
         if (h_x.size() == 6 * poses.size())
         {
@@ -2383,7 +2392,7 @@ bool optimize(std::vector<Session> &sessions)
                     poses[i] = pose;
                 }
             }
-            std::cout << "optimizing with tait bryan finished" << std::endl;
+            // std::cout << "optimizing with tait bryan finished" << std::endl;
         }
         else
         {

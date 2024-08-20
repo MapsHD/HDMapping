@@ -194,18 +194,25 @@ inline void adjustHeader(laszip_header *header, const Eigen::Affine3d &m_pose, c
     header->min_x = adj_min.x();
     header->min_y = adj_min.y();
     header->min_z = adj_min.z();
+
+    header->x_offset = offset_in.x();
+    header->y_offset = offset_in.y();
+    header->z_offset = offset_in.z();
 }
 
-inline void adjustPoint(laszip_F64 output_coordinates[3], laszip_F64 input_coordinates[3], const Eigen::Affine3d &m_pose, const Eigen::Vector3d &offset)
-{
-    Eigen::Vector3d i{input_coordinates[0], input_coordinates[1], input_coordinates[2]};
+//inline Eigen::Vector3d adjustPoint(laszip_F64 input_coordinates[3], const Eigen::Affine3d &m_pose)
+//{
+//    Eigen::Vector3d i(input_coordinates[0], input_coordinates[1], input_coordinates[2]);
     //i -= offset;
-    Eigen::Vector3d o = m_pose * i;
+//    Eigen::Vector3d o = m_pose * i;
+
+    //std::cout << i.x() << " " << i.y() << " " << i.z() << " " << o.x() << " " << o.y() << " " << o.z() << std::endl;
     //o += offset;
-    output_coordinates[0] = o.x();
-    output_coordinates[1] = o.y();
-    output_coordinates[2] = o.z();
-}
+    //output_coordinates[0] = o.x();
+    //output_coordinates[1] = o.y();
+    //output_coordinates[2] = o.z();
+//    return o;
+//}
 
 inline void save_processed_pc(const fs::path &file_path_in, const fs::path &file_path_put, const Eigen::Affine3d &m_pose, const Eigen::Vector3d &offset, bool override_compressed = false)
 {
@@ -250,6 +257,9 @@ inline void save_processed_pc(const fs::path &file_path_in, const fs::path &file
     std::cout << "header max before:" << std::endl;
     std::cout << header->max_x << " " << header->max_y << " " << header->max_z << std::endl;
 
+    std::cout << "header before:" << std::endl;
+    std::cout << header->x_offset << " " << header->y_offset << " " << header->z_offset << std::endl;
+
     adjustHeader(header, m_pose, offset);
 
     std::cout << "header min after:" << std::endl;
@@ -257,6 +267,11 @@ inline void save_processed_pc(const fs::path &file_path_in, const fs::path &file
 
     std::cout << "header max after:" << std::endl;
     std::cout << header->max_x << " " << header->max_y << " " << header->max_z << std::endl;
+
+    std::cout << "header after:" << std::endl;
+    std::cout << header->x_offset << " " << header->y_offset << " " << header->z_offset << std::endl;
+
+    std::cout << "m_pose: " << std::endl << m_pose.matrix() << std::endl;
 
     if (laszip_set_header(laszip_writer, header))
     {
@@ -307,10 +322,16 @@ inline void save_processed_pc(const fs::path &file_path_in, const fs::path &file
             std::abort();
         }
 
+        Eigen::Vector3d pg = Eigen::Vector3d(input_coordinates[0], input_coordinates[1], input_coordinates[2]);
+        pg = m_pose * pg;
+            // adjustPoint(input_coordinates, m_pose);
         laszip_F64 output_coordinates[3];
-        adjustPoint(output_coordinates, input_coordinates, m_pose, offset);
+        output_coordinates[0] = pg.x();
+        output_coordinates[1] = pg.y();
+        output_coordinates[2] = pg.z();
 
         if (laszip_set_coordinates(laszip_writer, output_coordinates))
+        //if (laszip_set_coordinates(laszip_writer, input_coordinates))
         {
             fprintf(stderr, "DLL ERROR: laszip_set_coordinates %u\n", i);
             std::abort();

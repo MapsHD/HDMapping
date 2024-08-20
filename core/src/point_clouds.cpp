@@ -1135,9 +1135,9 @@ void PointClouds::print_point_cloud_dimention()
 	std::cout << "--------min max coordinates----------" << std::endl;
 	std::cout << "x_min: " << x_min << std::endl;
 	std::cout << "x_max: " << x_max << std::endl;
+	std::cout << "y_min: " << y_min << std::endl;
 	std::cout << "y_max: " << y_max << std::endl;
-	std::cout << "y_max: " << y_max << std::endl;
-	std::cout << "z_max: " << z_max << std::endl;
+	std::cout << "z_min: " << z_min << std::endl;
 	std::cout << "z_max: " << z_max << std::endl;
 }
 

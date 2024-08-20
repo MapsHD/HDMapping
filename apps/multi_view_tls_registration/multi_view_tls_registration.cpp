@@ -1259,7 +1259,7 @@ void project_gui()
                         {
                             const auto &pp = p.points_local[i];
                             Eigen::Vector3d vp;
-                            vp = p.m_pose * pp + session.point_clouds_container.offset;
+                            vp = p.m_pose * pp;// + session.point_clouds_container.offset;
                             // std::cout << vp << std::endl;
                             pointcloud.push_back(vp);
                             if (i < p.intensities.size())
@@ -1390,7 +1390,7 @@ void project_gui()
                             {
                                 const auto &pp = p.local_trajectory[i].m_pose.translation();
                                 Eigen::Vector3d vp;
-                                vp = p.m_pose * pp + session.point_clouds_container.offset;
+                                vp = p.m_pose * pp;// + session.point_clouds_container.offset;
 
                                 if (i > 0)
                                 {
@@ -1509,7 +1509,7 @@ void project_gui()
                             {
                                 const auto &pp = p.local_trajectory[i].m_pose.translation();
                                 Eigen::Vector3d vp;
-                                vp = p.m_pose * pp + session.point_clouds_container.offset;
+                                vp = p.m_pose * pp;// + session.point_clouds_container.offset;
 
                                 // pointcloud.push_back(vp);
                                 // intensity.push_back(0);
@@ -1605,7 +1605,7 @@ void project_gui()
                             {
                                 const auto &pp = p.local_trajectory[i].m_pose.translation();
                                 Eigen::Vector3d vp;
-                                vp = p.m_pose * pp + session.point_clouds_container.offset;
+                                vp = p.m_pose * pp;// + session.point_clouds_container.offset;
 
                                 // pointcloud.push_back(vp);
                                 // intensity.push_back(0);
@@ -1701,7 +1701,7 @@ void project_gui()
                             {
                                 const auto &pp = p.local_trajectory[i].m_pose.translation();
                                 Eigen::Vector3d vp;
-                                vp = p.m_pose * pp + session.point_clouds_container.offset;
+                                vp = p.m_pose * pp;// + session.point_clouds_container.offset;
 
                                 // pointcloud.push_back(vp);
                                 // intensity.push_back(0);

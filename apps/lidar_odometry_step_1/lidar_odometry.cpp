@@ -327,9 +327,9 @@ void lidar_odometry_gui()
                                        auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
                                        auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy, calibration);
 
-                                       if (fn == laz_files.front())
-                                       {
-                                           fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
+                                    //    if (fn == laz_files.front())
+                                    //    {
+                                    //        fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
 
                                            std::ofstream testPointcloud{calibrationValidtationFile.c_str()};
                                            int counter = 0;
@@ -467,114 +467,73 @@ void lidar_odometry_gui()
                     // int last_point = 0;
                     int index_begin = 0;
 
-                    for (size_t i = 0; i < poses.size(); i++)
+                    int n_iter = (int)(poses.size() / thershold);
+                    worker_data.reserve(n_iter);
+                    for (int i = 0; i < n_iter; i++)
                     {
-                        if (i % 1000 == 0)
+                        if (i % 50 == 0)
                         {
                             std::cout << "preparing data " << i + 1 << " of " << poses.size() << std::endl;
                         }
-                        wd.intermediate_trajectory.emplace_back(poses[i]);
-                        wd.intermediate_trajectory_motion_model.emplace_back(poses[i]);
-                        wd.intermediate_trajectory_timestamps.emplace_back(timestamps[i]);
-
-                        //
-                        TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(poses[i]);
-                        // wd.imu_roll_pitch.emplace_back(tb.om, tb.fi);
-                        wd.imu_om_fi_ka.emplace_back(tb.om, tb.fi, tb.ka);
-
-                        // temp_ts.emplace_back(timestamps[i]);
-
-                        if (wd.intermediate_trajectory.size() >= thershold)
+                        WorkerData wd;
+                        wd.intermediate_trajectory.reserve(thershold);
+                        wd.intermediate_trajectory_motion_model.reserve(thershold);
+                        wd.intermediate_trajectory_timestamps.reserve(thershold);
+                        wd.imu_om_fi_ka.reserve(thershold);
+                        for (int ii = 0; ii < thershold; ii++)
                         {
-                            /*auto index_lower = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[0],
-                                                                [](Point3Di lhs, double rhs) -> bool
-                                                                { return lhs.timestamp < rhs; });
-                            unsigned long long int i_begin = std::distance(points.begin(), index_lower);
-
-                            auto index_upper = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1],
-                                                                [](Point3Di lhs, double rhs) -> bool
-                                                                { return lhs.timestamp < rhs; });
-                            unsigned long long int i_end = std::distance(points.begin(), index_upper);*/
-
-                            std::vector<Point3Di> points;
-                            // for (const auto &pp : pointsPerFile)
-                            //{
-                            //     for (const auto &p : pp)
-                            //     {
-                            //         if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1]){
-                            //             points.push_back(p);
-                            //         }
-                            //     }
-                            // }
-                            bool found = false;
-
-                            for (int index = index_begin; index < pointsPerFile.size(); index++)
-                            {
-                                for (const auto &p : pointsPerFile[index])
-                                {
-                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps[0].first && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first)
-                                    {
-                                        points.push_back(p);
-                                    }
-                                    if (p.timestamp >= wd.intermediate_trajectory_timestamps[0].first && !found)
-                                    {
-                                        index_begin = index;
-                                        found = true;
-                                    }
-                                    if (p.timestamp > wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first)
-                                    {
-                                        break;
-                                    }
-                                }
-                            }
-
-                            // for (unsigned long long int k = i_begin; k < i_end; k++)
-                            // if (i % 1000 == 0)
-                            //{
-                            // std::cout << "points.size() " << points.size() << std::endl;
-                            //}
-
-                            for (unsigned long long int k = 0; k < points.size(); k++)
-                            {
-                                // if (points[k].timestamp > wd.intermediate_trajectory_timestamps[0] && points[k].timestamp < wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
-                                //{
-                                auto p = points[k];
-                                auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp,
-                                                              [](std::pair<double, double> lhs, double rhs) -> bool
-                                                              { return lhs.first < rhs; });
-
-                                p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
-                                wd.intermediate_points.emplace_back(p);
-                                wd.original_points.emplace_back(p);
-                                //}
-                            }
-
-                            if (params.decimation > 0.0)
-                            {
-                                wd.intermediate_points = decimate(wd.intermediate_points, params.decimation, params.decimation, params.decimation);
-                            }
-
-                            worker_data.push_back(wd);
-                            wd.intermediate_points.clear();
-                            wd.original_points.clear();
-                            wd.intermediate_trajectory.clear();
-                            wd.intermediate_trajectory_motion_model.clear();
-                            wd.intermediate_trajectory_timestamps.clear();
-                            // wd.imu_roll_pitch.clear();
-                            wd.imu_om_fi_ka.clear();
-
-                            wd.intermediate_points.reserve(1000000);
-                            wd.original_points.reserve(1000000);
-                            wd.intermediate_trajectory.reserve(1000);
-                            wd.intermediate_trajectory_motion_model.reserve(1000);
-                            wd.intermediate_trajectory_timestamps.reserve(1000);
-                            // wd.imu_roll_pitch.reserve(1000);
-                            wd.imu_om_fi_ka.reserve(1000);
-
-                            // temp_ts.clear();
+                            int idx = i * thershold + ii;
+                            wd.intermediate_trajectory.emplace_back(poses[idx]);
+                            wd.intermediate_trajectory_motion_model.emplace_back(poses[idx]);
+                            wd.intermediate_trajectory_timestamps.emplace_back(timestamps[idx]);
+                            TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(poses[idx]);
+                            // wd.imu_roll_pitch.emplace_back(tb.om, tb.fi);
+                            wd.imu_om_fi_ka.emplace_back(tb.om, tb.fi, tb.ka);
                         }
-                    }
+                        std::vector<Point3Di> points;
+                        bool found = false;
+                        auto lower = pointsPerFile[0].begin();
+                        for (int index = index_begin; index < pointsPerFile.size(); index++)
+                        {
+                            auto lower = std::lower_bound(
+                                pointsPerFile[index].begin(), pointsPerFile[index].end(), 
+                                wd.intermediate_trajectory_timestamps[0].first, 
+                                [](const Point3Di &point, double timestamp) {
+                                    return point.timestamp < timestamp;
+                                });
+                            auto upper = std::upper_bound(
+                                pointsPerFile[index].begin(), pointsPerFile[index].end(), 
+                                wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first, 
+                                [](double timestamp, const Point3Di &point) {
+                                    return timestamp < point.timestamp;
+                                });
+                            auto tmp = std::distance(lower, upper);
+                            points.reserve(points.size() + std::distance(lower, upper));
+                            if (lower != upper) {
+                                points.insert(points.end(), std::make_move_iterator(lower), std::make_move_iterator(upper));
+                                // std::cout << "Got points in timestamp range: " << points.size() << std::endl;
+                                found = true;
+                            }   
+                        }
 
+                        wd.original_points = points;
+                        for (unsigned long long int k = 0; k < wd.original_points.size(); k++)
+                        {
+                            Point3Di& p = wd.original_points[k];
+                            auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp,
+                                                            [](std::pair<double, double> lhs, double rhs) -> bool
+                                                            { return lhs.first < rhs; });
+                            p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
+                        }
+                
+                        if (params.decimation > 0.0)
+                        {            
+                            wd.intermediate_points = decimate(wd.original_points, params.decimation, params.decimation, params.decimation);
+                            
+                        }
+                        worker_data.push_back(wd);
+                    }
+                    
                     params.m_g = worker_data[0].intermediate_trajectory[0];
                     step_1_done = true;
                     std::cout << "step_1_done please click 'compute_all (step 2)' to continue calculations" << std::endl;

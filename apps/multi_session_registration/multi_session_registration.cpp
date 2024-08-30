@@ -32,6 +32,8 @@
 
 #include <HDMapping/Version.hpp>
 
+#include <ndt.h>
+
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
 double camera_ortho_xy_view_shift_y = 0.0;
@@ -81,6 +83,8 @@ double search_radious = 0.3;
 bool loaded_sessions = false;
 bool optimized = false;
 bool gizmo_all_sessions = false;
+bool is_ndt_gui = false;
+NDT ndt;
 
 struct ProjectSettings
 {
@@ -124,6 +128,188 @@ bool save_results(std::vector<Session> &sessions);
 
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
+
+void ndt_gui()
+{
+    static bool compute_mean_and_cov_for_bucket = false;
+    if(ImGui::Begin("Normal Distributions Transform")){
+        ImGui::InputFloat3("bucket_size (x[m],y[m],z[m])", ndt.bucket_size);
+        if (ndt.bucket_size[0] < 0.01)
+            ndt.bucket_size[0] = 0.01f;
+        if (ndt.bucket_size[1] < 0.01)
+            ndt.bucket_size[1] = 0.01f;
+        if (ndt.bucket_size[2] < 0.01)
+            ndt.bucket_size[2] = 0.01f;
+
+        ImGui::InputInt("number_of_threads", &ndt.number_of_threads);
+        if (ndt.number_of_threads < 1)
+            ndt.number_of_threads = 1;
+
+        ImGui::InputInt("number_of_iterations", &ndt.number_of_iterations);
+        if (ndt.number_of_iterations < 1)
+            ndt.number_of_iterations = 1;
+
+        if (ImGui::Button("ndt_optimization"))
+        {
+            double rms_initial = 0.0;
+            double rms_final = 0.0;
+            double mui = 0.0;
+            // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
+            // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
+            ndt.optimize(sessions, false, compute_mean_and_cov_for_bucket);
+        }
+        ImGui::End();
+    }
+
+#if 0
+    
+
+    
+
+    
+
+    ImGui::Checkbox("ndt fix_first_node (add I to first pose in Hessian)", &ndt.is_fix_first_node);
+
+    ImGui::Checkbox("ndt Gauss-Newton", &ndt.is_gauss_newton);
+    if (ndt.is_gauss_newton)
+    {
+        ndt.is_levenberg_marguardt = false;
+    }
+
+    ImGui::SameLine();
+    ImGui::Checkbox("ndt Levenberg-Marguardt", &ndt.is_levenberg_marguardt);
+    if (ndt.is_levenberg_marguardt)
+    {
+        ndt.is_gauss_newton = false;
+    }
+
+    ImGui::Checkbox("ndt poses expressed as camera<-world (cw)", &ndt.is_cw);
+    if (ndt.is_cw)
+    {
+        ndt.is_wc = false;
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("ndt poses expressed as camera->world (wc)", &ndt.is_wc);
+    if (ndt.is_wc)
+    {
+        ndt.is_cw = false;
+    }
+
+    ImGui::Checkbox("ndt Tait-Bryan angles (om fi ka: RxRyRz)", &ndt.is_tait_bryan_angles);
+    if (ndt.is_tait_bryan_angles)
+    {
+        ndt.is_quaternion = false;
+        ndt.is_rodrigues = false;
+    }
+
+    ImGui::SameLine();
+    ImGui::Checkbox("ndt Quaternion (q0 q1 q2 q3)", &ndt.is_quaternion);
+    if (ndt.is_quaternion)
+    {
+        ndt.is_tait_bryan_angles = false;
+        ndt.is_rodrigues = false;
+    }
+
+    ImGui::SameLine();
+    ImGui::Checkbox("ndt Rodrigues (sx sy sz)", &ndt.is_rodrigues);
+    if (ndt.is_rodrigues)
+    {
+        ndt.is_tait_bryan_angles = false;
+        ndt.is_quaternion = false;
+    }
+
+    
+
+    if (ImGui::Button("compute mean mahalanobis distance"))
+    {
+        double rms_initial = 0.0;
+        double rms_final = 0.0;
+        double mui = 0.0;
+        // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
+        // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
+        ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
+    }
+
+    ImGui::Text("--------------------------------------------------------------------------------------------------------");
+
+    if (ImGui::Button("ndt_optimization(Lie-algebra left Jacobian)"))
+    {
+        // icp.optimize_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
+        ndt.optimize_lie_algebra_left_jacobian(session.point_clouds_container.point_clouds, compute_mean_and_cov_for_bucket);
+    }
+    if (ImGui::Button("ndt_optimization(Lie-algebra right Jacobian)"))
+    {
+        // icp.optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
+        ndt.optimize_lie_algebra_right_jacobian(session.point_clouds_container.point_clouds, compute_mean_and_cov_for_bucket);
+    }
+
+    ImGui::Text("--------------------------------------------------------------------------------------------------------");
+
+    ImGui::Checkbox("generalized", &ndt.is_generalized);
+
+    if (ndt.is_generalized)
+    {
+        ImGui::InputDouble("sigma_r", &ndt.sigma_r, 0.01, 0.01);
+        ImGui::InputDouble("sigma_polar_angle_rad", &ndt.sigma_polar_angle, 0.0001, 0.0001);
+        ImGui::InputDouble("sigma_azimuthal_angle_rad", &ndt.sigma_azimuthal_angle, 0.0001, 0.0001);
+        ImGui::InputInt("num_extended_points", &ndt.num_extended_points, 1, 1);
+
+        ImGui::Checkbox("compute_mean_and_cov_for_bucket", &compute_mean_and_cov_for_bucket);
+    }
+
+    if (ImGui::Button("Set Zoller+Fröhlich TLS Imager 5006i errors"))
+    {
+        ndt.sigma_r = 0.0068;
+        ndt.sigma_polar_angle = 0.007 / 180.0 * M_PI;
+        ndt.sigma_azimuthal_angle = 0.007 / 180.0 * M_PI;
+    }
+
+    if (ImGui::Button("Set Zoller+Fröhlich TLS Imager 5010C errors"))
+    {
+        ndt.sigma_r = 0.01;
+        ndt.sigma_polar_angle = 0.007 / 180.0 * M_PI;
+        ndt.sigma_azimuthal_angle = 0.007 / 180.0 * M_PI;
+    }
+
+    if (ImGui::Button("Set Zoller+Fröhlich TLS Imager 5016 errors"))
+    {
+        ndt.sigma_r = 0.00025;
+        ndt.sigma_polar_angle = 0.004 / 180.0 * M_PI;
+        ndt.sigma_azimuthal_angle = 0.004 / 180.0 * M_PI;
+    }
+    if (ImGui::Button("Set Faro Focus3D errors"))
+    {
+        ndt.sigma_r = 0.001;
+        ndt.sigma_polar_angle = 19.0 * (1.0 / 3600.0) / 180.0 * M_PI;
+        ndt.sigma_azimuthal_angle = 19.0 * (1.0 / 3600.0) / 180.0 * M_PI;
+    }
+    if (ImGui::Button("Set Leica ScanStation C5 C10 errors"))
+    {
+        ndt.sigma_r = 0.006;
+        ndt.sigma_polar_angle = 0.00006;
+        ndt.sigma_azimuthal_angle = 0.00006;
+    }
+    if (ImGui::Button("Set Riegl VZ400 errors"))
+    {
+        ndt.sigma_r = 0.005;
+        ndt.sigma_polar_angle = 0.0005 / 180.0 * M_PI + 0.0003;     // Laser Beam Dicvergence
+        ndt.sigma_azimuthal_angle = 0.0005 / 180.0 * M_PI + 0.0003; // Laser Beam Dicvergence
+    }
+    if (ImGui::Button("Set Leica HDS6100 errors"))
+    {
+        ndt.sigma_r = 0.009;
+        ndt.sigma_polar_angle = 0.000125;
+        ndt.sigma_azimuthal_angle = 0.000125;
+    }
+    if (ImGui::Button("Set Leica P40 errors"))
+    {
+        ndt.sigma_r = 0.0012;
+        ndt.sigma_polar_angle = 8.0 / 3600;
+        ndt.sigma_azimuthal_angle = 8.0 / 3600;
+    }
+#endif
+    
+}
 
 bool load_project_settings(const std::string &file_name, ProjectSettings &_project_settings)
 {
@@ -571,8 +757,8 @@ void project_gui()
                         optimized = true;
                     }
 
-                    if (optimized)
-                    {
+                    //if (optimized)
+                    //{
                         ImGui::SameLine();
                         if (ImGui::Button("Revert"))
                         {
@@ -583,7 +769,7 @@ void project_gui()
                         {
                             save_results(sessions);
                         }
-                    }
+                    //}
                 }
 
                 if (number_visible_sessions == 1 || number_visible_sessions == 2)
@@ -921,7 +1107,7 @@ void project_gui()
                 //}
             }
         }
-
+        ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
         ImGui::End();
     }
 }
@@ -1431,6 +1617,11 @@ void display()
 
             ImGui::End();
         }
+    }
+
+    if (is_ndt_gui)
+    {
+        ndt_gui();
     }
     /*if (!manual_pose_graph_loop_closure_mode)
     {

@@ -435,7 +435,7 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
 
     const auto hessian_fun = [&](const Point3Di &intermediate_points_i)
     {
-        if (intermediate_points_i.point.norm() < 1.0)
+        if (intermediate_points_i.point.norm() < 0.1)
         {
             return;
         }

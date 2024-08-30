@@ -325,18 +325,6 @@ void project_gui()
             {
                 // std::string poses_file_name;
                 // std::string initial_poses_file_name;
-                std::shared_ptr<pfd::save_file> save_file1;
-                std::string poses_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file1);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("poses_file_name", "C:\\", Resso_filter).result();
-                    poses_file_name = sel;
-                    std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
-
                 std::shared_ptr<pfd::save_file> save_file2;
                 std::string initial_poses_file_name = "";
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file2);
@@ -349,13 +337,26 @@ void project_gui()
                 std::thread t2(tt);
                 t2.join();
 
+                std::shared_ptr<pfd::save_file> save_file1;
+                std::string poses_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file1);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("poses_file_name", "C:\\", Resso_filter).result();
+                    poses_file_name = sel;
+                    std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
                 if (poses_file_name.size() > 0 && initial_poses_file_name.size() > 0)
                 {
                     session.save(fs::path(output_file_name).string(), poses_file_name, initial_poses_file_name, save_subsession);
-                    std::cout << "saving poses to: " << poses_file_name << std::endl;
-                    session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), save_subsession);
                     std::cout << "saving initial poses to: " << initial_poses_file_name << std::endl;
                     session.point_clouds_container.save_poses(fs::path(initial_poses_file_name).string(), save_subsession);
+                    std::cout << "saving poses to: " << poses_file_name << std::endl;
+                    session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), save_subsession);
+                    
                 }
             }
         }

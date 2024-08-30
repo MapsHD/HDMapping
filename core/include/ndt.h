@@ -4,6 +4,7 @@
 #include <point_cloud.h>
 #include <Eigen/Eigen>
 #include <thread>
+#include <session.h>
 
 class NDT
 {
@@ -112,9 +113,14 @@ public:
 	void reindex(std::vector<Point3Di> &points, std::vector<NDT::PointBucketIndexPair> &index_pair, NDT::GridParameters &rgd_params, int num_threads);
 
 	bool optimize(std::vector<PointCloud> &point_clouds, bool compute_only_mahalanobis_distance, bool compute_mean_and_cov_for_bucket);
+	bool optimize(std::vector<Session> &sessions, bool compute_only_mahalanobis_distance, bool compute_mean_and_cov_for_bucket);
+
 	std::vector<Eigen::SparseMatrix<double>> compute_covariance_matrices_and_rms(std::vector<PointCloud> &point_clouds, double &rms);
 
 	bool optimize(std::vector<PointCloud> &point_clouds, double &rms_initial, double &rms_final, double &mui, bool compute_mean_and_cov_for_bucket);
+
+	//std::vector<Session> sessions;
+
 
 	bool optimize_lie_algebra_left_jacobian(std::vector<PointCloud> &point_clouds, bool compute_mean_and_cov_for_bucket);
 	bool optimize_lie_algebra_right_jacobian(std::vector<PointCloud> &point_clouds, bool compute_mean_and_cov_for_bucket);

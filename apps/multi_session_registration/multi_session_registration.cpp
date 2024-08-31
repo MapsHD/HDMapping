@@ -710,6 +710,10 @@ void project_gui()
                     }
 
                     std::cout << "sessions reordered, ground truth should be in front" << std::endl;
+                    for (const auto &s : sessions)
+                    {
+                        std::cout << "session: '" << s.session_file_name << "' ground truth [" << int(s.is_ground_truth) << "]" << std::endl;  
+                    }
                 }
             }
 

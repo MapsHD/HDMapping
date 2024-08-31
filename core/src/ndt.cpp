@@ -2489,6 +2489,40 @@ bool NDT::optimize(std::vector<Session> &sessions, bool compute_only_mahalanobis
 
 	auto start = std::chrono::system_clock::now();
 
+	Session tmp_session;
+
+	if (sessions.size() > 1)
+	{
+		if (sessions[0].is_ground_truth)
+		{
+			tmp_session = sessions[0];
+			PointClouds point_clouds_container;
+
+			std::vector<PointCloud> point_clouds;
+
+			std::vector<Eigen::Vector3d> points_local;
+
+			for (const auto &pc : sessions[0].point_clouds_container.point_clouds)
+			{
+				for (const auto &p : pc.points_local)
+				{
+					Eigen::Vector3d pg = pc.m_pose * p;
+					points_local.push_back(pg);
+				}
+			}
+
+			PointCloud pc;
+			pc.points_local = points_local;
+			pc.m_initial_pose = Eigen::Affine3d::Identity();
+			pc.m_pose = Eigen::Affine3d::Identity();
+
+			point_clouds.push_back(pc);
+			point_clouds_container.point_clouds = point_clouds;
+
+			sessions[0].point_clouds_container = point_clouds_container;
+		}
+	}
+
 	OptimizationAlgorithm optimization_algorithm;
 	if (is_gauss_newton)
 	{
@@ -3039,17 +3073,17 @@ bool NDT::optimize(std::vector<Session> &sessions, bool compute_only_mahalanobis
 
 					if (is_wc)
 					{
-						if (!s.is_ground_truth)
-						{
-							pc.m_pose = m_pose; // ToDo check if !pc.fixed needed
-						}
+						// if (!s.is_ground_truth)
+						//{
+						pc.m_pose = m_pose; // ToDo check if !pc.fixed needed
+											//}
 					}
 					else
 					{
-						if (!s.is_ground_truth)
-						{
-							pc.m_pose = m_pose.inverse(); // ToDo check if !pc.fixed needed
-						}
+						// if (!s.is_ground_truth)
+						//{
+						pc.m_pose = m_pose.inverse(); // ToDo check if !pc.fixed needed
+													  //}
 					}
 
 					if (!pc.fixed)
@@ -3084,6 +3118,33 @@ bool NDT::optimize(std::vector<Session> &sessions, bool compute_only_mahalanobis
 			break;
 		}
 	}
+
+	//////////
+
+	if (sessions.size() > 1)
+	{
+		if (sessions[0].is_ground_truth)
+		{
+			Eigen::Affine3d pose_inv0 = sessions[0].point_clouds_container.point_clouds[0].m_pose.inverse();
+
+			sessions[0].point_clouds_container = tmp_session.point_clouds_container;
+
+			for (int i = 1; i < sessions.size(); i++){
+				for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+				{
+					sessions[i].point_clouds_container.point_clouds[j].m_pose = sessions[i].point_clouds_container.point_clouds[j].m_pose * pose_inv0;
+					sessions[i].point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[j].m_pose);
+					sessions[i].point_clouds_container.point_clouds[j].gui_translation[0] = sessions[i].point_clouds_container.point_clouds[j].pose.px;
+					sessions[i].point_clouds_container.point_clouds[j].gui_translation[1] = sessions[i].point_clouds_container.point_clouds[j].pose.py;
+					sessions[i].point_clouds_container.point_clouds[j].gui_translation[2] = sessions[i].point_clouds_container.point_clouds[j].pose.pz;
+					sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] = rad2deg(sessions[i].point_clouds_container.point_clouds[j].pose.om);
+					sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] = rad2deg(sessions[i].point_clouds_container.point_clouds[j].pose.fi);
+					sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] = rad2deg(sessions[i].point_clouds_container.point_clouds[j].pose.ka);
+				}
+			}
+		}
+	}
+	//////////
 
 	auto end = std::chrono::system_clock::now();
 	auto elapsed =

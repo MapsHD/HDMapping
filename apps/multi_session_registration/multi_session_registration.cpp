@@ -151,6 +151,11 @@ void ndt_gui()
 
         if (ImGui::Button("ndt_optimization"))
         {
+            for (auto &s : sessions)
+            {
+                s.is_gizmo = false;
+            }
+
             double rms_initial = 0.0;
             double rms_final = 0.0;
             double mui = 0.0;

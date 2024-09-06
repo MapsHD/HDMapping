@@ -86,15 +86,15 @@ std::vector<std::string> sn_files;
 std::string imuSnToUse;
 Session session;
 
-//std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> global_tmp;
+// std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> global_tmp;
 
 void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
-//bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity,
-//               const std::vector<double> &timestamps, double offset_x,
-//               double offset_y,
-//               double offset_alt);
+// bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity,
+//                const std::vector<double> &timestamps, double offset_x,
+//                double offset_y,
+//                double offset_alt);
 
 void lidar_odometry_gui()
 {
@@ -894,43 +894,45 @@ void lidar_odometry_gui()
         }
         if (!simple_gui)
         {
-            if (step_1_done && step_2_done){
-                ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
-            if (ImGui::Button("Consistency"))
-            {
-                std::cout << "Consistency START" << std::endl;
-
-                for (int i = 0; i < num_constistency_iter; i++)
+            //if (step_1_done && step_2_done)
+            //{
+                /*ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
+                if (ImGui::Button("Consistency"))
                 {
-                    std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
-                    for (int ii = 0; ii < worker_data.size(); ii++)
-                    {
-                        worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
-                    }
-                    Consistency(worker_data, params);
-                }
-                std::cout << "Consistency FINISHED" << std::endl;
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Consistency2"))
-            {
-                std::cout << "Consistency2 START" << std::endl;
+                    std::cout << "Consistency START" << std::endl;
 
-                for (int i = 0; i < num_constistency_iter; i++)
-                {
-                    std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
-                    for (int ii = 0; ii < worker_data.size(); ii++)
+                    for (int i = 0; i < num_constistency_iter; i++)
                     {
-                        worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
+                        std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
+                        for (int ii = 0; ii < worker_data.size(); ii++)
+                        {
+                            worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
+                        }
+                        Consistency(worker_data, params);
                     }
-                    Consistency2(worker_data, params);
+                    std::cout << "Consistency FINISHED" << std::endl;
                 }
-                std::cout << "Consistency2 FINISHED" << std::endl;
-            }
-            ImGui::SameLine();
-            ImGui::Text("Press this button optionally before pressing 'save result (step 3)'");
-            }
-            //ImGui::SameLine();
+                ImGui::SameLine();
+                if (ImGui::Button("Consistency2"))
+                {
+                    std::cout << "Consistency2 START" << std::endl;
+
+                    for (int i = 0; i < num_constistency_iter; i++)
+                    {
+                        std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
+                        for (int ii = 0; ii < worker_data.size(); ii++)
+                        {
+                            worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
+                        }
+                        Consistency2(worker_data, params);
+                    }
+                    std::cout << "Consistency2 FINISHED" << std::endl;
+                }
+                ImGui::SameLine();
+                ImGui::Text("Press this button optionally before pressing 'save result (step 3)'");
+                */
+            //}
+            // ImGui::SameLine();
             if (ImGui::Button("save trajectory to ascii (x y z)"))
             {
                 static std::shared_ptr<pfd::save_file> save_file;
@@ -1928,9 +1930,9 @@ void display()
         glColor3f(global_tmp[i].second.x(), global_tmp[i].second.y(), global_tmp[i].second.z());
         glBegin(GL_LINES);
             glVertex3f(global_tmp[i].first.x(), global_tmp[i].first.y(), global_tmp[i].first.z());
-            
+
             glVertex3f(global_tmp[i].first.x() + global_tmp[i].second.x(),
-                       global_tmp[i].first.y() + global_tmp[i].second.y(), 
+                       global_tmp[i].first.y() + global_tmp[i].second.y(),
                        global_tmp[i].first.z() + global_tmp[i].second.z());
         glEnd();
     }*/

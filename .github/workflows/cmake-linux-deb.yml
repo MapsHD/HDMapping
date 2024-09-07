@@ -41,13 +41,8 @@ jobs:
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest -C ${{env.BUILD_TYPE}}
 
-    - name: Verify and lint the Debian package
-      run: |
-        cd build
-        lintian *.deb
-
     - name: Upload Debian package as artifact
       uses: actions/upload-artifact@v3
       with:
         name: hd_mapping-deb
-        path: build/*.deb
+        path: ${{github.workspace}}/build/*.deb

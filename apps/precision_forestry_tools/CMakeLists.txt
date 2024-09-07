@@ -10,7 +10,7 @@ add_executable(precision_forestry_tools
 target_link_libraries(
   precision_forestry_tools
   PRIVATE ${PLATFORM_LASZIP_LIB}
-          freeglut
+          ${FREEGLUT_LIBRARY}
           ${OPENGL_gl_LIBRARY}
           OpenGL::GLU
           ${GUI_LIBRARIES}
@@ -22,15 +22,15 @@ target_include_directories(
   PRIVATE include
           ${REPOSITORY_DIRECTORY}/core/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen
+          ${EIGEN3_INCLUDE_DIR}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
           ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include
+          ${FREEGLUT_INCLUDE_DIR}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip/include)
+          ${LASZIP_INCLUDE_DIR}/LASzip/include)
 
 if(WIN32)
   add_custom_command(
@@ -41,3 +41,5 @@ if(WIN32)
       $<TARGET_FILE_DIR:precision_forestry_tools>
     COMMAND_EXPAND_LISTS)
 endif()
+
+install (TARGETS precision_forestry_tools DESTINATION bin)

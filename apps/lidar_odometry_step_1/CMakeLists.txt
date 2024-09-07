@@ -15,22 +15,22 @@ target_include_directories(
           ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen
+          ${EIGEN3_INCLUDE_DIR}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
           ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include
+          ${FREEGLUT_INCLUDE_DIR}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip/include
+          ${LASZIP_INCLUDE_DIR}/LASzip/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
           ${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
 
 target_link_libraries(
   lidar_odometry_step_1
   PRIVATE Fusion
-          freeglut
+          ${FREEGLUT_LIBRARY}
           ${OPENGL_gl_LIBRARY}
           OpenGL::GLU
           ${PLATFORM_LASZIP_LIB}
@@ -47,3 +47,5 @@ if(WIN32)
       $<TARGET_FILE_DIR:lidar_odometry_step_1>
     COMMAND_EXPAND_LISTS)
 endif()
+
+install(TARGETS lidar_odometry_step_1 DESTINATION bin)

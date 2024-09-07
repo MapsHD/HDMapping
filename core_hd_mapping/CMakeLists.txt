@@ -26,8 +26,8 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
           ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen
+          ${EIGEN3_INCLUDE_DIR}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
           ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip/include)
+          ${LASZIP_INCLUDE_DIR}/LASzip/include)

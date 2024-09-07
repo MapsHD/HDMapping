@@ -6,6 +6,6 @@ add_executable(matrix_mul matrix_mul.cpp)
 
 target_include_directories(
   matrix_mul PRIVATE include ${REPOSITORY_DIRECTORY}/core/include
-                     ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)
+                     ${EIGEN3_INCLUDE_DIR})
 
 target_link_libraries(matrix_mul PRIVATE ${PLATFORM_MISCELLANEOUS_LIBS})

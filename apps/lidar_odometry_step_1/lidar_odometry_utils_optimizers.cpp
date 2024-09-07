@@ -494,6 +494,21 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
 
         int c = intermediate_points_i.index_pose * 6;
 
+        // planarity
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+        auto eigen_values = eigen_solver.eigenvalues();
+        auto eigen_vectors = eigen_solver.eigenvectors();
+        double ev1 = eigen_values.x();
+        double ev2 = eigen_values.y();
+        double ev3 = eigen_values.z();
+        double sum_ev = ev1 + ev2 + ev3;
+        auto planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
+
+        double norm = p_s.norm();
+
+        AtPA *= (planarity * norm);
+        AtPB *= (planarity * norm);
+
         std::mutex &m = mutexes[intermediate_points_i.index_pose];
         std::unique_lock lck(m);
         AtPAndt.block<6, 6>(c, c) += AtPA;

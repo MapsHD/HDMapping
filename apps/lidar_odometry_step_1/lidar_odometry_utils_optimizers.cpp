@@ -506,8 +506,15 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
 
         double norm = p_s.norm();
 
-        AtPA *= (planarity * norm);
-        AtPB *= (planarity * norm);
+        double w = planarity * norm;
+        if (w > 10.0)
+        {
+            // std::cout << w << " " << planarity << " " << norm << "x " << p_s.x() << "y " << p_s.y() << "z " << p_s.z() << std::endl;
+            w = 10.0;
+        }
+
+        AtPA *= w;
+        AtPB *= w;
 
         std::mutex &m = mutexes[intermediate_points_i.index_pose];
         std::unique_lock lck(m);
@@ -940,6 +947,10 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
 
     AtPA += AtPAndt.sparseView();
     AtPB += AtPBndt.sparseView();
+
+    Eigen::SparseMatrix<double> AtPA_I(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
+    AtPA_I.setIdentity();
+    AtPA += AtPA_I;
 
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>>
         solver(AtPA);

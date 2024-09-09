@@ -3878,6 +3878,8 @@ double distance_point_to_line(const Eigen::Vector3d &point, const LaserBeam &lin
     return dist;
 }
 
+void wheel(int button, int dir, int x, int y);
+
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -3893,6 +3895,13 @@ void mouse(int glut_button, int state, int x, int y)
         io.MouseDown[button] = true;
     if (button != -1 && state == GLUT_UP)
         io.MouseDown[button] = false;
+
+    static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
+    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
+        glutMajorVersion < 3) {
+        wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
+    }
+
 
     if (!io.WantCaptureMouse)
     {

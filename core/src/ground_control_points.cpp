@@ -146,9 +146,9 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
                             }
                         }
                     }
-                    tripletListP.emplace_back(ir + 0, ir + 0, 1.0);
-                    tripletListP.emplace_back(ir + 1, ir + 1, 1.0);
-                    tripletListP.emplace_back(ir + 2, ir + 2, 1.0);
+                    tripletListP.emplace_back(ir + 0, ir + 0, 1.0 / (gpcs[i].sigma_x * gpcs[i].sigma_x));
+                    tripletListP.emplace_back(ir + 1, ir + 1, 1.0 / (gpcs[i].sigma_y * gpcs[i].sigma_y));
+                    tripletListP.emplace_back(ir + 2, ir + 2, 1.0 / (gpcs[i].sigma_z * gpcs[i].sigma_z));
 
                     tripletListB.emplace_back(ir, 0, delta_x);
                     tripletListB.emplace_back(ir + 1, 0, delta_y);

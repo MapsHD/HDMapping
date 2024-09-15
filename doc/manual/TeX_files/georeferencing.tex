@@ -131,7 +131,7 @@ To download ALS data Geoportal site will be used - \url{https://www.geoportal.go
 Prepare at least 3 ground control points with e.g. GPS receiver (Longitude, Latitude, Altitude), see figures \ref{fig:GCP1}, \ref{fig:GCP2}, \ref{fig:GCP3}.
 Prepare GCP in local coordinate system using arbitrary chosen projection, thus each one has x, y, z coordinates.
 Please apply offset to GSPs and store it to export data in global coordinate system.
-
+%You can align session to 
 
 During survey please place MANDEYE on top of each GCP (for at least 30 seconds) that LiDAR xy center will be exactly in the xy center of GCP (see figures \ref{fig:GCP4} and \ref{fig:GCP5}).
 The resulting trajectory should be as shown in figure \ref{fig:trj}.
@@ -145,6 +145,11 @@ Now it is possible to change GCP name, uncertainty (sigma x, sigma y, sigma z), 
 Now it is time to manual transformation of the trajectory using GIZMO (see figures \ref{fig:gcp1} and \ref{fig:gcp2}). 
 Uncheck 'manipulate only marked gizmo' to move all nodes of the trajectory that all GPCs are in proper positions.
 You can save session to json to store all GPS in the project file.
+
+Important notice: starting from v0.59 you can align session to all GCPs with button 'Register session to Ground Control Points (trajectory is rigid)' placed in the end of GUI window 'Ground Control Point'.
+This functionality is preserving the shape of the trajectory, thus the consecutive relative poses will not change.  
+It is recommended to use it before applying 'Manual Pose Graph Loop Closure Mode'.
+
 All GPCs are considered in 'Manual Pose Graph Loop Closure Mode', so they will converge assuming assigned uncertainty. 
 To export point cloud to global reference system applied offset has to be provided in GUI (see figure \ref{fig:offset}).
 Thus, for all point the offset transformation will applied during export.
@@ -170,9 +175,6 @@ Thus, for all point the offset transformation will applied during export.
 	\label{fig:GCP3}
 \end{figure}
 
-
-
-
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=\textwidth]{IMG_1123.png}
@@ -186,8 +188,6 @@ Thus, for all point the offset transformation will applied during export.
 	\caption{LiDAR xy center is exactly in the xy center of GCP.}
 	\label{fig:GCP5}
 \end{figure}
-
-
 
 \begin{figure}[H]
 	\centering

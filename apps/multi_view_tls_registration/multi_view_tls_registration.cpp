@@ -788,6 +788,8 @@ void project_gui()
         ImGui::Checkbox("Plane Features", &is_registration_plane_feature);
         ImGui::Checkbox("Pose Graph SLAM", &is_pose_graph_slam);
         ImGui::Checkbox("Manual Analysis", &is_manual_analisys);
+
+        
     }
     if (session.point_clouds_container.point_clouds.size() > 0)
     {
@@ -942,6 +944,8 @@ void project_gui()
             {
                 ImGui::Separator();
                 ImGui::Checkbox(session.point_clouds_container.point_clouds[i].file_name.c_str(), &session.point_clouds_container.point_clouds[i].visible);
+                //ImGui::SameLine();
+                ImGui::Text("--");
                 ImGui::SameLine();
                 ImGui::Checkbox((std::string("gizmo_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
                 ImGui::SameLine();

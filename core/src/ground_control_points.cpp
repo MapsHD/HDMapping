@@ -5,7 +5,9 @@
 #include <imgui_impl_opengl2.h>
 #include <imgui_internal.h>
 
-void GroundControlPoints::imgui(const PointClouds &point_clouds_container)
+#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
+
+void GroundControlPoints::imgui(PointClouds &point_clouds_container)
 {
     if (ImGui::Begin("Ground Control Point"))
     {
@@ -47,9 +49,18 @@ void GroundControlPoints::imgui(const PointClouds &point_clouds_container)
         }
 
         ImGui::Text("-------------------------------------");
+
+        // ImGui::SameLine();
+        int remove_gcp_index = -1;
         for (int i = 0; i < gpcs.size(); i++)
         {
             ImGui::Text((std::string("gcp_") + std::to_string(i) + "[" + gpcs[i].name + "]").c_str());
+            ImGui::SameLine();
+            if (ImGui::Button(std::string("remove: '" + std::to_string(i) + "'").c_str()))
+            {
+                remove_gcp_index = i;
+            }
+
             std::string text = "[" + std::to_string(i) + "]_" + gpcs[i].name;
 
             ImGui::InputText(text.c_str(), gpcs[i].name, IM_ARRAYSIZE(gpcs[i].name));
@@ -68,6 +79,155 @@ void GroundControlPoints::imgui(const PointClouds &point_clouds_container)
             ImGui::InputDouble(text.c_str(), &gpcs[i].z);
             text = "[" + std::to_string(i) + "]_lidar_height_above_ground";
             ImGui::InputDouble(text.c_str(), &gpcs[i].lidar_height_above_ground);
+        }
+
+        if (remove_gcp_index != -1)
+        {
+            std::vector<GroundControlPoint> new_gcps;
+            for (int i = 0; i < gpcs.size(); i++)
+            {
+                if (i != remove_gcp_index)
+                {
+                    new_gcps.push_back(gpcs[i]);
+                }
+            }
+            gpcs = new_gcps;
+        }
+
+        if (gpcs.size() >= 3)
+        {
+            if (ImGui::Button("Register session to Ground Control Points (trajectory is rigid)"))
+            {
+                ////////////////////////////////////
+                TaitBryanPose pose_s;
+                pose_s.px = 0.0;
+                pose_s.py = 0.0;
+                pose_s.pz = 0.0;
+                pose_s.om = 0.0;
+                pose_s.fi = 0.0;
+                pose_s.ka = 0.0;
+
+                std::vector<Eigen::Triplet<double>> tripletListA;
+                std::vector<Eigen::Triplet<double>> tripletListP;
+                std::vector<Eigen::Triplet<double>> tripletListB;
+
+                // GCPs
+                for (int i = 0; i < gpcs.size(); i++)
+                {
+                    Eigen::Vector3d p_s =
+                        point_clouds_container.point_clouds[gpcs[i].index_to_node_inner].m_pose *
+                        point_clouds_container.point_clouds[gpcs[i].index_to_node_inner]
+                            .local_trajectory[gpcs[i].index_to_node_outer]
+                            .m_pose.translation();
+
+                    Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+
+                    point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                           p_s.x(), p_s.y(), p_s.z());
+
+                    double delta_x;
+                    double delta_y;
+                    double delta_z;
+                    Eigen::Vector3d p_t(gpcs[i].x, gpcs[i].y, gpcs[i].z + gpcs[i].lidar_height_above_ground);
+                    point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                                  pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                  p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+
+                    int ir = tripletListB.size();
+                    int ic = 0;
+
+                    for (int row = 0; row < 3; row++)
+                    {
+                        for (int col = 0; col < 6; col++)
+                        {
+                            if (jacobian(row, col) != 0.0)
+                            {
+                                tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
+                            }
+                        }
+                    }
+                    tripletListP.emplace_back(ir + 0, ir + 0, 1.0);
+                    tripletListP.emplace_back(ir + 1, ir + 1, 1.0);
+                    tripletListP.emplace_back(ir + 2, ir + 2, 1.0);
+
+                    tripletListB.emplace_back(ir, 0, delta_x);
+                    tripletListB.emplace_back(ir + 1, 0, delta_y);
+                    tripletListB.emplace_back(ir + 2, 0, delta_z);
+
+                    std::cout << "gcp: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
+                }
+
+                Eigen::SparseMatrix<double> matA(tripletListB.size(), 6);
+                Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
+                Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
+
+                matA.setFromTriplets(tripletListA.begin(), tripletListA.end());
+                matP.setFromTriplets(tripletListP.begin(), tripletListP.end());
+                matB.setFromTriplets(tripletListB.begin(), tripletListB.end());
+
+                Eigen::SparseMatrix<double> AtPA(6, 6);
+                Eigen::SparseMatrix<double> AtPB(6, 1);
+
+                {
+                    Eigen::SparseMatrix<double> AtP = matA.transpose() * matP;
+                    AtPA = (AtP)*matA;
+                    AtPB = (AtP)*matB;
+                }
+
+                tripletListA.clear();
+                tripletListP.clear();
+                tripletListB.clear();
+
+                std::cout << "AtPA.size: " << AtPA.size() << std::endl;
+                std::cout << "AtPB.size: " << AtPB.size() << std::endl;
+
+                std::cout << "start solving AtPA=AtPB" << std::endl;
+                Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
+
+                std::cout << "x = solver.solve(AtPB)" << std::endl;
+                Eigen::SparseMatrix<double> x = solver.solve(AtPB);
+
+                std::vector<double> h_x;
+
+                for (int k = 0; k < x.outerSize(); ++k)
+                {
+                    for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
+                    {
+                        h_x.push_back(it.value());
+                    }
+                }
+
+                std::cout << "h_x.size(): " << h_x.size() << std::endl;
+
+                if (h_x.size() == 6)
+                {
+                    std::cout << "AtPA=AtPB SOLVED" << std::endl;
+                    pose_s.px = h_x[0];
+                    pose_s.py = h_x[1];
+                    pose_s.pz = h_x[2];
+                    pose_s.om = h_x[3];
+                    pose_s.fi = h_x[4];
+                    pose_s.ka = h_x[5];
+
+                    auto m_pose = affine_matrix_from_pose_tait_bryan(pose_s);
+
+                    for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+                    {
+                        point_clouds_container.point_clouds[i].m_pose = m_pose * point_clouds_container.point_clouds[i].m_pose;
+                        point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+                        point_clouds_container.point_clouds[i].gui_translation[0] = point_clouds_container.point_clouds[i].pose.px;
+                        point_clouds_container.point_clouds[i].gui_translation[1] = point_clouds_container.point_clouds[i].pose.py;
+                        point_clouds_container.point_clouds[i].gui_translation[2] = point_clouds_container.point_clouds[i].pose.pz;
+                        point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(point_clouds_container.point_clouds[i].pose.om);
+                        point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(point_clouds_container.point_clouds[i].pose.fi);
+                        point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(point_clouds_container.point_clouds[i].pose.ka);
+                    }
+                }
+                else
+                {
+                    std::cout << "AtPA=AtPB FAILED" << std::endl;
+                }
+            }
         }
 
         ImGui::End();
@@ -127,7 +287,7 @@ void GroundControlPoints::render(const PointClouds &point_clouds_container)
             draw_ellipse(covar, gcp, Eigen::Vector3f(0.5, 0.5, 0.5), 1.0f);
         }
 
-        glColor3f(0,0,0);
+        glColor3f(0, 0, 0);
         glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z + gpcs[i].lidar_height_above_ground + 0.1);
         glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)gpcs[i].name);
 

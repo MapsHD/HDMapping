@@ -161,6 +161,8 @@ void lidar_odometry_gui()
             ImGui::InputInt("number iterations", &params.nr_iter);
             ImGui::InputDouble("sliding window trajectory length threshold", &params.sliding_window_trajectory_length_threshold);
             ImGui::InputInt("threshold initial points", &threshold_initial_points);
+            ImGui::Checkbox("save_calibration_validation_file", &params.save_calibration_validation);
+            ImGui::InputInt("number of calibration validation points", &params.calibration_validation_points);
             ImGui::Checkbox("use_multithread", &params.useMultithread);
             ImGui::Checkbox("fusionConventionNwu", &fusionConventionNwu);
             if (fusionConventionNwu)
@@ -327,20 +329,18 @@ void lidar_odometry_gui()
                                        auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
                                        auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy, calibration);
 
-                                    //    if (fn == laz_files.front())
-                                    //    {
-                                    //        fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
-
+                                       if ((fn == laz_files.front()) && (params.save_calibration_validation))
+                                       {
+                                           fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
                                            std::ofstream testPointcloud{calibrationValidtationFile.c_str()};
-                                           int counter = 0;
+                                           int row_index = 0;
                                            for (const auto &p : data)
                                            {
+                                                if (row_index++ >= params.calibration_validation_points)
+                                                {
+                                                    break;
+                                                }
                                                testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int)p.lidarid << "\n";
-                                               counter++;
-                                               if (counter > 2000000)
-                                               {
-                                                   break;
-                                               }
                                            }
                                        }
 
@@ -467,13 +467,13 @@ void lidar_odometry_gui()
                     // int last_point = 0;
                     int index_begin = 0;
 
-                    int n_iter = (int)(poses.size() / thershold);
+                    const int n_iter = std::floor(poses.size() / thershold);
                     worker_data.reserve(n_iter);
                     for (int i = 0; i < n_iter; i++)
                     {
                         if (i % 50 == 0)
                         {
-                            std::cout << "preparing data " << i + 1 << " of " << poses.size() << std::endl;
+                            std::cout << "preparing data " << i + 1 << " of " << n_iter << std::endl;
                         }
                         WorkerData wd;
                         wd.intermediate_trajectory.reserve(thershold);

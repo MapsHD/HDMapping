@@ -19,6 +19,7 @@
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 
 #include <HDMapping/Version.hpp>
+#include <mutex>
 
 #include <mutex>
 

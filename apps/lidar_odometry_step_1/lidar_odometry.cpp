@@ -301,7 +301,7 @@ void lidar_odometry_gui()
                         const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
                         // GetId of Imu to use
                         int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
-                        std::cout << "imuNumberToUse  " << imuNumberToUse << " at" << imufn << std::endl;
+                        std::cout << "imuNumberToUse  " << imuNumberToUse << " at '" << imufn << "'" << std::endl;
                         auto imu = load_imu(imufn.c_str(), imuNumberToUse);
                         std::cout << imufn << " with mapping " << snFn << std::endl;
                         imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
@@ -370,6 +370,8 @@ void lidar_odometry_gui()
                     {
                         const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
                         const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
+
+                        //std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z: " << acc.axis.z << std::endl;
 
                         FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
 
@@ -894,43 +896,43 @@ void lidar_odometry_gui()
         }
         if (!simple_gui)
         {
-            //if (step_1_done && step_2_done)
+            // if (step_1_done && step_2_done)
             //{
-                /*ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
-                if (ImGui::Button("Consistency"))
-                {
-                    std::cout << "Consistency START" << std::endl;
+            /*ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
+            if (ImGui::Button("Consistency"))
+            {
+                std::cout << "Consistency START" << std::endl;
 
-                    for (int i = 0; i < num_constistency_iter; i++)
-                    {
-                        std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
-                        for (int ii = 0; ii < worker_data.size(); ii++)
-                        {
-                            worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
-                        }
-                        Consistency(worker_data, params);
-                    }
-                    std::cout << "Consistency FINISHED" << std::endl;
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Consistency2"))
+                for (int i = 0; i < num_constistency_iter; i++)
                 {
-                    std::cout << "Consistency2 START" << std::endl;
-
-                    for (int i = 0; i < num_constistency_iter; i++)
+                    std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
+                    for (int ii = 0; ii < worker_data.size(); ii++)
                     {
-                        std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
-                        for (int ii = 0; ii < worker_data.size(); ii++)
-                        {
-                            worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
-                        }
-                        Consistency2(worker_data, params);
+                        worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
                     }
-                    std::cout << "Consistency2 FINISHED" << std::endl;
+                    Consistency(worker_data, params);
                 }
-                ImGui::SameLine();
-                ImGui::Text("Press this button optionally before pressing 'save result (step 3)'");
-                */
+                std::cout << "Consistency FINISHED" << std::endl;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Consistency2"))
+            {
+                std::cout << "Consistency2 START" << std::endl;
+
+                for (int i = 0; i < num_constistency_iter; i++)
+                {
+                    std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
+                    for (int ii = 0; ii < worker_data.size(); ii++)
+                    {
+                        worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
+                    }
+                    Consistency2(worker_data, params);
+                }
+                std::cout << "Consistency2 FINISHED" << std::endl;
+            }
+            ImGui::SameLine();
+            ImGui::Text("Press this button optionally before pressing 'save result (step 3)'");
+            */
             //}
             // ImGui::SameLine();
             if (ImGui::Button("save trajectory to ascii (x y z)"))
@@ -1481,7 +1483,8 @@ void mouse(int glut_button, int state, int x, int y)
         io.MouseDown[button] = false;
     static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
     if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
-        glutMajorVersion < 3) {
+        glutMajorVersion < 3)
+    {
         wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
     }
 
@@ -1531,7 +1534,6 @@ void wheel(int button, int dir, int x, int y)
     }
     return;
 }
-
 
 void reshape(int w, int h)
 {

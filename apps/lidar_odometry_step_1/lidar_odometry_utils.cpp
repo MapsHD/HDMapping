@@ -625,7 +625,7 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
             int imu_id = -1;
             if (hasImuIdColumn)
             {
-                int imu_id = row["imuId"].get<int>();
+                imu_id = row["imuId"].get<int>();
             }
             if (imu_id < 0 || imuToUse == imu_id)
             {

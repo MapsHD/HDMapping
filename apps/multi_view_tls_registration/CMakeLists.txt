@@ -7,7 +7,7 @@ add_executable(multi_view_tls_registration_step_2
 
 target_link_libraries(
   multi_view_tls_registration_step_2
-  PRIVATE freeglut
+  PRIVATE ${FREEGLUT_LIBRARY}
           ${OPENGL_gl_LIBRARY}
           OpenGL::GLU
           ${PLATFORM_LASZIP_LIB}
@@ -20,15 +20,15 @@ target_include_directories(
   PRIVATE include
           ${REPOSITORY_DIRECTORY}/core/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen
+          ${EIGEN3_INCLUDE_DIR}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
           ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include
+          ${FREEGLUT_INCLUDE_DIR}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip/include)
+          ${LASZIP_INCLUDE_DIR}/LASzip/include)
 
 if(WIN32)
   add_custom_command(
@@ -40,3 +40,5 @@ if(WIN32)
       $<TARGET_FILE_DIR:multi_view_tls_registration_step_2>
     COMMAND_EXPAND_LISTS)
 endif()
+
+install (TARGETS multi_view_tls_registration_step_2 DESTINATION bin)

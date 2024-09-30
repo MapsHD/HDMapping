@@ -86,15 +86,15 @@ std::vector<std::string> sn_files;
 std::string imuSnToUse;
 Session session;
 
-//std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> global_tmp;
+// std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> global_tmp;
 
 void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
-//bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity,
-//               const std::vector<double> &timestamps, double offset_x,
-//               double offset_y,
-//               double offset_alt);
+// bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity,
+//                const std::vector<double> &timestamps, double offset_x,
+//                double offset_y,
+//                double offset_alt);
 
 void lidar_odometry_gui()
 {
@@ -303,7 +303,7 @@ void lidar_odometry_gui()
                         const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
                         // GetId of Imu to use
                         int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
-                        std::cout << "imuNumberToUse  " << imuNumberToUse << " at" << imufn << std::endl;
+                        std::cout << "imuNumberToUse  " << imuNumberToUse << " at '" << imufn << "'" << std::endl;
                         auto imu = load_imu(imufn.c_str(), imuNumberToUse);
                         std::cout << imufn << " with mapping " << snFn << std::endl;
                         imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
@@ -376,6 +376,8 @@ void lidar_odometry_gui()
                     {
                         const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
                         const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
+
+                        //std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z: " << acc.axis.z << std::endl;
 
                         FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
 
@@ -858,8 +860,9 @@ void lidar_odometry_gui()
         }
         if (!simple_gui)
         {
-            if (step_1_done && step_2_done){
-                ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
+            // if (step_1_done && step_2_done)
+            //{
+            /*ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
             if (ImGui::Button("Consistency"))
             {
                 std::cout << "Consistency START" << std::endl;
@@ -893,8 +896,9 @@ void lidar_odometry_gui()
             }
             ImGui::SameLine();
             ImGui::Text("Press this button optionally before pressing 'save result (step 3)'");
-            }
-            //ImGui::SameLine();
+            */
+            //}
+            // ImGui::SameLine();
             if (ImGui::Button("save trajectory to ascii (x y z)"))
             {
                 static std::shared_ptr<pfd::save_file> save_file;
@@ -1424,6 +1428,8 @@ void lidar_odometry_gui()
     }
 }
 
+void wheel(int button, int dir, int x, int y);
+
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -1439,6 +1445,12 @@ void mouse(int glut_button, int state, int x, int y)
         io.MouseDown[button] = true;
     if (button != -1 && state == GLUT_UP)
         io.MouseDown[button] = false;
+    static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
+    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
+        glutMajorVersion < 3)
+    {
+        wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
+    }
 
     if (!io.WantCaptureMouse)
     {
@@ -1892,9 +1904,9 @@ void display()
         glColor3f(global_tmp[i].second.x(), global_tmp[i].second.y(), global_tmp[i].second.z());
         glBegin(GL_LINES);
             glVertex3f(global_tmp[i].first.x(), global_tmp[i].first.y(), global_tmp[i].first.z());
-            
+
             glVertex3f(global_tmp[i].first.x() + global_tmp[i].second.x(),
-                       global_tmp[i].first.y() + global_tmp[i].second.y(), 
+                       global_tmp[i].first.y() + global_tmp[i].second.y(),
                        global_tmp[i].first.z() + global_tmp[i].second.z());
         glEnd();
     }*/

@@ -50,7 +50,7 @@ using NDTBucketMapType2 = std::unordered_map<uint64_t, NDT::Bucket2>;
 
 struct LidarOdometryParams
 {
-    double filter_threshold_xy = 0.5;
+    double filter_threshold_xy = 0.3;
     Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
     std::vector<Point3Di> initial_points;
     NDT::GridParameters in_out_params;

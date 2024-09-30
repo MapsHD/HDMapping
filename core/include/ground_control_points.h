@@ -31,7 +31,7 @@ class GroundControlPoints{
         int picking_mode_index_to_node_outer = -1;
         bool draw_uncertainty = false;
 
-        void imgui(const PointClouds &point_clouds_container);
+        void imgui(PointClouds &point_clouds_container);
         void render(const PointClouds &point_clouds_container);
         void draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd = 1);
 };

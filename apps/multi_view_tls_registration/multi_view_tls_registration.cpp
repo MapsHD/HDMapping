@@ -325,18 +325,6 @@ void project_gui()
             {
                 // std::string poses_file_name;
                 // std::string initial_poses_file_name;
-                std::shared_ptr<pfd::save_file> save_file1;
-                std::string poses_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file1);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("poses_file_name", "C:\\", Resso_filter).result();
-                    poses_file_name = sel;
-                    std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
-
                 std::shared_ptr<pfd::save_file> save_file2;
                 std::string initial_poses_file_name = "";
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file2);
@@ -349,13 +337,26 @@ void project_gui()
                 std::thread t2(tt);
                 t2.join();
 
+                std::shared_ptr<pfd::save_file> save_file1;
+                std::string poses_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file1);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("poses_file_name", "C:\\", Resso_filter).result();
+                    poses_file_name = sel;
+                    std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
+
                 if (poses_file_name.size() > 0 && initial_poses_file_name.size() > 0)
                 {
                     session.save(fs::path(output_file_name).string(), poses_file_name, initial_poses_file_name, save_subsession);
-                    std::cout << "saving poses to: " << poses_file_name << std::endl;
-                    session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), save_subsession);
                     std::cout << "saving initial poses to: " << initial_poses_file_name << std::endl;
                     session.point_clouds_container.save_poses(fs::path(initial_poses_file_name).string(), save_subsession);
+                    std::cout << "saving poses to: " << poses_file_name << std::endl;
+                    session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), save_subsession);
+                    
                 }
             }
         }
@@ -787,6 +788,8 @@ void project_gui()
         ImGui::Checkbox("Plane Features", &is_registration_plane_feature);
         ImGui::Checkbox("Pose Graph SLAM", &is_pose_graph_slam);
         ImGui::Checkbox("Manual Analysis", &is_manual_analisys);
+
+        
     }
     if (session.point_clouds_container.point_clouds.size() > 0)
     {
@@ -941,6 +944,8 @@ void project_gui()
             {
                 ImGui::Separator();
                 ImGui::Checkbox(session.point_clouds_container.point_clouds[i].file_name.c_str(), &session.point_clouds_container.point_clouds[i].visible);
+                //ImGui::SameLine();
+                ImGui::Text("--");
                 ImGui::SameLine();
                 ImGui::Checkbox((std::string("gizmo_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
                 ImGui::SameLine();
@@ -3877,6 +3882,8 @@ double distance_point_to_line(const Eigen::Vector3d &point, const LaserBeam &lin
     return dist;
 }
 
+void wheel(int button, int dir, int x, int y);
+
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -3892,6 +3899,13 @@ void mouse(int glut_button, int state, int x, int y)
         io.MouseDown[button] = true;
     if (button != -1 && state == GLUT_UP)
         io.MouseDown[button] = false;
+
+    static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
+    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
+        glutMajorVersion < 3) {
+        wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
+    }
+
 
     if (!io.WantCaptureMouse)
     {

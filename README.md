@@ -23,7 +23,7 @@ abstract = {This paper presents open-source software for large-scale 3D mapping 
 }
 ```
 
-Building commands
+# Building commands
 ```
 git clone https://github.com/MapsHD/HDMapping.git
 cd HDMapping
@@ -34,6 +34,27 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j
 ```
+
+# Building Debian package.
+
+The standard build contains all necessary libraries compiled with project. 
+This approach allows smooth build on Windows platform and guarantee predictable experience.
+If you want to build Debian package, you can depends on system-provided libraries:
+Before build install 3rd party libraries:
+```
+sudo apt-get install freeglut3-dev libeigen3-dev liblaszip-dev
+```
+Next build Debian package:
+```
+cmake .. -DBUILD_WITH_BUNDLED_FREEGLUT=0 -DBUILD_WITH_BUNDLED_EIGEN=0 -DBUILD_WITH_BUNDLED_LIBLASZIP=0 -DCMAKE_BUILD_TYPE=Release 
+make -j16
+make pack
+```
+To install package :
+```
+sudo dpkg -i hd_mapping-0.*.*-Linux.deb 
+```
+
 
 ![mandeye](images/softwareX1.png)
 

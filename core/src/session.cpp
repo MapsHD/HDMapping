@@ -140,7 +140,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         for (const auto &gcp_json : data["ground_control_points"])
         {
             GroundControlPoint gcp;
-            //gcp.name = gcp_json["name"];
+            // gcp.name = gcp_json["name"];
             std::string name = gcp_json["name"];
             strcpy(gcp.name, name.c_str());
             gcp.x = gcp_json["x"];
@@ -301,7 +301,7 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
         jgcps.push_back(jgcp);
     }
     jj["ground_control_points"] = jgcps;
-    
+
     std::ofstream fs(file_name);
     if (!fs.good())
         return false;

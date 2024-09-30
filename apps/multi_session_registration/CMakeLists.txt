@@ -11,7 +11,7 @@ target_include_directories(
           ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen
+          ${EIGEN3_INCLUDE_DIR}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
           ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo
@@ -23,7 +23,7 @@ target_include_directories(
 
 target_link_libraries(
   multi_session_registration_step_3
-  freeglut
+  ${FREEGLUT_LIBRARY}
   ${OPENGL_gl_LIBRARY}
   OpenGL::GLU
   ${PLATFORM_LASZIP_LIB}
@@ -41,3 +41,5 @@ if(WIN32)
       $<TARGET_FILE_DIR:multi_session_registration_step_3>
     COMMAND_EXPAND_LISTS)
 endif()
+
+install (TARGETS multi_session_registration_step_3 DESTINATION bin)

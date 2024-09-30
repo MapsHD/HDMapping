@@ -435,7 +435,7 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
 
     const auto hessian_fun = [&](const Point3Di &intermediate_points_i)
     {
-        if (intermediate_points_i.point.norm() < 1.0)
+        if (intermediate_points_i.point.norm() < 0.1)
         {
             return;
         }
@@ -493,6 +493,28 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
             this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
 
         int c = intermediate_points_i.index_pose * 6;
+
+        // planarity
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+        auto eigen_values = eigen_solver.eigenvalues();
+        auto eigen_vectors = eigen_solver.eigenvectors();
+        double ev1 = eigen_values.x();
+        double ev2 = eigen_values.y();
+        double ev3 = eigen_values.z();
+        double sum_ev = ev1 + ev2 + ev3;
+        auto planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
+
+        double norm = p_s.norm();
+
+        double w = planarity * norm;
+        if (w > 10.0)
+        {
+            // std::cout << w << " " << planarity << " " << norm << "x " << p_s.x() << "y " << p_s.y() << "z " << p_s.z() << std::endl;
+            w = 10.0;
+        }
+
+        AtPA *= w;
+        AtPB *= w;
 
         std::mutex &m = mutexes[intermediate_points_i.index_pose];
         std::unique_lock lck(m);
@@ -925,6 +947,10 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
 
     AtPA += AtPAndt.sparseView();
     AtPB += AtPBndt.sparseView();
+
+    Eigen::SparseMatrix<double> AtPA_I(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
+    AtPA_I.setIdentity();
+    AtPA += AtPA_I;
 
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>>
         solver(AtPA);

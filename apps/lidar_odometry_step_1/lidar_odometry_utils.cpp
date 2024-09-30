@@ -658,6 +658,9 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
                 std::string line;
                 std::getline(myfile, line);
                 std::istringstream iss(line);
+                if (line.empty()) {
+                    break;
+                }
                 iss >> data[0] >> data[1] >> data[2] >> data[3] >> data[4] >> data[5] >> data[6];
                 if (!iss.eof())
                 {
@@ -737,7 +740,11 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
         int id = point->user_data;
         Eigen::Affine3d calibration = calibrations.empty() ? Eigen::Affine3d::Identity() : calibrations.at(id);
 
-        const Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
+        const Eigen::Vector3d pf(
+            header->x_offset + header->x_scale_factor * static_cast<double>(point->X), 
+            header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), 
+            header->z_offset + header->z_scale_factor * static_cast<double>(point->Z)
+        );
         p.point = calibration * (pf);
         p.lidarid = id;
         p.timestamp = point->gps_time;

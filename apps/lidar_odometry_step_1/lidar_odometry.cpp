@@ -328,6 +328,10 @@ void lidar_odometry_gui()
                                        const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
                                        auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
                                        auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy, calibration);
+                                       
+                                       std::sort(data.begin(), data.end(), [](const Point3Di& a, const Point3Di& b) {
+                                           return a.timestamp < b.timestamp;
+                                       });
 
                                        if ((fn == laz_files.front()) && (params.save_calibration_validation))
                                        {
@@ -501,17 +505,16 @@ void lidar_odometry_gui()
                                 [](const Point3Di &point, double timestamp) {
                                     return point.timestamp < timestamp;
                                 });
-                            auto upper = std::upper_bound(
+                            auto upper = std::lower_bound(
                                 pointsPerFile[index].begin(), pointsPerFile[index].end(), 
                                 wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first, 
-                                [](double timestamp, const Point3Di &point) {
-                                    return timestamp < point.timestamp;
+                                [](const Point3Di &point, double timestamp) {
+                                    return point.timestamp < timestamp;
                                 });
                             auto tmp = std::distance(lower, upper);
                             points.reserve(points.size() + std::distance(lower, upper));
                             if (lower != upper) {
                                 points.insert(points.end(), std::make_move_iterator(lower), std::make_move_iterator(upper));
-                                // std::cout << "Got points in timestamp range: " << points.size() << std::endl;
                                 found = true;
                             }   
                         }

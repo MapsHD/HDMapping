@@ -1277,7 +1277,7 @@ void display()
         {
             glColor3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
             glRasterPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3) + 0.1);
-            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)std::to_string(i).c_str());
+            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)std::to_string(i).c_str());
             i++;
         }
 
@@ -1294,7 +1294,7 @@ void display()
         {
             glColor3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
             glRasterPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3) + 0.1);
-            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)std::to_string(i).c_str());
+            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)std::to_string(i).c_str());
             i++;
         }
 

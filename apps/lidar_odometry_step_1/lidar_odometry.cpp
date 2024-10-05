@@ -64,6 +64,7 @@ std::string working_directory = "";
 // double decimation = 0.1;
 int threshold_initial_points = 10000;
 bool initial_transformation_gizmo = false;
+double threshould_output_filter = 0.5;
 
 float m_gizmo[] = {1, 0, 0, 0,
                    0, 1, 0, 0,
@@ -152,7 +153,8 @@ void lidar_odometry_gui()
                 params.in_out_params.resolution_Z = 0.01;
             }
 
-            ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed)", &params.filter_threshold_xy);
+            ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy);
+            ImGui::InputDouble("threshould_output_filter (all local points inside lidar xy_circle radius[m] will be removed during save)", &threshould_output_filter);
 
             ImGui::InputDouble("decimation (larger value of decimation better performance, but worse accuracy)", &params.decimation);
             ImGui::InputInt("number iterations", &params.nr_iter);
@@ -371,7 +373,7 @@ void lidar_odometry_gui()
                         const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
                         const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
 
-                        //std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z: " << acc.axis.z << std::endl;
+                        // std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z: " << acc.axis.z << std::endl;
 
                         FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
 
@@ -684,6 +686,17 @@ void lidar_odometry_gui()
                     }
                     auto tmp_data = worker_data[i].original_points;
 
+                    /*// filter data
+                    std::vector<Point3Di> filtered_local_point_cloud;
+                    for (auto &t : tmp_data)
+                    {
+                        auto pp = worker_data[i].intermediate_trajectory[t.index_pose].inverse() * t.point;
+                        if(pp.norm() > threshould_output_filter){
+                            filtered_local_point_cloud.push_back(t);
+                        }
+                    }
+                    tmp_data = filtered_local_point_cloud;*/
+
                     for (auto &t : tmp_data)
                     {
                         t.index_pose += pose_offset;
@@ -730,7 +743,7 @@ void lidar_odometry_gui()
                     std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
                     path /= filename;
                     std::cout << "saving to: " << path << std::endl;
-                    saveLaz(path.string(), worker_data_concatenated[i]);
+                    saveLaz(path.string(), worker_data_concatenated[i], threshould_output_filter);
                     m_poses.push_back(worker_data_concatenated[i].intermediate_trajectory[0]);
                     file_names.push_back(filename);
 
@@ -858,10 +871,22 @@ void lidar_odometry_gui()
                     {
                         for (const auto &p : worker_data[i].intermediate_points)
                         {
-                            Eigen::Vector3d pt = worker_data[i].intermediate_trajectory[p.index_pose] * p.point;
-                            pointcloud.push_back(pt);
-                            intensity.push_back(p.intensity);
-                            timestamps.push_back(p.timestamp);
+                            // filter data
+                            // std::vector<Point3Di> filtered_local_point_cloud;
+                            // for (auto &t : tmp_data)
+                            //{
+                            //     if(t.point.norm() > threshould_output_filter){
+                            //         filtered_local_point_cloud.push_back(t);
+                            //     }
+                            // }
+                            // tmp_data = filtered_local_point_cloud;
+                            if (p.point.norm() > threshould_output_filter)
+                            {
+                                Eigen::Vector3d pt = worker_data[i].intermediate_trajectory[p.index_pose] * p.point;
+                                pointcloud.push_back(pt);
+                                intensity.push_back(p.intensity);
+                                timestamps.push_back(p.timestamp);
+                            }
                         }
                     }
                     if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))

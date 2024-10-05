@@ -100,7 +100,7 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
 std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy,
                                        const std::unordered_map<int, Eigen::Affine3d> &calibrations);
 
-bool saveLaz(const std::string &filename, const WorkerData &data);
+bool saveLaz(const std::string &filename, const WorkerData &data, double threshould_output_filter);
 bool saveLaz(const std::string &filename, const std::vector<Point3Di> &points_global);
 bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_poses, std::vector<std::string> filenames);
 

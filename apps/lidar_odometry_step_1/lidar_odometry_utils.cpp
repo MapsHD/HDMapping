@@ -183,7 +183,7 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
     }
 }
 
-bool saveLaz(const std::string &filename, const WorkerData &data)
+bool saveLaz(const std::string &filename, const WorkerData &data, double threshould_output_filter)
 {
     constexpr float scale = 0.0001f; // one tenth of milimeter
     // find max
@@ -199,8 +199,10 @@ bool saveLaz(const std::string &filename, const WorkerData &data)
     for (const auto &org_p : data.original_points)
     {
         Point3Di p = org_p;
-        p.point = m_pose * (data.intermediate_trajectory[org_p.index_pose] * org_p.point);
-        points.push_back(p);
+        if (p.point.norm() > threshould_output_filter){
+            p.point = m_pose * (data.intermediate_trajectory[org_p.index_pose] * org_p.point);
+            points.push_back(p);
+        }
     }
 
     for (auto &p : points)

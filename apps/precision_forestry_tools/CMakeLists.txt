@@ -5,6 +5,7 @@ project(precision_forestry_tools)
 add_executable(precision_forestry_tools 
   precision_forestry_tools.cpp 
   ${REPOSITORY_DIRECTORY}/core/src/local_shape_features.cpp
+  ${REPOSITORY_DIRECTORY}/core/src/surface.cpp
   ${REPOSITORY_DIRECTORY}/core/src/hash_utils.cpp)
 
 target_link_libraries(

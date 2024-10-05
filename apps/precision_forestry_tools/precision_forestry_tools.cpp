@@ -17,8 +17,9 @@
 #include <session.h>
 #include <transformations.h>
 #include <local_shape_features.h>
+#include <surface.h>
 
-struct Pose
+/*struct Pose
 {
   Eigen::Vector3d position;
   Eigen::Vector3d orientation;
@@ -214,7 +215,7 @@ GroundMesh generate_ground_mesh(std::vector<PointMesh> &points, const GroundMesh
   }
 
   return mesh;
-}
+}*/
 
 const unsigned int window_width = 800;
 const unsigned int window_height = 600;
@@ -250,27 +251,14 @@ std::vector<int> lowest_points_indexes;
 std::vector<LocalShapeFeatures::PointWithLocalShapeFeatures> points_with_lsf;
 bool show_normal_vectors = false;
 
-GroundMesh ground_mesh;
-// GroundMesh generate_ground_mesh(std::vector<Eigen::Vector3d> &points, const GroundMeshParams &ground_mesh_params)
+Surface surface;
+
+// GroundMesh ground_mesh;
+//  GroundMesh generate_ground_mesh(std::vector<Eigen::Vector3d> &points, const GroundMeshParams &ground_mesh_params)
 
 namespace fs = std::filesystem;
 
-unsigned long long int get_index_2D(const int16_t x, const int16_t y /*, const int16_t z*/)
-{
-  // return ((static_cast<unsigned long long int>(x) << 32) & (0x0000FFFF00000000ull)) |
-  //        ((static_cast<unsigned long long int>(y) << 16) & (0x00000000FFFF0000ull)) |
-  //        ((static_cast<unsigned long long int>(z) << 0) & (0x000000000000FFFFull));
-  return ((static_cast<unsigned long long int>(x) << 16) & (0x00000000FFFF0000ull)) |
-         ((static_cast<unsigned long long int>(y) << 0) & (0x000000000000FFFFull));
-}
 
-unsigned long long int get_rgd_index_2D(const Eigen::Vector3d p, const Eigen::Vector2d b)
-{
-  int16_t x = static_cast<int16_t>(p.x() / b.x());
-  int16_t y = static_cast<int16_t>(p.y() / b.y());
-  // int16_t z = static_cast<int16_t>(p.z() / b.z());
-  return get_index_2D(x, y);
-}
 
 std::vector<int> get_lowest_points_indexes(const PointCloud &pc, Eigen::Vector2d bucket_dim_xy)
 {
@@ -401,6 +389,12 @@ void project_gui()
     }
     ImGui::Checkbox("calculate_offset", &calculate_offset);
 
+    ImGui::InputDouble("lowest_points_resolution", &surface.lowest_points_resolution);
+    ImGui::InputDouble("lowest_points_filter_resolution", &surface.lowest_points_filter_resolution);
+    ImGui::InputDouble("z_sigma_threshold", &surface.z_sigma_threshold);
+
+    ImGui::InputDouble("surface_resolution", &surface.surface_resolution);
+
     ImGui::InputInt("viewer_decmiate_point_cloud", &viewer_decmiate_point_cloud);
     if (viewer_decmiate_point_cloud < 1)
     {
@@ -453,12 +447,17 @@ void project_gui()
     {
       if (session.point_clouds_container.point_clouds.size() > 0)
       {
-        lowest_points_indexes = get_lowest_points_indexes(session.point_clouds_container.point_clouds[0], Eigen::Vector2d(0.3, 0.3));
+        lowest_points_indexes = get_lowest_points_indexes(session.point_clouds_container.point_clouds[0], Eigen::Vector2d(surface.lowest_points_resolution, surface.lowest_points_resolution));
       }
       else
       {
         std::cout << "point cloud data is empty, please load data" << std::endl;
       }
+    }
+
+    if (ImGui::Button("Filter lower points indexes"))
+    {
+      lowest_points_indexes = surface.get_filtered_indexes(session.point_clouds_container.point_clouds[0].points_local, lowest_points_indexes, {surface.lowest_points_filter_resolution, surface.lowest_points_filter_resolution});
     }
 
     if (ImGui::Button("get local shape features"))
@@ -496,17 +495,25 @@ void project_gui()
 
     if (ImGui::Button("generate_ground_mesh"))
     {
-      std::cout << "ImGui::Button(generate_ground_mesh)" << std::endl;
-      GroundMeshParams ground_mesh_params;
-      std::vector<PointMesh> points;
-      for (const auto &p : session.point_clouds_container.point_clouds[0].points_local)
+      std::vector<Eigen::Vector3d> lowest_points;
+      for (int i = 0; i < lowest_points_indexes.size(); i++)
       {
-        PointMesh pp;
-        pp.coordinates = p;
-        points.push_back(pp);
+        lowest_points.push_back(session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]]);
       }
-      // session.point_clouds_container.point_clouds[0].points_local
-      ground_mesh = generate_ground_mesh(points, ground_mesh_params);
+
+      surface.generate_initial_surface(lowest_points);
+    }
+
+    
+
+    if (ImGui::Button("align surface to ground points"))
+    {
+      std::vector<Eigen::Vector3d> lowest_points;
+      for (int i = 0; i < lowest_points_indexes.size(); i++)
+      {
+        lowest_points.push_back(session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]]);
+      }
+      surface.align_surface_to_ground_points(lowest_points);
     }
 
     ImGui::Checkbox("show_normal_vectors", &show_normal_vectors);
@@ -684,16 +691,17 @@ void display()
   }
 
   //
-  glColor3f(0, 0, 0);
+  /*glColor3f(0, 0, 0);
   glBegin(GL_LINES);
   for (const auto &edge : ground_mesh.edges)
   {
     glVertex3f(ground_mesh.nodes[edge.index_from].pose.position.x(), ground_mesh.nodes[edge.index_from].pose.position.y(), ground_mesh.nodes[edge.index_from].pose.position.z());
     glVertex3f(ground_mesh.nodes[edge.index_to].pose.position.x(), ground_mesh.nodes[edge.index_to].pose.position.y(), ground_mesh.nodes[edge.index_to].pose.position.z());
   }
-  glEnd();
+  glEnd();*/
 
   //
+  surface.render();
 
   ImGui_ImplOpenGL2_NewFrame();
   ImGui_ImplGLUT_NewFrame();

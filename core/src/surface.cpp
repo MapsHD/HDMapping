@@ -293,12 +293,15 @@ void Surface::align_surface_to_ground_points(const std::vector<Eigen::Vector3d> 
         tripletListP.emplace_back(ir + 1, ir + 1, 1);
         tripletListP.emplace_back(ir + 2, ir + 2, 1);
 
-        // tripletListB.emplace_back(ir,  0,    cauchy (delta_x, 1));
-        // tripletListB.emplace_back(ir + 1, 0, cauchy (delta_y, 1));
-        // tripletListB.emplace_back(ir + 2, 0, cauchy (delta_z, 1));
-        tripletListB.emplace_back(ir, 0, delta_x);
-        tripletListB.emplace_back(ir + 1, 0, delta_y);
-        tripletListB.emplace_back(ir + 2, 0, delta_z);
+        if (robust_kernel){
+            tripletListB.emplace_back(ir,  0,    cauchy (delta_x, 1));
+            tripletListB.emplace_back(ir + 1, 0, cauchy (delta_y, 1));
+            tripletListB.emplace_back(ir + 2, 0, cauchy (delta_z, 1));
+        }else{
+            tripletListB.emplace_back(ir, 0, delta_x);
+            tripletListB.emplace_back(ir + 1, 0, delta_y);
+            tripletListB.emplace_back(ir + 2, 0, delta_z);
+        }
     }
 
     Eigen::SparseMatrix<double> matA(tripletListB.size(), vertices.size() * 6);
@@ -322,9 +325,9 @@ void Surface::align_surface_to_ground_points(const std::vector<Eigen::Vector3d> 
     tripletListP.clear();
     tripletListB.clear();
 
-    //Eigen::SparseMatrix<double> AtPA_I(vertices.size() * 6, vertices.size() * 6);
-    //AtPA_I.setIdentity();
-    //AtPA += AtPA_I;
+    // Eigen::SparseMatrix<double> AtPA_I(vertices.size() * 6, vertices.size() * 6);
+    // AtPA_I.setIdentity();
+    // AtPA += AtPA_I;
 
     std::cout << "AtPA.size: " << AtPA.size() << std::endl;
     std::cout << "AtPB.size: " << AtPB.size() << std::endl;
@@ -467,6 +470,7 @@ std::vector<int> Surface::get_filtered_indexes(const std::vector<Eigen::Vector3d
                         int index_element_target = indexes[index].second;
                         Eigen::Vector3d target = lowest_points[index_element_target].first;
 
+                        if (fabs(source.z() - target.z()) < 3 * z_sigma_threshold)
                         // if ((source - target).norm() < params.radious)
                         {
                             mean += target;
@@ -502,15 +506,16 @@ std::vector<int> Surface::get_filtered_indexes(const std::vector<Eigen::Vector3d
 
             cov /= batch_of_points.size();
 
-            //std::cout << 
-            if(sqrt (cov(2, 2)) < z_sigma_threshold){
+            // std::cout <<
+            if (sqrt(cov(2, 2)) < z_sigma_threshold)
+            {
                 lowest_points[index_element_source].second = true;
             }
 
-            //std::cout << "cov " << cov << std::endl;
-            // Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(cov, Eigen::ComputeEigenvectors);
-            // points[index_element_source].eigen_values = eigen_solver.eigenvalues();
-            // points[index_element_source].eigen_vectors = eigen_solver.eigenvectors();
+            // std::cout << "cov " << cov << std::endl;
+            //  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(cov, Eigen::ComputeEigenvectors);
+            //  points[index_element_source].eigen_values = eigen_solver.eigenvalues();
+            //  points[index_element_source].eigen_vectors = eigen_solver.eigenvectors();
 
             // points[index_element_source].normal_vector = Eigen::Vector3d(points[index_element_source].eigen_vectors(0, 0), points[index_element_source].eigen_vectors(1, 0), points[index_element_source].eigen_vectors(2, 0));
 
@@ -547,24 +552,102 @@ std::vector<int> Surface::get_filtered_indexes(const std::vector<Eigen::Vector3d
 
     for (int i = 0; i < lowest_points_indexes.size(); i++)
     {
-        if (lowest_points[i].second){
+        if (lowest_points[i].second)
+        {
             out_indexes.push_back(lowest_points_indexes[i]);
         }
     }
 
     //
 
-    //for (const auto &p : lowest_points){
-        //std::cout << (int)p.second;
+    // for (const auto &p : lowest_points){
+    // std::cout << (int)p.second;
     //}
 
-        /*std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
+    /*std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
 
-        for (int i = 0; i < lowest_points.size(); i++)
-        {
-            unsigned long long int index = get_rgd_index_2D(lowest_points[i], bucket_dim_xy);
-            indexes.emplace_back(index, i);
-        }*/
+    for (int i = 0; i < lowest_points.size(); i++)
+    {
+        unsigned long long int index = get_rgd_index_2D(lowest_points[i], bucket_dim_xy);
+        indexes.emplace_back(index, i);
+    }*/
 
     return out_indexes;
+}
+
+std::vector<Eigen::Vector3d> Surface::get_points_without_surface(const std::vector<Eigen::Vector3d> &points, double distance_to_ground_threshold_bottom,
+                                                                 double distance_to_ground_threshold_up, Eigen::Vector2d bucket_dim_xy)
+{
+    bool multithread = true;
+
+    std::vector<Eigen::Vector3d> out_points;
+    std::vector<bool> to_remove;
+
+    for (int i = 0; i < points.size(); i++)
+    {
+        to_remove.push_back(false);
+    }
+
+    ////////////////////////////////////////////
+
+    // std::vector<int> out_indexes;
+
+    std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
+
+    for (int i = 0; i < vertices.size(); i++)
+    {
+        unsigned long long int index = get_rgd_index_2D(vertices[i].translation(), bucket_dim_xy);
+        indexes.emplace_back(index, i);
+    }
+
+    std::sort(indexes.begin(), indexes.end(),
+              [](const std::pair<unsigned long long int, unsigned int> &a, const std::pair<unsigned long long int, unsigned int> &b)
+              { return a.first < b.first; });
+
+    std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
+
+    for (unsigned int i = 0; i < indexes.size(); i++)
+    {
+        unsigned long long int index_of_bucket = indexes[i].first;
+        if (buckets.contains(index_of_bucket))
+        {
+            buckets[index_of_bucket].second = i;
+        }
+        else
+        {
+            buckets[index_of_bucket].first = i;
+            buckets[index_of_bucket].second = i;
+        }
+    }
+
+    for (int i = 0; i < points.size(); i++)
+    {
+        unsigned long long int index_of_bucket = get_rgd_index_2D(points[i], bucket_dim_xy);
+        if (buckets.contains(index_of_bucket))
+        {
+            int index = buckets[index_of_bucket].first;
+
+            int index_element_target = indexes[index].second;
+            double z_ground = vertices[index_element_target].translation().z();
+
+            if (points[i].z() < z_ground + distance_to_ground_threshold_bottom ||
+                points[i].z() > z_ground + distance_to_ground_threshold_up)
+            {
+                to_remove[i] = true;
+                // std::cout << vertices[index_element_target].translation().x() << " " << vertices[index_element_target].translation().y() << " "
+                //          << vertices[index_element_target].translation().z() << " " << points[i].x() << " " << points[i].y() << " " << points[i].z() << std::endl;
+            }
+        }
+    }
+
+    //////////////////////////////////
+    for (int i = 0; i < points.size(); i++)
+    {
+        if (!to_remove[i])
+        {
+            out_points.push_back(points[i]);
+        }
+    }
+
+    return out_points;
 }

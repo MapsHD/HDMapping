@@ -92,6 +92,8 @@ add_subdirectory(core_hd_mapping)
 set(CORE_LIBRARIES core core-hd-mapping)
 set(GUI_LIBRARIES imgui imguizmo)
 
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+
 add_subdirectory(apps/hd_mapper)
 add_subdirectory(apps/lidar_odometry_step_1)
 add_subdirectory(apps/manual_color)

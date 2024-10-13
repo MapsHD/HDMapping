@@ -482,10 +482,10 @@ std::vector<int> Surface::get_filtered_indexes(const std::vector<Eigen::Vector3d
                 //}
             }
         }
-        batch_of_points.push_back(source);
-        number_of_points_nn++;
+        //batch_of_points.push_back(source);
+        //number_of_points_nn++;
 
-        if (number_of_points_nn >= 3)
+        if (number_of_points_nn >= 10)
         {
             // points[index_element_source].valid = true;
             mean /= batch_of_points.size();

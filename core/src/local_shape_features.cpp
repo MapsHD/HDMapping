@@ -70,9 +70,7 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
                 }
             }
         }
-        batch_of_points.push_back(source);
-        number_of_points_nn++;
-
+  
         if (number_of_points_nn >= 3)
         {
             points[index_element_source].valid = true;
@@ -115,6 +113,9 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
             points[index_element_source].omnivariance = std::cbrt(ev1 * ev2 * ev3);
 
             points[index_element_source].eigen_entropy = -ev1 * log(ev1) - ev2 * log(ev2) - ev3 * log(ev3);
+
+            points[index_element_source]
+                .verticality = 1.0 - fabs(points[index_element_source].normal_vector.z());
         }
         else
         {

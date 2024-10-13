@@ -21,6 +21,7 @@ public:
         double change_of_curvature;
         double omnivariance;
         double eigen_entropy;
+        double verticality;
     };
 
     struct Params{

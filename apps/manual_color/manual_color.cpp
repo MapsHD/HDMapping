@@ -54,6 +54,8 @@ GLuint make_tex(const std::string &fn)
     int width, height, nrChannels;
     unsigned char *data = stbi_load(fn.c_str(), &width, &height, &nrChannels, 0);
 
+    std::cout << "width: " << width << " height: " << height << " nrChannels: " << nrChannels << std::endl;
+
     if (data)
     {
         if (nrChannels == 1)
@@ -69,6 +71,10 @@ GLuint make_tex(const std::string &fn)
             }
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data3);
             stbi_image_free(data3);
+        }
+        else if (nrChannels == 4)
+        {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         }
         else
         {
@@ -413,15 +419,15 @@ void ImGuiLoadSaveButtons()
         const auto input_file_names = mandeye::fd::OpenFileDialog("Choose Image", mandeye::fd::ImageFilter, false);
         if (input_file_names.size())
         {
-            //std::cout << "1" << std::endl;
+            // std::cout << "1" << std::endl;
             tex1 = make_tex(input_file_names.front());
-            //std::cout << "2" << std::endl;
+            // std::cout << "2" << std::endl;
             SD::imageData = stbi_load(input_file_names.front().c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
-            //std::cout << "3" << std::endl;
+            // std::cout << "3" << std::endl;
         }
-        //std::cout << "4" << std::endl;
+        // std::cout << "4" << std::endl;
         SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
-        //std::cout << "5" << std::endl;
+        // std::cout << "5" << std::endl;
     }
     ImGui::SameLine();
     if (ImGui::Button("Load Poincloud"))
@@ -588,7 +594,6 @@ void optimize_fish_eye()
             //                                                                      SystemData::pointPickedPointCloud[i].z(),
             //                                                                      SystemData::pointPickedImage[i].x * SystemData::imageWidth,
             //                                                                      SystemData::pointPickedImage[i].y * SystemData::imageHeight);
-           
 
             observation_equation_fisheye_camera_tait_bryan_wc(delta, fx, fy, cx, cy,
                                                               pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
@@ -724,18 +729,21 @@ void display()
     glRotatef(rotate_y, 0.0, 0.0, 1.0);
 
     //////////
-    //glColor3f(p.rgb.data());
+    // glColor3f(p.rgb.data());
     glPointSize(SystemData::point_size);
     glBegin(GL_POINTS);
     for (const auto &p : SystemData::points)
     {
-        if (color){
+        if (color)
+        {
             glColor3fv(p.rgb.data());
-        }else{
-            glColor3f(p.intensity - 100, p.intensity - 100, p.intensity - 100);
-            //p.intensity
         }
-            
+        else
+        {
+            glColor3f(p.intensity - 100, p.intensity - 100, p.intensity - 100);
+            // p.intensity
+        }
+
         glVertex3dv(p.point.data());
     }
     glEnd();

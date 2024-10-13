@@ -14,6 +14,7 @@
 // The output is a session proving trajekctory and point clouds that can be  further processed by "multi_view_tls_registration" program.
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
+#define THRESHOLD_NR_POSES 20
 namespace fs = std::filesystem;
 
 // std::vector<Point3Di> initial_points;
@@ -331,9 +332,15 @@ void lidar_odometry_gui()
                                            fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
 
                                            std::ofstream testPointcloud{calibrationValidtationFile.c_str()};
+                                           int counter = 0;
                                            for (const auto &p : data)
                                            {
                                                testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int)p.lidarid << "\n";
+                                               counter++;
+                                               if (counter > 2000000)
+                                               {
+                                                   break;
+                                               }
                                            }
                                        }
 
@@ -452,7 +459,7 @@ void lidar_odometry_gui()
                         return;
                     }
 
-                    int thershold = 20;
+                    int thershold = THRESHOLD_NR_POSES;
                     WorkerData wd;
                     // std::vector<double> temp_ts;
                     // temp_ts.reserve(1000000);

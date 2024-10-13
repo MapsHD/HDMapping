@@ -370,11 +370,11 @@ void project_gui()
 
           file.open(output_file_name);
 
-          file << "x,y,z,planarity,cylindrical_likeness,plane_likeness,sphericity,change_of_curvature,omnivariance" << std::endl;
+          file << "x,y,z,planarity,cylindrical_likeness,plane_likeness,sphericity,change_of_curvature,omnivariance,verticality" << std::endl;
 
           for (const auto &p : points_with_lsf)
           {
-            file << p.coordinates_global.x() << "," << p.coordinates_global.y() << "," << p.coordinates_global.z() << "," << p.planarity << "," << p.cylindrical_likeness << "," << p.plane_likeness << "," << p.sphericity << "," << p.change_of_curvature << "," << p.omnivariance << "," << p.eigen_entropy << std::endl;
+            file << p.coordinates_global.x() << "," << p.coordinates_global.y() << "," << p.coordinates_global.z() << "," << p.planarity << "," << p.cylindrical_likeness << "," << p.plane_likeness << "," << p.sphericity << "," << p.change_of_curvature << "," << p.omnivariance << "," << p.eigen_entropy << "," << p.verticality << std::endl;
           }
           file.close();
         }

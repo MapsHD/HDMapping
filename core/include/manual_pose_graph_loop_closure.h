@@ -25,7 +25,7 @@ class ManualPoseGraphLoopClosure{
         int index_active_edge = 0;
         bool manipulate_active_edge = false;
         bool gizmo = false;
-        double search_radious = 0.3;
+        double search_radious = 0.1;
 
         std::vector<Eigen::Affine3d> poses_motion_model;
 

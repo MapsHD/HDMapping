@@ -643,7 +643,11 @@ void lidar_odometry_gui()
         }*/
         if (step_1_done && step_2_done && !step_3_done)
         {
+            static bool use_mutliple_gaussian = false;
             ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
+            ImGui::Text("Press 'Consistency' button optionally before pressing 'Save result (step 3)'");
+            ImGui::Text("Mutliple Gaussians suppose to work better in floor plan indoor scenarios (multiple neighbouring rooms)");
+
             if (ImGui::Button("Consistency"))
             {
                 std::cout << "Consistency START" << std::endl;
@@ -655,12 +659,20 @@ void lidar_odometry_gui()
                     {
                         worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
                     }
-                    Consistency(worker_data, params);
+                    if (!use_mutliple_gaussian)
+                    {
+                        Consistency(worker_data, params);
+                    }
+                    else
+                    {
+                        Consistency2(worker_data, params);
+                    }
                 }
                 std::cout << "Consistency FINISHED" << std::endl;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Consistency2"))
+            ImGui::Checkbox("use mutliple Gaussians for each bucket", &use_mutliple_gaussian);
+            /*if (ImGui::Button("Consistency2"))
             {
                 std::cout << "Consistency2 START" << std::endl;
 
@@ -674,11 +686,11 @@ void lidar_odometry_gui()
                     Consistency2(worker_data, params);
                 }
                 std::cout << "Consistency2 FINISHED" << std::endl;
-            }
-            ImGui::SameLine();
-            ImGui::Text("Press this button optionally before pressing 'save result (step 3)'");
+            }*/
+            // ImGui::SameLine();
+            // ImGui::Text(" (info: Press 'Consistency' button optionally before pressing 'Save result (step 3)')");
 
-            if (ImGui::Button("save result (step 3)"))
+            if (ImGui::Button("Save result (step 3)"))
             {
                 // concatenate data
                 std::vector<WorkerData> worker_data_concatenated;

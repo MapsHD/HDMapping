@@ -24,7 +24,9 @@ set(CORE_SOURCE_FILES
     src/pose_graph_slam.cpp
     src/registration_plane_feature.cpp
     src/session.cpp
-    src/wgs84_do_puwg92.cc)
+    src/wgs84_do_puwg92.cc
+    src/pair_wise_iterative_closest_point.cpp
+    src/hash_utils.cpp)
 
 set(CORE_INCLUDE_FILES
     include/color_las_loader.h

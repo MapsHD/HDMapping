@@ -58,6 +58,10 @@ bool PairWiseICP::compute(const std::vector<Eigen::Vector3d> &source, const std:
 
             Eigen::Vector3d source_point_global = m_pose_result * source_i;
 
+            double min_dist = 1000000000.0;
+            Eigen::Vector3d target_i;
+            Eigen::Vector3d target_i_nn;
+            bool nn_found = false;
             for (double x = -search_radious; x <= search_radious; x += search_radious)
             {
                 for (double y = -search_radious; y <= search_radious; y += search_radious)
@@ -72,36 +76,48 @@ bool PairWiseICP::compute(const std::vector<Eigen::Vector3d> &source, const std:
                             for (int index = buckets[index_of_bucket].first; index < buckets[index_of_bucket].second; index++)
                             {
                                 int index_element_target = indexes[index].second;
-                                Eigen::Vector3d target_i = target[index_element_target];
+                                target_i = target[index_element_target];
+                                double d = (source_point_global - target_i).norm();
 
-                                if ((source_point_global - target_i).norm() < search_radious)
+                                if (d < search_radious)
                                 {
-                                    const Eigen::Vector3d &p_s = source_i;
-                                    const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose_result);
-
-                                    Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA_;
-                                    point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
-                                        AtPA_,
-                                        pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                        p_s.x(), p_s.y(), p_s.z(),
-                                        1, 0, 0, 0, 1, 0, 0, 0, 1);
-
-                                    Eigen::Matrix<double, 6, 1> AtPB_;
-                                    point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
-                                        AtPB_,
-                                        pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                        p_s.x(), p_s.y(), p_s.z(),
-                                        1, 0, 0, 0, 1, 0, 0, 0, 1,
-                                        target_i.x(), target_i.y(), target_i.z());
-
-                                    std::unique_lock lck(mutex);
-                                    AtPA.block<6, 6>(0, 0) += AtPA_;
-                                    AtPB.block<6, 1>(0, 0) -= AtPB_;
+                                    if (d < min_dist)
+                                    {
+                                        min_dist = d;
+                                        nn_found = true;
+                                        target_i_nn = target_i;
+                                    }
+                                    /**/
                                 }
                             }
                         }
                     }
                 }
+            }
+
+            if (nn_found)
+            {
+                const Eigen::Vector3d &p_s = source_i;
+                const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose_result);
+
+                Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA_;
+                point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
+                    AtPA_,
+                    pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                    p_s.x(), p_s.y(), p_s.z(),
+                    1, 0, 0, 0, 1, 0, 0, 0, 1);
+
+                Eigen::Matrix<double, 6, 1> AtPB_;
+                point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
+                    AtPB_,
+                    pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                    p_s.x(), p_s.y(), p_s.z(),
+                    1, 0, 0, 0, 1, 0, 0, 0, 1,
+                    target_i_nn.x(), target_i_nn.y(), target_i_nn.z());
+
+                std::unique_lock lck(mutex);
+                AtPA.block<6, 6>(0, 0) += AtPA_;
+                AtPB.block<6, 1>(0, 0) -= AtPB_;
             }
         };
 
@@ -129,10 +145,11 @@ bool PairWiseICP::compute(const std::vector<Eigen::Vector3d> &source, const std:
         std::vector<double> h_x;
         for (int k = 0; k < x.outerSize(); ++k)
         {
+            std::cout << "result pose updates" << std::endl;
             for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
             {
                 h_x.push_back(it.value());
-                // std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
+                std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
             }
         }
 

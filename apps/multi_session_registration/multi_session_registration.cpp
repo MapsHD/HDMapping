@@ -34,6 +34,8 @@
 
 #include <ndt.h>
 
+#include <pair_wise_iterative_closest_point.h>
+
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
 double camera_ortho_xy_view_shift_y = 0.0;
@@ -132,7 +134,8 @@ Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationP
 void ndt_gui()
 {
     static bool compute_mean_and_cov_for_bucket = false;
-    if(ImGui::Begin("Normal Distributions Transform")){
+    if (ImGui::Begin("Normal Distributions Transform"))
+    {
         ImGui::InputFloat3("bucket_size (x[m],y[m],z[m])", ndt.bucket_size);
         if (ndt.bucket_size[0] < 0.01)
             ndt.bucket_size[0] = 0.01f;
@@ -313,7 +316,6 @@ void ndt_gui()
         ndt.sigma_azimuthal_angle = 8.0 / 3600;
     }
 #endif
-    
 }
 
 bool load_project_settings(const std::string &file_name, ProjectSettings &_project_settings)
@@ -717,7 +719,7 @@ void project_gui()
                     std::cout << "sessions reordered, ground truth should be in front" << std::endl;
                     for (const auto &s : sessions)
                     {
-                        std::cout << "session: '" << s.session_file_name << "' ground truth [" << int(s.is_ground_truth) << "]" << std::endl;  
+                        std::cout << "session: '" << s.session_file_name << "' ground truth [" << int(s.is_ground_truth) << "]" << std::endl;
                     }
                 }
             }
@@ -766,18 +768,18 @@ void project_gui()
                         optimized = true;
                     }
 
-                    //if (optimized)
+                    // if (optimized)
                     //{
-                        ImGui::SameLine();
-                        if (ImGui::Button("Revert"))
-                        {
-                            revert(sessions);
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("Save results"))
-                        {
-                            save_results(sessions);
-                        }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Revert"))
+                    {
+                        revert(sessions);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Save results"))
+                    {
+                        save_results(sessions);
+                    }
                     //}
                 }
 
@@ -1018,7 +1020,16 @@ void project_gui()
                                                         }
                                                     }
                                                 }
+                                                /*int number_of_iterations = 10;
+                                                PairWiseICP icp;
+                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                                                std::vector<Eigen::Vector3d> source = sessions[index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                                std::vector<Eigen::Vector3d> target = sessions[index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
 
+                                                if (icp.compute(source, target, search_radious, number_of_iterations, m_pose))
+                                                {
+                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                                }*/
                                                 PointClouds pcs;
                                                 pcs.point_clouds.push_back(sessions[index_session_from].point_clouds_container.point_clouds[index_from]);
                                                 pcs.point_clouds.push_back(sessions[index_session_to].point_clouds_container.point_clouds[index_to]);
@@ -1916,7 +1927,8 @@ void mouse(int glut_button, int state, int x, int y)
 
     static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
     if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
-        glutMajorVersion < 3) {
+        glutMajorVersion < 3)
+    {
         wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
     }
 
@@ -2112,7 +2124,7 @@ bool optimize(std::vector<Session> &sessions)
         sums.push_back(sum);
     }
 
-    //std::cout << "Compute Pose Graph SLAM" << std::endl;
+    // std::cout << "Compute Pose Graph SLAM" << std::endl;
 
     ///////////////////////////////////////////////////////////////////
     // graph slam

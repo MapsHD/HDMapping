@@ -32,7 +32,6 @@ double camera_ortho_xy_view_rotation_angle_deg = 0;
 bool is_ortho = false;
 bool show_axes = true;
 ImVec4 clear_color = ImVec4(0.8f, 0.8f, 0.8f, 1.00f);
-ImVec4 pc_color = ImVec4(1.0f, 0.0f, 0.0f, 1.00f);
 int point_size = 1;
 Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
 float translate_x, translate_y = 0.0;
@@ -94,7 +93,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV(const std::string &fi
          continue;
     }
 
-    double timestamp = values[0];
+    double timestamp = values[0]/1e9;
     Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
     pose(0, 3) = values[1];
     pose(1, 3) = values[2];
@@ -186,7 +185,6 @@ void project_gui()
     if (ImGui::Begin("main gui window"))
     {
         ImGui::ColorEdit3("clear color", (float *)&clear_color);
-        ImGui::ColorEdit3("pc_color", (float *)&pc_color);
 
         ImGui::InputInt("point_size", &point_size);
         point_size = std::max(1, point_size);
@@ -401,7 +399,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("mandeye raw data viewer " HDMAPPING_VERSION_STRING);
+    glutCreateWindow("mandeye trajectory compare data viewer " HDMAPPING_VERSION_STRING);
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -507,6 +505,24 @@ void wheel(int button, int dir, int x, int y)
 
 int main(int argc, char *argv[])
 {
+    if (argc == 3)
+    {
+        Data::trajectory_gt = load_trajectory_from_CSV(argv[1]);
+        Data::trajectory_est = load_trajectory_from_CSV(argv[2]);
+
+        double start_gt = Data::trajectory_gt.begin()->first;
+        double start_est = Data::trajectory_est.begin()->first;
+
+        double dur_gt = Data::trajectory_gt.rbegin()->first - start_gt;
+        double dur_est = Data::trajectory_est.rbegin()->first - start_est;
+
+        std::cout << "GT duration: " << dur_gt << "s" << std::endl;
+        std::cout << "EST duration: " << dur_est << "s" << std::endl;
+        std::cout << "GT start: " << start_gt << "s" << std::endl;
+        std::cout << "EST start: " << start_est << "s" << std::endl;
+
+        //std::abort();
+    }
     initGL(&argc, argv);
     glutDisplayFunc(display);
     glutMouseFunc(mouse);

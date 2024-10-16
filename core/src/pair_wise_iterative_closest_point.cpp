@@ -5,6 +5,8 @@
 #include <transformations.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian_simplified.h>
 
+#include <mutex>
+
 bool PairWiseICP::compute(const std::vector<Eigen::Vector3d> &source, const std::vector<Eigen::Vector3d> &target, double search_radious, int number_of_iterations, Eigen::Affine3d &m_pose_result)
 {
     std::cout << "PairWiseICP::compute" << std::endl;

@@ -20,6 +20,8 @@
 
 #include <HDMapping/Version.hpp>
 
+#include <mutex>
+
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 

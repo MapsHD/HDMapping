@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.15.0)
 
 project(core-hd-mapping)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 set(CORE_HD_MAPPING_SOURCE_FILES
     src/laz_wrapper.cpp src/odo_with_gnss_fusion.cpp src/project_settings.cpp
     src/roi_exporter.cpp src/single_trajectory_viewer.cpp)
@@ -16,7 +19,7 @@ set(CORE_HD_MAPPING_FILES ${CORE_HD_MAPPING_SOURCE_FILES}
 
 add_library(core-hd-mapping STATIC ${CORE_HD_MAPPING_FILES})
 
-target_link_libraries(core-hd-mapping PRIVATE core ${PLATFORM_MISCELLANEOUS_LIBS})
+target_link_libraries(core-hd-mapping PRIVATE core ${PLATFORM_MISCELLANEOUS_LIBS} Threads::Threads)
 
 target_include_directories(
   core-hd-mapping

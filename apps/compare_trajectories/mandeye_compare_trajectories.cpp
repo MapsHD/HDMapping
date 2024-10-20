@@ -41,6 +41,7 @@ int mouse_old_x, mouse_old_y;
 int mouse_buttons = 0;
 bool gui_mouse_down{false};
 float mouse_sensitivity = 1.0;
+bool move_source_trajectory_with_gizmo = false;
 
 float m_ortho_projection[] = {1, 0, 0, 0,
                               0, 1, 0, 0,
@@ -56,53 +57,57 @@ float m_gizmo[] = {1, 0, 0, 0,
                    0, 1, 0, 0,
                    0, 0, 1, 0,
                    0, 0, 0, 1};
-namespace Data{
+namespace Data
+{
     std::map<double, Eigen::Matrix4d> trajectory_gt;
     std::map<double, Eigen::Matrix4d> trajectory_est;
     Eigen::Matrix4d trajectory_offset = Eigen::Matrix4d::Identity();
 }
 
-
 // Function to split a CSV line into values
-std::vector<double> parseCSVLine(const std::string& line) {
-  std::vector<double> values;
-  std::stringstream ss(line);
-  std::string token;
+std::vector<double> parseCSVLine(const std::string &line)
+{
+    std::vector<double> values;
+    std::stringstream ss(line);
+    std::string token;
 
-  while (std::getline(ss, token, ',')) {
-    values.push_back(std::stod(token)); // Convert string to double
-  }
-  return values;
+    while (std::getline(ss, token, ','))
+    {
+        values.push_back(std::stod(token)); // Convert string to double
+    }
+    return values;
 }
 
-
-
-std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV(const std::string &file_path) {
-  std::map<double, Eigen::Matrix4d> trajectory;
-  std::ifstream file(file_path);
-  if (!file.is_open()) {
-    std::cerr << "Error: could not open file " << file_path << std::endl;
-    return trajectory;
-  }
-
-  std::string line;
-  while (std::getline(file, line)) {
-    std::vector<double> values = parseCSVLine(line);
-    if (values.size() != 1+3+4) {
-         std::cerr << "Error: invalid line in CSV file" << std::endl;
-         continue;
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV(const std::string &file_path)
+{
+    std::map<double, Eigen::Matrix4d> trajectory;
+    std::ifstream file(file_path);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: could not open file " << file_path << std::endl;
+        return trajectory;
     }
 
-    double timestamp = values[0]/1e9;
-    Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
-    pose(0, 3) = values[1];
-    pose(1, 3) = values[2];
-    pose(2, 3) = values[3];
-    pose.block<3, 3>(0, 0) = Eigen::Quaterniond(values[4], values[5], values[6], values[7]).toRotationMatrix();
+    std::string line;
+    while (std::getline(file, line))
+    {
+        std::vector<double> values = parseCSVLine(line);
+        if (values.size() != 1 + 3 + 4)
+        {
+            std::cerr << "Error: invalid line in CSV file" << std::endl;
+            continue;
+        }
 
-    trajectory[timestamp] = pose;
-  }
-  return trajectory;
+        double timestamp = values[0] / 1e9;
+        Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+        pose(0, 3) = values[1];
+        pose(1, 3) = values[2];
+        pose(2, 3) = values[3];
+        pose.block<3, 3>(0, 0) = Eigen::Quaterniond(values[4], values[5], values[6], values[7]).toRotationMatrix();
+
+        trajectory[timestamp] = pose;
+    }
+    return trajectory;
 }
 
 void reshape(int w, int h)
@@ -191,22 +196,122 @@ void project_gui()
 
         ImGui::Checkbox("show_axes", &show_axes);
         ImGui::Checkbox("is_ortho", &is_ortho);
-        if (ImGui::Button("Load GT trajectory"))
+        ImGui::Checkbox("move_source_trajectory_with_gizmo", &move_source_trajectory_with_gizmo);
+        if (ImGui::Button("Load target trajectory (e.g. ground truth)"))
         {
-            auto file_path = pfd::open_file("Select GT trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
             if (!file_path.empty())
             {
                 Data::trajectory_gt = load_trajectory_from_CSV(file_path[0]);
             }
         }
-        if (ImGui::Button("Load EST trajectory"))
+        if (ImGui::Button("Load source trajectory"))
         {
-            auto file_path = pfd::open_file("Select EST trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
             if (!file_path.empty())
             {
                 Data::trajectory_est = load_trajectory_from_CSV(file_path[0]);
             }
         }
+        if (ImGui::Button("Align source trajectory to target trajectory (1 iteration of optimization)"))
+        {
+            Eigen::MatrixXd AtPA(6, 6);
+            AtPA.setZero();
+            Eigen::MatrixXd AtPB(6, 1);
+            AtPB.setZero();
+
+            const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(Eigen::Affine3d(Data::trajectory_offset.matrix()));
+
+            for (const auto &p : Data::trajectory_est)
+            {
+                auto it = getInterpolatedPose(Data::trajectory_gt, p.first);
+                if (!it.isZero())
+                {
+                    Eigen::Vector3d p_s = (Eigen::Affine3d(p.second.matrix())).translation();
+                    Eigen::Vector3d p_t = (Eigen::Affine3d(it.matrix())).translation();
+
+                    Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA_;
+                    point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
+                        AtPA_,
+                        pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                        p_s.x(), p_s.y(), p_s.z(),
+                        1, 0, 0, 0, 1, 0, 0, 0, 1);
+
+                    Eigen::Matrix<double, 6, 1> AtPB_;
+                    point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
+                        AtPB_,
+                        pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                        p_s.x(), p_s.y(), p_s.z(),
+                        1, 0, 0, 0, 1, 0, 0, 0, 1,
+                        p_t.x(), p_t.y(), p_t.z());
+
+                    AtPA.block<6, 6>(0, 0) += AtPA_;
+                    AtPB.block<6, 1>(0, 0) -= AtPB_;
+                }
+            }
+
+            Eigen::SparseMatrix<double> AtPAc(6, 6);
+            Eigen::SparseMatrix<double> AtPBc(6, 1);
+
+            AtPAc = AtPA.sparseView();
+            AtPBc = AtPB.sparseView();
+
+            Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPAc);
+            Eigen::SparseMatrix<double> x = solver.solve(AtPBc);
+            std::vector<double> h_x;
+            for (int k = 0; k < x.outerSize(); ++k)
+            {
+                std::cout << "result pose updates" << std::endl;
+                for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
+                {
+                    h_x.push_back(it.value());
+                    std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
+                }
+            }
+
+            if (h_x.size() == 6)
+            {
+                int counter = 0;
+                TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(Eigen::Affine3d(Data::trajectory_offset.matrix()));
+
+                pose.px += h_x[counter++];
+                pose.py += h_x[counter++];
+                pose.pz += h_x[counter++];
+                pose.om += h_x[counter++];
+                pose.fi += h_x[counter++];
+                pose.ka += h_x[counter++];
+
+                auto m_pose_result = affine_matrix_from_pose_tait_bryan(pose);
+
+                Data::trajectory_offset = m_pose_result.matrix();
+                std::cout << "PairWiseICP::compute SUCCESS" << std::endl;
+                // return true;
+            }
+            else
+            {
+                std::cout << "PairWiseICP::compute FAILED" << std::endl;
+            }
+        }
+        if (ImGui::Button("Calculate ATE (Absolute Trajectory Error)"))
+        {
+            double ATE = 0.0;
+            int count = 0;
+            for (const auto &p : Data::trajectory_est)
+            {
+                auto it = getInterpolatedPose(Data::trajectory_gt, p.first);
+                if (!it.isZero())
+                {
+                    auto tp = Data::trajectory_offset * p.second;
+
+                    ATE += (tp - it).norm();
+                    count++;
+                }
+            }
+            std::cout << "ATE: " << ATE / count << std::endl;
+        }
+        // if (ImGui::Button("Calculate RPE (Relative Pose Error)"))
+        //{
+        // }
         ImGui::End();
     }
     return;
@@ -326,12 +431,12 @@ void display()
 
     glPointSize(point_size);
     glBegin(GL_POINTS);
-    glColor3f(1,0,0);
+    glColor3f(1, 0, 0);
     for (const auto &p : Data::trajectory_gt)
     {
         glVertex3f(p.second(0, 3), p.second(1, 3), p.second(2, 3));
     }
-    glColor3f(0,1,0);
+    glColor3f(0, 1, 0);
     for (const auto &p : Data::trajectory_est)
     {
         auto tp = Data::trajectory_offset * p.second;
@@ -341,17 +446,16 @@ void display()
     glPointSize(1);
 
     glBegin(GL_LINES);
-    glColor3f(1,1,1);
+    glColor3f(1, 1, 1);
     for (const auto &p : Data::trajectory_est)
     {
-      auto it  = getInterpolatedPose(Data::trajectory_gt, p.first);
-      if (!it.isZero())
-      {
-          auto tp = Data::trajectory_offset * p.second;
-          glVertex3f(tp(0, 3), tp(1, 3), tp(2, 3));
-          glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-      }
-
+        auto it = getInterpolatedPose(Data::trajectory_gt, p.first);
+        if (!it.isZero())
+        {
+            auto tp = Data::trajectory_offset * p.second;
+            glVertex3f(tp(0, 3), tp(1, 3), tp(2, 3));
+            glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+        }
     }
     glEnd();
 
@@ -368,22 +472,24 @@ void display()
     GLfloat modelview[16];
     glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-    if (!is_ortho)
+    if (move_source_trajectory_with_gizmo)
     {
-      GLfloat projection[16];
-      glGetFloatv(GL_PROJECTION_MATRIX, projection);
+        if (!is_ortho)
+        {
+            GLfloat projection[16];
+            glGetFloatv(GL_PROJECTION_MATRIX, projection);
 
-      GLfloat modelview[16];
-      glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+            GLfloat modelview[16];
+            glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-      ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+            ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+        }
+        else
+        {
+            ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+        }
+        Data::trajectory_offset = Eigen::Map<Eigen::Matrix4f>(m_gizmo).cast<double>();
     }
-    else
-    {
-      ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
-    }
-
-    Data::trajectory_offset = Eigen::Map<Eigen::Matrix4f>(m_gizmo).cast<double>();
 
     project_gui();
 
@@ -447,7 +553,8 @@ void mouse(int glut_button, int state, int x, int y)
 
     static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
     if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
-        glutMajorVersion < 3) {
+        glutMajorVersion < 3)
+    {
         wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
     }
 
@@ -521,7 +628,7 @@ int main(int argc, char *argv[])
         std::cout << "GT start: " << start_gt << "s" << std::endl;
         std::cout << "EST start: " << start_est << "s" << std::endl;
 
-        //std::abort();
+        // std::abort();
     }
     initGL(&argc, argv);
     glutDisplayFunc(display);

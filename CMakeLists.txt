@@ -101,6 +101,7 @@ add_subdirectory(apps/multi_view_tls_registration)
 add_subdirectory(apps/split_multi_livox)
 add_subdirectory(apps/precision_forestry_tools)
 add_subdirectory(apps/mandeye_raw_data_viewer)
+add_subdirectory(apps/compare_trajectories)
 
 # CPack configuration
 set(CPACK_PACKAGE_NAME "hd_mapping")

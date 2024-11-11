@@ -242,6 +242,22 @@ void lidar_odometry_gui()
                 {
                     working_directory = fs::path(input_file_names[0]).parent_path().string();
 
+                    // check if folder exists!
+                    if (!fs::exists(working_directory))
+                    {
+                        std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
+
+                        std::string message_info = "folder '" + working_directory + "' does not exist --> PLEASE REMOVE e.g. POLISH LETTERS from path. !!!PROGRAM WILL SHUT DOWN AFTER THIS MESSAGE!!!" ;
+
+                        [[maybe_unused]]
+                        pfd::message message(
+                            "Information",
+                            message_info.c_str(),
+                            pfd::choice::ok, pfd::icon::error);
+                        message.result();
+                        exit(1);
+                    }
+
                     const auto calibrationFile = (fs::path(working_directory) / "calibration.json").string();
                     const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
                     imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
@@ -285,7 +301,9 @@ void lidar_odometry_gui()
                     wdp /= "preview";
                     if (!fs::exists(wdp))
                     {
+                        std::cout << "trying creating folder: '" << wdp << "'" << std::endl;
                         fs::create_directory(wdp);
+                        std::cout << "folder created" << std::endl;
                     }
 
                     params.working_directory_preview = wdp.string();

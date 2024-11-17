@@ -122,6 +122,9 @@ void lidar_odometry_gui()
             return;
         }
 
+        ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy);
+        ImGui::InputDouble("threshould_output_filter (all local points inside lidar xy_circle radius[m] will be removed during save)", &threshould_output_filter);
+
         if (!simple_gui)
         {
             if (ImGui::Button("set 'narrow spaces' mapping parameters (slow motion upto 2km/h, gentle rotations, e.g. caves, indoor layouts)"))
@@ -154,8 +157,8 @@ void lidar_odometry_gui()
                 params.in_out_params.resolution_Z = 0.01;
             }
 
-            ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy);
-            ImGui::InputDouble("threshould_output_filter (all local points inside lidar xy_circle radius[m] will be removed during save)", &threshould_output_filter);
+            //ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy);
+            //ImGui::InputDouble("threshould_output_filter (all local points inside lidar xy_circle radius[m] will be removed during save)", &threshould_output_filter);
 
             ImGui::InputDouble("decimation (larger value of decimation better performance, but worse accuracy)", &params.decimation);
             ImGui::InputInt("number iterations", &params.nr_iter);
@@ -247,7 +250,7 @@ void lidar_odometry_gui()
                     {
                         std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
 
-                        std::string message_info = "folder '" + working_directory + "' does not exist --> PLEASE REMOVE e.g. POLISH LETTERS from path. !!!PROGRAM WILL SHUT DOWN AFTER THIS MESSAGE!!!" ;
+                        std::string message_info = "folder '" + working_directory + "' does not exist --> PLEASE REMOVE e.g. POLISH LETTERS from path. !!!PROGRAM WILL SHUT DOWN AFTER THIS MESSAGE!!!";
 
                         [[maybe_unused]]
                         pfd::message message(
@@ -569,7 +572,7 @@ void lidar_odometry_gui()
 
                             if (params.decimation > 0.0)
                             {
-                                wd.intermediate_points = decimate(wd.intermediate_points, params.decimation, params.decimation, params.decimation);
+                                 wd.intermediate_points = decimate(wd.intermediate_points, params.decimation, params.decimation, params.decimation);
                             }
 
                             worker_data.push_back(wd);
@@ -873,6 +876,16 @@ void lidar_odometry_gui()
                 fs << jj.dump(2);
                 fs.close();
                 step_3_done = true;
+
+                // std::cout << "Results saved to folder: '" << working_directory << "'" << std::endl;
+                std::string message_info = "Results saved to folder: '" + working_directory + "'";
+                std::cout << message_info << std::endl;
+                [[maybe_unused]]
+                pfd::message message(
+                    "Information",
+                    message_info.c_str(),
+                    pfd::choice::ok, pfd::icon::error);
+                message.result();
             }
             ImGui::SameLine();
             ImGui::Text("Press this button for saving resulting trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program");

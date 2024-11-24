@@ -1580,6 +1580,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
         for (int i = 0; i < worker_data.size(); i++)
         {
+            std::cout << "jojo" << std::endl;
             Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
             if (i > 1 && params.use_motion_from_previous_step)
             {
@@ -1593,32 +1594,40 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 }
 
                 std::vector<Eigen::Affine3d> new_trajectory;
-                Eigen::Affine3d current_node = worker_data[i].intermediate_trajectory[0];
+                Eigen::Affine3d current_node = worker_data[i - 1].intermediate_trajectory[worker_data[i - 1].intermediate_trajectory.size() - 1];
                 new_trajectory.push_back(current_node);
 
                 for (int tr = 1; tr < worker_data[i].intermediate_trajectory.size(); tr++)
                 {
-                    current_node.linear() = worker_data[i].intermediate_trajectory[tr].linear();
-                    current_node.translation() += mean_shift;
+                    auto update = worker_data[i].intermediate_trajectory[tr - 1].inverse() * worker_data[i].intermediate_trajectory[tr];
+                    current_node = current_node * update;
+                    // current_node.linear() = //worker_data[i].intermediate_trajectory[tr].linear();
+                    //current_node.translation() += mean_shift;
                     new_trajectory.push_back(current_node);
                 }
 
-                worker_data[i].intermediate_trajectory = new_trajectory;
-                ////////////////////////////////////////////////////////////////////////
-                std::vector<Eigen::Affine3d> new_trajectory_motion_model;
-                Eigen::Affine3d current_node_motion_model = worker_data[i].intermediate_trajectory_motion_model[0];
-                new_trajectory_motion_model.push_back(current_node_motion_model);
-
-                Eigen::Vector3d mean_shift_t = worker_data[i].intermediate_trajectory_motion_model[0].linear() * ((worker_data[i].intermediate_trajectory[0].linear()).inverse() * mean_shift);
-
-                for (int tr = 1; tr < worker_data[i].intermediate_trajectory_motion_model.size(); tr++)
+                for (int tr = 0; tr < new_trajectory.size(); tr++)
                 {
-                    current_node_motion_model.linear() = worker_data[i].intermediate_trajectory_motion_model[tr].linear();
-                    current_node_motion_model.translation() += mean_shift_t;
-                    new_trajectory_motion_model.push_back(current_node_motion_model);
+                    new_trajectory[tr].translation() += mean_shift * tr;
                 }
 
-                worker_data[i].intermediate_trajectory_motion_model = new_trajectory_motion_model;
+                worker_data[i].intermediate_trajectory = new_trajectory;
+                worker_data[i].intermediate_trajectory_motion_model = new_trajectory;
+                ////////////////////////////////////////////////////////////////////////
+                // std::vector<Eigen::Affine3d> new_trajectory_motion_model;
+                // Eigen::Affine3d current_node_motion_model = worker_data[i].intermediate_trajectory_motion_model[0];
+                // new_trajectory_motion_model.push_back(current_node_motion_model);
+
+                // Eigen::Vector3d mean_shift_t = worker_data[i].intermediate_trajectory_motion_model[0].linear() * ((worker_data[i].intermediate_trajectory[0].linear()).inverse() * mean_shift);
+
+                // for (int tr = 1; tr < worker_data[i].intermediate_trajectory_motion_model.size(); tr++)
+                //{
+                //     current_node_motion_model.linear() = worker_data[i].intermediate_trajectory_motion_model[tr].linear();
+                //     current_node_motion_model.translation() += mean_shift_t;
+                //     new_trajectory_motion_model.push_back(current_node_motion_model);
+                // }
+
+                // worker_data[i].intermediate_trajectory_motion_model = new_trajectory_motion_model;
             }
 
             bool add_pitch_roll_constraint = false;

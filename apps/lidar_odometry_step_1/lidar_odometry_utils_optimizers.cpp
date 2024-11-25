@@ -674,8 +674,8 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
                                                                  1000000,
                                                                  100000000,
                                                                  100000000,
-                                                                 // 100000000, underground mining
-                                                                 // 1000000, underground mining
+                                                                 //  100000000, underground mining
+                                                                 //  1000000, underground mining
                                                                  1000000);
         Eigen::Matrix<double, 12, 1> AtPBodo;
         relative_pose_obs_eq_tait_bryan_wc_case1_AtPB_simplified(AtPBodo,
@@ -702,8 +702,8 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
                                                                  1000000,
                                                                  100000000,
                                                                  100000000,
-                                                                 // 100000000, underground mining
-                                                                 // 1000000, underground mining
+                                                                 //  100000000, underground mining
+                                                                 //  1000000, underground mining
                                                                  1000000);
         int ic_1 = odo_edges[i].first * 6;
         int ic_2 = odo_edges[i].second * 6;
@@ -1580,12 +1580,16 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
         for (int i = 0; i < worker_data.size(); i++)
         {
-            std::cout << "jojo" << std::endl;
+            //std::cout << "jojo" << std::endl;
             Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
             if (i > 1 && params.use_motion_from_previous_step)
             {
-                mean_shift = worker_data[i - 1].intermediate_trajectory[0].translation() - worker_data[i - 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].translation();
-                mean_shift /= ((worker_data[i - 2].intermediate_trajectory.size()) - 2);
+                //mean_shift = worker_data[i - 1].intermediate_trajectory[0].translation() - worker_data[i - 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].translation();
+                //mean_shift /= ((worker_data[i - 2].intermediate_trajectory.size()) - 2);
+
+                mean_shift = worker_data[i - 1].intermediate_trajectory[worker_data[i - 1].intermediate_trajectory.size() - 1].translation() -
+                             worker_data[i - 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].translation();
+                mean_shift /= (worker_data[i - 1].intermediate_trajectory.size());
 
                 if (mean_shift.norm() > 1.0)
                 {
@@ -1659,11 +1663,29 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
             auto tmp_worker_data = worker_data[i].intermediate_trajectory;
 
+            //std::string fn1 = "input_" + std::to_string(i) + ".txt";
+            //ofstream file1;
+            //file1.open(fn1);
+            //for (int k = 0; k < worker_data[i].intermediate_trajectory.size(); k++){
+            //    file1 << worker_data[i].intermediate_trajectory[k](0, 3) << " " << worker_data[i].intermediate_trajectory[k](1, 3) << " " << worker_data[i].intermediate_trajectory[k](2, 3) << " 0" << std::endl;
+            //}
+            //file1.close();
+
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
                 optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
                          params.in_out_params, params.buckets, params.useMultithread /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
             }
+
+            //std::string fn2 = "output_" + std::to_string(i) + ".txt";
+            //ofstream file2;
+            //file2.open(fn2);
+            //for (int k = 0; k < worker_data[i].intermediate_trajectory.size(); k++)
+            //{
+            //    file2 << worker_data[i].intermediate_trajectory[k](0, 3) << " " << worker_data[i].intermediate_trajectory[k](1, 3) << " " << worker_data[i].intermediate_trajectory[k](2, 3) << " 1" << std::endl;
+            //}
+            //file2.close();
+
             end1 = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds1 = end1 - start1;
             std::cout << "optimizing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << " elapsed time: " << elapsed_seconds1.count() << std::endl;

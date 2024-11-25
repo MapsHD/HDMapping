@@ -4,6 +4,7 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 - Recent publication https://www.sciencedirect.com/science/article/pii/S235271102300314X
 - If You are ROS user please visit https://github.com/MapsHD/mandeye_to_bag to convert MANDEYE data to ROSBAG
 - Sample data is available at https://github.com/MapsHD/OmniWarsawDataset 
+- ROSCON 2024 workshop (sample data sets and more ...): https://michalpelka.github.io/RosCon2024_workshop/
 - Contact email: januszbedkowski@gmail.com
 
 To cite this work please use as follows:

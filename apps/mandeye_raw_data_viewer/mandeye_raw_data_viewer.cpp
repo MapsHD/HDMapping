@@ -195,7 +195,6 @@ void project_gui()
                     for (int i = 0; i < sel.size(); i++)
                     {
                         input_file_names.push_back(sel[i]);
-                        
                     }
                 };
                 std::thread t1(t);
@@ -292,8 +291,7 @@ void project_gui()
                     std::cout << "loading points" << std::endl;
                     std::vector<std::vector<Point3Di>> pointsPerFile;
                     pointsPerFile.resize(laz_files.size());
-                    //std::vector<std::vector<int>> indexesPerFile;
-                    
+                    // std::vector<std::vector<int>> indexesPerFile;
 
                     std::mutex mtx;
                     std::cout << "start std::transform" << std::endl;
@@ -373,16 +371,15 @@ void project_gui()
                         }
                     }
 
-                    //indexes_to_filename.resize(laz_files.size());
-                    //for (int i = 0; i < pointsPerFile.size(); i++){
-                    //    indexes_to_filename.push_back(i);
-
-                        //for (int j = 0; j < pointsPerFile[i].size(); j++)
-                        //{
-                        //    indexes_to_filename[i][j] = i;
-                        //}
-                    //}
-                        //indexesPerFile
+                    std::vector<std::pair<double, double>> timestamps;
+                    std::vector<Eigen::Affine3d> poses;
+                    for (const auto &t : trajectory)
+                    {
+                        timestamps.emplace_back(t.first, t.second.second);
+                        Eigen::Affine3d m;
+                        m.matrix() = t.second.first;
+                        poses.push_back(m);
+                    }
 
                     int number_of_points = 0;
                     for (const auto &pp : pointsPerFile)
@@ -393,11 +390,25 @@ void project_gui()
 
                     std::vector<Eigen::Vector3d> points_local;
 
-                    for (/*const auto &p : pointsPerFile*/ int i = 0; i < pointsPerFile.size(); i++)
+                    for (int i = 0; i < pointsPerFile.size(); i++)
                     {
                         for (const auto &pp : pointsPerFile[i])
                         {
-                            points_local.push_back(pp.point);
+                            auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), pp.timestamp,
+                                                          [](std::pair<double, double> lhs, double rhs) -> bool
+                                                          { return lhs.first < rhs; });
+
+                            int index_pose = std::distance(timestamps.begin(), lower);
+
+                            if (index_pose >= 0 && index_pose < poses.size())
+                            {
+                                auto ppp = pp;
+                                ppp.point = poses[index_pose] * ppp.point;
+
+                                points_local.push_back(ppp.point);
+                            }
+
+                            
                             if (points_local.size() > number_of_points_threshold)
                             {
                                 all_points_local.push_back(points_local);
@@ -590,7 +601,8 @@ void project_gui()
             }
         }
 
-        if (all_file_names.size() > 0){
+        if (all_file_names.size() > 0)
+        {
             if (index_rendered_points_local >= 0 && index_rendered_points_local < indexes_to_filename.size())
             {
                 std::string fn = all_file_names[indexes_to_filename[index_rendered_points_local]];
@@ -792,7 +804,8 @@ void mouse(int glut_button, int state, int x, int y)
 
     static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
     if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
-        glutMajorVersion < 3) {
+        glutMajorVersion < 3)
+    {
         wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
     }
 

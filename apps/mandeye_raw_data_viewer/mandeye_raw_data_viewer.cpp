@@ -36,6 +36,8 @@ bool is_ortho = false;
 bool show_axes = true;
 ImVec4 clear_color = ImVec4(0.8f, 0.8f, 0.8f, 1.00f);
 ImVec4 pc_color = ImVec4(1.0f, 0.0f, 0.0f, 1.00f);
+ImVec4 pc_color2 = ImVec4(0.0f, 0.0f, 1.0f, 1.00f);
+
 int point_size = 1;
 Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
 float translate_x, translate_y = 0.0;
@@ -70,6 +72,7 @@ int number_of_points_threshold = 20000;
 bool is_init = true;
 int index_rendered_points_local = -1;
 std::vector<std::vector<Eigen::Vector3d>> all_points_local;
+std::vector<std::vector<int>> all_lidar_ids;
 std::vector<int> indexes_to_filename;
 std::vector<std::string> all_file_names;
 
@@ -153,7 +156,8 @@ void project_gui()
     if (ImGui::Begin("main gui window"))
     {
         ImGui::ColorEdit3("clear color", (float *)&clear_color);
-        ImGui::ColorEdit3("pc_color", (float *)&pc_color);
+        ImGui::ColorEdit3("pc_color_lidar_1", (float *)&pc_color);
+        ImGui::ColorEdit3("pc_color_lidar_2", (float *)&pc_color2);
 
         ImGui::InputInt("point_size", &point_size);
         if (point_size < 1)
@@ -388,6 +392,7 @@ void project_gui()
                     std::cout << "number of points: " << number_of_points << std::endl;
 
                     std::vector<Eigen::Vector3d> points_local;
+                    std::vector<int> lidar_ids;
 
                     for (int i = 0; i < pointsPerFile.size(); i++)
                     {
@@ -403,16 +408,19 @@ void project_gui()
                             {
                                 auto ppp = pp;
                                 ppp.point = poses[index_pose] * ppp.point;
-
+                                // int lidar_id = pp.lidarid;
+                                lidar_ids.push_back(pp.lidarid);
                                 points_local.push_back(ppp.point);
                             }
 
-                            
                             if (points_local.size() > number_of_points_threshold)
                             {
                                 all_points_local.push_back(points_local);
                                 indexes_to_filename.push_back(i);
                                 points_local.clear();
+
+                                all_lidar_ids.push_back(lidar_ids);
+                                lidar_ids.clear();
                             }
                         }
                     }
@@ -725,14 +733,24 @@ void display()
         glEnd();
     }
 
-    glColor3f(pc_color.x, pc_color.y, pc_color.z);
+    //
     glPointSize(point_size);
     glBegin(GL_POINTS);
     if (index_rendered_points_local >= 0 && index_rendered_points_local < all_points_local.size())
     {
-        for (const auto &p : all_points_local[index_rendered_points_local])
-        {
-            glVertex3f(p.x(), p.y(), p.z());
+        //for (const auto &p : all_points_local[index_rendered_points_local])
+        //{
+        //
+        //    glVertex3f(p.x(), p.y(), p.z());
+        //}
+
+        for (int i = 0; i < all_points_local[index_rendered_points_local].size(); i++){
+            if (all_lidar_ids[index_rendered_points_local][i] == 0){
+                glColor3f(pc_color.x, pc_color.y, pc_color.z);
+            }else{
+                glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
+            }
+            glVertex3f(all_points_local[index_rendered_points_local][i].x(), all_points_local[index_rendered_points_local][i].y(), all_points_local[index_rendered_points_local][i].z());
         }
     }
     glEnd();

@@ -64,6 +64,8 @@ struct LidarOdometryParams
     NDTBucketMapType reference_buckets;
     std::string working_directory_preview = "";
     double sliding_window_trajectory_length_threshold = 50.0;
+    bool save_calibration_validation = true;
+    int calibration_validation_points = 1000000;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);

@@ -199,7 +199,8 @@ bool saveLaz(const std::string &filename, const WorkerData &data, double thresho
     for (const auto &org_p : data.original_points)
     {
         Point3Di p = org_p;
-        if (p.point.norm() > threshould_output_filter){
+        if (p.point.norm() > threshould_output_filter)
+        {
             p.point = m_pose * (data.intermediate_trajectory[org_p.index_pose] * org_p.point);
             points.push_back(p);
         }
@@ -525,7 +526,7 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
     outfile.open(file_name);
     if (!outfile.good())
     {
-        std::cout << "can not save file: '" << file_name <<  "'" << std::endl;
+        std::cout << "can not save file: '" << file_name << "'" << std::endl;
         std::cout << "if You can see only '' it means there is no filename assigned to poses, please read manual or contact me januszbedkowski@gmail.com" << std::endl;
         std::cout << "To assign filename to poses please use following two buttons in multi_view_tls_registration_step_2" << std::endl;
         std::cout << "1: update initial poses from RESSO file" << std::endl;
@@ -586,7 +587,7 @@ void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eig
     }
 }
 
-std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> load_imu(const std::string& imu_file, int imuToUse)
+std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> load_imu(const std::string &imu_file, int imuToUse)
 {
     std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> all_data;
 
@@ -596,17 +597,17 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
     csv::CSVReader reader(imu_file, format);
     const auto columns = reader.get_col_names();
     const std::set<std::string> columnsSet(columns.begin(), columns.end());
-    
-    //mandatory columns
+
+    // mandatory columns
     const bool hasTsColumn = columnsSet.contains("timestamp");
     const bool hasGyrosColumns = columnsSet.contains("gyroX") && columnsSet.contains("gyroY") && columnsSet.contains("gyroZ");
     const bool hasAccsColumns = columnsSet.contains("accX") && columnsSet.contains("accY") && columnsSet.contains("accZ");
 
-    //optional
+    // optional
     const bool hasImuIdColumn = columnsSet.contains("imuId");
     const bool hasUnixTimestampColumn = columnsSet.contains("timestampUnix");
 
-    //check if legacy
+    // check if legacy
     bool is_legacy = true;
     if (hasTsColumn)
     {
@@ -689,7 +690,7 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
     return all_data;
 }
 
-std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy, const std::unordered_map<int, Eigen::Affine3d>& calibrations)
+std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy, const std::unordered_map<int, Eigen::Affine3d> &calibrations)
 {
     std::vector<Point3Di> points;
     laszip_POINTER laszip_reader;
@@ -723,8 +724,12 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
 
     int counter_ts0 = 0;
     int counter_filtered_points = 0;
+
+    std::cout << "header->number_of_point_records:  " << header->number_of_point_records << std::endl;
+
     for (laszip_U32 j = 0; j < header->number_of_point_records; j++)
     {
+        
         if (laszip_read_point(laszip_reader))
         {
             fprintf(stderr, "DLL ERROR: reading point %u\n", j);
@@ -732,12 +737,19 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
             return points;
             // std::abort();
         }
+        
         Point3Di p;
-
         int id = point->user_data;
-        Eigen::Affine3d calibration = calibrations.empty() ? Eigen::Affine3d::Identity() : calibrations.at(id);
+        
+        if (!calibrations.empty()){
+            if (!calibrations.contains(id)){
+                continue;
+            }
+        }
 
+        Eigen::Affine3d calibration = calibrations.empty() ? Eigen::Affine3d::Identity() : calibrations.at(id);
         const Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
+       
         p.point = calibration * (pf);
         p.lidarid = id;
         p.timestamp = point->gps_time;
@@ -775,7 +787,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
             if (sqrt(pf.x() * pf.x()) < 4.5 && sqrt(pf.y() * pf.y()) < 2){
                 counter_filtered_points++;
             }else{
-                
+
 
                 points.emplace_back(p);
             }
@@ -791,7 +803,6 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
             }
         }
     }
-
     std::cout << "number points with ts == 0: " << counter_ts0 << std::endl;
     std::cout << "counter_filtered_points: " << counter_filtered_points << std::endl;
     std::cout << "total number points: " << points.size() << std::endl;
@@ -799,7 +810,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
     return points;
 }
 
-std::unordered_map<int, std::string> MLvxCalib::GetIdToSnMapping(const std::string& filename)
+std::unordered_map<int, std::string> MLvxCalib::GetIdToSnMapping(const std::string &filename)
 {
     if (!std::filesystem::exists(filename))
     {
@@ -808,22 +819,25 @@ std::unordered_map<int, std::string> MLvxCalib::GetIdToSnMapping(const std::stri
     std::unordered_map<int, std::string> dataMap;
     std::ifstream fst(filename);
     std::string line;
-    while (std::getline(fst, line)) {
+    while (std::getline(fst, line))
+    {
         std::istringstream iss(line);
         int key;
         std::string value;
 
-        if (iss >> key >> value) {
+        if (iss >> key >> value)
+        {
             dataMap[key] = value;
         }
-        else {
+        else
+        {
             std::cerr << "Failed to parse line: " << line << std::endl;
         }
     }
     return dataMap;
 }
 
-std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFile(const std::string& filename)
+std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFile(const std::string &filename)
 {
     if (!std::filesystem::exists(filename))
     {
@@ -837,8 +851,9 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
 
     // Iterate through the JSON object and parse each value into Eigen::Affine3d
 
-    for (auto& calibrationEntry : jsonData["calibration"].items()) {
-        const std::string& lidarSn = calibrationEntry.key();
+    for (auto &calibrationEntry : jsonData["calibration"].items())
+    {
+        const std::string &lidarSn = calibrationEntry.key();
         Eigen::Matrix4d value;
         std::cout << "lidarSn : " << lidarSn << std::endl;
 
@@ -859,8 +874,10 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
         const auto matrixRawData = calibrationEntry.value()["data"];
         assert(matrixRawData.size() == 16);
         // Populate the Eigen::Affine3d matrix from the JSON array
-        for (int i = 0; i < 4; ++i) {
-            for (int j = 0; j < 4; ++j) {
+        for (int i = 0; i < 4; ++i)
+        {
+            for (int j = 0; j < 4; ++j)
+            {
                 value(i, j) = matrixRawData[i * 4 + j]; // default is column-major order
             }
         }
@@ -900,18 +917,16 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
     if (jsonData.contains("blacklist"))
     {
         json blacklist = jsonData["blacklist"];
-        for (const auto& item : blacklist)
+        for (const auto &item : blacklist)
         {
             std::string blacklistedSn = item.get<std::string>();
             dataMap[blacklistedSn] = Eigen::Matrix4d::Zero();
         }
-
     }
     return dataMap;
 }
 
-
-std::string MLvxCalib::GetImuSnToUse(const std::string& filename)
+std::string MLvxCalib::GetImuSnToUse(const std::string &filename)
 {
     if (!std::filesystem::exists(filename))
     {
@@ -926,27 +941,28 @@ std::string MLvxCalib::GetImuSnToUse(const std::string& filename)
     return jsonData["imuToUse"];
 }
 
-std::unordered_map<int, Eigen::Affine3d> MLvxCalib::CombineIntoCalibration(const std::unordered_map<int, std::string>& idToSn, const std::unordered_map<std::string, Eigen::Affine3d>& calibration)
+std::unordered_map<int, Eigen::Affine3d> MLvxCalib::CombineIntoCalibration(const std::unordered_map<int, std::string> &idToSn, const std::unordered_map<std::string, Eigen::Affine3d> &calibration)
 {
     if (calibration.empty())
     {
         return std::unordered_map<int, Eigen::Affine3d>();
     }
     std::unordered_map<int, Eigen::Affine3d> dataMap;
-    for (const auto& [id, sn] : idToSn)
+    for (const auto &[id, sn] : idToSn)
     {
-        const auto& affine = calibration.at(sn);
+        const auto &affine = calibration.at(sn);
         dataMap[id] = affine;
     }
     return dataMap;
 }
 
-int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string>& idToSn, const std::string& snToUse )
+int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string> &idToSn, const std::string &snToUse)
 {
-    if (snToUse.empty() || idToSn.empty()) {
+    if (snToUse.empty() || idToSn.empty())
+    {
         return 0;
     }
-    for (const auto& [id, sn] : idToSn)
+    for (const auto &[id, sn] : idToSn)
     {
         if (snToUse == sn)
         {
@@ -955,4 +971,3 @@ int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string>& idToSn,
     }
     return 0;
 }
-

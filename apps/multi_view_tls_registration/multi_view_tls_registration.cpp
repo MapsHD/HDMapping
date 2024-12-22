@@ -143,6 +143,55 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observ
 double compute_rms(bool initial, Session &session, ObservationPicking &observation_picking);
 void reset_poses(Session &session);
 
+void createDXFPolyline(const std::string &filename, const std::vector<Eigen::Vector3d> &points)
+{
+    std::ofstream dxfFile(filename);
+
+    if (!dxfFile.is_open())
+    {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return;
+    }
+
+    // DXF header
+    dxfFile << "0\nSECTION\n2\nHEADER\n0\nENDSEC\n";
+    dxfFile << "0\nSECTION\n2\nTABLES\n0\nENDSEC\n";
+
+    // Start the ENTITIES section
+    dxfFile << "0\nSECTION\n2\nENTITIES\n";
+
+    // Start the POLYLINE entity
+    dxfFile << "0\nPOLYLINE\n";
+    dxfFile << "8\n0\n";  // Layer 0
+    dxfFile << "66\n1\n"; // Indicates the presence of vertices
+    dxfFile << "70\n1\n"; // 1 = Open polyline
+
+    // Write the VERTEX entities
+    for (const auto &point : points)
+    {
+        dxfFile << "0\nVERTEX\n";
+        dxfFile << "8\n0\n"; // Layer 0
+        dxfFile << "10\n"
+                << point.x() << "\n"; // X coordinate
+        dxfFile << "20\n"
+                << point.y() << "\n"; // Y coordinate
+        dxfFile << "30\n"
+                << point.z() << "\n"; // Z coordinate
+    }
+
+    // End the POLYLINE
+    dxfFile << "0\nSEQEND\n";
+
+    // End the ENTITIES section
+    dxfFile << "0\nENDSEC\n";
+
+    // End the DXF file
+    dxfFile << "0\nEOF\n";
+
+    dxfFile.close();
+    std::cout << "DXF file created: " << filename << std::endl;
+}
+
 void my_display_code()
 {
     // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
@@ -356,7 +405,6 @@ void project_gui()
                     session.point_clouds_container.save_poses(fs::path(initial_poses_file_name).string(), save_subsession);
                     std::cout << "saving poses to: " << poses_file_name << std::endl;
                     session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), save_subsession);
-                    
                 }
             }
         }
@@ -788,8 +836,6 @@ void project_gui()
         ImGui::Checkbox("Plane Features", &is_registration_plane_feature);
         ImGui::Checkbox("Pose Graph SLAM", &is_pose_graph_slam);
         ImGui::Checkbox("Manual Analysis", &is_manual_analisys);
-
-        
     }
     if (session.point_clouds_container.point_clouds.size() > 0)
     {
@@ -944,7 +990,7 @@ void project_gui()
             {
                 ImGui::Separator();
                 ImGui::Checkbox(session.point_clouds_container.point_clouds[i].file_name.c_str(), &session.point_clouds_container.point_clouds[i].visible);
-                //ImGui::SameLine();
+                // ImGui::SameLine();
                 ImGui::Text("--");
                 ImGui::SameLine();
                 ImGui::Checkbox((std::string("gizmo_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
@@ -1264,7 +1310,7 @@ void project_gui()
                         {
                             const auto &pp = p.points_local[i];
                             Eigen::Vector3d vp;
-                            vp = p.m_pose * pp;// + session.point_clouds_container.offset;
+                            vp = p.m_pose * pp; // + session.point_clouds_container.offset;
                             // std::cout << vp << std::endl;
                             pointcloud.push_back(vp);
                             if (i < p.intensities.size())
@@ -1395,7 +1441,7 @@ void project_gui()
                             {
                                 const auto &pp = p.local_trajectory[i].m_pose.translation();
                                 Eigen::Vector3d vp;
-                                vp = p.m_pose * pp;// + session.point_clouds_container.offset;
+                                vp = p.m_pose * pp; // + session.point_clouds_container.offset;
 
                                 if (i > 0)
                                 {
@@ -1514,7 +1560,7 @@ void project_gui()
                             {
                                 const auto &pp = p.local_trajectory[i].m_pose.translation();
                                 Eigen::Vector3d vp;
-                                vp = p.m_pose * pp;// + session.point_clouds_container.offset;
+                                vp = p.m_pose * pp; // + session.point_clouds_container.offset;
 
                                 // pointcloud.push_back(vp);
                                 // intensity.push_back(0);
@@ -1610,7 +1656,7 @@ void project_gui()
                             {
                                 const auto &pp = p.local_trajectory[i].m_pose.translation();
                                 Eigen::Vector3d vp;
-                                vp = p.m_pose * pp;// + session.point_clouds_container.offset;
+                                vp = p.m_pose * pp; // + session.point_clouds_container.offset;
 
                                 // pointcloud.push_back(vp);
                                 // intensity.push_back(0);
@@ -1706,7 +1752,7 @@ void project_gui()
                             {
                                 const auto &pp = p.local_trajectory[i].m_pose.translation();
                                 Eigen::Vector3d vp;
-                                vp = p.m_pose * pp;// + session.point_clouds_container.offset;
+                                vp = p.m_pose * pp; // + session.point_clouds_container.offset;
 
                                 // pointcloud.push_back(vp);
                                 // intensity.push_back(0);
@@ -2434,7 +2480,99 @@ void project_gui()
                     }
                 }
             }
+            if (ImGui::Button("save all marked trajectories to dxf as polyline"))
+            {
+                std::shared_ptr<pfd::save_file> save_file;
+                std::string output_file_name = "";
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+                const auto t = [&]()
+                {
+                    auto sel = pfd::save_file("Save dxf file", "C:\\").result();
+                    output_file_name = sel;
+                    std::cout << "dxf file to save: '" << output_file_name << "'" << std::endl;
+                };
+                std::thread t1(t);
+                t1.join();
 
+                if (output_file_name.size() > 0)
+                {
+                    // std::ofstream outfile(output_file_name);
+                    // if (outfile.good())
+                    //{
+
+                    std::vector<Eigen::Vector3d> polylinePoints;
+                    // Create DXF file
+
+                    float consecutive_distance = 0;
+                    for (auto &p : session.point_clouds_container.point_clouds)
+                    {
+                        if (p.visible)
+                        {
+
+                            for (int i = 0; i < p.local_trajectory.size(); i++)
+                            {
+                                const auto &m = p.local_trajectory[i].m_pose;
+                                Eigen::Affine3d pose = p.m_pose * m;
+                                pose.translation() += session.point_clouds_container.offset;
+                                Eigen::Quaterniond q(pose.rotation());
+
+                                if (i > 0)
+                                {
+                                    double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
+                                    consecutive_distance += dist;
+                                }
+
+                                bool is_curve = false;
+
+                                if (i > 100 && i < p.local_trajectory.size() - 100)
+                                {
+                                    Eigen::Vector3d position_prev = p.local_trajectory[i - 100].m_pose.translation();
+                                    Eigen::Vector3d position_curr = p.local_trajectory[i].m_pose.translation();
+                                    Eigen::Vector3d position_next = p.local_trajectory[i + 100].m_pose.translation();
+
+                                    Eigen::Vector3d v1 = position_curr - position_prev;
+                                    Eigen::Vector3d v2 = position_next - position_curr;
+
+                                    if (v1.norm() > 0 && v2.norm() > 0)
+                                    {
+                                        double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+
+                                        if (angle_deg > 10.0)
+                                        {
+                                            is_curve = true;
+                                        }
+                                    }
+                                }
+                                double tol = not_curve_consecutive_distance_meters;
+
+                                if (is_curve)
+                                {
+                                    tol = curve_consecutive_distance_meters;
+                                }
+
+                                if (!is_trajectory_export_downsampling)
+                                {
+                                    // outfile << std::setprecision(20);
+                                    // outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                    polylinePoints.push_back(pose.translation());
+                                }
+                                else
+                                {
+                                    if (consecutive_distance >= tol)
+                                    {
+                                        consecutive_distance = 0;
+                                        polylinePoints.push_back(pose.translation());
+                                        // outfile << std::setprecision(20);
+                                        // outfile << p.local_trajectory[i].timestamps.first << "," << p.local_trajectory[i].timestamps.second << "," << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << "," << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    createDXFPolyline(output_file_name, polylinePoints);
+                    //}
+                }
+            }
         } // simple gui
 
         ImGui::Separator();
@@ -2538,9 +2676,9 @@ void project_gui()
                 }
             }
 
-            //ImGui::InputDouble("WGS84ReferenceLatitude", &gnss.WGS84ReferenceLatitude);
-            //ImGui::InputDouble("WGS84ReferenceLongitude", &gnss.WGS84ReferenceLongitude);
-            //ImGui::InputDouble("OffsetAltitude", &gnss.offset_alt);
+            // ImGui::InputDouble("WGS84ReferenceLatitude", &gnss.WGS84ReferenceLatitude);
+            // ImGui::InputDouble("WGS84ReferenceLongitude", &gnss.WGS84ReferenceLongitude);
+            // ImGui::InputDouble("OffsetAltitude", &gnss.offset_alt);
 
             ImGui::Checkbox("setWGS84ReferenceFromFirstPose", &gnss.setWGS84ReferenceFromFirstPose);
 
@@ -3902,10 +4040,10 @@ void mouse(int glut_button, int state, int x, int y)
 
     static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
     if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
-        glutMajorVersion < 3) {
+        glutMajorVersion < 3)
+    {
         wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
     }
-
 
     if (!io.WantCaptureMouse)
     {

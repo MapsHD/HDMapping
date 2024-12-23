@@ -146,7 +146,7 @@ void reset_poses(Session &session);
 void createDXFPolyline(const std::string &filename, const std::vector<Eigen::Vector3d> &points)
 {
     std::ofstream dxfFile(filename);
-
+    dxfFile << std::setprecision(20);
     if (!dxfFile.is_open())
     {
         std::cerr << "Failed to open file: " << filename << std::endl;
@@ -164,7 +164,7 @@ void createDXFPolyline(const std::string &filename, const std::vector<Eigen::Vec
     dxfFile << "0\nPOLYLINE\n";
     dxfFile << "8\n0\n";  // Layer 0
     dxfFile << "66\n1\n"; // Indicates the presence of vertices
-    dxfFile << "70\n1\n"; // 1 = Open polyline
+    dxfFile << "70\n8\n"; // 1 = Open polyline
 
     // Write the VERTEX entities
     for (const auto &point : points)

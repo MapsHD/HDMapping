@@ -56,6 +56,9 @@ Terrestrial Laser Scanner data registration is elaborated in following paper:
 # VIDEOs
 - https://www.youtube.com/watch?v=u8siB0KLFLc&t=435s
 
+# Compatible commertial products (announcement soon ...)
+
+
 # Building commands
 ```
 git clone https://github.com/MapsHD/HDMapping.git

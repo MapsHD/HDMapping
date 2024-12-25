@@ -56,7 +56,7 @@ Terrestrial Laser Scanner data registration is elaborated in following paper:
 # VIDEOs
 - https://www.youtube.com/watch?v=u8siB0KLFLc&t=435s (data recorded with Mandeye, online data registration with FAST-LIO)
 
-# Compatible commertial products (announcement soon ...)
+# Compatible commercial products (announcement soon ...)
 
 
 # Building commands

@@ -19,6 +19,7 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 
 
 # To cite this work please use as follows:
+Mobile mapping system: hardware and software is elaborated in following paper:
 ```
 @article{BEDKOWSKI2024101618,
 title = {Open source, open hardware hand-held mobile mapping system for large scale surveys},
@@ -35,7 +36,7 @@ abstract = {This paper presents open-source software for large-scale 3D mapping 
 }
 ```
 
-Terrestrail Laser Scanner data registration is elaborated in following paper:
+Terrestrial Laser Scanner data registration is elaborated in following paper:
 ```
 @article{BEDKOWSKI2023113199,
      title = {Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms},

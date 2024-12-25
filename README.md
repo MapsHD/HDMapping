@@ -1,11 +1,20 @@
 # Open source, open hardware hand-held mobile mapping system for large scale surveys.
 
 This is an open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device available at https://github.com/JanuszBedkowski/mandeye_controller.
-- Recent publication https://www.sciencedirect.com/science/article/pii/S235271102300314X
+- https://www.sciencedirect.com/science/article/pii/S235271102300314X
 - If You are ROS user please visit https://github.com/MapsHD/mandeye_to_bag to convert MANDEYE data to ROSBAG
 - Sample data is available at https://github.com/MapsHD/OmniWarsawDataset 
 - ROSCON 2024 workshop (sample data sets and more ...): https://michalpelka.github.io/RosCon2024_workshop/
 - Contact email: januszbedkowski@gmail.com
+- VIDEO (how to build mobile mapping hardware) https://www.youtube.com/watch?v=BXBbuSJMFEo
+
+# Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems etc...) 
+- https://www.mdpi.com/1424-8220/24/18/6010
+- https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/147/2024/isprs-archives-XLVIII-2-W8-2024-147-2024.pdf
+- https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/9/2024/isprs-archives-XLVIII-2-W8-2024-9-2024.pdf
+- https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/25/2024/isprs-archives-XLVIII-2-W8-2024-25-2024.pdf
+- https://repozitorij.geof.unizg.hr/islandora/object/geof%3A142/datastream/PDF/view
+
 
 To cite this work please use as follows:
 ```

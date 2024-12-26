@@ -8,7 +8,7 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 - VIDEO (how to build mobile mapping hardware) https://www.youtube.com/watch?v=BXBbuSJMFEo
 - You can use it for multi view Terrestrial Laser Scanner Registration (Faro, Leica, Z+F, Riegl, etc...) https://www.sciencedirect.com/science/article/abs/pii/S0263224123007637
 
-# Quick DEMO (Windows OS, instalation is not required):
+# Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z
 - unpack 'quick_start_demo.7z' with 7-Zip (https://7-zip.org/)
 - double click 'quick_start_demo.exe' and observe DEMO (point cloud and trajectory)

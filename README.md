@@ -1,4 +1,4 @@
-# Open source, open hardware hand-held mobile mapping system for large scale surveys:
+# Open source (Windows and Linux), open hardware hand-held mobile mapping system for large scale surveys:
 This is an open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
 - The introductory paper is available here: https://www.sciencedirect.com/science/article/pii/S235271102300314X
 - Sample data is available at https://github.com/MapsHD/OmniWarsawDataset 
@@ -6,6 +6,7 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 - If You are ROS user please visit https://github.com/MapsHD/mandeye_to_bag to convert MANDEYE data to ROSBAG
 - ROSCON 2024 workshop (sample data sets and more ...): https://michalpelka.github.io/RosCon2024_workshop/
 - You can use it also for multi view Terrestrial Laser Scanner Registration (Faro, Leica, Z+F, Riegl, etc...) https://www.sciencedirect.com/science/article/abs/pii/S0263224123007637
+- Info for Windows users: please use latest release https://github.com/MapsHD/HDMapping/releases 
 - Contact email: januszbedkowski@gmail.com
 
 # Quick DEMO (Windows OS, installation is not required):

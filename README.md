@@ -14,6 +14,12 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 - NDT (Normal Distributions Transform)
 - ICP (Iterative Closest Point)
 
+# Main tools:
+- Initial trajectory estimation (lidar_odometry_step_1)
+- Single trajectory refinement (multi_view_tls_registration_step_2)
+- Multiple trajectory refinement (multi_session_registration_step_3)
+- Georeferencing (referenced point cloud, ground control points, GNSS data)
+
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems etc...) 
 - https://www.mdpi.com/1424-8220/24/18/6010
 - https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/147/2024/isprs-archives-XLVIII-2-W8-2024-147-2024.pdf

@@ -1,16 +1,16 @@
 cmake_minimum_required(VERSION 3.15.0)
 
-project(quick_start_demo)
+project(mandeye_mission_recorder_calibration)
 
 add_executable(
-  quick_start_demo
-  quick_start_demo.cpp
+  mandeye_mission_recorder_calibration
+  mandeye_mission_recorder_calibration.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils_optimizers.cpp
 )
 
 target_include_directories(
-  quick_start_demo
+  mandeye_mission_recorder_calibration
   PRIVATE include
   ${REPOSITORY_DIRECTORY}/core/include
   ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
@@ -29,7 +29,7 @@ target_include_directories(
   ${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
 
 target_link_libraries(
-  quick_start_demo
+  mandeye_mission_recorder_calibration
   PRIVATE Fusion
   ${FREEGLUT_LIBRARY}
   ${OPENGL_gl_LIBRARY}
@@ -41,12 +41,12 @@ target_link_libraries(
 
 if(WIN32)
   add_custom_command(
-    TARGET quick_start_demo
+    TARGET mandeye_mission_recorder_calibration
     POST_BUILD
     COMMAND
-    ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:quick_start_demo>
-    $<TARGET_FILE_DIR:quick_start_demo>
+    ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:mandeye_mission_recorder_calibration>
+    $<TARGET_FILE_DIR:mandeye_mission_recorder_calibration>
     COMMAND_EXPAND_LISTS)
 endif()
 
-install(TARGETS quick_start_demo DESTINATION bin)
+install(TARGETS mandeye_mission_recorder_calibration DESTINATION bin)

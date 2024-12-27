@@ -11,9 +11,9 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z
-- unpack 'quick_start_demo.7z' with 7-Zip (https://7-zip.org/)
-- double click 'quick_start_demo.exe' and observe DEMO (point cloud and trajectory)
-- once calculations are finished open 'out_demo_point_cloud.laz' with CloudCompare (https://cloudcompare.org/)
+- unpack `quick_start_demo.7z` with 7-Zip (https://7-zip.org/)
+- double click `quick_start_demo.exe` and observe DEMO (point cloud and trajectory)
+- once calculations are finished open `out_demo_point_cloud.laz` with CloudCompare (https://cloudcompare.org/)
 ![DEMO (point cloud and trajectory)](images/quick_start_demo.png)
 ![DEMO result in CloudCompare](images/demo-cc.png)
 
@@ -30,14 +30,15 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 - Georeferencing (referenced point cloud, ground control points, GNSS data)
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems etc...) 
-- https://www.mdpi.com/1424-8220/24/18/6010
-- https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/147/2024/isprs-archives-XLVIII-2-W8-2024-147-2024.pdf
-- https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/9/2024/isprs-archives-XLVIII-2-W8-2024-9-2024.pdf
-- https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/25/2024/isprs-archives-XLVIII-2-W8-2024-25-2024.pdf
-- https://repozitorij.geof.unizg.hr/islandora/object/geof%3A142/datastream/PDF/view
-- https://www.sciencedirect.com/science/article/abs/pii/S0263224123007637
-- https://www.ctro.hr/userfiles/files/Affordable%20geo-localisation%20in%20GNSS%20denied%20environment%2C%20Janusz%20B%C4%99dkowski.pdf
-- https://www.ibles.pl/wp-content/uploads/2024/06/Torana-Arya.pdf
+- Mitka, Bartosz, Przemysław Klapa, and Pelagia Gawronek. "Laboratory Tests of Metrological Characteristics of a Non-Repetitive Low-Cost Mobile Handheld Laser Scanner." Sensors 24.18 (2024): 6010. [[PDF]](https://www.mdpi.com/1424-8220/24/18/6010)
+- Elalailyi, Ahmad, et al. "Pose Graph Data Fusion for Visual-and LiDAR-based Low-Cost Portable Mapping Systems." International Archives of the Photogrammetry, Remote Sensing and Spatial Information Sciences 48 (2024): 147-154.[[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/147/2024/isprs-archives-XLVIII-2-W8-2024-147-2024.pdf)
+- Balestra, Mattia, et al. "Advancing forest inventory: a comparative study of low-cost MLS lidar device with professional laser scanners." The International Archives of the Photogrammetry, Remote Sensing and Spatial Information Sciences 48 (2024): 9-15.[[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/9/2024/isprs-archives-XLVIII-2-W8-2024-9-2024.pdf)
+- Bedkowski, Janusz, and Tresya Yuliana Fitri. "Novel (re-configurable, wearable, light weight, ergonomic) low cost 3D mobile mapping system not only for extreme mapping applications." The International Archives of Photogrammetry, Remote Sensing and Spatial Information Sciences 48 (2024): 25-30.[[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/25/2024/isprs-archives-XLVIII-2-W8-2024-25-2024.pdf)
+- Biloš, Josip. 3D mobilno kartiranje pomoću MandEye sustava prikupljanja i obrade prostornih podataka. Diss. University of Zagreb. Faculty of Geodesy. Institute for Applied Geodesy. Chair of Surveying, 2024.[[PDF]](https://repozitorij.geof.unizg.hr/islandora/object/geof%3A142/datastream/PDF/view)
+- Będkowski, Janusz. "Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms." Measurement 219 (2023): 113199.[[PDF]](https://www.sciencedirect.com/science/article/abs/pii/S0263224123007637)
+- Affordable geo-localisation of humanitarian demining tools (mountable on K9, robot, hand-held device, etc.) in GNSS-denied environment, HCR-CTRO [[PDF]](https://www.ctro.hr/userfiles/files/Affordable%20geo-localisation%20in%20GNSS%20denied%20environment%2C%20Janusz%20B%C4%99dkowski.pdf)
+- Aguilar, Fernando J., et al. ‘Preliminary Results of a Low-Cost Portable Terrestrial LiDAR Based on ICP-SLAM Algorithms. Application to Automatic Forest Digital Inventory’. 6th Euro-Mediterranean Conference for Environmental Integration (EMCEI-2024), 2024.
+[[PDF]](https://www.ibles.pl/wp-content/uploads/2024/06/Torana-Arya.pdf)
 
 # To cite this work please use as follows:
 Mobile mapping system: hardware and software is elaborated in following paper:

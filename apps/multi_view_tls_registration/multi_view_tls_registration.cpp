@@ -633,7 +633,7 @@ void project_gui()
             pfd::message message(
                 "Information",
                 "If You can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
-                pfd::choice::ok, pfd::icon::error);
+                pfd::choice::ok, pfd::icon::info);
             message.result();
         }
         ImGui::SameLine();

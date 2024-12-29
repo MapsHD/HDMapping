@@ -849,7 +849,7 @@ void lidar_odometry_gui()
                 pfd::message message(
                     "Information",
                     message_info.c_str(),
-                    pfd::choice::ok, pfd::icon::error);
+                    pfd::choice::ok, pfd::icon::info);
                 message.result();
             }
             ImGui::SameLine();

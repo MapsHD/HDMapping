@@ -478,9 +478,9 @@ void project_gui()
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
                 const auto t = [&]()
                 {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", json_filter).result();
+                    auto sel = pfd::save_file("Save *.json file", "", json_filter).result();
                     output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                    std::cout << "Calibration file to save: '" << output_file_name << "'" << std::endl;
                 };
                 std::thread t1(t);
                 t1.join();

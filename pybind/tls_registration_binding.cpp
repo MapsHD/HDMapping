@@ -120,7 +120,7 @@ PYBIND11_MODULE(multi_view_tls_registration_py, m) {
 
     m.def("run_multi_view_tls_registration", &run_multi_view_tls_registration,
           py::arg("input_file_name"),
-          py::arg("output_file_name"),
           py::arg("tls_registration"),
+          py::arg("output_file_name") = "",
           "Run multi-view TLS registration with the provided input file, output file, and TLS registration configuration.");
 }

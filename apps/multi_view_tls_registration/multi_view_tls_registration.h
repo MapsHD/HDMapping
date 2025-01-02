@@ -151,5 +151,5 @@ void save_trajectories(
 	bool save_to_dxf = false);
 
 void run_multi_view_tls_registration(
-	std::string input_file_name, std::string output_file_name, TLSRegistration& tls_registration);
+	std::string input_file_name, TLSRegistration& tls_registration, std::string output_file_name = "");
 #endif

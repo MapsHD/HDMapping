@@ -28,6 +28,35 @@ mvr_params.initial_pose_to_identity = True
 mvr_params.output_las_name = str(DATA_DIR / "all_mvr.laz")
 mvr_params.trajectories_name = str(DATA_DIR / "traj_mvr.csv")
 mvr.run_multi_view_tls_registration(
-    str(DATA_DIR), str(DATA_DIR / "session.json"), mvr_params
+    str(DATA_DIR / "session.json"), 
+    mvr_params, 
+    str(DATA_DIR / "session.json"),
+)
+```
+
+To run multi-view registration with the different dataset formats:
+
+* for ETH (no `traj_mvr.csv` as timestamps are not available in the data - adding `mvr_params.trajectories_name` will result in empty `traj_mvr.csv`): 
+```
+mvr.run_multi_view_tls_registration(
+    str(DATA_DIR / "pairs.txt"),
+    mvr_params,
+)
+```
+
+* for RESSO (output will be a RESSO reg file as well, without sesion json; no `traj_mvr.csv` as timestamps are not available in the data - adding `mvr_params.trajectories_name` will result in empty `traj_mvr.csv`):
+```
+mvr.run_multi_view_tls_registration(
+    str(DATA_DIR / "transformation_GroundTruth.reg"),
+    mvr_params,
+    str(DATA_DIR / "output.reg"),
+)
+```
+
+* for 3DTK (data directory should contain txt files and their corresponding dat files) and WHU_TLS (data directory should contain las files):
+```
+mvr.run_multi_view_tls_registration(
+    str(DATA_DIR),
+    mvr_params,
 )
 ```

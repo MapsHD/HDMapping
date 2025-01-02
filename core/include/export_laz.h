@@ -1,6 +1,11 @@
+#ifndef _EXPORT_LAZ_H_
+#define _EXPORT_LAZ_H_
+
 #include <string>
 #include <vector>
 #include <Eigen/Eigen>
+#include <filesystem>
+#include <iostream>
 
 namespace fs = std::filesystem;
 
@@ -392,3 +397,4 @@ inline void save_processed_pc(const fs::path &file_path_in, const fs::path &file
 
     std::cout << "saving to " << file_path_put << std::endl;
 }
+#endif

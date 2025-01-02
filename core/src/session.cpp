@@ -30,7 +30,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
     std::string initial_poses_file_name;
     std::string out_poses_file_name;
 
-    std::vector<ManualPoseGraphLoopClosure::Edge> loop_closure_edges;
+    std::vector<PoseGraphLoopClosure::Edge> loop_closure_edges;
     std::vector<std::string> laz_file_names;
 
     // Get a loaded file directory
@@ -52,6 +52,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         out_folder_name = pathUpdater(project_settings_json["out_folder_name"], directory);
         poses_file_name = pathUpdater(project_settings_json["poses_file_name"], directory);
         initial_poses_file_name = pathUpdater(project_settings_json["initial_poses_file_name"], directory);
+        std::cout << "!!" << initial_poses_file_name << std::endl;
         out_poses_file_name = pathUpdater(project_settings_json["out_poses_file_name"], directory);
         if (project_settings_json.contains("ground_truth"))
         {
@@ -64,7 +65,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
 
         for (const auto &edge_json : data["loop_closure_edges"])
         {
-            ManualPoseGraphLoopClosure::Edge edge;
+            PoseGraphLoopClosure::Edge edge;
             edge.index_from = edge_json["index_from"];
             edge.index_to = edge_json["index_to"];
             edge.is_fixed_fi = edge_json["is_fixed_fi"];
@@ -136,7 +137,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         {
             std::cout << "'" << fn << "'" << std::endl;
         }
-
+#if WITH_GUI == 1
         for (const auto &gcp_json : data["ground_control_points"])
         {
             GroundControlPoint gcp;
@@ -154,6 +155,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             gcp.index_to_node_outer = gcp_json["index_to_node_outer"];
             ground_control_points.gpcs.push_back(gcp);
         };
+#endif
 
         // loading all data
         point_clouds_container.load_whu_tls(laz_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
@@ -191,7 +193,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             }
         }
 
-        manual_pose_graph_loop_closure.edges = loop_closure_edges;
+        pose_graph_loop_closure.edges = loop_closure_edges;
 
         // change color
         render_color[0] = float(rand() % 255) / 255.0;
@@ -235,7 +237,7 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
     nlohmann::json jloop_closure_edges;
     if (!is_subsession)
     {
-        for (const auto &edge : manual_pose_graph_loop_closure.edges)
+        for (const auto &edge : pose_graph_loop_closure.edges)
         {
             nlohmann::json jloop_closure_edge{
                 {"px", edge.relative_pose_tb.px},
@@ -283,7 +285,7 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
         }
     }
     jj["laz_file_names"] = jlaz_file_names;
-
+#if WITH_GUI == 1
     nlohmann::json jgcps;
     for (const auto &gcp : ground_control_points.gpcs)
     {
@@ -301,6 +303,7 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
         jgcps.push_back(jgcp);
     }
     jj["ground_control_points"] = jgcps;
+#endif
 
     std::ofstream fs(file_name);
     if (!fs.good())

@@ -1,8 +1,6 @@
 #ifndef _LIDAR_ODOMETRY_UTILS_H_
 #define _LIDAR_ODOMETRY_UTILS_H_
 
-#include <portable-file-dialogs.h>
-
 #include <laszip/laszip_api.h>
 #include <iostream>
 #include <Eigen/Dense>
@@ -10,19 +8,9 @@
 #include <Fusion.h>
 #include <map>
 #include <execution>
-
-#include <imgui.h>
-#include <imgui_impl_glut.h>
-#include <imgui_impl_opengl2.h>
-#include <ImGuizmo.h>
-#include <imgui_internal.h>
-
-#include <GL/glew.h>
-#include <GL/freeglut.h>
-
 #include <structures.h>
 #include <ndt.h>
-
+#include <nlohmann/json.hpp>
 #include <transformations.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
@@ -32,7 +20,7 @@
 #include <python-scripts/constraints/constraint_fixed_parameter_jacobian.h>
 #include <common/include/cauchy.h>
 #include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
-#include <pfd_wrapper.hpp>
+
 
 struct WorkerData
 {
@@ -91,6 +79,17 @@ struct LidarOdometryParams
     double rgd_sf_sigma_ka_deg = 0.01;
 
     double total_length_of_calculated_trajectory = 0.0;
+    bool fusionConventionNwu = true;
+    bool fusionConventionEnu = false;
+    bool fusionConventionNed = false;
+    int threshold_initial_points = 10000;
+    bool apply_consistency = true;
+    bool use_mutliple_gaussian = false;
+    int num_constistency_iter = 10;
+    double threshould_output_filter = 0.5;
+    double ahrs_gain = 0.5;
+
+    int threshold_nr_poses = 20;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);
@@ -133,9 +132,6 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
 bool saveLaz(const std::string &filename, const WorkerData &data, double threshould_output_filter);
 bool saveLaz(const std::string &filename, const std::vector<Point3Di> &points_global);
 bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_poses, std::vector<std::string> filenames);
-
-// this function draws ellipse for each bucket
-void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd = 3);
 
 // this function performs main LiDAR odometry calculations
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,

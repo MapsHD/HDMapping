@@ -4,30 +4,17 @@
 #include <point_clouds.h>
 #include <gnss.h>
 #include <ground_control_points.h>
+#include <observation_picking.h>
+#include <pose_graph_loop_closure.h>
+#include <imgui.h>
+#include <GL/freeglut.h>
 
-class ManualPoseGraphLoopClosure{
+class ManualPoseGraphLoopClosure: public PoseGraphLoopClosure{
     public:
-        struct Edge
-        {
-            TaitBryanPose relative_pose_tb;
-            TaitBryanPose relative_pose_tb_weights;
-            int index_from;
-            int index_to;
-            bool is_fixed_px = false;
-            bool is_fixed_py = false;
-            bool is_fixed_pz = false;
-            bool is_fixed_om = false;
-            bool is_fixed_fi = false;
-            bool is_fixed_ka = false;
-        };
-
-        std::vector<Edge> edges;
         int index_active_edge = 0;
         bool manipulate_active_edge = false;
         bool gizmo = false;
         double search_radious = 0.1;
-
-        std::vector<Eigen::Affine3d> poses_motion_model;
 
         ManualPoseGraphLoopClosure(){};
         ~ManualPoseGraphLoopClosure(){};

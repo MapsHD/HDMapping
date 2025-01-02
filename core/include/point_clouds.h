@@ -5,7 +5,10 @@
 #include <vector>
 
 #include <point_cloud.h>
+#include <transformations.h>
+#if WITH_GUI == 1
 #include <observation_picking.h>
+#endif
 
 class PointClouds {
 public:
@@ -25,7 +28,9 @@ public:
 	bool update_initial_poses_from_RESSO(const std::string &folder_with_point_clouds, const std::string &poses_file_name);
 	bool load_eth(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z);
 	//std::vector<Eigen::Vector3d> load_points(const std::string& point_clouds_file_name);
+#if WITH_GUI == 1
 	void render(const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud);
+#endif
 	//bool save_poses();
 	bool save_poses(const std::string file_name, bool is_subsession);
 	bool save_scans();

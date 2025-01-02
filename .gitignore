@@ -50,6 +50,7 @@ build
 .ipynb_checkpoints/
 
 *.pyc
+*.pyd
 
 data/
 
@@ -57,5 +58,6 @@ data/
 .idea/
 cmake-*
 
+.vs/
 .vscode/
 3pbinary/

@@ -243,11 +243,54 @@ void lidar_odometry_gui()
                         sn_files.push_back(fileName);
                     } });
 
+                for (int i = 0; i < laz_files.size(); i++)
+                {
+                    fs::path lf(laz_files[i]);
+                    std::string lfs = lf.filename().stem().string().substr(lf.filename().stem().string().size() - 4);
+                                   
+                    bool found = false;
+                    for (int j = 0; j < csv_files.size(); j++)
+                    {
+                        fs::path cf(csv_files[j]);
+                        std::string cfs = cf.filename().stem().string().substr(cf.filename().stem().string().size() - 4);
+                        if (lfs.compare(cfs) == 0)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found){
+                        std::cout << "there is no IMU file for: " << laz_files[i] << std::endl;
+                    }
+                }
+
+                for (int i = 0; i < csv_files.size(); i++)
+                {
+                    fs::path lf(csv_files[i]);
+                    std::string lfs = lf.filename().stem().string().substr(lf.filename().stem().string().size() - 4);
+
+                    bool found = false;
+                    for (int j = 0; j < laz_files.size(); j++)
+                    {
+                        fs::path cf(laz_files[j]);
+                        std::string cfs = cf.filename().stem().string().substr(cf.filename().stem().string().size() - 4);
+                        if (lfs.compare(cfs) == 0)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found)
+                    {
+                        std::cout << "there is no LAZ file for: " << csv_files[i] << std::endl;
+                    }
+                }
+
                 if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
                 {
                     working_directory = fs::path(input_file_names[0]).parent_path().string();
-
-                    std::cout << "0" << std::endl;
 
                     // check if folder exists!
                     if (!fs::exists(working_directory))

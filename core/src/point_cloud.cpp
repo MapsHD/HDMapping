@@ -49,11 +49,19 @@ bool PointCloud::load(const std::string &file_name)
 		// std::cout << "\n";
 		auto yData = data["vertex"]->properties["y"];
 		auto zData = data["vertex"]->properties["z"];
-
 		for (size_t i = 0; i < xData->size(); i++)
 		{
 			Eigen::Vector3d point(xData->at<float>(i), yData->at<float>(i), zData->at<float>(i));
 			points_local.push_back(point);
+			timestamps.push_back(0);  // no timestamps available in ETH ply
+		}
+		if (data["vertex"]->properties.has_key("intensity"))
+		{
+			auto iData = data["vertex"]->properties["intensity"];
+			for (size_t i = 0; i < xData->size(); i++)
+			{
+				intensities.push_back(static_cast<unsigned short>(iData->at<float>(i) * 65535.0f));
+			}
 		}
 	}
 	//}

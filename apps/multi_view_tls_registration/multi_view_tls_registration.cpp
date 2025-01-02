@@ -54,11 +54,13 @@ void save_all_to_las(const Session& session, std::string output_las_name)
 				{
 					intensity.push_back(0);
 				}
-				timestamps.push_back(p.timestamps[i]);
+				if (i < p.timestamps.size())
+				{
+					timestamps.push_back(p.timestamps[i]);
+				}				
 			}
 		}
 	}
-
 	if (!exportLaz(output_las_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
 	{
 		std::cout << "problem with saving file: " << output_las_name << std::endl;
@@ -91,7 +93,6 @@ void save_trajectories_to_laz(const Session& session, std::string output_file_na
 	std::vector<double> timestamps;
 
 	float consecutive_distance = 0;
-
 	for (auto& p : session.point_clouds_container.point_clouds)
 	{
 		if (p.visible)
@@ -484,7 +485,7 @@ std::vector<std::string> get_matching_files(const std::string& directory, const 
 }
 
 void run_multi_view_tls_registration(
-	std::string input_file_name, std::string output_file_name, TLSRegistration& tls_registration)
+	std::string input_file_name, TLSRegistration& tls_registration, std::string output_file_name)
 {
 	Session session;
 	if ((input_file_name.size() > 0) && (fs::exists(input_file_name)))
@@ -511,10 +512,19 @@ void run_multi_view_tls_registration(
 		{
 			session.point_clouds_container.point_clouds.clear();
 			session.working_directory = fs::path(input_file_name).string();
-			std::string pattern = R"(scan_lio_\d+\.laz)";
-			std::vector<std::string> las_files = get_matching_files(session.working_directory, pattern);
-			pattern = R"(trajectory_lio_\d+\.csv)";
-			std::vector<std::string> txt_files = get_matching_files(session.working_directory, pattern);
+			std::vector<std::string> las_files;
+			std::vector<std::string> txt_files; 
+			for (const auto& entry : std::filesystem::directory_iterator(input_file_name)) {
+				auto file_name = entry.path().string();
+				if (has_extension(file_name, ".laz") || (has_extension(file_name, ".las"))) 
+				{
+					las_files.push_back(file_name);
+				}
+				else if (has_extension(file_name, ".txt"))
+				{
+					txt_files.push_back(file_name);
+				}
+			}
 			if (las_files.size() > 0)
 			{
 				std::cout << "Las/Laz files:" << std::endl;
@@ -695,29 +705,35 @@ void run_multi_view_tls_registration(
 
 	if (output_file_name.size() > 0)
 	{
-		std::cout << session.point_clouds_container.initial_poses_file_name << std::endl;
-		if (session.point_clouds_container.initial_poses_file_name.empty())
+		if (has_extension(output_file_name, ".reg"))  // RESSO output
 		{
-			std::cout << "Please assign initial_poses_file_name to session" << std::endl;
-			std::cout << "Session is not saved" << std::endl;
-			if (tls_registration.initial_poses_file_name.size() > 0)
-			{
-				std::cout << "saving initial poses to: " << tls_registration.initial_poses_file_name << std::endl;
-				session.point_clouds_container.save_poses(fs::path(tls_registration.initial_poses_file_name).string(), false);
-			}
+			session.point_clouds_container.save_poses(fs::path(output_file_name).string(), false);
 		}
+		else 
+		{
+			if (session.point_clouds_container.initial_poses_file_name.empty())
+			{
+				std::cout << "Please assign initial_poses_file_name to session" << std::endl;
+				std::cout << "Session is not saved" << std::endl;
+				if (tls_registration.initial_poses_file_name.size() > 0)
+				{
+					std::cout << "saving initial poses to: " << tls_registration.initial_poses_file_name << std::endl;
+					session.point_clouds_container.save_poses(fs::path(tls_registration.initial_poses_file_name).string(), false);
+				}
+			}
 
-		if (session.point_clouds_container.poses_file_name.empty())
-		{
-			if (tls_registration.poses_file_name.size() > 0)
+			if (session.point_clouds_container.poses_file_name.empty())
 			{
-				std::cout << "saving poses to: " << tls_registration.poses_file_name << std::endl;
-				session.point_clouds_container.save_poses(fs::path(tls_registration.poses_file_name).string(), false);
+				if (tls_registration.poses_file_name.size() > 0)
+				{
+					std::cout << "saving poses to: " << tls_registration.poses_file_name << std::endl;
+					session.point_clouds_container.save_poses(fs::path(tls_registration.poses_file_name).string(), false);
+				}
 			}
+			session.save(fs::path(output_file_name).string(), session.point_clouds_container.poses_file_name, session.point_clouds_container.initial_poses_file_name, false);
+			std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
+			session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false);
 		}
-		session.save(fs::path(output_file_name).string(), session.point_clouds_container.poses_file_name, session.point_clouds_container.initial_poses_file_name, false);
-		std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
-		session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false);
 	}
 
 	if (tls_registration.output_las_name.size() > 0)

@@ -670,16 +670,17 @@ void lidar_odometry_gui()
             ImGui::SameLine();
             ImGui::Text("Press this button for automatic lidar odometry calculation -> it will produce trajectory");
         }*/
-        if (step_1_done && step_2_done && !step_3_done)
+        //if (step_1_done && step_2_done && !step_3_done)
+        if (step_1_done && step_2_done)
         {
             static bool use_mutliple_gaussian = false;
-            ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
-            ImGui::Text("Press 'Consistency' button optionally before pressing 'Save result (step 3)'");
+            ImGui::Text("'Point cloud consistency and trajectory smoothness' makes trajectory smooth, point cloud will be more consistent");
+            ImGui::Text("Press 'Point cloud consistency and trajectory smoothness' button optionally before pressing 'Save result (step 3)'");
             ImGui::Text("Mutliple Gaussians suppose to work better in floor plan indoor scenarios (multiple neighbouring rooms)");
 
-            if (ImGui::Button("Consistency"))
+            if (ImGui::Button("Point cloud consistency and trajectory smoothness"))
             {
-                std::cout << "Consistency START" << std::endl;
+                std::cout << "Point cloud consistency and trajectory smoothness START" << std::endl;
 
                 for (int i = 0; i < num_constistency_iter; i++)
                 {
@@ -697,9 +698,11 @@ void lidar_odometry_gui()
                         Consistency2(worker_data, params);
                     }
                 }
-                std::cout << "Consistency FINISHED" << std::endl;
+                std::cout << "Point cloud consistency and trajectory smoothness FINISHED" << std::endl;
             }
-            ImGui::SameLine();
+            //ImGui::SameLine();
+            //ImGui::InputInt("number of constistency iterations", &num_constistency_iter);
+            //ImGui::SameLine();
             ImGui::Checkbox("use mutliple Gaussians for each bucket", &use_mutliple_gaussian);
             /*if (ImGui::Button("Consistency2"))
             {
@@ -721,8 +724,13 @@ void lidar_odometry_gui()
 
             if (ImGui::Button("Save result (step 3)"))
             {
+                static int result = 0;
+                fs::path outwd = working_directory / fs::path("lidar_odometry_result_" + std::to_string(result));
+                std::filesystem::create_directory(outwd);
+                result++;
                 // concatenate data
-                std::vector<WorkerData> worker_data_concatenated;
+                std::vector<WorkerData>
+                    worker_data_concatenated;
                 WorkerData wd;
                 int counter = 0;
                 int pose_offset = 0;
@@ -787,7 +795,7 @@ void lidar_odometry_gui()
                 for (int i = 0; i < worker_data_concatenated.size(); i++)
                 {
                     std::cout << "------------------------" << std::endl;
-                    fs::path path(working_directory);
+                    fs::path path(outwd);
                     std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
                     path /= filename;
                     std::cout << "saving to: " << path << std::endl;
@@ -797,7 +805,7 @@ void lidar_odometry_gui()
 
                     // save trajectory
                     std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
-                    fs::path pathtrj(working_directory);
+                    fs::path pathtrj(outwd);
                     pathtrj /= trajectory_filename;
                     std::cout << "saving to: " << pathtrj << std::endl;
 
@@ -838,14 +846,14 @@ void lidar_odometry_gui()
                     outfile.close();
                     //
                 }
-                fs::path path(working_directory);
+                fs::path path(outwd);
                 path /= "lio_initial_poses.reg";
                 save_poses(path.string(), m_poses, file_names);
-                fs::path path2(working_directory);
+                fs::path path2(outwd);
                 path2 /= "poses.reg";
                 save_poses(path2.string(), m_poses, file_names);
 
-                fs::path path3(working_directory);
+                fs::path path3(outwd);
                 path3 /= "session.json";
 
                 // save session file
@@ -857,8 +865,8 @@ void lidar_odometry_gui()
                 j["offset_x"] = 0.0;
                 j["offset_y"] = 0.0;
                 j["offset_z"] = 0.0;
-                j["folder_name"] = working_directory;
-                j["out_folder_name"] = working_directory;
+                j["folder_name"] = outwd;
+                j["out_folder_name"] = outwd;
                 j["poses_file_name"] = path2.string();
                 j["initial_poses_file_name"] = path.string();
                 j["out_poses_file_name"] = path2.string();
@@ -869,7 +877,7 @@ void lidar_odometry_gui()
                 nlohmann::json jlaz_file_names;
                 for (int i = 0; i < worker_data_concatenated.size(); i++)
                 {
-                    fs::path path(working_directory);
+                    fs::path path(outwd);
                     std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
                     path /= filename;
                     std::cout << "adding file: " << path << std::endl;
@@ -885,8 +893,8 @@ void lidar_odometry_gui()
                 fs.close();
                 step_3_done = true;
 
-                // std::cout << "Results saved to folder: '" << working_directory << "'" << std::endl;
-                std::string message_info = "Results saved to folder: '" + working_directory + "'";
+                // std::cout << "Results saved to folder: '" << outwd << "'" << std::endl;
+                std::string message_info = "Results saved to folder: '" + outwd.string() + "'";
                 std::cout << message_info << std::endl;
                 [[maybe_unused]]
                 pfd::message message(
@@ -898,12 +906,13 @@ void lidar_odometry_gui()
             ImGui::SameLine();
             ImGui::Text("Press this button for saving resulting trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program");
         }
-        if (step_3_done)
+        //if (step_3_done)
+        if (step_1_done && step_2_done)
         {
-            ImGui::Text("-------------------------------------------------------------------------------");
-            ImGui::Text(std::string("All data is saved in folder '" + working_directory + "' You can close this program.").c_str());
-            ImGui::Text("Next step is to load 'session.json' with 'multi_view_tls_registration_step_2' program");
-            ImGui::Text("-------------------------------------------------------------------------------");
+            //ImGui::Text("-------------------------------------------------------------------------------");
+            //ImGui::Text(std::string("All data is saved in folder '" + working_directory + "' You can close this program.").c_str());
+            //ImGui::Text("Next step is to load 'session.json' with 'multi_view_tls_registration_step_2' program");
+            //ImGui::Text("-------------------------------------------------------------------------------");
 
             if (ImGui::Button("save all point clouds to single '*.las or *.laz' file"))
             {

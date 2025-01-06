@@ -1159,107 +1159,27 @@ void project_gui()
                             }
                         }
                     }
-                    // ImGui::SameLine();
-                    // if (ImGui::Button(std::string("#" + std::to_string(i) + "_IMU").c_str()))
-                    //{
-                    /*size_t index_target = i;
-                    PointClouds pcs;
-                    for (size_t k = 0; k < index_target; k++)
-                    {
-                        if (session.point_clouds_container.point_clouds[k].visible)
-                        {
-                            pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[k]);
-                        }
-                    }
-
-                    if (pcs.point_clouds.size() > 0)
-                    {
-                        for (size_t k = 0; k < pcs.point_clouds.size(); k++)
-                        {
-                            pcs.point_clouds[k].fixed = true;
-                        }
-                    }
-                    pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[index_target]);
-                    pcs.point_clouds[pcs.point_clouds.size() - 1].fixed = false;
-
-                    ICP icp;
-                    icp.search_radious = 0.3; // ToDo move to params
-                    for (auto &pc : pcs.point_clouds)
-                    {
-                        pc.rgd_params.resolution_X = icp.search_radious;
-                        pc.rgd_params.resolution_Y = icp.search_radious;
-                        pc.rgd_params.resolution_Z = icp.search_radious;
-
-                        pc.build_rgd();
-                        pc.cout_rgd();
-                        pc.compute_normal_vectors(0.5);
-                    }
-
-                    icp.number_of_threads = std::thread::hardware_concurrency();
-
-                    icp.number_of_iterations = 10;
-                    icp.is_adaptive_robust_kernel = false;
-
-                    icp.is_ballanced_horizontal_vs_vertical = false;
-                    icp.is_fix_first_node = false;
-                    icp.is_gauss_newton = true;
-                    icp.is_levenberg_marguardt = false;
-                    icp.is_cw = false;
-                    icp.is_wc = true;
-                    icp.is_tait_bryan_angles = true;
-                    icp.is_quaternion = false;
-                    icp.is_rodrigues = false;
-                    std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                    icp.optimization_point_to_point_source_to_target(pcs);
-
-                    std::cout << "pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
-
-                    std::vector<Eigen::Affine3d> all_m_poses;
-                    for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                    {
-                        all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
-                    }
-
-                    session.point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
-
-                    std::cout << "pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
-
-                    // like gizmo
-                    if (!manipulate_only_marked_gizmo)
-                    {
-                        std::cout << "update all poses after current pose" << std::endl;
-
-                        Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[index_target].m_pose;
-                        for (int j = index_target + 1; j < session.point_clouds_container.point_clouds.size(); j++)
-                        {
-                            curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                            session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                        }
-                    }*/
-                    //}
                 }
                 ImGui::SameLine();
                 if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str()))
                 {
                     std::cout << session.point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
                 }
-                ImGui::SameLine();
-                ImGui::Checkbox(std::string("#" + std::to_string(i) + " choose_geo").c_str(), &session.point_clouds_container.point_clouds[i].choosing_geo);
-
-                ImGui::SameLine();
+                // ImGui::SameLine();
                 ImGui::Checkbox(std::string("#" + std::to_string(i) + " fuse inclination from IMU").c_str(), &session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU);
 
-                if (session.point_clouds_container.point_clouds[i].choosing_geo)
-                {
-                    for (int gp = 0; gp < session.point_clouds_container.point_clouds[i].available_geo_points.size(); gp++)
-                    {
-                        ImGui::Checkbox(std::string("#" + std::to_string(i) + " " + std::to_string(gp) + "[" +
-                                                    session.point_clouds_container.point_clouds[i].available_geo_points[gp].name + "]")
-                                            .c_str(),
-                                        &session.point_clouds_container.point_clouds[i].available_geo_points[gp].choosen);
-                    }
-                }
+                //ImGui::SameLine();
+                //ImGui::Checkbox(std::string("#" + std::to_string(i) + " choose_geo").c_str(), &session.point_clouds_container.point_clouds[i].choosing_geo);
+                //if (session.point_clouds_container.point_clouds[i].choosing_geo)
+                //{
+                //    for (int gp = 0; gp < session.point_clouds_container.point_clouds[i].available_geo_points.size(); gp++)
+                //    {
+                //        ImGui::Checkbox(std::string("#" + std::to_string(i) + " " + std::to_string(gp) + "[" +
+                //                                    session.point_clouds_container.point_clouds[i].available_geo_points[gp].name + "]")
+                //                            .c_str(),
+                //                        &session.point_clouds_container.point_clouds[i].available_geo_points[gp].choosen);
+                //    }
+                //}
             }
             ImGui::Separator();
             int total_number_of_points = 0;

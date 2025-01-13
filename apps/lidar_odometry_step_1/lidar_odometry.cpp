@@ -39,6 +39,7 @@ int dec_covs = 10;
 bool fusionConventionNwu = true;
 bool fusionConventionEnu = false;
 bool fusionConventionNed = false;
+double ahrs_gain = 0.5;
 // bool use_motion_from_previous_step = true;
 // bool useMultithread = true;
 bool simple_gui = true;
@@ -195,6 +196,7 @@ void lidar_odometry_gui()
             }
 
             ImGui::Checkbox("use_motion_from_previous_step", &params.use_motion_from_previous_step);
+            ImGui::InputDouble("ahrs_gain", &ahrs_gain);
         }
         if (!step_1_done)
         {
@@ -247,7 +249,7 @@ void lidar_odometry_gui()
                 {
                     fs::path lf(laz_files[i]);
                     std::string lfs = lf.filename().stem().string().substr(lf.filename().stem().string().size() - 4);
-                                   
+
                     bool found = false;
                     for (int j = 0; j < csv_files.size(); j++)
                     {
@@ -260,7 +262,8 @@ void lidar_odometry_gui()
                         }
                     }
 
-                    if (!found){
+                    if (!found)
+                    {
                         std::cout << "there is no IMU file for: " << laz_files[i] << std::endl;
                     }
                 }
@@ -441,7 +444,10 @@ void lidar_odometry_gui()
                         ahrs.settings.convention = FusionConventionNed;
                     }
 
-                    std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;
+                    ahrs.settings.gain = ahrs_gain;
+
+                    std::map<double, std::pair<Eigen::Matrix4d, double>>
+                        trajectory;
 
                     int counter = 1;
                     for (const auto &[timestamp_pair, gyr, acc] : imu_data)
@@ -670,7 +676,7 @@ void lidar_odometry_gui()
             ImGui::SameLine();
             ImGui::Text("Press this button for automatic lidar odometry calculation -> it will produce trajectory");
         }*/
-        //if (step_1_done && step_2_done && !step_3_done)
+        // if (step_1_done && step_2_done && !step_3_done)
         if (step_1_done && step_2_done)
         {
             static bool use_mutliple_gaussian = false;
@@ -700,9 +706,9 @@ void lidar_odometry_gui()
                 }
                 std::cout << "Point cloud consistency and trajectory smoothness FINISHED" << std::endl;
             }
-            //ImGui::SameLine();
-            //ImGui::InputInt("number of constistency iterations", &num_constistency_iter);
-            //ImGui::SameLine();
+            // ImGui::SameLine();
+            // ImGui::InputInt("number of constistency iterations", &num_constistency_iter);
+            // ImGui::SameLine();
             ImGui::Checkbox("use mutliple Gaussians for each bucket", &use_mutliple_gaussian);
             /*if (ImGui::Button("Consistency2"))
             {
@@ -906,13 +912,13 @@ void lidar_odometry_gui()
             ImGui::SameLine();
             ImGui::Text("Press this button for saving resulting trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program");
         }
-        //if (step_3_done)
+        // if (step_3_done)
         if (step_1_done && step_2_done)
         {
-            //ImGui::Text("-------------------------------------------------------------------------------");
-            //ImGui::Text(std::string("All data is saved in folder '" + working_directory + "' You can close this program.").c_str());
-            //ImGui::Text("Next step is to load 'session.json' with 'multi_view_tls_registration_step_2' program");
-            //ImGui::Text("-------------------------------------------------------------------------------");
+            // ImGui::Text("-------------------------------------------------------------------------------");
+            // ImGui::Text(std::string("All data is saved in folder '" + working_directory + "' You can close this program.").c_str());
+            // ImGui::Text("Next step is to load 'session.json' with 'multi_view_tls_registration_step_2' program");
+            // ImGui::Text("-------------------------------------------------------------------------------");
 
             if (ImGui::Button("save all point clouds to single '*.las or *.laz' file"))
             {

@@ -183,6 +183,82 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
     }
 }
 
+void update_rgd_spherical_coordinates(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
+                                      std::vector<Point3Di> &points_global, std::vector<Eigen::Vector3d> &points_global_spherical, Eigen::Vector3d viewport)
+{
+    Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
+
+    for (int i = 0; i < points_global.size(); i++)
+    {
+        auto index_of_bucket = get_rgd_index(points_global_spherical[i], b);
+
+        auto bucket_it = buckets.find(index_of_bucket);
+
+        if (bucket_it != buckets.end())
+        {
+            auto &this_bucket = bucket_it->second;
+            this_bucket.number_of_points++;
+            const auto &curr_mean = points_global[i].point;
+            const auto &mean = this_bucket.mean;
+            // buckets[index_of_bucket].mean += (mean - curr_mean) / buckets[index_of_bucket].number_of_points;
+
+            auto mean_diff = mean - curr_mean;
+            Eigen::Matrix3d cov_update;
+            cov_update.row(0) = mean_diff.x() * mean_diff;
+            cov_update.row(1) = mean_diff.y() * mean_diff;
+            cov_update.row(2) = mean_diff.z() * mean_diff;
+
+            // this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+            //                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+
+            if (this_bucket.number_of_points == 2)
+            {
+                this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+                                  cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+            }
+
+            if (this_bucket.number_of_points == 3)
+            {
+                this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+                                  cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+
+                // calculate normal vector
+                Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+                Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
+
+                Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
+                nv.normalize();
+
+                // flip towards viewport
+                if (nv.dot(viewport - this_bucket.mean) < 0.0)
+                {
+                    nv *= -1.0;
+                }
+                this_bucket.normal_vector = nv;
+            }
+
+            if (this_bucket.number_of_points > 3)
+            {
+                Eigen::Vector3d &nv = this_bucket.normal_vector;
+
+                if (nv.dot(viewport - this_bucket.mean) >= 0.0)
+                {
+                    this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+                                      cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+                }
+            }
+        }
+        else
+        {
+            NDT::Bucket bucket_to_add;
+            bucket_to_add.mean = points_global[i].point;
+            bucket_to_add.cov = Eigen::Matrix3d::Identity() * 0.03 * 0.03;
+            bucket_to_add.number_of_points = 1;
+            buckets.emplace(index_of_bucket, bucket_to_add);
+        }
+    }
+}
+
 bool saveLaz(const std::string &filename, const WorkerData &data, double threshould_output_filter)
 {
     constexpr float scale = 0.0001f; // one tenth of milimeter

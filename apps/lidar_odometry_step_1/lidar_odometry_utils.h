@@ -66,6 +66,14 @@ struct LidarOdometryParams
     double sliding_window_trajectory_length_threshold = 50.0;
     bool save_calibration_validation = true;
     int calibration_validation_points = 1000000;
+
+    //rgd_sf
+    bool use_robust_and_accurate_lidar_odometry = false;
+    double distance_bucket = 0.5;
+    double polar_angle_deg = 5.0;
+    double azimutal_angle_deg = 5.0;
+    int robust_and_accurate_lidar_odometry_iterations = 20;
+    double max_distance_lidar = 30.0;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);
@@ -80,6 +88,9 @@ std::vector<Point3Di> decimate(const std::vector<Point3Di> &points, double bucke
 // this function updates each bucket (mean value, covariance) in regular grid decomposition
 void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
                 std::vector<Point3Di> &points_global, Eigen::Vector3d viewport = Eigen::Vector3d(0, 0, 0));
+
+void update_rgd_spherical_coordinates(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
+                                      std::vector<Point3Di> &points_global, std::vector<Eigen::Vector3d> &points_global_spherical, Eigen::Vector3d viewport);
 
 //! This function load inertial measurement unit data.
 //! This function expects a file with the following format:
@@ -115,6 +126,14 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
               NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread /*,
                bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
 );
+
+void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
+              std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
+              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread );
+
+void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3Di> &intermediate_points_sf, std::vector<Eigen::Affine3d> &intermediate_trajectory,
+                  std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
+                  NDT::GridParameters &rgd_params, bool useMultithread);
 
 void optimize_icp(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
                   std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,

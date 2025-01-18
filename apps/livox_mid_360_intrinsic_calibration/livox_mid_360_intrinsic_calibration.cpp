@@ -24,6 +24,8 @@
 
 #include <pair_wise_iterative_closest_point.h>
 
+#include <export_laz.h>
+
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
@@ -36,9 +38,15 @@ double camera_mode_ortho_z_center_h = 0.0;
 double camera_ortho_xy_view_rotation_angle_deg = 0;
 bool is_ortho = false;
 bool show_axes = true;
-ImVec4 clear_color = ImVec4(0.8f, 0.8f, 0.8f, 1.00f);
-ImVec4 pc_color = ImVec4(1.0f, 0.0f, 0.0f, 1.00f);
-ImVec4 pc_color2 = ImVec4(0.0f, 0.0f, 1.0f, 1.00f);
+ImVec4 clear_color = ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
+ImVec4 pc_color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+ImVec4 pc_color_point = ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
+ImVec4 pc_color_ray = ImVec4(1.0f, 0.0f, 1.0f, 1.0f);
+ImVec4 pc_color_point_cloud_path = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
+ImVec4 intrinsics_color = ImVec4(0.4f, 0.0f, 0.4f, 1.0f);
+ImVec4 intrinsic_path_color = ImVec4(0.8f, 0.0f, 0.4f, 1.0f);
+
+// ImVec4 pc_color2 = ImVec4(0.0f, 0.0f, 1.0f, 1.00f);
 
 int point_size = 1;
 Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
@@ -60,46 +68,42 @@ float m_ortho_gizmo_view[] = {1, 0, 0, 0,
                               0, 0, 1, 0,
                               0, 0, 0, 1};
 
-std::vector<std::string> laz_files;
-std::vector<std::string> csv_files;
-std::vector<std::string> sn_files;
-std::string working_directory = "";
-std::string imuSnToUse;
-std::string working_directory_preview;
-double filter_threshold_xy = 0.1;
-bool fusionConventionNwu = true;
-bool fusionConventionEnu = false;
-bool fusionConventionNed = false;
-int number_of_points_threshold = 20000;
-bool is_init = true;
-int index_rendered_points_local = -1;
-std::vector<std::vector<Eigen::Vector3d>> all_points_local;
-std::vector<std::vector<int>> all_lidar_ids;
-std::vector<int> indexes_to_filename;
-std::vector<std::string> all_file_names;
-LidarOdometryParams params;
-int threshold_initial_points = 10000;
-std::vector<WorkerData> worker_data;
-const std::vector<std::string> json_filter = {"Calibration file (*.json)", "*.json", "All files", "*"};
+bool show_pc = true;
+bool show_single_point_and_ray = false;
+int single_point_size = 4;
+
+std::vector<Eigen::Vector3d> point_cloud_path;
+std::vector<Eigen::Vector3d> intrinsic_path;
+bool show_point_cloud_path = true;
+
+bool show_intrinsics = false;
+bool apply_intrinsics_in_render = false;
+bool show_intrinsic_path = false;
+
 const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
-const std::vector<std::string> sn_filter = {"sn file (*.sn)", "*.sn", "All files", "*"};
-std::unordered_map<std::string, Eigen::Affine3d> calibration;
 std::vector<Point3Di> point_cloud;
+std::vector<Eigen::Affine3d> intrinsics;
 
-std::unordered_map<int, std::string> idToSn;
-std::unordered_map<int, Eigen::Affine3d> calibrations;
+int index_rendered_point_and_ray = -1;
 
-struct Checked
-{
-    bool check;
-};
-std::vector<Checked> calibrated_lidar;
-std::vector<Checked> imu_lidar;
+std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> point_intrinsic_correspondances;
 
-double search_radious = 0.1;
+// std::unordered_map<int, std::string> idToSn;
+// std::unordered_map<int, Eigen::Affine3d> calibrations;
 
-bool show_grid = true;
-bool manual_calibration = false;
+// struct Checked
+//{
+//     bool check;
+// };
+// std::vector<Checked> calibrated_lidar;
+// std::vector<Checked> imu_lidar;
+
+// double search_radious = 0.1;
+
+// bool show_grid = true;
+// bool manual_calibration = false;
+
+void calibrate_intrinsics();
 
 void reshape(int w, int h)
 {
@@ -176,7 +180,7 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
-std::vector<Point3Di> load_pc(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy)
+std::vector<Point3Di> load_pc(const std::string &lazFile)
 {
     std::vector<Point3Di> points;
     laszip_POINTER laszip_reader;
@@ -227,72 +231,17 @@ std::vector<Point3Di> load_pc(const std::string &lazFile, bool ommit_points_with
         Point3Di p;
         int id = point->user_data;
 
-        // if (!calibrations.empty())
-        //{
-        //     if (!calibrations.contains(id))
-        //     {
-        //         continue;
-        //     }
-        // }
-
         // Eigen::Affine3d calibration = calibrations.empty() ? Eigen::Affine3d::Identity() : calibrations.at(id);
         const Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
 
-        p.point = /*calibration **/ (pf);
+        p.point = pf;
         p.lidarid = id;
         p.timestamp = point->gps_time;
         p.intensity = point->intensity;
 
-        // add z correction
-        // if (p.point.z() > 0)
-        //{
-        //    double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
-        //    double correction = dist * asin(0.08 / 10.0);
-
-        //    p.point.z() += correction;
-        //}
-        /*if (p.point.z() > 0)
-        {
-            double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
-            double correction = 0;//dist * asin(0.08 / 10.0);
-
-            if (dist < 11.0){
-                correction = 0.005;
-            }else{
-                correction = -0.015;
-            }
-
-            p.point.z() += correction;
-        }*/
-
-        if (p.timestamp == 0 && ommit_points_with_timestamp_equals_zero)
-        {
-            counter_ts0++;
-        }
-        else
-        {
-            /* underground mining
-            if (sqrt(pf.x() * pf.x()) < 4.5 && sqrt(pf.y() * pf.y()) < 2){
-                counter_filtered_points++;
-            }else{
-
-
-                points.emplace_back(p);
-            }
-            */
-
-            if (sqrt(pf.x() * pf.x() + pf.y() * pf.y()) > filter_threshold_xy)
-            {
-                points.emplace_back(p);
-            }
-            else
-            {
-                counter_filtered_points++;
-            }
-        }
+        points.emplace_back(p);
     }
-    std::cout << "number points with ts == 0: " << counter_ts0 << std::endl;
-    std::cout << "counter_filtered_points: " << counter_filtered_points << std::endl;
+
     std::cout << "total number points: " << points.size() << std::endl;
     laszip_close_reader(laszip_reader);
     return points;
@@ -303,6 +252,181 @@ void project_gui()
     if (ImGui::Begin("main gui window"))
     {
         ImGui::ColorEdit3("clear color", (float *)&clear_color);
+
+        if (show_pc)
+        {
+            ImGui::ColorEdit3("pc_color", (float *)&pc_color);
+        }
+
+        if (ImGui::Button("Load pointcloud (lidar****.laz) (step 1)"))
+        {
+            static std::shared_ptr<pfd::open_file> open_file;
+            std::vector<std::string> input_file_names;
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+            const auto t = [&]()
+            {
+                auto sel = pfd::open_file("Point cloud files", "C:\\", LAS_LAZ_filter, true).result();
+                for (int i = 0; i < sel.size(); i++)
+                {
+                    input_file_names.push_back(sel[i]);
+                }
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (input_file_names.size() > 0)
+            {
+                for (int i = 0; i < input_file_names.size(); i++)
+                {
+                    auto pc = load_pc(input_file_names[i].c_str());
+
+                    for (const auto &p : pc)
+                    {
+                        point_cloud.emplace_back(p);
+                    }
+                }
+            }
+
+            for (int i = 0; i < point_cloud.size(); i++)
+            {
+                point_cloud[i].index_pose = i;
+                intrinsics.push_back(Eigen::Affine3d::Identity());
+            }
+        }
+
+        ImGui::Checkbox("show_pc", &show_pc);
+        ImGui::Checkbox("show_single_point_and_ray", &show_single_point_and_ray);
+
+        if (show_single_point_and_ray)
+        {
+            ImGui::ColorEdit3("pc_color_point", (float *)&pc_color_point);
+            ImGui::ColorEdit3("pc_color_ray", (float *)&pc_color_ray);
+
+            ImGui::InputInt("single_point_size", &single_point_size);
+            if (single_point_size < 1)
+            {
+                single_point_size = 1;
+            }
+
+            ImGui::InputInt("index_rendered_point_and_ray", &index_rendered_point_and_ray, 1, 100);
+
+            if (index_rendered_point_and_ray < 0)
+            {
+                index_rendered_point_and_ray = 0;
+            }
+
+            if (index_rendered_point_and_ray > point_cloud.size() - 1)
+            {
+                index_rendered_point_and_ray = point_cloud.size() - 1;
+            }
+
+            point_cloud_path.push_back(point_cloud[index_rendered_point_and_ray].point);
+            intrinsic_path.push_back(intrinsics[index_rendered_point_and_ray].translation());
+        }
+
+        ImGui::ColorEdit3("pc_color_point_cloud_path", (float *)&pc_color_point_cloud_path);
+        ImGui::ColorEdit3("intrinsic_path_color", (float *)&intrinsic_path_color);
+
+        if (ImGui::Button("clear point_cloud_path and intrinsic path"))
+        {
+            point_cloud_path.clear();
+            intrinsic_path.clear();
+        }
+
+        ImGui::Checkbox("show_point_cloud_path", &show_point_cloud_path);
+
+        if (ImGui::Button("calibrate_intrinsics"))
+        {
+            calibrate_intrinsics();
+        }
+        if (ImGui::Button("calibrate_intrinsics x 10"))
+        {
+            for(int i = 0; i < 10; i++){
+                std::cout << "iteration: " << i + 1 << " of 10" << std::endl; 
+                calibrate_intrinsics();
+            }
+            
+        }
+        if (ImGui::Button("calibrate_intrinsics x 100"))
+        {
+            for (int i = 0; i < 100; i++)
+            {
+                std::cout << "iteration: " << i + 1 << " of 100" << std::endl;
+                calibrate_intrinsics();
+            }
+        }
+
+        ImGui::ColorEdit3("intrinsics_color", (float *)&intrinsics_color);
+
+        ImGui::Checkbox("show_intrinsics", &show_intrinsics);
+        ImGui::Checkbox("apply_intrinsics_in_render", &apply_intrinsics_in_render);
+        ImGui::Checkbox("show_intrinsic_path", &show_intrinsic_path);
+
+        //////////////////////////
+
+        if (ImGui::Button("save point cloud"))
+        {
+            std::shared_ptr<pfd::save_file> save_file;
+            std::string output_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+            const auto t = [&]()
+            {
+                auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
+                output_file_name = sel;
+                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (output_file_name.size() > 0)
+            {
+                std::vector<Eigen::Vector3d> pointcloud;
+                std::vector<unsigned short> intensity;
+                std::vector<double> timestamps;
+
+                for (int i = 0; i < point_cloud.size(); i++)
+                {
+                    pointcloud.push_back(intrinsics[point_cloud[i].index_pose] * point_cloud[i].point);
+                    intensity.push_back(point_cloud[i].intensity);
+                    timestamps.push_back(point_cloud[i].timestamp);
+                }
+
+                if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
+                {
+                    std::cout << "problem with saving file: " << output_file_name << std::endl;
+                }
+            }
+        }
+
+        if (ImGui::Button("calculate current point_intrinsic_correspondances cloud"))
+        {
+            point_intrinsic_correspondances.clear();
+
+            Eigen::Vector3d current_point = intrinsics[point_cloud[index_rendered_point_and_ray].index_pose] * point_cloud[index_rendered_point_and_ray].point;
+
+            for (int i = 0; i < point_cloud.size(); i++)
+            {
+                Eigen::Vector3d point = intrinsics[point_cloud[i].index_pose] * point_cloud[i].point;
+
+                if ((current_point - point).norm() < 0.03)
+                {
+                    point_intrinsic_correspondances.emplace_back(current_point, point);
+                    point_intrinsic_correspondances.emplace_back(intrinsics[point_cloud[i].index_pose].translation(), point);
+                }
+                // index_rendered_point_and_ray
+            }
+
+            // index_rendered_point_and_ray
+        }
+
+        ImGui::End();
+    }
+
+#if 0
+    if (ImGui::Begin("main gui window"))
+    {
+        
+        
 
         if (idToSn.size() == 2)
         {
@@ -785,6 +909,7 @@ void project_gui()
         }
         ImGui::End();
     }
+#endif
     return;
 }
 
@@ -882,7 +1007,7 @@ void display()
         glEnd();
     }
 
-    if (show_axes)
+    /*if (show_axes)
     {
         glLineWidth(2);
         glBegin(GL_LINES);
@@ -899,8 +1024,130 @@ void display()
         glVertex3f(0.0f, 0.0f, 1);
         glEnd();
         glLineWidth(1);
+    }*/
+
+    if (show_pc)
+    {
+        glBegin(GL_POINTS);
+        for (int i = 0; i < point_cloud.size(); i++)
+        {
+            glColor3f(pc_color.x, pc_color.y, pc_color.z);
+            if (apply_intrinsics_in_render)
+            {
+                auto p = intrinsics[i] * point_cloud[i].point;
+                glVertex3f(p.x(), p.y(), p.z());
+            }
+            else
+            {
+                glVertex3f(point_cloud[i].point.x(), point_cloud[i].point.y(), point_cloud[i].point.z());
+            }
+        }
+        glEnd();
     }
 
+    // ImVec4 pc_color_point = ImVec4(1.0f, 1.0f, 0.0f, 1.00f);
+    // ImVec4 pc_color_ray = ImVec4(1.0f, 0.0f, 1.0f, 1.00f);
+    if (show_single_point_and_ray)
+    {
+        glPointSize(single_point_size);
+        glColor3f(pc_color_point.x, pc_color_point.y, pc_color_point.z);
+        glBegin(GL_POINTS);
+        glVertex3f(point_cloud[index_rendered_point_and_ray].point.x(), point_cloud[index_rendered_point_and_ray].point.y(), point_cloud[index_rendered_point_and_ray].point.z());
+        glEnd();
+        glPointSize(1);
+
+        glColor3f(pc_color_ray.x, pc_color_ray.y, pc_color_ray.z);
+        glBegin(GL_LINES);
+        glVertex3f(intrinsics[index_rendered_point_and_ray](0, 3), intrinsics[index_rendered_point_and_ray](1, 3), intrinsics[index_rendered_point_and_ray](2, 3));
+        glVertex3f(point_cloud[index_rendered_point_and_ray].point.x(), point_cloud[index_rendered_point_and_ray].point.y(), point_cloud[index_rendered_point_and_ray].point.z());
+        glEnd();
+    }
+
+    if (show_point_cloud_path)
+    {
+        glColor3f(pc_color_point_cloud_path.x, pc_color_point_cloud_path.y, pc_color_point_cloud_path.z);
+
+        glBegin(GL_LINE_STRIP);
+        for (int i = 0; i < point_cloud_path.size(); i++)
+        {
+            bool is_to_render = true;
+
+            if (i > 0)
+            {
+                if ((point_cloud_path[i - 1] - point_cloud_path[i]).norm() > 1.0)
+                {
+                    is_to_render = false;
+                }
+            }
+
+            if (point_cloud_path[i].norm() < 0.1)
+            {
+                is_to_render = false;
+            }
+
+            if (!is_to_render)
+            {
+                glEnd();
+                glBegin(GL_LINE_STRIP);
+            }
+            else
+            {
+                glVertex3f(point_cloud_path[i].x(), point_cloud_path[i].y(), point_cloud_path[i].z());
+            }
+        }
+        glEnd();
+    }
+
+    if (show_intrinsic_path)
+    {
+        glColor3f(intrinsic_path_color.x, intrinsic_path_color.y, intrinsic_path_color.z);
+
+        glBegin(GL_LINE_STRIP);
+        for (int i = 0; i < intrinsic_path.size(); i++)
+        {
+            glVertex3f(intrinsic_path[i].x(), intrinsic_path[i].y(), intrinsic_path[i].z());
+        }
+        glEnd();
+        // ImGui::ColorEdit3("intrinsic_path_color", (float *)&intrinsic_path_color);
+
+        // if (ImGui::Button("clear point_cloud_path and intrinsic path"))
+        //{
+        //     point_cloud_path.clear();
+        //     intrinsic_path.clear();
+        // }
+    }
+
+    if (show_intrinsics)
+    {
+        glColor3f(intrinsics_color.x, intrinsics_color.y, intrinsics_color.z);
+
+        glBegin(GL_LINE_STRIP);
+        for (int i = 0; i < intrinsics.size(); i++)
+        {
+            glVertex3f(intrinsics[i](0, 3), intrinsics[i](1, 3), intrinsics[i](2, 3));
+        }
+        glEnd();
+    }
+
+    glColor3f(0, 0, 0);
+    glBegin(GL_LINES);
+    for (const auto &p : point_intrinsic_correspondances)
+    {
+        glVertex3f(p.first.x(), p.first.y(), p.first.z());
+        glVertex3f(p.second.x(), p.second.y(), p.second.z());
+    }
+    glEnd();
+    // point_intrinsic_correspondances
+
+    // ImGui::Checkbox("show_intrinsics", &show_intrinsics);
+    // ImGui::Checkbox("apply_intrinsics_in_render", &apply_intrinsics_in_render);
+
+    // if (index_rendered_point_and_ray > point_cloud.size() - 1)
+    //{
+    //     index_rendered_point_and_ray = point_cloud.size() - 1;
+    // }
+
+#if 0
     if (calibration.size() > 0)
     {
         for (const auto &c : calibration)
@@ -1009,7 +1256,7 @@ void display()
         }
         glEnd();
     }
-
+#endif
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
 
@@ -1027,7 +1274,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("mandeye_mission_recorder_calibration " HDMAPPING_VERSION_STRING);
+    glutCreateWindow("livox_mid_360_intrinsic_calibration " HDMAPPING_VERSION_STRING);
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -1134,7 +1381,7 @@ void wheel(int button, int dir, int x, int y)
 
 int main(int argc, char *argv[])
 {
-    params.decimation = 0.03;
+    // params.decimation = 0.03;
 
     initGL(&argc, argv);
     glutDisplayFunc(display);
@@ -1149,4 +1396,395 @@ int main(int argc, char *argv[])
 
     ImGui::DestroyContext();
     return 0;
+}
+
+void calibrate_intrinsics()
+{
+    bool multithread = false;
+
+    std::cout
+        << "calibrate_intrinsics" << std::endl;
+
+    // step 1 build rgd
+    std::cout << "build rgd" << std::endl;
+
+    // for (int i = 0; i < pp.size(); i++)
+    //{
+    //     pp[i].point = params.m_g * pp[i].point;
+    // }
+
+    std::vector<Point3Di> point_cloud_global;
+    // std::vector<Eigen::Affine3d> intrinsics;
+
+    for (int i = 0; i < point_cloud.size(); i++)
+    {
+        Point3Di p = point_cloud[i];
+        p.point = intrinsics[i] * point_cloud[i].point;
+        point_cloud_global.push_back(p);
+    }
+
+    NDT::GridParameters rgd_params;
+    rgd_params.resolution_X = 0.2;
+    rgd_params.resolution_Y = 0.2;
+    rgd_params.resolution_Z = 0.2;
+
+    NDTBucketMapType buckets;
+
+    update_rgd(rgd_params, buckets, point_cloud_global, {0, 0, 0});
+
+    std::cout << "buckets.size(): " << buckets.size() << std::endl;
+
+    /////////////////////////////////////////////////////////////////////////
+    std::vector<Eigen::Triplet<double>> tripletListA;
+    std::vector<Eigen::Triplet<double>> tripletListP;
+    std::vector<Eigen::Triplet<double>> tripletListB;
+
+    // Eigen::MatrixXd AtPAndt(intrinsics.size() * 6, intrinsics.size() * 6);
+    // AtPAndt.setZero();
+    // Eigen::MatrixXd AtPBndt(intrinsics.size() * 6, 1);
+    // AtPBndt.setZero();
+    Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
+
+    // std::vector<std::mutex> mutexes(intrinsics.size());
+
+    // std::cout << "jojo" << std::endl;
+    const auto hessian_fun = [&](const Point3Di &intermediate_points_i)
+    {
+        int ir = tripletListB.size();
+        double delta_x;
+        double delta_y;
+        double delta_z;
+
+        Eigen::Affine3d m_pose = intrinsics[intermediate_points_i.index_pose];
+        Eigen::Vector3d point_local(intermediate_points_i.point.x(), intermediate_points_i.point.y(), intermediate_points_i.point.z());
+        Eigen::Vector3d point_global = m_pose * point_local;
+
+        auto index_of_bucket = get_rgd_index(point_global, b);
+
+        auto bucket_it = buckets.find(index_of_bucket);
+        // no bucket found
+        if (bucket_it == buckets.end())
+        {
+            return;
+        }
+        auto &this_bucket = bucket_it->second;
+
+        Eigen::Vector3d mean(this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
+
+        Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+        TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
+
+        point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                      pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                      point_local.x(), point_local.y(), point_local.z(), mean.x(), mean.y(), mean.z());
+
+        point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian,
+                                                               pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                               point_local.x(), point_local.y(), point_local.z());
+
+        int c = intermediate_points_i.index_pose * 6;
+        for (int row = 0; row < 3; row++)
+        {
+            for (int col = 0; col < 6; col++)
+            {
+                if (jacobian(row, col) != 0.0)
+                {
+                    tripletListA.emplace_back(ir + row, c + col, -jacobian(row, col));
+                }
+            }
+        }
+
+        Eigen::Matrix3d infm = this_bucket.cov.inverse();
+
+        tripletListB.emplace_back(ir, 0, delta_x);
+        tripletListB.emplace_back(ir + 1, 0, delta_y);
+        tripletListB.emplace_back(ir + 2, 0, delta_z);
+
+        tripletListP.emplace_back(ir, ir, infm(0, 0));
+        tripletListP.emplace_back(ir, ir + 1, infm(0, 1));
+        tripletListP.emplace_back(ir, ir + 2, infm(0, 2));
+        tripletListP.emplace_back(ir + 1, ir, infm(1, 0));
+        tripletListP.emplace_back(ir + 1, ir + 1, infm(1, 1));
+        tripletListP.emplace_back(ir + 1, ir + 2, infm(1, 2));
+        tripletListP.emplace_back(ir + 2, ir, infm(2, 0));
+        tripletListP.emplace_back(ir + 2, ir + 1, infm(2, 1));
+        tripletListP.emplace_back(ir + 2, ir + 2, infm(2, 2));
+    };
+
+    std::cout << "start adding lidar observations" << std::endl;
+    if (multithread)
+    {
+        std::for_each(std::execution::par_unseq, std::begin(point_cloud), std::end(point_cloud), hessian_fun);
+    }
+    else
+    {
+        std::for_each(std::begin(point_cloud), std::end(point_cloud), hessian_fun);
+    }
+    std::cout << "adding lidar observations finished" << std::endl;
+
+    std::vector<std::pair<int, int>> odo_edges;
+    for (size_t i = 1; i < intrinsics.size(); i++)
+    {
+        odo_edges.emplace_back(i - 1, i);
+    }
+
+    std::vector<TaitBryanPose> poses;
+    std::vector<TaitBryanPose> poses_desired;
+
+    for (size_t i = 0; i < intrinsics.size(); i++)
+    {
+        poses.push_back(pose_tait_bryan_from_affine_matrix(intrinsics[i]));
+    }
+    for (size_t i = 0; i < intrinsics.size(); i++)
+    {
+        poses_desired.push_back(pose_tait_bryan_from_affine_matrix(intrinsics[i]));
+    }
+
+    for (size_t i = 0; i < odo_edges.size(); i++)
+    {
+        Eigen::Matrix<double, 6, 1> delta;
+        relative_pose_obs_eq_tait_bryan_wc_case1(
+            delta,
+            poses[odo_edges[i].first].px,
+            poses[odo_edges[i].first].py,
+            poses[odo_edges[i].first].pz,
+            poses[odo_edges[i].first].om,
+            poses[odo_edges[i].first].fi,
+            poses[odo_edges[i].first].ka,
+            poses[odo_edges[i].second].px,
+            poses[odo_edges[i].second].py,
+            poses[odo_edges[i].second].pz,
+            poses[odo_edges[i].second].om,
+            poses[odo_edges[i].second].fi,
+            poses[odo_edges[i].second].ka,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+
+        Eigen::Matrix<double, 6, 12, Eigen::RowMajor> jacobian;
+        relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(jacobian,
+                                                          poses[odo_edges[i].first].px,
+                                                          poses[odo_edges[i].first].py,
+                                                          poses[odo_edges[i].first].pz,
+                                                          poses[odo_edges[i].first].om,
+                                                          poses[odo_edges[i].first].fi,
+                                                          poses[odo_edges[i].first].ka,
+                                                          poses[odo_edges[i].second].px,
+                                                          poses[odo_edges[i].second].py,
+                                                          poses[odo_edges[i].second].pz,
+                                                          poses[odo_edges[i].second].om,
+                                                          poses[odo_edges[i].second].fi,
+                                                          poses[odo_edges[i].second].ka);
+
+        int ir = tripletListB.size();
+
+        int ic_1 = odo_edges[i].first * 6;
+        int ic_2 = odo_edges[i].second * 6;
+
+        for (size_t row = 0; row < 6; row++)
+        {
+            tripletListA.emplace_back(ir + row, ic_1, -jacobian(row, 0));
+            tripletListA.emplace_back(ir + row, ic_1 + 1, -jacobian(row, 1));
+            tripletListA.emplace_back(ir + row, ic_1 + 2, -jacobian(row, 2));
+            tripletListA.emplace_back(ir + row, ic_1 + 3, -jacobian(row, 3));
+            tripletListA.emplace_back(ir + row, ic_1 + 4, -jacobian(row, 4));
+            tripletListA.emplace_back(ir + row, ic_1 + 5, -jacobian(row, 5));
+
+            tripletListA.emplace_back(ir + row, ic_2, -jacobian(row, 6));
+            tripletListA.emplace_back(ir + row, ic_2 + 1, -jacobian(row, 7));
+            tripletListA.emplace_back(ir + row, ic_2 + 2, -jacobian(row, 8));
+            tripletListA.emplace_back(ir + row, ic_2 + 3, -jacobian(row, 9));
+            tripletListA.emplace_back(ir + row, ic_2 + 4, -jacobian(row, 10));
+            tripletListA.emplace_back(ir + row, ic_2 + 5, -jacobian(row, 11));
+        }
+
+        tripletListB.emplace_back(ir, 0, delta(0, 0));
+        tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+        tripletListB.emplace_back(ir + 2, 0, delta(2, 0));
+        tripletListB.emplace_back(ir + 3, 0, delta(3, 0));
+        tripletListB.emplace_back(ir + 4, 0, delta(4, 0));
+        tripletListB.emplace_back(ir + 5, 0, delta(5, 0));
+
+        tripletListP.emplace_back(ir, ir, 100000000);
+        tripletListP.emplace_back(ir + 1, ir + 1, 100000000);
+        tripletListP.emplace_back(ir + 2, ir + 2, 100000000);
+        tripletListP.emplace_back(ir + 3, ir + 3, 10000000000);
+        tripletListP.emplace_back(ir + 4, ir + 4, 10000000000);
+        tripletListP.emplace_back(ir + 5, ir + 5, 10000000000);
+    }
+
+    std::vector<std::pair<int, int>> odo_edges_to_0;
+    for (size_t i = 0; i < intrinsics.size(); i++)
+    {
+        odo_edges_to_0.emplace_back(i, i);
+    }
+
+    for (size_t i = 0; i < odo_edges_to_0.size(); i++)
+    {
+        Eigen::Matrix<double, 6, 1> delta;
+        relative_pose_obs_eq_tait_bryan_wc_case1(
+            delta,
+            poses[odo_edges_to_0[i].first].px,
+            poses[odo_edges_to_0[i].first].py,
+            poses[odo_edges_to_0[i].first].pz,
+            poses[odo_edges_to_0[i].first].om,
+            poses[odo_edges_to_0[i].first].fi,
+            poses[odo_edges_to_0[i].first].ka,
+            poses[odo_edges_to_0[i].second].px,
+            poses[odo_edges_to_0[i].second].py,
+            poses[odo_edges_to_0[i].second].pz,
+            poses[odo_edges_to_0[i].second].om,
+            poses[odo_edges_to_0[i].second].fi,
+            poses[odo_edges_to_0[i].second].ka,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+
+        Eigen::Matrix<double, 6, 12, Eigen::RowMajor> jacobian;
+        relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(jacobian,
+                                                          poses[odo_edges_to_0[i].first].px,
+                                                          poses[odo_edges_to_0[i].first].py,
+                                                          poses[odo_edges_to_0[i].first].pz,
+                                                          poses[odo_edges_to_0[i].first].om,
+                                                          poses[odo_edges_to_0[i].first].fi,
+                                                          poses[odo_edges_to_0[i].first].ka,
+                                                          poses[odo_edges_to_0[i].second].px,
+                                                          poses[odo_edges_to_0[i].second].py,
+                                                          poses[odo_edges_to_0[i].second].pz,
+                                                          poses[odo_edges_to_0[i].second].om,
+                                                          poses[odo_edges_to_0[i].second].fi,
+                                                          poses[odo_edges_to_0[i].second].ka);
+
+        int ir = tripletListB.size();
+
+        int ic_1 = odo_edges_to_0[i].first * 6;
+        int ic_2 = odo_edges_to_0[i].second * 6;
+
+        for (size_t row = 0; row < 6; row++)
+        {
+            tripletListA.emplace_back(ir + row, ic_1, -jacobian(row, 0));
+            tripletListA.emplace_back(ir + row, ic_1 + 1, -jacobian(row, 1));
+            tripletListA.emplace_back(ir + row, ic_1 + 2, -jacobian(row, 2));
+            tripletListA.emplace_back(ir + row, ic_1 + 3, -jacobian(row, 3));
+            tripletListA.emplace_back(ir + row, ic_1 + 4, -jacobian(row, 4));
+            tripletListA.emplace_back(ir + row, ic_1 + 5, -jacobian(row, 5));
+
+            tripletListA.emplace_back(ir + row, ic_2, -jacobian(row, 6));
+            tripletListA.emplace_back(ir + row, ic_2 + 1, -jacobian(row, 7));
+            tripletListA.emplace_back(ir + row, ic_2 + 2, -jacobian(row, 8));
+            tripletListA.emplace_back(ir + row, ic_2 + 3, -jacobian(row, 9));
+            tripletListA.emplace_back(ir + row, ic_2 + 4, -jacobian(row, 10));
+            tripletListA.emplace_back(ir + row, ic_2 + 5, -jacobian(row, 11));
+        }
+
+        tripletListB.emplace_back(ir, 0, delta(0, 0));
+        tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+        tripletListB.emplace_back(ir + 2, 0, delta(2, 0));
+        tripletListB.emplace_back(ir + 3, 0, delta(3, 0));
+        tripletListB.emplace_back(ir + 4, 0, delta(4, 0));
+        tripletListB.emplace_back(ir + 5, 0, delta(5, 0));
+
+        tripletListP.emplace_back(ir, ir, 1000000);
+        tripletListP.emplace_back(ir + 1, ir + 1, 1000000);
+        tripletListP.emplace_back(ir + 2, ir + 2, 1000000);
+        tripletListP.emplace_back(ir + 3, ir + 3, 10000000000);
+        tripletListP.emplace_back(ir + 4, ir + 4, 10000000000);
+        tripletListP.emplace_back(ir + 5, ir + 5, 10000000000);
+    }
+
+    int ic = 0;
+    int ir = tripletListB.size();
+    tripletListA.emplace_back(ir, ic * 6 + 0, 1);
+    tripletListA.emplace_back(ir + 1, ic * 6 + 1, 1);
+    tripletListA.emplace_back(ir + 2, ic * 6 + 2, 1);
+    tripletListA.emplace_back(ir + 3, ic * 6 + 3, 1);
+    tripletListA.emplace_back(ir + 4, ic * 6 + 4, 1);
+    tripletListA.emplace_back(ir + 5, ic * 6 + 5, 1);
+
+    tripletListP.emplace_back(ir, ir, 1);
+    tripletListP.emplace_back(ir + 1, ir + 1, 1);
+    tripletListP.emplace_back(ir + 2, ir + 2, 1);
+    tripletListP.emplace_back(ir + 3, ir + 3, 1);
+    tripletListP.emplace_back(ir + 4, ir + 4, 1);
+    tripletListP.emplace_back(ir + 5, ir + 5, 1);
+
+    tripletListB.emplace_back(ir, 0, 0);
+    tripletListB.emplace_back(ir + 1, 0, 0);
+    tripletListB.emplace_back(ir + 2, 0, 0);
+    tripletListB.emplace_back(ir + 3, 0, 0);
+    tripletListB.emplace_back(ir + 4, 0, 0);
+    tripletListB.emplace_back(ir + 5, 0, 0);
+
+    Eigen::SparseMatrix<double> matA(tripletListB.size(), intrinsics.size() * 6);
+    Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
+    Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
+
+    matA.setFromTriplets(tripletListA.begin(), tripletListA.end());
+    matP.setFromTriplets(tripletListP.begin(), tripletListP.end());
+    matB.setFromTriplets(tripletListB.begin(), tripletListB.end());
+
+    Eigen::SparseMatrix<double> AtPA(intrinsics.size() * 6, intrinsics.size() * 6);
+    Eigen::SparseMatrix<double> AtPB(intrinsics.size() * 6, 1);
+
+    {
+        Eigen::SparseMatrix<double> AtP = matA.transpose() * matP;
+        AtPA = (AtP)*matA;
+        AtPB = (AtP)*matB;
+    }
+
+    tripletListA.clear();
+    tripletListP.clear();
+    tripletListB.clear();
+
+    // AtPA += AtPAndt.sparseView();
+    // AtPB += AtPBndt.sparseView();
+
+    // Eigen::SparseMatrix<double> AtPA_I(intrinsics.size() * 6, intrinsics.size() * 6);
+    // AtPA_I.setIdentity();
+    // AtPA_I *= 1;
+    // AtPA += AtPA_I;
+
+    Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>>
+        solver(AtPA);
+    std::cout << "start solving" << std::endl;
+    Eigen::SparseMatrix<double> x = solver.solve(AtPB);
+    std::cout << "start finished" << std::endl;
+    std::vector<double> h_x;
+    for (int k = 0; k < x.outerSize(); ++k)
+    {
+        for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
+        {
+            // std::cout << it.value() << " ";
+            h_x.push_back(it.value());
+        }
+    }
+
+    if (h_x.size() == 6 * intrinsics.size())
+    {
+        int counter = 0;
+
+        for (size_t i = 0; i < intrinsics.size(); i++)
+        {
+            TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(intrinsics[i]);
+            auto prev_pose = pose;
+            pose.px += h_x[counter++];
+            pose.py += h_x[counter++];
+            pose.pz += h_x[counter++];
+            pose.om += h_x[counter++];
+            pose.fi += h_x[counter++];
+            pose.ka += h_x[counter++] * 0;
+            intrinsics[i] = affine_matrix_from_pose_tait_bryan(pose);
+        }
+    }
+    else
+    {
+        std::cout << "intrinsic calibration failed" << std::endl;
+    }
+    return;
 }

@@ -994,6 +994,14 @@ void lidar_odometry_gui()
         }
         if (!simple_gui)
         {
+            ImGui::Text("------- robust and accurate lidar odometry -----------");
+            ImGui::Checkbox("use_robust_and_accurate_lidar_odometry", &params.use_robust_and_accurate_lidar_odometry);
+            ImGui::InputDouble("distance_bucket", &params.distance_bucket);
+            ImGui::InputDouble("polar_angle_deg", &params.polar_angle_deg);
+            ImGui::InputDouble("azimutal_angle_deg", &params.azimutal_angle_deg);
+            ImGui::InputInt("number of iterations", &params.robust_and_accurate_lidar_odometry_iterations);
+            ImGui::InputDouble("max distance lidar", &params.max_distance_lidar);
+            ImGui::Text("------------------------------------------------------");
             // if (step_1_done && step_2_done)
             //{
             /*ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
@@ -2369,28 +2377,6 @@ void alternative_approach()
         std::cout << fn << std::endl;
     }
 
-    // for (const auto &fn : laz_files)
-    //{
-    // std::vector<Point3Di> points = load_point_cloud(fn);
-    // std::cout << "points.cloud(): " << points.size() << std::endl;
-    //}
-
-    /*int current_file_index = 0;
-    int current_point_index = 0;
-
-    std::vector<Point3Di> points;
-
-    bool do_not_stop = true;
-    while (do_not_stop){
-        bool do_not_stop_internal_loop = true;
-        while (do_not_stop_internal_loop){
-            bool collected_all_points = get_next_batch_of_points(
-                point_count_threshold, laz_files, current_file_index, int &current_point_index_offset,
-                                                                 std::vector<Point3Di> &points)
-        }
-    }*/
-    // get_next_batch_of_points(point_count_threshold, laz_files, current_file_index, current_point_index, points);
-
     std::vector<Point3Di> prev_points;
     std::vector<std::vector<Point3Di>> all_points;
     std::vector<std::vector<Point3Di>> tmp_points = get_batches_of_points(laz_files[0], point_count_threshold, prev_points);
@@ -2508,177 +2494,3 @@ Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationP
 
     return out_point;
 }
-
-#if 0
-bool exportLaz(const std::string &filename,
-               const std::vector<Eigen::Vector3d> &pointcloud,
-               const std::vector<unsigned short> &intensity,
-               const std::vector<double> &timestamps,
-               double offset_x, double offset_y, double offset_alt)
-{
-
-    constexpr float scale = 0.0001f; // one tenth of milimeter
-    // find max
-    Eigen::Vector3d _max(-1000000000.0, -1000000000.0, -1000000000.0);
-    Eigen::Vector3d _min(1000000000.0, 1000000000.0, 1000000000.0);
-
-    for (auto &p : pointcloud)
-    {
-        if (p.x() < _min.x())
-        {
-            _min.x() = p.x();
-        }
-        if (p.y() < _min.y())
-        {
-            _min.y() = p.y();
-        }
-        if (p.z() < _min.z())
-        {
-            _min.z() = p.z();
-        }
-
-        if (p.x() > _max.x())
-        {
-            _max.x() = p.x();
-        }
-        if (p.y() > _max.y())
-        {
-            _max.y() = p.y();
-        }
-        if (p.z() > _max.z())
-        {
-            _max.z() = p.z();
-        }
-    }
-
-    // create the writer
-    laszip_POINTER laszip_writer;
-    if (laszip_create(&laszip_writer))
-    {
-        fprintf(stderr, "DLL ERROR: creating laszip writer\n");
-        return false;
-    }
-
-    // get a pointer to the header of the writer so we can populate it
-
-    laszip_header *header;
-
-    if (laszip_get_header_pointer(laszip_writer, &header))
-    {
-        fprintf(stderr, "DLL ERROR: getting header pointer from laszip writer\n");
-        return false;
-    }
-
-    // populate the header
-
-    header->file_source_ID = 4711;
-    header->global_encoding = (1 << 0); // see LAS specification for details
-    header->version_major = 1;
-    header->version_minor = 2;
-    //    header->file_creation_day = 120;
-    //    header->file_creation_year = 2013;
-    header->point_data_format = 1;
-    header->point_data_record_length = 0;
-    header->number_of_point_records = pointcloud.size();
-    header->number_of_points_by_return[0] = pointcloud.size();
-    header->number_of_points_by_return[1] = 0;
-    header->point_data_record_length = 28;
-    header->x_scale_factor = scale;
-    header->y_scale_factor = scale;
-    header->z_scale_factor = scale;
-
-    header->max_x = _max.x() + offset_x;
-    header->min_x = _min.x() + offset_x;
-    header->max_y = _max.y() + offset_y;
-    header->min_y = _min.y() + offset_y;
-    header->max_z = _max.z() + offset_alt;
-    header->min_z = _min.z() + offset_alt;
-
-    header->x_offset = offset_x;
-    header->y_offset = offset_y;
-    header->z_offset = offset_alt;
-
-    // optional: use the bounding box and the scale factor to create a "good" offset
-    // open the writer
-    laszip_BOOL compress = (strstr(filename.c_str(), ".laz") != 0);
-
-    if (laszip_open_writer(laszip_writer, filename.c_str(), compress))
-    {
-        fprintf(stderr, "DLL ERROR: opening laszip writer for '%s'\n", filename.c_str());
-        return false;
-    }
-
-    fprintf(stderr, "writing file '%s' %scompressed\n", filename.c_str(), (compress ? "" : "un"));
-
-    // get a pointer to the point of the writer that we will populate and write
-
-    laszip_point *point;
-    if (laszip_get_point_pointer(laszip_writer, &point))
-    {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip writer\n");
-        return false;
-    }
-
-    laszip_I64 p_count = 0;
-    laszip_F64 coordinates[3];
-
-    for (int i = 0; i < pointcloud.size(); i++)
-    {
-        point->intensity = intensity[i];
-        
-        const auto &p = pointcloud[i];
-        point->gps_time = timestamps[i] * 1e9;
-
-        p_count++;
-        coordinates[0] = p.x() + offset_x;
-        coordinates[1] = p.y() + offset_y;
-        coordinates[2] = p.z() + offset_alt;
-        if (laszip_set_coordinates(laszip_writer, coordinates))
-        {
-            fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);
-            return false;
-        }
-
-        // p.SetIntensity(pp.intensity);
-
-        // if (i < intensity.size()) {
-        //     point->intensity = intensity[i];
-        // }
-        // laszip_set_point
-
-        if (laszip_write_point(laszip_writer))
-        {
-            fprintf(stderr, "DLL ERROR: writing point %I64d\n", p_count);
-            return false;
-        }
-    }
-
-    if (laszip_get_point_count(laszip_writer, &p_count))
-    {
-        fprintf(stderr, "DLL ERROR: getting point count\n");
-        return false;
-    }
-
-    fprintf(stderr, "successfully written %I64d points\n", p_count);
-
-    // close the writer
-
-    if (laszip_close_writer(laszip_writer))
-    {
-        fprintf(stderr, "DLL ERROR: closing laszip writer\n");
-        return false;
-    }
-
-    // destroy the writer
-
-    if (laszip_destroy(laszip_writer))
-    {
-        fprintf(stderr, "DLL ERROR: destroying laszip writer\n");
-        return false;
-    }
-
-    std::cout << "exportLaz DONE" << std::endl;
-
-    return true;
-}
-#endif

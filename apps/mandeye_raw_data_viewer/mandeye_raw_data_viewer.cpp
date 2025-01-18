@@ -22,6 +22,8 @@
 
 #include <mutex>
 
+#include <export_laz.h>
+
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
@@ -58,6 +60,16 @@ float m_ortho_gizmo_view[] = {1, 0, 0, 0,
                               0, 0, 1, 0,
                               0, 0, 0, 1};
 
+struct AllData
+{
+    std::vector<std::pair<double, double>> timestamps;
+    std::vector<Eigen::Affine3d> poses;
+    std::vector<Point3Di> points_local;
+    std::vector<int> lidar_ids;
+};
+
+std::vector<AllData> all_data;
+
 std::vector<std::string> laz_files;
 std::vector<std::string> csv_files;
 std::vector<std::string> sn_files;
@@ -71,10 +83,29 @@ bool fusionConventionNed = false;
 int number_of_points_threshold = 20000;
 bool is_init = true;
 int index_rendered_points_local = -1;
-std::vector<std::vector<Eigen::Vector3d>> all_points_local;
-std::vector<std::vector<int>> all_lidar_ids;
+// std::vector<std::vector<Point3Di>> all_points_local;
+// std::vector<std::vector<Point3Di>> all_points_local;
+// std::vector<std::vector<int>> all_lidar_ids;
 std::vector<int> indexes_to_filename;
 std::vector<std::string> all_file_names;
+double ahrs_gain = 0.5;
+// bool is_slerp = false;
+
+const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
+
+double rgd_x = 0.5;
+double rgd_y = 5;
+double rgd_z = 5;
+
+std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> rgd_nn;
+std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> mean_cov;
+bool show_mean_cov = false;
+bool show_rgd_nn = false;
+
+void optimize();
+std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> get_nn();
+void draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd);
+std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov();
 
 void reshape(int w, int h)
 {
@@ -174,14 +205,17 @@ void project_gui()
             }
         }
 
+        ImGui::InputDouble("ahrs_gain", &ahrs_gain);
+        // ImGui::Checkbox("is_slerp", &is_slerp);
+
         ImGui::InputInt("index_rendered_points_local", &index_rendered_points_local);
         if (index_rendered_points_local < 0)
         {
             index_rendered_points_local = 0;
         }
-        if (index_rendered_points_local >= all_points_local.size())
+        if (index_rendered_points_local >= all_data.size())
         {
-            index_rendered_points_local = all_points_local.size() - 1;
+            index_rendered_points_local = all_data.size() - 1;
         }
 
         if (is_init)
@@ -348,6 +382,7 @@ void project_gui()
                     {
                         ahrs.settings.convention = FusionConventionNed;
                     }
+                    ahrs.settings.gain = ahrs_gain;
 
                     std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;
 
@@ -391,11 +426,28 @@ void project_gui()
                     }
                     std::cout << "number of points: " << number_of_points << std::endl;
 
-                    std::vector<Eigen::Vector3d> points_local;
+                    std::cout << "start indexing points" << std::endl;
+
+                    // std::vector<Point3Di> points_global;
+                    std::vector<Point3Di> points_local;
                     std::vector<int> lidar_ids;
+
+                    Eigen::Affine3d m_prev;
+                    Eigen::Affine3d m_next;
+
+                    Eigen::Quaterniond q_prev;
+                    Eigen::Quaterniond q_next;
+                    Eigen::Quaterniond q;
+
+                    double time_prev;
+                    double time_next;
+                    double curr_time;
+
+                    double t;
 
                     for (int i = 0; i < pointsPerFile.size(); i++)
                     {
+                        std::cout << "indexed: " << i + 1 << " of " << pointsPerFile.size() << " files" << std::endl;
                         for (const auto &pp : pointsPerFile[i])
                         {
                             auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), pp.timestamp,
@@ -407,194 +459,71 @@ void project_gui()
                             if (index_pose >= 0 && index_pose < poses.size())
                             {
                                 auto ppp = pp;
-                                ppp.point = poses[index_pose] * ppp.point;
-                                // int lidar_id = pp.lidarid;
+                                // Eigen::Affine3d m = poses[index_pose];
+                                /*if (is_slerp)
+                                {
+                                    if (index_pose > 0)
+                                    {
+                                        m_prev = poses[index_pose - 1];
+                                        m_next = poses[index_pose];
+
+                                        q_prev = Eigen::Quaterniond(m_prev.rotation());
+                                        q_next = Eigen::Quaterniond(m_next.rotation());
+
+                                        time_prev = timestamps[index_pose - 1].first;
+                                        time_next = timestamps[index_pose].first;
+                                        curr_time = ppp.timestamp;
+
+                                        t = (curr_time - time_prev) / (time_next - time_prev);
+                                        q = q_prev.slerp(t, q_next);
+
+                                        m.linear() = q.toRotationMatrix();
+                                    }
+                                }*/
+
+                                points_local.push_back(ppp);
+
+                                // ppp.point = m * ppp.point;
                                 lidar_ids.push_back(pp.lidarid);
-                                points_local.push_back(ppp.point);
+                                // points_global.push_back(ppp);
                             }
 
                             if (points_local.size() > number_of_points_threshold)
                             {
-                                all_points_local.push_back(points_local);
+                                // all_points_local.push_back(points_global);
                                 indexes_to_filename.push_back(i);
-                                points_local.clear();
+                                // points_global.clear();
+                                // all_lidar_ids.push_back(lidar_ids);
 
-                                all_lidar_ids.push_back(lidar_ids);
+                                ///////////////////////////////////////
+                                AllData data;
+                                data.points_local = points_local;
+                                data.lidar_ids = lidar_ids;
+
+                                for (int i = 0; i < timestamps.size(); i++)
+                                {
+                                    if (timestamps[i].first >= points_local[0].timestamp && timestamps[i].first <= points_local[points_local.size() - 1].timestamp)
+                                    {
+                                        data.timestamps.push_back(timestamps[i]);
+                                        data.poses.push_back(poses[i]);
+                                    }
+                                }
+                                all_data.push_back(data);
+
+                                points_local.clear();
                                 lidar_ids.clear();
+                                //////////////////////////////////////
                             }
                         }
                     }
 
-                    if (all_points_local.size() > 0)
+                    std::cout << "indexing points finished" << std::endl;
+
+                    if (all_data.size() > 0)
                     {
                         is_init = false;
                         index_rendered_points_local = 0;
                     }
-
-#if 0
-                std::cout << "start transforming points" << std::endl;
-
-                int number_of_initial_points = 0;
-                double timestamp_begin;
-                for (const auto &pp : pointsPerFile)
-                {
-                    // number_of_points += pp.size();
-                    for (const auto &p : pp)
-                    {
-                        number_of_initial_points++;
-                        params.initial_points.push_back(p);
-                        if (number_of_initial_points > threshold_initial_points)
-                        {
-                            timestamp_begin = p.timestamp;
-                            break;
-                        }
-                    }
-                    if (number_of_initial_points > threshold_initial_points)
-                    {
-                        break;
-                    }
-                }
-
-                std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
-
-                std::vector<std::pair<double, double>> timestamps;
-                std::vector<Eigen::Affine3d> poses;
-                for (const auto &t : trajectory)
-                {
-                    if (t.first >= timestamp_begin)
-                    {
-                        timestamps.emplace_back(t.first, t.second.second);
-                        Eigen::Affine3d m;
-                        m.matrix() = t.second.first;
-                        poses.push_back(m);
-                    }
-                }
-
-                std::cout << "poses.size(): " << poses.size() << std::endl;
-
-                if (poses.empty())
-                {
-                    std::cerr << "Loading poses went wrong! Could not load poses!" << std::endl;
-                    return;
-                }
-
-                int thershold = 20;
-                WorkerData wd;
-                // std::vector<double> temp_ts;
-                // temp_ts.reserve(1000000);
-
-                // int last_point = 0;
-                int index_begin = 0;
-
-                for (size_t i = 0; i < poses.size(); i++)
-                {
-                    if (i % 1000 == 0)
-                    {
-                        std::cout << "preparing data " << i + 1 << " of " << poses.size() << std::endl;
-                    }
-                    wd.intermediate_trajectory.emplace_back(poses[i]);
-                    wd.intermediate_trajectory_motion_model.emplace_back(poses[i]);
-                    wd.intermediate_trajectory_timestamps.emplace_back(timestamps[i]);
-
-                    //
-                    TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(poses[i]);
-                    wd.imu_roll_pitch.emplace_back(tb.om, tb.fi);
-
-                    // temp_ts.emplace_back(timestamps[i]);
-
-                    if (wd.intermediate_trajectory.size() >= thershold)
-                    {
-                        /*auto index_lower = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[0],
-                                                            [](Point3Di lhs, double rhs) -> bool
-                                                            { return lhs.timestamp < rhs; });
-                        unsigned long long int i_begin = std::distance(points.begin(), index_lower);
-
-                        auto index_upper = std::lower_bound(points.begin(), points.end(), wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1],
-                                                            [](Point3Di lhs, double rhs) -> bool
-                                                            { return lhs.timestamp < rhs; });
-                        unsigned long long int i_end = std::distance(points.begin(), index_upper);*/
-
-                        std::vector<Point3Di> points;
-                        // for (const auto &pp : pointsPerFile)
-                        //{
-                        //     for (const auto &p : pp)
-                        //     {
-                        //         if (p.timestamp >= wd.intermediate_trajectory_timestamps[0] && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1]){
-                        //             points.push_back(p);
-                        //         }
-                        //     }
-                        // }
-                        bool found = false;
-
-                        for (int index = index_begin; index < pointsPerFile.size(); index++)
-                        {
-                            for (const auto &p : pointsPerFile[index])
-                            {
-                                if (p.timestamp >= wd.intermediate_trajectory_timestamps[0].first && p.timestamp <= wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first)
-                                {
-                                    points.push_back(p);
-                                }
-                                if (p.timestamp >= wd.intermediate_trajectory_timestamps[0].first && !found)
-                                {
-                                    index_begin = index;
-                                    found = true;
-                                }
-                                if (p.timestamp > wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first)
-                                {
-                                    break;
-                                }
-                            }
-                        }
-
-                        // for (unsigned long long int k = i_begin; k < i_end; k++)
-                        // if (i % 1000 == 0)
-                        //{
-                        // std::cout << "points.size() " << points.size() << std::endl;
-                        //}
-
-                        for (unsigned long long int k = 0; k < points.size(); k++)
-                        {
-                            // if (points[k].timestamp > wd.intermediate_trajectory_timestamps[0] && points[k].timestamp < wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1])
-                            //{
-                            auto p = points[k];
-                            auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp,
-                                                          [](std::pair<double, double> lhs, double rhs) -> bool
-                                                          { return lhs.first < rhs; });
-
-                            p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
-                            wd.intermediate_points.emplace_back(p);
-                            wd.original_points.emplace_back(p);
-                            //}
-                        }
-
-                        //if (params.decimation > 0.0)
-                        //{
-                        //    wd.intermediate_points = decimate(wd.intermediate_points, params.decimation, params.decimation, params.decimation);
-                        //}
-
-                        /*worker_data.push_back(wd);
-                        wd.intermediate_points.clear();
-                        wd.original_points.clear();
-                        wd.intermediate_trajectory.clear();
-                        wd.intermediate_trajectory_motion_model.clear();
-                        wd.intermediate_trajectory_timestamps.clear();
-                        wd.imu_roll_pitch.clear();
-
-                        wd.intermediate_points.reserve(1000000);
-                        wd.original_points.reserve(1000000);
-                        wd.intermediate_trajectory.reserve(1000);
-                        wd.intermediate_trajectory_motion_model.reserve(1000);
-                        wd.intermediate_trajectory_timestamps.reserve(1000);
-                        wd.imu_roll_pitch.reserve(1000);*/
-
-                        // temp_ts.clear();
-                    }
-                }
-
-                //params.m_g = worker_data[0].intermediate_trajectory[0];
-                //step_1_done = true;
-                //std::cout << "step_1_done please click 'compute_all (step 2)' to continue calculations" << std::endl;
-#endif
                 }
                 else
                 {
@@ -616,6 +545,66 @@ void project_gui()
                 ImGui::Text(fn.c_str());
             }
         }
+
+        if (ImGui::Button("save point cloud"))
+        {
+            std::shared_ptr<pfd::save_file> save_file;
+            std::string output_file_name = "";
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
+            const auto t = [&]()
+            {
+                auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
+                output_file_name = sel;
+                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+            };
+            std::thread t1(t);
+            t1.join();
+
+            if (output_file_name.size() > 0)
+            {
+                std::vector<Eigen::Vector3d> pointcloud;
+                std::vector<unsigned short> intensity;
+                std::vector<double> timestamps;
+
+                /*if (index_rendered_points_local >= 0 && index_rendered_points_local < all_points_local.size())
+                {
+                    for (int i = 0; i < all_points_local[index_rendered_points_local].size(); i++)
+                    {
+                        pointcloud.emplace_back(all_points_local[index_rendered_points_local][i].point.x(), all_points_local[index_rendered_points_local][i].point.y(), all_points_local[index_rendered_points_local][i].point.z());
+                        intensity.push_back(all_points_local[index_rendered_points_local][i].intensity);
+                        timestamps.push_back(all_points_local[index_rendered_points_local][i].timestamp);
+                    }
+                }*/
+
+                if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
+                {
+                    std::cout << "problem with saving file: " << output_file_name << std::endl;
+                }
+            }
+        }
+
+        if (ImGui::Button("optimize"))
+        {
+            optimize();
+        }
+
+        ImGui::InputDouble("rgd_x", &rgd_x);
+        ImGui::InputDouble("rgd_y", &rgd_y);
+        ImGui::InputDouble("rgd_z", &rgd_z);
+        ImGui::Checkbox("show show_rgd_nn", &show_rgd_nn);
+
+        if (ImGui::Button("get_nn"))
+        {
+            rgd_nn = get_nn();
+        }
+
+        ImGui::Checkbox("show_mean_cov", &show_mean_cov);
+
+        if (ImGui::Button("get_mean_cov"))
+        {
+            mean_cov = get_mean_cov();
+        }
+
         ImGui::End();
     }
     return;
@@ -734,27 +723,77 @@ void display()
     }
 
     //
+    /* glPointSize(point_size);
+     glBegin(GL_POINTS);
+     if (index_rendered_points_local >= 0 && index_rendered_points_local < all_points_local.size())
+     {
+         for (int i = 0; i < all_points_local[index_rendered_points_local].size(); i++)
+         {
+             if (all_lidar_ids[index_rendered_points_local][i] == 0)
+             {
+                 glColor3f(pc_color.x, pc_color.y, pc_color.z);
+             }
+             else
+             {
+                 glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
+             }
+             glVertex3f(all_points_local[index_rendered_points_local][i].point.x(), all_points_local[index_rendered_points_local][i].point.y(), all_points_local[index_rendered_points_local][i].point.z());
+         }
+     }
+     glEnd();
+     glPointSize(1);*/
+
     glPointSize(point_size);
     glBegin(GL_POINTS);
-    if (index_rendered_points_local >= 0 && index_rendered_points_local < all_points_local.size())
+    if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
     {
-        //for (const auto &p : all_points_local[index_rendered_points_local])
-        //{
-        //
-        //    glVertex3f(p.x(), p.y(), p.z());
-        //}
+        for (int i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
+        {
+            auto lower = std::lower_bound(all_data[index_rendered_points_local].timestamps.begin(), all_data[index_rendered_points_local].timestamps.end(), all_data[index_rendered_points_local].points_local[i].timestamp,
+                                          [](std::pair<double, double> lhs, double rhs) -> bool
+                                          { return lhs.first < rhs; });
 
-        for (int i = 0; i < all_points_local[index_rendered_points_local].size(); i++){
-            if (all_lidar_ids[index_rendered_points_local][i] == 0){
-                glColor3f(pc_color.x, pc_color.y, pc_color.z);
-            }else{
-                glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
+            int index_pose = std::distance(all_data[index_rendered_points_local].timestamps.begin(), lower);
+
+            if (index_pose >= 0 && index_pose < all_data[index_rendered_points_local].poses.size())
+            {
+                Eigen::Affine3d m = all_data[index_rendered_points_local].poses[index_pose];
+                Eigen::Vector3d p = m * all_data[index_rendered_points_local].points_local[i].point;
+
+                if (all_data[index_rendered_points_local].lidar_ids[i] == 0)
+                {
+                    glColor3f(pc_color.x, pc_color.y, pc_color.z);
+                }
+                else
+                {
+                    glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
+                }
+                glVertex3f(p.x(), p.y(), p.z());
             }
-            glVertex3f(all_points_local[index_rendered_points_local][i].x(), all_points_local[index_rendered_points_local][i].y(), all_points_local[index_rendered_points_local][i].z());
         }
     }
     glEnd();
     glPointSize(1);
+
+    if (show_rgd_nn)
+    {
+        glColor3f(0, 0, 0);
+        glBegin(GL_LINES);
+        for (const auto &nn : rgd_nn)
+        {
+            glVertex3f(nn.first.x(), nn.first.y(), nn.first.z());
+            glVertex3f(nn.second.x(), nn.second.y(), nn.second.z());
+        }
+        glEnd();
+    }
+
+    if (show_mean_cov)
+    {
+        for (const auto &mc : mean_cov)
+        {
+            draw_ellipse(mc.second, mc.first, Eigen::Vector3f(1, 0, 0), 1);
+        }
+    }
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
@@ -892,4 +931,742 @@ int main(int argc, char *argv[])
 
     ImGui::DestroyContext();
     return 0;
+}
+
+void optimize()
+{
+    if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
+    {
+        auto worker_data = all_data[index_rendered_points_local];
+
+        auto tr = worker_data.intermediate_trajectory;
+        auto trmm = worker_data.intermediate_trajectory_motion_model;
+    }
+
+#if 0
+    if (params.use_robust_and_accurate_lidar_odometry)
+    {
+        
+
+        auto firstm = tr[0];
+
+        for (auto &t : tr)
+        {
+            t.translation() -= firstm.translation();
+        }
+        for (auto &t : trmm)
+        {
+            t.translation() -= firstm.translation();
+        }
+
+        NDT::GridParameters rgd_params_sc;
+
+        rgd_params_sc.resolution_X = params.distance_bucket;
+        rgd_params_sc.resolution_Y = params.polar_angle_deg;
+        rgd_params_sc.resolution_Z = params.azimutal_angle_deg;
+
+        // for (int iter = 0; iter < 10; iter++)
+        //{
+        //     optimize_sf(worker_data[i].intermediate_points, tr, trmm,
+        //                 rgd_params_sc, params.buckets, /*params.useMultithread*/ false);
+        // }
+        std::vector<Point3Di> points_local_sf;
+        std::vector<Point3Di> points_local;
+
+        ///
+        for (int ii = 0; ii < worker_data[i].intermediate_points.size(); ii++)
+        {
+            double r_l = worker_data[i].intermediate_points[ii].point.norm();
+            if (r_l > 0.5 && worker_data[i].intermediate_points[ii].index_pose != -1 && r_l < params.max_distance_lidar)
+            {
+                double polar_angle_deg_l = atan2(worker_data[i].intermediate_points[ii].point.y(), worker_data[i].intermediate_points[ii].point.x()) / M_PI * 180.0;
+                double azimutal_angle_deg_l = acos(worker_data[i].intermediate_points[ii].point.z() / r_l) / M_PI * 180.0;
+
+                points_local.push_back(worker_data[i].intermediate_points[ii]);
+
+                ///////////////////////////////////////////////////////
+                Point3Di p_sl = worker_data[i].intermediate_points[ii];
+                p_sl.point.x() = r_l;
+                p_sl.point.y() = polar_angle_deg_l;
+                p_sl.point.z() = azimutal_angle_deg_l;
+
+                points_local_sf.push_back(p_sl);
+            }
+        }
+        ///
+        std::cout << "optimize_sf2" << std::endl;
+        for (int iter = 0; iter < params.robust_and_accurate_lidar_odometry_iterations; iter++)
+        {
+            optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, params.useMultithread);
+        }
+
+        for (auto &t : tr)
+        {
+            t.translation() += firstm.translation();
+        }
+
+        for (auto &t : trmm)
+        {
+            t.translation() += firstm.translation();
+        }
+
+        worker_data[i].intermediate_trajectory = tr;
+        worker_data[i].intermediate_trajectory_motion_model = tr;
+    }
+#endif
+#if 0
+    bool multithread = false;
+    std::cout << "optimize" << std::endl;
+    if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
+    {
+        // for (int i = 0; i < all_data[index_rendered_points_local].poses.size(); i++){
+        //     all_data[index_rendered_points_local].poses[i](0, 3) += 1.0;
+        // }
+
+        
+
+        // index data
+        for (int i = 0; i < worker_data.points_local.size(); i++)
+        {
+            auto lower = std::lower_bound(worker_data.timestamps.begin(), worker_data.timestamps.end(), worker_data.points_local[i].timestamp,
+                                          [](std::pair<double, double> lhs, double rhs) -> bool
+                                          { return lhs.first < rhs; });
+
+            int index_pose = std::distance(worker_data.timestamps.begin(), lower);
+
+            if (index_pose >= 0 && index_pose < worker_data.poses.size())
+            {
+                worker_data.points_local[i].index_pose = index_pose;
+            }
+            else
+            {
+                worker_data.points_local[i].index_pose = -1;
+            }
+        }
+
+        NDT::GridParameters rgd_params;
+        // rgd_params.resolution_X = 0.3; // distance bucket
+        // rgd_params.resolution_Y = 0.3; // polar angle deg
+        // rgd_params.resolution_Z = 0.3; // azimutal angle deg
+
+        rgd_params.resolution_X = rgd_x; // distance bucket
+        rgd_params.resolution_Y = rgd_y; // polar angle deg
+        rgd_params.resolution_Z = rgd_z; // azimutal angle deg
+
+        std::vector<Point3Di> point_cloud_global;
+        std::vector<Point3Di> points_local;
+
+        std::vector<Eigen::Vector3d> point_cloud_global_sc;
+        std::vector<Point3Di> points_local_sc;
+
+        for (int i = 0; i < worker_data.points_local.size(); i++)
+        {
+            double r_l = worker_data.points_local[i].point.norm();
+            if (r_l > 0.5 && worker_data.points_local[i].index_pose != -1 && r_l < 10)
+            {
+                double polar_angle_deg_l = atan2(worker_data.points_local[i].point.y(), worker_data.points_local[i].point.x()) / M_PI * 180.0;
+                double azimutal_angle_deg_l = acos(worker_data.points_local[i].point.z() / r_l) / M_PI * 180.0;
+
+                Eigen::Vector3d pp = worker_data.points_local[i].point;
+                // pps.x() = r;
+                // pps.y() = polar_angle_deg;
+                // pps.z() = azimutal_angle_deg;
+                // point_cloud_spherical_coordinates.push_back(pps);
+
+                Eigen::Affine3d pose = worker_data.poses[worker_data.points_local[i].index_pose];
+
+                pp = pose * pp;
+
+                Point3Di pg = worker_data.points_local[i];
+                pg.point = pp;
+
+                point_cloud_global.push_back(pg);
+                points_local.push_back(worker_data.points_local[i]);
+
+                ///////////////////////////////////////////////////////
+                Point3Di p_sl = worker_data.points_local[i];
+                p_sl.point.x() = r_l;
+                p_sl.point.y() = polar_angle_deg_l;
+                p_sl.point.z() = azimutal_angle_deg_l;
+
+                points_local_sc.push_back(p_sl);
+                //
+                double r_g = pg.point.norm();
+                double polar_angle_deg_g = atan2(pg.point.y(), pg.point.x()) / M_PI * 180.0;
+                double azimutal_angle_deg_g = acos(pg.point.z() / r_l) / M_PI * 180.0;
+
+                Eigen::Vector3d p_sg = worker_data.points_local[i].point;
+                p_sg.x() = r_g;
+                p_sg.y() = polar_angle_deg_g;
+                p_sg.z() = azimutal_angle_deg_g;
+
+                point_cloud_global_sc.push_back(p_sg);
+            }
+        }
+
+        NDTBucketMapType buckets;
+        update_rgd_spherical_coordinates(rgd_params, buckets, point_cloud_global, point_cloud_global_sc, {0, 0, 0});
+        // update_rgd(rgd_params, buckets, point_cloud_global, {0, 0, 0});
+        std::cout << "buckets.size(): " << buckets.size() << std::endl;
+
+        std::vector<Eigen::Triplet<double>> tripletListA;
+        std::vector<Eigen::Triplet<double>> tripletListP;
+        std::vector<Eigen::Triplet<double>> tripletListB;
+
+        Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
+
+        const auto hessian_fun = [&](const Point3Di &intermediate_points_i)
+        {
+            int ir = tripletListB.size();
+            double delta_x;
+            double delta_y;
+            double delta_z;
+
+            Eigen::Affine3d m_pose = worker_data.poses[intermediate_points_i.index_pose];
+            Eigen::Vector3d point_local(intermediate_points_i.point.x(), intermediate_points_i.point.y(), intermediate_points_i.point.z());
+            Eigen::Vector3d point_global = m_pose * point_local;
+
+            ///////////////
+            double r = point_global.norm();
+            double polar_angle_deg = atan2(point_global.y(), point_global.x()) / M_PI * 180.0;
+            double azimutal_angle_deg = acos(point_global.z() / r) / M_PI * 180.0;
+            ///////////////
+
+            auto index_of_bucket = get_rgd_index({r, polar_angle_deg, azimutal_angle_deg}, b);
+            // auto index_of_bucket = get_rgd_index(point_global, b);
+
+            auto bucket_it = buckets.find(index_of_bucket);
+            // no bucket found
+            if (bucket_it == buckets.end())
+            {
+                return;
+            }
+            auto &this_bucket = bucket_it->second;
+
+            Eigen::Vector3d mean(this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
+
+            Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+            TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
+
+            point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                          pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                          point_local.x(), point_local.y(), point_local.z(), mean.x(), mean.y(), mean.z());
+
+            point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian,
+                                                                   pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                   point_local.x(), point_local.y(), point_local.z());
+
+            int c = intermediate_points_i.index_pose * 6;
+            for (int row = 0; row < 3; row++)
+            {
+                for (int col = 0; col < 6; col++)
+                {
+                    if (jacobian(row, col) != 0.0)
+                    {
+                        tripletListA.emplace_back(ir + row, c + col, -jacobian(row, col));
+                    }
+                }
+            }
+
+            Eigen::Matrix3d infm = this_bucket.cov.inverse();
+
+            tripletListB.emplace_back(ir, 0, delta_x);
+            tripletListB.emplace_back(ir + 1, 0, delta_y);
+            tripletListB.emplace_back(ir + 2, 0, delta_z);
+
+            tripletListP.emplace_back(ir, ir, infm(0, 0));
+            tripletListP.emplace_back(ir, ir + 1, infm(0, 1));
+            tripletListP.emplace_back(ir, ir + 2, infm(0, 2));
+            tripletListP.emplace_back(ir + 1, ir, infm(1, 0));
+            tripletListP.emplace_back(ir + 1, ir + 1, infm(1, 1));
+            tripletListP.emplace_back(ir + 1, ir + 2, infm(1, 2));
+            tripletListP.emplace_back(ir + 2, ir, infm(2, 0));
+            tripletListP.emplace_back(ir + 2, ir + 1, infm(2, 1));
+            tripletListP.emplace_back(ir + 2, ir + 2, infm(2, 2));
+        };
+
+        if (points_local.size() > 100)
+        {
+            std::cout << "start adding lidar observations" << std::endl;
+            if (multithread)
+            {
+                std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
+            }
+            else
+            {
+                std::for_each(std::begin(points_local), std::end(points_local), hessian_fun);
+            }
+            std::cout << "adding lidar observations finished" << std::endl;
+        }
+
+        std::vector<std::pair<int, int>> odo_edges;
+        for (size_t i = 1; i < worker_data.poses.size(); i++)
+        {
+            odo_edges.emplace_back(i - 1, i);
+        }
+
+        std::vector<TaitBryanPose> poses;
+        std::vector<TaitBryanPose> poses_desired;
+
+        for (size_t i = 0; i < worker_data.poses.size(); i++)
+        {
+            poses.push_back(pose_tait_bryan_from_affine_matrix(worker_data.poses[i]));
+        }
+        for (size_t i = 0; i < worker_data.poses.size(); i++)
+        {
+            poses_desired.push_back(pose_tait_bryan_from_affine_matrix(worker_data.poses[i]));
+        }
+
+        for (size_t i = 0; i < odo_edges.size(); i++)
+        {
+            /*Eigen::Matrix<double, 6, 1> relative_pose_measurement_odo;
+            relative_pose_tait_bryan_wc_case1(relative_pose_measurement_odo,
+                                              poses_desired[odo_edges[i].first].px,
+                                              poses_desired[odo_edges[i].first].py,
+                                              poses_desired[odo_edges[i].first].pz,
+                                              poses_desired[odo_edges[i].first].om,
+                                              poses_desired[odo_edges[i].first].fi,
+                                              poses_desired[odo_edges[i].first].ka,
+                                              poses_desired[odo_edges[i].second].px,
+                                              poses_desired[odo_edges[i].second].py,
+                                              poses_desired[odo_edges[i].second].pz,
+                                              poses_desired[odo_edges[i].second].om,
+                                              poses_desired[odo_edges[i].second].fi,
+                                              poses_desired[odo_edges[i].second].ka);*/
+
+            Eigen::Matrix<double, 6, 1> delta;
+            relative_pose_obs_eq_tait_bryan_wc_case1(
+                delta,
+                poses[odo_edges[i].first].px,
+                poses[odo_edges[i].first].py,
+                poses[odo_edges[i].first].pz,
+                poses[odo_edges[i].first].om,
+                poses[odo_edges[i].first].fi,
+                poses[odo_edges[i].first].ka,
+                poses[odo_edges[i].second].px,
+                poses[odo_edges[i].second].py,
+                poses[odo_edges[i].second].pz,
+                poses[odo_edges[i].second].om,
+                poses[odo_edges[i].second].fi,
+                poses[odo_edges[i].second].ka,
+                0, 0, 0, 0, 0, 0);
+            // relative_pose_measurement_odo(0, 0),
+            // relative_pose_measurement_odo(1, 0),
+            // relative_pose_measurement_odo(2, 0),
+            // relative_pose_measurement_odo(3, 0),
+            // relative_pose_measurement_odo(4, 0),
+            // relative_pose_measurement_odo(5, 0));
+
+            Eigen::Matrix<double, 6, 12, Eigen::RowMajor> jacobian;
+            relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(jacobian,
+                                                              poses[odo_edges[i].first].px,
+                                                              poses[odo_edges[i].first].py,
+                                                              poses[odo_edges[i].first].pz,
+                                                              poses[odo_edges[i].first].om,
+                                                              poses[odo_edges[i].first].fi,
+                                                              poses[odo_edges[i].first].ka,
+                                                              poses[odo_edges[i].second].px,
+                                                              poses[odo_edges[i].second].py,
+                                                              poses[odo_edges[i].second].pz,
+                                                              poses[odo_edges[i].second].om,
+                                                              poses[odo_edges[i].second].fi,
+                                                              poses[odo_edges[i].second].ka);
+
+            int ir = tripletListB.size();
+
+            int ic_1 = odo_edges[i].first * 6;
+            int ic_2 = odo_edges[i].second * 6;
+
+            for (size_t row = 0; row < 6; row++)
+            {
+                tripletListA.emplace_back(ir + row, ic_1, -jacobian(row, 0));
+                tripletListA.emplace_back(ir + row, ic_1 + 1, -jacobian(row, 1));
+                tripletListA.emplace_back(ir + row, ic_1 + 2, -jacobian(row, 2));
+                tripletListA.emplace_back(ir + row, ic_1 + 3, -jacobian(row, 3));
+                tripletListA.emplace_back(ir + row, ic_1 + 4, -jacobian(row, 4));
+                tripletListA.emplace_back(ir + row, ic_1 + 5, -jacobian(row, 5));
+
+                tripletListA.emplace_back(ir + row, ic_2, -jacobian(row, 6));
+                tripletListA.emplace_back(ir + row, ic_2 + 1, -jacobian(row, 7));
+                tripletListA.emplace_back(ir + row, ic_2 + 2, -jacobian(row, 8));
+                tripletListA.emplace_back(ir + row, ic_2 + 3, -jacobian(row, 9));
+                tripletListA.emplace_back(ir + row, ic_2 + 4, -jacobian(row, 10));
+                tripletListA.emplace_back(ir + row, ic_2 + 5, -jacobian(row, 11));
+            }
+
+            tripletListB.emplace_back(ir, 0, delta(0, 0));
+            tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+            tripletListB.emplace_back(ir + 2, 0, delta(2, 0));
+            tripletListB.emplace_back(ir + 3, 0, delta(3, 0));
+            tripletListB.emplace_back(ir + 4, 0, delta(4, 0));
+            tripletListB.emplace_back(ir + 5, 0, delta(5, 0));
+
+            tripletListP.emplace_back(ir, ir, 1000000);
+            tripletListP.emplace_back(ir + 1, ir + 1, 1000000);
+            tripletListP.emplace_back(ir + 2, ir + 2, 1000000);
+            tripletListP.emplace_back(ir + 3, ir + 3, 1000000);
+            tripletListP.emplace_back(ir + 4, ir + 4, 1000000);
+            tripletListP.emplace_back(ir + 5, ir + 5, 1000000);
+        }
+
+        int ic = 0;
+        int ir = tripletListB.size();
+        tripletListA.emplace_back(ir, ic * 6 + 0, 1);
+        tripletListA.emplace_back(ir + 1, ic * 6 + 1, 1);
+        tripletListA.emplace_back(ir + 2, ic * 6 + 2, 1);
+        tripletListA.emplace_back(ir + 3, ic * 6 + 3, 1);
+        tripletListA.emplace_back(ir + 4, ic * 6 + 4, 1);
+        tripletListA.emplace_back(ir + 5, ic * 6 + 5, 1);
+
+        tripletListP.emplace_back(ir, ir, 1);
+        tripletListP.emplace_back(ir + 1, ir + 1, 1);
+        tripletListP.emplace_back(ir + 2, ir + 2, 1);
+        tripletListP.emplace_back(ir + 3, ir + 3, 1);
+        tripletListP.emplace_back(ir + 4, ir + 4, 1);
+        tripletListP.emplace_back(ir + 5, ir + 5, 1);
+
+        tripletListB.emplace_back(ir, 0, 0);
+        tripletListB.emplace_back(ir + 1, 0, 0);
+        tripletListB.emplace_back(ir + 2, 0, 0);
+        tripletListB.emplace_back(ir + 3, 0, 0);
+        tripletListB.emplace_back(ir + 4, 0, 0);
+        tripletListB.emplace_back(ir + 5, 0, 0);
+
+        Eigen::SparseMatrix<double> matA(tripletListB.size(), worker_data.poses.size() * 6);
+        Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
+        Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
+
+        matA.setFromTriplets(tripletListA.begin(), tripletListA.end());
+        matP.setFromTriplets(tripletListP.begin(), tripletListP.end());
+        matB.setFromTriplets(tripletListB.begin(), tripletListB.end());
+
+        Eigen::SparseMatrix<double> AtPA(worker_data.poses.size() * 6, worker_data.poses.size() * 6);
+        Eigen::SparseMatrix<double> AtPB(worker_data.poses.size() * 6, 1);
+
+        {
+            Eigen::SparseMatrix<double> AtP = matA.transpose() * matP;
+            AtPA = (AtP)*matA;
+            AtPB = (AtP)*matB;
+        }
+
+        tripletListA.clear();
+        tripletListP.clear();
+        tripletListB.clear();
+
+        // AtPA += AtPAndt.sparseView();
+        // AtPB += AtPBndt.sparseView();
+
+        // Eigen::SparseMatrix<double> AtPA_I(intrinsics.size() * 6, intrinsics.size() * 6);
+        // AtPA_I.setIdentity();
+        // AtPA_I *= 1;
+        // AtPA += AtPA_I;
+
+        Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>>
+            solver(AtPA);
+        std::cout << "start solving" << std::endl;
+        Eigen::SparseMatrix<double> x = solver.solve(AtPB);
+        std::cout << "start finished" << std::endl;
+        std::vector<double> h_x;
+        for (int k = 0; k < x.outerSize(); ++k)
+        {
+            for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
+            {
+                // std::cout << it.value() << " ";
+                h_x.push_back(it.value());
+            }
+            // std::cout << std::endl;
+        }
+
+        if (h_x.size() == 6 * worker_data.poses.size())
+        {
+            int counter = 0;
+
+            for (size_t i = 0; i < worker_data.poses.size(); i++)
+            {
+                TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(worker_data.poses[i]);
+                auto prev_pose = pose;
+                pose.px += h_x[counter++];
+                pose.py += h_x[counter++];
+                pose.pz += h_x[counter++];
+                pose.om += h_x[counter++];
+                pose.fi += h_x[counter++];
+                pose.ka += h_x[counter++];
+
+                worker_data.poses[i] = affine_matrix_from_pose_tait_bryan(pose);
+                all_data[index_rendered_points_local].poses[i] = worker_data.poses[i];
+            }
+        }
+        else
+        {
+            std::cout << "optimization failed" << std::endl;
+        }
+    }
+
+#endif
+    return;
+}
+
+std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> get_nn()
+{
+    std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> nn;
+    if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
+    {
+        // for (int i = 0; i < all_data[index_rendered_points_local].poses.size(); i++){
+        //     all_data[index_rendered_points_local].poses[i](0, 3) += 1.0;
+        // }
+
+        auto worker_data = all_data[index_rendered_points_local];
+
+        // index data
+        for (int i = 0; i < worker_data.points_local.size(); i++)
+        {
+            auto lower = std::lower_bound(worker_data.timestamps.begin(), worker_data.timestamps.end(), worker_data.points_local[i].timestamp,
+                                          [](std::pair<double, double> lhs, double rhs) -> bool
+                                          { return lhs.first < rhs; });
+
+            int index_pose = std::distance(worker_data.timestamps.begin(), lower);
+
+            if (index_pose >= 0 && index_pose < worker_data.poses.size())
+            {
+                worker_data.points_local[i].index_pose = index_pose;
+            }
+            else
+            {
+                worker_data.points_local[i].index_pose = -1;
+            }
+        }
+
+        NDT::GridParameters rgd_params;
+        // rgd_params.resolution_X = 0.3; // distance bucket
+        // rgd_params.resolution_Y = 0.3; // polar angle deg
+        // rgd_params.resolution_Z = 0.3; // azimutal angle deg
+
+        rgd_params.resolution_X = rgd_x; // distance bucket
+        rgd_params.resolution_Y = rgd_y; // polar angle deg
+        rgd_params.resolution_Z = rgd_z; // azimutal angle deg
+
+        std::vector<Point3Di> point_cloud_global;
+        std::vector<Point3Di> points_local;
+
+        std::vector<Eigen::Vector3d> point_cloud_global_sc;
+        std::vector<Point3Di> points_local_sc;
+
+        for (int i = 0; i < worker_data.points_local.size(); i++)
+        {
+            double r_l = worker_data.points_local[i].point.norm();
+            if (r_l > 0.5 && worker_data.points_local[i].index_pose != -1)
+            {
+                double polar_angle_deg_l = atan2(worker_data.points_local[i].point.y(), worker_data.points_local[i].point.x()) / M_PI * 180.0;
+                double azimutal_angle_deg_l = acos(worker_data.points_local[i].point.z() / r_l) / M_PI * 180.0;
+
+                Eigen::Vector3d pp = worker_data.points_local[i].point;
+                // pps.x() = r;
+                // pps.y() = polar_angle_deg;
+                // pps.z() = azimutal_angle_deg;
+                // point_cloud_spherical_coordinates.push_back(pps);
+
+                Eigen::Affine3d pose = worker_data.poses[worker_data.points_local[i].index_pose];
+
+                pp = pose * pp;
+
+                Point3Di pg = worker_data.points_local[i];
+                pg.point = pp;
+
+                point_cloud_global.push_back(pg);
+                points_local.push_back(worker_data.points_local[i]);
+
+                ///////////////////////////////////////////////////////
+                Point3Di p_sl = worker_data.points_local[i];
+                p_sl.point.x() = r_l;
+                p_sl.point.y() = polar_angle_deg_l;
+                p_sl.point.z() = azimutal_angle_deg_l;
+
+                points_local_sc.push_back(p_sl);
+                //
+                double r_g = pg.point.norm();
+                double polar_angle_deg_g = atan2(pg.point.y(), pg.point.x()) / M_PI * 180.0;
+                double azimutal_angle_deg_g = acos(pg.point.z() / r_l) / M_PI * 180.0;
+
+                Eigen::Vector3d p_sg = worker_data.points_local[i].point;
+                p_sg.x() = r_g;
+                p_sg.y() = polar_angle_deg_g;
+                p_sg.z() = azimutal_angle_deg_g;
+
+                point_cloud_global_sc.push_back(p_sg);
+            }
+        }
+
+        NDTBucketMapType buckets;
+        update_rgd_spherical_coordinates(rgd_params, buckets, point_cloud_global, point_cloud_global_sc, {0, 0, 0});
+
+        /////////////
+        // std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> nn;
+        Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
+
+        for (int i = 0; i < point_cloud_global_sc.size(); i++)
+        {
+            auto index_of_bucket = get_rgd_index(point_cloud_global_sc[i], b);
+
+            auto bucket_it = buckets.find(index_of_bucket);
+
+            if (bucket_it != buckets.end())
+            {
+                auto &this_bucket = bucket_it->second;
+                this_bucket.number_of_points++;
+                // const auto &curr_mean = points_global[i].point;
+                const auto &mean = this_bucket.mean;
+
+                nn.emplace_back(point_cloud_global[i].point, mean);
+
+                //////////////
+            }
+        }
+    }
+    return nn;
+}
+
+void draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd = 3)
+{
+
+    Eigen::LLT<Eigen::Matrix<double, 3, 3>> cholSolver(covar);
+    Eigen::Matrix3d transform = cholSolver.matrixL();
+
+    const double pi = 3.141592;
+    const double di = 0.02;
+    const double dj = 0.04;
+    const double du = di * 2 * pi;
+    const double dv = dj * pi;
+    glColor3f(color.x(), color.y(), color.z());
+
+    for (double i = 0; i < 1.0; i += di) // horizonal
+    {
+        for (double j = 0; j < 1.0; j += dj) // vertical
+        {
+            double u = i * 2 * pi;     // 0     to  2pi
+            double v = (j - 0.5) * pi; //-pi/2 to pi/2
+
+            const Eigen::Vector3d pp0(cos(v) * cos(u), cos(v) * sin(u), sin(v));
+            const Eigen::Vector3d pp1(cos(v) * cos(u + du), cos(v) * sin(u + du), sin(v));
+            const Eigen::Vector3d pp2(cos(v + dv) * cos(u + du), cos(v + dv) * sin(u + du), sin(v + dv));
+            const Eigen::Vector3d pp3(cos(v + dv) * cos(u), cos(v + dv) * sin(u), sin(v + dv));
+            Eigen::Vector3d tp0 = transform * (nstd * pp0) + mean;
+            Eigen::Vector3d tp1 = transform * (nstd * pp1) + mean;
+            Eigen::Vector3d tp2 = transform * (nstd * pp2) + mean;
+            Eigen::Vector3d tp3 = transform * (nstd * pp3) + mean;
+
+            glBegin(GL_LINE_LOOP);
+            glVertex3dv(tp0.data());
+            glVertex3dv(tp1.data());
+            glVertex3dv(tp2.data());
+            glVertex3dv(tp3.data());
+            glEnd();
+        }
+    }
+}
+
+std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov()
+{
+    std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> mc;
+    if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
+    {
+        // for (int i = 0; i < all_data[index_rendered_points_local].poses.size(); i++){
+        //     all_data[index_rendered_points_local].poses[i](0, 3) += 1.0;
+        // }
+
+        auto worker_data = all_data[index_rendered_points_local];
+
+        // index data
+        for (int i = 0; i < worker_data.points_local.size(); i++)
+        {
+            auto lower = std::lower_bound(worker_data.timestamps.begin(), worker_data.timestamps.end(), worker_data.points_local[i].timestamp,
+                                          [](std::pair<double, double> lhs, double rhs) -> bool
+                                          { return lhs.first < rhs; });
+
+            int index_pose = std::distance(worker_data.timestamps.begin(), lower);
+
+            if (index_pose >= 0 && index_pose < worker_data.poses.size())
+            {
+                worker_data.points_local[i].index_pose = index_pose;
+            }
+            else
+            {
+                worker_data.points_local[i].index_pose = -1;
+            }
+        }
+
+        NDT::GridParameters rgd_params;
+        // rgd_params.resolution_X = 0.3; // distance bucket
+        // rgd_params.resolution_Y = 0.3; // polar angle deg
+        // rgd_params.resolution_Z = 0.3; // azimutal angle deg
+
+        rgd_params.resolution_X = rgd_x; // distance bucket
+        rgd_params.resolution_Y = rgd_y; // polar angle deg
+        rgd_params.resolution_Z = rgd_z; // azimutal angle deg
+
+        std::vector<Point3Di> point_cloud_global;
+        std::vector<Point3Di> points_local;
+
+        std::vector<Eigen::Vector3d> point_cloud_global_sc;
+        std::vector<Point3Di> points_local_sc;
+
+        for (int i = 0; i < worker_data.points_local.size(); i++)
+        {
+            double r_l = worker_data.points_local[i].point.norm();
+            if (r_l > 0.5 && worker_data.points_local[i].index_pose != -1)
+            {
+                double polar_angle_deg_l = atan2(worker_data.points_local[i].point.y(), worker_data.points_local[i].point.x()) / M_PI * 180.0;
+                double azimutal_angle_deg_l = acos(worker_data.points_local[i].point.z() / r_l) / M_PI * 180.0;
+
+                Eigen::Vector3d pp = worker_data.points_local[i].point;
+                // pps.x() = r;
+                // pps.y() = polar_angle_deg;
+                // pps.z() = azimutal_angle_deg;
+                // point_cloud_spherical_coordinates.push_back(pps);
+
+                Eigen::Affine3d pose = worker_data.poses[worker_data.points_local[i].index_pose];
+
+                pp = pose * pp;
+
+                Point3Di pg = worker_data.points_local[i];
+                pg.point = pp;
+
+                point_cloud_global.push_back(pg);
+                points_local.push_back(worker_data.points_local[i]);
+
+                ///////////////////////////////////////////////////////
+                Point3Di p_sl = worker_data.points_local[i];
+                p_sl.point.x() = r_l;
+                p_sl.point.y() = polar_angle_deg_l;
+                p_sl.point.z() = azimutal_angle_deg_l;
+
+                points_local_sc.push_back(p_sl);
+                //
+                double r_g = pg.point.norm();
+                double polar_angle_deg_g = atan2(pg.point.y(), pg.point.x()) / M_PI * 180.0;
+                double azimutal_angle_deg_g = acos(pg.point.z() / r_l) / M_PI * 180.0;
+
+                Eigen::Vector3d p_sg = worker_data.points_local[i].point;
+                p_sg.x() = r_g;
+                p_sg.y() = polar_angle_deg_g;
+                p_sg.z() = azimutal_angle_deg_g;
+
+                point_cloud_global_sc.push_back(p_sg);
+            }
+        }
+
+        NDTBucketMapType buckets;
+        update_rgd_spherical_coordinates(rgd_params, buckets, point_cloud_global, point_cloud_global_sc, {0, 0, 0});
+
+        /////////////
+        Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
+
+        for (const auto &b : buckets)
+        {
+            auto &this_bucket = b.second;
+
+            mc.emplace_back(this_bucket.mean, this_bucket.cov);
+        }
+    }
+
+    return mc;
 }

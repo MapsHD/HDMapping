@@ -132,8 +132,8 @@ void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::
               NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread );
 
 void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3Di> &intermediate_points_sf, std::vector<Eigen::Affine3d> &intermediate_trajectory,
-                  std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-                  NDT::GridParameters &rgd_params, bool useMultithread);
+                  const std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
+                  NDT::GridParameters &rgd_params, bool useMultithread, double wx, double wy, double wz, double wom, double wfi, double wka);
 
 void optimize_icp(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
                   std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,

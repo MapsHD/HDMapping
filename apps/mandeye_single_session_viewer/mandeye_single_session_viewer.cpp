@@ -206,6 +206,9 @@ void project_gui()
             }
 
             ImGui::Text(session.point_clouds_container.point_clouds[index_rendered_points_local].file_name.c_str());
+
+            double ts = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps[0] / 1e9;
+                        ImGui::Text((std::string("ts: ") + std::to_string(ts)).c_str());
         }
 
         ImGui::End();

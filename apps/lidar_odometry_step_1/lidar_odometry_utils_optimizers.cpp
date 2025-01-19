@@ -807,8 +807,13 @@ void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::
 }
 
 void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3Di> &intermediate_points_sf, std::vector<Eigen::Affine3d> &intermediate_trajectory,
-                  std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-                  NDT::GridParameters &rgd_params, bool useMultithread)
+                  const std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
+                  NDT::GridParameters &rgd_params, bool useMultithread, double wx,
+                  double wy,
+                  double wz,
+                  double wom,
+                  double wfi,
+                  double wka)
 {
     std::vector<Point3Di> point_cloud_global;
     std::vector<Eigen::Vector3d> point_cloud_global_sc;
@@ -848,10 +853,15 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
         auto &this_bucket = bucket_it->second;
 
         const Eigen::Matrix3d &infm = this_bucket.cov.inverse();
-        const double threshold = 10000.0;
+        const double threshold = 100000.0;
 
         if ((infm.array() > threshold).any())
         {
+            std::cout << "> threshold" << std::endl;
+            std::cout << this_bucket.cov << std::endl;
+            std::cout << "-------------" << std::endl;
+            std::cout << infm << std::endl;
+            std::cout << "-------------" << std::endl;
             return;
         }
         if ((infm.array() < -threshold).any())
@@ -884,28 +894,33 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
         // planarity
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
         auto eigen_values = eigen_solver.eigenvalues();
-        // auto eigen_vectors = eigen_solver.eigenvectors();
+        auto eigen_vectors = eigen_solver.eigenvectors();
         double ev1 = eigen_values.x();
         double ev2 = eigen_values.y();
         double ev3 = eigen_values.z();
         double sum_ev = ev1 + ev2 + ev3;
         auto planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
 
-        double norm = p_s.norm();
+        // double norm = p_s.norm();
 
-        Eigen::Vector3d pp = point_cloud_global_sc[indexes_i];
+        // Eigen::Vector3d pp = point_cloud_global_sc[indexes_i];
 
-        double a = pp.x() * sin(pp.y() * M_PI / 180.0);
-        double b = pp.x() * sin(pp.z() * M_PI / 180.0);
-        // double scale_factor =
+        // double a = pp.x() * sin(pp.y() * M_PI / 180.0);
+        // double b = pp.x() * sin(pp.z() * M_PI / 180.0);
+        //   double scale_factor =
 
-        double w = planarity * norm / (a * b);
-        if (w > 10.0)
-        {
-            // std::cout << w << " " << planarity << " " << norm << "x " << p_s.x() << "y " << p_s.y() << "z " << p_s.z() << std::endl;
-            w = 10.0;
-        }
+        // double w = planarity;
+        // ouble w = planarity / (a * b);
+        // if (w > 10.0)
+        //{
+        //  std::cout << w << " " << planarity << " " << norm << "x " << p_s.x() << "y " << p_s.y() << "z " << p_s.z() << std::endl;
+        //    w = 10.0;
+        //}
 
+        // double ref1 = rgd_params.resolution_X * sin(rgd_params.resolution_Y * M_PI / 180.0);
+        // double ref2 = rgd_params.resolution_X * sin(rgd_params.resolution_Z * M_PI / 180.0);
+
+        double w = planarity; // * (ref1 * ref2) / (a * b);
         AtPA *= w;
         AtPB *= w;
 
@@ -945,7 +960,7 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
 
     for (size_t i = 0; i < odo_edges.size(); i++)
     {
-        /*Eigen::Matrix<double, 6, 1> relative_pose_measurement_odo;
+        Eigen::Matrix<double, 6, 1> relative_pose_measurement_odo;
         relative_pose_tait_bryan_wc_case1_simplified_1(relative_pose_measurement_odo,
                                                        poses_desired[odo_edges[i].first].px,
                                                        poses_desired[odo_edges[i].first].py,
@@ -958,7 +973,7 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
                                                        poses_desired[odo_edges[i].second].pz,
                                                        poses_desired[odo_edges[i].second].om,
                                                        poses_desired[odo_edges[i].second].fi,
-                                                       poses_desired[odo_edges[i].second].ka);*/
+                                                       poses_desired[odo_edges[i].second].ka);
 
         Eigen::Matrix<double, 12, 12> AtPAodo;
         relative_pose_obs_eq_tait_bryan_wc_case1_AtPA_simplified(AtPAodo,
@@ -974,12 +989,12 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
                                                                  poses[odo_edges[i].second].om,
                                                                  poses[odo_edges[i].second].fi,
                                                                  poses[odo_edges[i].second].ka,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 1000000);
+                                                                 wx,
+                                                                 wy,
+                                                                 wz,
+                                                                 wom,
+                                                                 wfi,
+                                                                 wka);
         Eigen::Matrix<double, 12, 1> AtPBodo;
         relative_pose_obs_eq_tait_bryan_wc_case1_AtPB_simplified(AtPBodo,
                                                                  poses[odo_edges[i].first].px,
@@ -994,19 +1009,19 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
                                                                  poses[odo_edges[i].second].om,
                                                                  poses[odo_edges[i].second].fi,
                                                                  poses[odo_edges[i].second].ka,
-                                                                 // relative_pose_measurement_odo(0, 0),
-                                                                 // relative_pose_measurement_odo(1, 0),
-                                                                 // relative_pose_measurement_odo(2, 0),
-                                                                 // relative_pose_measurement_odo(3, 0),
-                                                                 // relative_pose_measurement_odo(4, 0),
-                                                                 // relative_pose_measurement_odo(5, 0),
-                                                                 0, 0, 0, 0, 0, 0,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 1000000);
+                                                                 relative_pose_measurement_odo(0, 0),
+                                                                 relative_pose_measurement_odo(1, 0),
+                                                                 relative_pose_measurement_odo(2, 0),
+                                                                 relative_pose_measurement_odo(3, 0),
+                                                                 relative_pose_measurement_odo(4, 0),
+                                                                 relative_pose_measurement_odo(5, 0),
+                                                                 // 0, 0, 0, 0, 0, 0,
+                                                                 wx,
+                                                                 wy,
+                                                                 wz,
+                                                                 wom,
+                                                                 wfi,
+                                                                 wka);
         int ic_1 = odo_edges[i].first * 6;
         int ic_2 = odo_edges[i].second * 6;
 
@@ -1079,9 +1094,9 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
     AtPA += AtPAndt.sparseView();
     AtPB += AtPBndt.sparseView();
 
-    Eigen::SparseMatrix<double> AtPA_I(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
-    AtPA_I.setIdentity();
-    AtPA += AtPA_I;
+    // Eigen::SparseMatrix<double> AtPA_I(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
+    // AtPA_I.setIdentity();
+    // AtPA += AtPA_I;
 
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>>
         solver(AtPA);
@@ -1116,8 +1131,8 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
             // if ((p1 - p2).norm() < 1.0)
             //{
             intermediate_trajectory[i] = affine_matrix_from_pose_tait_bryan(pose);
-            intermediate_trajectory_motion_model[i] = intermediate_trajectory[i];
-            //}
+            // intermediate_trajectory_motion_model[i] = intermediate_trajectory[i];
+            // }
         }
     }
     ///
@@ -1161,7 +1176,7 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
 
         // if(buckets[index_of_bucket].number_of_points >= 5){
         const Eigen::Matrix3d &infm = this_bucket.cov.inverse();
-        const double threshold = 10000.0;
+        const double threshold = 100000.0;
 
         if ((infm.array() > threshold).any())
         {
@@ -2195,6 +2210,9 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             //     file1 << worker_data[i].intermediate_trajectory[k](0, 3) << " " << worker_data[i].intermediate_trajectory[k](1, 3) << " " << worker_data[i].intermediate_trajectory[k](2, 3) << " 0" << std::endl;
             // }
             // file1.close();
+
+            auto tmp_worker_data = worker_data[i].intermediate_trajectory;
+
             if (params.use_robust_and_accurate_lidar_odometry)
             {
                 auto tr = worker_data[i].intermediate_trajectory;
@@ -2212,7 +2230,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 }
 
                 NDT::GridParameters rgd_params_sc;
-                
+
                 rgd_params_sc.resolution_X = params.distance_bucket;
                 rgd_params_sc.resolution_Y = params.polar_angle_deg;
                 rgd_params_sc.resolution_Z = params.azimutal_angle_deg;
@@ -2229,11 +2247,13 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 for (int ii = 0; ii < worker_data[i].intermediate_points.size(); ii++)
                 {
                     double r_l = worker_data[i].intermediate_points[ii].point.norm();
+
+                    //std::cout << worker_data[i].intermediate_points[ii].index_pose << " ";
                     if (r_l > 0.5 && worker_data[i].intermediate_points[ii].index_pose != -1 && r_l < params.max_distance_lidar)
                     {
                         double polar_angle_deg_l = atan2(worker_data[i].intermediate_points[ii].point.y(), worker_data[i].intermediate_points[ii].point.x()) / M_PI * 180.0;
                         double azimutal_angle_deg_l = acos(worker_data[i].intermediate_points[ii].point.z() / r_l) / M_PI * 180.0;
-                       
+
                         points_local.push_back(worker_data[i].intermediate_points[ii]);
 
                         ///////////////////////////////////////////////////////
@@ -2249,7 +2269,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 std::cout << "optimize_sf2" << std::endl;
                 for (int iter = 0; iter < params.robust_and_accurate_lidar_odometry_iterations; iter++)
                 {
-                    optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, params.useMultithread);
+                    optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, params.useMultithread, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000);
                 }
 
                 for (auto &t : tr)
@@ -2358,12 +2378,12 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
             if (!(acc_distance == acc_distance))
             {
-                //worker_data[i].intermediate_trajectory = tmp_worker_data;
+                worker_data[i].intermediate_trajectory = tmp_worker_data;
                 std::cout << "CHALLENGING DATA OCCURED!!!" << std::endl;
-                //acc_distance = acc_distance_tmp;
+                acc_distance = acc_distance_tmp;
                 std::cout << "please split data set into subsets" << std::endl;
-                //ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
-                //// std::cout << "calculations canceled for TIMESTAMP: " << (long long int)worker_data[i].intermediate_trajectory_timestamps[0].first << std::endl;
+                ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
+                std::cout << "calculations canceled for TIMESTAMP: " << (long long int)worker_data[i].intermediate_trajectory_timestamps[0].first << std::endl;
                 return false;
             }
 
@@ -3182,7 +3202,7 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
                 auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), all_points_local[index].timestamp,
                                               [](std::pair<double, double> lhs, double rhs) -> bool
                                               { return lhs.first < rhs; });
-                int index_pose = std::distance(timestamps.begin(), lower);
+                int index_pose = std::distance(timestamps.begin(), lower) - 1;
                 if (index_pose >= 0 && index_pose < trajectory.size())
                 {
                     auto pl = all_points_local[index];
@@ -3217,7 +3237,7 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
                 auto &this_bucket = bucket_it->second;
 
                 const Eigen::Matrix3d &infm = this_bucket.cov.inverse();
-                const double threshold = 10000.0;
+                const double threshold = 100000.0;
 
                 if ((infm.array() > threshold).any())
                 {
@@ -3588,7 +3608,7 @@ void Consistency2(std::vector<WorkerData> &worker_data, LidarOdometryParams &par
             auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), all_points_local[index].timestamp,
                                           [](std::pair<double, double> lhs, double rhs) -> bool
                                           { return lhs.first < rhs; });
-            int index_pose = std::distance(timestamps.begin(), lower);
+            int index_pose = std::distance(timestamps.begin(), lower) - 1;
             if (index_pose >= 0 && index_pose < trajectory.size())
             {
                 auto pl = all_points_local[index];
@@ -3783,7 +3803,7 @@ void Consistency2(std::vector<WorkerData> &worker_data, LidarOdometryParams &par
                 auto &this_bucket = bb.second;
 
                 const Eigen::Matrix3d &infm = this_bucket.cov.inverse();
-                const double threshold = 10000.0;
+                const double threshold = 100000.0;
 
                 if ((infm.array() > threshold).any())
                 {

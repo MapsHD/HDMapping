@@ -935,13 +935,13 @@ int main(int argc, char *argv[])
 
 void optimize()
 {
-    if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
-    {
-        auto worker_data = all_data[index_rendered_points_local];
+    //if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
+    //{
+    //    auto worker_data = all_data[index_rendered_points_local];
 
-        auto tr = worker_data.intermediate_trajectory;
-        auto trmm = worker_data.intermediate_trajectory_motion_model;
-    }
+    //    auto tr = worker_data.intermediate_trajectory;
+    //    auto trmm = worker_data.intermediate_trajectory_motion_model;
+    //}
 
 #if 0
     if (params.use_robust_and_accurate_lidar_odometry)

@@ -881,6 +881,34 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
 
         int c = intermediate_points[indexes_i].index_pose * 6;
 
+        // planarity
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+        auto eigen_values = eigen_solver.eigenvalues();
+        // auto eigen_vectors = eigen_solver.eigenvectors();
+        double ev1 = eigen_values.x();
+        double ev2 = eigen_values.y();
+        double ev3 = eigen_values.z();
+        double sum_ev = ev1 + ev2 + ev3;
+        auto planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
+
+        double norm = p_s.norm();
+
+        Eigen::Vector3d pp = point_cloud_global_sc[indexes_i];
+
+        double a = pp.x() * sin(pp.y() * M_PI / 180.0);
+        double b = pp.x() * sin(pp.z() * M_PI / 180.0);
+        // double scale_factor =
+
+        double w = planarity * norm / (a * b);
+        if (w > 10.0)
+        {
+            // std::cout << w << " " << planarity << " " << norm << "x " << p_s.x() << "y " << p_s.y() << "z " << p_s.z() << std::endl;
+            w = 10.0;
+        }
+
+        AtPA *= w;
+        AtPB *= w;
+
         std::mutex &m = mutexes[intermediate_points[indexes_i].index_pose];
         std::unique_lock lck(m);
         AtPAndt.block<6, 6>(c, c) += AtPA;
@@ -2330,12 +2358,12 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
             if (!(acc_distance == acc_distance))
             {
-                worker_data[i].intermediate_trajectory = tmp_worker_data;
+                //worker_data[i].intermediate_trajectory = tmp_worker_data;
                 std::cout << "CHALLENGING DATA OCCURED!!!" << std::endl;
-                acc_distance = acc_distance_tmp;
+                //acc_distance = acc_distance_tmp;
                 std::cout << "please split data set into subsets" << std::endl;
-                ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
-                // std::cout << "calculations canceled for TIMESTAMP: " << (long long int)worker_data[i].intermediate_trajectory_timestamps[0].first << std::endl;
+                //ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
+                //// std::cout << "calculations canceled for TIMESTAMP: " << (long long int)worker_data[i].intermediate_trajectory_timestamps[0].first << std::endl;
                 return false;
             }
 

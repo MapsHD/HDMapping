@@ -1026,7 +1026,7 @@ std::unordered_map<int, Eigen::Affine3d> MLvxCalib::CombineIntoCalibration(const
     std::unordered_map<int, Eigen::Affine3d> dataMap;
     for (const auto &[id, sn] : idToSn)
     {
-        std::cout << "XXX: "<< id << " " << sn << std::endl;
+        //std::cout << "XXX: "<< id << " " << sn << std::endl;
         const auto &affine = calibration.at(sn);
         dataMap[id] = affine;
     }

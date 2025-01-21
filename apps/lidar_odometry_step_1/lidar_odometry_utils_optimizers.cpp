@@ -960,7 +960,7 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
 
     for (size_t i = 0; i < odo_edges.size(); i++)
     {
-        Eigen::Matrix<double, 6, 1> relative_pose_measurement_odo;
+        /*Eigen::Matrix<double, 6, 1> relative_pose_measurement_odo;
         relative_pose_tait_bryan_wc_case1_simplified_1(relative_pose_measurement_odo,
                                                        poses_desired[odo_edges[i].first].px,
                                                        poses_desired[odo_edges[i].first].py,
@@ -973,7 +973,7 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
                                                        poses_desired[odo_edges[i].second].pz,
                                                        poses_desired[odo_edges[i].second].om,
                                                        poses_desired[odo_edges[i].second].fi,
-                                                       poses_desired[odo_edges[i].second].ka);
+                                                       poses_desired[odo_edges[i].second].ka);*/
 
         Eigen::Matrix<double, 12, 12> AtPAodo;
         relative_pose_obs_eq_tait_bryan_wc_case1_AtPA_simplified(AtPAodo,
@@ -1009,13 +1009,13 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
                                                                  poses[odo_edges[i].second].om,
                                                                  poses[odo_edges[i].second].fi,
                                                                  poses[odo_edges[i].second].ka,
-                                                                 relative_pose_measurement_odo(0, 0),
-                                                                 relative_pose_measurement_odo(1, 0),
-                                                                 relative_pose_measurement_odo(2, 0),
-                                                                 relative_pose_measurement_odo(3, 0),
-                                                                 relative_pose_measurement_odo(4, 0),
-                                                                 relative_pose_measurement_odo(5, 0),
-                                                                 // 0, 0, 0, 0, 0, 0,
+                                                                 //relative_pose_measurement_odo(0, 0),
+                                                                 //relative_pose_measurement_odo(1, 0),
+                                                                 //relative_pose_measurement_odo(2, 0),
+                                                                 //relative_pose_measurement_odo(3, 0),
+                                                                 //relative_pose_measurement_odo(4, 0),
+                                                                 //relative_pose_measurement_odo(5, 0),
+                                                                 0, 0, 0, 0, 0, 0,
                                                                  wx,
                                                                  wy,
                                                                  wz,
@@ -1056,12 +1056,12 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
     tripletListA.emplace_back(ir + 4, ic * 6 + 4, 1);
     tripletListA.emplace_back(ir + 5, ic * 6 + 5, 1);
 
-    tripletListP.emplace_back(ir, ir, 1000000);
-    tripletListP.emplace_back(ir + 1, ir + 1, 1000000);
-    tripletListP.emplace_back(ir + 2, ir + 2, 1000000);
-    tripletListP.emplace_back(ir + 3, ir + 3, 1000000);
-    tripletListP.emplace_back(ir + 4, ir + 4, 1000000);
-    tripletListP.emplace_back(ir + 5, ir + 5, 1000000);
+    tripletListP.emplace_back(ir, ir, 100000000);
+    tripletListP.emplace_back(ir + 1, ir + 1, 100000000);
+    tripletListP.emplace_back(ir + 2, ir + 2, 100000000);
+    tripletListP.emplace_back(ir + 3, ir + 3, 100000000);
+    tripletListP.emplace_back(ir + 4, ir + 4, 100000000);
+    tripletListP.emplace_back(ir + 5, ir + 5, 100000000);
 
     tripletListB.emplace_back(ir, 0, 0);
     tripletListB.emplace_back(ir + 1, 0, 0);
@@ -1094,9 +1094,9 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
     AtPA += AtPAndt.sparseView();
     AtPB += AtPBndt.sparseView();
 
-    // Eigen::SparseMatrix<double> AtPA_I(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
-    // AtPA_I.setIdentity();
-    // AtPA += AtPA_I;
+    Eigen::SparseMatrix<double> AtPA_I(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
+    AtPA_I.setIdentity();
+    AtPA += AtPA_I;
 
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>>
         solver(AtPA);

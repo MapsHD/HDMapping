@@ -2,6 +2,7 @@
 #include <hash_utils.h>
 #include <mutex>
 
+#include <export_laz.h>
 // extern std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> global_tmp;
 
 std::vector<std::pair<int, int>> nns(std::vector<Point3Di> points_global, const std::vector<int> &indexes_for_nn)
@@ -815,6 +816,8 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
                   double wfi,
                   double wka)
 {
+
+    auto trj = intermediate_trajectory;
     std::vector<Point3Di> point_cloud_global;
     std::vector<Eigen::Vector3d> point_cloud_global_sc;
     std::vector<int> indexes;
@@ -857,11 +860,11 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
 
         if ((infm.array() > threshold).any())
         {
-            std::cout << "> threshold" << std::endl;
-            std::cout << this_bucket.cov << std::endl;
-            std::cout << "-------------" << std::endl;
-            std::cout << infm << std::endl;
-            std::cout << "-------------" << std::endl;
+            //std::cout << "> threshold" << std::endl;
+            //std::cout << this_bucket.cov << std::endl;
+            //std::cout << "-------------" << std::endl;
+            //std::cout << infm << std::endl;
+            //std::cout << "-------------" << std::endl;
             return;
         }
         if ((infm.array() < -threshold).any())
@@ -1056,12 +1059,12 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
     tripletListA.emplace_back(ir + 4, ic * 6 + 4, 1);
     tripletListA.emplace_back(ir + 5, ic * 6 + 5, 1);
 
-    tripletListP.emplace_back(ir, ir, 100000000);
-    tripletListP.emplace_back(ir + 1, ir + 1, 100000000);
-    tripletListP.emplace_back(ir + 2, ir + 2, 100000000);
-    tripletListP.emplace_back(ir + 3, ir + 3, 100000000);
-    tripletListP.emplace_back(ir + 4, ir + 4, 100000000);
-    tripletListP.emplace_back(ir + 5, ir + 5, 100000000);
+    tripletListP.emplace_back(ir, ir, 1000000);
+    tripletListP.emplace_back(ir + 1, ir + 1, 1000000);
+    tripletListP.emplace_back(ir + 2, ir + 2, 1000000);
+    tripletListP.emplace_back(ir + 3, ir + 3, 1000000);
+    tripletListP.emplace_back(ir + 4, ir + 4, 1000000);
+    tripletListP.emplace_back(ir + 5, ir + 5, 1000000);
 
     tripletListB.emplace_back(ir, 0, 0);
     tripletListB.emplace_back(ir + 1, 0, 0);
@@ -1118,12 +1121,12 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
         {
             TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(intermediate_trajectory[i]);
             auto prev_pose = pose;
-            pose.px += h_x[counter++];
-            pose.py += h_x[counter++];
-            pose.pz += h_x[counter++];
-            pose.om += h_x[counter++];
-            pose.fi += h_x[counter++];
-            pose.ka += h_x[counter++];
+            pose.px += h_x[counter++] * 0.5;
+            pose.py += h_x[counter++] * 0.5;
+            pose.pz += h_x[counter++] * 0.5;
+            pose.om += h_x[counter++] * 0.5;
+            pose.fi += h_x[counter++] * 0.5;
+            pose.ka += h_x[counter++] * 0.5;
 
             // Eigen::Vector3d p1(prev_pose.px, prev_pose.py, prev_pose.pz);
             // Eigen::Vector3d p2(pose.px, pose.py, pose.pz);
@@ -1134,6 +1137,23 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
             // intermediate_trajectory_motion_model[i] = intermediate_trajectory[i];
             // }
         }
+
+        //
+
+        //auto trj = intermediate_trajectory;
+        Eigen::Affine3d first = trj[0];
+        std::vector<Eigen::Affine3d> out;
+        out.push_back(first);
+
+        for (int i = 1; i < intermediate_trajectory.size(); i++){
+            auto update = intermediate_trajectory[i - 1].inverse() * intermediate_trajectory[i];
+
+            first = first * update;
+            out.push_back(first);
+        }
+
+        intermediate_trajectory = out;
+        //
     }
     ///
 }
@@ -1188,12 +1208,12 @@ void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Aff
         }
 
         // check nv
-        Eigen::Vector3d &nv = this_bucket.normal_vector;
-        Eigen::Vector3d viewport = intermediate_trajectory[intermediate_points_i.index_pose].translation();
-        if (nv.dot(viewport - this_bucket.mean) < 0)
-        {
-            return;
-        }
+        //Eigen::Vector3d &nv = this_bucket.normal_vector;
+        //Eigen::Vector3d viewport = intermediate_trajectory[intermediate_points_i.index_pose].translation();
+        //if (nv.dot(viewport - this_bucket.mean) < 0)
+        //{
+        //    return;
+        //}
 
         const Eigen::Affine3d &m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
         const Eigen::Vector3d &p_s = intermediate_points_i.point;
@@ -2267,9 +2287,67 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 }
                 ///
                 std::cout << "optimize_sf2" << std::endl;
+                bool debug = false;
+                std::vector<Eigen::Vector3d> pointcloud;
+                std::vector<unsigned short> intensity;
+                std::vector<double> timestamps;
+
+                if(debug){
+                    static int index_fn = 0;
+
+                    for (int i = 0; i < points_local.size(); i++)
+                    {
+                        Eigen::Vector3d pg = points_local[i].point;
+                        pg = tr[points_local[i].index_pose] * pg;
+                        pointcloud.push_back(pg);
+                        intensity.push_back(points_local[i].intensity);
+                        timestamps.push_back(0);
+                    }
+
+                    //std::string output_file_name = "before_optimize_sf2_" + std::to_string(index_fn) + ".laz";
+
+                    //if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
+                    //{
+                    //    std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    //}
+                }
+
+                double wx = 1000000;
+                double wy = 1000000;
+                double wz = 1000000;
+                double angle_sigma_rad = 0.01 / 180.0 * M_PI;
+                double wom = 1.0 / (angle_sigma_rad * angle_sigma_rad);
+                double wfi = 1.0 / (angle_sigma_rad * angle_sigma_rad);
+                double wka = 1.0 / (angle_sigma_rad * angle_sigma_rad);
+
                 for (int iter = 0; iter < params.robust_and_accurate_lidar_odometry_iterations; iter++)
                 {
-                    optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, params.useMultithread, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000);
+                    optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, params.useMultithread, wx, wy, wz, wom, wfi, wka);
+                }
+
+                if (debug)
+                {
+                    static int index_fn = 0;
+
+                    //std::vector<Eigen::Vector3d> pointcloud;
+                    //std::vector<unsigned short> intensity;
+                    //std::vector<double> timestamps;
+
+                    for (int i = 0; i < points_local.size(); i++)
+                    {
+                        Eigen::Vector3d pg = points_local[i].point;
+                        pg = tr[points_local[i].index_pose] * pg;
+                        pointcloud.push_back(pg);
+                        intensity.push_back(points_local[i].intensity);
+                        timestamps.push_back(1);
+                    }
+
+                    std::string output_file_name = "optimize_sf2_" + std::to_string(index_fn++) + ".laz";
+
+                    if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
+                    {
+                        std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    }
                 }
 
                 for (auto &t : tr)

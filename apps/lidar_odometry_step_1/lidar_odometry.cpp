@@ -105,14 +105,16 @@ void lidar_odometry_gui()
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
-        ImGui::Text("It saves session.json file in 'Working directory'.");
+        
+        
+        ImGui::Text(("It saves session.json file in " + working_directory + "\\lidar_odometry_result_*").c_str() );
         ImGui::Text("Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program.");
         ImGui::Checkbox("simple_gui", &simple_gui);
         if (!simple_gui)
         {
             ImGui::SliderFloat("mouse_sensitivity_xy", &mouse_sensitivity, 0.1, 10);
         }
-        ImGui::Text(("Working directory ('session.json' will be saved here): '" + working_directory + "'").c_str());
+        ImGui::Text(("Working directory ('session.json' will be saved here): '" + working_directory + "\\lidar_odometry_result_*'").c_str());
         // ImGui::Checkbox("show_all_points", &show_all_points);
         ImGui::InputFloat3("rotation center", rotation_center.data());
 

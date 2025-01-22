@@ -1,6 +1,7 @@
 #include "lidar_odometry_utils.h"
 #include <filesystem>
 #include "csv.hpp"
+#include <algorithm>
 
 // this function provides unique index
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z)
@@ -107,6 +108,33 @@ std::vector<Point3Di> decimate(const std::vector<Point3Di> &points, double bucke
     return out;
 }
 
+void limit_covariance(Eigen::Matrix3d &io_cov)
+{
+    return;
+    //std::cout << "------io_cov in ------------" << std::endl;
+    //std::cout << io_cov << std::endl;
+
+    Eigen::EigenSolver<Eigen::Matrix3d> eigensolver;
+    eigensolver.compute(io_cov);
+
+    Eigen::Vector3d eigenValues = eigensolver.eigenvalues().real();
+    Eigen::Matrix3d eigenVectors = eigensolver.eigenvectors().real();
+
+    // modify eigen values
+    for (int k = 0; k < 3; ++k)
+    {
+        eigenValues(k) = std::max(eigenValues(k), 0.00001);
+    }
+
+    // create diagonal matrix
+    Eigen::DiagonalMatrix<double, 3> diagonal_matrix(eigenValues(0), eigenValues(1), eigenValues(2));
+
+    // update covariance
+    io_cov = eigenVectors * diagonal_matrix * eigenVectors.inverse();
+    //std::cout << "------io_cov out ------------" << std::endl;
+    //std::cout << io_cov << std::endl;
+}
+
 void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
                 std::vector<Point3Di> &points_global, Eigen::Vector3d viewport)
 {
@@ -139,37 +167,40 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+
+                //limit_covariance(this_bucket.cov);
             }
 
             if (this_bucket.number_of_points == 3)
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-
+                //limit_covariance(this_bucket.cov);
                 // calculate normal vector
-                Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
-                Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
+                //Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+                //Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
 
-                Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
-                nv.normalize();
+                //Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
+                //nv.normalize();
 
                 // flip towards viewport
-                if (nv.dot(viewport - this_bucket.mean) < 0.0)
-                {
-                    nv *= -1.0;
-                }
-                this_bucket.normal_vector = nv;
+                //if (nv.dot(viewport - this_bucket.mean) < 0.0)
+                //{
+                //    nv *= -1.0;
+                //}
+                //this_bucket.normal_vector = nv;
             }
 
             if (this_bucket.number_of_points > 3)
             {
-                Eigen::Vector3d &nv = this_bucket.normal_vector;
+                //Eigen::Vector3d &nv = this_bucket.normal_vector;
 
-                if (nv.dot(viewport - this_bucket.mean) >= 0.0)
-                {
+                //if (nv.dot(viewport - this_bucket.mean) >= 0.0)
+                //{
                     this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                       cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-                }
+                    //limit_covariance(this_bucket.cov);
+                //}
             }
         }
         else
@@ -215,37 +246,39 @@ void update_rgd_spherical_coordinates(NDT::GridParameters &rgd_params, NDTBucket
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+                //limit_covariance(this_bucket.cov);
             }
 
             if (this_bucket.number_of_points == 3)
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-
+                //limit_covariance(this_bucket.cov);
                 // calculate normal vector
-                Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
-                Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
+                //Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+                //Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
 
-                Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
-                nv.normalize();
+                //Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
+                //nv.normalize();
 
                 // flip towards viewport
-                if (nv.dot(viewport - this_bucket.mean) < 0.0)
-                {
-                    nv *= -1.0;
-                }
-                this_bucket.normal_vector = nv;
+                //if (nv.dot(viewport - this_bucket.mean) < 0.0)
+                //{
+                //    nv *= -1.0;
+                //}
+                //this_bucket.normal_vector = nv;
             }
 
             if (this_bucket.number_of_points > 3)
             {
-                Eigen::Vector3d &nv = this_bucket.normal_vector;
+                //Eigen::Vector3d &nv = this_bucket.normal_vector;
 
-                if (nv.dot(viewport - this_bucket.mean) >= 0.0)
-                {
+                //if (nv.dot(viewport - this_bucket.mean) >= 0.0)
+                //{
                     this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                       cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-                }
+                    //limit_covariance(this_bucket.cov);
+                //}
             }
         }
         else

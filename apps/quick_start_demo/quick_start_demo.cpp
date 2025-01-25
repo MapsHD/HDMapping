@@ -513,7 +513,7 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
                 optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
-                         params.in_out_params, params.buckets, params.useMultithread /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
+                         params.in_out_params, params.buckets, params.useMultithread, 70.0 /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
             }
 
             end1 = std::chrono::system_clock::now();

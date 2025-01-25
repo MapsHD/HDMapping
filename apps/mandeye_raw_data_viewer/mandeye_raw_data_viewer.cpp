@@ -1030,7 +1030,7 @@ void optimize()
         Eigen::Vector3d b(rgd_params_sc.resolution_X, rgd_params_sc.resolution_Y, rgd_params_sc.resolution_Z);
 
         NDTBucketMapType buckets;
-        update_rgd_spherical_coordinates(rgd_params_sc, buckets, point_cloud_global, point_cloud_global_sc, {0, 0, 0});
+        update_rgd_spherical_coordinates(rgd_params_sc, buckets, point_cloud_global, point_cloud_global_sc);
         //update_rgd(rgd_params_sc, buckets, point_cloud_global, {0, 0, 0});
 
         std::vector<Eigen::Triplet<double>> tripletListA;
@@ -1484,7 +1484,7 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> get_nn()
         }
 
         NDTBucketMapType buckets;
-        update_rgd_spherical_coordinates(rgd_params, buckets, point_cloud_global, point_cloud_global_sc, {0, 0, 0});
+        update_rgd_spherical_coordinates(rgd_params, buckets, point_cloud_global, point_cloud_global_sc);
 
         /////////////
         // std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> nn;
@@ -1642,7 +1642,7 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov()
         }
 
         NDTBucketMapType buckets;
-        update_rgd_spherical_coordinates(rgd_params, buckets, point_cloud_global, point_cloud_global_sc, {0, 0, 0});
+        update_rgd_spherical_coordinates(rgd_params, buckets, point_cloud_global, point_cloud_global_sc);
 
         /////////////
         Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);

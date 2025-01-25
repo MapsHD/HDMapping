@@ -215,7 +215,7 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
 }
 
 void update_rgd_spherical_coordinates(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
-                                      std::vector<Point3Di> &points_global, std::vector<Eigen::Vector3d> &points_global_spherical, Eigen::Vector3d viewport)
+                                      std::vector<Point3Di> &points_global, std::vector<Eigen::Vector3d> &points_global_spherical)
 {
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
@@ -249,7 +249,7 @@ void update_rgd_spherical_coordinates(NDT::GridParameters &rgd_params, NDTBucket
                 //limit_covariance(this_bucket.cov);
             }
 
-            if (this_bucket.number_of_points == 3)
+            if (this_bucket.number_of_points >= 3)
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
@@ -269,17 +269,17 @@ void update_rgd_spherical_coordinates(NDT::GridParameters &rgd_params, NDTBucket
                 //this_bucket.normal_vector = nv;
             }
 
-            if (this_bucket.number_of_points > 3)
-            {
-                //Eigen::Vector3d &nv = this_bucket.normal_vector;
+            //if (this_bucket.number_of_points > 3)
+            //{
+            //Eigen::Vector3d &nv = this_bucket.normal_vector;
 
-                //if (nv.dot(viewport - this_bucket.mean) >= 0.0)
-                //{
-                    this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
-                                      cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-                    //limit_covariance(this_bucket.cov);
-                //}
-            }
+            //if (nv.dot(viewport - this_bucket.mean) >= 0.0)
+            //{
+            //        this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+            //                          cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+            //limit_covariance(this_bucket.cov);
+            //}
+            //}
         }
         else
         {

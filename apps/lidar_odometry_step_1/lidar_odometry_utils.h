@@ -66,6 +66,7 @@ struct LidarOdometryParams
     double sliding_window_trajectory_length_threshold = 5.0;
     bool save_calibration_validation = true;
     int calibration_validation_points = 1000000;
+    double max_distance = 70.0;
 
     //rgd_sf
     bool use_robust_and_accurate_lidar_odometry = false;
@@ -74,6 +75,19 @@ struct LidarOdometryParams
     double azimutal_angle_deg = 5.0;
     int robust_and_accurate_lidar_odometry_iterations = 20;
     double max_distance_lidar = 30.0;
+
+    double distance_bucket_rigid_sf = 0.5;
+    double polar_angle_deg_rigid_sf = 10.0;
+    double azimutal_angle_deg_rigid_sf = 10.0;
+    int robust_and_accurate_lidar_odometry_rigid_sf_iterations = 30;
+    double max_distance_lidar_rigid_sf = 70.0;
+
+    double rgd_sf_sigma_x_m = 0.001;
+    double rgd_sf_sigma_y_m = 0.001;
+    double rgd_sf_sigma_z_m = 0.001;
+    double rgd_sf_sigma_om_deg = 0.01;
+    double rgd_sf_sigma_fi_deg = 0.01;
+    double rgd_sf_sigma_ka_deg = 0.01;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);
@@ -90,7 +104,7 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
                 std::vector<Point3Di> &points_global, Eigen::Vector3d viewport = Eigen::Vector3d(0, 0, 0));
 
 void update_rgd_spherical_coordinates(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
-                                      std::vector<Point3Di> &points_global, std::vector<Eigen::Vector3d> &points_global_spherical, Eigen::Vector3d viewport);
+                                      std::vector<Point3Di> &points_global, std::vector<Eigen::Vector3d> &points_global_spherical);
 
 //! This function load inertial measurement unit data.
 //! This function expects a file with the following format:
@@ -123,7 +137,7 @@ void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eig
 // this function performs main LiDAR odometry calculations
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread /*,
+              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread, double max_distance /*,
                bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
 );
 

@@ -14,7 +14,10 @@
 // The output is a session proving trajekctory and point clouds that can be  further processed by "multi_view_tls_registration" program.
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
-#define THRESHOLD_NR_POSES 20
+// #define THRESHOLD_NR_POSES 20
+
+int THRESHOLD_NR_POSES = 20;
+
 namespace fs = std::filesystem;
 
 // std::vector<Point3Di> initial_points;
@@ -89,6 +92,7 @@ std::vector<std::string> sn_files;
 std::string imuSnToUse;
 Session session;
 
+bool full_lidar_odometry_gui = false;
 // std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> global_tmp;
 
 void alternative_approach();
@@ -99,20 +103,728 @@ Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationP
 //                double offset_y,
 //                double offset_alt);
 
+void lidar_odometry_gui();
+
+#if _WIN32
+#define DEFAULT_PATH "C:\\"
+#else
+#define DEFAULT_PATH "~"
+#endif
+
+
+void step1(){
+    static std::shared_ptr<pfd::open_file> open_file;
+    std::vector<std::string> input_file_names;
+    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+    const auto t = [&]()
+    {
+        std::vector<std::string> filters;
+        auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
+        for (int i = 0; i < sel.size(); i++)
+        {
+            input_file_names.push_back(sel[i]);
+            // std::cout << "las file: '" << input_file_name << "'" << std::endl;
+        }
+    };
+    std::thread t1(t);
+    t1.join();
+
+    std::sort(std::begin(input_file_names), std::end(input_file_names));
+
+    // std::vector<std::string> csv_files;
+    std::vector<std::string> laz_files;
+    // std::vector<std::string> sn_files;
+
+    std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
+                  {
+                    if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
+                    {
+                        laz_files.push_back(fileName);
+                    }
+                    if (fileName.ends_with(".csv"))
+                    {
+                        csv_files.push_back(fileName);
+                    }
+                    if (fileName.ends_with(".sn"))
+                    {
+                        sn_files.push_back(fileName);
+                    } });
+
+    for (int i = 0; i < laz_files.size(); i++)
+    {
+        fs::path lf(laz_files[i]);
+        std::string lfs = lf.filename().stem().string().substr(lf.filename().stem().string().size() - 4);
+
+        bool found = false;
+        for (int j = 0; j < csv_files.size(); j++)
+        {
+            fs::path cf(csv_files[j]);
+            std::string cfs = cf.filename().stem().string().substr(cf.filename().stem().string().size() - 4);
+            if (lfs.compare(cfs) == 0)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            std::cout << "there is no IMU file for: " << laz_files[i] << std::endl;
+        }
+    }
+
+    for (int i = 0; i < csv_files.size(); i++)
+    {
+        fs::path lf(csv_files[i]);
+        std::string lfs = lf.filename().stem().string().substr(lf.filename().stem().string().size() - 4);
+
+        bool found = false;
+        for (int j = 0; j < laz_files.size(); j++)
+        {
+            fs::path cf(laz_files[j]);
+            std::string cfs = cf.filename().stem().string().substr(cf.filename().stem().string().size() - 4);
+            if (lfs.compare(cfs) == 0)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            std::cout << "there is no LAZ file for: " << csv_files[i] << std::endl;
+        }
+    }
+
+    if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
+    {
+        working_directory = fs::path(input_file_names[0]).parent_path().string();
+
+        // check if folder exists!
+        if (!fs::exists(working_directory))
+        {
+            std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
+
+            std::string message_info = "folder '" + working_directory + "' does not exist --> PLEASE REMOVE e.g. POLISH LETTERS from path. !!!PROGRAM WILL SHUT DOWN AFTER THIS MESSAGE!!!";
+
+            [[maybe_unused]]
+            pfd::message message(
+                "Information",
+                message_info.c_str(),
+                pfd::choice::ok, pfd::icon::error);
+            message.result();
+            exit(1);
+        }
+
+        const auto calibrationFile = (fs::path(working_directory) / "calibration.json").string();
+        const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
+        imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
+        if (!preloadedCalibration.empty())
+        {
+            std::cout << "Loaded calibration for: \n";
+            for (const auto &[sn, _] : preloadedCalibration)
+            {
+                std::cout << " -> " << sn << std::endl;
+            }
+        }
+        else
+        {
+            std::cout << "There is no calibration.json file in folder (check comment in source code) file: " << __FILE__ << " line: " << __LINE__ << std::endl;
+            std::cout << "IGNORE THIS MESSAGE IF YOU HAVE ONLY 1 LIDAR" << std::endl;
+
+            // example file for 2x livox";
+            /*
+            {
+                "calibration" : {
+                    "47MDL9T0020193" : {
+                        "identity" : "true"
+                    },
+                    "47MDL9S0020300" :
+                        {
+                            "order" : "ROW",
+                            "inverted" : "TRUE",
+                            "data" : [
+                                0.999824, 0.00466397, -0.0181595, -0.00425984,
+                                -0.0181478, -0.00254457, -0.999832, -0.151599,
+                                -0.0047094, 0.999986, -0.00245948, -0.146408,
+                                0, 0, 0, 1
+                            ]
+                        }
+                },
+                                "imuToUse" : "47MDL9T0020193"
+            }*/
+        }
+
+        fs::path wdp = fs::path(input_file_names[0]).parent_path();
+        wdp /= "preview";
+        if (!fs::exists(wdp))
+        {
+            std::cout << "trying creating folder: '" << wdp << "'" << std::endl;
+            fs::create_directory(wdp);
+            std::cout << "folder created" << std::endl;
+        }
+
+        params.working_directory_preview = wdp.string();
+
+        for (size_t i = 0; i < input_file_names.size(); i++)
+        {
+            std::cout << input_file_names[i] << std::endl;
+        }
+        std::cout << "loading imu" << std::endl;
+        std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
+
+        for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
+        {
+            const std::string &imufn = csv_files.at(fileNo);
+            const std::string snFn = (fileNo >= sn_files.size()) ? ("") : (sn_files.at(fileNo));
+            const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
+            // GetId of Imu to use
+            int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
+            std::cout << "imuNumberToUse  " << imuNumberToUse << " at '" << imufn << "'" << std::endl;
+            auto imu = load_imu(imufn.c_str(), imuNumberToUse);
+            std::cout << imufn << " with mapping " << snFn << std::endl;
+            imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
+        }
+
+        std::cout << "loading points" << std::endl;
+        std::vector<std::vector<Point3Di>> pointsPerFile;
+        pointsPerFile.resize(laz_files.size());
+        std::mutex mtx;
+        std::cout << "start std::transform" << std::endl;
+
+        std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [&](const std::string &fn)
+                       {
+                           // Load mapping from id to sn
+                           fs::path fnSn(fn);
+                           fnSn.replace_extension(".sn");
+
+                           // GetId of Imu to use
+                           const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
+                           auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
+                           auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy, calibration);
+
+                           std::sort(data.begin(), data.end(), [](const Point3Di &a, const Point3Di &b)
+                                     { return a.timestamp < b.timestamp; });
+
+                           if ((fn == laz_files.front()) && (params.save_calibration_validation))
+                           {
+                               fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
+                               std::ofstream testPointcloud{calibrationValidtationFile.c_str()};
+                               int row_index = 0;
+                               for (const auto &p : data)
+                               {
+                                   if (row_index++ >= params.calibration_validation_points)
+                                   {
+                                       break;
+                                   }
+                                   testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int)p.lidarid << "\n";
+                               }
+                           }
+
+                           std::unique_lock lck(mtx);
+                           for (const auto &[id, calib] : calibration)
+                           {
+                               std::cout << " id : " << id << std::endl;
+                               std::cout << calib.matrix() << std::endl;
+                           }
+                           return data;
+                           // std::cout << fn << std::endl;
+                           //
+                       });
+        std::cout << "std::transform finished" << std::endl;
+
+        FusionAhrs ahrs;
+        FusionAhrsInitialise(&ahrs);
+
+        if (fusionConventionNwu)
+        {
+            ahrs.settings.convention = FusionConventionNwu;
+        }
+        if (fusionConventionEnu)
+        {
+            ahrs.settings.convention = FusionConventionEnu;
+        }
+        if (fusionConventionNed)
+        {
+            ahrs.settings.convention = FusionConventionNed;
+        }
+
+        ahrs.settings.gain = ahrs_gain;
+
+        std::map<double, std::pair<Eigen::Matrix4d, double>>
+            trajectory;
+
+        int counter = 1;
+        for (const auto &[timestamp_pair, gyr, acc] : imu_data)
+        {
+            const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
+            const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
+
+            // std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z: " << acc.axis.z << std::endl;
+
+            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
+
+            FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
+
+            Eigen::Quaterniond d{quat.element.w, quat.element.x, quat.element.y, quat.element.z};
+            Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
+            t.rotate(d);
+
+            //
+            // TaitBryanPose rot_y;
+            // rot_y.px = rot_y.py = rot_y.pz = rot_y.px = rot_y.py = rot_y.pz;
+            // rot_y.fi = -5 * M_PI / 180.0;
+            // Eigen::Affine3d m_rot_y = affine_matrix_from_pose_tait_bryan(rot_y);
+            // t = t * m_rot_y;
+            //
+            // std::map<double, Eigen::Matrix4d> trajectory;
+            trajectory[timestamp_pair.first] = std::pair(t.matrix(), timestamp_pair.second);
+            const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+            counter++;
+            if (counter % 100 == 0)
+            {
+                printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+            }
+        }
+
+        int number_of_points = 0;
+        for (const auto &pp : pointsPerFile)
+        {
+            number_of_points += pp.size();
+        }
+        std::cout << "number of points: " << number_of_points << std::endl;
+        std::cout << "start transforming points" << std::endl;
+
+        int number_of_initial_points = 0;
+        double timestamp_begin;
+        for (const auto &pp : pointsPerFile)
+        {
+            // number_of_points += pp.size();
+            for (const auto &p : pp)
+            {
+                number_of_initial_points++;
+                params.initial_points.push_back(p);
+                if (number_of_initial_points > threshold_initial_points)
+                {
+                    timestamp_begin = p.timestamp;
+                    break;
+                }
+            }
+            if (number_of_initial_points > threshold_initial_points)
+            {
+                break;
+            }
+        }
+
+        std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
+
+        std::vector<std::pair<double, double>> timestamps;
+        std::vector<Eigen::Affine3d> poses;
+        for (const auto &t : trajectory)
+        {
+            if (t.first >= timestamp_begin)
+            {
+                timestamps.emplace_back(t.first, t.second.second);
+                Eigen::Affine3d m;
+                m.matrix() = t.second.first;
+                poses.push_back(m);
+            }
+        }
+
+        std::cout << "poses.size(): " << poses.size() << std::endl;
+
+        if (poses.empty())
+        {
+            std::cerr << "Loading poses went wrong! Could not load poses!" << std::endl;
+            return;
+        }
+
+        int thershold = THRESHOLD_NR_POSES;
+        WorkerData wd;
+        // std::vector<double> temp_ts;
+        // temp_ts.reserve(1000000);
+
+        // int last_point = 0;
+        int index_begin = 0;
+
+        const int n_iter = std::floor(poses.size() / thershold);
+        worker_data.reserve(n_iter);
+        for (int i = 0; i < n_iter; i++)
+        {
+            if (i % 50 == 0)
+            {
+                std::cout << "preparing data " << i + 1 << " of " << n_iter << std::endl;
+            }
+            WorkerData wd;
+            wd.intermediate_trajectory.reserve(thershold);
+            wd.intermediate_trajectory_motion_model.reserve(thershold);
+            wd.intermediate_trajectory_timestamps.reserve(thershold);
+            wd.imu_om_fi_ka.reserve(thershold);
+            for (int ii = 0; ii < thershold; ii++)
+            {
+                int idx = i * thershold + ii;
+                wd.intermediate_trajectory.emplace_back(poses[idx]);
+                wd.intermediate_trajectory_motion_model.emplace_back(poses[idx]);
+                wd.intermediate_trajectory_timestamps.emplace_back(timestamps[idx]);
+                TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(poses[idx]);
+                // wd.imu_roll_pitch.emplace_back(tb.om, tb.fi);
+                wd.imu_om_fi_ka.emplace_back(tb.om, tb.fi, tb.ka);
+            }
+            std::vector<Point3Di> points;
+            bool found = false;
+            auto lower = pointsPerFile[0].begin();
+            for (int index = index_begin; index < pointsPerFile.size(); index++)
+            {
+                auto lower = std::lower_bound(
+                    pointsPerFile[index].begin(), pointsPerFile[index].end(),
+                    wd.intermediate_trajectory_timestamps[0].first,
+                    [](const Point3Di &point, double timestamp)
+                    {
+                        return point.timestamp < timestamp;
+                    });
+                auto upper = std::lower_bound(
+                    pointsPerFile[index].begin(), pointsPerFile[index].end(),
+                    wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first,
+                    [](const Point3Di &point, double timestamp)
+                    {
+                        return point.timestamp < timestamp;
+                    });
+                auto tmp = std::distance(lower, upper);
+                points.reserve(points.size() + std::distance(lower, upper));
+                if (lower != upper)
+                {
+                    points.insert(points.end(), std::make_move_iterator(lower), std::make_move_iterator(upper));
+                    found = true;
+                }
+            }
+
+            wd.original_points = points;
+            for (unsigned long long int k = 0; k < wd.original_points.size(); k++)
+            {
+                Point3Di &p = wd.original_points[k];
+                auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp,
+                                              [](std::pair<double, double> lhs, double rhs) -> bool
+                                              { return lhs.first < rhs; });
+                p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
+            }
+
+            if (params.decimation > 0.0)
+            {
+                wd.intermediate_points = decimate(wd.original_points, params.decimation, params.decimation, params.decimation);
+            }
+            worker_data.push_back(wd);
+        }
+
+        params.m_g = worker_data[0].intermediate_trajectory[0];
+        step_1_done = true;
+        std::cout << "step_1_done please click 'compute_all (step 2)' to continue calculations" << std::endl;
+    }
+    else
+    {
+        std::cout << "please select files correctly" << std::endl;
+        std::cout << "input_file_names.size(): " << input_file_names.size() << std::endl;
+        std::cout << "laz_files.size(): " << laz_files.size() << std::endl;
+        std::cout << "csv_files.size(): " << csv_files.size() << std::endl;
+
+        std::cout << "condition: input_file_names.size() > 0 && laz_files.size() == csv_files.size() NOT SATISFIED!!!" << std::endl;
+    }
+}
+
+void step2(){
+    double ts_failure = 0.0;
+    if (compute_step_2(worker_data, params, ts_failure))
+    {
+        step_2_done = true;
+    }
+    else
+    {
+        for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
+        {
+            const std::string &imufn = csv_files.at(fileNo);
+            const std::string snFn = (fileNo >= sn_files.size()) ? ("") : (sn_files.at(fileNo));
+            const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
+            // GetId of Imu to use
+            int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
+            auto imu = load_imu(imufn.c_str(), imuNumberToUse);
+
+            if (imu.size() > 0)
+            {
+                if (std::get<0>(imu[imu.size() - 1]).first > ts_failure)
+                {
+                    break;
+                }
+            }
+            std::cout << "file: '" << imufn << "' [OK]" << std::endl;
+        }
+        calculations_failed = true;
+    }
+}
+
+void save_results(bool info){
+    static int result = 0;
+    fs::path outwd = working_directory / fs::path("lidar_odometry_result_" + std::to_string(result));
+    std::filesystem::create_directory(outwd);
+    result++;
+    // concatenate data
+    std::vector<WorkerData>
+        worker_data_concatenated;
+    WorkerData wd;
+    int counter = 0;
+    int pose_offset = 0;
+    for (int i = 0; i < worker_data.size(); i++)
+    {
+        if (i % 1000 == 0)
+        {
+            printf("processing worker_data [%d] of %d \n", i + 1, worker_data.size());
+        }
+        auto tmp_data = worker_data[i].original_points;
+
+        /*// filter data
+        std::vector<Point3Di> filtered_local_point_cloud;
+        for (auto &t : tmp_data)
+        {
+            auto pp = worker_data[i].intermediate_trajectory[t.index_pose].inverse() * t.point;
+            if(pp.norm() > threshould_output_filter){
+                filtered_local_point_cloud.push_back(t);
+            }
+        }
+        tmp_data = filtered_local_point_cloud;*/
+
+        for (auto &t : tmp_data)
+        {
+            t.index_pose += pose_offset;
+        }
+
+        wd.intermediate_trajectory.insert(std::end(wd.intermediate_trajectory),
+                                          std::begin(worker_data[i].intermediate_trajectory), std::end(worker_data[i].intermediate_trajectory));
+
+        wd.intermediate_trajectory_timestamps.insert(std::end(wd.intermediate_trajectory_timestamps),
+                                                     std::begin(worker_data[i].intermediate_trajectory_timestamps), std::end(worker_data[i].intermediate_trajectory_timestamps));
+
+        wd.original_points.insert(std::end(wd.original_points),
+                                  std::begin(tmp_data), std::end(tmp_data));
+
+        wd.imu_om_fi_ka.insert(std::end(wd.imu_om_fi_ka), std::begin(worker_data[i].imu_om_fi_ka), std::end(worker_data[i].imu_om_fi_ka));
+
+        pose_offset += worker_data[i].intermediate_trajectory.size();
+
+        counter++;
+        if (counter > 50)
+        {
+            worker_data_concatenated.push_back(wd);
+            wd.intermediate_trajectory.clear();
+            wd.intermediate_trajectory_timestamps.clear();
+            wd.original_points.clear();
+            wd.imu_om_fi_ka.clear();
+
+            counter = 0;
+            pose_offset = 0;
+        }
+    }
+
+    if (counter > 10)
+    {
+        worker_data_concatenated.push_back(wd);
+    }
+
+    std::vector<Eigen::Affine3d> m_poses;
+    std::vector<std::string> file_names;
+    for (int i = 0; i < worker_data_concatenated.size(); i++)
+    {
+        std::cout << "------------------------" << std::endl;
+        fs::path path(outwd);
+        std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
+        path /= filename;
+        std::cout << "saving to: " << path << std::endl;
+        saveLaz(path.string(), worker_data_concatenated[i], threshould_output_filter);
+        m_poses.push_back(worker_data_concatenated[i].intermediate_trajectory[0]);
+        file_names.push_back(filename);
+
+        // save trajectory
+        std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
+        fs::path pathtrj(outwd);
+        pathtrj /= trajectory_filename;
+        std::cout << "saving to: " << pathtrj << std::endl;
+
+        ///
+        std::ofstream outfile;
+        outfile.open(pathtrj);
+        if (!outfile.good())
+        {
+            std::cout << "can not save file: " << pathtrj << std::endl;
+            return;
+        }
+
+        outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 timestampUnix_nanoseconds" << std::endl;
+        for (int j = 0; j < worker_data_concatenated[i].intermediate_trajectory.size(); j++)
+        {
+            auto pose = worker_data_concatenated[i].intermediate_trajectory[0].inverse() * worker_data_concatenated[i].intermediate_trajectory[j];
+
+            outfile
+                << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].first * 1e9 << " " << std::setprecision(10)
+                << pose(0, 0) << " "
+                << pose(0, 1) << " "
+                << pose(0, 2) << " "
+                << pose(0, 3) << " "
+                << pose(1, 0) << " "
+                << pose(1, 1) << " "
+                << pose(1, 2) << " "
+                << pose(1, 3) << " "
+                << pose(2, 0) << " "
+                << pose(2, 1) << " "
+                << pose(2, 2) << " "
+                << pose(2, 3) << " "
+                << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].second * 1e9 << " "
+                << worker_data_concatenated[i].imu_om_fi_ka[j].x() << " "
+                << worker_data_concatenated[i].imu_om_fi_ka[j].y() << " "
+                << worker_data_concatenated[i].imu_om_fi_ka[j].z() << " "
+                << std::endl;
+        }
+        outfile.close();
+        //
+    }
+    fs::path path(outwd);
+    path /= "lio_initial_poses.reg";
+    save_poses(path.string(), m_poses, file_names);
+    fs::path path2(outwd);
+    path2 /= "poses.reg";
+    save_poses(path2.string(), m_poses, file_names);
+
+    fs::path path3(outwd);
+    path3 /= "session.json";
+
+    // save session file
+    std::cout << "saving file: '" << path3 << "'" << std::endl;
+
+    nlohmann::json jj;
+    nlohmann::json j;
+
+    j["offset_x"] = 0.0;
+    j["offset_y"] = 0.0;
+    j["offset_z"] = 0.0;
+    j["folder_name"] = outwd;
+    j["out_folder_name"] = outwd;
+    j["poses_file_name"] = path2.string();
+    j["initial_poses_file_name"] = path.string();
+    j["out_poses_file_name"] = path2.string();
+    j["lidar_odometry_version"] = HDMAPPING_VERSION_STRING;
+
+    jj["Session Settings"] = j;
+
+    nlohmann::json jlaz_file_names;
+    for (int i = 0; i < worker_data_concatenated.size(); i++)
+    {
+        fs::path path(outwd);
+        std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
+        path /= filename;
+        std::cout << "adding file: " << path << std::endl;
+
+        nlohmann::json jfn{
+            {"file_name", path.string()}};
+        jlaz_file_names.push_back(jfn);
+    }
+    jj["laz_file_names"] = jlaz_file_names;
+
+    std::ofstream fs(path3.string());
+    fs << jj.dump(2);
+    fs.close();
+    step_3_done = true;
+
+    if(info){
+        // std::cout << "Results saved to folder: '" << outwd << "'" << std::endl;
+        std::string message_info = "Results saved to folder: '" + outwd.string() + "'";
+        std::cout << message_info << std::endl;
+        [[maybe_unused]]
+        pfd::message message(
+            "Information",
+            message_info.c_str(),
+            pfd::choice::ok, pfd::icon::info);
+        message.result();
+    }
+}
+
+void lidar_odometry_basic_gui()
+{
+    if (ImGui::Begin("lidar_odometry_simple_gui")){
+        if (ImGui::Button("Process MANDEYE data in folder"))
+        {
+            //auto dir = pfd::select_folder("Select any directory", DEFAULT_PATH).result();
+            //std::cout << "Selected dir: " << dir << "\n";
+
+            step1();
+
+            params.decimation = 0.01;
+            params.in_out_params.resolution_X = 0.1;
+            params.in_out_params.resolution_Y = 0.1;
+            params.in_out_params.resolution_Z = 0.1;
+            params.filter_threshold_xy = 0.3;
+
+            params.distance_bucket = 0.2;
+            params.polar_angle_deg = 10.0;
+            params.azimutal_angle_deg = 10.0;
+            params.robust_and_accurate_lidar_odometry_iterations = 20;
+            params.max_distance_lidar = 30.0;
+
+            params.use_robust_and_accurate_lidar_odometry = true;
+
+            step2();
+
+            save_results(false);
+
+            for (int i = 0; i < num_constistency_iter; i++)
+            {
+                std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
+                for (int ii = 0; ii < worker_data.size(); ii++)
+                {
+                    worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
+                }
+                Consistency(worker_data, params);
+            }
+
+            save_results(false);
+
+            //std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
+
+            std::string message_info = "Data saved to folders '" + working_directory + "\\lidar_odometry_result_0' and '" + working_directory + "\\lidar_odometry_result_1'";
+
+            [[maybe_unused]]
+            pfd::message message(
+                "Information",
+                message_info.c_str(),
+                pfd::choice::ok, pfd::icon::info);
+            message.result();
+            //exit(1);
+        }
+
+        ImGui::Checkbox("full_lidar_odometry_gui", &full_lidar_odometry_gui);
+
+        ImGui::End();
+        }
+
+    if (full_lidar_odometry_gui)
+    {
+        lidar_odometry_gui();
+    }
+}
+
 void lidar_odometry_gui()
 {
     if (ImGui::Begin("lidar_odometry_step_1"))
     {
         ImGui::Text("This program is first step in MANDEYE process.");
         ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
-        
-        
-        ImGui::Text(("It saves session.json file in " + working_directory + "\\lidar_odometry_result_*").c_str() );
+
+        ImGui::Text(("It saves session.json file in " + working_directory + "\\lidar_odometry_result_*").c_str());
         ImGui::Text("Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program.");
         ImGui::Checkbox("simple_gui", &simple_gui);
         if (!simple_gui)
         {
             ImGui::SliderFloat("mouse_sensitivity_xy", &mouse_sensitivity, 0.1, 10);
+            ImGui::InputInt("THRESHOLD_NR_POSES", &THRESHOLD_NR_POSES);
+            if (THRESHOLD_NR_POSES < 20)
+            {
+                THRESHOLD_NR_POSES = 20;
+            }
         }
         ImGui::Text(("Working directory ('session.json' will be saved here): '" + working_directory + "\\lidar_odometry_result_*'").c_str());
         // ImGui::Checkbox("show_all_points", &show_all_points);
@@ -137,6 +849,12 @@ void lidar_odometry_gui()
                 params.in_out_params.resolution_Y = 0.1;
                 params.in_out_params.resolution_Z = 0.1;
                 params.filter_threshold_xy = 0.3;
+
+                params.distance_bucket = 0.2;
+                params.polar_angle_deg = 10.0;
+                params.azimutal_angle_deg = 10.0;
+                params.robust_and_accurate_lidar_odometry_iterations = 20;
+                params.max_distance_lidar = 30.0;
             }
 
             ImGui::Checkbox("show_initial_points", &show_initial_points);
@@ -164,12 +882,14 @@ void lidar_odometry_gui()
             // ImGui::InputDouble("threshould_output_filter (all local points inside lidar xy_circle radius[m] will be removed during save)", &threshould_output_filter);
 
             ImGui::InputDouble("decimation (larger value of decimation better performance, but worse accuracy)", &params.decimation);
+            ImGui::InputDouble("max_distance of processed points (local LiDAR coordinates)", &params.max_distance);
             ImGui::InputInt("number iterations", &params.nr_iter);
             ImGui::InputDouble("sliding window trajectory length threshold", &params.sliding_window_trajectory_length_threshold);
             ImGui::InputInt("threshold initial points", &threshold_initial_points);
             ImGui::Checkbox("save_calibration_validation_file", &params.save_calibration_validation);
             ImGui::InputInt("number of calibration validation points", &params.calibration_validation_points);
             ImGui::Checkbox("use_multithread", &params.useMultithread);
+
             ImGui::Checkbox("fusionConventionNwu", &fusionConventionNwu);
             if (fusionConventionNwu)
             {
@@ -209,422 +929,9 @@ void lidar_odometry_gui()
 
             if (ImGui::Button("load data (step 1)"))
             {
+                step1();
 
-                static std::shared_ptr<pfd::open_file> open_file;
-                std::vector<std::string> input_file_names;
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-                const auto t = [&]()
-                {
-                    std::vector<std::string> filters;
-                    auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
-                    for (int i = 0; i < sel.size(); i++)
-                    {
-                        input_file_names.push_back(sel[i]);
-                        // std::cout << "las file: '" << input_file_name << "'" << std::endl;
-                    }
-                };
-                std::thread t1(t);
-                t1.join();
-
-                std::sort(std::begin(input_file_names), std::end(input_file_names));
-
-                // std::vector<std::string> csv_files;
-                std::vector<std::string> laz_files;
-                // std::vector<std::string> sn_files;
-
-                std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
-                              {
-                    if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
-                    {
-                        laz_files.push_back(fileName);
-                    }
-                    if (fileName.ends_with(".csv"))
-                    {
-                        csv_files.push_back(fileName);
-                    }
-                    if (fileName.ends_with(".sn"))
-                    {
-                        sn_files.push_back(fileName);
-                    } });
-
-                for (int i = 0; i < laz_files.size(); i++)
-                {
-                    fs::path lf(laz_files[i]);
-                    std::string lfs = lf.filename().stem().string().substr(lf.filename().stem().string().size() - 4);
-
-                    bool found = false;
-                    for (int j = 0; j < csv_files.size(); j++)
-                    {
-                        fs::path cf(csv_files[j]);
-                        std::string cfs = cf.filename().stem().string().substr(cf.filename().stem().string().size() - 4);
-                        if (lfs.compare(cfs) == 0)
-                        {
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if (!found)
-                    {
-                        std::cout << "there is no IMU file for: " << laz_files[i] << std::endl;
-                    }
-                }
-
-                for (int i = 0; i < csv_files.size(); i++)
-                {
-                    fs::path lf(csv_files[i]);
-                    std::string lfs = lf.filename().stem().string().substr(lf.filename().stem().string().size() - 4);
-
-                    bool found = false;
-                    for (int j = 0; j < laz_files.size(); j++)
-                    {
-                        fs::path cf(laz_files[j]);
-                        std::string cfs = cf.filename().stem().string().substr(cf.filename().stem().string().size() - 4);
-                        if (lfs.compare(cfs) == 0)
-                        {
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if (!found)
-                    {
-                        std::cout << "there is no LAZ file for: " << csv_files[i] << std::endl;
-                    }
-                }
-
-                if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
-                {
-                    working_directory = fs::path(input_file_names[0]).parent_path().string();
-
-                    // check if folder exists!
-                    if (!fs::exists(working_directory))
-                    {
-                        std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
-
-                        std::string message_info = "folder '" + working_directory + "' does not exist --> PLEASE REMOVE e.g. POLISH LETTERS from path. !!!PROGRAM WILL SHUT DOWN AFTER THIS MESSAGE!!!";
-
-                        [[maybe_unused]]
-                        pfd::message message(
-                            "Information",
-                            message_info.c_str(),
-                            pfd::choice::ok, pfd::icon::error);
-                        message.result();
-                        exit(1);
-                    }
-
-                    const auto calibrationFile = (fs::path(working_directory) / "calibration.json").string();
-                    const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
-                    imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
-                    if (!preloadedCalibration.empty())
-                    {
-                        std::cout << "Loaded calibration for: \n";
-                        for (const auto &[sn, _] : preloadedCalibration)
-                        {
-                            std::cout << " -> " << sn << std::endl;
-                        }
-                    }
-                    else
-                    {
-                        std::cout << "There is no calibration.json file in folder (check comment in source code) file: " << __FILE__ << " line: " << __LINE__ << std::endl;
-                        std::cout << "IGNORE THIS MESSAGE IF YOU HAVE ONLY 1 LIDAR" << std::endl;
-
-                        // example file for 2x livox";
-                        /*
-                        {
-                            "calibration" : {
-                                "47MDL9T0020193" : {
-                                    "identity" : "true"
-                                },
-                                "47MDL9S0020300" :
-                                    {
-                                        "order" : "ROW",
-                                        "inverted" : "TRUE",
-                                        "data" : [
-                                            0.999824, 0.00466397, -0.0181595, -0.00425984,
-                                            -0.0181478, -0.00254457, -0.999832, -0.151599,
-                                            -0.0047094, 0.999986, -0.00245948, -0.146408,
-                                            0, 0, 0, 1
-                                        ]
-                                    }
-                            },
-                                            "imuToUse" : "47MDL9T0020193"
-                        }*/
-                    }
-
-                    fs::path wdp = fs::path(input_file_names[0]).parent_path();
-                    wdp /= "preview";
-                    if (!fs::exists(wdp))
-                    {
-                        std::cout << "trying creating folder: '" << wdp << "'" << std::endl;
-                        fs::create_directory(wdp);
-                        std::cout << "folder created" << std::endl;
-                    }
-
-                    params.working_directory_preview = wdp.string();
-
-                    for (size_t i = 0; i < input_file_names.size(); i++)
-                    {
-                        std::cout << input_file_names[i] << std::endl;
-                    }
-                    std::cout << "loading imu" << std::endl;
-                    std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
-
-                    for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
-                    {
-                        const std::string &imufn = csv_files.at(fileNo);
-                        const std::string snFn = (fileNo >= sn_files.size()) ? ("") : (sn_files.at(fileNo));
-                        const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
-                        // GetId of Imu to use
-                        int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
-                        std::cout << "imuNumberToUse  " << imuNumberToUse << " at '" << imufn << "'" << std::endl;
-                        auto imu = load_imu(imufn.c_str(), imuNumberToUse);
-                        std::cout << imufn << " with mapping " << snFn << std::endl;
-                        imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
-                    }
-
-                    std::cout << "loading points" << std::endl;
-                    std::vector<std::vector<Point3Di>> pointsPerFile;
-                    pointsPerFile.resize(laz_files.size());
-                    std::mutex mtx;
-                    std::cout << "start std::transform" << std::endl;
-
-                    std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [&](const std::string &fn)
-                                   {
-                                       // Load mapping from id to sn
-                                       fs::path fnSn(fn);
-                                       fnSn.replace_extension(".sn");
-
-                                       // GetId of Imu to use
-                                       const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
-                                       auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
-                                       auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy, calibration);
-
-                                       std::sort(data.begin(), data.end(), [](const Point3Di &a, const Point3Di &b)
-                                                 { return a.timestamp < b.timestamp; });
-
-                                       if ((fn == laz_files.front()) && (params.save_calibration_validation))
-                                       {
-                                           fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
-                                           std::ofstream testPointcloud{calibrationValidtationFile.c_str()};
-                                           int row_index = 0;
-                                           for (const auto &p : data)
-                                           {
-                                               if (row_index++ >= params.calibration_validation_points)
-                                               {
-                                                   break;
-                                               }
-                                               testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int)p.lidarid << "\n";
-                                           }
-                                       }
-
-                                       std::unique_lock lck(mtx);
-                                       for (const auto &[id, calib] : calibration)
-                                       {
-                                           std::cout << " id : " << id << std::endl;
-                                           std::cout << calib.matrix() << std::endl;
-                                       }
-                                       return data;
-                                       // std::cout << fn << std::endl;
-                                       //
-                                   });
-                    std::cout << "std::transform finished" << std::endl;
-
-                    FusionAhrs ahrs;
-                    FusionAhrsInitialise(&ahrs);
-
-                    if (fusionConventionNwu)
-                    {
-                        ahrs.settings.convention = FusionConventionNwu;
-                    }
-                    if (fusionConventionEnu)
-                    {
-                        ahrs.settings.convention = FusionConventionEnu;
-                    }
-                    if (fusionConventionNed)
-                    {
-                        ahrs.settings.convention = FusionConventionNed;
-                    }
-
-                    ahrs.settings.gain = ahrs_gain;
-
-                    std::map<double, std::pair<Eigen::Matrix4d, double>>
-                        trajectory;
-
-                    int counter = 1;
-                    for (const auto &[timestamp_pair, gyr, acc] : imu_data)
-                    {
-                        const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
-                        const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
-
-                        // std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z: " << acc.axis.z << std::endl;
-
-                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-
-                        FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-                        Eigen::Quaterniond d{quat.element.w, quat.element.x, quat.element.y, quat.element.z};
-                        Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
-                        t.rotate(d);
-
-                        //
-                        // TaitBryanPose rot_y;
-                        // rot_y.px = rot_y.py = rot_y.pz = rot_y.px = rot_y.py = rot_y.pz;
-                        // rot_y.fi = -5 * M_PI / 180.0;
-                        // Eigen::Affine3d m_rot_y = affine_matrix_from_pose_tait_bryan(rot_y);
-                        // t = t * m_rot_y;
-                        //
-                        // std::map<double, Eigen::Matrix4d> trajectory;
-                        trajectory[timestamp_pair.first] = std::pair(t.matrix(), timestamp_pair.second);
-                        const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
-                        counter++;
-                        if (counter % 100 == 0)
-                        {
-                            printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
-                        }
-                    }
-
-                    int number_of_points = 0;
-                    for (const auto &pp : pointsPerFile)
-                    {
-                        number_of_points += pp.size();
-                    }
-                    std::cout << "number of points: " << number_of_points << std::endl;
-                    std::cout << "start transforming points" << std::endl;
-
-                    int number_of_initial_points = 0;
-                    double timestamp_begin;
-                    for (const auto &pp : pointsPerFile)
-                    {
-                        // number_of_points += pp.size();
-                        for (const auto &p : pp)
-                        {
-                            number_of_initial_points++;
-                            params.initial_points.push_back(p);
-                            if (number_of_initial_points > threshold_initial_points)
-                            {
-                                timestamp_begin = p.timestamp;
-                                break;
-                            }
-                        }
-                        if (number_of_initial_points > threshold_initial_points)
-                        {
-                            break;
-                        }
-                    }
-
-                    std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
-
-                    std::vector<std::pair<double, double>> timestamps;
-                    std::vector<Eigen::Affine3d> poses;
-                    for (const auto &t : trajectory)
-                    {
-                        if (t.first >= timestamp_begin)
-                        {
-                            timestamps.emplace_back(t.first, t.second.second);
-                            Eigen::Affine3d m;
-                            m.matrix() = t.second.first;
-                            poses.push_back(m);
-                        }
-                    }
-
-                    std::cout << "poses.size(): " << poses.size() << std::endl;
-
-                    if (poses.empty())
-                    {
-                        std::cerr << "Loading poses went wrong! Could not load poses!" << std::endl;
-                        return;
-                    }
-
-                    int thershold = THRESHOLD_NR_POSES;
-                    WorkerData wd;
-                    // std::vector<double> temp_ts;
-                    // temp_ts.reserve(1000000);
-
-                    // int last_point = 0;
-                    int index_begin = 0;
-
-                    const int n_iter = std::floor(poses.size() / thershold);
-                    worker_data.reserve(n_iter);
-                    for (int i = 0; i < n_iter; i++)
-                    {
-                        if (i % 50 == 0)
-                        {
-                            std::cout << "preparing data " << i + 1 << " of " << n_iter << std::endl;
-                        }
-                        WorkerData wd;
-                        wd.intermediate_trajectory.reserve(thershold);
-                        wd.intermediate_trajectory_motion_model.reserve(thershold);
-                        wd.intermediate_trajectory_timestamps.reserve(thershold);
-                        wd.imu_om_fi_ka.reserve(thershold);
-                        for (int ii = 0; ii < thershold; ii++)
-                        {
-                            int idx = i * thershold + ii;
-                            wd.intermediate_trajectory.emplace_back(poses[idx]);
-                            wd.intermediate_trajectory_motion_model.emplace_back(poses[idx]);
-                            wd.intermediate_trajectory_timestamps.emplace_back(timestamps[idx]);
-                            TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(poses[idx]);
-                            // wd.imu_roll_pitch.emplace_back(tb.om, tb.fi);
-                            wd.imu_om_fi_ka.emplace_back(tb.om, tb.fi, tb.ka);
-                        }
-                        std::vector<Point3Di> points;
-                        bool found = false;
-                        auto lower = pointsPerFile[0].begin();
-                        for (int index = index_begin; index < pointsPerFile.size(); index++)
-                        {
-                            auto lower = std::lower_bound(
-                                pointsPerFile[index].begin(), pointsPerFile[index].end(),
-                                wd.intermediate_trajectory_timestamps[0].first,
-                                [](const Point3Di &point, double timestamp)
-                                {
-                                    return point.timestamp < timestamp;
-                                });
-                            auto upper = std::lower_bound(
-                                pointsPerFile[index].begin(), pointsPerFile[index].end(),
-                                wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first,
-                                [](const Point3Di &point, double timestamp)
-                                {
-                                    return point.timestamp < timestamp;
-                                });
-                            auto tmp = std::distance(lower, upper);
-                            points.reserve(points.size() + std::distance(lower, upper));
-                            if (lower != upper)
-                            {
-                                points.insert(points.end(), std::make_move_iterator(lower), std::make_move_iterator(upper));
-                                found = true;
-                            }
-                        }
-
-                        wd.original_points = points;
-                        for (unsigned long long int k = 0; k < wd.original_points.size(); k++)
-                        {
-                            Point3Di &p = wd.original_points[k];
-                            auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp,
-                                                          [](std::pair<double, double> lhs, double rhs) -> bool
-                                                          { return lhs.first < rhs; });
-                            p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
-                        }
-
-                        if (params.decimation > 0.0)
-                        {
-                            wd.intermediate_points = decimate(wd.original_points, params.decimation, params.decimation, params.decimation);
-                        }
-                        worker_data.push_back(wd);
-                    }
-
-                    params.m_g = worker_data[0].intermediate_trajectory[0];
-                    step_1_done = true;
-                    std::cout << "step_1_done please click 'compute_all (step 2)' to continue calculations" << std::endl;
-                }
-                else
-                {
-                    std::cout << "please select files correctly" << std::endl;
-                    std::cout << "input_file_names.size(): " << input_file_names.size() << std::endl;
-                    std::cout << "laz_files.size(): " << laz_files.size() << std::endl;
-                    std::cout << "csv_files.size(): " << csv_files.size() << std::endl;
-
-                    std::cout << "condition: input_file_names.size() > 0 && laz_files.size() == csv_files.size() NOT SATISFIED!!!" << std::endl;
-                }
+                
             }
             ImGui::SameLine();
             ImGui::Text("Select all imu *.csv and lidar *.laz files produced by MANDEYE saved in 'continousScanning_*' folder");
@@ -633,33 +940,7 @@ void lidar_odometry_gui()
         {
             if (ImGui::Button("compute_all (step 2)"))
             {
-                double ts_failure = 0.0;
-                if (compute_step_2(worker_data, params, ts_failure))
-                {
-                    step_2_done = true;
-                }
-                else
-                {
-                    for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
-                    {
-                        const std::string &imufn = csv_files.at(fileNo);
-                        const std::string snFn = (fileNo >= sn_files.size()) ? ("") : (sn_files.at(fileNo));
-                        const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
-                        // GetId of Imu to use
-                        int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
-                        auto imu = load_imu(imufn.c_str(), imuNumberToUse);
-
-                        if (imu.size() > 0)
-                        {
-                            if (std::get<0>(imu[imu.size() - 1]).first > ts_failure)
-                            {
-                                break;
-                            }
-                        }
-                        std::cout << "file: '" << imufn << "' [OK]" << std::endl;
-                    }
-                    calculations_failed = true;
-                }
+                step2();
             }
             ImGui::SameLine();
             ImGui::Text("Press this button for automatic lidar odometry calculation -> it will produce trajectory");
@@ -732,184 +1013,7 @@ void lidar_odometry_gui()
 
             if (ImGui::Button("Save result (step 3)"))
             {
-                static int result = 0;
-                fs::path outwd = working_directory / fs::path("lidar_odometry_result_" + std::to_string(result));
-                std::filesystem::create_directory(outwd);
-                result++;
-                // concatenate data
-                std::vector<WorkerData>
-                    worker_data_concatenated;
-                WorkerData wd;
-                int counter = 0;
-                int pose_offset = 0;
-                for (int i = 0; i < worker_data.size(); i++)
-                {
-                    if (i % 1000 == 0)
-                    {
-                        printf("processing worker_data [%d] of %d \n", i + 1, worker_data.size());
-                    }
-                    auto tmp_data = worker_data[i].original_points;
-
-                    /*// filter data
-                    std::vector<Point3Di> filtered_local_point_cloud;
-                    for (auto &t : tmp_data)
-                    {
-                        auto pp = worker_data[i].intermediate_trajectory[t.index_pose].inverse() * t.point;
-                        if(pp.norm() > threshould_output_filter){
-                            filtered_local_point_cloud.push_back(t);
-                        }
-                    }
-                    tmp_data = filtered_local_point_cloud;*/
-
-                    for (auto &t : tmp_data)
-                    {
-                        t.index_pose += pose_offset;
-                    }
-
-                    wd.intermediate_trajectory.insert(std::end(wd.intermediate_trajectory),
-                                                      std::begin(worker_data[i].intermediate_trajectory), std::end(worker_data[i].intermediate_trajectory));
-
-                    wd.intermediate_trajectory_timestamps.insert(std::end(wd.intermediate_trajectory_timestamps),
-                                                                 std::begin(worker_data[i].intermediate_trajectory_timestamps), std::end(worker_data[i].intermediate_trajectory_timestamps));
-
-                    wd.original_points.insert(std::end(wd.original_points),
-                                              std::begin(tmp_data), std::end(tmp_data));
-
-                    wd.imu_om_fi_ka.insert(std::end(wd.imu_om_fi_ka), std::begin(worker_data[i].imu_om_fi_ka), std::end(worker_data[i].imu_om_fi_ka));
-
-                    pose_offset += worker_data[i].intermediate_trajectory.size();
-
-                    counter++;
-                    if (counter > 50)
-                    {
-                        worker_data_concatenated.push_back(wd);
-                        wd.intermediate_trajectory.clear();
-                        wd.intermediate_trajectory_timestamps.clear();
-                        wd.original_points.clear();
-                        wd.imu_om_fi_ka.clear();
-
-                        counter = 0;
-                        pose_offset = 0;
-                    }
-                }
-
-                if (counter > 10)
-                {
-                    worker_data_concatenated.push_back(wd);
-                }
-
-                std::vector<Eigen::Affine3d> m_poses;
-                std::vector<std::string> file_names;
-                for (int i = 0; i < worker_data_concatenated.size(); i++)
-                {
-                    std::cout << "------------------------" << std::endl;
-                    fs::path path(outwd);
-                    std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
-                    path /= filename;
-                    std::cout << "saving to: " << path << std::endl;
-                    saveLaz(path.string(), worker_data_concatenated[i], threshould_output_filter);
-                    m_poses.push_back(worker_data_concatenated[i].intermediate_trajectory[0]);
-                    file_names.push_back(filename);
-
-                    // save trajectory
-                    std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
-                    fs::path pathtrj(outwd);
-                    pathtrj /= trajectory_filename;
-                    std::cout << "saving to: " << pathtrj << std::endl;
-
-                    ///
-                    std::ofstream outfile;
-                    outfile.open(pathtrj);
-                    if (!outfile.good())
-                    {
-                        std::cout << "can not save file: " << pathtrj << std::endl;
-                        return;
-                    }
-
-                    outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 timestampUnix_nanoseconds" << std::endl;
-                    for (int j = 0; j < worker_data_concatenated[i].intermediate_trajectory.size(); j++)
-                    {
-                        auto pose = worker_data_concatenated[i].intermediate_trajectory[0].inverse() * worker_data_concatenated[i].intermediate_trajectory[j];
-
-                        outfile
-                            << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].first * 1e9 << " " << std::setprecision(10)
-                            << pose(0, 0) << " "
-                            << pose(0, 1) << " "
-                            << pose(0, 2) << " "
-                            << pose(0, 3) << " "
-                            << pose(1, 0) << " "
-                            << pose(1, 1) << " "
-                            << pose(1, 2) << " "
-                            << pose(1, 3) << " "
-                            << pose(2, 0) << " "
-                            << pose(2, 1) << " "
-                            << pose(2, 2) << " "
-                            << pose(2, 3) << " "
-                            << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].second * 1e9 << " "
-                            << worker_data_concatenated[i].imu_om_fi_ka[j].x() << " "
-                            << worker_data_concatenated[i].imu_om_fi_ka[j].y() << " "
-                            << worker_data_concatenated[i].imu_om_fi_ka[j].z() << " "
-                            << std::endl;
-                    }
-                    outfile.close();
-                    //
-                }
-                fs::path path(outwd);
-                path /= "lio_initial_poses.reg";
-                save_poses(path.string(), m_poses, file_names);
-                fs::path path2(outwd);
-                path2 /= "poses.reg";
-                save_poses(path2.string(), m_poses, file_names);
-
-                fs::path path3(outwd);
-                path3 /= "session.json";
-
-                // save session file
-                std::cout << "saving file: '" << path3 << "'" << std::endl;
-
-                nlohmann::json jj;
-                nlohmann::json j;
-
-                j["offset_x"] = 0.0;
-                j["offset_y"] = 0.0;
-                j["offset_z"] = 0.0;
-                j["folder_name"] = outwd;
-                j["out_folder_name"] = outwd;
-                j["poses_file_name"] = path2.string();
-                j["initial_poses_file_name"] = path.string();
-                j["out_poses_file_name"] = path2.string();
-                j["lidar_odometry_version"] = HDMAPPING_VERSION_STRING;
-
-                jj["Session Settings"] = j;
-
-                nlohmann::json jlaz_file_names;
-                for (int i = 0; i < worker_data_concatenated.size(); i++)
-                {
-                    fs::path path(outwd);
-                    std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
-                    path /= filename;
-                    std::cout << "adding file: " << path << std::endl;
-
-                    nlohmann::json jfn{
-                        {"file_name", path.string()}};
-                    jlaz_file_names.push_back(jfn);
-                }
-                jj["laz_file_names"] = jlaz_file_names;
-
-                std::ofstream fs(path3.string());
-                fs << jj.dump(2);
-                fs.close();
-                step_3_done = true;
-
-                // std::cout << "Results saved to folder: '" << outwd << "'" << std::endl;
-                std::string message_info = "Results saved to folder: '" + outwd.string() + "'";
-                std::cout << message_info << std::endl;
-                [[maybe_unused]]
-                pfd::message message(
-                    "Information",
-                    message_info.c_str(),
-                    pfd::choice::ok, pfd::icon::info);
-                message.result();
+                save_results(true);
             }
             ImGui::SameLine();
             ImGui::Text("Press this button for saving resulting trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program");
@@ -1001,8 +1105,21 @@ void lidar_odometry_gui()
             ImGui::InputDouble("distance_bucket", &params.distance_bucket);
             ImGui::InputDouble("polar_angle_deg", &params.polar_angle_deg);
             ImGui::InputDouble("azimutal_angle_deg", &params.azimutal_angle_deg);
-            ImGui::InputInt("number of iterations", &params.robust_and_accurate_lidar_odometry_iterations);
-            ImGui::InputDouble("max distance lidar", &params.max_distance_lidar);
+            ImGui::InputInt("number_of_iterations", &params.robust_and_accurate_lidar_odometry_iterations);
+            ImGui::InputDouble("max_distance_lidar", &params.max_distance_lidar);
+
+            ImGui::Text("....... rigid ICP using spherical coordinates.........");
+            ImGui::InputDouble("distance_bucket_rigid_icp", &params.distance_bucket_rigid_sf);
+            ImGui::InputDouble("polar_angle_deg_rigid_icp", &params.polar_angle_deg_rigid_sf);
+            ImGui::InputDouble("azimutal_angle_deg_rigid_icp", &params.azimutal_angle_deg_rigid_sf);
+            ImGui::InputInt("number_of_iterations_rigid_icp", &params.robust_and_accurate_lidar_odometry_rigid_sf_iterations);
+            ImGui::InputDouble("max_distance_rgd_rigid_icp", &params.max_distance_lidar_rigid_sf);
+            ImGui::InputDouble("rgd_sf_sigma_x_m", &params.rgd_sf_sigma_x_m);
+            ImGui::InputDouble("rgd_sf_sigma_y_m", &params.rgd_sf_sigma_y_m);
+            ImGui::InputDouble("rgd_sf_sigma_z_m", &params.rgd_sf_sigma_z_m);
+            ImGui::InputDouble("rgd_sf_sigma_om_deg", &params.rgd_sf_sigma_om_deg);
+            ImGui::InputDouble("rgd_sf_sigma_fi_deg", &params.rgd_sf_sigma_fi_deg);
+            ImGui::InputDouble("rgd_sf_sigma_ka_deg", &params.rgd_sf_sigma_ka_deg);
             ImGui::Text("------------------------------------------------------");
             // if (step_1_done && step_2_done)
             //{
@@ -1971,7 +2088,9 @@ void display()
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
 
-    lidar_odometry_gui();
+    lidar_odometry_basic_gui();
+
+    // lidar_odometry_gui();
 
     if (initial_transformation_gizmo)
     {

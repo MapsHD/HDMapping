@@ -431,7 +431,7 @@ void project_gui()
 
         if (idToSn.size() == 2 && calibrations.size() == 0)
         {
-            if (ImGui::Button("Load calibration (*.json) (step 2)"))
+            if (ImGui::Button("Load last known calibration (*.json) (step 2)"))
             {
                 static std::shared_ptr<pfd::open_file> open_file;
                 std::vector<std::string> input_file_names;
@@ -471,7 +471,7 @@ void project_gui()
             ImGui::SameLine();
             ImGui::Text(" if You dont have any calibration file --> ");
             ImGui::SameLine();
-            if (ImGui::Button("Save default calibration (optional before step 2)"))
+            if (ImGui::Button("Create calibration from scratch (optional before step 2)"))
             {
                 std::shared_ptr<pfd::save_file> save_file;
                 std::string output_file_name = "";
@@ -667,7 +667,7 @@ void project_gui()
 
             if (imu_lidar.size() == 2)
             {
-                ImGui::Text(".......... Check imu for lidar odometry in calibration file ..........");
+                ImGui::Text(".......... Check imu for lidar odometry in calibration file (horizontal LiDAR preferable) ..........");
 
                 int chosen_imu = -1;
                 for (int i = 0; i < imu_lidar.size(); i++)

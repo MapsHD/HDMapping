@@ -30,6 +30,7 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 - Georeferencing (referenced point cloud, ground control points, GNSS data)
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems etc...) 
+- Loris Redovniković, Antun Jakopec, Janusz Będkowski, Jurica Jagetić. "The affordable DIY Mandeye LiDAR system for surveying caves, and how to convert 3D clouds into traditional cave ground plans and extended profiles." International Journal of Speleology, 53(3), 2024 [[PDF]](https://digitalcommons.usf.edu/ijs/vol53/iss3/7/) 
 - Mitka, Bartosz, Przemysław Klapa, and Pelagia Gawronek. "Laboratory Tests of Metrological Characteristics of a Non-Repetitive Low-Cost Mobile Handheld Laser Scanner." Sensors 24.18 (2024): 6010. [[PDF]](https://www.mdpi.com/1424-8220/24/18/6010)
 - Elalailyi, Ahmad, et al. "Pose Graph Data Fusion for Visual-and LiDAR-based Low-Cost Portable Mapping Systems." International Archives of the Photogrammetry, Remote Sensing and Spatial Information Sciences 48 (2024): 147-154.[[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/147/2024/isprs-archives-XLVIII-2-W8-2024-147-2024.pdf)
 - Balestra, Mattia, et al. "Advancing forest inventory: a comparative study of low-cost MLS lidar device with professional laser scanners." The International Archives of the Photogrammetry, Remote Sensing and Spatial Information Sciences 48 (2024): 9-15.[[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/9/2024/isprs-archives-XLVIII-2-W8-2024-9-2024.pdf)

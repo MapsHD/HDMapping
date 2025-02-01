@@ -799,7 +799,7 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
     return all_data;
 }
 
-std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy, const std::unordered_map<int, Eigen::Affine3d> &calibrations)
+std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy_inner, double filter_threshold_xy_outer, const std::unordered_map<int, Eigen::Affine3d> &calibrations)
 {
     std::vector<Point3Di> points;
     laszip_POINTER laszip_reader;
@@ -902,7 +902,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
             }
             */
 
-            if (sqrt(pf.x() * pf.x() + pf.y() * pf.y()) > filter_threshold_xy)
+            if (sqrt(pf.x() * pf.x() + pf.y() * pf.y()) > filter_threshold_xy_inner && sqrt(pf.x() * pf.x() + pf.y() * pf.y()) < filter_threshold_xy_outer)
             {
                 points.emplace_back(p);
             }

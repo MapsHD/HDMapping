@@ -76,7 +76,8 @@ std::vector<std::string> sn_files;
 std::string working_directory = "";
 std::string imuSnToUse;
 std::string working_directory_preview;
-double filter_threshold_xy = 0.1;
+double filter_threshold_xy_inner = 0.1;
+double filter_threshold_xy_outer = 70.0;
 bool fusionConventionNwu = true;
 bool fusionConventionEnu = false;
 bool fusionConventionNed = false;
@@ -352,7 +353,7 @@ void project_gui()
                                        // GetId of Imu to use
                                        const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
                                        auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
-                                       auto data = load_point_cloud(fn.c_str(), true, filter_threshold_xy, calibration);
+                                       auto data = load_point_cloud(fn.c_str(), true, filter_threshold_xy_inner, filter_threshold_xy_outer, calibration);
 
                                        if (fn == laz_files.front())
                                        {

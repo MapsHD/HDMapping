@@ -824,7 +824,7 @@ int main(int argc, char *argv[])
                            // GetId of Imu to use
                            const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
                            auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
-                           auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy, calibration);
+                           auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy_inner, params.filter_threshold_xy_outer, calibration);
 
                            std::sort(data.begin(), data.end(), [](const Point3Di &a, const Point3Di &b)
                                      { return a.timestamp < b.timestamp; });

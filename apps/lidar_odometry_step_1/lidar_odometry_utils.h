@@ -50,7 +50,8 @@ using NDTBucketMapType2 = std::unordered_map<uint64_t, NDT::Bucket2>;
 
 struct LidarOdometryParams
 {
-    double filter_threshold_xy = 0.3;
+    double filter_threshold_xy_inner = 0.3;
+    double filter_threshold_xy_outer = 70.0;
     Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
     std::vector<Point3Di> initial_points;
     NDT::GridParameters in_out_params;
@@ -88,6 +89,8 @@ struct LidarOdometryParams
     double rgd_sf_sigma_om_deg = 0.01;
     double rgd_sf_sigma_fi_deg = 0.01;
     double rgd_sf_sigma_ka_deg = 0.01;
+
+    double total_length_of_calculated_trajectory = 0.0;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);
@@ -124,7 +127,7 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
 //! @param filter_threshold_xy - threshold for filtering points in xy plane
 //! @param calibrations - map of calibrations for each scanner key is scanner id.
 //! @return vector of points of @ref Point3Di type
-std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy,
+std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy_inner, double filter_threshold_xy_outer,
                                        const std::unordered_map<int, Eigen::Affine3d> &calibrations);
 
 bool saveLaz(const std::string &filename, const WorkerData &data, double threshould_output_filter);

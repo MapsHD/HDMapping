@@ -3112,12 +3112,13 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                   << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
         // estimate total lenght of trajectory
-        double length_of_trajectory = 0;
+        //double length_of_trajectory = 0;
+        params.total_length_of_calculated_trajectory = 0;
         for (int i = 1; i < worker_data.size(); i++)
         {
-            length_of_trajectory += (worker_data[i].intermediate_trajectory[0].translation() - worker_data[i - 1].intermediate_trajectory[0].translation()).norm();
+            params.total_length_of_calculated_trajectory += (worker_data[i].intermediate_trajectory[0].translation() - worker_data[i - 1].intermediate_trajectory[0].translation()).norm();
         }
-        std::cout << "length_of_trajectory: " << length_of_trajectory << " [m]" << std::endl;
+        std::cout << "total_length_of_calculated_trajectory: " << params.total_length_of_calculated_trajectory << " [m]" << std::endl;
     }
 
     return true;

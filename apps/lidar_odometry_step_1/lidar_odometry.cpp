@@ -301,7 +301,7 @@ void step1(){
                            // GetId of Imu to use
                            const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
                            auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
-                           auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy, calibration);
+                           auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy_inner, params.filter_threshold_xy_outer, calibration);
 
                            std::sort(data.begin(), data.end(), [](const Point3Di &a, const Point3Di &b)
                                      { return a.timestamp < b.timestamp; });
@@ -757,7 +757,8 @@ void lidar_odometry_basic_gui()
             params.in_out_params.resolution_X = 0.1;
             params.in_out_params.resolution_Y = 0.1;
             params.in_out_params.resolution_Z = 0.1;
-            params.filter_threshold_xy = 0.3;
+            params.filter_threshold_xy_inner = 0.3;
+            params.filter_threshold_xy_outer = 70.0;
 
             params.distance_bucket = 0.2;
             params.polar_angle_deg = 10.0;
@@ -785,7 +786,8 @@ void lidar_odometry_basic_gui()
 
             //std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
 
-            std::string message_info = "Data saved to folders '" + working_directory + "\\lidar_odometry_result_0' and '" + working_directory + "\\lidar_odometry_result_1'";
+            std::string message_info = "Data saved to folders '" + working_directory + "\\lidar_odometry_result_0' and '" + working_directory + "\\lidar_odometry_result_1' total_length_of_calculated_trajectory=" +
+                                       std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
 
             [[maybe_unused]]
             pfd::message message(
@@ -837,7 +839,8 @@ void lidar_odometry_gui()
             return;
         }
 
-        ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy);
+        ImGui::InputDouble("filter_threshold_xy_inner (all local points inside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy_inner);
+        ImGui::InputDouble("filter_threshold_xy_outer (all local points outside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy_outer);
         ImGui::InputDouble("threshould_output_filter (all local points inside lidar xy_circle radius[m] will be removed during save)", &threshould_output_filter);
 
         if (!simple_gui)
@@ -848,7 +851,8 @@ void lidar_odometry_gui()
                 params.in_out_params.resolution_X = 0.1;
                 params.in_out_params.resolution_Y = 0.1;
                 params.in_out_params.resolution_Z = 0.1;
-                params.filter_threshold_xy = 0.3;
+                params.filter_threshold_xy_inner = 0.3;
+                params.filter_threshold_xy_outer = 70.0;
 
                 params.distance_bucket = 0.2;
                 params.polar_angle_deg = 10.0;
@@ -1213,7 +1217,7 @@ void lidar_odometry_gui()
                     for (size_t i = 0; i < input_file_names.size(); i++)
                     {
                         std::cout << "loading reference point cloud from: " << input_file_names[i] << std::endl;
-                        auto pp = load_point_cloud(input_file_names[i].c_str(), false, 0, {});
+                        auto pp = load_point_cloud(input_file_names[i].c_str(), false, 0, 10000, {});
                         std::cout << "loaded " << pp.size() << " reference points" << std::endl;
                         params.reference_points.insert(std::end(params.reference_points), std::begin(pp), std::end(pp));
                     }
@@ -2250,7 +2254,7 @@ int main(int argc, char *argv[])
 std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, int point_count_threshold, std::vector<Point3Di> prev_points)
 {
     std::vector<std::vector<Point3Di>> res_points;
-    std::vector<Point3Di> points = load_point_cloud(laz_file, false, 0, {});
+    std::vector<Point3Di> points = load_point_cloud(laz_file, false, 0, 10000, {});
 
     std::vector<Point3Di> tmp_points = prev_points;
     int counter = tmp_points.size();

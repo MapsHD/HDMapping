@@ -23,7 +23,7 @@ jobs:
     - name: Install Libs
       run: sudo apt-get install libeigen3-dev libglew-dev freeglut3-dev libx11-dev libxi-dev libtbb-dev liblaszip-dev
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: Configure CMake
@@ -42,7 +42,7 @@ jobs:
       run: ctest -C ${{env.BUILD_TYPE}}
 
     - name: Upload Debian package as artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: hd_mapping-deb
         path: ${{github.workspace}}/build/*.deb

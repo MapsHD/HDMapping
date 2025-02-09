@@ -865,7 +865,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
         p.intensity = point->intensity;
 
         // add z correction
-        // if (p.point.z() > 0)
+        //if (p.point.z() > 0)
         //{
         //    double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
         //    double correction = dist * asin(0.08 / 10.0);

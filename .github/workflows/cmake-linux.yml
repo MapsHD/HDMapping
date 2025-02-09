@@ -23,7 +23,7 @@ jobs:
     - name: Install Libs
       run: sudo apt-get install libx11-dev libxi-dev libtbb-dev libegl1-mesa-dev libglu1-mesa-dev
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: Configure CMake

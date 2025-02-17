@@ -2,6 +2,7 @@
 #define _USE_MATH_DEFINES
 #endif
 #include <cmath>
+#include <filesystem>
 
 #include <imgui.h>
 #include <imgui_impl_glut.h>
@@ -13,6 +14,7 @@
 #include <GL/freeglut.h>
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
+#include <nlohmann/json.hpp>
 
 #include <Eigen/Eigen>
 
@@ -35,6 +37,7 @@
 #include <ndt.h>
 
 #include <pair_wise_iterative_closest_point.h>
+#include <observation_picking.h>
 
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;

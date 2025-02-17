@@ -7,6 +7,7 @@ add_executable(
   lidar_odometry_gui.cpp lidar_odometry_utils.h lidar_odometry_utils.cpp
   lidar_odometry_utils_optimizers.cpp
   lidar_odometry.cpp lidar_odometry.h
+  lidar_odometry_gui_utils.cpp lidar_odometry_gui_utils.h
   )
 
 target_compile_definitions(lidar_odometry_step_1 PRIVATE -DWITH_GUI=1)

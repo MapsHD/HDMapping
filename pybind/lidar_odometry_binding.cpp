@@ -91,16 +91,15 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         .def_readwrite("num_constistency_iter", &LidarOdometryParams::num_constistency_iter)
         .def_readwrite("threshould_output_filter", &LidarOdometryParams::threshould_output_filter)
         .def_readwrite("ahrs_gain", &LidarOdometryParams::ahrs_gain)
-        .def_readwrite("threshold_nr_poses", &LidarOdometryParams::threshold_nr_poses);
+        .def_readwrite("threshold_nr_poses", &LidarOdometryParams::threshold_nr_poses)
+        .def_readwrite("current_output_dir", &LidarOdometryParams::current_output_dir)
+        .def_readwrite("save_trajectory", &LidarOdometryParams::save_trajectory)
+        .def_readwrite("save_laz", &LidarOdometryParams::save_laz)
+        ;
 
     // Bind run_lidar_odometry function
     m.def("run_lidar_odometry", &run_lidar_odometry,
           py::arg("input_dir"),
           py::arg("params"),
-          py::arg("output_las_name") = "",
-          py::arg("trajectory_ascii_name") = "",
-          py::arg("reference_dir") = "",
-          py::arg("output_resso_file") = "",
-          py::arg("filter_ref_buckets") = false,
           "Run lidar odometry with given parameters");
 }

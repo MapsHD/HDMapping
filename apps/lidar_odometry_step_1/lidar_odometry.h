@@ -27,8 +27,8 @@ void save_trajectory_to_ascii(std::vector<WorkerData>& worker_data, std::string 
 void save_all_to_las(
     std::vector<WorkerData>& worker_data, LidarOdometryParams& params, std::string output_file_name, Session& session,
     bool export_selected = false, bool filter_on_export = true, bool apply_pose = true, bool add_to_pc_container = false);
-void run_lidar_odometry(
-    std::string input_dir, LidarOdometryParams& params, std::string output_las_name = "",
-    std::string trajectory_ascii_name = "", std::string reference_dir = "", std::string output_resso_file = "",
-    bool filter_ref_buckets = false);
+std::string save_results_automatic(
+    LidarOdometryParams& params, const std::vector<WorkerData> &worker_data, 
+    Session& session, std::string working_directory);
+void run_lidar_odometry(std::string input_dir, LidarOdometryParams& params);
 #endif

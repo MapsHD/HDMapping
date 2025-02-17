@@ -1,11 +1,8 @@
 #include <pcl_wrapper.h>
-#include <filesystem>
 #include <fstream>
 #include <laszip/laszip_api.h>
 #include <export_laz.h>
 #include "multi_view_tls_registration.h"
-
-namespace fs = std::filesystem;
 
 
 bool has_extension(const std::string file_path, const std::string extension) {
@@ -67,14 +64,14 @@ void save_all_to_las(const Session& session, std::string output_las_name)
 	}
 }
 
-void save_separately_to_las(const Session& session, std::string extension)
+void save_separately_to_las(const Session& session, fs::path outwd, std::string extension)
 {
 	for (auto& p : session.point_clouds_container.point_clouds)
 	{
 		if (p.visible)
 		{
 			fs::path file_path_in = p.file_name;
-			fs::path file_path_put = file_path_in.parent_path();
+			fs::path file_path_put = outwd;
 			file_path_put /= (file_path_in.stem().string() + "_processed" + extension);
 			std::cout << "file_in: " << file_path_in << std::endl;
 			std::cout << "file_out: " << file_path_put << std::endl;
@@ -485,77 +482,80 @@ std::vector<std::string> get_matching_files(const std::string& directory, const 
 }
 
 void run_multi_view_tls_registration(
-	std::string input_file_name, TLSRegistration& tls_registration, std::string output_file_name)
+	std::string input_file_name, TLSRegistration& tls_registration, std::string output_dir)
 {
+	fs::path outwd = fs::path(output_dir);
 	Session session;
-	if ((input_file_name.size() > 0) && (fs::exists(input_file_name)))
+	if (!fs::exists(input_file_name))
 	{
-		if (has_extension(input_file_name, ".json")) 
-		{
-			std::cout << "Session file: '" << input_file_name << "'" << std::endl;
-			session.working_directory = fs::path(input_file_name).parent_path().string();
-			session.load(fs::path(input_file_name).string(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset);
-		}
-		else if (has_extension(input_file_name, ".reg"))
-		{
-			std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-			session.working_directory = fs::path(input_file_name).parent_path().string();
-			session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z);
-		}
-		else if (has_extension(input_file_name, ".txt"))
-		{
-			std::cout << "ETH file: '" << input_file_name << "'" << std::endl;
-			session.working_directory = fs::path(input_file_name).parent_path().string();
-			session.point_clouds_container.load_eth(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z);
-		}
-		else if (!has_extension(input_file_name, ""))
-		{
-			session.point_clouds_container.point_clouds.clear();
-			session.working_directory = fs::path(input_file_name).string();
-			std::vector<std::string> las_files;
-			std::vector<std::string> txt_files; 
-			for (const auto& entry : std::filesystem::directory_iterator(input_file_name)) {
-				auto file_name = entry.path().string();
-				if (has_extension(file_name, ".laz") || (has_extension(file_name, ".las"))) 
-				{
-					las_files.push_back(file_name);
-				}
-				else if (has_extension(file_name, ".txt"))
-				{
-					txt_files.push_back(file_name);
-				}
-			}
-			if (las_files.size() > 0)
+		std::cout << "Provided input path does not exist." << std::endl;
+		return;
+	}
+	if (has_extension(input_file_name, ".json")) 
+	{
+		std::cout << "Session file: '" << input_file_name << "'" << std::endl;
+		session.working_directory = fs::path(input_file_name).parent_path().string();
+		session.load(fs::path(input_file_name).string(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset);
+	}
+	else if (has_extension(input_file_name, ".reg"))
+	{
+		std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
+		session.working_directory = fs::path(input_file_name).parent_path().string();
+		session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z);
+	}
+	else if (has_extension(input_file_name, ".txt"))
+	{
+		std::cout << "ETH file: '" << input_file_name << "'" << std::endl;
+		session.working_directory = fs::path(input_file_name).parent_path().string();
+		session.point_clouds_container.load_eth(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z);
+	}
+	else if (!has_extension(input_file_name, ""))
+	{
+		session.point_clouds_container.point_clouds.clear();
+		session.working_directory = fs::path(input_file_name).string();
+		std::vector<std::string> las_files;
+		std::vector<std::string> txt_files; 
+		for (const auto& entry : std::filesystem::directory_iterator(input_file_name)) {
+			auto file_name = entry.path().string();
+			if (has_extension(file_name, ".laz") || (has_extension(file_name, ".las"))) 
 			{
-				std::cout << "Las/Laz files:" << std::endl;
-				for (size_t i = 0; i < las_files.size(); i++)
-				{
-					std::cout << las_files[i] << std::endl;
-				}
-				session.point_clouds_container.load_whu_tls(las_files, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset);
+				las_files.push_back(file_name);
 			}
-			else if (txt_files.size() > 0)
+			else if (has_extension(file_name, ".txt"))
 			{
-				std::cout << "txt files:" << std::endl;
-				for (size_t i = 0; i < txt_files.size(); i++)
-				{
-					std::cout << txt_files[i] << std::endl;
-				}
-				session.point_clouds_container.load_3DTK_tls(txt_files, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z);
+				txt_files.push_back(file_name);
 			}
-			else
+		}
+		if (las_files.size() > 0)
+		{
+			std::cout << "Las/Laz files:" << std::endl;
+			for (size_t i = 0; i < las_files.size(); i++)
 			{
-				std::cout << "No WHU-TLS / 3DTK files available in the given directory, check path." << std::endl;
-				return;
+				std::cout << las_files[i] << std::endl;
 			}
+			session.point_clouds_container.load_whu_tls(las_files, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset);
+		}
+		else if (txt_files.size() > 0)
+		{
+			std::cout << "txt files:" << std::endl;
+			for (size_t i = 0; i < txt_files.size(); i++)
+			{
+				std::cout << txt_files[i] << std::endl;
+			}
+			session.point_clouds_container.load_3DTK_tls(txt_files, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z);
 		}
 		else
 		{
-			std::cout << "Session file: '" << input_file_name << "'" << std::endl;
-			session.load(fs::path(input_file_name).string(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset);
+			std::cout << "No WHU-TLS / 3DTK files available in the given directory, check path." << std::endl;
+			return;
 		}
-		std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
 	}
+	else
+	{
+		std::cout << "Session file: '" << input_file_name << "'" << std::endl;
+		session.load(fs::path(input_file_name).string(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset);
+	}
+	std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
 
 	int number_of_point = 0;
 	for (const auto& pc : session.point_clouds_container.point_clouds)
@@ -703,73 +703,76 @@ void run_multi_view_tls_registration(
 		tls_registration.pose_graph_slam.optimize(session.point_clouds_container);
 	}
 
-	if (output_file_name.size() > 0)
+	if (output_dir.length() > 0)
 	{
-		if (has_extension(output_file_name, ".reg"))  // RESSO output
+		if (session.point_clouds_container.initial_poses_file_name.empty() && tls_registration.save_initial_poses)
 		{
-			session.point_clouds_container.save_poses(fs::path(output_file_name).string(), false);
+			std::string initial_poses_file_name = (outwd / "initial_poses.reg").string();
+			std::cout << "saving initial poses to: " << initial_poses_file_name << std::endl;
+			session.point_clouds_container.save_poses(initial_poses_file_name, false);
 		}
-		else 
-		{
-			if (session.point_clouds_container.initial_poses_file_name.empty())
-			{
-				std::cout << "Please assign initial_poses_file_name to session" << std::endl;
-				std::cout << "Session is not saved" << std::endl;
-				if (tls_registration.initial_poses_file_name.size() > 0)
-				{
-					std::cout << "saving initial poses to: " << tls_registration.initial_poses_file_name << std::endl;
-					session.point_clouds_container.save_poses(fs::path(tls_registration.initial_poses_file_name).string(), false);
-				}
-			}
 
-			if (session.point_clouds_container.poses_file_name.empty())
-			{
-				if (tls_registration.poses_file_name.size() > 0)
-				{
-					std::cout << "saving poses to: " << tls_registration.poses_file_name << std::endl;
-					session.point_clouds_container.save_poses(fs::path(tls_registration.poses_file_name).string(), false);
-				}
-			}
-			session.save(fs::path(output_file_name).string(), session.point_clouds_container.poses_file_name, session.point_clouds_container.initial_poses_file_name, false);
-			std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
-			session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false);
+		if (session.point_clouds_container.poses_file_name.empty() && tls_registration.save_poses)
+		{
+			std::string poses_file_name = (outwd / "poses.reg").string();
+			std::cout << "saving poses to: " << poses_file_name << std::endl;
+			session.point_clouds_container.save_poses(poses_file_name, false);
 		}
+		session.save(
+			(outwd / "session_step_2.json").string(), session.point_clouds_container.poses_file_name, 
+			session.point_clouds_container.initial_poses_file_name, false);
+		std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
+		session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false);
 	}
 
-	if (tls_registration.output_las_name.size() > 0)
+	if (tls_registration.save_laz)
 	{
-		save_all_to_las(session, tls_registration.output_las_name);
+		save_all_to_las(session, (outwd / "all_step_2.laz").string());
+	}
+	if (tls_registration.save_las)
+	{
+		save_all_to_las(session, (outwd / "all_step_2.las").string());
 	}
 	if (tls_registration.save_as_separate_las)
 	{
-		save_separately_to_las(session, ".las");
+		save_separately_to_las(session, outwd, ".las");
 	}
 	if (tls_registration.save_as_separate_laz)
 	{
-		save_separately_to_las(session, ".laz");
+		save_separately_to_las(session, outwd, ".laz");
 	}
 
-	if (tls_registration.trajectories_laz_name.size() > 0)
+	if (tls_registration.save_trajectories_laz)
 	{
-		save_trajectories_to_laz(session, tls_registration.trajectories_laz_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling);
+		save_trajectories_to_laz(session, (outwd / "trajectories.laz").string(), tls_registration.curve_consecutive_distance_meters, 
+		tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling);
 	}
 
-	if (tls_registration.gnss_laz_name.size() > 0)
+	if (tls_registration.save_gnss_laz)
 	{
-		tls_registration.gnss.save_to_laz(output_file_name, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
+		tls_registration.gnss.save_to_laz((outwd / "gnss.laz").string(), session.point_clouds_container.offset.x(), 
+		session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
 	}
 
-	if (tls_registration.scale_board_las_name.size() > 0)
+	if (tls_registration.save_scale_board_laz)
 	{
-		save_scale_board_to_laz(session, output_file_name, tls_registration.scale_board_dec, tls_registration.scale_board_side_len);
+		save_scale_board_to_laz(session, (outwd / "scale_board.laz").string(), tls_registration.scale_board_dec, tls_registration.scale_board_side_len);
 	}
 
-	if (tls_registration.trajectories_name.size() > 0)
+	if (tls_registration.save_trajectories_csv)
 	{
 		save_trajectories(
-			session, tls_registration.trajectories_name, tls_registration.curve_consecutive_distance_meters,
+			session, (outwd / "trajectories.csv").string(), tls_registration.curve_consecutive_distance_meters,
 			tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling,
 			tls_registration.write_lidar_timestamp, tls_registration.write_unix_timestamp,
-			tls_registration.use_quaternions, tls_registration.save_to_dxf);
+			tls_registration.use_quaternions, false);
+	}
+	if (tls_registration.save_trajectories_dxf)
+	{
+		save_trajectories(
+			session, (outwd / "trajectories.dxf").string(), tls_registration.curve_consecutive_distance_meters,
+			tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling,
+			tls_registration.write_lidar_timestamp, tls_registration.write_unix_timestamp,
+			tls_registration.use_quaternions, true);
 	}
 }

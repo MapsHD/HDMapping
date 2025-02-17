@@ -2,6 +2,10 @@
 #include <filesystem>
 #include "csv.hpp"
 #include <algorithm>
+#include <regex>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 // this function provides unique index
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z)
@@ -1041,4 +1045,25 @@ int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string> &idToSn,
         }
     }
     return 0;
+}
+
+int get_next_result_id(const std::string working_directory)
+{
+    std::regex pattern(R"(lidar_odometry_result_(\d+))");
+    int max_number = -1;
+    for (const auto& entry : fs::directory_iterator(working_directory))
+    {
+        if (entry.is_directory())
+        {
+            std::smatch match;
+            std::string folder_name = entry.path().filename().string();
+
+            if (std::regex_match(folder_name, match, pattern))
+            {
+                int folder_number = std::stoi(match[1].str());
+                max_number = std::max(max_number, folder_number);
+            }
+        }
+    }
+    return max_number + 1;
 }

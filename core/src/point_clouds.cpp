@@ -1129,7 +1129,7 @@ void PointClouds::print_point_cloud_dimention()
 		}
 	}
 
-	std::cout << "Bounaries" << std::endl;
+	std::cout << "Boundaries" << std::endl;
 	std::cout << "x: " << x_max - x_min << std::endl;
 	std::cout << "y: " << y_max - y_min << std::endl;
 	std::cout << "z: " << z_max - z_min << std::endl;

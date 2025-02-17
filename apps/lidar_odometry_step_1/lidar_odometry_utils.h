@@ -83,13 +83,20 @@ struct LidarOdometryParams
     bool fusionConventionEnu = false;
     bool fusionConventionNed = false;
     int threshold_initial_points = 10000;
-    bool apply_consistency = true;
+    
     bool use_mutliple_gaussian = false;
     int num_constistency_iter = 10;
     double threshould_output_filter = 0.5;
     double ahrs_gain = 0.5;
-
     int threshold_nr_poses = 20;
+
+    // for automatic mode
+    std::string current_output_dir = "";
+    bool apply_consistency = true;
+    bool save_trajectory = true;
+    bool save_laz = true;
+    bool filter_ref_buckets = false;
+    bool save_poses = true;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);
@@ -132,6 +139,8 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
 bool saveLaz(const std::string &filename, const WorkerData &data, double threshould_output_filter);
 bool saveLaz(const std::string &filename, const std::vector<Point3Di> &points_global);
 bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_poses, std::vector<std::string> filenames);
+
+int get_next_result_id(const std::string working_directory);
 
 // this function performs main LiDAR odometry calculations
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,

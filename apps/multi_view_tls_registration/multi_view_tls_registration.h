@@ -10,6 +10,9 @@
 #include <gnss.h>
 #include <session.h>
 #include <regex>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 struct TLSRegistration
 {
@@ -108,24 +111,25 @@ struct TLSRegistration
 	bool initial_pose_to_identity = true;        // Whether to set first pose as identity and recalculate the rest relatively to it
 	
 	// Export
-	std::string output_las_name = "";                    // Path where output las is saved
+	bool save_las = false;                               // Save resulting point cloud as las
+	bool save_laz = false;                               // Save resulting point cloud as laz
 	bool save_as_separate_las = false;                   // Whether to save all scans as separate global scans in las format
 	bool save_as_separate_laz = false;                   // Whether to save all scans as separate global scans in laz format
-	std::string trajectories_laz_name = "";              // Path to laz where all trajectories are saved
-	std::string gnss_laz_name = "";                      // Path to laz where GNSS data is saved
-	std::string scale_board_las_name = "";               // Path where scale board for all trajectories is saved
+	bool save_trajectories_laz = false;                  // Save laz with all trajectories
+	bool save_gnss_laz = false;                          // Save laz with GNSS data
+	bool save_scale_board_laz = false;                   // Save laz with scale board 
 	float scale_board_dec = 0.1;                         // Decimation for scale board laz export 
 	float scale_board_side_len = -1.0;                   // Range covered in x and y dimensions
-	std::string initial_poses_file_name = "";            // Path where initial poses are saved
-	std::string poses_file_name = "";                    // Path where poses are saved 
+	bool save_initial_poses = false;                     // Path where initial poses are saved
+	bool save_poses = false;                             // Path where poses are saved 
 	bool is_trajectory_export_downsampling = false;      // Whether to downsample trajectory on export
 	float curve_consecutive_distance_meters = 1.0f;      // Meters after which trajectory point is saved (if downsampling and curve is detected)
 	float not_curve_consecutive_distance_meters = 0.05f; // Meters after which trajectory point is saved (if downsampling and no curve detected)
-	std::string trajectories_name = "";                  // Path the trajectories are saved as csv/dxf
+	bool save_trajectories_csv = false;                  // Save trajectories as csv
+	bool save_trajectories_dxf = false;                  // Save trajectories as dxf
 	bool write_lidar_timestamp = true;                   // Whether lidar timestamp is wrriten to csv trajectory output
 	bool write_unix_timestamp = false;                   // Whether unix timestamp is written to csv trajectory
 	bool use_quaternions = true;						 // Whether quaternions are used when writing csv trajectory
-	bool save_to_dxf = false;							 // Whether trajectory is saved as dxf instead of csv (other trajectory params are then ignored)
 };
 
 bool has_extension(const std::string file_path, const std::string extension);
@@ -134,7 +138,7 @@ void initial_pose_to_identity(Session& session);
 
 void save_all_to_las(const Session& session, std::string output_las_name);
 
-void save_separately_to_las(const Session& session, std::string extension = ".las");
+void save_separately_to_las(const Session& session, fs::path outwd, std::string extension = ".las");
 
 void save_trajectories_to_laz(const Session& session, std::string output_file_name, float curve_consecutive_distance_meters, float not_curve_consecutive_distance_meters, bool is_trajectory_export_downsampling);
 
@@ -151,5 +155,5 @@ void save_trajectories(
 	bool save_to_dxf = false);
 
 void run_multi_view_tls_registration(
-	std::string input_file_name, TLSRegistration& tls_registration, std::string output_file_name = "");
+	std::string input_file_name, TLSRegistration& tls_registration, std::string output_dir = "");
 #endif

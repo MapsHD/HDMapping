@@ -40,24 +40,25 @@ PYBIND11_MODULE(multi_view_tls_registration_py, m) {
         .def_readwrite("resso_upd", &TLSRegistration::resso_upd)
         .def_readwrite("resso_upd_inv", &TLSRegistration::resso_upd_inv)
         .def_readwrite("initial_pose_to_identity", &TLSRegistration::initial_pose_to_identity)
-        .def_readwrite("output_las_name", &TLSRegistration::output_las_name)
+        .def_readwrite("save_laz", &TLSRegistration::save_laz)
+        .def_readwrite("save_las", &TLSRegistration::save_las)
         .def_readwrite("save_as_separate_las", &TLSRegistration::save_as_separate_las)
         .def_readwrite("save_as_separate_laz", &TLSRegistration::save_as_separate_laz)
-        .def_readwrite("trajectories_laz_name", &TLSRegistration::trajectories_laz_name)
-        .def_readwrite("gnss_laz_name", &TLSRegistration::gnss_laz_name)
-        .def_readwrite("scale_board_las_name", &TLSRegistration::scale_board_las_name)
+        .def_readwrite("save_trajectories_laz", &TLSRegistration::save_trajectories_laz)
+        .def_readwrite("save_gnss_laz", &TLSRegistration::save_gnss_laz)
+        .def_readwrite("save_scale_board_laz", &TLSRegistration::save_scale_board_laz)
         .def_readwrite("scale_board_dec", &TLSRegistration::scale_board_dec)
         .def_readwrite("scale_board_side_len", &TLSRegistration::scale_board_side_len)
-        .def_readwrite("initial_poses_file_name", &TLSRegistration::initial_poses_file_name)
-        .def_readwrite("poses_file_name", &TLSRegistration::poses_file_name)
+        .def_readwrite("save_initial_poses", &TLSRegistration::save_initial_poses)
+        .def_readwrite("save_poses", &TLSRegistration::save_poses)
         .def_readwrite("is_trajectory_export_downsampling", &TLSRegistration::is_trajectory_export_downsampling)
         .def_readwrite("curve_consecutive_distance_meters", &TLSRegistration::curve_consecutive_distance_meters)
         .def_readwrite("not_curve_consecutive_distance_meters", &TLSRegistration::not_curve_consecutive_distance_meters)
-        .def_readwrite("trajectories_name", &TLSRegistration::trajectories_name)
+        .def_readwrite("save_trajectories_csv", &TLSRegistration::save_trajectories_csv)
+        .def_readwrite("save_trajectories_dxf", &TLSRegistration::save_trajectories_dxf)
         .def_readwrite("write_lidar_timestamp", &TLSRegistration::write_lidar_timestamp)
         .def_readwrite("write_unix_timestamp", &TLSRegistration::write_unix_timestamp)
         .def_readwrite("use_quaternions", &TLSRegistration::use_quaternions)
-        .def_readwrite("save_to_dxf", &TLSRegistration::save_to_dxf)
         .def("set_zoller_frohlich_tls_imager_5006i_errors",
             &TLSRegistration::set_zoller_frohlich_tls_imager_5006i_errors,
             "Set the Zoller-Frohlich TLS Imager 5006i errors")
@@ -81,7 +82,8 @@ PYBIND11_MODULE(multi_view_tls_registration_py, m) {
             "Set the Leica HDS6100 errors")
         .def("set_leica_p40_errors",
             &TLSRegistration::set_leica_p40_errors,
-            "Set the Leica P40 errors");
+            "Set the Leica P40 errors")
+        ;
 
     py::class_<ICP>(m, "ICP")
         .def(py::init<>())
@@ -121,6 +123,6 @@ PYBIND11_MODULE(multi_view_tls_registration_py, m) {
     m.def("run_multi_view_tls_registration", &run_multi_view_tls_registration,
           py::arg("input_file_name"),
           py::arg("tls_registration"),
-          py::arg("output_file_name") = "",
+          py::arg("output_dir"),
           "Run multi-view TLS registration with the provided input file, output file, and TLS registration configuration.");
 }

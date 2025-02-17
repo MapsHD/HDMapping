@@ -181,9 +181,8 @@ void step2()
 
 void save_results(bool info)
 {
-    static int result = 0;
+    int result = get_next_result_id(working_directory);
     fs::path outwd = working_directory / fs::path("lidar_odometry_result_" + std::to_string(result));
-    result++;
     save_result(worker_data, params, outwd);
     if (info)
     {
@@ -195,9 +194,7 @@ void save_results(bool info)
             message_info.c_str(),
             pfd::choice::ok, pfd::icon::info);
         message.result();
-
     }
-    
 }
 
 void lidar_odometry_gui()
@@ -354,7 +351,6 @@ void lidar_odometry_gui()
         }*/
         if (step_1_done && step_2_done)
         {
-            static bool use_mutliple_gaussian = false;
             ImGui::Text("'Point cloud consistency and trajectory smoothness' makes trajectory smooth, point cloud will be more consistent");
             ImGui::Text("Press 'Point cloud consistency and trajectory smoothness' button optionally before pressing 'Save result (step 3)'");
             ImGui::Text("Mutliple Gaussians suppose to work better in floor plan indoor scenarios (multiple neighbouring rooms)");

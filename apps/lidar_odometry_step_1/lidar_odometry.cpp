@@ -675,10 +675,27 @@ void load_reference_point_clouds(std::vector<std::string> input_file_names, Lida
     params.buckets = params.reference_buckets;
 }
 
-void run_lidar_odometry(
-    std::string input_dir, LidarOdometryParams& params, std::string output_las_name,
-    std::string trajectory_ascii_name, std::string reference_dir, std::string output_resso_file,
-    bool filter_ref_buckets)
+std::string save_results_automatic(LidarOdometryParams& params, std::vector<WorkerData> &worker_data, Session& session, std::string working_directory)
+{
+    int result = get_next_result_id(working_directory);
+    fs::path outwd = working_directory / fs::path("lidar_odometry_result_" + std::to_string(result));
+    save_result(worker_data, params, outwd);
+    if (params.save_laz)
+    {
+        save_all_to_las(worker_data, params, (outwd / "all_lo.laz").string(), session);
+    }
+    if (params.save_trajectory)
+    {
+        save_trajectory_to_ascii(worker_data, (outwd / "traj_lo.csv").string());
+    }
+    if (params.save_poses)
+    {
+        session.point_clouds_container.save_poses((outwd / "poses_lo.reg").string(), false);
+    }
+    return outwd.string();
+}
+
+void run_lidar_odometry(std::string input_dir, LidarOdometryParams& params)
 {
     Session session;
     std::vector<std::string> input_file_names;
@@ -709,48 +726,11 @@ void run_lidar_odometry(
         std::cout << "Calculation failed at step 2 of lidar odometry, exiting." << std::endl;
         return;
     }
+    std::string working_directory = fs::path(input_file_names[0]).parent_path().string();
+    params.current_output_dir = save_results_automatic(params, worker_data, session, working_directory);
     if (params.apply_consistency)
     {
-        if (trajectory_ascii_name.size() > 0)
-        {
-            std::filesystem::path file_path(trajectory_ascii_name);
-            std::string base_name = file_path.stem().string();
-            std::string extension = file_path.extension().string();
-            base_name += "_before_consistency";
-            std::string trajectory_name_before_cst = file_path.parent_path().string() + "/" + base_name + extension;
-            save_trajectory_to_ascii(worker_data, trajectory_name_before_cst);
-        }
         run_consistency(worker_data, params);
-    }
-    std::string working_directory = fs::path(input_file_names[0]).parent_path().string();
-    save_result(worker_data, params, working_directory);
-    if (output_las_name.size() > 0)
-    {
-        save_all_to_las(worker_data, params, output_las_name, session);
-    }
-    if (trajectory_ascii_name.size() > 0)
-    {
-        save_trajectory_to_ascii(worker_data, trajectory_ascii_name);
-    }
-    if (reference_dir.size() > 0)
-    {
-        input_file_names.clear();
-        for (const auto& entry : std::filesystem::directory_iterator(input_dir))
-        {
-            auto file_name = entry.path().string();
-            if (file_name.ends_with(".laz") || file_name.ends_with(".las"))
-            {
-                input_file_names.push_back(file_name);
-            }
-        }
-        load_reference_point_clouds(input_file_names, params);
-    }
-    if (output_resso_file.size() > 0)
-    {
-        session.point_clouds_container.save_poses(fs::path(output_resso_file).string(), false);
-    }
-    if (filter_ref_buckets)
-    {
-        filter_reference_buckets(params);
+        params.current_output_dir = save_results_automatic(params, worker_data, session, working_directory);
     }
 }

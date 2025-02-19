@@ -1,5 +1,5 @@
 #include <single_trajectory_viewer.h>
-#include <portable-file-dialogs.h>
+#include "pfd_wrapper.hpp"
 #include <GL/freeglut.h>
 #include <transformations.h>
 
@@ -22,26 +22,11 @@ bool SingleTrajectoryViewer::load_fused_trajectory(const std::string &file_name)
 
 bool SingleTrajectoryViewer::load_fused_trajectory()
 {
-    static std::shared_ptr<pfd::open_file> open_file;
-    std::string input_file_name = "";
-    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-    const auto t = [&]() {
-        auto sel = pfd::open_file("Choose folder", "C:\\").result();
-        for (int i = 0; i < sel.size(); i++)
-        {
-            input_file_name = sel[i];
-            std::cout << "trajectory file: '" << input_file_name << "'" << std::endl;
-        }
-    };
-    std::thread t1(t);
-    t1.join();
-
-    if (input_file_name.size() > 0) {
-        return load_fused_trajectory(input_file_name);
+    auto selectedFile = mandeye::fd::OpenFileDialogOneFile("Choose folder", {});
+    if (!selectedFile.empty()) {
+        return load_fused_trajectory(selectedFile);
     }
-    else {
-        return false;
-    }
+    return false;
 }
 
 std::vector<Point> SingleTrajectoryViewer::load_points_and_transform_to_global(double ts, Eigen::Vector3d roi, float roi_size, int ext)

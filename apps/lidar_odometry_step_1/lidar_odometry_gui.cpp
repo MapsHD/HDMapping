@@ -123,21 +123,8 @@ void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eig
 
 void step1()
 {
-    static std::shared_ptr<pfd::open_file> open_file;
     std::vector<std::string> input_file_names;
-    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-    const auto t = [&]()
-        {
-            std::vector<std::string> filters;
-            auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
-            for (int i = 0; i < sel.size(); i++)
-            {
-                input_file_names.push_back(sel[i]);
-                // std::cout << "las file: '" << input_file_name << "'" << std::endl;
-            }
-        };
-    std::thread t1(t);
-    t1.join();
+    input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
 
     if (load_data(input_file_names, params, pointsPerFile, imu_data))
     {
@@ -396,17 +383,7 @@ void lidar_odometry_gui()
 
             if (ImGui::Button("save all point clouds to single '*.las or *.laz' file"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                    output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
 
                 if (output_file_name.size() > 0)
                 {
@@ -502,17 +479,9 @@ void lidar_odometry_gui()
             // ImGui::SameLine();
             if (ImGui::Button("save trajectory to ascii (x y z)"))
             {
-                static std::shared_ptr<pfd::save_file> save_file;
                 std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save trajectory", "C:\\").result();
-                    output_file_name = sel;
-                    std::cout << "file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                output_file_name = mandeye::fd::SaveFileDialog("Save trajectory", {}, "");
+                std::cout << "file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -521,21 +490,7 @@ void lidar_odometry_gui()
             }
             if (ImGui::Button("load reference point clouds (laz)"))
             {
-                static std::shared_ptr<pfd::open_file> open_file;
-                std::vector<std::string> input_file_names;
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-                const auto t = [&]()
-                {
-                    std::vector<std::string> filters;
-                    auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
-                    for (int i = 0; i < sel.size(); i++)
-                    {
-                        input_file_names.push_back(sel[i]);
-                    }
-                };
-                std::thread t1(t);
-                t1.join();
-
+                auto input_file_names = mandeye::fd::OpenFileDialog("Load las files", mandeye::fd::LAS_LAZ_filter, true);
                 if (input_file_names.size() > 0)
                 {
                     show_reference_points = true;
@@ -726,18 +681,7 @@ void lidar_odometry_gui()
 
             if (ImGui::Button("export selected scans"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                    output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
-
+                auto output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
                 Eigen::Affine3d pose;
                 if (output_file_name.size() > 0)
                 {
@@ -774,17 +718,8 @@ void lidar_odometry_gui()
 
             if (ImGui::Button("save RESSO file"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save RESSO file", "C:\\").result();
-                    output_file_name = sel;
-                    std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", {}, "");
+                std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1732,22 +1667,8 @@ void alternative_approach()
 
     std::cout << "aternative_approach" << std::endl;
 
-    static std::shared_ptr<pfd::open_file> open_file;
     std::vector<std::string> input_file_names;
-    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-    const auto t = [&]()
-    {
-        std::vector<std::string> filters;
-        auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
-        for (int i = 0; i < sel.size(); i++)
-        {
-            input_file_names.push_back(sel[i]);
-            // std::cout << "las file: '" << input_file_name << "'" << std::endl;
-        }
-    };
-    std::thread t1(t);
-    t1.join();
-
+    input_file_names = mandeye::fd::OpenFileDialog("Load las files",{}, true);
     std::sort(std::begin(input_file_names), std::end(input_file_names));
 
     std::vector<std::string> csv_files;

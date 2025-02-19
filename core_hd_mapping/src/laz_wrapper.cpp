@@ -9,29 +9,15 @@
 #include <laszip/laszip_api.h>
 
 #include <GL/freeglut.h>
+#include "pfd_wrapper.hpp"
 
 void LazWrapper::imgui(CommonData& common_data, const ProjectSettings& project_setings) {
 	ImGui::Begin("LazWrapper");
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
 	if (ImGui::Button("Add point cloud from LAZ file")) {
-		static std::shared_ptr<pfd::open_file> open_file;
-		std::vector<std::string> input_file_names;
-		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-		const auto t = [&]() {
-            auto sel = pfd::open_file("Choose folder", "C:\\", {"LAZ files, *.laz"}, true).result();
-			for (int i = 0; i < sel.size(); i++)
-			{
-				std::string input_file_name = sel[i];
-				std::cout << "LAZ file: '" << input_file_name << "'" << std::endl;
 
-                if (input_file_name.size() > 0) {
-                    input_file_names.push_back(input_file_name);
-                }
-			}
-		};
-		std::thread t1(t);
-		t1.join();
+        auto input_file_names = mandeye::fd::OpenFileDialog("Choose folder", {"LAZ files, *.laz"}, true);
 
         for(int i = 0 ; i < input_file_names.size(); i++){
             std::cout << "loading progers: " << i + 1 << " of " << input_file_names.size() << std::endl;

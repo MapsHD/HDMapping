@@ -201,20 +201,9 @@ void project_gui()
     {
         if (ImGui::Button("load session (first step)"))
         {
-            static std::shared_ptr<pfd::open_file> open_file;
             std::string input_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::open_file("Load session", "C:\\", Session_filter).result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_name = sel[i];
-                    std::cout << "Session file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load session", mandeye::fd::Session_filter);
+            std::cout << "Session file: '" << input_file_name << "'" << std::endl;
 
             if (input_file_name.size() > 0)
             {
@@ -227,17 +216,8 @@ void project_gui()
 
     if (ImGui::Button("save session (last step)"))
     {
-        std::shared_ptr<pfd::save_file> save_file;
-        std::string output_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-        const auto t = [&]()
-        {
-            auto sel = pfd::save_file("Save session", "C:\\", Session_filter).result();
-            output_file_name = sel;
-            std::cout << "Session file to save: '" << output_file_name << "'" << std::endl;
-        };
-        std::thread t_1(t);
-        t_1.join();
+        const auto output_file_name = mandeye::fd::SaveFileDialog("Save session", Session_filter, ".json");
+        std::cout << "Session file to save: '" << output_file_name << "'" << std::endl;
 
         if (output_file_name.size() > 0)
         {
@@ -290,18 +270,8 @@ void project_gui()
                         pfd::choice::ok, pfd::icon::error);
                     message.result();
 
-                    std::shared_ptr<pfd::save_file> save_file1;
-                    std::string poses_file_name = "";
-                    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file1);
-                    const auto t = [&]()
-                    {
-                        auto sel = pfd::save_file("poses_file_name", "C:\\", Resso_filter).result();
-                        poses_file_name = sel;
-                        std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
-                    };
-                    std::thread t1(t);
-                    t1.join();
-
+                    const auto poses_file_name = mandeye::fd::SaveFileDialog("poses_file_name", Resso_filter);
+                    std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
                     if (poses_file_name.size() > 0)
                     {
                         std::cout << "saving poses to: " << poses_file_name << std::endl;
@@ -317,29 +287,10 @@ void project_gui()
             {
                 // std::string poses_file_name;
                 // std::string initial_poses_file_name;
-                std::shared_ptr<pfd::save_file> save_file2;
-                std::string initial_poses_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file2);
-                const auto tt = [&]()
-                {
-                    auto sel = pfd::save_file("initial_poses_file_name", "C:\\", Resso_filter).result();
-                    initial_poses_file_name = sel;
-                    std::cout << "Resso file to save: '" << initial_poses_file_name << "'" << std::endl;
-                };
-                std::thread t2(tt);
-                t2.join();
-
-                std::shared_ptr<pfd::save_file> save_file1;
-                std::string poses_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file1);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("poses_file_name", "C:\\", Resso_filter).result();
-                    poses_file_name = sel;
-                    std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto initial_poses_file_name = mandeye::fd::SaveFileDialog("initial_poses_file_name", Resso_filter);
+                const auto poses_file_name = mandeye::fd::SaveFileDialog("poses_file_name", Resso_filter);
+                std::cout << "Resso file to save: '" << initial_poses_file_name << "'" << std::endl;
+                std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
 
                 if (poses_file_name.size() > 0 && initial_poses_file_name.size() > 0)
                 {
@@ -437,20 +388,9 @@ void project_gui()
 
         if (ImGui::Button("load RESSO file (transformation_GroundTruth.reg)"))
         {
-            static std::shared_ptr<pfd::open_file> open_file;
             std::string input_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_name = sel[i];
-                    std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load resso", mandeye::fd::Resso_filter);
+            std::cout << "resso file: '" << input_file_name << "'" << std::endl;
 
             if (input_file_name.size() > 0)
             {
@@ -471,18 +411,8 @@ void project_gui()
         ImGui::SameLine();
         if (ImGui::Button("save RESSO file"))
         {
-            std::shared_ptr<pfd::save_file> save_file;
-            std::string output_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::save_file("Save RESSO file", "C:\\").result();
-                output_file_name = sel;
-                std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
-            };
-            std::thread t1(t);
-            t1.join();
-
+            const auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", Resso_filter);
+            std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
             if (output_file_name.size() > 0)
             {
                 session.point_clouds_container.save_poses(fs::path(output_file_name).string(), false);
@@ -492,21 +422,8 @@ void project_gui()
         ImGui::Text("RESSO dataset: https://3d.bk.tudelft.nl/liangliang/publications/2019/plade/resso.html");
         if (ImGui::Button("load ETH file (pairs.txt)"))
         {
-            static std::shared_ptr<pfd::open_file> open_file;
             std::string input_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::open_file("Load ETH file", "C:\\").result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_name = sel[i];
-                    std::cout << "ETH file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
-
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load ETH file", {});
             if (input_file_name.size() > 0)
             {
                 session.working_directory = fs::path(input_file_name).parent_path().string();
@@ -527,22 +444,8 @@ void project_gui()
         if (ImGui::Button("load AlignedPointCloud from WHU-TLS (select all *.las or *.laz files in folder 2-AlignedPointCloud)"))
         {
             session.point_clouds_container.point_clouds.clear();
-            static std::shared_ptr<pfd::open_file> open_file;
             std::vector<std::string> input_file_names;
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                std::vector<std::string> filters;
-                auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_names.push_back(sel[i]);
-                    // std::cout << "las file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
-
+            input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
             if (input_file_names.size() > 0)
             {
                 session.working_directory = fs::path(input_file_names[0]).parent_path().string();
@@ -586,21 +489,8 @@ void project_gui()
         if (ImGui::Button("load 3DTK files (select all *.txt files)"))
         {
             session.point_clouds_container.point_clouds.clear();
-            static std::shared_ptr<pfd::open_file> open_file;
             std::vector<std::string> input_file_names;
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                std::vector<std::string> filters;
-                auto sel = pfd::open_file("Load txt files", "C:\\", filters, true).result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_names.push_back(sel[i]);
-                    // std::cout << "las file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
+            input_file_names = mandeye::fd::OpenFileDialog("Load txt files", {}, true);
 
             if (input_file_names.size() > 0)
             {
@@ -627,21 +517,8 @@ void project_gui()
 
         if (ImGui::Button("update initial poses from RESSO file"))
         {
-            static std::shared_ptr<pfd::open_file> open_file;
-            std::string input_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_name = sel[i];
-                    std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
-
+            std::string input_file_name ;
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
             if (input_file_name.size() > 0)
             {
 
@@ -665,20 +542,8 @@ void project_gui()
 
         if (ImGui::Button("update poses from RESSO file"))
         {
-            static std::shared_ptr<pfd::open_file> open_file;
-            std::string input_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_name = sel[i];
-                    std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
+            std::string input_file_name ;
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
 
             if (input_file_name.size() > 0)
             {
@@ -700,20 +565,8 @@ void project_gui()
 
         if (ImGui::Button("update poses from RESSO file (inverse)"))
         {
-            static std::shared_ptr<pfd::open_file> open_file;
-            std::string input_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::open_file("Load RESSO file", "C:\\").result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_name = sel[i];
-                    std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
+            std::string input_file_name ;
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
 
             if (input_file_name.size() > 0)
             {
@@ -955,18 +808,8 @@ void project_gui()
                 ImGui::SameLine();
                 if (ImGui::Button(std::string("#" + std::to_string(i) + " save scan(global reference frame)").c_str()))
                 {
-                    static std::shared_ptr<pfd::save_file> save_file;
-                    std::string output_file_name = "";
-                    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                    const auto t = [&]()
-                    {
-                        auto sel = pfd::save_file("Choose folder", "C:\\").result();
-                        output_file_name = sel;
-                        std::cout << "Scan file to save: '" << output_file_name << "'" << std::endl;
-                    };
-                    std::thread t1(t);
-                    t1.join();
-
+                    const auto output_file_name = mandeye::fd::SaveFileDialog("Choose folder", {});
+                    std::cout << "Scan file to save: '" << output_file_name << "'" << std::endl;
                     if (output_file_name.size() > 0)
                     {
                         session.point_clouds_container.point_clouds[i].save_as_global(output_file_name);
@@ -1139,17 +982,8 @@ void project_gui()
 
         if (ImGui::Button("save all marked scans to laz (as one global scan)"))
         {
-            std::shared_ptr<pfd::save_file> save_file;
-            std::string output_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                output_file_name = sel;
-                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-            };
-            std::thread t1(t);
-            t1.join();
+            const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+            std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
             if (output_file_name.size() > 0)
             {
@@ -1185,18 +1019,8 @@ void project_gui()
 
             if (ImGui::Button("save all marked trajectories to laz (as one global scan)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                    output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
-
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
                 if (output_file_name.size() > 0)
                 {
                     save_trajectories_to_laz(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling);
@@ -1205,17 +1029,8 @@ void project_gui()
 
             if (ImGui::Button("save gnss data to laz file"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                    output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
+                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1225,17 +1040,8 @@ void project_gui()
 
             if (ImGui::Button("save scale board for all marked trajectories to laz (as one global scan - dec 0.1)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                    output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1244,17 +1050,8 @@ void project_gui()
             }
             if (ImGui::Button("save scale board for all marked trajectories to laz (as one global scan - dec 1.0)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                    output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1263,17 +1060,8 @@ void project_gui()
             }
             if (ImGui::Button("save scale board for all marked trajectories to laz (as one global scan - dec 10.0)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                    output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1282,17 +1070,8 @@ void project_gui()
             }
             if (ImGui::Button("save scale board 10km x 10km to laz (10m)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                    output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1301,17 +1080,8 @@ void project_gui()
             }
             if (ImGui::Button("save scale board 10km x 10km to laz (100m)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                    output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1320,17 +1090,8 @@ void project_gui()
             }
             if (ImGui::Button("save scale board 10km x 10km to laz (1000m)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                    output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1339,17 +1100,8 @@ void project_gui()
             }
             if (ImGui::Button("save all marked trajectories to csv (timestampLidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save csv file", "C:\\", {"csv file", "*.csv"}).result();
-                    output_file_name = sel;
-                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
+                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1358,17 +1110,8 @@ void project_gui()
             }
             if (ImGui::Button("save all marked trajectories to csv (timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save csv file", "C:\\", {"csv file", "*.csv"}).result();
-                    output_file_name = sel;
-                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
+                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1377,17 +1120,8 @@ void project_gui()
             }
             if (ImGui::Button("save all marked trajectories to csv (timestampLidar,timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save csv file", "C:\\", {"csv file", "*.csv"}).result();
-                    output_file_name = sel;
-                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
+                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1396,17 +1130,9 @@ void project_gui()
             }
             if (ImGui::Button("save all marked trajectories to csv (timestampLidar,x,y,z,qx,qy,qz,qw)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("csv file", "C:\\").result();
-                    output_file_name = sel;
-                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
+                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+
 
                 if (output_file_name.size() > 0)
                 {
@@ -1415,17 +1141,8 @@ void project_gui()
             }
             if (ImGui::Button("save all marked trajectories to csv (timestampUnix,x,y,z,qx,qy,qz,qw)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save csv file", "C:\\").result();
-                    output_file_name = sel;
-                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
+                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1434,17 +1151,8 @@ void project_gui()
             }
             if (ImGui::Button("save all marked trajectories to csv (timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save csv file", "C:\\").result();
-                    output_file_name = sel;
-                    std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
+                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1453,17 +1161,8 @@ void project_gui()
             }
             if (ImGui::Button("save all marked trajectories to dxf as polyline"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
-                std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save dxf file", "C:\\").result();
-                    output_file_name = sel;
-                    std::cout << "dxf file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Ouput file name", mandeye::fd::Dxf_filter, ".dxf");
+                std::cout << "dxf file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -1479,20 +1178,9 @@ void project_gui()
         {
             if (ImGui::Button("load georefence points"))
             {
-                static std::shared_ptr<pfd::open_file> open_file;
                 std::string input_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::open_file("Load geo-reference file", "C:\\").result();
-                    for (int i = 0; i < sel.size(); i++)
-                    {
-                        input_file_name = sel[i];
-                        std::cout << "geo-reference file: '" << input_file_name << "'" << std::endl;
-                    }
-                };
-                std::thread t1(t);
-                t1.join();
+                input_file_name = mandeye::fd::OpenFileDialogOneFile("Load geo-reference file", {});
+                std::cout << "geo-reference file: '" << input_file_name << "'" << std::endl;
 
                 if (input_file_name.size() > 0)
                 {
@@ -1502,21 +1190,8 @@ void project_gui()
 
             if (ImGui::Button("load gnss files and convert from wgs84 to puwg92"))
             {
-                static std::shared_ptr<pfd::open_file> open_file;
                 std::vector<std::string> input_file_names;
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-                const auto t = [&]()
-                {
-                    std::vector<std::string> filters;
-                    auto sel = pfd::open_file("Load gnss files", "C:\\", filters, true).result();
-                    for (int i = 0; i < sel.size(); i++)
-                    {
-                        input_file_names.push_back(sel[i]);
-                        // std::cout << "las file: '" << input_file_name << "'" << std::endl;
-                    }
-                };
-                std::thread t1(t);
-                t1.join();
+                input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", {}, true);
 
                 if (input_file_names.size() > 0)
                 {
@@ -1535,21 +1210,8 @@ void project_gui()
 
             if (ImGui::Button("load gnss files and convert from wgs84 to Cartesian using Mercator projection"))
             {
-                static std::shared_ptr<pfd::open_file> open_file;
                 std::vector<std::string> input_file_names;
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-                const auto t = [&]()
-                {
-                    std::vector<std::string> filters;
-                    auto sel = pfd::open_file("Load gnss files", "C:\\", filters, true).result();
-                    for (int i = 0; i < sel.size(); i++)
-                    {
-                        input_file_names.push_back(sel[i]);
-                        // std::cout << "las file: '" << input_file_name << "'" << std::endl;
-                    }
-                };
-                std::thread t1(t);
-                t1.join();
+                input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", {}, true);
 
                 if (input_file_names.size() > 0)
                 {
@@ -2223,20 +1885,8 @@ void observation_picking_gui()
 
     if (ImGui::Button("load observations"))
     {
-        static std::shared_ptr<pfd::open_file> open_file;
         std::string input_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-        const auto t = [&]()
-        {
-            auto sel = pfd::open_file("Load observations", "C:\\").result();
-            for (int i = 0; i < sel.size(); i++)
-            {
-                input_file_name = sel[i];
-                std::cout << "json file: '" << input_file_name << "'" << std::endl;
-            }
-        };
-        std::thread t1(t);
-        t1.join();
+        input_file_name = mandeye::fd::OpenFileDialogOneFile("Load observations", {});
 
         if (input_file_name.size() > 0)
         {
@@ -2265,17 +1915,8 @@ void observation_picking_gui()
     ImGui::SameLine();
     if (ImGui::Button("save observations"))
     {
-        static std::shared_ptr<pfd::save_file> save_file;
-        std::string output_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-        const auto t = [&]()
-        {
-            auto sel = pfd::save_file("Save observations", "C:\\").result();
-            output_file_name = sel;
-            std::cout << "json file to save: '" << output_file_name << "'" << std::endl;
-        };
-        std::thread t1(t);
-        t1.join();
+        const auto output_file_name = mandeye::fd::SaveFileDialog("Save observations", {}, ".json");
+        std::cout << "json file to save: '" << output_file_name << "'" << std::endl;
 
         if (output_file_name.size() > 0)
         {
@@ -2348,17 +1989,9 @@ void observation_picking_gui()
     {
         if (ImGui::Button("export point clouds inside intersections, rms and poses (RESSO format) to folder"))
         {
-            static std::shared_ptr<pfd::select_folder> selected_folder;
             std::string output_folder_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)selected_folder);
-            const auto t = [&]()
-            {
-                auto sel = pfd::select_folder("Choose folder", "C:\\").result();
-                output_folder_name = sel;
-                std::cout << "folder: '" << output_folder_name << "'" << std::endl;
-            };
-            std::thread t1(t);
-            t1.join();
+            output_folder_name = mandeye::fd::SelectFolder("Choose folder");
+            std::cout << "folder: '" << output_folder_name << "'" << std::endl;
 
             if (output_folder_name.size() > 0)
             {

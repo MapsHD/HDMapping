@@ -10,6 +10,7 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+#include "pfd_wrapper.hpp"
 
 std::vector<Point> decimate(std::vector<Point> pc) {
     std::vector<Point> pc_out;
@@ -353,16 +354,9 @@ typedef std::vector<std::vector<float> > Cloud;
 
 void RoiExporter::export_to_RESSO_format(std::vector<PointCloudWithPose>& roi_point_clouds)
 {
-    static std::shared_ptr<pfd::save_file> save_file;
     std::string output_file_name = "";
-    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-    const auto t = [&]() {
-        auto sel = pfd::save_file("Choose file", "C:\\").result();
-        output_file_name = sel;
-        std::cout << "file to save: '" << output_file_name << "'" << std::endl;
-    };
-    std::thread t1(t);
-    t1.join();
+    output_file_name = mandeye::fd::SaveFileDialog("Choose file", {});
+    std::cout << "file to save: '" << output_file_name << "'" << std::endl;
 
     if (output_file_name.size() > 0) {
         std::ofstream outfile;
@@ -417,19 +411,8 @@ void RoiExporter::export_to_RESSO_format(std::vector<PointCloudWithPose>& roi_po
 
 void RoiExporter::import_from_RESSO_format_as_constraints_to_georeference()
 {
-    static std::shared_ptr<pfd::open_file> open_file;
     std::string input_file_name = "";
-    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-    const auto t = [&]() {
-        auto sel = pfd::open_file("Choose folder", "C:\\").result();
-        for (int i = 0; i < sel.size(); i++)
-        {
-            input_file_name = sel[i];
-            std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-        }
-    };
-    std::thread t1(t);
-    t1.join();
+    input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
 
     if (input_file_name.size() > 0) {
         std::vector<Eigen::Affine3d> m_poses;

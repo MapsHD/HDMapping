@@ -3,7 +3,10 @@ cmake_minimum_required(VERSION 3.15.0)
 project(multi_view_tls_registration_step_2)
 
 add_executable(multi_view_tls_registration_step_2
-               multi_view_tls_registration.cpp perform_experiment.cpp)
+               multi_view_tls_registration.cpp perform_experiment.cpp 
+               multi_view_tls_registration_gui.cpp multi_view_tls_registration.h)
+
+target_compile_definitions(multi_view_tls_registration_step_2 PRIVATE -DWITH_GUI=1)
 
 target_link_libraries(
   multi_view_tls_registration_step_2

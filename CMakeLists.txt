@@ -10,6 +10,11 @@ add_definitions(-DHDMAPPING_VERSION_MAJOR=${HDMAPPING_VERSION_MAJOR})
 add_definitions(-DHDMAPPING_VERSION_MINOR=${HDMAPPING_VERSION_MINOR})
 add_definitions(-DHDMAPPING_VERSION_PATCH=${HDMAPPING_VERSION_PATCH})
 
+
+if (MSVC)
+    add_definitions(-D_HAS_STD_BYTE=0)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
 
 include_directories(shared/include)
@@ -84,6 +89,28 @@ else()
     MESSAGE(STATUS "LASzip include dir: ${LASZIP_INCLUDE_DIR}", "LASzip library: ${LASZIP_LIBRARY}")
 endif ()
 
+option(PYBIND "Enable pybind11 bindings" OFF)
+if(PYBIND)
+    message(STATUS "PYBIND is enabled: fetching pybind.")
+    include(FetchContent)
+    set(pybind11_SOURCE_DIR "${CMAKE_BINARY_DIR}/3rdparty/pybind11-src")
+    set(pybind11_BINARY_DIR "${CMAKE_BINARY_DIR}/3rdparty/pybind11-build")
+    FetchContent_Declare(
+        pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11
+        GIT_TAG        v2.12.1
+        SOURCE_DIR     ${pybind11_SOURCE_DIR}
+        BINARY_DIR     ${pybind11_BINARY_DIR}
+    )
+    FetchContent_GetProperties(pybind11)
+    if(NOT pybind11_POPULATED)
+        FetchContent_MakeAvailable(pybind11)
+    endif()
+    add_subdirectory(pybind)
+else()
+    message(STATUS "PYBIND is disabled.")
+endif()
+
 add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
 
 add_subdirectory(core)
@@ -93,7 +120,7 @@ set(CORE_LIBRARIES core core-hd-mapping)
 set(GUI_LIBRARIES imgui imguizmo)
 
 add_subdirectory(apps/hd_mapper)
-add_subdirectory(apps/lidar_odometry_step_1)
+add_subdirectory(apps/lidar_odometry_step_1)    
 add_subdirectory(apps/manual_color)
 add_subdirectory(apps/matrix_mul)
 add_subdirectory(apps/multi_session_registration)

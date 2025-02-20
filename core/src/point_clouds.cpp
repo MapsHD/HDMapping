@@ -554,6 +554,7 @@ bool PointClouds::load_eth(const std::string &folder_with_point_clouds, const st
 	return true;
 }
 
+#if WITH_GUI == 1
 void PointClouds::render(const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud)
 {
 	for (auto &p : point_clouds)
@@ -561,6 +562,7 @@ void PointClouds::render(const ObservationPicking &observation_picking, int view
 		p.render(this->show_with_initial_pose, observation_picking, viewer_decmiate_point_cloud);
 	}
 }
+#endif
 
 bool PointClouds::save_poses(const std::string file_name, bool is_subsession)
 {
@@ -1127,7 +1129,7 @@ void PointClouds::print_point_cloud_dimention()
 		}
 	}
 
-	std::cout << "Bounaries" << std::endl;
+	std::cout << "Boundaries" << std::endl;
 	std::cout << "x: " << x_max - x_min << std::endl;
 	std::cout << "y: " << y_max - y_min << std::endl;
 	std::cout << "z: " << z_max - z_min << std::endl;

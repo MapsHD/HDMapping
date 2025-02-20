@@ -5,9 +5,11 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
-#include <GL/freeglut.h>
 #include <WGS84toCartesian.hpp>
 #include <laszip/laszip_api.h>
+#if WITH_GUI == 1
+#include <GL/freeglut.h>
+#endif
 
 inline void split(std::string &str, char delim, std::vector<std::string> &out)
 {
@@ -190,6 +192,7 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
     return true;
 }
 
+#if WITH_GUI == 1
 void GNSS::render(const PointClouds &point_clouds_container)
 {
     glColor3f(1, 1, 1);
@@ -233,6 +236,7 @@ void GNSS::render(const PointClouds &point_clouds_container)
         glEnd();
     }
 }
+#endif
 
 bool GNSS::save_to_laz(const std::string &output_file_names, double offset_x, double offset_y, double offset_alt)
 {

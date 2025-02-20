@@ -4,10 +4,11 @@
 #include <string>
 #include <vector>
 #include <Eigen/Eigen>
-
 #include <structures.h>
+#if WITH_GUI == 1
+#include <GL/freeglut.h>
 #include <observation_picking.h>
-//#include <laszip/laszip_api.h>
+#endif
 
 class PointCloud {
 public:
@@ -108,8 +109,6 @@ public:
 	//double search_radious = 2.0;
 
 	bool load(const std::string& file_name);
-	void render(bool show_with_initial_pose, const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud);
-	void render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud);
 	void update_from_gui();
 	bool save_as_global(std::string file_name);
 	//rgd
@@ -123,6 +122,10 @@ public:
 	void compute_normal_vectors(double search_radious);
 	void decimate(double bucket_x, double bucket_y, double bucket_z);
 	void shift_to_center();
+#if WITH_GUI == 1
+	void render(bool show_with_initial_pose, const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud);
+    void render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud);
+#endif
 };
 
 #endif

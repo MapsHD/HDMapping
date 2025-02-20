@@ -4,6 +4,8 @@ project(multi_session_registration_step_3)
 
 add_executable(multi_session_registration_step_3 multi_session_registration.cpp)
 
+target_compile_definitions(multi_session_registration_step_3 PRIVATE -DWITH_GUI=1)
+
 target_include_directories(
   multi_session_registration_step_3
   PRIVATE include

@@ -1,7 +1,6 @@
 #include <point_cloud.h>
 #include <transformations.h>
 
-#include <GL/freeglut.h>
 #include <iostream>
 #include <cstdlib>
 #include <sstream>
@@ -50,11 +49,19 @@ bool PointCloud::load(const std::string &file_name)
 		// std::cout << "\n";
 		auto yData = data["vertex"]->properties["y"];
 		auto zData = data["vertex"]->properties["z"];
-
 		for (size_t i = 0; i < xData->size(); i++)
 		{
 			Eigen::Vector3d point(xData->at<float>(i), yData->at<float>(i), zData->at<float>(i));
 			points_local.push_back(point);
+			timestamps.push_back(0);  // no timestamps available in ETH ply
+		}
+		if (data["vertex"]->properties.has_key("intensity"))
+		{
+			auto iData = data["vertex"]->properties["intensity"];
+			for (size_t i = 0; i < xData->size(); i++)
+			{
+				intensities.push_back(static_cast<unsigned short>(iData->at<float>(i) * 65535.0f));
+			}
 		}
 	}
 	//}
@@ -89,145 +96,6 @@ bool PointCloud::load(const std::string &file_name)
 #endif
 	std::cout << "File: '" << file_name << "' loaded" << std::endl;
 	return true;
-}
-
-void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud)
-{
-	glPointSize(observation_picking.point_size);
-	
-	if (this->visible)
-	{
-		glColor3f(render_color[0], render_color[1], render_color[2]);
-		glPointSize(point_size);
-		// glBegin(GL_POINTS);
-		//  for (const auto& p : this->points_local) {
-
-		// std::cout << this->colors.size() << " " << this->points_local.size() << std::endl;
-		glBegin(GL_POINTS);
-		for (int i = 0; i < this->points_local.size(); i += viewer_decmiate_point_cloud)
-		{
-			const auto &p = this->points_local[i];
-			Eigen::Vector3d vp;
-			if (show_with_initial_pose)
-			{
-				vp = this->m_initial_pose * p;
-			}
-			else
-			{
-				vp = this->m_pose * p;
-			}
-			if (this->show_color){
-				if (this->colors.size() == this->points_local.size())
-				{
-					glColor3f(this->colors[i].x(), this->colors[i].y(), this->colors[i].z());
-				}
-			}
-			//
-			
-			if (observation_picking.is_observation_picking_mode)
-			{
-				if (fabs(vp.z() - observation_picking.picking_plane_height) <= observation_picking.picking_plane_threshold)
-				{
-					glVertex3d(vp.x(), vp.y(), vp.z());
-				}
-			}
-			else
-			{
-				glVertex3d(vp.x(), vp.y(), vp.z());
-			}
-			//glEnd();
-		}
-		glEnd();
-		glPointSize(1);
-
-		glColor3f(render_color[0], render_color[1], render_color[2]);
-		glBegin(GL_LINE_STRIP);
-		for (int i = 0; i < this->local_trajectory.size(); i++)
-		{
-			auto m = this->m_pose * this->local_trajectory[i].m_pose;
-			glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-		}
-		glEnd();
-
-		if (this->local_trajectory.size() > 0 && this->fuse_inclination_from_IMU)
-		{
-			Eigen::Vector3d a1(-0.2, -0.2, 0);
-			Eigen::Vector3d a2( 0.2, -0.2, 0);
-			Eigen::Vector3d a3( 0.2,  0.2, 0);
-			Eigen::Vector3d a4(-0.2,  0.2, 0);
-
-			Eigen::Vector3d a1t = this->m_pose * a1;
-			Eigen::Vector3d a2t = this->m_pose * a2;
-			Eigen::Vector3d a3t = this->m_pose * a3;
-			Eigen::Vector3d a4t = this->m_pose * a4;
-
-			glColor3f(0, 1, 0);
-			glBegin(GL_LINE_STRIP);
-				glVertex3f(a1t.x(), a1t.y(), a1t.z());
-				glVertex3f(a2t.x(), a2t.y(), a2t.z());
-				glVertex3f(a3t.x(), a3t.y(), a3t.z());
-				glVertex3f(a4t.x(), a4t.y(), a4t.z());
-				glVertex3f(a1t.x(), a1t.y(), a1t.z());
-			glEnd();
-
-
-
-			TaitBryanPose tb;
-			tb.px = this->m_pose(0, 3);
-			tb.py = this->m_pose(1, 3);
-			tb.pz = this->m_pose(2, 3);
-			tb.om = this->local_trajectory[0].imu_om_fi_ka.x();
-			tb.fi = this->local_trajectory[0].imu_om_fi_ka.y();
-			tb.ka = this->local_trajectory[0].imu_om_fi_ka.z();
-
-			auto m = affine_matrix_from_pose_tait_bryan(tb);
-			a1t = m * a1;
-			a2t = m * a2;
-			a3t = m * a3;
-			a4t = m * a4;
-
-			glColor3f(1, 0, 0);
-			glBegin(GL_LINE_STRIP);
-				glVertex3f(a1t.x(), a1t.y(), a1t.z());
-				glVertex3f(a2t.x(), a2t.y(), a2t.z());
-				glVertex3f(a3t.x(), a3t.y(), a3t.z());
-				glVertex3f(a4t.x(), a4t.y(), a4t.z());
-				glVertex3f(a1t.x(), a1t.y(), a1t.z());
-			glEnd();
-			// 
-			// Eigen::Affine3d imu_pose =
-			// auto m = this->m_pose * this->local_trajectory[i].m_pose;
-		}
-	}
-}
-
-void PointCloud::render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud)
-{
-	if (this->visible)
-	{
-		glColor3f(render_color[0], render_color[1], render_color[2]);
-		glPointSize(point_size);
-		glBegin(GL_POINTS);
-
-		for (int i = 0; i < this->points_local.size(); i += viewer_decmiate_point_cloud)
-		{
-			const auto &p = this->points_local[i];
-			Eigen::Vector3d vp;
-			vp = pose * p;
-			glVertex3d(vp.x(), vp.y(), vp.z());
-		}
-		glEnd();
-		glPointSize(1);
-
-		glColor3f(render_color[0], render_color[1], render_color[2]);
-		glBegin(GL_LINE_STRIP);
-		for (int i = 0; i < this->local_trajectory.size(); i++)
-		{
-			auto m = this->m_pose * this->local_trajectory[i].m_pose;
-			glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-		}
-		glEnd();
-	}
 }
 
 void PointCloud::update_from_gui()
@@ -1546,3 +1414,144 @@ void PointCloud::shift_to_center()
 		}
 	}
 }
+
+#if WITH_GUI == 1
+void PointCloud::render(bool show_with_initial_pose, const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud)
+{
+	glPointSize(observation_picking.point_size);
+
+	if (this->visible)
+	{
+		glColor3f(render_color[0], render_color[1], render_color[2]);
+		glPointSize(point_size);
+		// glBegin(GL_POINTS);
+		//  for (const auto& p : this->points_local) {
+
+		// std::cout << this->colors.size() << " " << this->points_local.size() << std::endl;
+		glBegin(GL_POINTS);
+		for (int i = 0; i < this->points_local.size(); i += viewer_decmiate_point_cloud)
+		{
+			const auto& p = this->points_local[i];
+			Eigen::Vector3d vp;
+			if (show_with_initial_pose)
+			{
+				vp = this->m_initial_pose * p;
+			}
+			else
+			{
+				vp = this->m_pose * p;
+			}
+			if (this->show_color) {
+				if (this->colors.size() == this->points_local.size())
+				{
+					glColor3f(this->colors[i].x(), this->colors[i].y(), this->colors[i].z());
+				}
+			}
+			//
+
+			if (observation_picking.is_observation_picking_mode)
+			{
+				if (fabs(vp.z() - observation_picking.picking_plane_height) <= observation_picking.picking_plane_threshold)
+				{
+					glVertex3d(vp.x(), vp.y(), vp.z());
+				}
+			}
+			else
+			{
+				glVertex3d(vp.x(), vp.y(), vp.z());
+			}
+			//glEnd();
+		}
+		glEnd();
+		glPointSize(1);
+
+		glColor3f(render_color[0], render_color[1], render_color[2]);
+		glBegin(GL_LINE_STRIP);
+		for (int i = 0; i < this->local_trajectory.size(); i++)
+		{
+			auto m = this->m_pose * this->local_trajectory[i].m_pose;
+			glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+		}
+		glEnd();
+
+		if (this->local_trajectory.size() > 0 && this->fuse_inclination_from_IMU)
+		{
+			Eigen::Vector3d a1(-0.2, -0.2, 0);
+			Eigen::Vector3d a2(0.2, -0.2, 0);
+			Eigen::Vector3d a3(0.2, 0.2, 0);
+			Eigen::Vector3d a4(-0.2, 0.2, 0);
+
+			Eigen::Vector3d a1t = this->m_pose * a1;
+			Eigen::Vector3d a2t = this->m_pose * a2;
+			Eigen::Vector3d a3t = this->m_pose * a3;
+			Eigen::Vector3d a4t = this->m_pose * a4;
+
+			glColor3f(0, 1, 0);
+			glBegin(GL_LINE_STRIP);
+			glVertex3f(a1t.x(), a1t.y(), a1t.z());
+			glVertex3f(a2t.x(), a2t.y(), a2t.z());
+			glVertex3f(a3t.x(), a3t.y(), a3t.z());
+			glVertex3f(a4t.x(), a4t.y(), a4t.z());
+			glVertex3f(a1t.x(), a1t.y(), a1t.z());
+			glEnd();
+
+
+
+			TaitBryanPose tb;
+			tb.px = this->m_pose(0, 3);
+			tb.py = this->m_pose(1, 3);
+			tb.pz = this->m_pose(2, 3);
+			tb.om = this->local_trajectory[0].imu_om_fi_ka.x();
+			tb.fi = this->local_trajectory[0].imu_om_fi_ka.y();
+			tb.ka = this->local_trajectory[0].imu_om_fi_ka.z();
+
+			auto m = affine_matrix_from_pose_tait_bryan(tb);
+			a1t = m * a1;
+			a2t = m * a2;
+			a3t = m * a3;
+			a4t = m * a4;
+
+			glColor3f(1, 0, 0);
+			glBegin(GL_LINE_STRIP);
+			glVertex3f(a1t.x(), a1t.y(), a1t.z());
+			glVertex3f(a2t.x(), a2t.y(), a2t.z());
+			glVertex3f(a3t.x(), a3t.y(), a3t.z());
+			glVertex3f(a4t.x(), a4t.y(), a4t.z());
+			glVertex3f(a1t.x(), a1t.y(), a1t.z());
+			glEnd();
+			// 
+			// Eigen::Affine3d imu_pose =
+			// auto m = this->m_pose * this->local_trajectory[i].m_pose;
+		}
+	}
+}
+
+void PointCloud::render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud)
+{
+	if (this->visible)
+	{
+		glColor3f(render_color[0], render_color[1], render_color[2]);
+		glPointSize(point_size);
+		glBegin(GL_POINTS);
+
+		for (int i = 0; i < this->points_local.size(); i += viewer_decmiate_point_cloud)
+		{
+			const auto& p = this->points_local[i];
+			Eigen::Vector3d vp;
+			vp = pose * p;
+			glVertex3d(vp.x(), vp.y(), vp.z());
+		}
+		glEnd();
+		glPointSize(1);
+
+		glColor3f(render_color[0], render_color[1], render_color[2]);
+		glBegin(GL_LINE_STRIP);
+		for (int i = 0; i < this->local_trajectory.size(); i++)
+		{
+			auto m = this->m_pose * this->local_trajectory[i].m_pose;
+			glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+		}
+		glEnd();
+	}
+}
+#endif

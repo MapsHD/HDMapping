@@ -6,6 +6,7 @@ add_executable(
   mandeye_raw_data_viewer
   mandeye_raw_data_viewer.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils.cpp
+  ../lidar_odometry_step_1/lidar_odometry_gui_utils.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils_optimizers.cpp
 )
 

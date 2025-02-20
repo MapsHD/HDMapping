@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <point_clouds.h>
+#include <GL/freeglut.h>
 
 struct GroundControlPoint{
     char name[64];

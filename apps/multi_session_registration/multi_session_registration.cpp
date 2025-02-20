@@ -2,6 +2,7 @@
 #define _USE_MATH_DEFINES
 #endif
 #include <cmath>
+#include <filesystem>
 
 #include <imgui.h>
 #include <imgui_impl_glut.h>
@@ -13,6 +14,7 @@
 #include <GL/freeglut.h>
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
+#include <nlohmann/json.hpp>
 
 #include <Eigen/Eigen>
 
@@ -35,6 +37,7 @@
 #include <ndt.h>
 
 #include <pair_wise_iterative_closest_point.h>
+#include <observation_picking.h>
 
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
@@ -1508,10 +1511,10 @@ void display()
 
         for (int i = 0; i < sessions.size(); i++)
         {
-            for (int j = 0; j < sessions[i].manual_pose_graph_loop_closure.edges.size(); j++)
+            for (int j = 0; j < sessions[i].pose_graph_loop_closure.edges.size(); j++)
             {
-                int index_src = sessions[i].manual_pose_graph_loop_closure.edges[j].index_from;
-                int index_trg = sessions[i].manual_pose_graph_loop_closure.edges[j].index_to;
+                int index_src = sessions[i].pose_graph_loop_closure.edges[j].index_from;
+                int index_trg = sessions[i].pose_graph_loop_closure.edges[j].index_to;
 
                 glColor3f(0.0f, 0.0f, 1.0f);
                 glBegin(GL_LINES);
@@ -2402,14 +2405,14 @@ bool optimize(std::vector<Session> &sessions)
 
     for (int i = 0; i < sessions.size(); i++)
     {
-        for (int j = 0; j < sessions[i].manual_pose_graph_loop_closure.edges.size(); j++)
+        for (int j = 0; j < sessions[i].pose_graph_loop_closure.edges.size(); j++)
         {
             // std::cout << "add manual_pose_graph_loop_closure.edge" << std::endl;
             Edge edge;
-            edge.index_from = sessions[i].manual_pose_graph_loop_closure.edges[j].index_from + sums[i];
-            edge.index_to = sessions[i].manual_pose_graph_loop_closure.edges[j].index_to + sums[i];
-            edge.relative_pose_tb = sessions[i].manual_pose_graph_loop_closure.edges[j].relative_pose_tb;
-            edge.relative_pose_tb_weights = sessions[i].manual_pose_graph_loop_closure.edges[j].relative_pose_tb_weights;
+            edge.index_from = sessions[i].pose_graph_loop_closure.edges[j].index_from + sums[i];
+            edge.index_to = sessions[i].pose_graph_loop_closure.edges[j].index_to + sums[i];
+            edge.relative_pose_tb = sessions[i].pose_graph_loop_closure.edges[j].relative_pose_tb;
+            edge.relative_pose_tb_weights = sessions[i].pose_graph_loop_closure.edges[j].relative_pose_tb_weights;
             // edge.is_fixed_fi = ToDo
             all_edges.push_back(edge);
         }

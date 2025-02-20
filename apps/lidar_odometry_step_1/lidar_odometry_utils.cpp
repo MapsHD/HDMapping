@@ -2,6 +2,10 @@
 #include <filesystem>
 #include "csv.hpp"
 #include <algorithm>
+#include <regex>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 // this function provides unique index
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z)
@@ -657,45 +661,6 @@ bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_pose
     return true;
 }
 
-// this function draws ellipse for each bucket
-void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd)
-{
-    Eigen::LLT<Eigen::Matrix<double, 3, 3>> cholSolver(covar);
-    Eigen::Matrix3d transform = cholSolver.matrixL();
-
-    const double pi = 3.141592;
-    const double di = 0.02;
-    const double dj = 0.04;
-    const double du = di * 2 * pi;
-    const double dv = dj * pi;
-    glColor3f(color.x(), color.y(), color.z());
-
-    for (double i = 0; i < 1.0; i += di) // horizonal
-    {
-        for (double j = 0; j < 1.0; j += dj) // vertical
-        {
-            double u = i * 2 * pi;     // 0     to  2pi
-            double v = (j - 0.5) * pi; //-pi/2 to pi/2
-
-            const Eigen::Vector3d pp0(cos(v) * cos(u), cos(v) * sin(u), sin(v));
-            const Eigen::Vector3d pp1(cos(v) * cos(u + du), cos(v) * sin(u + du), sin(v));
-            const Eigen::Vector3d pp2(cos(v + dv) * cos(u + du), cos(v + dv) * sin(u + du), sin(v + dv));
-            const Eigen::Vector3d pp3(cos(v + dv) * cos(u), cos(v + dv) * sin(u), sin(v + dv));
-            Eigen::Vector3d tp0 = transform * (nstd * pp0) + mean;
-            Eigen::Vector3d tp1 = transform * (nstd * pp1) + mean;
-            Eigen::Vector3d tp2 = transform * (nstd * pp2) + mean;
-            Eigen::Vector3d tp3 = transform * (nstd * pp3) + mean;
-
-            glBegin(GL_LINE_LOOP);
-            glVertex3dv(tp0.data());
-            glVertex3dv(tp1.data());
-            glVertex3dv(tp2.data());
-            glVertex3dv(tp3.data());
-            glEnd();
-        }
-    }
-}
-
 std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> load_imu(const std::string &imu_file, int imuToUse)
 {
     std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> all_data;
@@ -1080,4 +1045,25 @@ int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string> &idToSn,
         }
     }
     return 0;
+}
+
+int get_next_result_id(const std::string working_directory)
+{
+    std::regex pattern(R"(lidar_odometry_result_(\d+))");
+    int max_number = -1;
+    for (const auto& entry : fs::directory_iterator(working_directory))
+    {
+        if (entry.is_directory())
+        {
+            std::smatch match;
+            std::string folder_name = entry.path().filename().string();
+
+            if (std::regex_match(folder_name, match, pattern))
+            {
+                int folder_number = std::stoi(match[1].str());
+                max_number = std::max(max_number, folder_number);
+            }
+        }
+    }
+    return max_number + 1;
 }

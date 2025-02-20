@@ -17,6 +17,7 @@
 
 #include <filesystem>
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
+#include "../lidar_odometry_step_1/lidar_odometry_gui_utils.h"
 
 #include <HDMapping/Version.hpp>
 

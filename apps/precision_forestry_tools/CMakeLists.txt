@@ -8,6 +8,8 @@ add_executable(precision_forestry_tools
   ${REPOSITORY_DIRECTORY}/core/src/surface.cpp
   ${REPOSITORY_DIRECTORY}/core/src/hash_utils.cpp)
 
+target_compile_definitions(precision_forestry_tools PRIVATE -DWITH_GUI=1)
+
 target_link_libraries(
   precision_forestry_tools
   PRIVATE ${PLATFORM_LASZIP_LIB}

@@ -236,6 +236,22 @@ void lidar_odometry_gui()
                 params.max_distance_lidar = 30.0;
             }
 
+            if (ImGui::Button("set 'regular spaces' mapping parameters (slow motion upto 8km/h, gentle rotations, e.g. outdoor)"))
+            {
+                params.decimation = 0.1;
+                params.in_out_params.resolution_X = 0.3;
+                params.in_out_params.resolution_Y = 0.3;
+                params.in_out_params.resolution_Z = 0.3;
+                params.filter_threshold_xy_inner = 0.3;
+                params.filter_threshold_xy_outer = 70.0;
+
+                params.distance_bucket = 0.3;
+                params.polar_angle_deg = 10.0;
+                params.azimutal_angle_deg = 10.0;
+                params.robust_and_accurate_lidar_odometry_iterations = 20;
+                params.max_distance_lidar = 30.0;
+            }
+
             ImGui::Checkbox("show_initial_points", &show_initial_points);
             ImGui::Checkbox("show_trajectory", &show_trajectory);
             ImGui::SameLine();
@@ -267,7 +283,7 @@ void lidar_odometry_gui()
             ImGui::InputInt("threshold initial points", &params.threshold_initial_points);
             ImGui::Checkbox("save_calibration_validation_file", &params.save_calibration_validation);
             ImGui::InputInt("number of calibration validation points", &params.calibration_validation_points);
-            ImGui::Checkbox("use_multithread", &params.useMultithread);
+            //ImGui::Checkbox("use_multithread", &params.useMultithread);
 
             ImGui::Checkbox("fusionConventionNwu", &params.fusionConventionNwu);
             if (params.fusionConventionNwu)
@@ -1481,9 +1497,9 @@ int main(int argc, char *argv[])
 {
     try
     {
-        params.in_out_params.resolution_X = 0.3;
-        params.in_out_params.resolution_Y = 0.3;
-        params.in_out_params.resolution_Z = 0.3;
+        params.in_out_params.resolution_X = 0.1;
+        params.in_out_params.resolution_Y = 0.1;
+        params.in_out_params.resolution_Z = 0.1;
         params.in_out_params.bounding_box_extension = 20.0;
 
         initGL(&argc, argv);

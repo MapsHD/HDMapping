@@ -572,14 +572,14 @@ void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::
     if (points_local.size() > 100)
     {
         // std::cout << "start adding lidar observations" << std::endl;
-        if (multithread)
-        {
-            std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
-        }
-        else
-        {
+        //if (multithread)
+        //{
+        //    std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
+        //}
+        //else
+        //{
             std::for_each(std::begin(points_local), std::end(points_local), hessian_fun);
-        }
+        //}
         // std::cout << "adding lidar observations finished" << std::endl;
     }
 
@@ -933,14 +933,14 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
         AtPBndt.block<6, 1>(c, 0) -= AtPB;
     };
 
-    if (useMultithread)
-    {
-        std::for_each(std::execution::par_unseq, std::begin(indexes), std::end(indexes), hessian_fun);
-    }
-    else
-    {
+    //if (useMultithread)
+    //{
+    //    std::for_each(std::execution::par_unseq, std::begin(indexes), std::end(indexes), hessian_fun);
+    //}
+    //else
+    //{
         std::for_each(std::begin(indexes), std::end(indexes), hessian_fun);
-    }
+    //}
 
     ///
     std::vector<TaitBryanPose> poses;
@@ -1359,14 +1359,14 @@ void optimize_rigid_sf(
             number_of_observations++;
         };
 
-        if (useMultithread)
-        {
-            std::for_each(std::execution::par_unseq, std::begin(indexes), std::end(indexes), hessian_fun);
-        }
-        else
-        {
+        //if (useMultithread)
+        //{
+        //    std::for_each(std::execution::par_unseq, std::begin(indexes), std::end(indexes), hessian_fun);
+        //}
+        //else
+        //{
             std::for_each(std::begin(indexes), std::end(indexes), hessian_fun);
-        }
+        //}
 
         // std::cout << "number_of_observations " << number_of_observations << std::endl;
 
@@ -1748,14 +1748,14 @@ double max_distance /*,
         AtPBndt.block<6, 1>(c, 0) -= AtPB;
     };
 
-    if (multithread)
-    {
-        std::for_each(std::execution::par_unseq, std::begin(intermediate_points), std::end(intermediate_points), hessian_fun);
-    }
-    else
-    {
+    //if (multithread)
+    //{
+    //    std::for_each(std::execution::par_unseq, std::begin(intermediate_points), std::end(intermediate_points), hessian_fun);
+    //}
+    //else
+    //{
         std::for_each(std::begin(intermediate_points), std::end(intermediate_points), hessian_fun);
-    }
+    //}
     std::vector<std::pair<int, int>> odo_edges;
     for (size_t i = 1; i < intermediate_trajectory.size(); i++)
     {
@@ -2802,7 +2802,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
                 for (int iter = 0; iter < params.robust_and_accurate_lidar_odometry_iterations; iter++)
                 {
-                    optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, params.useMultithread, wx, wy, wz, wom, wfi, wka);
+                    optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, /*params.useMultithread*/false, wx, wy, wz, wom, wfi, wka);
                 }
 
                 if (debug)
@@ -2856,7 +2856,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                               params.azimutal_angle_deg_rigid_sf,
                               params.robust_and_accurate_lidar_odometry_rigid_sf_iterations,
                               params.max_distance_lidar_rigid_sf,
-                              params.useMultithread,
+                              /*params.useMultithread*/false,
                               params.rgd_sf_sigma_x_m,
                               params.rgd_sf_sigma_y_m,
                               params.rgd_sf_sigma_z_m,
@@ -2919,7 +2919,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
                 optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
-                         params.in_out_params, params.buckets, params.useMultithread, params.max_distance /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
+                         params.in_out_params, params.buckets, /*params.useMultithread*/false, params.max_distance /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
             }
 
             // std::string fn2 = "output_" + std::to_string(i) + ".txt";
@@ -3953,14 +3953,14 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
                 tripletListP.emplace_back(ir + 2, ir + 2, infm(2, 2));
             };
 
-            if (multithread)
-            {
-                std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
-            }
-            else
-            {
+            //if (multithread)
+            //{
+            //    std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
+            //}
+            //else
+            //{
                 std::for_each(std::begin(points_local), std::end(points_local), hessian_fun);
-            }
+            //}
 
             Eigen::SparseMatrix<double> matAndt(tripletListB.size(), trajectory.size() * 6);
             Eigen::SparseMatrix<double> matPndt(tripletListB.size(), tripletListB.size());

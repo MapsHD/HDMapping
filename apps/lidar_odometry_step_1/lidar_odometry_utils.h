@@ -47,9 +47,10 @@ struct LidarOdometryParams
     bool use_motion_from_previous_step = true;
     double consecutive_distance = 0.0;
     int nr_iter = 100;
-    bool useMultithread = true;
+    //bool useMultithread = true;
     std::vector<Point3Di> reference_points;
-    double decimation = 0.1;
+    //double decimation = 0.1;
+    double decimation = 0.01;
     NDTBucketMapType reference_buckets;
     std::string working_directory_preview = "";
     double sliding_window_trajectory_length_threshold = 5.0;
@@ -59,9 +60,9 @@ struct LidarOdometryParams
 
     //rgd_sf
     bool use_robust_and_accurate_lidar_odometry = false;
-    double distance_bucket = 0.5;
-    double polar_angle_deg = 5.0;
-    double azimutal_angle_deg = 5.0;
+    double distance_bucket = 0.2;
+    double polar_angle_deg = 10.0;
+    double azimutal_angle_deg = 10.0;
     int robust_and_accurate_lidar_odometry_iterations = 20;
     double max_distance_lidar = 30.0;
 

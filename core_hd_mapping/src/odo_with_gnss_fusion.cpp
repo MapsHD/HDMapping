@@ -17,7 +17,7 @@
 
 
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
-
+#include "pfd_wrapper.hpp"
 
 void OdoWithGnssFusion::imgui(CommonData& common_data) {
 	ImGui::Begin("odometry with gnss fusion");
@@ -26,19 +26,8 @@ void OdoWithGnssFusion::imgui(CommonData& common_data) {
 	ImGui::Checkbox("set_initial_offset_from_trajectory", &set_initial_offset_from_trajectory);
 
 	if (ImGui::Button("load GNSS trajectory")) {
-        static std::shared_ptr<pfd::open_file> open_file;
         std::string input_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-        const auto t = [&]() {
-            auto sel = pfd::open_file("Load GNSS trajectory", "C:\\").result();
-            for (int i = 0; i < sel.size(); i++)
-            {
-                input_file_name = sel[i];
-                std::cout << "trajectory file: '" << input_file_name << "'" << std::endl;
-            }
-        };
-        std::thread t1(t);
-        t1.join();
+        input_file_name = mandeye::fd::OpenFileDialogOneFile("Load GNSS trajectory", {});
 
         if (input_file_name.size() > 0) {
             gnss_trajectory = load_trajectory(input_file_name);
@@ -64,19 +53,9 @@ void OdoWithGnssFusion::imgui(CommonData& common_data) {
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("load LiDAR odometry trajectory")) {
-        static std::shared_ptr<pfd::open_file> open_file;
         std::string input_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-        const auto t = [&]() {
-            auto sel = pfd::open_file("Load LiDAR odometry trajectory", "C:\\").result();
-            for (int i = 0; i < sel.size(); i++)
-            {
-                input_file_name = sel[i];
-                std::cout << "trajectory file: '" << input_file_name << "'" << std::endl;
-            }
-        };
-        std::thread t1(t);
-        t1.join();
+        input_file_name = mandeye::fd::OpenFileDialogOneFile("Load LiDAR odometry trajectory", {});
+        std::cout << "trajectory file: '" << input_file_name << "'" << std::endl;
 
         if (input_file_name.size() > 0) {
 			fused_trajectory = load_trajectory(input_file_name);
@@ -85,21 +64,8 @@ void OdoWithGnssFusion::imgui(CommonData& common_data) {
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("save fused trajectory")) {
-		static std::shared_ptr<pfd::save_file> save_file;
 		std::string output_file_name = "";
-		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-		const auto t = [&]() {
-			auto sel = pfd::save_file("Save fused trajectory", "C:\\").result();
-			output_file_name = sel;
-			//for (int i = 0; i < sel.size(); i++)
-			//{
-			//	input_file_name = sel[i];
-			//	std::cout << "trajectory file: '" << input_file_name << "'" << std::endl;
-			//}
-		};
-		std::thread t1(t);
-		t1.join();
-
+                output_file_name = mandeye::fd::SaveFileDialog("Save fused trajectory", {});
 		if (output_file_name.size() > 0) {
 			if (save_trajectory(output_file_name)) {
 				std::cout << "trajectory saved to file: " << output_file_name << std::endl;

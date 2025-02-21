@@ -13,7 +13,7 @@
 
 #include <transformations.h>
 
-#include <portable-file-dialogs.h>
+#include "pfd_wrapper.hpp"
 
 #include <filesystem>
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
@@ -155,20 +155,9 @@ void project_gui()
 
         if (ImGui::Button("load session"))
         {
-            static std::shared_ptr<pfd::open_file> open_file;
             std::string input_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::open_file("Load session", "C:\\", Session_filter).result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_name = sel[i];
-                    std::cout << "Session file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load session file", Session_filter);
+            std::cout << "Session file: '" << input_file_name << "'" << std::endl;
 
             if (input_file_name.size() > 0)
             {

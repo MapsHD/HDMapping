@@ -11,7 +11,7 @@
 
 #include <Eigen/Eigen>
 
-#include <portable-file-dialogs.h>
+#include "pfd_wrapper.hpp"
 
 #include <HDMapping/Version.hpp>
 #include <session.h>
@@ -203,20 +203,8 @@ void project_gui()
 
     if (ImGui::Button("Load *.laz file"))
     {
-      static std::shared_ptr<pfd::open_file> open_file;
       std::vector<std::string> input_file_names;
-      ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-      const auto t = [&]()
-      {
-        std::vector<std::string> filters;
-        auto sel = pfd::open_file("Load laz files", "C:\\", filters, true).result();
-        for (int i = 0; i < sel.size(); i++)
-        {
-          input_file_names.push_back(sel[i]);
-        }
-      };
-      std::thread t1(t);
-      t1.join();
+      input_file_names = mandeye::fd::OpenFileDialog("Load laz files", {}, true);
 
       if (input_file_names.size() == 1)
       {
@@ -353,17 +341,9 @@ void project_gui()
     {
       if (ImGui::Button("save features"))
       {
-        static std::shared_ptr<pfd::save_file> save_file;
         std::string output_file_name = "";
-        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-        const auto t = [&]()
-        {
-          auto sel = pfd::save_file("Save local shape features", "C:\\").result();
-          output_file_name = sel;
-          std::cout << "file to save: '" << output_file_name << "'" << std::endl;
-        };
-        std::thread t1(t);
-        t1.join();
+        output_file_name = mandeye::fd::SaveFileDialog("Save local shape features", {}, "");
+        std::cout << "file to save: '" << output_file_name << "'" << std::endl;
 
         if (output_file_name.size() > 0)
         {

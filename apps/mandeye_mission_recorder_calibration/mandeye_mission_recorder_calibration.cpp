@@ -13,7 +13,7 @@
 
 #include <transformations.h>
 
-#include <portable-file-dialogs.h>
+#include "pfd_wrapper.hpp"
 
 #include <filesystem>
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
@@ -410,22 +410,8 @@ void project_gui()
         {
             if (ImGui::Button("Load 'LiDAR serial number to index' file (lidar****.sn) (step 1)"))
             {
-                static std::shared_ptr<pfd::open_file> open_file;
-                std::vector<std::string> input_file_names;
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::open_file("Calibration files", "C:\\", sn_filter, true).result();
-                    for (int i = 0; i < sel.size(); i++)
-                    {
-                        input_file_names.push_back(sel[i]);
-                        // std::cout << "las file: '" << input_file_name << "'" << std::endl;
-                    }
-                };
-                std::thread t1(t);
-                t1.join();
-
-                idToSn = MLvxCalib::GetIdToSnMapping(input_file_names[0]);
+              const auto input_file_name = mandeye::fd::OpenFileDialogOneFile("Calibration files", {});
+              idToSn = MLvxCalib::GetIdToSnMapping(input_file_name);
             }
         }
 
@@ -433,26 +419,13 @@ void project_gui()
         {
             if (ImGui::Button("Load last known calibration (*.json) (step 2)"))
             {
-                static std::shared_ptr<pfd::open_file> open_file;
-                std::vector<std::string> input_file_names;
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-                const auto t = [&]()
+                const auto input_file_name = mandeye::fd::OpenFileDialogOneFile("Calibration files", {});
+                if (input_file_name.size() > 0)
                 {
-                    auto sel = pfd::open_file("Calibration files", "C:\\", json_filter, true).result();
-                    for (int i = 0; i < sel.size(); i++)
-                    {
-                        input_file_names.push_back(sel[i]);
-                    }
-                };
-                std::thread t1(t);
-                t1.join();
+                    std::cout << "loading file: " << input_file_name << std::endl;
 
-                if (input_file_names.size() > 0)
-                {
-                    std::cout << "loading file: " << input_file_names[0] << std::endl;
-
-                    calibration = MLvxCalib::GetCalibrationFromFile(input_file_names[0]);
-                    imuSnToUse = MLvxCalib::GetImuSnToUse(input_file_names[0]);
+                    calibration = MLvxCalib::GetCalibrationFromFile(input_file_name);
+                    imuSnToUse = MLvxCalib::GetImuSnToUse(input_file_name);
 
                     calibrations = MLvxCalib::CombineIntoCalibration(idToSn, calibration);
 
@@ -473,17 +446,8 @@ void project_gui()
             ImGui::SameLine();
             if (ImGui::Button("Create calibration from scratch (optional before step 2)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
                 std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save *.json file", "", json_filter).result();
-                    output_file_name = sel;
-                    std::cout << "Calibration file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                output_file_name = mandeye::fd::SaveFileDialog("Save *.json file", json_filter, ".json");
 
                 if (output_file_name.size() > 0)
                 {
@@ -528,19 +492,8 @@ void project_gui()
         {
             if (ImGui::Button("Load pointcloud (lidar****.laz) (step 3)"))
             {
-                static std::shared_ptr<pfd::open_file> open_file;
                 std::vector<std::string> input_file_names;
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::open_file("Point cloud files", "C:\\", LAS_LAZ_filter, true).result();
-                    for (int i = 0; i < sel.size(); i++)
-                    {
-                        input_file_names.push_back(sel[i]);
-                    }
-                };
-                std::thread t1(t);
-                t1.join();
+                input_file_names = mandeye::fd::OpenFileDialog("Point cloud files", mandeye::fd::LAS_LAZ_filter, true);
 
                 if (input_file_names.size() > 0)
                 {
@@ -709,17 +662,9 @@ void project_gui()
 
             if (ImGui::Button("Save result calibration as 'calibration.json' (step 5)"))
             {
-                std::shared_ptr<pfd::save_file> save_file;
                 std::string output_file_name = "";
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-                const auto t = [&]()
-                {
-                    auto sel = pfd::save_file("Save las or laz file", "C:\\", json_filter).result();
-                    output_file_name = sel;
-                    std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-                };
-                std::thread t1(t);
-                t1.join();
+                output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", json_filter);
+                std::cout << "las or laz file toj save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {

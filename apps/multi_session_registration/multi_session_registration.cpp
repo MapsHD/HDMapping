@@ -518,20 +518,9 @@ void project_gui()
         ImGui::Text("-------PROJECT SETTINGS BEGIN----------------");
         if (ImGui::Button("add session to project"))
         {
-            static std::shared_ptr<pfd::open_file> open_file;
             std::string input_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::open_file("Load RESSO file", "C:\\", Session_filter).result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_name = sel[i];
-                    std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
+            std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
 
             if (input_file_name.size() > 0)
             {
@@ -541,20 +530,9 @@ void project_gui()
 
         if (ImGui::Button("load project"))
         {
-            static std::shared_ptr<pfd::open_file> open_file;
             std::string input_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::open_file("Load project", "C:\\", Project_filter).result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_name = sel[i];
-                    std::cout << "Project file: '" << input_file_name << "'" << std::endl;
-                }
-            };
-            std::thread t1(t);
-            t1.join();
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load project", Project_filter);
+            std::cout << "Project file: '" << input_file_name << "'" << std::endl;
 
             if (input_file_name.size() > 0)
             {
@@ -564,17 +542,8 @@ void project_gui()
         ImGui::SameLine();
         if (ImGui::Button("save project"))
         {
-            std::shared_ptr<pfd::save_file> save_file;
             std::string output_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::save_file("Save project file", "C:\\", Project_filter).result();
-                output_file_name = sel;
-                std::cout << "Project file to save: '" << output_file_name << "'" << std::endl;
-            };
-            std::thread t1(t);
-            t1.join();
+            output_file_name = mandeye::fd::SaveFileDialog("Save project file", Project_filter);
 
             if (output_file_name.size() > 0)
             {

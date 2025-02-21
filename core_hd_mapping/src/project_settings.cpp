@@ -14,6 +14,7 @@
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 #include <m_estimators.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
+#include "pfd_wrapper.hpp"
 
 void ProjectSettings::imgui(OdoWithGnssFusion& odo_with_gnss_fusion, std::vector<LAZSector>& sectors, std::vector<ROIwithConstraints>& rois_with_constraints,
 	CommonData &common_data )
@@ -54,37 +55,20 @@ void ProjectSettings::imgui(OdoWithGnssFusion& odo_with_gnss_fusion, std::vector
 
 
 	if (ImGui::Button("load project")) {
-		static std::shared_ptr<pfd::open_file> open_file;
-		std::string input_file_name = "";
-		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-		const auto t = [&]() {
-			auto sel = pfd::open_file("Load project", "C:\\").result();
-			for (int i = 0; i < sel.size(); i++)
-			{
-				input_file_name = sel[i];
-				std::cout << "project settings file: '" << input_file_name << "'" << std::endl;
-			}
-		};
-		std::thread t1(t);
-		t1.join();
+              std::string input_file_name = "";
+              input_file_name = mandeye::fd::OpenFileDialogOneFile("Load Project", {});
 
-		if (input_file_name.size() > 0) {
-			load(std::filesystem::path(input_file_name).string(), sectors, rois_with_constraints, common_data);
-			odo_with_gnss_fusion.update_shift(common_data.shift_x, common_data.shift_y, common_data);
-		}
+              std::cout << "project settings file: '" << input_file_name << "'" << std::endl;
+              if (input_file_name.size() > 0) {
+                      load(std::filesystem::path(input_file_name).string(), sectors, rois_with_constraints, common_data);
+                      odo_with_gnss_fusion.update_shift(common_data.shift_x, common_data.shift_y, common_data);
+              }
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("save project")) {
-		static std::shared_ptr<pfd::save_file> save_file;
 		std::string output_file_name = "";
-		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-		const auto t = [&]() {
-			auto sel = pfd::save_file("save project", "C:\\").result();
-			output_file_name = sel;
-			std::cout << "project settings file to save: '" << output_file_name << "'" << std::endl;
-		};
-		std::thread t1(t);
-		t1.join();
+                output_file_name = mandeye::fd::SaveFileDialog("save project", {});
+                std::cout << "project settings file to save: '" << output_file_name << "'" << std::endl;
 
 		if (output_file_name.size() > 0) {
 			save(std::filesystem::path(output_file_name).string(), sectors, rois_with_constraints, common_data);
@@ -125,33 +109,13 @@ void ProjectSettings::imgui(OdoWithGnssFusion& odo_with_gnss_fusion, std::vector
 	}*/
 
 	if (ImGui::Button("add trajectory")) {
-		static std::shared_ptr<pfd::open_file> open_file;
-		std::string input_file_name = "";
-		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-		const auto t = [&]() {
-			auto sel = pfd::open_file("Choose trajectory", "C:\\").result();
-			for (int i = 0; i < sel.size(); i++)
-			{
-				input_file_name = sel[i];
-				std::cout << "trajectory file: '" << input_file_name << "'" << std::endl;
-			}
-		};
-		std::thread t1(t);
-		t1.join();
-
-		static std::shared_ptr<pfd::open_file> open_file_mm;
+		std::string input_file_name;
+                input_file_name = mandeye::fd::OpenFileDialogOneFile("Choose trajectory", {});
 		std::string input_file_name_mm = "";
-		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file_mm);
-		const auto tt = [&]() {
-			auto sel = pfd::open_file("Choose motion model trajectory", "C:\\").result();
-			for (int i = 0; i < sel.size(); i++)
-			{
-				input_file_name_mm = sel[i];
-				std::cout << "motion model file: '" << input_file_name_mm << "'" << std::endl;
-			}
-		};
-		std::thread t2(tt);
-		t2.join();
+                input_file_name_mm = mandeye::fd::OpenFileDialogOneFile("Choose motion model trajectory", {});
+
+                std::cout << "trajectory file: '" << input_file_name << "'" << std::endl;
+                std::cout << "motion model file: '" << input_file_name_mm << "'" << std::endl;
 
 		if (input_file_name.size() > 0) {
 			//create motion model trajectory

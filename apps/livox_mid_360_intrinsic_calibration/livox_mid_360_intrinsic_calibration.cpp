@@ -13,7 +13,7 @@
 
 #include <transformations.h>
 
-#include <portable-file-dialogs.h>
+#include "pfd_wrapper.hpp"
 
 #include <filesystem>
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
@@ -80,7 +80,6 @@ bool show_intrinsics = false;
 bool apply_intrinsics_in_render = false;
 bool show_intrinsic_path = false;
 
-const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
 std::vector<Point3Di> point_cloud;
 std::vector<Eigen::Affine3d> intrinsics;
 
@@ -260,20 +259,9 @@ void project_gui()
 
         if (ImGui::Button("Load pointcloud (lidar****.laz) (step 1)"))
         {
-            static std::shared_ptr<pfd::open_file> open_file;
             std::vector<std::string> input_file_names;
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::open_file("Point cloud files", "C:\\", LAS_LAZ_filter, true).result();
-                for (int i = 0; i < sel.size(); i++)
-                {
-                    input_file_names.push_back(sel[i]);
-                }
-            };
-            std::thread t1(t);
-            t1.join();
 
+            input_file_names = mandeye::fd::OpenFileDialog("Point cloud files", mandeye::fd::LAS_LAZ_filter, true);
             if (input_file_names.size() > 0)
             {
                 for (int i = 0; i < input_file_names.size(); i++)
@@ -366,17 +354,8 @@ void project_gui()
 
         if (ImGui::Button("save point cloud"))
         {
-            std::shared_ptr<pfd::save_file> save_file;
-            std::string output_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                output_file_name = sel;
-                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-            };
-            std::thread t1(t);
-            t1.join();
+            auto output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
+            std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
 
             if (output_file_name.size() > 0)
             {

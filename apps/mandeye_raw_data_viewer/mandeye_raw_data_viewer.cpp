@@ -13,7 +13,7 @@
 
 #include <transformations.h>
 
-#include <portable-file-dialogs.h>
+#include "pfd_wrapper.hpp"
 
 #include <filesystem>
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
@@ -234,20 +234,8 @@ void project_gui()
         {
             if (ImGui::Button("load data"))
             {
-                static std::shared_ptr<pfd::open_file> open_file;
                 std::vector<std::string> input_file_names;
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
-                const auto t = [&]()
-                {
-                    std::vector<std::string> filters;
-                    auto sel = pfd::open_file("Load las files", "C:\\", filters, true).result();
-                    for (int i = 0; i < sel.size(); i++)
-                    {
-                        input_file_names.push_back(sel[i]);
-                    }
-                };
-                std::thread t1(t);
-                t1.join();
+                input_file_names = mandeye::fd::OpenFileDialog("Load laz files", mandeye::fd::LAS_LAZ_filter, true);
 
                 std::sort(std::begin(input_file_names), std::end(input_file_names));
 
@@ -562,17 +550,9 @@ void project_gui()
 
         if (ImGui::Button("save point cloud"))
         {
-            std::shared_ptr<pfd::save_file> save_file;
             std::string output_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file);
-            const auto t = [&]()
-            {
-                auto sel = pfd::save_file("Save las or laz file", "C:\\", LAS_LAZ_filter).result();
-                output_file_name = sel;
-                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-            };
-            std::thread t1(t);
-            t1.join();
+            output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", LAS_LAZ_filter);
+            std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
 
             if (output_file_name.size() > 0)
             {

@@ -59,7 +59,7 @@ struct LidarOdometryParams
     double max_distance = 70.0;
 
     //rgd_sf
-    bool use_robust_and_accurate_lidar_odometry = false;
+    bool use_robust_and_accurate_lidar_odometry = true;
     double distance_bucket = 0.2;
     double polar_angle_deg = 10.0;
     double azimutal_angle_deg = 10.0;

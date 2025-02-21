@@ -220,7 +220,7 @@ void lidar_odometry_gui()
 
         if (!simple_gui)
         {
-            if (ImGui::Button("set 'narrow spaces' mapping parameters (slow motion upto 2km/h, gentle rotations, e.g. caves, indoor layouts)"))
+            if (ImGui::Button("set 'narrow spaces' mapping parameters (fastest motion upto 2km/h, gentle rotations, e.g. caves, indoor layouts)"))
             {
                 params.decimation = 0.01;
                 params.in_out_params.resolution_X = 0.1;
@@ -234,9 +234,11 @@ void lidar_odometry_gui()
                 params.azimutal_angle_deg = 10.0;
                 params.robust_and_accurate_lidar_odometry_iterations = 20;
                 params.max_distance_lidar = 30.0;
+
+                params.use_robust_and_accurate_lidar_odometry = true;
             }
 
-            if (ImGui::Button("set 'regular spaces' mapping parameters (slow motion upto 8km/h, gentle rotations, e.g. outdoor)"))
+            if (ImGui::Button("set 'regular spaces' mapping parameters (fastest motion upto 8km/h, gentle rotations, e.g. outdoor)"))
             {
                 params.decimation = 0.1;
                 params.in_out_params.resolution_X = 0.3;
@@ -250,6 +252,8 @@ void lidar_odometry_gui()
                 params.azimutal_angle_deg = 10.0;
                 params.robust_and_accurate_lidar_odometry_iterations = 20;
                 params.max_distance_lidar = 30.0;
+
+                params.use_robust_and_accurate_lidar_odometry = true;
             }
 
             ImGui::Checkbox("show_initial_points", &show_initial_points);

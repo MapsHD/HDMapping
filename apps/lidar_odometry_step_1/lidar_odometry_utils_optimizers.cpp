@@ -1316,7 +1316,7 @@ void optimize_rigid_sf(
                 infm(0, 0), infm(0, 1), infm(0, 2), infm(1, 0), infm(1, 1), infm(1, 2), infm(2, 0), infm(2, 1), infm(2, 2),
                 this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
 
-            int c = 0;
+            //int c = 0;
 
             // planarity
             Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
@@ -1353,8 +1353,8 @@ void optimize_rigid_sf(
 
             std::mutex &m = mutexes[intermediate_points[indexes_i].index_pose];
             std::unique_lock lck(m);
-            AtPAndt.block<6, 6>(c, c) += AtPA;
-            AtPBndt.block<6, 1>(c, 0) -= AtPB;
+            AtPAndt.block<6, 6>(0, 0) += AtPA;
+            AtPBndt.block<6, 1>(0, 0) -= AtPB;
 
             number_of_observations++;
         };

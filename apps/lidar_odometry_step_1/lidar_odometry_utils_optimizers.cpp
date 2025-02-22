@@ -4,7 +4,26 @@
 
 #include <export_laz.h>
 // extern std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> global_tmp;
+namespace {
+    //! Structure holds block of Hessian from observations to be sumed
+    struct Blocks
+    {
+        Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPAndtBlocksToSum;
+        Eigen::Matrix<double, 6, 1> AtPBndtBlocksToSum;
+        int c = 0;
+    };
 
+    //! Sumation of blocks
+    void SumBlocks(const std::vector<Blocks>& blocks, Eigen::MatrixXd& AtPAndt, Eigen::MatrixXd& AtPBndt)
+    {
+        for (auto& block : blocks)
+        {
+            const int c = block.c;
+            AtPAndt.block<6, 6>(c, c) += block.AtPAndtBlocksToSum;
+            AtPBndt.block<6, 1>(c, 0) -= block.AtPBndtBlocksToSum;
+        }
+    };
+}
 std::vector<std::pair<int, int>> nns(std::vector<Point3Di> points_global, const std::vector<int> &indexes_for_nn)
 {
     Eigen::Vector3d search_radious = {0.1, 0.1, 0.1};
@@ -572,14 +591,14 @@ void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::
     if (points_local.size() > 100)
     {
         // std::cout << "start adding lidar observations" << std::endl;
-        //if (multithread)
-        //{
-        //    std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
-        //}
-        //else
-        //{
+        if (multithread)
+        {
+            std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
+        }
+        else
+        {
             std::for_each(std::begin(points_local), std::end(points_local), hessian_fun);
-        //}
+        }
         // std::cout << "adding lidar observations finished" << std::endl;
     }
 
@@ -835,23 +854,18 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
     NDTBucketMapType buckets;
     update_rgd_spherical_coordinates(rgd_params, buckets, point_cloud_global, point_cloud_global_sc);
 
-    std::vector<std::mutex> mutexes(indexes.size());
-
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
-    Eigen::MatrixXd AtPAndt(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
-    AtPAndt.setZero();
-    Eigen::MatrixXd AtPBndt(intermediate_trajectory.size() * 6, 1);
-    AtPBndt.setZero();
 
-    const auto hessian_fun = [&](const int &indexes_i)
+    const auto hessian_fun = [&](const int &indexes_i) -> Blocks
     {
+        int c = intermediate_points[indexes_i].index_pose * 6;
         auto index_of_bucket = get_rgd_index(point_cloud_global_sc[indexes_i], b);
         auto bucket_it = buckets.find(index_of_bucket);
         // no bucket found
         if (bucket_it == buckets.end())
         {
-            return;
+            return { Eigen::Matrix<double, 6, 6, Eigen::RowMajor>::Zero(), Eigen::Matrix<double, 6, 1>::Zero(), c};
         }
         auto &this_bucket = bucket_it->second;
 
@@ -865,11 +879,11 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
             // std::cout << "-------------" << std::endl;
             // std::cout << infm << std::endl;
             // std::cout << "-------------" << std::endl;
-            return;
+            return { Eigen::Matrix<double, 6, 6, Eigen::RowMajor>::Zero(), Eigen::Matrix<double, 6, 1>::Zero(), c };
         }
         if ((infm.array() < -threshold).any())
         {
-            return;
+            return { Eigen::Matrix<double, 6, 6, Eigen::RowMajor>::Zero(), Eigen::Matrix<double, 6, 1>::Zero(), c };
         }
 
         const Eigen::Affine3d &m_pose = intermediate_trajectory[intermediate_points[indexes_i].index_pose]; // intermediate_trajectory[intermediate_points_i.index_pose];
@@ -892,7 +906,6 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
             infm(0, 0), infm(0, 1), infm(0, 2), infm(1, 0), infm(1, 1), infm(1, 2), infm(2, 0), infm(2, 1), infm(2, 2),
             this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
 
-        int c = intermediate_points[indexes_i].index_pose * 6;
 
         // planarity
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
@@ -924,23 +937,31 @@ void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3
         // double ref2 = rgd_params.resolution_X * sin(rgd_params.resolution_Z * M_PI / 180.0);
 
         double w = planarity; // * (ref1 * ref2) / (a * b);
-        AtPA *= w;
-        AtPB *= w;
 
-        std::mutex &m = mutexes[intermediate_points[indexes_i].index_pose];
-        std::unique_lock lck(m);
-        AtPAndt.block<6, 6>(c, c) += AtPA;
-        AtPBndt.block<6, 1>(c, 0) -= AtPB;
+        // Wisdom ahead (mpelka) :
+        // The order of execution in summing matters, so using concurrent execution, we will get slightly different output.
+        // We should compute every contibution to Hessian in parallel, then add those ouputs sequentially.
+        return Blocks{ AtPA * w,AtPB * w, c }; 
     };
 
-    //if (useMultithread)
-    //{
-    //    std::for_each(std::execution::par_unseq, std::begin(indexes), std::end(indexes), hessian_fun);
-    //}
-    //else
-    //{
-        std::for_each(std::begin(indexes), std::end(indexes), hessian_fun);
-    //}
+    Eigen::MatrixXd AtPAndt(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
+    AtPAndt.setZero();
+    Eigen::MatrixXd AtPBndt(intermediate_trajectory.size() * 6, 1);
+    AtPBndt.setZero();
+
+
+    std::vector<Blocks> AtPAndtBlocksToSum(intermediate_points.size());
+
+    if (useMultithread)
+    {
+        std::transform(std::execution::par_unseq, std::begin(indexes), std::end(indexes), std::begin(AtPAndtBlocksToSum), hessian_fun);
+    }
+    else
+    {
+        std::transform(std::begin(indexes), std::end(indexes), std::begin(AtPAndtBlocksToSum), hessian_fun);
+    }
+
+    SumBlocks(AtPAndtBlocksToSum, AtPAndt, AtPBndt);
 
     ///
     std::vector<TaitBryanPose> poses;
@@ -1254,19 +1275,12 @@ void optimize_rigid_sf(
 
     for (int iter = 0; iter < robust_and_accurate_lidar_odometry_sf_rigid_iterations; iter++)
     {
+        [[maybe_unused]] std::atomic<int> number_of_observations = 0;
 
-        Eigen::MatrixXd AtPAndt(6, 6);
-        AtPAndt.setZero();
-        Eigen::MatrixXd AtPBndt(6, 1);
-        AtPBndt.setZero();
-
-        std::vector<std::mutex> mutexes(indexes.size());
-
-        int number_of_observations = 0;
-
-        const auto hessian_fun = [&](const int &indexes_i)
+        const auto hessian_fun = [&](const int &indexes_i)->Blocks
         {
-            auto point_local = points_local[indexes_i];
+            int c = 0;
+            const auto& point_local = points_local[indexes_i];
             auto point_global = first_pose * point_local;
 
             double r_l = point_global.norm();
@@ -1279,7 +1293,7 @@ void optimize_rigid_sf(
             // no bucket found
             if (bucket_it == buckets_sf.end())
             {
-                return;
+                return { Eigen::Matrix<double, 6, 6, Eigen::RowMajor>::Zero(), Eigen::Matrix<double, 6, 1>::Zero(), c };
             }
             auto &this_bucket = bucket_it->second;
 
@@ -1289,12 +1303,12 @@ void optimize_rigid_sf(
             if ((infm.array() > threshold).any())
             {
                 // std::cout << "infm.array() " << infm.array() << std::endl;
-                return;
+                return { Eigen::Matrix<double, 6, 6, Eigen::RowMajor>::Zero(), Eigen::Matrix<double, 6, 1>::Zero(), c };
             }
             if ((infm.array() < -threshold).any())
             {
                 //std::cout << "infm.array() " << infm.array() << std::endl;
-                return;
+                return { Eigen::Matrix<double, 6, 6, Eigen::RowMajor>::Zero(), Eigen::Matrix<double, 6, 1>::Zero(), c };
             }
 
             const Eigen::Affine3d &m_pose = first_pose;
@@ -1350,23 +1364,29 @@ void optimize_rigid_sf(
             double w = planarity; // * (ref1 * ref2) / (a * b);
             AtPA *= w;
             AtPB *= w;
-
-            std::mutex &m = mutexes[intermediate_points[indexes_i].index_pose];
-            std::unique_lock lck(m);
-            AtPAndt.block<6, 6>(0, 0) += AtPA;
-            AtPBndt.block<6, 1>(0, 0) -= AtPB;
+ /*           AtPAndt.block<6, 6>(c, c) += AtPA;
+            AtPBndt.block<6, 1>(c, 0) -= AtPB;*/
 
             number_of_observations++;
+            return { AtPA, AtPB,c };
         };
 
-        //if (useMultithread)
-        //{
-        //    std::for_each(std::execution::par_unseq, std::begin(indexes), std::end(indexes), hessian_fun);
-        //}
-        //else
-        //{
-            std::for_each(std::begin(indexes), std::end(indexes), hessian_fun);
-        //}
+        std:vector<Blocks> blocks(indexes.size());
+
+        if (useMultithread) //ToDo fix for this case
+        {
+            std::transform(std::execution::par_unseq, std::begin(indexes), std::end(indexes), std::begin(blocks), hessian_fun);
+        }
+        else
+        {
+            std::transform(std::begin(indexes), std::end(indexes), std::begin(blocks), hessian_fun);
+        }
+        Eigen::MatrixXd AtPAndt(6, 6);
+        AtPAndt.setZero();
+        Eigen::MatrixXd AtPBndt(6, 1);
+        AtPBndt.setZero();
+
+        SumBlocks(blocks, AtPAndt, AtPBndt);
 
         // std::cout << "number_of_observations " << number_of_observations << std::endl;
 
@@ -1748,14 +1768,14 @@ double max_distance /*,
         AtPBndt.block<6, 1>(c, 0) -= AtPB;
     };
 
-    //if (multithread)
-    //{
-    //    std::for_each(std::execution::par_unseq, std::begin(intermediate_points), std::end(intermediate_points), hessian_fun);
-    //}
-    //else
-    //{
+    if (multithread)
+    {
+        std::for_each(std::execution::par_unseq, std::begin(intermediate_points), std::end(intermediate_points), hessian_fun);
+    }
+    else
+    {
         std::for_each(std::begin(intermediate_points), std::end(intermediate_points), hessian_fun);
-    //}
+    }
     std::vector<std::pair<int, int>> odo_edges;
     for (size_t i = 1; i < intermediate_trajectory.size(); i++)
     {
@@ -2802,7 +2822,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
                 for (int iter = 0; iter < params.robust_and_accurate_lidar_odometry_iterations; iter++)
                 {
-                    optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, /*params.useMultithread*/false, wx, wy, wz, wom, wfi, wka);
+                    optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, params.useMultithread, wx, wy, wz, wom, wfi, wka);
                 }
 
                 if (debug)
@@ -2856,7 +2876,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                               params.azimutal_angle_deg_rigid_sf,
                               params.robust_and_accurate_lidar_odometry_rigid_sf_iterations,
                               params.max_distance_lidar_rigid_sf,
-                              /*params.useMultithread*/false,
+                              params.useMultithread,
                               params.rgd_sf_sigma_x_m,
                               params.rgd_sf_sigma_y_m,
                               params.rgd_sf_sigma_z_m,
@@ -2919,7 +2939,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
                 optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
-                         params.in_out_params, params.buckets, /*params.useMultithread*/false, params.max_distance /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
+                         params.in_out_params, params.buckets, params.useMultithread, params.max_distance /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
             }
 
             // std::string fn2 = "output_" + std::to_string(i) + ".txt";
@@ -3730,11 +3750,11 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
                                                  poses[i + 1].fi,
                                                  poses[i + 1].ka);
 
-        int ir = tripletListB.size();
+        const auto ir = tripletListB.size();
 
-        int ic_1 = (i - 1) * 6;
-        int ic_2 = i * 6;
-        int ic_3 = (i + 1) * 6;
+        const auto ic_1 = (i - 1) * 6;
+        const auto ic_2 = i * 6;
+        const auto ic_3 = (i + 1) * 6;
 
         for (size_t row = 0; row < 6; row++)
         {
@@ -3953,14 +3973,14 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
                 tripletListP.emplace_back(ir + 2, ir + 2, infm(2, 2));
             };
 
-            //if (multithread)
-            //{
-            //    std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
-            //}
-            //else
-            //{
+            if (multithread)
+            {
+                std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
+            }
+            else
+            {
                 std::for_each(std::begin(points_local), std::end(points_local), hessian_fun);
-            //}
+            }
 
             Eigen::SparseMatrix<double> matAndt(tripletListB.size(), trajectory.size() * 6);
             Eigen::SparseMatrix<double> matPndt(tripletListB.size(), tripletListB.size());

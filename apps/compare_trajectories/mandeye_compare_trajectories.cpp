@@ -158,6 +158,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARROT(const std::s
                           r10, r11, r12,
                           r20, r21, r22;
         pose.block<3, 3>(0, 0) = rotationMatrix;
+
         trajectory[timestamp] = pose;
     }
     return trajectory;
@@ -197,6 +198,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXROT(const std::st
                           r10, r11, r12,
                           r20, r21, r22;
         pose.block<3, 3>(0, 0) = rotationMatrix;
+
         trajectory[timestamp] = pose;
     }
     return trajectory;
@@ -237,6 +239,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXROT(const st
                           r10, r11, r12,
                           r20, r21, r22;
         pose.block<3, 3>(0, 0) = rotationMatrix;
+
         trajectory[timestamplidar] = pose;
     }
     return trajectory;
@@ -376,6 +379,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_STEP1(const std::stri
                           r10, r11, r12,
                           r20, r21, r22;
         pose.block<3, 3>(0, 0) = rotationMatrix;
+        
         trajectory[timestamp] = pose;
     }
     return trajectory;

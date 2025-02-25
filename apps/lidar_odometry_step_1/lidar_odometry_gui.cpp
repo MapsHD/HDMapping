@@ -287,7 +287,7 @@ void lidar_odometry_gui()
             ImGui::InputInt("threshold initial points", &params.threshold_initial_points);
             ImGui::Checkbox("save_calibration_validation_file", &params.save_calibration_validation);
             ImGui::InputInt("number of calibration validation points", &params.calibration_validation_points);
-            //ImGui::Checkbox("use_multithread", &params.useMultithread);
+            ImGui::Checkbox("use_multithread", &params.useMultithread);
 
             ImGui::Checkbox("fusionConventionNwu", &params.fusionConventionNwu);
             if (params.fusionConventionNwu)

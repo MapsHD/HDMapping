@@ -47,7 +47,7 @@ struct LidarOdometryParams
     bool use_motion_from_previous_step = true;
     double consecutive_distance = 0.0;
     int nr_iter = 100;
-    //bool useMultithread = true;
+    bool useMultithread = true;
     std::vector<Point3Di> reference_points;
     //double decimation = 0.1;
     double decimation = 0.01;

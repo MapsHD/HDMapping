@@ -78,6 +78,20 @@ std::vector<double> parseCSVLine(const std::string &line)
     return values;
 }
 
+std::vector<double> parseCSVLineSpace(const std::string &line)
+{
+    std::vector<double> values;
+    std::stringstream ss(line);
+    std::string token;
+
+    while (std::getline(ss, token, ' '))
+    {
+        values.push_back(std::stod(token)); // Convert string to double
+    }
+    return values;
+}
+
+
 std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV(const std::string &file_path)
 {
     std::map<double, Eigen::Matrix4d> trajectory;
@@ -105,6 +119,267 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV(const std::string &fi
         pose(2, 3) = values[3];
         pose.block<3, 3>(0, 0) = Eigen::Quaterniond(values[4], values[5], values[6], values[7]).toRotationMatrix();
 
+        trajectory[timestamp] = pose;
+    }
+    return trajectory;
+}
+
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARROT(const std::string& file_path) 
+{
+    std::map<double, Eigen::Matrix4d> trajectory;
+    std::ifstream file(file_path);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: could not open file " << file_path << std::endl;
+        return trajectory;
+    }
+
+    std::string line;
+    std::getline(file, line);  // Skip header line
+
+    while (std::getline(file, line))
+    {
+        std::vector<double> values = parseCSVLine(line);
+        if (values.size() != 13)
+        {
+            std::cerr << "Error: Invalid line in CSV file. Expected 13 values but found " << values.size() << std::endl;
+            continue;
+        }
+        double timestamp = values[0] / 1e9;
+        Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+        pose(0, 3) = values[1];
+        pose(1, 3) = values[2];
+        pose(2, 3) = values[3];
+        double r00 = values[4], r01 = values[5], r02 = values[6];
+        double r10 = values[7], r11 = values[8], r12 = values[9];
+        double r20 = values[10], r21 = values[11], r22 = values[12];
+        Eigen::Matrix3d rotationMatrix;
+        rotationMatrix << r00, r01, r02,
+                          r10, r11, r12,
+                          r20, r21, r22;
+        pose.block<3, 3>(0, 0) = rotationMatrix;
+
+        trajectory[timestamp] = pose;
+    }
+    return trajectory;
+}
+
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXROT(const std::string& file_path) 
+{
+    std::map<double, Eigen::Matrix4d> trajectory;
+    std::ifstream file(file_path);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: could not open file " << file_path << std::endl;
+        return trajectory;
+    }
+
+    std::string line;
+    std::getline(file, line);  // Skip header line
+
+    while (std::getline(file, line))
+    {
+        std::vector<double> values = parseCSVLine(line);
+        if (values.size() != 13)
+        {
+            std::cerr << "Error: Invalid line in CSV file. Expected 13 values but found " << values.size() << std::endl;
+            continue;
+        }
+        double timestamp = values[0] / 1e9;
+        Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+        pose(0, 3) = values[1];
+        pose(1, 3) = values[2];
+        pose(2, 3) = values[3];
+        double r00 = values[4], r01 = values[5], r02 = values[6];
+        double r10 = values[7], r11 = values[8], r12 = values[9];
+        double r20 = values[10], r21 = values[11], r22 = values[12];
+        Eigen::Matrix3d rotationMatrix;
+        rotationMatrix << r00, r01, r02,
+                          r10, r11, r12,
+                          r20, r21, r22;
+        pose.block<3, 3>(0, 0) = rotationMatrix;
+
+        trajectory[timestamp] = pose;
+    }
+    return trajectory;
+}
+
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXROT(const std::string& file_path) 
+{
+    std::map<double, Eigen::Matrix4d> trajectory;
+    std::ifstream file(file_path);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: could not open file " << file_path << std::endl;
+        return trajectory;
+    }
+
+    std::string line;
+    std::getline(file, line);  // Skip header line
+
+    while (std::getline(file, line))
+    {
+        std::vector<double> values = parseCSVLine(line);
+        if (values.size() != 14)
+        {
+            std::cerr << "Error: Invalid line in CSV file. Expected 14 values but found " << values.size() << std::endl;
+            continue;
+        }
+        double timestamplidar = values[0] / 1e9;
+        double timestampunix = values[1] / 1e9;
+        Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+        pose(0, 3) = values[2];
+        pose(1, 3) = values[3];
+        pose(2, 3) = values[4];
+        double r00 = values[5], r01 = values[6], r02 = values[7];
+        double r10 = values[8], r11 = values[9], r12 = values[10];
+        double r20 = values[11], r21 = values[12], r22 = values[13];
+        Eigen::Matrix3d rotationMatrix;
+        rotationMatrix << r00, r01, r02,
+                          r10, r11, r12,
+                          r20, r21, r22;
+        pose.block<3, 3>(0, 0) = rotationMatrix;
+
+        trajectory[timestamplidar] = pose;
+    }
+    return trajectory;
+}
+
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARQ(const std::string& file_path) 
+{
+    std::map<double, Eigen::Matrix4d> trajectory;
+    std::ifstream file(file_path);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: could not open file " << file_path << std::endl;
+        return trajectory;
+    }
+
+    std::string line;
+    std::getline(file, line);  // Skip header line
+
+    while (std::getline(file, line))
+    {
+        std::vector<double> values = parseCSVLine(line);
+        if (values.size() != 1 + 3 + 4)
+        {
+            std::cerr << "Error: Invalid line in CSV file. Expected 8 values but found " << values.size() << std::endl;
+            continue;
+        }
+        double timestamp = values[0] / 1e9;
+        Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+        pose(0, 3) = values[1];
+        pose(1, 3) = values[2];
+        pose(2, 3) = values[3];
+        pose.block<3, 3>(0, 0) = Eigen::Quaterniond(values[4], values[5], values[6], values[7]).toRotationMatrix();
+
+        trajectory[timestamp] = pose;
+    }
+    return trajectory;
+}
+
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXQ(const std::string& file_path) 
+{
+    std::map<double, Eigen::Matrix4d> trajectory;
+    std::ifstream file(file_path);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: could not open file " << file_path << std::endl;
+        return trajectory;
+    }
+
+    std::string line;
+    std::getline(file, line);  // Skip header line
+
+    while (std::getline(file, line))
+    {
+        std::vector<double> values = parseCSVLine(line);
+        if (values.size() != 1 + 3 + 4)
+        {
+            std::cerr << "Error: Invalid line in CSV file. Expected 8 values but found " << values.size() << std::endl;
+            continue;
+        }
+        double timestamp = values[0] / 1e9;
+        Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+        pose(0, 3) = values[1];
+        pose(1, 3) = values[2];
+        pose(2, 3) = values[3];
+        pose.block<3, 3>(0, 0) = Eigen::Quaterniond(values[4], values[5], values[6], values[7]).toRotationMatrix();
+
+        trajectory[timestamp] = pose;
+    }
+    return trajectory;
+}
+
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXQ(const std::string& file_path) 
+{
+    std::map<double, Eigen::Matrix4d> trajectory;
+    std::ifstream file(file_path);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: could not open file " << file_path << std::endl;
+        return trajectory;
+    }
+
+    std::string line;
+    std::getline(file, line);  // Skip header line
+
+    while (std::getline(file, line))
+    {
+        std::vector<double> values = parseCSVLine(line);
+        if (values.size() != 1 + 3 + 5)
+        {
+            std::cerr << "Error: Invalid line in CSV file. Expected 9 values but found " << values.size() << std::endl;
+            continue;
+        }
+        double timestamplidar = values[0] / 1e9;
+        double timestampunix = values[1] / 1e9;
+        Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+        pose(0, 3) = values[2];
+        pose(1, 3) = values[3];
+        pose(2, 3) = values[4];
+        pose.block<3, 3>(0, 0) = Eigen::Quaterniond(values[5], values[6], values[7], values[8]).toRotationMatrix();
+
+        trajectory[timestamplidar] = pose;
+    }
+    return trajectory;
+}
+
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_STEP1(const std::string& file_path) 
+{
+    std::map<double, Eigen::Matrix4d> trajectory;
+    std::ifstream file(file_path);
+    if (!file.is_open())
+    {
+        std::cerr << "Error: could not open file " << file_path << std::endl;
+        return trajectory;
+    }
+
+    std::string line;
+    std::getline(file, line);  // Skip header line
+
+    while (std::getline(file, line))
+    {
+        std::vector<double> values = parseCSVLineSpace(line);
+        if (values.size() != 17)
+        {
+            std::cerr << "Error: Invalid line in CSV file. Expected 17 values but found " << values.size() << std::endl;
+            continue;
+        }
+        double timestamp = values[0] / 1e9;
+        Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+        pose(0, 3) = values[1];
+        pose(1, 3) = values[2];
+        pose(2, 3) = values[3];
+        double r00 = values[4], r01 = values[5], r02 = values[6];
+        double r10 = values[7], r11 = values[8], r12 = values[9];
+        double r20 = values[10], r21 = values[11], r22 = values[12];
+        Eigen::Matrix3d rotationMatrix;
+        rotationMatrix << r00, r01, r02,
+                          r10, r11, r12,
+                          r20, r21, r22;
+        pose.block<3, 3>(0, 0) = rotationMatrix;
+        
         trajectory[timestamp] = pose;
     }
     return trajectory;
@@ -197,20 +472,124 @@ void project_gui()
         ImGui::Checkbox("show_axes", &show_axes);
         ImGui::Checkbox("is_ortho", &is_ortho);
         ImGui::Checkbox("move_source_trajectory_with_gizmo", &move_source_trajectory_with_gizmo);
-        if (ImGui::Button("Load target trajectory (e.g. ground truth)"))
-        {
-            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_gt = load_trajectory_from_CSV(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load source trajectory"))
+        // if (ImGui::Button("Load target trajectory (e.g. ground truth trajectory))
+        // {
+        //     auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+        //     if (!file_path.empty())
+        //     {
+        //         Data::trajectory_gt = load_trajectory_from_CSV(file_path[0]);
+        //     }
+        // }
+        if (ImGui::Button("Load source trajectory (timestampLidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(estimated trajectory)"))
         {
             auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
             if (!file_path.empty())
             {
-                Data::trajectory_est = load_trajectory_from_CSV(file_path[0]);
+                Data::trajectory_est = load_trajectory_from_CSV_LIDARROT(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load source trajectory (timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(estimated trajectory)"))
+        {
+            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_est = load_trajectory_from_CSV_UNIXROT(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load source trajectory (timestampLidar,timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(estimated trajectory)"))
+        {
+            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_est = load_trajectory_from_CSV_LIDARUNIXROT(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load source trajectory (timestampLidar,x,y,z,qx,qy,qz,qw(estimated trajectory)"))
+        {
+            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_est = load_trajectory_from_CSV_LIDARQ(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load source trajectory (timestampUnix,x,y,z,qx,qy,qz,qw(estimated trajectory)"))
+        {
+            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_est = load_trajectory_from_CSV_UNIXQ(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load source trajectory (timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw(estimated trajectory)"))
+        {
+            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_est = load_trajectory_from_CSV_LIDARUNIXQ(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load source trajectory timestamp_nanoseconds,pose00,pose01,pose02,pose03,pose10,pose11,pose12,pose13,pose20,pose21,pose22,pose23,timestampUnix_nanoseconds,imuom,imufi,imuka ground truth trajectory"))
+        {
+            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_est = load_trajectory_from_CSV_STEP1(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load target trajectory (timestampLidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(ground trajectory)"))
+        {
+            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_gt = load_trajectory_from_CSV_LIDARROT(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load target trajectory (timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(ground truth trajectory)"))
+        {
+            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_gt = load_trajectory_from_CSV_UNIXROT(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load target trajectory (timestampLidar,timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(ground truth trajectory)"))
+        {
+            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_gt = load_trajectory_from_CSV_LIDARUNIXROT(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load target trajectory (timestampLidar,x,y,z,qx,qy,qz,qw(ground truth trajectory)"))
+        {
+            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_gt = load_trajectory_from_CSV_LIDARQ(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load target trajectory (timestampUnix,x,y,z,qx,qy,qz,qw(ground truth trajectory)"))
+        {
+            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_gt = load_trajectory_from_CSV_UNIXQ(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load target trajectory (timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw(ground truth trajectory)"))
+        {
+            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_gt = load_trajectory_from_CSV_LIDARUNIXQ(file_path[0]);
+            }
+        }
+        if (ImGui::Button("Load target trajectory timestamp_nanoseconds,pose00,pose01,pose02,pose03,pose10,pose11,pose12,pose13,pose20,pose21,pose22,pose23,timestampUnix_nanoseconds,imuom,imufi,imuka ground truth trajectory"))
+        {
+            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+            if (!file_path.empty())
+            {
+                Data::trajectory_gt = load_trajectory_from_CSV_STEP1(file_path[0]);
             }
         }
         if (ImGui::Button("Align source trajectory to target trajectory (1 iteration of optimization)"))

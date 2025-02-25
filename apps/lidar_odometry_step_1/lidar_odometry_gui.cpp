@@ -198,9 +198,9 @@ void lidar_odometry_gui()
         {
             ImGui::SliderFloat("mouse_sensitivity_xy", &mouse_sensitivity, 0.1, 10);
             ImGui::InputInt("THRESHOLD_NR_POSES", &params.threshold_nr_poses);
-            if (params.threshold_nr_poses < 20)
+            if (params.threshold_nr_poses < 1)
             {
-                params.threshold_nr_poses = 20;
+                params.threshold_nr_poses = 1;
             }
         }
         ImGui::Text(("Working directory ('session.json' will be saved here): '" + working_directory + "\\lidar_odometry_result_*'").c_str());

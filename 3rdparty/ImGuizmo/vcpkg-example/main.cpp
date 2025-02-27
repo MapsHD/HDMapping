@@ -1,5 +1,5 @@
-#include "imgui.h"
 #define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui.h"
 #include "imgui_internal.h"
 #define IMAPP_IMPL
 #include "ImApp.h"
@@ -10,7 +10,7 @@
 #include "ImCurveEdit.h"
 #include "GraphEditor.h"
 
-#include <math.h>
+#include <cmath>
 #include <vector>
 #include <algorithm>
 

@@ -5,6 +5,7 @@
 #include "imgui.h"
 #include "imgui_impl_glut.h"
 #include "imgui_impl_opengl2.h"
+#include "ImGuizmo.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -164,28 +165,28 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
     float speed = io.KeyShift ? 10.f : 1.f;
     int transX = 0;
     int transY = 0;
-    if (io.KeysDown[io.KeyMap[ImGuiKey_UpArrow]])
+    if (ImGui::IsKeyDown(ImGuiKey_UpArrow))//update to new version
     {
         transY = -10 * speed;
     }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_DownArrow]])
+    if (ImGui::IsKeyDown(ImGuiKey_DownArrow))//update to new version
     {
         transY = 10 * speed;
     }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_LeftArrow]])
+    if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))//update to new version
     {
         transX = -10 * speed;
     }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_RightArrow]])
+    if (ImGui::IsKeyDown(ImGuiKey_RightArrow))//update to new version
     {
         transX = 10 * speed;
     }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_PageUp]])
+    if (ImGui::IsKeyDown(ImGuiKey_PageUp))//update to new version
     {
         zoom *= 1.0f + 0.01f * speed;
     }
 
-    if (io.KeysDown[io.KeyMap[ImGuiKey_PageDown]])
+    if (ImGui::IsKeyDown(ImGuiKey_PageDown))//update to new version
     {
         zoom /= 1.00f + 0.01f * speed;
     }
@@ -776,6 +777,7 @@ void display()
     }
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+    ImGui::NewFrame();  // Essential line that was missing
 
     std::vector<ImVec2> picked3DPoints(SystemData::pointPickedPointCloud.size());
     std::transform(SystemData::pointPickedPointCloud.begin(), SystemData::pointPickedPointCloud.end(), picked3DPoints.begin(), UnprojectPoint);
@@ -1055,7 +1057,8 @@ bool initGL(int *argc, char **argv)
     glutReshapeFunc(reshape);
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void)io;
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());  // Set ImGuizmo context
+    (void)io;  // Prevents unused variable warning
 
     ImGui::StyleColorsDark();
     ImGui_ImplGLUT_Init();

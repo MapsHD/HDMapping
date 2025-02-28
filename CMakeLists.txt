@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15.0)
+cmake_minimum_required(VERSION 3.16.0)
 
 project(hd-mapping)
 
@@ -13,6 +13,7 @@ add_definitions(-DHDMAPPING_VERSION_PATCH=${HDMAPPING_VERSION_PATCH})
 
 if (MSVC)
     add_definitions(-D_HAS_STD_BYTE=0)
+    add_compile_options("/bigobj") # Resolving error C1128: number of sections exceeded object file format limit
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
@@ -40,6 +41,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 include(cmake/platform.cmake)
 include(cmake/imgui.cmake)
 include(cmake/imguizmo.cmake)
+
+# Add this line to set the policy
+if(POLICY CMP0177)
+  cmake_policy(SET CMP0177 NEW)
+endif()
 
 # Option to build with bundled Eigen
 option(BUILD_WITH_BUNDLED_EIGEN "Build with bundled Eigen" ON)

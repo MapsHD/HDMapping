@@ -151,6 +151,7 @@ void display() {
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+    ImGui::NewFrame();  // Essential line that was missing
 
     //my_display_code();
     project_setings.imgui(odo_with_gnss_fusion, laz_wrapper.sectors, roi_exporter.rois_with_constraints, common_data);
@@ -281,7 +282,9 @@ bool initGL(int* argc, char** argv) {
     gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01, 10000.0);
     glutReshapeFunc(reshape);
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO& io = ImGui::GetIO();
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());  // Set ImGuizmo context
+    (void)io;  // Prevents unused variable warning
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
     ImGui::StyleColorsDark();

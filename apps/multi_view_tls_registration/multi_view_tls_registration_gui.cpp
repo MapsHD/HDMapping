@@ -2186,6 +2186,7 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+    ImGui::NewFrame();  // Essential line that was missing
 
     // my_display_code();
     if (is_ndt_gui)
@@ -2244,11 +2245,21 @@ void display()
                     GLfloat modelview[16];
                     glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-                    ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                    // old // ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                    ImGuizmo::Manipulate(
+                        &modelview[0], 
+                        &projection[0], 
+                        ImGuizmo::TRANSLATE | ImGuizmo::ROTATE,  // New combined flags instead of separate X,Y,Z
+                        ImGuizmo::WORLD, 
+                        m_gizmo, 
+                        NULL,   // delta matrix
+                        NULL,   // snap values
+                        NULL    // bounds
+                    );
                 }
                 else
                 {
-                    ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                    //
                 }
 
                 session.point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
@@ -2389,11 +2400,22 @@ void display()
                 GLfloat modelview[16];
                 glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-                ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                // old // ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE, ImGuizmo::WORLD, m_gizmo, NULL, NULL, NULL); //update to new version
             }
             else
             {
-                ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                // old // ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                // Update ImGuizmo::Manipulate calls to match the new API
+                ImGuizmo::Manipulate(
+                    m_ortho_gizmo_view,
+                    m_ortho_projection,
+                    ImGuizmo::TRANSLATE | ImGuizmo::ROTATE, 
+                    ImGuizmo::WORLD, m_gizmo,
+                    NULL, // delta matrix
+                    NULL, // snap values
+                    NULL     // bounds
+                );
             }
 
             Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
@@ -2719,7 +2741,8 @@ bool initGL(int *argc, char **argv)
     glutReshapeFunc(reshape);
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void)io;
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());  // Set ImGuizmo context
+    (void)io;  // Prevents unused variable warning
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
     ImGui::StyleColorsDark();

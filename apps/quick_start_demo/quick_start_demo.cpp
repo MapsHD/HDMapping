@@ -318,6 +318,7 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+    ImGui::NewFrame();  // Essential line that was missing
 
     // project_gui();
 
@@ -351,7 +352,8 @@ bool initGL(int *argc, char **argv)
     glutReshapeFunc(reshape);
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void)io;
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());  // Set ImGuizmo context
+    (void)io;  // Prevents unused variable warning
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
     ImGui::StyleColorsDark();

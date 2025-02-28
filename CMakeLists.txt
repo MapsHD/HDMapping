@@ -13,6 +13,7 @@ add_definitions(-DHDMAPPING_VERSION_PATCH=${HDMAPPING_VERSION_PATCH})
 
 if (MSVC)
     add_definitions(-D_HAS_STD_BYTE=0)
+    add_compile_options("/bigobj") # Resolving error C1128: number of sections exceeded object file format limit
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")

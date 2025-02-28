@@ -1,3 +1,4 @@
+#include <thread>  // Pentru std::this_thread
 #include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
@@ -1372,6 +1373,7 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+    ImGui::NewFrame();  // Essential line that was missing
 
     lidar_odometry_basic_gui();
 
@@ -1389,8 +1391,17 @@ void display()
         GLfloat modelview[16];
         glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
-
+        // old // ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+        ImGuizmo::Manipulate(
+            &modelview[0], 
+            &projection[0], 
+            ImGuizmo::TRANSLATE | ImGuizmo::ROTATE,  // New combined flags instead of separate X,Y,Z
+            ImGuizmo::WORLD, 
+            m_gizmo, 
+            NULL,   // delta matrix
+            NULL,   // snap values
+            NULL    // bounds
+        );
         // Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
 
         params.m_g(0, 0) = m_gizmo[0];
@@ -1425,8 +1436,17 @@ void display()
         GLfloat modelview[16];
         glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
-
+        // old // ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+        ImGuizmo::Manipulate(
+            &modelview[0], 
+            &projection[0], 
+            ImGuizmo::TRANSLATE | ImGuizmo::ROTATE,  // New combined flags instead of separate X,Y,Z
+            ImGuizmo::WORLD, 
+            m_gizmo, 
+            NULL,   // delta matrix
+            NULL,   // snap values
+            NULL    // bounds
+        );
         stretch_gizmo_m(0, 0) = m_gizmo[0];
         stretch_gizmo_m(1, 0) = m_gizmo[1];
         stretch_gizmo_m(2, 0) = m_gizmo[2];
@@ -1487,7 +1507,8 @@ bool initGL(int *argc, char **argv)
     glutReshapeFunc(reshape);
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void)io;
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());  // Set ImGuizmo context
+    (void)io;  // Prevents unused variable warning
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
     ImGui::StyleColorsDark();

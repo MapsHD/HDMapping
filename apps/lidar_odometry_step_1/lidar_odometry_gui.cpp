@@ -931,13 +931,13 @@ void lidar_odometry_basic_gui()
             params.robust_and_accurate_lidar_odometry_iterations = 20;
             params.max_distance_lidar = 30.0;
 
-            params.use_robust_and_accurate_lidar_odometry = true;
+            params.use_robust_and_accurate_lidar_odometry = false;
 
             step2();
 
             save_results(false);
 
-            for (int i = 0; i < params.num_constistency_iter; i++)
+            /*for (int i = 0; i < params.num_constistency_iter; i++)
             {
                 std::cout << "Iteration " << i + 1 << " of " << params.num_constistency_iter << std::endl;
                 for (int ii = 0; ii < worker_data.size(); ii++)
@@ -947,12 +947,15 @@ void lidar_odometry_basic_gui()
                 Consistency(worker_data, params);
             }
 
-            save_results(false);
+            save_results(false);*/
 
             //std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
 
-            std::string message_info = "Data saved to folders '" + working_directory + "\\lidar_odometry_result_0' and '" + working_directory + "\\lidar_odometry_result_1' total_length_of_calculated_trajectory=" +
-                std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
+            //std::string message_info = "Data saved to folders '" + working_directory + "\\lidar_odometry_result_0' and '" + working_directory + "\\lidar_odometry_result_1' total_length_of_calculated_trajectory=" +
+            //    std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
+
+            std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
+                 std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
 
             [[maybe_unused]]
             pfd::message message(

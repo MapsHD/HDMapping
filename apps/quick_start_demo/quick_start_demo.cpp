@@ -290,7 +290,8 @@ void display()
         glEnd();
         glLineWidth(1);
 
-        if (render_trajectory.size() > 0){
+        if (render_trajectory.size() > 0)
+        {
             auto m = render_trajectory[render_trajectory.size() - 1];
             glBegin(GL_LINES);
             glColor3f(1.0f, 0.0f, 0.0f);
@@ -306,7 +307,7 @@ void display()
             glVertex3f(m(0, 3) + m(0, 2), m(1, 3) + m(1, 2), m(2, 3) + m(2, 2));
             glEnd();
         }
-            
+
         glBegin(GL_POINTS);
         for (int i = 0; i < render_pointcloud.size(); i++)
         {
@@ -512,8 +513,9 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
 
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
+                double delta = 1000000.0;
                 optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
-                         params.in_out_params, params.buckets, /*params.useMultithread*/false, 70.0 /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
+                         params.in_out_params, params.buckets, /*params.useMultithread*/ false, 70.0, delta);
             }
 
             end1 = std::chrono::system_clock::now();
@@ -683,15 +685,15 @@ int main(int argc, char *argv[])
     params.in_out_params.bounding_box_extension = 20.0;
 
     std::vector<std::string> input_file_names;
-    
+
     input_file_names.push_back("imu0001.csv");
     input_file_names.push_back("imu0002.csv");
     input_file_names.push_back("imu0003.csv");
-    
+
     input_file_names.push_back("lidar0001.sn");
     input_file_names.push_back("lidar0002.sn");
     input_file_names.push_back("lidar0003.sn");
-    
+
     input_file_names.push_back("lidar0001.laz");
     input_file_names.push_back("lidar0002.laz");
     input_file_names.push_back("lidar0003.laz");
@@ -1059,7 +1061,7 @@ int main(int argc, char *argv[])
     double ts_failure = 0.0;
 
     std::thread th([&]()
-    {
+                   {
         compute_step_2_demo(worker_data, params, ts_failure);
 
         {
@@ -1076,8 +1078,7 @@ int main(int argc, char *argv[])
         
         saveLaz("out_demo_point_cloud.laz", global_points);
         std::cout << "file: out_demo_point_cloud.laz saved" << std::endl;
-        }
-    });
+        } });
 
     glutMainLoop();
 

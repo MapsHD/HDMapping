@@ -146,9 +146,7 @@ int get_next_result_id(const std::string working_directory);
 // this function performs main LiDAR odometry calculations
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread, double max_distance /*,
-               bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
-);
+              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread, double max_distance, double &delta);
 
 void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,

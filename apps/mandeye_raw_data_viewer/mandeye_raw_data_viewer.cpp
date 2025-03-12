@@ -235,7 +235,7 @@ void project_gui()
             if (ImGui::Button("load data"))
             {
                 std::vector<std::string> input_file_names;
-                input_file_names = mandeye::fd::OpenFileDialog("Load laz files", mandeye::fd::LAS_LAZ_filter, true);
+                input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
 
                 std::sort(std::begin(input_file_names), std::end(input_file_names));
 

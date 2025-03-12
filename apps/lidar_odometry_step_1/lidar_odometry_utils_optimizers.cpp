@@ -1660,12 +1660,10 @@ void optimize_rigid_sf(
 }
 
 void optimize(std::vector<Point3Di> &intermediate_points, 
-std::vector<Eigen::Affine3d> &intermediate_trajectory, 
-std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model, 
-NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool multithread,
-double max_distance /*,
-                                                                                                                                                                                      bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
-)
+    std::vector<Eigen::Affine3d> &intermediate_trajectory, 
+    std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model, 
+    NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool multithread,
+    double max_distance, double &delta)
 {
     std::vector<Eigen::Triplet<double>> tripletListA;
     std::vector<Eigen::Triplet<double>> tripletListP;
@@ -1700,13 +1698,15 @@ double max_distance /*,
         // if(buckets[index_of_bucket].number_of_points >= 5){
         const Eigen::Matrix3d &infm = this_bucket.cov.inverse();
         const double threshold = 100000.0;
-
+        
         if ((infm.array() > threshold).any())
         {
+            
             return;
         }
         if ((infm.array() < -threshold).any())
         {
+           
             return;
         }
 
@@ -1750,17 +1750,22 @@ double max_distance /*,
         double sum_ev = ev1 + ev2 + ev3;
         auto planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
 
+        //if (!(planarity == planarity)){
+        //    std::cout << "planarity" << std::endl;
+        //    exit(1);
+        //}
         double norm = p_s.norm();
 
         double w = planarity * norm;
         if (w > 10.0)
         {
-            // std::cout << w << " " << planarity << " " << norm << "x " << p_s.x() << "y " << p_s.y() << "z " << p_s.z() << std::endl;
+        //  std::cout << w << " " << planarity << " " << norm << "x " << p_s.x() << "y " << p_s.y() << "z " << p_s.z() << std::endl;
             w = 10.0;
         }
 
         AtPA *= w;
         AtPB *= w;
+        
 
         std::mutex &m = mutexes[intermediate_points_i.index_pose];
         std::unique_lock lck(m);
@@ -1916,12 +1921,12 @@ double max_distance /*,
                                                                  poses[odo_edges[i].second].fi,
                                                                  poses[odo_edges[i].second].ka,
                                                                  1000000,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 100000000,
-                                                                 100000000,
-                                                                 //  100000000, underground mining
-                                                                 //  1000000, underground mining
+                                                                 10000000000,
+                                                                 10000000000,
+                                                                 //100000000,
+                                                                 //100000000,
+                                                                 1000000,// 
+                                                                 1000000,// 
                                                                  1000000);
         Eigen::Matrix<double, 12, 1> AtPBodo;
         relative_pose_obs_eq_tait_bryan_wc_case1_AtPB_simplified(AtPBodo,
@@ -1944,12 +1949,12 @@ double max_distance /*,
                                                                  relative_pose_measurement_odo(4, 0),
                                                                  relative_pose_measurement_odo(5, 0),
                                                                  1000000,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 100000000,
-                                                                 100000000,
-                                                                 //  100000000, underground mining
-                                                                 //  1000000, underground mining
+                                                                 10000000000,
+                                                                 10000000000,
+                                                                 //100000000,
+                                                                 //100000000,
+                                                                 1000000,// underground mining
+                                                                 1000000,// underground mining
                                                                  1000000);
         int ic_1 = odo_edges[i].first * 6;
         int ic_2 = odo_edges[i].second * 6;
@@ -2196,7 +2201,7 @@ double max_distance /*,
 
     Eigen::SparseMatrix<double> AtPA_I(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
     AtPA_I.setIdentity();
-    AtPA += AtPA_I;
+    AtPA += (AtPA_I * 10000.0);
 
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>>
         solver(AtPA);
@@ -2210,6 +2215,7 @@ double max_distance /*,
         }
     }
 
+    delta = 1000000.0;
     if (h_x.size() == 6 * intermediate_trajectory.size())
     {
         int counter = 0;
@@ -2217,7 +2223,7 @@ double max_distance /*,
         for (size_t i = 0; i < intermediate_trajectory.size(); i++)
         {
             TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(intermediate_trajectory[i]);
-            auto prev_pose = pose;
+            TaitBryanPose prev_pose = pose_tait_bryan_from_affine_matrix(intermediate_trajectory_motion_model[i]);
             pose.px += h_x[counter++];
             pose.py += h_x[counter++];
             pose.pz += h_x[counter++];
@@ -2228,10 +2234,17 @@ double max_distance /*,
             Eigen::Vector3d p1(prev_pose.px, prev_pose.py, prev_pose.pz);
             Eigen::Vector3d p2(pose.px, pose.py, pose.pz);
 
-            if ((p1 - p2).norm() < 1.0)
+            //std::cout << "(p1 - p2).norm() " << (p1 - p2).norm() << std::endl;
+
+            if ((p1 - p2).norm() < 0.2)
             {
                 intermediate_trajectory[i] = affine_matrix_from_pose_tait_bryan(pose);
             }
+        }
+        delta = 0.0;
+        for (int i = 0; i < h_x.size(); i++)
+        {
+            delta += sqrt(h_x[i] * h_x[i]);
         }
     }
     return;
@@ -2935,11 +2948,19 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             // save
 
             ///
+            worker_data[i].intermediate_trajectory_motion_model = worker_data[i].intermediate_trajectory;
 
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
+                double delta = 100000.0;
                 optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
-                         params.in_out_params, params.buckets, params.useMultithread, params.max_distance /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
+                         params.in_out_params, params.buckets, params.useMultithread, params.max_distance, delta /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
+                if(delta < 1e-4){
+                    std::cout << "finished at iteration: " << iter + 1 << " nr_iter: " << params.nr_iter << " delta: " << delta << std::endl;
+                    break;
+                }
+
+                //std::cout << "[" << iter << "] " << delta << std::endl;
             }
 
             // std::string fn2 = "output_" + std::to_string(i) + ".txt";
@@ -3563,7 +3584,7 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     std::vector<Point3Di> all_points_local;
 
     std::vector<std::pair<int, int>> indexes;
-    bool multithread = true;
+    bool multithread = false;
 
     std::cout << "preparing data START" << std::endl;
     for (int i = 0; i < worker_data.size(); i++)
@@ -3617,7 +3638,7 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     //     poses_desired.push_back(pose_tait_bryan_from_affine_matrix(trajectory_motion_model[i]));
     // }
 
-    double angle = 0.01 / 180.0 * M_PI;
+    double angle = 0.1 / 180.0 * M_PI;
     double wangle = 1.0 / (angle * angle);
 
     /*for (size_t i = 0; i < odo_edges.size(); i++)
@@ -3786,7 +3807,7 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
         tripletListB.emplace_back(ir + 4, 0, delta(4, 0));
         tripletListB.emplace_back(ir + 5, 0, delta(5, 0));
 
-        tripletListP.emplace_back(ir, ir, 100000000);
+        tripletListP.emplace_back(ir, ir, 1000000);
         tripletListP.emplace_back(ir + 1, ir + 1, 100000000);
         tripletListP.emplace_back(ir + 2, ir + 2, 100000000);
         tripletListP.emplace_back(ir + 3, ir + 3, wangle);
@@ -3900,12 +3921,12 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
                 }
 
                 // check nv
-                Eigen::Vector3d &nv = this_bucket.normal_vector;
-                Eigen::Vector3d viewport = trajectory[intermediate_points_i.index_pose].translation();
-                if (nv.dot(viewport - this_bucket.mean) < 0)
-                {
-                    return;
-                }
+                //Eigen::Vector3d &nv = this_bucket.normal_vector;
+                //Eigen::Vector3d viewport = trajectory[intermediate_points_i.index_pose].translation();
+                //if (nv.dot(viewport - this_bucket.mean) < 0)
+                //{
+                //    return;
+                //}
 
                 const Eigen::Affine3d &m_pose = trajectory[intermediate_points_i.index_pose];
                 const Eigen::Vector3d &p_s = intermediate_points_i.point;

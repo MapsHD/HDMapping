@@ -466,7 +466,7 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
         {
             pp[i].point = params.m_g * pp[i].point;
         }
-        update_rgd(params.in_out_params, params.buckets, pp, params.m_g.translation());
+        update_rgd(params.in_out_params_indoor, params.buckets_indoor, pp, params.m_g.translation());
 
         for (int i = 0; i < worker_data.size(); i++)
         {
@@ -515,7 +515,7 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
             {
                 double delta = 1000000.0;
                 optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
-                         params.in_out_params, params.buckets, /*params.useMultithread*/ false, 70.0, delta);
+                         params.in_out_params_indoor, params.buckets_indoor, params.in_out_params_outdoor, params.buckets_outdoor, /*params.useMultithread*/ false, 70.0, delta);
             }
 
             end1 = std::chrono::system_clock::now();
@@ -603,7 +603,8 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
 
                 if (params.reference_points.size() == 0)
                 {
-                    params.buckets.clear();
+                    params.buckets_indoor.clear();
+                    params.buckets_outdoor.clear();
                 }
 
                 std::vector<Point3Di> points_global_new;
@@ -621,7 +622,7 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
                 {
                     decimate(points_global, params.decimation, params.decimation, params.decimation);
                 }
-                update_rgd(params.in_out_params, params.buckets, points_global, worker_data[i].intermediate_trajectory[0].translation());
+                update_rgd(params.in_out_params_indoor, params.buckets_indoor, points_global, worker_data[i].intermediate_trajectory[0].translation());
                 //
                 endu = std::chrono::system_clock::now();
 
@@ -640,7 +641,7 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
                     pp.point = worker_data[i].intermediate_trajectory[worker_data[i].intermediate_points[j].index_pose] * pp.point;
                     pg.push_back(pp);
                 }
-                update_rgd(params.in_out_params, params.buckets, pg, worker_data[i].intermediate_trajectory[0].translation());
+                update_rgd(params.in_out_params_indoor, params.buckets_indoor, pg, worker_data[i].intermediate_trajectory[0].translation());
             }
 
             if (i > 1)
@@ -679,10 +680,15 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
 
 int main(int argc, char *argv[])
 {
-    params.in_out_params.resolution_X = 0.3;
-    params.in_out_params.resolution_Y = 0.3;
-    params.in_out_params.resolution_Z = 0.3;
-    params.in_out_params.bounding_box_extension = 20.0;
+    params.in_out_params_indoor.resolution_X = 0.3;
+    params.in_out_params_indoor.resolution_Y = 0.3;
+    params.in_out_params_indoor.resolution_Z = 0.3;
+    params.in_out_params_indoor.bounding_box_extension = 20.0;
+
+    params.in_out_params_outdoor.resolution_X = 0.3;
+    params.in_out_params_outdoor.resolution_Y = 0.3;
+    params.in_out_params_outdoor.resolution_Z = 0.3;
+    params.in_out_params_outdoor.bounding_box_extension = 20.0;
 
     std::vector<std::string> input_file_names;
 

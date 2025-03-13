@@ -127,7 +127,7 @@ void limit_covariance(Eigen::Matrix3d &io_cov)
     // modify eigen values
     for (int k = 0; k < 3; ++k)
     {
-        eigenValues(k) = std::max(eigenValues(k), 0.00001);
+        eigenValues(k) = std::max(eigenValues(k), 0.0001);
     }
 
     // create diagonal matrix
@@ -181,30 +181,30 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
                                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
                 //limit_covariance(this_bucket.cov);
                 // calculate normal vector
-                //Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
-                //Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
+                Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+                Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
 
-                //Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
-                //nv.normalize();
+                Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
+                nv.normalize();
 
                 // flip towards viewport
-                //if (nv.dot(viewport - this_bucket.mean) < 0.0)
-                //{
-                //    nv *= -1.0;
-                //}
-                //this_bucket.normal_vector = nv;
+                if (nv.dot(viewport - this_bucket.mean) < 0.0)
+                {
+                    nv *= -1.0;
+                }
+                this_bucket.normal_vector = nv;
             }
 
             if (this_bucket.number_of_points > 3)
             {
-                //Eigen::Vector3d &nv = this_bucket.normal_vector;
+                Eigen::Vector3d &nv = this_bucket.normal_vector;
 
-                //if (nv.dot(viewport - this_bucket.mean) >= 0.0)
-                //{
+                if (nv.dot(viewport - this_bucket.mean) >= 0.0)
+                {
                     this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                       cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
                     //limit_covariance(this_bucket.cov);
-                //}
+                }
             }
         }
         else

@@ -42,8 +42,14 @@ struct LidarOdometryParams
     double filter_threshold_xy_outer = 70.0;
     Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
     std::vector<Point3Di> initial_points;
-    NDT::GridParameters in_out_params;
-    NDTBucketMapType buckets;
+    
+    NDT::GridParameters in_out_params_indoor;
+    NDTBucketMapType buckets_indoor;
+
+    NDT::GridParameters in_out_params_outdoor;
+    NDTBucketMapType buckets_outdoor;
+
+
     bool use_motion_from_previous_step = true;
     double consecutive_distance = 0.0;
     int nr_iter = 100;
@@ -146,7 +152,8 @@ int get_next_result_id(const std::string working_directory);
 // this function performs main LiDAR odometry calculations
 void optimize(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread, double max_distance, double &delta);
+              NDT::GridParameters &rgd_params_indoor, NDTBucketMapType &buckets_indoor,
+              NDT::GridParameters &rgd_params_outdoor, NDTBucketMapType &buckets_outdoor, bool useMultithread, double max_distance, double &delta);
 
 void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,

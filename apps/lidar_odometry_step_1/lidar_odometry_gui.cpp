@@ -223,9 +223,9 @@ void lidar_odometry_gui()
             if (ImGui::Button("set 'narrow spaces' mapping parameters (fastest motion upto 2km/h, gentle rotations, e.g. caves, indoor layouts)"))
             {
                 params.decimation = 0.01;
-                params.in_out_params.resolution_X = 0.1;
-                params.in_out_params.resolution_Y = 0.1;
-                params.in_out_params.resolution_Z = 0.1;
+                params.in_out_params_indoor.resolution_X = 0.1;
+                params.in_out_params_indoor.resolution_Y = 0.1;
+                params.in_out_params_indoor.resolution_Z = 0.1;
                 params.filter_threshold_xy_inner = 0.3;
                 params.filter_threshold_xy_outer = 70.0;
 
@@ -241,9 +241,9 @@ void lidar_odometry_gui()
             if (ImGui::Button("set 'regular spaces' mapping parameters (fastest motion upto 8km/h, gentle rotations, e.g. outdoor)"))
             {
                 params.decimation = 0.1;
-                params.in_out_params.resolution_X = 0.3;
-                params.in_out_params.resolution_Y = 0.3;
-                params.in_out_params.resolution_Z = 0.3;
+                params.in_out_params_indoor.resolution_X = 0.3;
+                params.in_out_params_indoor.resolution_Y = 0.3;
+                params.in_out_params_indoor.resolution_Z = 0.3;
                 params.filter_threshold_xy_inner = 0.3;
                 params.filter_threshold_xy_outer = 70.0;
 
@@ -261,20 +261,20 @@ void lidar_odometry_gui()
             ImGui::SameLine();
             ImGui::Checkbox("show_trajectory_as_axes", &show_trajectory_as_axes);
             // ImGui::Checkbox("show_covs", &show_covs);
-            ImGui::InputDouble("normal distribution transforms bucket size X", &params.in_out_params.resolution_X);
-            if (params.in_out_params.resolution_X < 0.01)
+            ImGui::InputDouble("normal distribution transforms bucket size X", &params.in_out_params_indoor.resolution_X);
+            if (params.in_out_params_indoor.resolution_X < 0.01)
             {
-                params.in_out_params.resolution_X = 0.01;
+                params.in_out_params_indoor.resolution_X = 0.01;
             }
-            ImGui::InputDouble("normal distribution transforms bucket size Y", &params.in_out_params.resolution_Y);
-            if (params.in_out_params.resolution_Y < 0.01)
+            ImGui::InputDouble("normal distribution transforms bucket size Y", &params.in_out_params_indoor.resolution_Y);
+            if (params.in_out_params_indoor.resolution_Y < 0.01)
             {
-                params.in_out_params.resolution_Y = 0.01;
+                params.in_out_params_indoor.resolution_Y = 0.01;
             }
-            ImGui::InputDouble("normal distribution transforms bucket size Z", &params.in_out_params.resolution_Z);
-            if (params.in_out_params.resolution_Z < 0.01)
+            ImGui::InputDouble("normal distribution transforms bucket size Z", &params.in_out_params_indoor.resolution_Z);
+            if (params.in_out_params_indoor.resolution_Z < 0.01)
             {
-                params.in_out_params.resolution_Z = 0.01;
+                params.in_out_params_indoor.resolution_Z = 0.01;
             }
 
             // ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy);
@@ -553,7 +553,7 @@ void lidar_odometry_gui()
                     {
                         for (int i = 0; i < 30; i++)
                         {
-                            align_to_reference(params.in_out_params, params.initial_points, params.m_g, params.reference_buckets);
+                            align_to_reference(params.in_out_params_indoor, params.initial_points, params.m_g, params.reference_buckets);
                         }
                     }
                 }
@@ -919,9 +919,14 @@ void lidar_odometry_basic_gui()
             step1();
 
             params.decimation = 0.01;
-            params.in_out_params.resolution_X = 0.1;
-            params.in_out_params.resolution_Y = 0.1;
-            params.in_out_params.resolution_Z = 0.1;
+            params.in_out_params_indoor.resolution_X = 0.1;
+            params.in_out_params_indoor.resolution_Y = 0.1;
+            params.in_out_params_indoor.resolution_Z = 0.1;
+
+            params.in_out_params_outdoor.resolution_X = 0.3;
+            params.in_out_params_outdoor.resolution_Y = 0.3;
+            params.in_out_params_outdoor.resolution_Z = 0.3;
+
             params.filter_threshold_xy_inner = 0.3;
             params.filter_threshold_xy_outer = 70.0;
 
@@ -933,6 +938,8 @@ void lidar_odometry_basic_gui()
 
             params.use_robust_and_accurate_lidar_odometry = false;
 
+            params.nr_iter = 200;
+            
             step2();
 
             save_results(false);
@@ -1171,7 +1178,7 @@ void display()
     // }
     if (show_covs)
     {
-        for (const auto &b : params.buckets)
+        for (const auto &b : params.buckets_indoor)
         {
             draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
         }
@@ -1504,10 +1511,15 @@ int main(int argc, char *argv[])
 {
     try
     {
-        params.in_out_params.resolution_X = 0.1;
-        params.in_out_params.resolution_Y = 0.1;
-        params.in_out_params.resolution_Z = 0.1;
-        params.in_out_params.bounding_box_extension = 20.0;
+        params.in_out_params_indoor.resolution_X = 0.1;
+        params.in_out_params_indoor.resolution_Y = 0.1;
+        params.in_out_params_indoor.resolution_Z = 0.1;
+        params.in_out_params_indoor.bounding_box_extension = 20.0;
+
+        params.in_out_params_outdoor.resolution_X = 0.3;
+        params.in_out_params_outdoor.resolution_Y = 0.3;
+        params.in_out_params_outdoor.resolution_Z = 0.3;
+        params.in_out_params_outdoor.bounding_box_extension = 20.0;
 
         initGL(&argc, argv);
         glutDisplayFunc(display);

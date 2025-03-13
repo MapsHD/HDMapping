@@ -671,8 +671,8 @@ void load_reference_point_clouds(std::vector<std::string> input_file_names, Lida
         params.reference_points.insert(std::end(params.reference_points), std::begin(pp), std::end(pp));
     }
 
-    update_rgd(params.in_out_params, params.reference_buckets, params.reference_points);
-    params.buckets = params.reference_buckets;
+    update_rgd(params.in_out_params_indoor, params.reference_buckets, params.reference_points);
+    params.buckets_indoor = params.reference_buckets;
 }
 
 std::string save_results_automatic(LidarOdometryParams& params, std::vector<WorkerData> &worker_data, Session& session, std::string working_directory)

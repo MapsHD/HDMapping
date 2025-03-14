@@ -998,7 +998,7 @@ void project_gui()
                                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
                                                 std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = ground_truth ;// sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
 
                                                 if (icp.compute(source, target, search_radious, number_of_iterations, m_pose))
                                                 {
@@ -1010,8 +1010,8 @@ void project_gui()
                                                 pcs.point_clouds[0].points_local = ground_truth;
                                                 pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
                                                 pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                                                
-                                                
+
+
                                                 ICP icp;
                                                 icp.search_radious = (float)search_radious;
 
@@ -1087,10 +1087,10 @@ void project_gui()
                                                 int number_of_iterations = 10;
                                                 PairWiseICP icp;
                                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                                                
+
                                                 std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
                                                 std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-                                                
+
                                                 if (icp.compute(source, target, search_radious, number_of_iterations, m_pose))
                                                 {
                                                     edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
@@ -1294,7 +1294,8 @@ void project_gui()
                 //}
             }
         }
-        if (!manual_pose_graph_loop_closure_mode){
+        if (!manual_pose_graph_loop_closure_mode)
+        {
             ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
         }
         ImGui::End();
@@ -1608,6 +1609,7 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+    ImGui::NewFrame(); // Essential line that was missing
 
     // my_display_code();
     /*if (is_ndt_gui)
@@ -1656,11 +1658,22 @@ void display()
                     GLfloat modelview[16];
                     glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-                    ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                    // old // ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                    ImGuizmo::Manipulate(
+                        &modelview[0],
+                        &projection[0],
+                        ImGuizmo::TRANSLATE | ImGuizmo::ROTATE, // New combined flags instead of separate X,Y,Z
+                        ImGuizmo::WORLD,
+                        m_gizmo,
+                        NULL, // delta matrix
+                        NULL, // snap values
+                        NULL  // bounds
+                    );
                 }
                 else
                 {
-                    ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                    // old // ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                    ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE | ImGuizmo::ROTATE, ImGuizmo::WORLD, m_gizmo, NULL, NULL, NULL); // update to new version
                 }
 
                 sessions[i].point_clouds_container.point_clouds[0].m_pose(0, 0) = m_gizmo[0];
@@ -1773,11 +1786,22 @@ void display()
                 GLfloat modelview[16];
                 glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-                ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                // old // ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                ImGuizmo::Manipulate(
+                    &modelview[0],
+                    &projection[0],
+                    ImGuizmo::TRANSLATE | ImGuizmo::ROTATE, // New combined flags instead of separate X,Y,Z
+                    ImGuizmo::WORLD,
+                    m_gizmo,
+                    NULL, // delta matrix
+                    NULL, // snap values
+                    NULL  // bounds
+                );
             }
             else
             {
-                ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                // old // ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE | ImGuizmo::ROTATE, ImGuizmo::WORLD, m_gizmo, NULL, NULL, NULL); // update to new version
             }
 
             Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
@@ -1838,11 +1862,31 @@ void display()
                     GLfloat modelview[16];
                     glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-                    ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                    // old // ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+ImGuizmo::Manipulate(
+    &modelview[0],
+    &projection[0],
+    ImGuizmo::TRANSLATE | ImGuizmo::ROTATE,  // New combined flags instead of separate X,Y,Z
+    ImGuizmo::WORLD,
+    m_gizmo,
+    NULL,   // delta matrix
+    NULL,   // snap values
+    NULL    // bounds
+);
                 }
                 else
                 {
-                    ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                    // old // ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+            // Update ImGuizmo::Manipulate calls to match the new API
+            ImGuizmo::Manipulate(
+                m_ortho_gizmo_view,
+                m_ortho_projection,
+                ImGuizmo::TRANSLATE | ImGuizmo::ROTATE, 
+                ImGuizmo::WORLD, m_gizmo,
+                NULL, // delta matrix
+                NULL, // snap values
+                NULL     // bounds
+            );
                 }
 
                 session.point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
@@ -1983,11 +2027,31 @@ void display()
                 GLfloat modelview[16];
                 glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-                ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                // old // ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+ImGuizmo::Manipulate(
+    &modelview[0], 
+    &projection[0], 
+    ImGuizmo::TRANSLATE | ImGuizmo::ROTATE,  // New combined flags instead of separate X,Y,Z
+    ImGuizmo::WORLD, 
+    m_gizmo, 
+    NULL,   // delta matrix
+    NULL,   // snap values
+    NULL    // bounds
+);
             }
             else
             {
-                ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                // old // ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+            // Update ImGuizmo::Manipulate calls to match the new API
+            ImGuizmo::Manipulate(
+                m_ortho_gizmo_view,
+                m_ortho_projection,
+                ImGuizmo::TRANSLATE | ImGuizmo::ROTATE, 
+                ImGuizmo::WORLD, m_gizmo,
+                NULL, // delta matrix
+                NULL, // snap values
+                NULL     // bounds
+            );
             }
 
             Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
@@ -2234,7 +2298,8 @@ bool initGL(int *argc, char **argv)
     glutReshapeFunc(reshape);
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void)io;
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext()); // Set ImGuizmo context
+    (void)io;                                              // Prevents unused variable warning
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
     ImGui::StyleColorsDark();

@@ -29,6 +29,7 @@ set(CORE_SOURCE_FILES
 set(CORE_SOURCE_FILES_GUI
     src/pfd_wrapper.cpp
     src/ground_control_points.cpp
+    src/control_points.cpp
     src/manual_pose_graph_loop_closure.cpp
     src/observation_picking.cpp
 )

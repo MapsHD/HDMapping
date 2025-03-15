@@ -7,6 +7,7 @@
 #if WITH_GUI == 1
 #include <manual_pose_graph_loop_closure.h>
 #include <ground_control_points.h>
+#include <control_points.h>
 #else
 #include <pose_graph_loop_closure.h>
 #endif
@@ -29,6 +30,7 @@ public:
 #if WITH_GUI == 1
     ManualPoseGraphLoopClosure pose_graph_loop_closure;
     GroundControlPoints ground_control_points;
+    ControlPoints control_points;
 #else
     PoseGraphLoopClosure pose_graph_loop_closure;
 #endif

@@ -640,7 +640,8 @@ void project_gui()
                                             index_loop_closure_target,
                                             m_gizmo,
                                             tls_registration.gnss,
-                                            session.ground_control_points);
+                                            session.ground_control_points,
+                                            session.control_points);
 
         /*if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size()> 0)
         {

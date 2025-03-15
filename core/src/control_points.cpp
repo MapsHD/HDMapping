@@ -44,7 +44,7 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
             {
                 if (ImGui::Button("Add Ground Control Point"))
                 {
-                    ControlPoint cp;// = picked_control_point;
+                    ControlPoint cp; // = picked_control_point;
                     cp.x_source_local = point_clouds_container.point_clouds[index_pose].points_local[index_picked_point].x();
                     cp.y_source_local = point_clouds_container.point_clouds[index_pose].points_local[index_picked_point].y();
                     cp.z_source_local = point_clouds_container.point_clouds[index_pose].points_local[index_picked_point].z();
@@ -128,6 +128,8 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
                 for (int i = 0; i < cps.size(); i++)
                 {
                     Eigen::Vector3d p_s(cps[i].x_source_local, cps[i].y_source_local, cps[i].z_source_local);
+                    p_s = point_clouds_container.point_clouds[cps[i].index_to_pose].m_pose * p_s;
+
                     Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
 
                     point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
@@ -257,10 +259,10 @@ void ControlPoints::render(const PointClouds &point_clouds_container)
         }
         glEnd();
     }
-   
+
     for (int i = 0; i < cps.size(); i++)
     {
-      
+
         Eigen::Vector3d p(cps[i].x_source_local, cps[i].y_source_local, cps[i].z_source_local);
         Eigen::Vector3d c = point_clouds_container.point_clouds[cps[i].index_to_pose].m_pose * p;
 

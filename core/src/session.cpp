@@ -157,6 +157,27 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         };
 #endif
 
+#if WITH_GUI == 1
+        for (const auto &cp_json : data["control_points"])
+        {
+            ControlPoint cp;
+            // cp.name = cp_json["name"];
+            std::string name = cp_json["name"];
+            strcpy(cp.name, name.c_str());
+            cp.x_source_local = cp_json["x_source_local"];
+            cp.y_source_local = cp_json["y_source_local"];
+            cp.z_source_local = cp_json["z_source_local"];
+            cp.x_target_global = cp_json["x_target_global"];
+            cp.y_target_global = cp_json["y_target_global"];
+            cp.z_target_global = cp_json["z_target_global"];
+            cp.sigma_x = cp_json["sigma_x"];
+            cp.sigma_y = cp_json["sigma_y"];
+            cp.sigma_z = cp_json["sigma_z"];
+            cp.index_to_pose = cp_json["index_to_pose"];
+            control_points.cps.push_back(cp);
+        };
+#endif
+
         // loading all data
         point_clouds_container.load_whu_tls(laz_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
 
@@ -303,6 +324,27 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
         jgcps.push_back(jgcp);
     }
     jj["ground_control_points"] = jgcps;
+#endif
+
+#if WITH_GUI == 1
+    nlohmann::json jcps;
+    for (const auto &cp : control_points.cps)
+    {
+        nlohmann::json jcp{
+            {"name", cp.name},
+            {"x_source_local", cp.x_source_local},
+            {"y_source_local", cp.y_source_local},
+            {"z_source_local", cp.z_source_local},
+            {"x_target_global", cp.x_target_global},
+            {"y_target_global", cp.y_target_global},
+            {"z_target_global", cp.z_target_global},
+            {"sigma_x", cp.sigma_x},
+            {"sigma_y", cp.sigma_y},
+            {"sigma_z", cp.sigma_z},
+            {"index_to_pose", cp.index_to_pose}};
+        jcps.push_back(jcp);
+    }
+    jj["control_points"] = jcps;
 #endif
 
     std::ofstream fs(file_name);

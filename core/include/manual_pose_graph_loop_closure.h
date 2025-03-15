@@ -4,6 +4,7 @@
 #include <point_clouds.h>
 #include <gnss.h>
 #include <ground_control_points.h>
+#include <control_points.h>
 #include <observation_picking.h>
 #include <pose_graph_loop_closure.h>
 #include <imgui.h>
@@ -20,7 +21,7 @@ class ManualPoseGraphLoopClosure: public PoseGraphLoopClosure{
         ~ManualPoseGraphLoopClosure(){};
 
         void Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss,
-                 GroundControlPoints &gcps);
+                 GroundControlPoints &gcps, ControlPoints &cps);
         void Render(PointClouds &point_clouds_container, int index_loop_closure_source, int index_loop_closure_target);
 };
 

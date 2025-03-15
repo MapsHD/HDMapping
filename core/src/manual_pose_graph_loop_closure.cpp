@@ -44,7 +44,7 @@
 }*/
 
 void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
-                                     int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss, GroundControlPoints &gcps)
+                                     int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss, GroundControlPoints &gcps, ControlPoints &cps)
 {
     if (point_clouds_container.point_clouds.size() > 0)
     {
@@ -463,6 +463,52 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 tripletListB.emplace_back(ir + 2, 0, delta_z);
 
                                 std::cout << "gcp: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
+                            }
+
+                            // CPs
+                            for (int i = 0; i < cps.cps.size(); i++)
+                            {
+                                Eigen::Vector3d p_s(cps.cps[i].x_source_local,
+                                                    cps.cps[i].y_source_local, cps.cps[i].z_source_local);
+
+                                Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+                                TaitBryanPose pose_s;
+                                pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[cps.cps[i].index_to_pose].m_pose);
+
+                                point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                                       p_s.x(), p_s.y(), p_s.z());
+
+                                double delta_x;
+                                double delta_y;
+                                double delta_z;
+                                Eigen::Vector3d p_t(cps.cps[i].x_target_global,
+                                                    cps.cps[i].y_target_global, cps.cps[i].z_target_global);
+                                point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                                              pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                              p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+
+                                int ir = tripletListB.size();
+                                int ic = cps.cps[i].index_to_pose * 6;
+
+                                for (int row = 0; row < 3; row++)
+                                {
+                                    for (int col = 0; col < 6; col++)
+                                    {
+                                        if (jacobian(row, col) != 0.0)
+                                        {
+                                            tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
+                                        }
+                                    }
+                                }
+                                tripletListP.emplace_back(ir + 0, ir + 0, (1.0 / (cps.cps[i].sigma_x * cps.cps[i].sigma_x)) * get_cauchy_w(delta_x, 1));
+                                tripletListP.emplace_back(ir + 1, ir + 1, (1.0 / (cps.cps[i].sigma_y * cps.cps[i].sigma_y)) * get_cauchy_w(delta_y, 1));
+                                tripletListP.emplace_back(ir + 2, ir + 2, (1.0 / (cps.cps[i].sigma_z * cps.cps[i].sigma_z)) * get_cauchy_w(delta_z, 1));
+
+                                tripletListB.emplace_back(ir, 0, delta_x);
+                                tripletListB.emplace_back(ir + 1, 0, delta_y);
+                                tripletListB.emplace_back(ir + 2, 0, delta_z);
+
+                                std::cout << "cp: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
                             }
 
                             // fuse_inclination_from_imu

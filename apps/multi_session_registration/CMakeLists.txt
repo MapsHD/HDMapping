@@ -21,7 +21,7 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include)
+          ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut/include)
 
 target_link_libraries(
   multi_session_registration_step_3

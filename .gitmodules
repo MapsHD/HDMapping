@@ -19,3 +19,6 @@
 [submodule "3rdparty/opencv"]
 	path = 3rdparty/opencv
 	url = https://github.com/opencv/opencv.git
+[submodule "3rdparty/imgui"]
+	path = 3rdparty/imgui
+	url = https://github.com/ocornut/imgui.git

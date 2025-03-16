@@ -25,3 +25,6 @@
 [submodule "3rdparty/ImGuizmo"]
 	path = 3rdparty/ImGuizmo
 	url = https://github.com/CedricGuillemet/ImGuizmo.git
+[submodule "3rdparty/freeglut"]
+	path = 3rdparty/freeglut
+	url = https://github.com/freeglut/freeglut.git

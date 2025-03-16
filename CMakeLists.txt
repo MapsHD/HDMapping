@@ -64,8 +64,8 @@ if (BUILD_WITH_BUNDLED_FREEGLUT)
     set(FREEGLUT_BUILD_DEMOS
             OFF
             CACHE BOOL "" FORCE)
-    add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2)
-    set(FREEGLUT_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include)
+    add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut)
+    set(FREEGLUT_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut/include)
     set(FREEGLUT_LIBRARY freeglut)
     MESSAGE("Using bundled FreeGlut")
 else()

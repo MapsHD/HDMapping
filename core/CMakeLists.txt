@@ -85,7 +85,7 @@ target_include_directories(core PRIVATE
     ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
     ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo
     ${LASZIP_INCLUDE_DIR}/LASzip/include
-    ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut-3.2.2/include
+    ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut/include
     ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
     ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
 )

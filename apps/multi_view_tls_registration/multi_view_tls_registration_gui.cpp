@@ -1004,11 +1004,15 @@ void project_gui()
 
             if (ImGui::Button("save all marked scans to laz (as separate global scans)"))
             {
-                save_separately_to_las(session, ".laz");
+                std::string output_folder_name_separately= "";
+                output_folder_name_separately = mandeye::fd::SelectFolder("Choose folder");
+                save_separately_to_las(session, output_folder_name_separately,".laz");
             }
             if (ImGui::Button("save all marked scans to las (as separate global scans)"))
-            {
-                save_separately_to_las(session, ".las");
+            {   
+                std::string output_folder_name_separately = "";
+                output_folder_name_separately = mandeye::fd::SelectFolder("Choose folder");
+                save_separately_to_las(session, output_folder_name_separately, ".las");
             }
 
             ImGui::Checkbox("is_trajectory_export_downsampling", &tls_registration.is_trajectory_export_downsampling);

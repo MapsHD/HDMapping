@@ -1176,7 +1176,7 @@ void project_gui()
 
         if (session.point_clouds_container.point_clouds.size() > 0)
         {
-            if (ImGui::Button("load georefence points"))
+            /*if (ImGui::Button("load georefence points"))
             {
                 std::string input_file_name = "";
                 input_file_name = mandeye::fd::OpenFileDialogOneFile("Load geo-reference file", {});
@@ -1186,7 +1186,7 @@ void project_gui()
                 {
                     load_available_geo_points(session, input_file_name);
                 }
-            }
+            }*/
 
             if (ImGui::Button("load gnss files and convert from wgs84 to puwg92"))
             {
@@ -2129,7 +2129,7 @@ void display()
         }
         else
         {
-            if (session.point_clouds_container.point_clouds.size() > 0)
+            /*if (session.point_clouds_container.point_clouds.size() > 0)
             {
                 for (const auto &g : session.point_clouds_container.point_clouds[0].available_geo_points)
                 {
@@ -2146,10 +2146,10 @@ void display()
                     glVertex3f(c.x(), c.y(), c.z() + 0.5);
                     glEnd();
                 }
-            }
+            }*/
 
             //
-            for (const auto &pc : session.point_clouds_container.point_clouds)
+            /*for (const auto &pc : session.point_clouds_container.point_clouds)
             {
                 for (const auto &gp : pc.available_geo_points)
                 {
@@ -2184,7 +2184,7 @@ void display()
                         glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)gp.name.c_str());
                     }
                 }
-            }
+            }*/
         }
 
         tls_registration.gnss.render(session.point_clouds_container);

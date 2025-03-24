@@ -91,7 +91,7 @@ public:
 	int number_points_vertical = 0;
 	int number_points_horizontal = 0;
 	int point_size = 1;
-	std::vector<GeoPoint> available_geo_points;
+	//std::vector<GeoPoint> available_geo_points;
 	bool choosing_geo = false;
 	std::vector<LocalTrajectoryNode> local_trajectory;
 	bool show_local_trajectory = false;

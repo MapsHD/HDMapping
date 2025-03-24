@@ -555,6 +555,7 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
     j["initial_poses_file_name"] = path.string();
     j["out_poses_file_name"] = path2.string();
     j["lidar_odometry_version"] = HDMAPPING_VERSION_STRING;
+    j["length of trajectory[m]"] = params.total_length_of_calculated_trajectory;
 
     jj["Session Settings"] = j;
 

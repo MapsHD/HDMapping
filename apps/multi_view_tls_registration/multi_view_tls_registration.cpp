@@ -314,7 +314,7 @@ void save_trajectories(
 	}
 }
 
-void load_available_geo_points(Session& session, std::string input_file_name)
+/*void load_available_geo_points(Session& session, std::string input_file_name)
 {
 	std::vector<GeoPoint> available_geo_points;
 	std::ifstream f;
@@ -364,7 +364,7 @@ void load_available_geo_points(Session& session, std::string input_file_name)
 			p.available_geo_points = geo;
 		}
 	}
-}
+}*/
 
 void save_scale_board_to_laz(const Session& session, std::string output_file_name, float dec, float side_len)
 {

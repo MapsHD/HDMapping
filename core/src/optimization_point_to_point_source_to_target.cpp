@@ -850,7 +850,7 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
             return true;
         }
 
-        for (int i = 0; i < point_clouds_container.point_clouds.size(); i++)
+        /*for (int i = 0; i < point_clouds_container.point_clouds.size(); i++)
         {
             for (int gp = 0; gp < point_clouds_container.point_clouds[i].available_geo_points.size(); gp++)
             {
@@ -957,7 +957,7 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
         if (rms_geo_sum > 0)
         {
             std::cout << "rms geo: " << sqrt(rms_geo / rms_geo_sum) << std::endl;
-        }
+        }*/
 
         std::cout << "previous_rms: " << previous_rms << " rms: " << rms << std::endl;
         if (optimization_algorithm == OptimizationAlgorithm::levenberg_marguardt)

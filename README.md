@@ -76,8 +76,44 @@ Terrestrial Laser Scanner data registration is elaborated in following paper:
 ```
 
 # VIDEOs
-- https://www.youtube.com/watch?v=u8siB0KLFLc&t=435s (data recorded with Mandeye, online data registration with FAST-LIO)
-- https://www.youtube.com/watch?v=BXBbuSJMFEo (how to build Mandeye DEV)
+
+Air ground survey 
+
+[![survey - precise forestry application](https://img.youtube.com/vi/_nvq2un_lFc/default.jpg)](https://youtu.be/_nvq2un_lFc)
+
+Air ground survey result 
+
+[![result of precise forestry application](https://img.youtube.com/vi/InqpiFrPizg/default.jpg)](https://youtu.be/InqpiFrPizg)
+
+Data recorded with Mandeye, online data registration with FAST-LIO
+
+[![data recorded with Mandeye, online data registration with FAST-LIO](https://img.youtube.com/vi/u8siB0KLFLc/default.jpg)](https://youtu.be/u8siB0KLFLc)
+
+How to build Mandeye DEV
+
+[![how to build Mandeye DEV](https://img.youtube.com/vi/BXBbuSJMFEo/default.jpg)](https://youtu.be/BXBbuSJMFEo)
+
+Next 5 movies are instruction for precise forestry data collection and registration
+
+1. hdmapping precise forestry intro
+
+[![hdmapping precise forestry intro](https://img.youtube.com/vi/W2ZHNOdZsq4/default.jpg)](https://youtu.be/W2ZHNOdZsq4)
+
+2. hdmapping percise forestry raw data inspection
+
+[![hdmapping percise forestry raw data inspection](https://img.youtube.com/vi/WRmW2hi1Cug/default.jpg)](https://youtu.be/WRmW2hi1Cug)
+
+3. hdmapping percise forestry lidar odometry STEP1
+
+[![hdmapping percise forestry lidar odometry STEP1](https://img.youtube.com/vi/laPuPJRoj5U/default.jpg)](https://youtu.be/laPuPJRoj5U)
+
+4. hdmapping precise forestry session inspection
+
+[![hdmapping precise forestry session inspection](https://img.youtube.com/vi/rmLXZh7SQTs/default.jpg)](https://youtu.be/rmLXZh7SQTs)
+
+5. hdmapping precise forestry session inspection
+
+[![hdmapping precise forestry session inspection](https://img.youtube.com/vi/Biz_OA8x1Ek/default.jpg)](https://youtu.be/Biz_OA8x1Ek)
 
 # Compatible commercial products (announcement soon ...)
 

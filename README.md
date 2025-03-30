@@ -115,6 +115,18 @@ Next 5 movies are instruction for precise forestry data collection and registrat
 
 [![hdmapping precise forestry session inspection](https://img.youtube.com/vi/Biz_OA8x1Ek/default.jpg)](https://youtu.be/Biz_OA8x1Ek)
 
+--
+
+Nuclear Power Plant inspection PART 1
+
+[![Nuclear Power Plant inspection PART 1](https://img.youtube.com/vi/bpXQYZkH8Sc/default.jpg)](https://youtu.be/bpXQYZkH8Sc)
+
+Nuclear Power Plant inspection PART 2 
+
+[![Nuclear Power Plant inspection PART 2](https://img.youtube.com/vi/fJcuGw1RLO0/default.jpg)](https://youtu.be/fJcuGw1RLO0)
+
+
+
 # Compatible commercial products (announcement soon ...)
 
 

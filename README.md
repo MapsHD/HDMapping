@@ -28,6 +28,7 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 - Single trajectory refinement (multi_view_tls_registration_step_2)
 - Multiple trajectory refinement (multi_session_registration_step_3)
 - Georeferencing (referenced point cloud, ground control points, GNSS data)
+- Multi view terrestrial laser scanning registration (all available methods from literature and more)
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems etc...) 
 - Loris Redovniković, Antun Jakopec, Janusz Będkowski, Jurica Jagetić. "The affordable DIY Mandeye LiDAR system for surveying caves, and how to convert 3D clouds into traditional cave ground plans and extended profiles." International Journal of Speleology, 53(3), 2024 [[PDF]](https://digitalcommons.usf.edu/ijs/vol53/iss3/7/) 
@@ -76,6 +77,9 @@ Terrestrial Laser Scanner data registration is elaborated in following paper:
 ```
 
 # VIDEOs
+Where to find, how to download HDMAPPING software and manual
+
+[![Where to find, how to download HDMAPPING software and manual](https://img.youtube.com/vi/dHCOAeto9-M/default.jpg)](https://youtu.be/dHCOAeto9-M)
 
 Air ground survey 
 

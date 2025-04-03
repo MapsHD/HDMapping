@@ -97,25 +97,29 @@ How to build Mandeye DEV
 
 [![how to build Mandeye DEV](https://img.youtube.com/vi/BXBbuSJMFEo/default.jpg)](https://youtu.be/BXBbuSJMFEo)
 
-Next 5 movies are instruction for precise forestry data collection and registration
+Instruction for precise forestry
 
-1. hdmapping precise forestry intro
+1. Fast and fully automatic calculations in single step
+
+[![Fast and fully automatic calculations in single step](https://img.youtube.com/vi/08E41CPyyj4/default.jpg)](https://youtu.be/08E41CPyyj4)
+
+2. hdmapping precise forestry intro
 
 [![hdmapping precise forestry intro](https://img.youtube.com/vi/W2ZHNOdZsq4/default.jpg)](https://youtu.be/W2ZHNOdZsq4)
 
-2. hdmapping percise forestry raw data inspection
+3. hdmapping percise forestry raw data inspection
 
 [![hdmapping percise forestry raw data inspection](https://img.youtube.com/vi/WRmW2hi1Cug/default.jpg)](https://youtu.be/WRmW2hi1Cug)
 
-3. hdmapping percise forestry lidar odometry STEP1
+4. hdmapping percise forestry lidar odometry STEP1
 
 [![hdmapping percise forestry lidar odometry STEP1](https://img.youtube.com/vi/laPuPJRoj5U/default.jpg)](https://youtu.be/laPuPJRoj5U)
 
-4. hdmapping precise forestry session inspection
+5. hdmapping precise forestry session inspection
 
 [![hdmapping precise forestry session inspection](https://img.youtube.com/vi/rmLXZh7SQTs/default.jpg)](https://youtu.be/rmLXZh7SQTs)
 
-5. hdmapping precise forestry session inspection
+6. hdmapping precise forestry session inspection
 
 [![hdmapping precise forestry session inspection](https://img.youtube.com/vi/Biz_OA8x1Ek/default.jpg)](https://youtu.be/Biz_OA8x1Ek)
 

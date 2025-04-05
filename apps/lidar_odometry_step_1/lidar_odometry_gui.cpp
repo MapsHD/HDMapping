@@ -973,6 +973,69 @@ void lidar_odometry_basic_gui()
             //exit(1);
         }
 
+        if (ImGui::Button("Process MANDEYE data in folder (quick but less accurate, less precise)"))
+        {
+            // auto dir = pfd::select_folder("Select any directory", DEFAULT_PATH).result();
+            // std::cout << "Selected dir: " << dir << "\n";
+
+            step1();
+
+            params.decimation = 0.03;
+            params.in_out_params_indoor.resolution_X = 0.1;
+            params.in_out_params_indoor.resolution_Y = 0.1;
+            params.in_out_params_indoor.resolution_Z = 0.1;
+
+            params.in_out_params_outdoor.resolution_X = 0.3;
+            params.in_out_params_outdoor.resolution_Y = 0.3;
+            params.in_out_params_outdoor.resolution_Z = 0.3;
+
+            params.filter_threshold_xy_inner = 0.3;
+            params.filter_threshold_xy_outer = 40.0;
+
+            params.distance_bucket = 0.2;
+            params.polar_angle_deg = 10.0;
+            params.azimutal_angle_deg = 10.0;
+            params.robust_and_accurate_lidar_odometry_iterations = 20;
+            params.max_distance_lidar = 30.0;
+
+            params.use_robust_and_accurate_lidar_odometry = false;
+
+            params.nr_iter = 10;
+            params.sliding_window_trajectory_length_threshold = 200;
+
+            step2();
+
+            save_results(false);
+
+            /*for (int i = 0; i < params.num_constistency_iter; i++)
+            {
+                std::cout << "Iteration " << i + 1 << " of " << params.num_constistency_iter << std::endl;
+                for (int ii = 0; ii < worker_data.size(); ii++)
+                {
+                    worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
+                }
+                Consistency(worker_data, params);
+            }
+
+            save_results(false);*/
+
+            // std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
+
+            // std::string message_info = "Data saved to folders '" + working_directory + "\\lidar_odometry_result_0' and '" + working_directory + "\\lidar_odometry_result_1' total_length_of_calculated_trajectory=" +
+            //     std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
+
+            std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
+                                       std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
+
+            [[maybe_unused]]
+            pfd::message message(
+                "Information",
+                message_info.c_str(),
+                pfd::choice::ok, pfd::icon::info);
+            message.result();
+            // exit(1);
+        }
+
         ImGui::Checkbox("full_lidar_odometry_gui", &full_lidar_odometry_gui);
 
         ImGui::End();

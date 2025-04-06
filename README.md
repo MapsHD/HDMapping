@@ -137,7 +137,7 @@ Nuclear Power Plant inspection PART 2
 
 
 # Compatible commercial products
-[![MANDEYE-PRO](https://img.youtube.com/vi/08E41CPyEBUxUBWKIcoyj4/default.jpg)](https://youtu.be/EBUxUBWKIco)
+[![MANDEYE-PRO](https://img.youtube.com/vi/EBUxUBWKIco/default.jpg)](https://youtu.be/EBUxUBWKIco)
 
 
 # Building commands

@@ -937,6 +937,8 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		std::string trajectory_filename = (fn + ".csv");
 		trj_path /= trajectory_filename;
 
+		std::cout << "trying to load trajectory from file: " << trj_path << std::endl;
+
 		if (std::filesystem::exists(trj_path))
 		{
 			std::cout << "loading trajectory from file: " << trj_path << std::endl;
@@ -1030,6 +1032,8 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 			infile.close();
 			///
 			pc.local_trajectory = local_trajectory;
+		}else{
+			std::cout << "trajectory path: " << trj_path << " does not exist" << std::endl; 
 		}
 
 		point_clouds_nodata.push_back(pc);

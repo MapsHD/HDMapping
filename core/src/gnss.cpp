@@ -23,7 +23,7 @@ inline void split(std::string &str, char delim, std::vector<std::string> &out)
     }
 }
 
-bool GNSS::load(const std::vector<std::string> &input_file_names)
+bool GNSS::load(const std::vector<std::string> &input_file_names, bool localize)
 {
     // 54651848940 5156.43798828125 2009.1610107421875 122.1999969482421875 1.25 8 35.799999237060546875 nan 14:51:42 1
     // timestamp lat lon alt hdop satelites_tracked height age time fix_quality
@@ -45,13 +45,14 @@ bool GNSS::load(const std::vector<std::string> &input_file_names)
             return false;
         }
         std::string s;
+
         while (!infile.eof())
         {
             getline(infile, s);
             std::vector<std::string> strs;
             split(s, ' ', strs);
 
-            if (strs.size() == 10)
+            if (strs.size() >=  10)
             {
                 GlobalPose gp;
                 std::istringstream(strs[0]) >> gp.timestamp;
@@ -73,14 +74,48 @@ bool GNSS::load(const std::vector<std::string> &input_file_names)
                 if (Eigen::Vector3d(gp.y, gp.x, gp.alt).norm() > 0)
                 {
                     gnss_poses.push_back(gp);
+
                 }
             }
         }
+
         infile.close();
     }
 
+
     std::sort(gnss_poses.begin(), gnss_poses.end(), [](GNSS::GlobalPose &a, GNSS::GlobalPose &b)
               { return (a.timestamp < b.timestamp); });
+
+
+
+    // get first GNSS point
+    auto firstGNSSIt = std::find_if(gnss_poses.begin(), gnss_poses.end(), [](const GNSS::GlobalPose &gp)
+                                  { return gp.x != 0 && gp.y != 0 && gp.alt != 0; });
+    if (firstGNSSIt == gnss_poses.end())
+    {
+      std::cout << "no valid GNSS data" << std::endl;
+      return false;
+    }
+
+    auto firstGNSS = *firstGNSSIt;
+    std::cout << "firstGNSS: " << firstGNSS.lat << " " << firstGNSS.lon << " " << firstGNSS.alt << std::endl;
+    std::cout << "firstGNSS: " << firstGNSS.x << " " << firstGNSS.y << " " << firstGNSS.alt << std::endl;
+
+
+    WGS84ReferenceLatitude = firstGNSS.lat;
+    WGS84ReferenceLongitude = firstGNSS.lon;
+
+    //apply offset
+    if (localize)
+    {
+      for (auto &pose : gnss_poses)
+      {
+        pose.x = pose.x - firstGNSS.x;
+        pose.y = pose.y - firstGNSS.y;
+        pose.alt = pose.alt - firstGNSS.alt;
+        std::cout << "pose.x: " << pose.x << " pose.y: " << pose.y << " pose.alt: " << pose.alt << std::endl;
+      }
+    }
 
     //offset_x = 0;
     //offset_y = 0;

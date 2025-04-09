@@ -43,7 +43,8 @@
 #include <HDMapping/Version.hpp>
 
 #include <export_laz.h>
-
+#include "wgs84_do_puwg92.h"
+#include "WGS84toCartesian.hpp"
 namespace fs = std::filesystem;
 
 static bool show_demo_window = true;
@@ -1195,7 +1196,7 @@ void project_gui()
             if (ImGui::Button("load gnss files and convert from wgs84 to puwg92"))
             {
                 std::vector<std::string> input_file_names;
-                input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", {}, true);
+                input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", {"GNSS", "*.gnss"}, true);
 
                 if (input_file_names.size() > 0)
                 {
@@ -1204,6 +1205,20 @@ void project_gui()
                         std::cout << "problem with loading gnss files" << std::endl;
                     }
                 }
+            }
+
+            if (ImGui::Button("load gnss files and convert from wgs84 to puwg92(with offset)"))
+            {
+              std::vector<std::string> input_file_names;
+              input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", {"GNSS", "*.gnss"}, true);
+
+              if (input_file_names.size() > 0)
+              {
+                if (!tls_registration.gnss.load(input_file_names, true))
+                {
+                  std::cout << "problem with loading gnss files" << std::endl;
+                }
+              }
             }
 
             // ImGui::InputDouble("WGS84ReferenceLatitude", &gnss.WGS84ReferenceLatitude);
@@ -1215,7 +1230,7 @@ void project_gui()
             if (ImGui::Button("load gnss files and convert from wgs84 to Cartesian using Mercator projection"))
             {
                 std::vector<std::string> input_file_names;
-                input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", {}, true);
+                input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", {"GNSS", "*.gnss"}, true);
 
                 if (input_file_names.size() > 0)
                 {
@@ -1225,6 +1240,54 @@ void project_gui()
                     }
                 }
             }
+
+            if (ImGui::Button("save metascan points in PUWG92"))
+            {
+
+              const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+              std::vector<Eigen::Vector3d> pointcloud;
+              std::vector<unsigned short> intensity;
+              std::vector<double> timestamps;
+
+              for (auto& p : session.point_clouds_container.point_clouds)
+              {
+                if (p.visible)
+                {
+                  for (int i = 0; i < p.points_local.size(); i++)
+                  {
+                    const auto& pp = p.points_local[i];
+                    Eigen::Vector3d vp;
+                    vp = p.m_pose * pp; // + session.point_clouds_container.offset;
+                    // std::cout << vp << std::endl;
+                    pointcloud.push_back(vp);
+                    if (i < p.intensities.size())
+                    {
+                      intensity.push_back(p.intensities[i]);
+                    }
+                    else
+                    {
+                      intensity.push_back(0);
+                    }
+                    if (i < p.timestamps.size())
+                    {
+                      timestamps.push_back(p.timestamps[i]);
+                    }
+                  }
+                }
+              }
+
+              const auto lat = tls_registration.gnss.WGS84ReferenceLatitude;
+              const auto lon = tls_registration.gnss.WGS84ReferenceLongitude;
+              const auto alt = tls_registration.gnss.gnss_poses[0].alt;
+
+              double Xpuwg92 = 0.0;
+              double Ypuwg92 = 0.0;
+              wgs84_do_puwg92(lat, lon, &Xpuwg92, &Ypuwg92);
+              Eigen::Vector3d  offset(Ypuwg92, Xpuwg92, alt);
+              exportLaz(output_file_name, pointcloud, intensity, timestamps, offset.x(), offset.y(), offset.z());
+            }
+
+
         }
         if (tls_registration.gnss.gnss_poses.size() > 0)
         {

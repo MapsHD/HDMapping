@@ -143,6 +143,11 @@ Cave surveys (climbing, crawling in caves with MANDEYE-MR)
 [![Cave data processing](https://img.youtube.com/vi/4iq69c76eG8/default.jpg)](https://youtu.be/4iq69c76eG8)
 
 
+------------------------------------------
+
+Multilevel building: example of using new functionality in v0.75 - intersection 
+
+[![Multi level building](https://img.youtube.com/vi/XYIHKyaxQzo/default.jpg)](https://youtu.be/XYIHKyaxQzo)
 
 # Compatible commercial products
 [![MANDEYE-PRO](https://img.youtube.com/vi/EBUxUBWKIco/default.jpg)](https://youtu.be/EBUxUBWKIco)

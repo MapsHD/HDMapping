@@ -331,6 +331,13 @@ void project_gui()
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     }
 
+    ImGui::Checkbox("xz_intersection", &session.point_clouds_container.xz_intersection);
+    ImGui::Checkbox("yz_intersection", &session.point_clouds_container.yz_intersection);
+    ImGui::Checkbox("xy_intersection", &session.point_clouds_container.xy_intersection);
+
+    //session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection);
+
+
     if (!simple_gui)
     {
         ImGui::Text("Offset x: %.10f y: %.10f z: %.10f", session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
@@ -2383,7 +2390,7 @@ void display()
                 }
             }
 
-            session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud);
+            session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection);
             observation_picking.render();
 
             glPushAttrib(GL_ALL_ATTRIB_BITS);

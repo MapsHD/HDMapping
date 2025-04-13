@@ -123,8 +123,8 @@ public:
 	void decimate(double bucket_x, double bucket_y, double bucket_z);
 	void shift_to_center();
 #if WITH_GUI == 1
-	void render(bool show_with_initial_pose, const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud);
-    void render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud);
+	void render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud, bool xz_intersection, bool yz_intersection, bool xy_intersection);
+	void render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud);
 #endif
 };
 

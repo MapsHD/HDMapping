@@ -53,7 +53,7 @@ bool PointCloud::load(const std::string &file_name)
 		{
 			Eigen::Vector3d point(xData->at<float>(i), yData->at<float>(i), zData->at<float>(i));
 			points_local.push_back(point);
-			timestamps.push_back(0);  // no timestamps available in ETH ply
+			timestamps.push_back(0); // no timestamps available in ETH ply
 		}
 		if (data["vertex"]->properties.has_key("intensity"))
 		{
@@ -1416,7 +1416,7 @@ void PointCloud::shift_to_center()
 }
 
 #if WITH_GUI == 1
-void PointCloud::render(bool show_with_initial_pose, const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud)
+void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud, bool xz_intersection, bool yz_intersection, bool xy_intersection)
 {
 	glPointSize(observation_picking.point_size);
 
@@ -1431,7 +1431,7 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking& o
 		glBegin(GL_POINTS);
 		for (int i = 0; i < this->points_local.size(); i += viewer_decmiate_point_cloud)
 		{
-			const auto& p = this->points_local[i];
+			const auto &p = this->points_local[i];
 			Eigen::Vector3d vp;
 			if (show_with_initial_pose)
 			{
@@ -1441,7 +1441,8 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking& o
 			{
 				vp = this->m_pose * p;
 			}
-			if (this->show_color) {
+			if (this->show_color)
+			{
 				if (this->colors.size() == this->points_local.size())
 				{
 					glColor3f(this->colors[i].x(), this->colors[i].y(), this->colors[i].z());
@@ -1458,70 +1459,93 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking& o
 			}
 			else
 			{
-				glVertex3d(vp.x(), vp.y(), vp.z());
+				if (xz_intersection)
+				{
+					if (fabs(vp.y()) < 0.2)
+					{
+						glVertex3d(vp.x(), vp.y(), vp.z());
+					}
+				}
+				if (yz_intersection)
+				{
+					if (fabs(vp.x()) < 0.2)
+					{
+						glVertex3d(vp.x(), vp.y(), vp.z());
+					}
+				}
+				if (xy_intersection)
+				{
+					if (fabs(vp.z()) < 0.2)
+					{
+						glVertex3d(vp.x(), vp.y(), vp.z());
+					}
+				}
+
+				if (!xz_intersection && !yz_intersection && !xy_intersection)
+				{
+					glVertex3d(vp.x(), vp.y(), vp.z());
+				}
 			}
-			//glEnd();
+			// glEnd();
 		}
 		glEnd();
 		glPointSize(1);
 
-		glColor3f(render_color[0], render_color[1], render_color[2]);
-		glBegin(GL_LINE_STRIP);
-		for (int i = 0; i < this->local_trajectory.size(); i++)
+		if (!xz_intersection && !yz_intersection && !xy_intersection)
 		{
-			auto m = this->m_pose * this->local_trajectory[i].m_pose;
-			glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-		}
-		glEnd();
-
-		if (this->local_trajectory.size() > 0 && this->fuse_inclination_from_IMU)
-		{
-			Eigen::Vector3d a1(-0.2, -0.2, 0);
-			Eigen::Vector3d a2(0.2, -0.2, 0);
-			Eigen::Vector3d a3(0.2, 0.2, 0);
-			Eigen::Vector3d a4(-0.2, 0.2, 0);
-
-			Eigen::Vector3d a1t = this->m_pose * a1;
-			Eigen::Vector3d a2t = this->m_pose * a2;
-			Eigen::Vector3d a3t = this->m_pose * a3;
-			Eigen::Vector3d a4t = this->m_pose * a4;
-
-			glColor3f(0, 1, 0);
+			glColor3f(render_color[0], render_color[1], render_color[2]);
 			glBegin(GL_LINE_STRIP);
-			glVertex3f(a1t.x(), a1t.y(), a1t.z());
-			glVertex3f(a2t.x(), a2t.y(), a2t.z());
-			glVertex3f(a3t.x(), a3t.y(), a3t.z());
-			glVertex3f(a4t.x(), a4t.y(), a4t.z());
-			glVertex3f(a1t.x(), a1t.y(), a1t.z());
+			for (int i = 0; i < this->local_trajectory.size(); i++)
+			{
+				auto m = this->m_pose * this->local_trajectory[i].m_pose;
+				glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+			}
 			glEnd();
 
+			if (this->local_trajectory.size() > 0 && this->fuse_inclination_from_IMU)
+			{
+				Eigen::Vector3d a1(-0.2, -0.2, 0);
+				Eigen::Vector3d a2(0.2, -0.2, 0);
+				Eigen::Vector3d a3(0.2, 0.2, 0);
+				Eigen::Vector3d a4(-0.2, 0.2, 0);
 
+				Eigen::Vector3d a1t = this->m_pose * a1;
+				Eigen::Vector3d a2t = this->m_pose * a2;
+				Eigen::Vector3d a3t = this->m_pose * a3;
+				Eigen::Vector3d a4t = this->m_pose * a4;
 
-			TaitBryanPose tb;
-			tb.px = this->m_pose(0, 3);
-			tb.py = this->m_pose(1, 3);
-			tb.pz = this->m_pose(2, 3);
-			tb.om = this->local_trajectory[0].imu_om_fi_ka.x();
-			tb.fi = this->local_trajectory[0].imu_om_fi_ka.y();
-			tb.ka = this->local_trajectory[0].imu_om_fi_ka.z();
+				glColor3f(0, 1, 0);
+				glBegin(GL_LINE_STRIP);
+				glVertex3f(a1t.x(), a1t.y(), a1t.z());
+				glVertex3f(a2t.x(), a2t.y(), a2t.z());
+				glVertex3f(a3t.x(), a3t.y(), a3t.z());
+				glVertex3f(a4t.x(), a4t.y(), a4t.z());
+				glVertex3f(a1t.x(), a1t.y(), a1t.z());
+				glEnd();
 
-			auto m = affine_matrix_from_pose_tait_bryan(tb);
-			a1t = m * a1;
-			a2t = m * a2;
-			a3t = m * a3;
-			a4t = m * a4;
+				TaitBryanPose tb;
+				tb.px = this->m_pose(0, 3);
+				tb.py = this->m_pose(1, 3);
+				tb.pz = this->m_pose(2, 3);
+				tb.om = this->local_trajectory[0].imu_om_fi_ka.x();
+				tb.fi = this->local_trajectory[0].imu_om_fi_ka.y();
+				tb.ka = this->local_trajectory[0].imu_om_fi_ka.z();
 
-			glColor3f(1, 0, 0);
-			glBegin(GL_LINE_STRIP);
-			glVertex3f(a1t.x(), a1t.y(), a1t.z());
-			glVertex3f(a2t.x(), a2t.y(), a2t.z());
-			glVertex3f(a3t.x(), a3t.y(), a3t.z());
-			glVertex3f(a4t.x(), a4t.y(), a4t.z());
-			glVertex3f(a1t.x(), a1t.y(), a1t.z());
-			glEnd();
-			// 
-			// Eigen::Affine3d imu_pose =
-			// auto m = this->m_pose * this->local_trajectory[i].m_pose;
+				auto m = affine_matrix_from_pose_tait_bryan(tb);
+				a1t = m * a1;
+				a2t = m * a2;
+				a3t = m * a3;
+				a4t = m * a4;
+
+				glColor3f(1, 0, 0);
+				glBegin(GL_LINE_STRIP);
+				glVertex3f(a1t.x(), a1t.y(), a1t.z());
+				glVertex3f(a2t.x(), a2t.y(), a2t.z());
+				glVertex3f(a3t.x(), a3t.y(), a3t.z());
+				glVertex3f(a4t.x(), a4t.y(), a4t.z());
+				glVertex3f(a1t.x(), a1t.y(), a1t.z());
+				glEnd();
+			}
 		}
 	}
 }
@@ -1536,7 +1560,7 @@ void PointCloud::render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud)
 
 		for (int i = 0; i < this->points_local.size(); i += viewer_decmiate_point_cloud)
 		{
-			const auto& p = this->points_local[i];
+			const auto &p = this->points_local[i];
 			Eigen::Vector3d vp;
 			vp = pose * p;
 			glVertex3d(vp.x(), vp.y(), vp.z());

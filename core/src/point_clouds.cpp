@@ -555,11 +555,11 @@ bool PointClouds::load_eth(const std::string &folder_with_point_clouds, const st
 }
 
 #if WITH_GUI == 1
-void PointClouds::render(const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud)
+void PointClouds::render(const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud, bool xz_intersection, bool yz_intersection, bool xy_intersection)
 {
 	for (auto &p : point_clouds)
 	{
-		p.render(this->show_with_initial_pose, observation_picking, viewer_decmiate_point_cloud);
+		p.render(this->show_with_initial_pose, observation_picking, viewer_decmiate_point_cloud, xz_intersection, yz_intersection, xy_intersection);
 	}
 }
 #endif

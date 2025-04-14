@@ -663,7 +663,7 @@ void project_gui()
             if (ImGui::Button("Save result calibration as 'calibration.json' (step 5)"))
             {
                 std::string output_file_name = "";
-                output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", json_filter);
+                output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", json_filter, ".json");
                 std::cout << "las or laz file toj save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)

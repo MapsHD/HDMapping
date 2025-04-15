@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.15.0)
 
-project(mandeye_with_gopro_max_manual_coloring)
+project(mandeye_with_360_camera_manual_coloring)
 
-add_executable(mandeye_with_gopro_max_manual_coloring manual_color.cpp)
+add_executable(mandeye_with_360_camera_manual_coloring manual_color.cpp)
 
 target_include_directories(
-  mandeye_with_gopro_max_manual_coloring
+  mandeye_with_360_camera_manual_coloring
   PRIVATE include
           ${REPOSITORY_DIRECTORY}/core/include
           ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
@@ -23,7 +23,7 @@ target_include_directories(
           ${FREEGLUT_INCLUDE_DIR})
 
 target_link_libraries(
-  mandeye_with_gopro_max_manual_coloring
+  mandeye_with_360_camera_manual_coloring
   PRIVATE ${FREEGLUT_LIBRARY}
           ${OPENGL_gl_LIBRARY}
           OpenGL::GLU
@@ -34,13 +34,13 @@ target_link_libraries(
 
 if(WIN32)
   add_custom_command(
-    TARGET mandeye_with_gopro_max_manual_coloring
+    TARGET mandeye_with_360_camera_manual_coloring
     POST_BUILD
     COMMAND
       ${CMAKE_COMMAND} -E copy
-      $<TARGET_RUNTIME_DLLS:mandeye_with_gopro_max_manual_coloring>
-      $<TARGET_FILE_DIR:mandeye_with_gopro_max_manual_coloring>
+      $<TARGET_RUNTIME_DLLS:mandeye_with_360_camera_manual_coloring>
+      $<TARGET_FILE_DIR:mandeye_with_360_camera_manual_coloring>
     COMMAND_EXPAND_LISTS)
 endif()
 
-install(TARGETS mandeye_with_gopro_max_manual_coloring DESTINATION bin)
+install(TARGETS mandeye_with_360_camera_manual_coloring DESTINATION bin)

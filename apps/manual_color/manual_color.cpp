@@ -846,6 +846,108 @@ void display()
         SystemData::point_size = 1;
     }
 
+    if (ImGui::Button("save camera to lidar relative pose"))
+    {
+        auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", {}, "");
+        std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
+
+        std::ofstream outfile;
+        outfile.open(output_file_name);
+        if (!outfile.good())
+        {
+            std::cout << "can not save file: " << output_file_name << std::endl;
+            
+            return;
+        }
+
+        outfile << 1 << std::endl;
+        outfile << "camera_to_lidar_relative_pose" << std::endl;
+        outfile << SystemData::camera_pose(0, 0) << " " << SystemData::camera_pose(0, 1) << " " << SystemData::camera_pose(0, 2) << " " << SystemData::camera_pose(0, 3) << std::endl;
+        outfile << SystemData::camera_pose(1, 0) << " " << SystemData::camera_pose(1, 1) << " " << SystemData::camera_pose(1, 2) << " " << SystemData::camera_pose(1, 3) << std::endl;
+        outfile << SystemData::camera_pose(2, 0) << " " << SystemData::camera_pose(2, 1) << " " << SystemData::camera_pose(2, 2) << " " << SystemData::camera_pose(2, 3) << std::endl;
+        outfile << "0 0 0 1" << std::endl;
+           
+        outfile.close();
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("load camera to lidar relative pose"))
+    {
+        std::string input_file_name = "";
+        input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO", mandeye::fd::Resso_filter);
+        std::cout << "resso file: '" << input_file_name << "'" << std::endl;
+
+        std::ifstream infile(input_file_name);
+        if (!infile.good())
+        {
+            std::cout << "problem with file: '" << input_file_name << "'" << std::endl;
+            return;
+        }
+        std::string line;
+        std::getline(infile, line);
+        std::istringstream iss(line);
+
+        int num_scans;
+        iss >> num_scans;
+
+        std::cout << "number of scans: " << num_scans << std::endl;
+        size_t sum_points_before_decimation = 0;
+        size_t sum_points_after_decimation = 0;
+
+        for (size_t i = 0; i < num_scans; i++)
+        {
+            std::getline(infile, line);
+            std::istringstream iss(line);
+            std::string point_cloud_file_name;
+            iss >> point_cloud_file_name;
+
+            double r11, r12, r13, r21, r22, r23, r31, r32, r33;
+            double t14, t24, t34;
+
+            std::getline(infile, line);
+            std::istringstream iss1(line);
+            iss1 >> r11 >> r12 >> r13 >> t14;
+
+            std::getline(infile, line);
+            std::istringstream iss2(line);
+            iss2 >> r21 >> r22 >> r23 >> t24;
+
+            std::getline(infile, line);
+            std::istringstream iss3(line);
+            iss3 >> r31 >> r32 >> r33 >> t34;
+
+            std::getline(infile, line);
+
+            //PointCloud pc;
+            //pc.file_name = point_cloud_file_name;
+            SystemData::camera_pose = Eigen::Affine3d::Identity();
+            SystemData::camera_pose(0, 0) = r11;
+            SystemData::camera_pose(0, 1) = r12;
+            SystemData::camera_pose(0, 2) = r13;
+            SystemData::camera_pose(1, 0) = r21;
+            SystemData::camera_pose(1, 1) = r22;
+            SystemData::camera_pose(1, 2) = r23;
+            SystemData::camera_pose(2, 0) = r31;
+            SystemData::camera_pose(2, 1) = r32;
+            SystemData::camera_pose(2, 2) = r33;
+            SystemData::camera_pose(0, 3) = t14;
+            SystemData::camera_pose(1, 3) = t24;
+            SystemData::camera_pose(2, 3) = t34;
+        }
+        infile.close();
+
+        TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
+        std::cout << "pose" << std::endl;
+        std::cout << "px " << pose.px << std::endl;
+        std::cout << "py " << pose.py << std::endl;
+        std::cout << "pz " << pose.pz << std::endl;
+        std::cout << "om " << pose.om << std::endl;
+        std::cout << "fi " << pose.fi << std::endl;
+        std::cout << "ka " << pose.ka << std::endl;
+        SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+    }
+
     imagePicker("ImagePicker", (ImTextureID)tex1, SystemData::pointPickedImage, picked3DPoints);
 
     ImGui::Text("!!! SELECT at least 5 image <--> point cloud pairs !!!");

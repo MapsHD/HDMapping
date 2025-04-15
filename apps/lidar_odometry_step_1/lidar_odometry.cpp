@@ -244,12 +244,26 @@ void calculate_trajectory(
     }
     ahrs.settings.gain = ahrs_gain;
     int counter = 1;
+
+    double provious_time_stamp = 0.0; 
+
     for (const auto& [timestamp_pair, gyr, acc] : imu_data)
     {
         const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI) };
         const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
 
-        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
+        if (provious_time_stamp == 0.0){
+            double SAMPLE_PERIOD = (1.0 / 200.0);
+            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
+        }else{
+            double sp = timestamp_pair.first - provious_time_stamp;
+            //std::cout << "sp: " << sp << std::endl;
+            if (sp > 0.1){
+                sp = 0.1;
+            }
+            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, sp);
+        }
+            
 
         FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
 
@@ -264,6 +278,7 @@ void calculate_trajectory(
         {
             printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, (int)imu_data.size());
         }
+        provious_time_stamp = timestamp_pair.first;
     }
 }
 

@@ -4,17 +4,18 @@
 #include <export_laz.h>
 #include "multi_view_tls_registration.h"
 
-
-bool has_extension(const std::string file_path, const std::string extension) {
+bool has_extension(const std::string file_path, const std::string extension)
+{
 	std::string::size_type dot_pos = file_path.find_last_of('.');
-	if (dot_pos == std::string::npos) {
+	if (dot_pos == std::string::npos)
+	{
 		return false; // No extension found
 	}
 	std::string file_extension = file_path.substr(dot_pos);
 	return file_extension == extension;
 }
 
-void initial_pose_to_identity(Session& session)
+void initial_pose_to_identity(Session &session)
 {
 	if (session.point_clouds_container.point_clouds.size() > 0)
 	{
@@ -26,19 +27,28 @@ void initial_pose_to_identity(Session& session)
 	}
 }
 
-void save_all_to_las(const Session& session, std::string output_las_name)
+void save_all_to_las_as_local(const Session &session, std::string output_las_name)
 {
 	std::vector<Eigen::Vector3d> pointcloud;
 	std::vector<unsigned short> intensity;
 	std::vector<double> timestamps;
 
-	for (auto& p : session.point_clouds_container.point_clouds)
+	Eigen::Affine3d first_pose_inv = Eigen::Affine3d::Identity();
+
+	bool found_first_pose = false;
+
+	for (auto &p : session.point_clouds_container.point_clouds)
 	{
 		if (p.visible)
 		{
+			if (!found_first_pose)
+			{
+				found_first_pose = true;
+				first_pose_inv = p.m_pose.inverse();
+			}
 			for (int i = 0; i < p.points_local.size(); i++)
 			{
-				const auto& pp = p.points_local[i];
+				const auto &pp = p.points_local[i];
 				Eigen::Vector3d vp;
 				vp = p.m_pose * pp; // + session.point_clouds_container.offset;
 				// std::cout << vp << std::endl;
@@ -54,7 +64,54 @@ void save_all_to_las(const Session& session, std::string output_las_name)
 				if (i < p.timestamps.size())
 				{
 					timestamps.push_back(p.timestamps[i]);
-				}				
+				}
+			}
+		}
+	}
+
+	for (int i = 0; i < pointcloud.size(); i++)
+	{
+		pointcloud[i] = first_pose_inv * pointcloud[i];
+	}
+
+	std::cout << "----------------------" << std::endl;
+	std::cout << first_pose_inv.inverse().matrix() << std::endl;
+
+	if (!exportLaz(output_las_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
+	{
+		std::cout << "problem with saving file: " << output_las_name << std::endl;
+	}
+}
+
+void save_all_to_las(const Session &session, std::string output_las_name)
+{
+	std::vector<Eigen::Vector3d> pointcloud;
+	std::vector<unsigned short> intensity;
+	std::vector<double> timestamps;
+
+	for (auto &p : session.point_clouds_container.point_clouds)
+	{
+		if (p.visible)
+		{
+			for (int i = 0; i < p.points_local.size(); i++)
+			{
+				const auto &pp = p.points_local[i];
+				Eigen::Vector3d vp;
+				vp = p.m_pose * pp; // + session.point_clouds_container.offset;
+				// std::cout << vp << std::endl;
+				pointcloud.push_back(vp);
+				if (i < p.intensities.size())
+				{
+					intensity.push_back(p.intensities[i]);
+				}
+				else
+				{
+					intensity.push_back(0);
+				}
+				if (i < p.timestamps.size())
+				{
+					timestamps.push_back(p.timestamps[i]);
+				}
 			}
 		}
 	}
@@ -64,9 +121,9 @@ void save_all_to_las(const Session& session, std::string output_las_name)
 	}
 }
 
-void save_separately_to_las(const Session& session, fs::path outwd, std::string extension)
+void save_separately_to_las(const Session &session, fs::path outwd, std::string extension)
 {
-	for (auto& p : session.point_clouds_container.point_clouds)
+	for (auto &p : session.point_clouds_container.point_clouds)
 	{
 		if (p.visible)
 		{
@@ -83,20 +140,20 @@ void save_separately_to_las(const Session& session, fs::path outwd, std::string 
 	}
 }
 
-void save_trajectories_to_laz(const Session& session, std::string output_file_name, float curve_consecutive_distance_meters, float not_curve_consecutive_distance_meters, bool is_trajectory_export_downsampling)
+void save_trajectories_to_laz(const Session &session, std::string output_file_name, float curve_consecutive_distance_meters, float not_curve_consecutive_distance_meters, bool is_trajectory_export_downsampling)
 {
 	std::vector<Eigen::Vector3d> pointcloud;
 	std::vector<unsigned short> intensity;
 	std::vector<double> timestamps;
 
 	float consecutive_distance = 0;
-	for (auto& p : session.point_clouds_container.point_clouds)
+	for (auto &p : session.point_clouds_container.point_clouds)
 	{
 		if (p.visible)
 		{
 			for (int i = 0; i < p.local_trajectory.size(); i++)
 			{
-				const auto& pp = p.local_trajectory[i].m_pose.translation();
+				const auto &pp = p.local_trajectory[i].m_pose.translation();
 				Eigen::Vector3d vp;
 				vp = p.m_pose * pp; // + session.point_clouds_container.offset;
 
@@ -160,7 +217,7 @@ void save_trajectories_to_laz(const Session& session, std::string output_file_na
 	}
 }
 
-void createDXFPolyline(const std::string& filename, const std::vector<Eigen::Vector3d>& points)
+void createDXFPolyline(const std::string &filename, const std::vector<Eigen::Vector3d> &points)
 {
 	std::ofstream dxfFile(filename);
 	dxfFile << std::setprecision(20);
@@ -184,16 +241,16 @@ void createDXFPolyline(const std::string& filename, const std::vector<Eigen::Vec
 	dxfFile << "70\n8\n"; // 1 = Open polyline
 
 	// Write the VERTEX entities
-	for (const auto& point : points)
+	for (const auto &point : points)
 	{
 		dxfFile << "0\nVERTEX\n";
 		dxfFile << "8\n0\n"; // Layer 0
 		dxfFile << "10\n"
-			<< point.x() << "\n"; // X coordinate
+				<< point.x() << "\n"; // X coordinate
 		dxfFile << "20\n"
-			<< point.y() << "\n"; // Y coordinate
+				<< point.y() << "\n"; // Y coordinate
 		dxfFile << "30\n"
-			<< point.z() << "\n"; // Z coordinate
+				<< point.z() << "\n"; // Z coordinate
 	}
 
 	// End the POLYLINE
@@ -210,7 +267,7 @@ void createDXFPolyline(const std::string& filename, const std::vector<Eigen::Vec
 }
 
 void save_trajectories(
-	Session& session, std::string output_file_name, float curve_consecutive_distance_meters,
+	Session &session, std::string output_file_name, float curve_consecutive_distance_meters,
 	float not_curve_consecutive_distance_meters, bool is_trajectory_export_downsampling,
 	bool write_lidar_timestamp, bool write_unix_timestamp, bool use_quaternions,
 	bool save_to_dxf)
@@ -224,13 +281,13 @@ void save_trajectories(
 	{
 		float consecutive_distance = 0;
 		std::vector<Eigen::Vector3d> polylinePoints;
-		for (auto& p : session.point_clouds_container.point_clouds)
+		for (auto &p : session.point_clouds_container.point_clouds)
 		{
 			if (p.visible)
 			{
 				for (int i = 0; i < p.local_trajectory.size(); i++)
 				{
-					const auto& m = p.local_trajectory[i].m_pose;
+					const auto &m = p.local_trajectory[i].m_pose;
 					Eigen::Affine3d pose = p.m_pose * m;
 					pose.translation() += session.point_clouds_container.offset;
 
@@ -270,7 +327,8 @@ void save_trajectories(
 
 					if (!is_trajectory_export_downsampling || (is_trajectory_export_downsampling && consecutive_distance >= tol))
 					{
-						if (is_trajectory_export_downsampling) {
+						if (is_trajectory_export_downsampling)
+						{
 							consecutive_distance = 0;
 						}
 						if (save_to_dxf)
@@ -366,7 +424,7 @@ void save_trajectories(
 	}
 }*/
 
-void save_scale_board_to_laz(const Session& session, std::string output_file_name, float dec, float side_len)
+void save_scale_board_to_laz(const Session &session, std::string output_file_name, float dec, float side_len)
 {
 	std::vector<Eigen::Vector3d> pointcloud;
 	std::vector<unsigned short> intensity;
@@ -382,15 +440,15 @@ void save_scale_board_to_laz(const Session& session, std::string output_file_nam
 	float z = 0.0;
 	if (side_len < 0.0)
 	{
-		for (auto& p : session.point_clouds_container.point_clouds)
+		for (auto &p : session.point_clouds_container.point_clouds)
 		{
 			if (p.visible)
 			{
 				for (int i = 0; i < p.local_trajectory.size(); i++)
 				{
-					const auto& pp = p.local_trajectory[i].m_pose.translation();
+					const auto &pp = p.local_trajectory[i].m_pose.translation();
 					Eigen::Vector3d vp;
-					vp = p.m_pose * pp; 
+					vp = p.m_pose * pp;
 					if (vp.x() < min_x)
 					{
 						min_x = vp.x();
@@ -433,7 +491,7 @@ void save_scale_board_to_laz(const Session& session, std::string output_file_nam
 		xy_incr = 0.2;
 		z = 0.0;
 	}
-	
+
 	for (float x = min_x; x <= max_x; x += dec)
 	{
 		for (float y = min_y; y <= max_y; y += xy_incr)
@@ -462,27 +520,34 @@ void save_scale_board_to_laz(const Session& session, std::string output_file_nam
 	}
 }
 
-std::vector<std::string> get_matching_files(const std::string& directory, const std::string& pattern) {
-    std::vector<std::string> matching_files;
-    std::regex regex_pattern(pattern); 
-    try {
-        for (const auto& entry : fs::directory_iterator(directory)) {
-            if (entry.is_regular_file()) { // Ensure it's a regular file
-                const std::string filename = entry.path().filename().string();
-                if (std::regex_match(filename, regex_pattern)) {
-                    matching_files.push_back(entry.path().string());
-                }
-            }
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Error accessing directory: " << e.what() << std::endl;
-    }
+std::vector<std::string> get_matching_files(const std::string &directory, const std::string &pattern)
+{
+	std::vector<std::string> matching_files;
+	std::regex regex_pattern(pattern);
+	try
+	{
+		for (const auto &entry : fs::directory_iterator(directory))
+		{
+			if (entry.is_regular_file())
+			{ // Ensure it's a regular file
+				const std::string filename = entry.path().filename().string();
+				if (std::regex_match(filename, regex_pattern))
+				{
+					matching_files.push_back(entry.path().string());
+				}
+			}
+		}
+	}
+	catch (const std::exception &e)
+	{
+		std::cerr << "Error accessing directory: " << e.what() << std::endl;
+	}
 
-    return matching_files;
+	return matching_files;
 }
 
 void run_multi_view_tls_registration(
-	std::string input_file_name, TLSRegistration& tls_registration, std::string output_dir)
+	std::string input_file_name, TLSRegistration &tls_registration, std::string output_dir)
 {
 	fs::path outwd = fs::path(output_dir);
 	Session session;
@@ -491,7 +556,7 @@ void run_multi_view_tls_registration(
 		std::cout << "Provided input path does not exist." << std::endl;
 		return;
 	}
-	if (has_extension(input_file_name, ".json")) 
+	if (has_extension(input_file_name, ".json"))
 	{
 		std::cout << "Session file: '" << input_file_name << "'" << std::endl;
 		session.working_directory = fs::path(input_file_name).parent_path().string();
@@ -514,10 +579,11 @@ void run_multi_view_tls_registration(
 		session.point_clouds_container.point_clouds.clear();
 		session.working_directory = fs::path(input_file_name).string();
 		std::vector<std::string> las_files;
-		std::vector<std::string> txt_files; 
-		for (const auto& entry : std::filesystem::directory_iterator(input_file_name)) {
+		std::vector<std::string> txt_files;
+		for (const auto &entry : std::filesystem::directory_iterator(input_file_name))
+		{
 			auto file_name = entry.path().string();
-			if (has_extension(file_name, ".laz") || (has_extension(file_name, ".las"))) 
+			if (has_extension(file_name, ".laz") || (has_extension(file_name, ".las")))
 			{
 				las_files.push_back(file_name);
 			}
@@ -558,7 +624,7 @@ void run_multi_view_tls_registration(
 	std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
 
 	int number_of_point = 0;
-	for (const auto& pc : session.point_clouds_container.point_clouds)
+	for (const auto &pc : session.point_clouds_container.point_clouds)
 	{
 		number_of_point += pc.points_local.size();
 	}
@@ -719,7 +785,7 @@ void run_multi_view_tls_registration(
 			session.point_clouds_container.save_poses(poses_file_name, false);
 		}
 		session.save(
-			(outwd / "session_step_2.json").string(), session.point_clouds_container.poses_file_name, 
+			(outwd / "session_step_2.json").string(), session.point_clouds_container.poses_file_name,
 			session.point_clouds_container.initial_poses_file_name, false);
 		std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
 		session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false);
@@ -744,14 +810,14 @@ void run_multi_view_tls_registration(
 
 	if (tls_registration.save_trajectories_laz)
 	{
-		save_trajectories_to_laz(session, (outwd / "trajectories.laz").string(), tls_registration.curve_consecutive_distance_meters, 
-		tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling);
+		save_trajectories_to_laz(session, (outwd / "trajectories.laz").string(), tls_registration.curve_consecutive_distance_meters,
+								 tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling);
 	}
 
 	if (tls_registration.save_gnss_laz)
 	{
-		tls_registration.gnss.save_to_laz((outwd / "gnss.laz").string(), session.point_clouds_container.offset.x(), 
-		session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
+		tls_registration.gnss.save_to_laz((outwd / "gnss.laz").string(), session.point_clouds_container.offset.x(),
+										  session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
 	}
 
 	if (tls_registration.save_scale_board_laz)

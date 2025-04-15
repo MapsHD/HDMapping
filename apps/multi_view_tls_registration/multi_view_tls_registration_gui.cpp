@@ -396,8 +396,8 @@ void project_gui()
         if (ImGui::Button("load RESSO file (transformation_GroundTruth.reg)"))
         {
             std::string input_file_name = "";
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load resso", mandeye::fd::Resso_filter);
-            std::cout << "resso file: '" << input_file_name << "'" << std::endl;
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO", mandeye::fd::Resso_filter);
+            std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
 
             if (input_file_name.size() > 0)
             {
@@ -988,6 +988,23 @@ void project_gui()
         ImGui::InputDouble("offset_x", &session.point_clouds_container.offset.x());
         ImGui::InputDouble("offset_y", &session.point_clouds_container.offset.y());
         ImGui::InputDouble("offset_z", &session.point_clouds_container.offset.z());
+
+        if (ImGui::Button("save all marked scans to laz (as one local scan transformed via inverse pose of first scan)"))
+        {
+            const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+            std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+            if (output_file_name.size() > 0)
+            {
+                save_all_to_las_as_local(session, output_file_name);
+                // for (int i = 0; i < 10; i++)
+                //{
+                //     std::cout << pointcloud[i].x() << " " << pointcloud[i].y() << " " << pointcloud[i].z() << std::endl;
+                // }
+
+                // if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+            }
+        }
 
         if (ImGui::Button("save all marked scans to laz (as one global scan)"))
         {

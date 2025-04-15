@@ -8,7 +8,7 @@
 #include <export_laz.h>
 #include <nlohmann/json.hpp>
 
-#define SAMPLE_PERIOD (1.0 / 200.0)
+//#define SAMPLE_PERIOD (1.0 / 200.0)
 
 using Trajectory = std::map<double, std::pair<Eigen::Matrix4d, double>>;
 using Imu = std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>>;

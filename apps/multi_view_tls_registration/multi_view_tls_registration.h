@@ -138,7 +138,9 @@ void initial_pose_to_identity(Session& session);
 
 void save_all_to_las(const Session& session, std::string output_las_name);
 
-void save_separately_to_las(const Session& session, fs::path outwd, std::string extension = ".las");
+void save_all_to_las_as_local(const Session &session, std::string output_las_name);
+
+void save_separately_to_las(const Session &session, fs::path outwd, std::string extension = ".las");
 
 void save_trajectories_to_laz(const Session& session, std::string output_file_name, float curve_consecutive_distance_meters, float not_curve_consecutive_distance_meters, bool is_trajectory_export_downsampling);
 

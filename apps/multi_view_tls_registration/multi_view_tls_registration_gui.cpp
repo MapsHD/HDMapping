@@ -332,8 +332,30 @@ void project_gui()
     }
 
     ImGui::Checkbox("xz_intersection", &session.point_clouds_container.xz_intersection);
+    if (session.point_clouds_container.xz_intersection){
+        ImGui::SameLine();
+        ImGui::Checkbox("xz_grid_10x10[m]", &session.point_clouds_container.xz_grid_10x10);
+        ImGui::SameLine();
+        ImGui::Checkbox("xz_grid_1x1[m]", &session.point_clouds_container.xz_grid_1x1);
+    }
+
     ImGui::Checkbox("yz_intersection", &session.point_clouds_container.yz_intersection);
+    if (session.point_clouds_container.yz_intersection)
+    {
+        ImGui::SameLine();
+        ImGui::Checkbox("yz_grid_10x10[m]", &session.point_clouds_container.yz_grid_10x10);
+        ImGui::SameLine();
+        ImGui::Checkbox("yz_grid_1x1[m]", &session.point_clouds_container.yz_grid_1x1);
+    }
+
     ImGui::Checkbox("xy_intersection", &session.point_clouds_container.xy_intersection);
+    if (session.point_clouds_container.xy_intersection)
+    {
+        ImGui::SameLine();
+        ImGui::Checkbox("xy_grid_10x10[m]", &session.point_clouds_container.xy_grid_10x10);
+        ImGui::SameLine();
+        ImGui::Checkbox("xy_grid_1x1[m]", &session.point_clouds_container.xy_grid_1x1);
+    }
 
     //session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection);
 
@@ -2407,7 +2429,11 @@ void display()
                 }
             }
 
-            session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection);
+            session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection,
+                                                  session.point_clouds_container.xy_intersection, session.point_clouds_container.xz_grid_10x10, session.point_clouds_container.xz_grid_1x1, session.point_clouds_container.yz_grid_10x10, session.point_clouds_container.yz_grid_1x1, session.point_clouds_container.xy_grid_10x10, session.point_clouds_container.xy_grid_1x1 );
+
+            //std::cout << "session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 << std::endl;
+            
             observation_picking.render();
 
             glPushAttrib(GL_ALL_ATTRIB_BITS);

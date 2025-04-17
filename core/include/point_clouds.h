@@ -19,6 +19,13 @@ public:
 	bool yz_intersection = false;
 	bool xy_intersection = false;
 
+	bool xz_grid_10x10 = false;
+	bool xz_grid_1x1 = false;
+	bool yz_grid_10x10 = false;
+	bool yz_grid_1x1 = false;
+	bool xy_grid_10x10 = false;
+	bool xy_grid_1x1 = false;
+
 	Eigen::Vector3d offset = Eigen::Vector3d(0, 0, 0);
 	std::string folder_name;
 	std::string out_folder_name;
@@ -33,7 +40,8 @@ public:
 	bool load_eth(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z);
 	//std::vector<Eigen::Vector3d> load_points(const std::string& point_clouds_file_name);
 #if WITH_GUI == 1
-	void render(const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud, bool xz_intersection, bool yz_intersection, bool xy_intersection);
+	void render(const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud, bool xz_intersection, bool yz_intersection, bool xy_intersection,
+				bool xz_grid_10x10, bool xz_grid_1x1, bool yz_grid_10x10, bool yz_grid_1x1, bool xy_grid_10x10, bool xy_grid_1x1);
 #endif
 	//bool save_poses();
 	bool save_poses(const std::string file_name, bool is_subsession);

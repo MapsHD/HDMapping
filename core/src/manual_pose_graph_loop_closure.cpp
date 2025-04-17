@@ -880,8 +880,8 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
     if (!manipulate_active_edge)
     {
         ObservationPicking observation_picking;
-        point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, 1, false, false, false);
-        point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, 1, false, false, false);
+        point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, 1, false, false, false, false, false, false, false, false, false);
+        point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, 1, false, false, false, false, false, false, false, false, false);
     }
     else
     {

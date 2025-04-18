@@ -331,12 +331,35 @@ void project_gui()
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     }
 
+    ImGui::Text("-------------------------------------------------------");
+    ImGui::InputDouble("Intersection width [m]", &session.point_clouds_container.intersection_width);
+    if (session.point_clouds_container.intersection_width < 0.001)
+    {
+        session.point_clouds_container.intersection_width = 0.001;
+    }
+
     ImGui::Checkbox("xz_intersection", &session.point_clouds_container.xz_intersection);
-    if (session.point_clouds_container.xz_intersection){
+    if (session.point_clouds_container.xz_intersection)
+    {
         ImGui::SameLine();
         ImGui::Checkbox("xz_grid_10x10[m]", &session.point_clouds_container.xz_grid_10x10);
         ImGui::SameLine();
         ImGui::Checkbox("xz_grid_1x1[m]", &session.point_clouds_container.xz_grid_1x1);
+        ImGui::SameLine();
+        ImGui::Checkbox("xz_grid_01x01[m]", &session.point_clouds_container.xz_grid_01x01);
+        ImGui::SameLine();
+        if (ImGui::Button("export xz intersection"))
+        {
+            const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+            std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+            if (output_file_name.size() > 0)
+            {
+                save_intersection(session, output_file_name,
+                                  session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
+                                  session.point_clouds_container.intersection_width);
+            }
+        }
     }
 
     ImGui::Checkbox("yz_intersection", &session.point_clouds_container.yz_intersection);
@@ -346,6 +369,21 @@ void project_gui()
         ImGui::Checkbox("yz_grid_10x10[m]", &session.point_clouds_container.yz_grid_10x10);
         ImGui::SameLine();
         ImGui::Checkbox("yz_grid_1x1[m]", &session.point_clouds_container.yz_grid_1x1);
+        ImGui::SameLine();
+        ImGui::Checkbox("yz_grid_01x01[m]", &session.point_clouds_container.yz_grid_01x01);
+        ImGui::SameLine();
+        if (ImGui::Button("export yz intersection"))
+        {
+            const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+            std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+            if (output_file_name.size() > 0)
+            {
+                save_intersection(session, output_file_name,
+                                  session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
+                                  session.point_clouds_container.intersection_width);
+            }
+        }
     }
 
     ImGui::Checkbox("xy_intersection", &session.point_clouds_container.xy_intersection);
@@ -355,10 +393,24 @@ void project_gui()
         ImGui::Checkbox("xy_grid_10x10[m]", &session.point_clouds_container.xy_grid_10x10);
         ImGui::SameLine();
         ImGui::Checkbox("xy_grid_1x1[m]", &session.point_clouds_container.xy_grid_1x1);
+        ImGui::SameLine();
+        ImGui::Checkbox("xy_grid_01x01[m]", &session.point_clouds_container.xy_grid_01x01);
+        ImGui::SameLine();
+        if (ImGui::Button("export xy intersection"))
+        {
+            const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+            std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+            if (output_file_name.size() > 0)
+            {
+                save_intersection(session, output_file_name,
+                                  session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
+                                  session.point_clouds_container.intersection_width);
+            }
+        }
     }
 
-    //session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection);
-
+    // session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection);
 
     if (!simple_gui)
     {
@@ -1019,12 +1071,6 @@ void project_gui()
             if (output_file_name.size() > 0)
             {
                 save_all_to_las_as_local(session, output_file_name);
-                // for (int i = 0; i < 10; i++)
-                //{
-                //     std::cout << pointcloud[i].x() << " " << pointcloud[i].y() << " " << pointcloud[i].z() << std::endl;
-                // }
-
-                // if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
             }
         }
 
@@ -1051,12 +1097,12 @@ void project_gui()
 
             if (ImGui::Button("save all marked scans to laz (as separate global scans)"))
             {
-                std::string output_folder_name_separately= "";
+                std::string output_folder_name_separately = "";
                 output_folder_name_separately = mandeye::fd::SelectFolder("Choose folder");
-                save_separately_to_las(session, output_folder_name_separately,".laz");
+                save_separately_to_las(session, output_folder_name_separately, ".laz");
             }
             if (ImGui::Button("save all marked scans to las (as separate global scans)"))
-            {   
+            {
                 std::string output_folder_name_separately = "";
                 output_folder_name_separately = mandeye::fd::SelectFolder("Choose folder");
                 save_separately_to_las(session, output_folder_name_separately, ".las");
@@ -1255,16 +1301,16 @@ void project_gui()
 
             if (ImGui::Button("load gnss files and convert from wgs84 to puwg92(with offset)"))
             {
-              std::vector<std::string> input_file_names;
-              input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", {"GNSS", "*.gnss"}, true);
+                std::vector<std::string> input_file_names;
+                input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", {"GNSS", "*.gnss"}, true);
 
-              if (input_file_names.size() > 0)
-              {
-                if (!tls_registration.gnss.load(input_file_names, true))
+                if (input_file_names.size() > 0)
                 {
-                  std::cout << "problem with loading gnss files" << std::endl;
+                    if (!tls_registration.gnss.load(input_file_names, true))
+                    {
+                        std::cout << "problem with loading gnss files" << std::endl;
+                    }
                 }
-              }
             }
 
             // ImGui::InputDouble("WGS84ReferenceLatitude", &gnss.WGS84ReferenceLatitude);
@@ -1290,50 +1336,48 @@ void project_gui()
             if (ImGui::Button("save metascan points in PUWG92"))
             {
 
-              const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-              std::vector<Eigen::Vector3d> pointcloud;
-              std::vector<unsigned short> intensity;
-              std::vector<double> timestamps;
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                std::vector<Eigen::Vector3d> pointcloud;
+                std::vector<unsigned short> intensity;
+                std::vector<double> timestamps;
 
-              for (auto& p : session.point_clouds_container.point_clouds)
-              {
-                if (p.visible)
+                for (auto &p : session.point_clouds_container.point_clouds)
                 {
-                  for (int i = 0; i < p.points_local.size(); i++)
-                  {
-                    const auto& pp = p.points_local[i];
-                    Eigen::Vector3d vp;
-                    vp = p.m_pose * pp; // + session.point_clouds_container.offset;
-                    // std::cout << vp << std::endl;
-                    pointcloud.push_back(vp);
-                    if (i < p.intensities.size())
+                    if (p.visible)
                     {
-                      intensity.push_back(p.intensities[i]);
+                        for (int i = 0; i < p.points_local.size(); i++)
+                        {
+                            const auto &pp = p.points_local[i];
+                            Eigen::Vector3d vp;
+                            vp = p.m_pose * pp; // + session.point_clouds_container.offset;
+                            // std::cout << vp << std::endl;
+                            pointcloud.push_back(vp);
+                            if (i < p.intensities.size())
+                            {
+                                intensity.push_back(p.intensities[i]);
+                            }
+                            else
+                            {
+                                intensity.push_back(0);
+                            }
+                            if (i < p.timestamps.size())
+                            {
+                                timestamps.push_back(p.timestamps[i]);
+                            }
+                        }
                     }
-                    else
-                    {
-                      intensity.push_back(0);
-                    }
-                    if (i < p.timestamps.size())
-                    {
-                      timestamps.push_back(p.timestamps[i]);
-                    }
-                  }
                 }
-              }
 
-              const auto lat = tls_registration.gnss.WGS84ReferenceLatitude;
-              const auto lon = tls_registration.gnss.WGS84ReferenceLongitude;
-              const auto alt = tls_registration.gnss.gnss_poses[0].alt;
+                const auto lat = tls_registration.gnss.WGS84ReferenceLatitude;
+                const auto lon = tls_registration.gnss.WGS84ReferenceLongitude;
+                const auto alt = tls_registration.gnss.gnss_poses[0].alt;
 
-              double Xpuwg92 = 0.0;
-              double Ypuwg92 = 0.0;
-              wgs84_do_puwg92(lat, lon, &Xpuwg92, &Ypuwg92);
-              Eigen::Vector3d  offset(Ypuwg92, Xpuwg92, alt);
-              exportLaz(output_file_name, pointcloud, intensity, timestamps, offset.x(), offset.y(), offset.z());
+                double Xpuwg92 = 0.0;
+                double Ypuwg92 = 0.0;
+                wgs84_do_puwg92(lat, lon, &Xpuwg92, &Ypuwg92);
+                Eigen::Vector3d offset(Ypuwg92, Xpuwg92, alt);
+                exportLaz(output_file_name, pointcloud, intensity, timestamps, offset.x(), offset.y(), offset.z());
             }
-
-
         }
         if (tls_registration.gnss.gnss_poses.size() > 0)
         {
@@ -2430,10 +2474,14 @@ void display()
             }
 
             session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection,
-                                                  session.point_clouds_container.xy_intersection, session.point_clouds_container.xz_grid_10x10, session.point_clouds_container.xz_grid_1x1, session.point_clouds_container.yz_grid_10x10, session.point_clouds_container.yz_grid_1x1, session.point_clouds_container.xy_grid_10x10, session.point_clouds_container.xy_grid_1x1 );
+                                                  session.point_clouds_container.xy_intersection,
+                                                  session.point_clouds_container.xz_grid_10x10, session.point_clouds_container.xz_grid_1x1, session.point_clouds_container.xz_grid_01x01,
+                                                  session.point_clouds_container.yz_grid_10x10, session.point_clouds_container.yz_grid_1x1, session.point_clouds_container.yz_grid_01x01,
+                                                  session.point_clouds_container.xy_grid_10x10, session.point_clouds_container.xy_grid_1x1, session.point_clouds_container.xy_grid_01x01,
+                                                  session.point_clouds_container.intersection_width);
 
-            //std::cout << "session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 << std::endl;
-            
+            // std::cout << "session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 << std::endl;
+
             observation_picking.render();
 
             glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -2727,12 +2775,12 @@ void mouse(int glut_button, int state, int x, int y)
                 std::cout << "control point picking" << std::endl;
                 const auto laser_beam = GetLaserBeam(x, y);
                 double min_distance = 10000000000;
-                //int index_i = -1;
-                //int index_j = -1;
+                // int index_i = -1;
+                // int index_j = -1;
                 session.control_points.index_picked_point = -1;
-                //session.control_points.found_picked = false;
+                // session.control_points.found_picked = false;
 
-                //for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                // for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
                 int i = session.control_points.index_pose;
                 if (session.control_points.index_pose >= 0 && session.control_points.index_pose < session.point_clouds_container.point_clouds.size())
                 {
@@ -2746,24 +2794,24 @@ void mouse(int glut_button, int state, int x, int y)
                         if (dist < min_distance && dist < 0.1)
                         {
                             min_distance = dist;
-                            //index_i = i;
-                            //index_j = j;
+                            // index_i = i;
+                            // index_j = j;
 
                             rotation_center.x() = vp.x();
                             rotation_center.y() = vp.y();
                             rotation_center.z() = vp.z();
 
-                            //session.control_points.picked_control_point.x_source_local = p.x();
-                            //session.control_points.picked_control_point.y_source_local = p.y();
-                            //session.control_points.picked_control_point.z_source_local = p.z();
-                            //session.control_points.picked_control_point.x_target_global = vp.x();
-                            //session.control_points.picked_control_point.y_target_global = vp.y();
-                            //session.control_points.picked_control_point.z_target_global = vp.z();
+                            // session.control_points.picked_control_point.x_source_local = p.x();
+                            // session.control_points.picked_control_point.y_source_local = p.y();
+                            // session.control_points.picked_control_point.z_source_local = p.z();
+                            // session.control_points.picked_control_point.x_target_global = vp.x();
+                            // session.control_points.picked_control_point.y_target_global = vp.y();
+                            // session.control_points.picked_control_point.z_target_global = vp.z();
 
-                            //session.control_points.found_picked = true;
+                            // session.control_points.found_picked = true;
                             session.control_points.index_picked_point = j;
-                            //session.ground_control_points.picking_mode_index_to_node_inner = index_i;
-                            //session.ground_control_points.picking_mode_index_to_node_outer = index_j;
+                            // session.ground_control_points.picking_mode_index_to_node_inner = index_i;
+                            // session.ground_control_points.picking_mode_index_to_node_outer = index_j;
 
                             // if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
                         }

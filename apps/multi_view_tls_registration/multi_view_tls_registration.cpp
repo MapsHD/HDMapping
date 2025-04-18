@@ -83,6 +83,72 @@ void save_all_to_las_as_local(const Session &session, std::string output_las_nam
 	}
 }
 
+void save_intersection(const Session &session, std::string output_las_name, bool xz_intersection, bool yz_intersection, bool xy_intersection, 
+	double intersection_width)
+{
+	std::vector<Eigen::Vector3d> pointcloud;
+	std::vector<unsigned short> intensity;
+	std::vector<double> timestamps;
+
+	for (auto &p : session.point_clouds_container.point_clouds)
+	{
+		if (p.visible)
+		{
+			for (int i = 0; i < p.points_local.size(); i++)
+			{
+				const auto &pp = p.points_local[i];
+				Eigen::Vector3d vp;
+				vp = p.m_pose * pp; // + session.point_clouds_container.offset;
+
+				bool is_inside = false;
+				if (xz_intersection)
+				{
+					if (fabs(vp.y()) < intersection_width){
+						is_inside = true;
+					}
+				}
+
+				if (yz_intersection)
+				{
+					if (fabs(vp.x()) < intersection_width)
+					{
+						is_inside = true;
+					}
+				}
+
+				if (xy_intersection)
+				{
+					if (fabs(vp.z()) < intersection_width)
+					{
+						is_inside = true;
+					}
+				}
+
+				if (is_inside)
+				{
+					pointcloud.push_back(vp);
+					if (i < p.intensities.size())
+					{
+						intensity.push_back(p.intensities[i]);
+					}
+					else
+					{
+						intensity.push_back(0);
+					}
+					if (i < p.timestamps.size())
+					{
+						timestamps.push_back(p.timestamps[i]);
+					}
+				}
+			}
+		}
+	}
+	if (!exportLaz(output_las_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
+	{
+		std::cout << "problem with saving file: " << output_las_name << std::endl;
+	}
+}
+
 void save_all_to_las(const Session &session, std::string output_las_name)
 {
 	std::vector<Eigen::Vector3d> pointcloud;

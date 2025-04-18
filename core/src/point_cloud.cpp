@@ -1417,7 +1417,10 @@ void PointCloud::shift_to_center()
 
 #if WITH_GUI == 1
 void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud, bool xz_intersection, bool yz_intersection,
-						bool xy_intersection, bool xz_grid_10x10, bool xz_grid_1x1, bool yz_grid_10x10, bool yz_grid_1x1, bool xy_grid_10x10, bool xy_grid_1x1)
+						bool xy_intersection, bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_01x01,
+						bool yz_grid_10x10, bool yz_grid_1x1, bool yz_grid_01x01,
+						bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01,
+						double intersection_width)
 {
 	// std::cout << (int)xz_grid_10x10 << std::endl;
 
@@ -1475,6 +1478,27 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 			glEnd();
 		}
 
+		if (xz_grid_01x01)
+		{
+			// std::cout << "0000" << std::endl;
+			glColor3f(0.3, 0.3, 0.3);
+			glBegin(GL_LINES);
+			for (float x_ = -max_grid; x_ <= max_grid; x_ += 0.1f)
+			{
+				glVertex3f(x_, 0.0f, -max_grid);
+				glVertex3f(x_, 0.0f, max_grid);
+			}
+			glEnd();
+
+			glBegin(GL_LINES);
+			for (float z = -max_grid; z <= max_grid; z += 0.1f)
+			{
+				glVertex3f(-max_grid, 0, z);
+				glVertex3f(max_grid, 0, z);
+			}
+			glEnd();
+		}
+
 		if (yz_grid_10x10)
 		{
 			// std::cout << "0000" << std::endl;
@@ -1510,6 +1534,27 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 
 			glBegin(GL_LINES);
 			for (float z = -max_grid; z <= max_grid; z += 1.0f)
+			{
+				glVertex3f(0, -max_grid, z);
+				glVertex3f(0, max_grid, z);
+			}
+			glEnd();
+		}
+
+		if (yz_grid_01x01)
+		{
+			// std::cout << "0000" << std::endl;
+			glColor3f(0.3, 0.3, 0.3);
+			glBegin(GL_LINES);
+			for (float x_ = -max_grid; x_ <= max_grid; x_ += 0.1f)
+			{
+				glVertex3f(0.0f, x_, -max_grid);
+				glVertex3f(0.0f, x_, max_grid);
+			}
+			glEnd();
+
+			glBegin(GL_LINES);
+			for (float z = -max_grid; z <= max_grid; z += 0.1f)
 			{
 				glVertex3f(0, -max_grid, z);
 				glVertex3f(0, max_grid, z);
@@ -1559,6 +1604,27 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 			glEnd();
 		}
 
+		if (xy_grid_01x01)
+		{
+			// std::cout << "0000" << std::endl;
+			glColor3f(0.3, 0.3, 0.3);
+			glBegin(GL_LINES);
+			for (float x_ = -max_grid; x_ <= max_grid; x_ += 0.1f)
+			{
+				glVertex3f(x_, -max_grid, 0.0);
+				glVertex3f(x_, max_grid, 0.0);
+			}
+			glEnd();
+
+			glBegin(GL_LINES);
+			for (float z = -max_grid; z <= max_grid; z += 0.1f)
+			{
+				glVertex3f(-max_grid, z, 0.0);
+				glVertex3f(max_grid, z, 0.0);
+			}
+			glEnd();
+		}
+
 		glBegin(GL_POINTS);
 		for (int i = 0; i < this->points_local.size(); i += viewer_decmiate_point_cloud)
 		{
@@ -1592,46 +1658,21 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 			{
 				if (xz_intersection)
 				{
-					if (fabs(vp.y()) < 0.2)
+					if (fabs(vp.y()) < intersection_width)
 					{
 						glVertex3d(vp.x(), vp.y(), vp.z());
 					}
-					// float max_grid = 100.0f;
-
-					/*if (xz_grid_1x1){
-						glColor3f(0.3, 0.3, 0.3);
-						glBegin(GL_LINES);
-						for (float x = -max_xy; x <= max_xy; x += 1)
-						{
-							glVertex3f(x, -max_xy, picking_plane_height);
-							glVertex3f(x, max_xy, picking_plane_height);
-						}
-						for (float y = -max_xy; y <= max_xy; y += 1)
-						{
-							glVertex3f(-max_xy, y, picking_plane_height);
-							glVertex3f(max_xy, y, picking_plane_height);
-						}
-						glEnd();
-					}*/
-
-					/*bool xz_grid_10x10 = false;
-	bool xz_grid_1x1 = false;
-	bool yz_grid_10x10 = false;
-	bool yz_grid_1x1 = false;
-	bool xy_grid_10x10 = false;
-	bool xy_grid_1x1 = false;
- */
 				}
 				if (yz_intersection)
 				{
-					if (fabs(vp.x()) < 0.2)
+					if (fabs(vp.x()) < intersection_width)
 					{
 						glVertex3d(vp.x(), vp.y(), vp.z());
 					}
 				}
 				if (xy_intersection)
 				{
-					if (fabs(vp.z()) < 0.2)
+					if (fabs(vp.z()) < intersection_width)
 					{
 						glVertex3d(vp.x(), vp.y(), vp.z());
 					}

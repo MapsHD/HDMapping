@@ -220,7 +220,7 @@ void lidar_odometry_gui()
 
         if (!simple_gui)
         {
-            if (ImGui::Button("set 'narrow spaces' mapping parameters (fastest motion upto 2km/h, gentle rotations, e.g. caves, indoor layouts)"))
+            /*if (ImGui::Button("set 'narrow spaces' mapping parameters (fastest motion upto 2km/h, gentle rotations, e.g. caves, indoor layouts)"))
             {
                 params.decimation = 0.01;
                 params.in_out_params_indoor.resolution_X = 0.1;
@@ -235,7 +235,7 @@ void lidar_odometry_gui()
                 params.robust_and_accurate_lidar_odometry_iterations = 20;
                 params.max_distance_lidar = 30.0;
 
-                params.use_robust_and_accurate_lidar_odometry = true;
+                params.use_robust_and_accurate_lidar_odometry = false;
             }
 
             if (ImGui::Button("set 'regular spaces' mapping parameters (fastest motion upto 8km/h, gentle rotations, e.g. outdoor)"))
@@ -253,29 +253,47 @@ void lidar_odometry_gui()
                 params.robust_and_accurate_lidar_odometry_iterations = 20;
                 params.max_distance_lidar = 30.0;
 
-                params.use_robust_and_accurate_lidar_odometry = true;
-            }
+                params.use_robust_and_accurate_lidar_odometry = false;
+            }*/
 
             ImGui::Checkbox("show_initial_points", &show_initial_points);
             ImGui::Checkbox("show_trajectory", &show_trajectory);
             ImGui::SameLine();
             ImGui::Checkbox("show_trajectory_as_axes", &show_trajectory_as_axes);
             // ImGui::Checkbox("show_covs", &show_covs);
-            ImGui::InputDouble("normal distribution transforms bucket size X", &params.in_out_params_indoor.resolution_X);
+            ImGui::Text("-----------------------------------------------");
+            ImGui::InputDouble("NDT (inner) bucket size X", &params.in_out_params_indoor.resolution_X);
             if (params.in_out_params_indoor.resolution_X < 0.01)
             {
                 params.in_out_params_indoor.resolution_X = 0.01;
             }
-            ImGui::InputDouble("normal distribution transforms bucket size Y", &params.in_out_params_indoor.resolution_Y);
+            ImGui::InputDouble("NDT (inner) bucket size Y", &params.in_out_params_indoor.resolution_Y);
             if (params.in_out_params_indoor.resolution_Y < 0.01)
             {
                 params.in_out_params_indoor.resolution_Y = 0.01;
             }
-            ImGui::InputDouble("normal distribution transforms bucket size Z", &params.in_out_params_indoor.resolution_Z);
+            ImGui::InputDouble("NDT (inner) bucket size Z", &params.in_out_params_indoor.resolution_Z);
             if (params.in_out_params_indoor.resolution_Z < 0.01)
             {
                 params.in_out_params_indoor.resolution_Z = 0.01;
             }
+            ImGui::Text("-----------------------------------------------");
+            ImGui::InputDouble("NDT (outer) bucket size X", &params.in_out_params_outdoor.resolution_X);
+            if (params.in_out_params_outdoor.resolution_X < 0.01)
+            {
+                params.in_out_params_outdoor.resolution_X = 0.01;
+            }
+            ImGui::InputDouble("NDT (outer) bucket size Y", &params.in_out_params_outdoor.resolution_Y);
+            if (params.in_out_params_outdoor.resolution_Y < 0.01)
+            {
+                params.in_out_params_outdoor.resolution_Y = 0.01;
+            }
+            ImGui::InputDouble("NDT (outer) bucket size Z", &params.in_out_params_outdoor.resolution_Z);
+            if (params.in_out_params_outdoor.resolution_Z < 0.01)
+            {
+                params.in_out_params_outdoor.resolution_Z = 0.01;
+            }
+            ImGui::Text("-----------------------------------------------");
 
             // ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy);
             // ImGui::InputDouble("threshould_output_filter (all local points inside lidar xy_circle radius[m] will be removed during save)", &threshould_output_filter);

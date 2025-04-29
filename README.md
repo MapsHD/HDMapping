@@ -42,6 +42,10 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 - Affordable geo-localisation of humanitarian demining tools (mountable on K9, robot, hand-held device, etc.) in GNSS-denied environment, HCR-CTRO [[PDF]](https://www.ctro.hr/userfiles/files/Affordable%20geo-localisation%20in%20GNSS%20denied%20environment%2C%20Janusz%20B%C4%99dkowski.pdf)
 - Aguilar Fernando J., et al. ‘Preliminary Results of a Low-Cost Portable Terrestrial LiDAR Based on ICP-SLAM Algorithms. Application to Automatic Forest Digital Inventory’. 6th Euro-Mediterranean Conference for Environmental Integration (EMCEI-2024), 2024.
 [[PDF]](https://www.ibles.pl/wp-content/uploads/2024/06/Torana-Arya.pdf)
+- Janusz Będkowski. Novel wearable mobile mapping system for Forensic and Security, mountable on trained dog and human. TechRxiv. April 24, 2025.
+DOI: 10.36227/techrxiv.174552824.47146860/v1 [[PDF]](https://www.techrxiv.org/users/915148/articles/1288112-novel-wearable-mobile-mapping-system-for-forensic-and-security-mountable-on-trained-dog-and-human)
+
+
 
 # To cite this work please use as follows:
 Mobile mapping system: hardware and software is elaborated in following paper:

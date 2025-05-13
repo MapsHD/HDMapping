@@ -11,6 +11,12 @@
 #include <mutex>
 #include <vector>
 
+#include <array>
+#include <cstdint>
+#include <sstream>
+#include <iostream>
+#include <nlohmann/json.hpp>
+
 #include "color_las_loader.h"
 #include "pfd_wrapper.hpp"
 #include <execution>
@@ -410,6 +416,158 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloudFishEye(const std::vector<m
     return newCloud;
 }
 
+
+uint32_t fromGrayCode(uint32_t gray) {
+    uint32_t num = 0;
+    for (; gray; gray >>= 1) {
+        num ^= gray;
+    }
+    return num;
+}
+
+uint32_t packBoolsToUint32(const std::array<bool, 18>& bools) {
+    uint32_t result = 0;
+    for (size_t i = 0; i < bools.size(); ++i) {
+        if (bools[i]) {
+            result |= (1U << i);
+        }
+    }
+    return result;
+}
+
+void TimeStampCount() {
+    namespace SD = SystemData;
+
+    static bool show_terminal = false;
+    static char diode_input[256] = "";
+    static uint32_t packedValue = 0;
+    static uint64_t decodedValue = 0;
+    static std::array<bool, 18> diodeBits = {};
+    static uint64_t fullTimestamp = 0;
+    static const std::array<int, 18> newOrder = {
+        8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 0, 1, 2, 3, 4, 5, 6, 7
+    };
+    static uint64_t sessionStart = 0;
+
+    static const std::array<ImVec2, 18> diodePositions = {
+        ImVec2(400, 3375), ImVec2(840, 3375),
+        ImVec2(1250, 3350), ImVec2(1600, 3330), ImVec2(2000, 3350),
+        ImVec2(2400, 3400), ImVec2(2850, 3450), ImVec2(3370, 3470),
+        ImVec2(3870, 3460), ImVec2(4400, 3450), ImVec2(4900, 3400),
+        ImVec2(5300, 3350), ImVec2(5600, 3300), ImVec2(6000, 3300),
+        ImVec2(6400, 3330), ImVec2(6800, 3350), ImVec2(7200, 3375),
+        ImVec2(7600, 3375) 
+    };
+    
+    if (ImGui::Button("Manual Calculate Timestamp")) {
+        show_terminal = true;
+    }
+
+    if (show_terminal) {
+        ImGui::Begin("Timestamp Terminal", &show_terminal);
+
+        float scale = 1.0f;
+        ImVec2 imgPos = ImGui::GetCursorScreenPos();
+
+        if (SD::imageData != nullptr) {
+            ImVec2 windowSize = ImGui::GetContentRegionAvail();
+            float aspectRatio = (float)SD::imageWidth / (float)SD::imageHeight;
+            float scaleX = windowSize.x / SD::imageWidth;
+            float scaleY = windowSize.y / SD::imageHeight;
+            scale = std::min(scaleX, scaleY);
+
+            float scaledWidth = SD::imageWidth * scale;
+            float scaledHeight = SD::imageHeight * scale;
+
+            ImGui::Text("Loaded image:");
+            imgPos = ImGui::GetCursorScreenPos(); 
+            ImGui::Image(reinterpret_cast<void*>(static_cast<uintptr_t>(tex1)), ImVec2(scaledWidth, scaledHeight));
+
+            auto* drawList = ImGui::GetWindowDrawList();
+            ImGui::SetWindowFontScale(1.25f);
+            for (int i = 0; i < 18; ++i) {
+                ImVec2 pos = diodePositions[i];
+                pos.x = imgPos.x + pos.x * scale;
+                pos.y = imgPos.y + pos.y * scale;
+                ImU32 color = diodeBits[i] ? IM_COL32(255, 0, 0, 255) : IM_COL32(0, 0, 0, 255);
+                drawList->AddText(pos, color, std::to_string(i).c_str());
+            }
+        } else {
+            ImGui::Text("No image loaded.");
+        }
+
+        ImGui::SetWindowFontScale(1.0f);
+        ImGui::Text("Click on bits:");
+        for (int i = 0; i < 18; ++i) {
+            if (diodeBits[i]) {
+                ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(255, 0, 0, 255));         
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(200, 0, 0, 255));  
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(150, 0, 0, 255));   
+            } else {
+                ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(50, 50, 50, 255));        
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(80, 80, 80, 255));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(100, 100, 100, 255));
+            }
+        
+            std::string label = std::to_string(i) + ": " + (diodeBits[i] ? "1" : "0");
+            if (ImGui::SmallButton(label.c_str())) {
+                diodeBits[i] = !diodeBits[i];
+            }
+        
+            ImGui::PopStyleColor(3); 
+        
+            if (i != 17) ImGui::SameLine();
+        }
+        ImGui::NewLine();
+
+        if (ImGui::Button("Load status.json")) {
+            const auto input_file_names = mandeye::fd::OpenFileDialog("Choose json", mandeye::fd::Session_filter, false);
+            if (!input_file_names.empty()) {
+                std::ifstream file(input_file_names.front());
+                if (file) {
+                    try {
+                        nlohmann::json j;
+                        file >> j;
+        
+                        if (j.contains("livox") && j["livox"].contains("LivoxLidarInfo") && j["livox"]["LivoxLidarInfo"].contains("m_sessionStart")) {
+                            sessionStart = j["livox"]["LivoxLidarInfo"]["m_sessionStart"];
+                            std::cout << "m_sessionStart: " << sessionStart << std::endl;
+        
+                            fullTimestamp = sessionStart + decodedValue;
+                        } else {
+                            std::cerr << "Invalid JSON or missing 'm_sessionStart' key\n";
+                        }
+                    } catch (const std::exception &e) {
+                        std::cerr << "JSON read error: " << e.what() << "\n";
+                    }
+                }
+            }
+        }
+
+        if (ImGui::Button("Calculate timestamp")) {
+            std::array<bool, 18> reorderedBits = {};
+            for (int i = 0; i < 18; ++i) {
+                reorderedBits[i] = diodeBits[newOrder[i]];  
+            }
+
+            packedValue = packBoolsToUint32(reorderedBits);
+            decodedValue = static_cast<uint64_t>(fromGrayCode(packedValue)) * 10'000'000;
+            if (sessionStart != 0) {
+                fullTimestamp = sessionStart + decodedValue;
+            }
+        }
+
+        ImGui::Text("Packed uint32_t: %u", packedValue);
+        ImGui::Text("Decoded timestamp: %llu", decodedValue);
+        ImGui::Text("Timestamp: %llu", fullTimestamp);
+        double timestampSeconds = static_cast<double>(fullTimestamp) / 1'000'000'000.0;
+        ImGui::Text("Timestamp (formatted): %.6f", timestampSeconds);
+
+        ImGui::End();
+    }
+}
+
+
 void ImGuiLoadSaveButtons()
 {
 
@@ -782,6 +940,7 @@ void display()
 
     ImGui::Begin("Image");
     ImGuiLoadSaveButtons();
+    TimeStampCount();
     if (ImGui::Button("apply color to PC (fishEye)"))
     {
         SystemData::points = ApplyColorToPointcloudFishEye(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);

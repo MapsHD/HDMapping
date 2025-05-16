@@ -441,10 +441,10 @@ void project_gui()
                 }
             }
 
+            //ImGui::SameLine();
+            ImGui::Text("If You dont have any calibration file --> ");
             ImGui::SameLine();
-            ImGui::Text(" if You dont have any calibration file --> ");
-            ImGui::SameLine();
-            if (ImGui::Button("Create calibration from scratch (optional before step 2)"))
+            if (ImGui::Button("Create calibration from scratch and save as 'calibration.json' (optional before step 2)"))
             {
                 std::string output_file_name = "";
                 output_file_name = mandeye::fd::SaveFileDialog("Save *.json file", json_filter, ".json");

@@ -1701,47 +1701,57 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 
 			if (this->local_trajectory.size() > 0 && this->fuse_inclination_from_IMU)
 			{
-				Eigen::Vector3d a1(-0.2, -0.2, 0);
-				Eigen::Vector3d a2(0.2, -0.2, 0);
-				Eigen::Vector3d a3(0.2, 0.2, 0);
-				Eigen::Vector3d a4(-0.2, 0.2, 0);
+				double om = local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
+				double fi = local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
 
-				Eigen::Vector3d a1t = this->m_pose * a1;
-				Eigen::Vector3d a2t = this->m_pose * a2;
-				Eigen::Vector3d a3t = this->m_pose * a3;
-				Eigen::Vector3d a4t = this->m_pose * a4;
+				if (fabs(om) > 5 || fabs(fi) > 5)
+				{
+				}
+				else
+				{
 
-				glColor3f(0, 1, 0);
-				glBegin(GL_LINE_STRIP);
-				glVertex3f(a1t.x(), a1t.y(), a1t.z());
-				glVertex3f(a2t.x(), a2t.y(), a2t.z());
-				glVertex3f(a3t.x(), a3t.y(), a3t.z());
-				glVertex3f(a4t.x(), a4t.y(), a4t.z());
-				glVertex3f(a1t.x(), a1t.y(), a1t.z());
-				glEnd();
+					Eigen::Vector3d a1(-0.2, -0.2, 0);
+					Eigen::Vector3d a2(0.2, -0.2, 0);
+					Eigen::Vector3d a3(0.2, 0.2, 0);
+					Eigen::Vector3d a4(-0.2, 0.2, 0);
 
-				TaitBryanPose tb;
-				tb.px = this->m_pose(0, 3);
-				tb.py = this->m_pose(1, 3);
-				tb.pz = this->m_pose(2, 3);
-				tb.om = this->local_trajectory[0].imu_om_fi_ka.x();
-				tb.fi = this->local_trajectory[0].imu_om_fi_ka.y();
-				tb.ka = this->local_trajectory[0].imu_om_fi_ka.z();
+					Eigen::Vector3d a1t = this->m_pose * a1;
+					Eigen::Vector3d a2t = this->m_pose * a2;
+					Eigen::Vector3d a3t = this->m_pose * a3;
+					Eigen::Vector3d a4t = this->m_pose * a4;
 
-				auto m = affine_matrix_from_pose_tait_bryan(tb);
-				a1t = m * a1;
-				a2t = m * a2;
-				a3t = m * a3;
-				a4t = m * a4;
+					glColor3f(0, 1, 0);
+					glBegin(GL_LINE_STRIP);
+					glVertex3f(a1t.x(), a1t.y(), a1t.z());
+					glVertex3f(a2t.x(), a2t.y(), a2t.z());
+					glVertex3f(a3t.x(), a3t.y(), a3t.z());
+					glVertex3f(a4t.x(), a4t.y(), a4t.z());
+					glVertex3f(a1t.x(), a1t.y(), a1t.z());
+					glEnd();
 
-				glColor3f(1, 0, 0);
-				glBegin(GL_LINE_STRIP);
-				glVertex3f(a1t.x(), a1t.y(), a1t.z());
-				glVertex3f(a2t.x(), a2t.y(), a2t.z());
-				glVertex3f(a3t.x(), a3t.y(), a3t.z());
-				glVertex3f(a4t.x(), a4t.y(), a4t.z());
-				glVertex3f(a1t.x(), a1t.y(), a1t.z());
-				glEnd();
+					TaitBryanPose tb;
+					tb.px = this->m_pose(0, 3);
+					tb.py = this->m_pose(1, 3);
+					tb.pz = this->m_pose(2, 3);
+					tb.om = this->local_trajectory[0].imu_om_fi_ka.x();
+					tb.fi = this->local_trajectory[0].imu_om_fi_ka.y();
+					tb.ka = this->local_trajectory[0].imu_om_fi_ka.z();
+
+					auto m = affine_matrix_from_pose_tait_bryan(tb);
+					a1t = m * a1;
+					a2t = m * a2;
+					a3t = m * a3;
+					a4t = m * a4;
+
+					glColor3f(1, 0, 0);
+					glBegin(GL_LINE_STRIP);
+					glVertex3f(a1t.x(), a1t.y(), a1t.z());
+					glVertex3f(a2t.x(), a2t.y(), a2t.z());
+					glVertex3f(a3t.x(), a3t.y(), a3t.z());
+					glVertex3f(a4t.x(), a4t.y(), a4t.z());
+					glVertex3f(a1t.x(), a1t.y(), a1t.z());
+					glEnd();
+				}
 			}
 		}
 	}

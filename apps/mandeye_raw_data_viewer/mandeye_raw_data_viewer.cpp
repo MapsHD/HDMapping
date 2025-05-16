@@ -779,6 +779,52 @@ void display()
     glEnd();
     glPointSize(1);
 
+    if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
+    {
+        for (int i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
+        {
+            auto lower = std::lower_bound(all_data[index_rendered_points_local].timestamps.begin(), all_data[index_rendered_points_local].timestamps.end(), all_data[index_rendered_points_local].points_local[i].timestamp,
+                                          [](std::pair<double, double> lhs, double rhs) -> bool
+                                          { return lhs.first < rhs; });
+
+            int index_pose = std::distance(all_data[index_rendered_points_local].timestamps.begin(), lower) - 1;
+
+            if (index_pose >= 0 && index_pose < all_data[index_rendered_points_local].poses.size())
+            {
+                /*Eigen::Affine3d m = all_data[index_rendered_points_local].poses[index_pose];
+                Eigen::Vector3d p = m * all_data[index_rendered_points_local].points_local[i].point;
+
+                if (all_data[index_rendered_points_local].lidar_ids[i] == 0)
+                {
+                    glColor3f(pc_color.x, pc_color.y, pc_color.z);
+                }
+                else
+                {
+                    glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
+                }
+                glVertex3f(p.x(), p.y(), p.z());*/
+
+                Eigen::Affine3d m = all_data[index_rendered_points_local].poses[index_pose];
+                glLineWidth(2.0);
+                glBegin(GL_LINES);
+                glColor3f(1.0f, 0.0f, 0.0f);
+                glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+                glVertex3f(m(0, 3) + m(0,0), m(1, 3) + m(1,0), m(2, 3) + m(2,0));
+
+                glColor3f(0.0f, 1.0f, 0.0f);
+                glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+                glVertex3f(m(0, 3) + m(0, 1), m(1, 3) + m(1, 1), m(2, 3) + m(2, 1));
+
+                glColor3f(0.0f, 0.0f, 1.0f);
+                glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+                glVertex3f(m(0, 3) + m(0, 2), m(1, 3) + m(1, 2), m(2, 3) + m(2, 2));
+                glEnd();
+                glLineWidth(1.0);
+                break;
+            }
+        }
+    }
+
     if (show_rgd_nn)
     {
         glColor3f(0, 0, 0);

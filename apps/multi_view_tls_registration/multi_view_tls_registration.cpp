@@ -151,6 +151,8 @@ void save_intersection(const Session &session, std::string output_las_name, bool
 
 void save_all_to_las(const Session &session, std::string output_las_name)
 {
+	//std::vector<mandeye::PointRGB> color_points;
+
 	std::vector<Eigen::Vector3d> pointcloud;
 	std::vector<unsigned short> intensity;
 	std::vector<double> timestamps;

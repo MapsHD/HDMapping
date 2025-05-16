@@ -74,7 +74,7 @@ bool load_data(std::vector<std::string>& input_file_names, LidarOdometryParams& 
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
 
-        std::cout << "0" << std::endl;
+        //std::cout << "0" << std::endl;
 
         // check if folder exists!
         if (!fs::exists(working_directory))
@@ -426,7 +426,7 @@ void run_consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams& 
     std::cout << "Point cloud consistency and trajectory smoothness FINISHED" << std::endl;
 }
 
-void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, fs::path outwd)
+void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, fs::path outwd, double elapsed_time_s)
 {   
     std::filesystem::create_directory(outwd);
     // concatenate data
@@ -572,7 +572,8 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
     j["out_poses_file_name"] = path2.string();
     j["lidar_odometry_version"] = HDMAPPING_VERSION_STRING;
     j["length of trajectory[m]"] = params.total_length_of_calculated_trajectory;
-
+    j["elapsed time seconds"] = elapsed_time_s;
+    
     jj["Session Settings"] = j;
 
     nlohmann::json jlaz_file_names;
@@ -692,11 +693,11 @@ void load_reference_point_clouds(std::vector<std::string> input_file_names, Lida
     params.buckets_indoor = params.reference_buckets;
 }
 
-std::string save_results_automatic(LidarOdometryParams& params, std::vector<WorkerData> &worker_data, Session& session, std::string working_directory)
+std::string save_results_automatic(LidarOdometryParams& params, std::vector<WorkerData> &worker_data, Session& session, std::string working_directory, double elapsed_seconds)
 {
     int result = get_next_result_id(working_directory);
     fs::path outwd = working_directory / fs::path("lidar_odometry_result_" + std::to_string(result));
-    save_result(worker_data, params, outwd);
+    save_result(worker_data, params, outwd, elapsed_seconds);
     if (params.save_laz)
     {
         save_all_to_las(worker_data, params, (outwd / "all_lo.laz").string(), session);
@@ -744,10 +745,10 @@ void run_lidar_odometry(std::string input_dir, LidarOdometryParams& params)
         return;
     }
     std::string working_directory = fs::path(input_file_names[0]).parent_path().string();
-    params.current_output_dir = save_results_automatic(params, worker_data, session, working_directory);
+    params.current_output_dir = save_results_automatic(params, worker_data, session, working_directory, 0.0);
     if (params.apply_consistency)
     {
         run_consistency(worker_data, params);
-        params.current_output_dir = save_results_automatic(params, worker_data, session, working_directory);
+        params.current_output_dir = save_results_automatic(params, worker_data, session, working_directory, 0.0);
     }
 }

@@ -167,11 +167,11 @@ void step2()
     }
 }
 
-void save_results(bool info)
+void save_results(bool info, double elapsed_seconds)
 {
     int result = get_next_result_id(working_directory);
     fs::path outwd = working_directory / fs::path("lidar_odometry_result_" + std::to_string(result));
-    save_result(worker_data, params, outwd);
+    save_result(worker_data, params, outwd, elapsed_seconds);
     if (info)
     {
         std::string message_info = "Results saved to folder: '" + outwd.string() + "'";
@@ -387,27 +387,10 @@ void lidar_odometry_gui()
             }
             //ImGui::SameLine();
             ImGui::Checkbox("use mutliple Gaussians for each bucket", &params.use_mutliple_gaussian);
-            /*if (ImGui::Button("Consistency2"))
-            {
-                std::cout << "Consistency2 START" << std::endl;
-
-                for (int i = 0; i < num_constistency_iter; i++)
-                {
-                    std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
-                    for (int ii = 0; ii < worker_data.size(); ii++)
-                    {
-                        worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
-                    }
-                    Consistency2(worker_data, params);
-                }
-                std::cout << "Consistency2 FINISHED" << std::endl;
-            }*/
-            // ImGui::SameLine();
-            // ImGui::Text(" (info: Press 'Consistency' button optionally before pressing 'Save result (step 3)')");
-
+            
             if (ImGui::Button("Save result (step 3)"))
             {
-                save_results(true);
+                save_results(true, 0.0);
             }
             ImGui::SameLine();
             ImGui::Text("Press this button for saving resulting trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program");
@@ -476,43 +459,6 @@ void lidar_odometry_gui()
             ImGui::InputDouble("rgd_sf_sigma_ka_deg", &params.rgd_sf_sigma_ka_deg);
             ImGui::Text("------------------------------------------------------");
 
-            // if (step_1_done && step_2_done)
-            //{
-            /*ImGui::Text("'Consistency' makes trajectory smooth, point cloud will be more consistent");
-            if (ImGui::Button("Consistency"))
-            {
-                std::cout << "Consistency START" << std::endl;
-
-                for (int i = 0; i < num_constistency_iter; i++)
-                {
-                    std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
-                    for (int ii = 0; ii < worker_data.size(); ii++)
-                    {
-                        worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
-                    }
-                    Consistency(worker_data, params);
-                }
-                std::cout << "Consistency FINISHED" << std::endl;
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Consistency2"))
-            {
-                std::cout << "Consistency2 START" << std::endl;
-
-                for (int i = 0; i < num_constistency_iter; i++)
-                {
-                    std::cout << "Iteration " << i + 1 << " of " << num_constistency_iter << std::endl;
-                    for (int ii = 0; ii < worker_data.size(); ii++)
-                    {
-                        worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
-                    }
-                    Consistency2(worker_data, params);
-                }
-                std::cout << "Consistency2 FINISHED" << std::endl;
-            }
-            ImGui::SameLine();
-            ImGui::Text("Press this button optionally before pressing 'save result (step 3)'");
-            */
             //}
             // ImGui::SameLine();
             if (ImGui::Button("save trajectory to ascii (x y z)"))
@@ -931,6 +877,9 @@ void lidar_odometry_basic_gui()
     if (ImGui::Begin("lidar_odometry_simple_gui")) {
         if (ImGui::Button("Process MANDEYE data in folder"))
         {
+            std::chrono::time_point<std::chrono::system_clock> start, end;
+            start = std::chrono::system_clock::now();
+
             //auto dir = pfd::select_folder("Select any directory", DEFAULT_PATH).result();
             //std::cout << "Selected dir: " << dir << "\n";
 
@@ -956,11 +905,18 @@ void lidar_odometry_basic_gui()
 
             params.use_robust_and_accurate_lidar_odometry = false;
 
-            params.nr_iter = 200;
+            params.nr_iter = 50;
             
             step2();
 
-            save_results(false);
+            end = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_seconds = end - start;
+            std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+            std::cout << "calculations finished computation at "
+                      << std::ctime(&end_time)
+                      << "elapsed time: " << elapsed_seconds.count() << "s\n";
+
+            save_results(false, elapsed_seconds.count());
 
             /*for (int i = 0; i < params.num_constistency_iter; i++)
             {
@@ -980,7 +936,7 @@ void lidar_odometry_basic_gui()
             //    std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
 
             std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
-                 std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
+                                       std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
 
             [[maybe_unused]]
             pfd::message message(
@@ -993,6 +949,9 @@ void lidar_odometry_basic_gui()
 
         if (ImGui::Button("Process MANDEYE data in folder (quick but less accurate, less precise)"))
         {
+            std::chrono::time_point<std::chrono::system_clock> start, end;
+            start = std::chrono::system_clock::now();
+
             // auto dir = pfd::select_folder("Select any directory", DEFAULT_PATH).result();
             // std::cout << "Selected dir: " << dir << "\n";
 
@@ -1023,27 +982,17 @@ void lidar_odometry_basic_gui()
 
             step2();
 
-            save_results(false);
+            end = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_seconds = end - start;
+            std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+            std::cout << "calculations finished computation at "
+                      << std::ctime(&end_time)
+                      << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
-            /*for (int i = 0; i < params.num_constistency_iter; i++)
-            {
-                std::cout << "Iteration " << i + 1 << " of " << params.num_constistency_iter << std::endl;
-                for (int ii = 0; ii < worker_data.size(); ii++)
-                {
-                    worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
-                }
-                Consistency(worker_data, params);
-            }
-
-            save_results(false);*/
-
-            // std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
-
-            // std::string message_info = "Data saved to folders '" + working_directory + "\\lidar_odometry_result_0' and '" + working_directory + "\\lidar_odometry_result_1' total_length_of_calculated_trajectory=" +
-            //     std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
+            save_results(false, elapsed_seconds.count());
 
             std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
-                                       std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
+                                       std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
 
             [[maybe_unused]]
             pfd::message message(
@@ -1051,7 +1000,6 @@ void lidar_odometry_basic_gui()
                 message_info.c_str(),
                 pfd::choice::ok, pfd::icon::info);
             message.result();
-            // exit(1);
         }
 
         ImGui::Checkbox("full_lidar_odometry_gui", &full_lidar_odometry_gui);

@@ -781,6 +781,23 @@ void project_gui()
                 }*/
             }
 
+            ImGui::SameLine();
+            if (ImGui::Button("set all fuse_inclination_from_IMU"))
+            {
+                for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++){
+                    session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = true;
+                }
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("unset all fuse_inclination_from_IMU"))
+            {
+                for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                {
+                    session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = false;
+                }
+            }
+
             ImGui::Checkbox("show_with_initial_pose", &session.point_clouds_container.show_with_initial_pose);
             ImGui::SameLine();
             ImGui::Checkbox("manipulate_only_marked_gizmo (false: move also succesive nodes)", &manipulate_only_marked_gizmo);

@@ -1658,12 +1658,12 @@ void optimize_rigid_sf(
     intermediate_trajectory_motion_model = _intermediate_trajectory;
 }
 
-void optimize(std::vector<Point3Di> &intermediate_points,
-              std::vector<Eigen::Affine3d> &intermediate_trajectory,
-              std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params_indoor, NDTBucketMapType &buckets_indoor,
-              NDT::GridParameters &rgd_params_outdoor, NDTBucketMapType &buckets_outdoor, bool multithread,
-              double max_distance, double &delta)
+void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
+                             std::vector<Eigen::Affine3d> &intermediate_trajectory,
+                             std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
+                             NDT::GridParameters &rgd_params_indoor, NDTBucketMapType &buckets_indoor,
+                             NDT::GridParameters &rgd_params_outdoor, NDTBucketMapType &buckets_outdoor, bool multithread,
+                             double max_distance, double &delta)
 {
     std::vector<Eigen::Triplet<double>> tripletListA;
     std::vector<Eigen::Triplet<double>> tripletListP;
@@ -1990,6 +1990,21 @@ void optimize(std::vector<Point3Di> &intermediate_points,
         tripletListP.emplace_back(ir + 4, ir + 4, 100000000);
         tripletListP.emplace_back(ir + 5, ir + 5, 1000000);
     }*/
+
+    double sigma_motion_model_om = 0.001 * M_PI / 180.0;
+    double sigma_motion_model_fi = 0.001 * M_PI / 180.0;
+    double sigma_motion_model_ka = 0.01 * M_PI / 180.0;
+
+    double w_motion_model_om = 1.0 / (sigma_motion_model_om * sigma_motion_model_om);
+    double w_motion_model_fi = 1.0 / (sigma_motion_model_fi * sigma_motion_model_fi);
+    double w_motion_model_ka = 1.0 / (sigma_motion_model_ka * sigma_motion_model_ka);
+
+    //double sigma_motion_model_om_gt = 0.1 * M_PI / 180.0;
+    //double sigma_motion_model_fi_gt = 0.1 * M_PI / 180.0;
+
+    //double w_motion_model_om_gt = 1.0 / (sigma_motion_model_om_gt * sigma_motion_model_om_gt);
+    //double w_motion_model_fi_gt = 1.0 / (sigma_motion_model_fi_gt * sigma_motion_model_fi_gt);
+
     for (size_t i = 0; i < odo_edges.size(); i++)
     {
         Eigen::Matrix<double, 6, 1> relative_pose_measurement_odo;
@@ -2026,9 +2041,9 @@ void optimize(std::vector<Point3Di> &intermediate_points,
                                                                  // 10000000000,
                                                                  100000000,
                                                                  100000000,
-                                                                 100000000, //
-                                                                 100000000, //
-                                                                 100000000);
+                                                                 w_motion_model_om * cauchy(relative_pose_measurement_odo(3, 0), 1), // 100000000, //
+                                                                 w_motion_model_fi * cauchy(relative_pose_measurement_odo(4, 0), 1),                                                  // 100000000, //
+                                                                 w_motion_model_ka * cauchy(relative_pose_measurement_odo(5, 0), 1));                                                 // 100000000);
         Eigen::Matrix<double, 12, 1> AtPBodo;
         relative_pose_obs_eq_tait_bryan_wc_case1_AtPB_simplified(AtPBodo,
                                                                  poses[odo_edges[i].first].px,
@@ -2054,9 +2069,9 @@ void optimize(std::vector<Point3Di> &intermediate_points,
                                                                  // 10000000000,
                                                                  100000000,
                                                                  100000000,
-                                                                 100000000, // underground mining
-                                                                 100000000, // underground mining
-                                                                 100000000);
+                                                                 w_motion_model_om * cauchy(relative_pose_measurement_odo(3, 0), 1), // 100000000, //
+                                                                 w_motion_model_fi * cauchy(relative_pose_measurement_odo(4, 0), 1),  // 100000000, //
+                                                                 w_motion_model_ka * cauchy(relative_pose_measurement_odo(5, 0), 1));
         int ic_1 = odo_edges[i].first * 6;
         int ic_2 = odo_edges[i].second * 6;
 
@@ -2078,181 +2093,203 @@ void optimize(std::vector<Point3Di> &intermediate_points,
         }
     }
 
-    // smoothness
-    /*for (size_t i = 1; i < poses.size() - 1; i++)
-    {
-        Eigen::Matrix<double, 6, 1> delta;
-        smoothness_obs_eq_tait_bryan_wc(delta,
-                                        poses[i - 1].px,
-                                        poses[i - 1].py,
-                                        poses[i - 1].pz,
-                                        poses[i - 1].om,
-                                        poses[i - 1].fi,
-                                        poses[i - 1].ka,
-                                        poses[i].px,
-                                        poses[i].py,
-                                        poses[i].pz,
-                                        poses[i].om,
-                                        poses[i].fi,
-                                        poses[i].ka,
-                                        poses[i + 1].px,
-                                        poses[i + 1].py,
-                                        poses[i + 1].pz,
-                                        poses[i + 1].om,
-                                        poses[i + 1].fi,
-                                        poses[i + 1].ka);
+    //std::vector<TaitBryanPose> poses;
+    //std::vector<TaitBryanPose> poses_desired;
 
-        Eigen::Matrix<double, 6, 18, Eigen::RowMajor> jacobian;
-        smoothness_obs_eq_tait_bryan_wc_jacobian(jacobian,
-                                                 poses[i - 1].px,
-                                                 poses[i - 1].py,
-                                                 poses[i - 1].pz,
-                                                 poses[i - 1].om,
-                                                 poses[i - 1].fi,
-                                                 poses[i - 1].ka,
-                                                 poses[i].px,
-                                                 poses[i].py,
-                                                 poses[i].pz,
-                                                 poses[i].om,
-                                                 poses[i].fi,
-                                                 poses[i].ka,
-                                                 poses[i + 1].px,
-                                                 poses[i + 1].py,
-                                                 poses[i + 1].pz,
-                                                 poses[i + 1].om,
-                                                 poses[i + 1].fi,
-                                                 poses[i + 1].ka);
-
+    /*for (int i = 0; i < poses.size(); i++){
+        int ic = i * 6;
         int ir = tripletListB.size();
 
-        int ic_1 = (i - 1) * 6;
-        int ic_2 = i * 6;
-        int ic_3 = (i + 1) * 6;
+        double delta_om = poses_desired[i].om - poses[i].om;
+        double delta_fi = poses_desired[i].fi - poses[i].fi;
 
-        for (size_t row = 0; row < 6; row++)
-        {
-            tripletListA.emplace_back(ir + row, ic_1, -jacobian(row, 0));
-            tripletListA.emplace_back(ir + row, ic_1 + 1, -jacobian(row, 1));
-            tripletListA.emplace_back(ir + row, ic_1 + 2, -jacobian(row, 2));
-            tripletListA.emplace_back(ir + row, ic_1 + 3, -jacobian(row, 3));
-            tripletListA.emplace_back(ir + row, ic_1 + 4, -jacobian(row, 4));
-            tripletListA.emplace_back(ir + row, ic_1 + 5, -jacobian(row, 5));
+        //std::cout << ":" << delta_om << " " << delta_fi << std::endl;
 
-            tripletListA.emplace_back(ir + row, ic_2, -jacobian(row, 6));
-            tripletListA.emplace_back(ir + row, ic_2 + 1, -jacobian(row, 7));
-            tripletListA.emplace_back(ir + row, ic_2 + 2, -jacobian(row, 8));
-            tripletListA.emplace_back(ir + row, ic_2 + 3, -jacobian(row, 9));
-            tripletListA.emplace_back(ir + row, ic_2 + 4, -jacobian(row, 10));
-            tripletListA.emplace_back(ir + row, ic_2 + 5, -jacobian(row, 11));
+        tripletListA.emplace_back(ir + 0, ic + 3, 1);
+        tripletListA.emplace_back(ir + 1, ic + 4, 1);
 
-            tripletListA.emplace_back(ir + row, ic_3, -jacobian(row, 12));
-            tripletListA.emplace_back(ir + row, ic_3 + 1, -jacobian(row, 13));
-            tripletListA.emplace_back(ir + row, ic_3 + 2, -jacobian(row, 14));
-            tripletListA.emplace_back(ir + row, ic_3 + 3, -jacobian(row, 15));
-            tripletListA.emplace_back(ir + row, ic_3 + 4, -jacobian(row, 16));
-            tripletListA.emplace_back(ir + row, ic_3 + 5, -jacobian(row, 17));
-        }
-        tripletListB.emplace_back(ir, 0, delta(0, 0));
-        tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
-        tripletListB.emplace_back(ir + 2, 0, delta(2, 0));
-        tripletListB.emplace_back(ir + 3, 0, delta(3, 0));
-        tripletListB.emplace_back(ir + 4, 0, delta(4, 0));
-        tripletListB.emplace_back(ir + 5, 0, delta(5, 0));
+        tripletListB.emplace_back(ir, 0, delta_om);
+        tripletListB.emplace_back(ir + 1, 0, delta_fi);
 
-        tripletListP.emplace_back(ir, ir, 10000);
-        tripletListP.emplace_back(ir + 1, ir + 1, 10000);
-        tripletListP.emplace_back(ir + 2, ir + 2, 10000);
-        tripletListP.emplace_back(ir + 3, ir + 3, 10000);
-        tripletListP.emplace_back(ir + 4, ir + 4, 10000);
-        tripletListP.emplace_back(ir + 5, ir + 5, 10000);
+        tripletListP.emplace_back(ir, ir, w_motion_model_om_gt * cauchy(delta_om, 1));
+        tripletListP.emplace_back(ir + 1, ir + 1, w_motion_model_fi_gt * cauchy(delta_fi, 1));
     }*/
 
-    // maintain angles
-    /*if (add_pitch_roll_constraint)
-    {
-        for (int i = 0; i < imu_roll_pitch.size(); i++)
+        // smoothness
+        /*for (size_t i = 1; i < poses.size() - 1; i++)
         {
-            TaitBryanPose current_pose = poses[i];
-            TaitBryanPose desired_pose = current_pose;
-            desired_pose.om = imu_roll_pitch[i].first;
-            desired_pose.fi = imu_roll_pitch[i].second;
+            Eigen::Matrix<double, 6, 1> delta;
+            smoothness_obs_eq_tait_bryan_wc(delta,
+                                            poses[i - 1].px,
+                                            poses[i - 1].py,
+                                            poses[i - 1].pz,
+                                            poses[i - 1].om,
+                                            poses[i - 1].fi,
+                                            poses[i - 1].ka,
+                                            poses[i].px,
+                                            poses[i].py,
+                                            poses[i].pz,
+                                            poses[i].om,
+                                            poses[i].fi,
+                                            poses[i].ka,
+                                            poses[i + 1].px,
+                                            poses[i + 1].py,
+                                            poses[i + 1].pz,
+                                            poses[i + 1].om,
+                                            poses[i + 1].fi,
+                                            poses[i + 1].ka);
 
-            Eigen::Affine3d desired_mpose = affine_matrix_from_pose_tait_bryan(desired_pose);
-            Eigen::Vector3d vx(desired_mpose(0, 0), desired_mpose(1, 0), desired_mpose(2, 0));
-            Eigen::Vector3d vy(desired_mpose(0, 1), desired_mpose(1, 1), desired_mpose(2, 1));
-            Eigen::Vector3d point_on_target_line(desired_mpose(0, 3), desired_mpose(1, 3), desired_mpose(2, 3));
-
-            Eigen::Vector3d point_source_local(0, 0, 1);
-
-            Eigen::Matrix<double, 2, 1> delta;
-            point_to_line_tait_bryan_wc(delta,
-                                        current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
-                                        point_source_local.x(), point_source_local.y(), point_source_local.z(),
-                                        point_on_target_line.x(), point_on_target_line.y(), point_on_target_line.z(),
-                                        vx.x(), vx.y(), vx.z(), vy.x(), vy.y(), vy.z());
-
-            Eigen::Matrix<double, 2, 6> delta_jacobian;
-            point_to_line_tait_bryan_wc_jacobian(delta_jacobian,
-                                                 current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
-                                                 point_source_local.x(), point_source_local.y(), point_source_local.z(),
-                                                 point_on_target_line.x(), point_on_target_line.y(), point_on_target_line.z(),
-                                                 vx.x(), vx.y(), vx.z(), vy.x(), vy.y(), vy.z());
+            Eigen::Matrix<double, 6, 18, Eigen::RowMajor> jacobian;
+            smoothness_obs_eq_tait_bryan_wc_jacobian(jacobian,
+                                                     poses[i - 1].px,
+                                                     poses[i - 1].py,
+                                                     poses[i - 1].pz,
+                                                     poses[i - 1].om,
+                                                     poses[i - 1].fi,
+                                                     poses[i - 1].ka,
+                                                     poses[i].px,
+                                                     poses[i].py,
+                                                     poses[i].pz,
+                                                     poses[i].om,
+                                                     poses[i].fi,
+                                                     poses[i].ka,
+                                                     poses[i + 1].px,
+                                                     poses[i + 1].py,
+                                                     poses[i + 1].pz,
+                                                     poses[i + 1].om,
+                                                     poses[i + 1].fi,
+                                                     poses[i + 1].ka);
 
             int ir = tripletListB.size();
 
-            for (int ii = 0; ii < 2; ii++)
-            {
-                for (int jj = 0; jj < 6; jj++)
-                {
-                    int ic = i * 6;
-                    if (delta_jacobian(ii, jj) != 0.0)
-                    {
-                        tripletListA.emplace_back(ir + ii, ic + jj, -delta_jacobian(ii, jj));
-                    }
-                }
-            }
-            // tripletListP.emplace_back(ir, ir, cauchy(delta(0, 0), 1));
-            // tripletListP.emplace_back(ir + 1, ir + 1, cauchy(delta(1, 0), 1));
-            tripletListP.emplace_back(ir, ir, 1);
-            tripletListP.emplace_back(ir + 1, ir + 1, 1);
+            int ic_1 = (i - 1) * 6;
+            int ic_2 = i * 6;
+            int ic_3 = (i + 1) * 6;
 
+            for (size_t row = 0; row < 6; row++)
+            {
+                tripletListA.emplace_back(ir + row, ic_1, -jacobian(row, 0));
+                tripletListA.emplace_back(ir + row, ic_1 + 1, -jacobian(row, 1));
+                tripletListA.emplace_back(ir + row, ic_1 + 2, -jacobian(row, 2));
+                tripletListA.emplace_back(ir + row, ic_1 + 3, -jacobian(row, 3));
+                tripletListA.emplace_back(ir + row, ic_1 + 4, -jacobian(row, 4));
+                tripletListA.emplace_back(ir + row, ic_1 + 5, -jacobian(row, 5));
+
+                tripletListA.emplace_back(ir + row, ic_2, -jacobian(row, 6));
+                tripletListA.emplace_back(ir + row, ic_2 + 1, -jacobian(row, 7));
+                tripletListA.emplace_back(ir + row, ic_2 + 2, -jacobian(row, 8));
+                tripletListA.emplace_back(ir + row, ic_2 + 3, -jacobian(row, 9));
+                tripletListA.emplace_back(ir + row, ic_2 + 4, -jacobian(row, 10));
+                tripletListA.emplace_back(ir + row, ic_2 + 5, -jacobian(row, 11));
+
+                tripletListA.emplace_back(ir + row, ic_3, -jacobian(row, 12));
+                tripletListA.emplace_back(ir + row, ic_3 + 1, -jacobian(row, 13));
+                tripletListA.emplace_back(ir + row, ic_3 + 2, -jacobian(row, 14));
+                tripletListA.emplace_back(ir + row, ic_3 + 3, -jacobian(row, 15));
+                tripletListA.emplace_back(ir + row, ic_3 + 4, -jacobian(row, 16));
+                tripletListA.emplace_back(ir + row, ic_3 + 5, -jacobian(row, 17));
+            }
             tripletListB.emplace_back(ir, 0, delta(0, 0));
             tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
-        }
-    }*/
+            tripletListB.emplace_back(ir + 2, 0, delta(2, 0));
+            tripletListB.emplace_back(ir + 3, 0, delta(3, 0));
+            tripletListB.emplace_back(ir + 4, 0, delta(4, 0));
+            tripletListB.emplace_back(ir + 5, 0, delta(5, 0));
 
-    // underground mining
-    /*double angle = 1.0 / 180.0 * M_PI;
-    double w_angle = 1.0 / (angle * angle);
+            tripletListP.emplace_back(ir, ir, 10000);
+            tripletListP.emplace_back(ir + 1, ir + 1, 10000);
+            tripletListP.emplace_back(ir + 2, ir + 2, 10000);
+            tripletListP.emplace_back(ir + 3, ir + 3, 10000);
+            tripletListP.emplace_back(ir + 4, ir + 4, 10000);
+            tripletListP.emplace_back(ir + 5, ir + 5, 10000);
+        }*/
 
-    double angle01 = 0.1 / 180.0 * M_PI;
-    double w_angle01 = 1.0 / (angle01 * angle01);
+        // maintain angles
+        /*if (add_pitch_roll_constraint)
+        {
+            for (int i = 0; i < imu_roll_pitch.size(); i++)
+            {
+                TaitBryanPose current_pose = poses[i];
+                TaitBryanPose desired_pose = current_pose;
+                desired_pose.om = imu_roll_pitch[i].first;
+                desired_pose.fi = imu_roll_pitch[i].second;
 
-    for (int ic = 0; ic < intermediate_trajectory.size(); ic ++){
-        int ir = tripletListB.size();
-        tripletListA.emplace_back(ir    , ic * 6 + 0, 1);
-        tripletListA.emplace_back(ir + 1, ic * 6 + 1, 1);
-        tripletListA.emplace_back(ir + 2, ic * 6 + 2, 1);
-        tripletListA.emplace_back(ir + 3, ic * 6 + 3, 1);
-        tripletListA.emplace_back(ir + 4, ic * 6 + 4, 1);
-        tripletListA.emplace_back(ir + 5, ic * 6 + 5, 1);
+                Eigen::Affine3d desired_mpose = affine_matrix_from_pose_tait_bryan(desired_pose);
+                Eigen::Vector3d vx(desired_mpose(0, 0), desired_mpose(1, 0), desired_mpose(2, 0));
+                Eigen::Vector3d vy(desired_mpose(0, 1), desired_mpose(1, 1), desired_mpose(2, 1));
+                Eigen::Vector3d point_on_target_line(desired_mpose(0, 3), desired_mpose(1, 3), desired_mpose(2, 3));
 
-        tripletListP.emplace_back(ir, ir, 0);
-        tripletListP.emplace_back(ir + 1, ir + 1, 0);
-        tripletListP.emplace_back(ir + 2, ir + 2, 0);
-        tripletListP.emplace_back(ir + 3, ir + 3, w_angle01);
-        tripletListP.emplace_back(ir + 4, ir + 4, w_angle01);
-        tripletListP.emplace_back(ir + 5, ir + 5, 0);
+                Eigen::Vector3d point_source_local(0, 0, 1);
 
-        tripletListB.emplace_back(ir, 0, 0);
-        tripletListB.emplace_back(ir + 1, 0, 0);
-        tripletListB.emplace_back(ir + 2, 0, 0);
-        tripletListB.emplace_back(ir + 3, 0, 0);
-        tripletListB.emplace_back(ir + 4, 0, 0);
-        tripletListB.emplace_back(ir + 5, 0, 0);
-    }*/
+                Eigen::Matrix<double, 2, 1> delta;
+                point_to_line_tait_bryan_wc(delta,
+                                            current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                            point_source_local.x(), point_source_local.y(), point_source_local.z(),
+                                            point_on_target_line.x(), point_on_target_line.y(), point_on_target_line.z(),
+                                            vx.x(), vx.y(), vx.z(), vy.x(), vy.y(), vy.z());
 
-    // exit(1);
+                Eigen::Matrix<double, 2, 6> delta_jacobian;
+                point_to_line_tait_bryan_wc_jacobian(delta_jacobian,
+                                                     current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                                     point_source_local.x(), point_source_local.y(), point_source_local.z(),
+                                                     point_on_target_line.x(), point_on_target_line.y(), point_on_target_line.z(),
+                                                     vx.x(), vx.y(), vx.z(), vy.x(), vy.y(), vy.z());
+
+                int ir = tripletListB.size();
+
+                for (int ii = 0; ii < 2; ii++)
+                {
+                    for (int jj = 0; jj < 6; jj++)
+                    {
+                        int ic = i * 6;
+                        if (delta_jacobian(ii, jj) != 0.0)
+                        {
+                            tripletListA.emplace_back(ir + ii, ic + jj, -delta_jacobian(ii, jj));
+                        }
+                    }
+                }
+                // tripletListP.emplace_back(ir, ir, cauchy(delta(0, 0), 1));
+                // tripletListP.emplace_back(ir + 1, ir + 1, cauchy(delta(1, 0), 1));
+                tripletListP.emplace_back(ir, ir, 1);
+                tripletListP.emplace_back(ir + 1, ir + 1, 1);
+
+                tripletListB.emplace_back(ir, 0, delta(0, 0));
+                tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+            }
+        }*/
+
+        // underground mining
+        /*double angle = 1.0 / 180.0 * M_PI;
+        double w_angle = 1.0 / (angle * angle);
+
+        double angle01 = 0.1 / 180.0 * M_PI;
+        double w_angle01 = 1.0 / (angle01 * angle01);
+
+        for (int ic = 0; ic < intermediate_trajectory.size(); ic ++){
+            int ir = tripletListB.size();
+            tripletListA.emplace_back(ir    , ic * 6 + 0, 1);
+            tripletListA.emplace_back(ir + 1, ic * 6 + 1, 1);
+            tripletListA.emplace_back(ir + 2, ic * 6 + 2, 1);
+            tripletListA.emplace_back(ir + 3, ic * 6 + 3, 1);
+            tripletListA.emplace_back(ir + 4, ic * 6 + 4, 1);
+            tripletListA.emplace_back(ir + 5, ic * 6 + 5, 1);
+
+            tripletListP.emplace_back(ir, ir, 0);
+            tripletListP.emplace_back(ir + 1, ir + 1, 0);
+            tripletListP.emplace_back(ir + 2, ir + 2, 0);
+            tripletListP.emplace_back(ir + 3, ir + 3, w_angle01);
+            tripletListP.emplace_back(ir + 4, ir + 4, w_angle01);
+            tripletListP.emplace_back(ir + 5, ir + 5, 0);
+
+            tripletListB.emplace_back(ir, 0, 0);
+            tripletListB.emplace_back(ir + 1, 0, 0);
+            tripletListB.emplace_back(ir + 2, 0, 0);
+            tripletListB.emplace_back(ir + 3, 0, 0);
+            tripletListB.emplace_back(ir + 4, 0, 0);
+            tripletListB.emplace_back(ir + 5, 0, 0);
+        }*/
+
+        // exit(1);
     int ic = 0;
     int ir = tripletListB.size();
     tripletListA.emplace_back(ir, ic * 6 + 0, 1);
@@ -2265,9 +2302,9 @@ void optimize(std::vector<Point3Di> &intermediate_points,
     tripletListP.emplace_back(ir, ir, 1000000);
     tripletListP.emplace_back(ir + 1, ir + 1, 1000000);
     tripletListP.emplace_back(ir + 2, ir + 2, 1000000);
-    tripletListP.emplace_back(ir + 3, ir + 3, 100000000);
-    tripletListP.emplace_back(ir + 4, ir + 4, 100000000);
-    tripletListP.emplace_back(ir + 5, ir + 5, 100000000);
+    tripletListP.emplace_back(ir + 3, ir + 3, w_motion_model_om); // 100000000
+    tripletListP.emplace_back(ir + 4, ir + 4, w_motion_model_fi); // 100000000
+    tripletListP.emplace_back(ir + 5, ir + 5, w_motion_model_ka);
 
     tripletListB.emplace_back(ir, 0, 0);
     tripletListB.emplace_back(ir + 1, 0, 0);
@@ -3061,15 +3098,25 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             ///
             worker_data[i].intermediate_trajectory_motion_model = worker_data[i].intermediate_trajectory;
 
+            /*for (int j = 0; j < worker_data[i].intermediate_trajectory_motion_model.size(); j++){
+                double om = worker_data[i].imu_om_fi_ka[j].x();
+                double fi = worker_data[i].imu_om_fi_ka[j].y();
+
+                TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory_motion_model[j]);
+                pose.om = om;
+                pose.fi = fi;
+                worker_data[i].intermediate_trajectory_motion_model[j] = affine_matrix_from_pose_tait_bryan(pose);
+            }*/
+
             double delta = 100000.0;
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
 
                 delta = 100000.0;
-                optimize(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
-                         params.in_out_params_indoor, params.buckets_indoor,
-                         params.in_out_params_outdoor, params.buckets_outdoor, 
-                         params.useMultithread, params.max_distance, delta /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
+                optimize_lidar_odometry(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
+                                        params.in_out_params_indoor, params.buckets_indoor,
+                                        params.in_out_params_outdoor, params.buckets_outdoor,
+                                        params.useMultithread, params.max_distance, delta /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
                 if (delta < 1e-6)
                 {
                     std::cout << "------------" << std::endl;

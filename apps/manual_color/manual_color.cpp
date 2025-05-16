@@ -443,7 +443,7 @@ void ImGuiLoadSaveButtons()
         SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
     }
     ImGui::SameLine();
-    if (ImGui::Button("Save Poincloud"))
+    if (ImGui::Button("Save Pointcloud"))
     {
         const auto input_file_names = mandeye::fd::SaveFileDialog("Choose Pointcloud", mandeye::fd::LazFilter);
         if (!input_file_names.empty())

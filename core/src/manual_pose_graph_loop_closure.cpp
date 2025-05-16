@@ -314,12 +314,25 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 // tripletListP.emplace_back(ir + 3, ir + 3, get_cauchy_w(delta(3, 0), 10));
                                 // tripletListP.emplace_back(ir + 4, ir + 4, get_cauchy_w(delta(4, 0), 10));
                                 // tripletListP.emplace_back(ir + 5, ir + 5, get_cauchy_w(delta(5, 0), 10));
-                                tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
-                                tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
-                                tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
-                                tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
-                                tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
-                                tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
+
+                                if (i < poses_motion_model.size())
+                                {
+                                    tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
+                                    tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
+                                    tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
+                                    tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om * cauchy(normalize_angle(delta(3, 0)), 1));
+                                    tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi * cauchy(normalize_angle(delta(4, 0)), 1));
+                                    tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka * cauchy(normalize_angle(delta(5, 0)), 1));
+                                }
+                                else
+                                {
+                                    tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
+                                    tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
+                                    tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
+                                    tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
+                                    tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
+                                    tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
+                                }
                             }
 
                             if (gcps.gpcs.size() == 0)
@@ -515,6 +528,9 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                             // if (fuse_inclination_from_imu)
                             //{
                             //
+                            double error_imu = 0;
+                            double error_imu_sum = 0;
+
                             for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
                             {
 
@@ -527,6 +543,37 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 {
                                     continue;
                                 }
+
+                                double om = pc.local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
+                                double fi = pc.local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
+
+                                if (fabs(om) > 5 || fabs(fi) > 5){
+                                    continue;
+                                }
+
+                               // std::cout << "om: " << om << " fi: " << fi << std::endl;
+#if 0
+                                int ic = index_pose * 6;
+                                int ir = tripletListB.size();
+
+                                double delta_om = pc.local_trajectory[0].imu_om_fi_ka.x() - poses[index_pose].om;
+                                double delta_fi = pc.local_trajectory[0].imu_om_fi_ka.y() - poses[index_pose].fi;
+
+                                // std::cout << ":" << delta_om << " " << delta_fi << std::endl;
+
+                                tripletListA.emplace_back(ir + 0, ic + 3, 1);
+                                tripletListA.emplace_back(ir + 1, ic + 4, 1);
+
+                                tripletListB.emplace_back(ir, 0, delta_om);
+                                tripletListB.emplace_back(ir + 1, 0, delta_fi);
+
+                                tripletListP.emplace_back(ir, ir, 100 * get_cauchy_w(delta_om, 1));
+                                tripletListP.emplace_back(ir + 1, ir + 1, 100 * get_cauchy_w(delta_fi, 1));
+
+                                error_imu += sqrt(delta_om * delta_om + delta_fi * delta_fi);
+                                error_imu_sum++;
+#endif 
+#if 1
                                 TaitBryanPose current_pose = pose_tait_bryan_from_affine_matrix(pc.m_pose); // poses[i];
                                 TaitBryanPose desired_pose = current_pose;
                                 desired_pose.om = pc.local_trajectory[0].imu_om_fi_ka.x();
@@ -584,7 +631,16 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
 
                                 tripletListB.emplace_back(ir, 0, delta(0, 0));
                                 tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+
+                                error_imu += sqrt(delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0));
+                                error_imu_sum++;
+
+#endif
+
                             }
+
+                            std::cout << "------------------------------" << std::endl;
+                            std::cout << "error imu: " << error_imu / error_imu_sum << std::endl;
                             //
                             //}
 

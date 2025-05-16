@@ -151,6 +151,31 @@ bool load_data(std::vector<std::string>& input_file_names, LidarOdometryParams& 
             auto imu = load_imu(imufn.c_str(), imuNumberToUse);
             std::cout << imufn << " with mapping " << snFn << std::endl;
             imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
+            bool hasError = false;
+
+            if (!preloadedCalibration.empty()) {
+                for (const auto& [id, sn] : idToSn) {
+                        if (preloadedCalibration.find(sn) == preloadedCalibration.end()) {
+                            std::cerr << "WRONG CALIBRATION FILE! THE SERIAL NUMBER SHOULD BE " << sn << "!!!\n";
+                            hasError = true;
+                        }
+                    }
+
+            if (!hasError && preloadedCalibration.find(imuSnToUse) == preloadedCalibration.end()) {
+                    std::cerr << "MISSING CALIBRATION FOR imuSnToUse: " << imuSnToUse << "!!!\n";
+                    std::cerr << "Available serial numbers in calibration file are:\n";
+                    for (const auto& [snKey, _] : preloadedCalibration) {
+                                std::cerr << "  - " << snKey << "\n";
+                    }
+                    hasError = true;
+                }
+
+                if (hasError) {
+                    std::cerr << "Press ENTER to exit...\n";
+                    std::cin.get();
+                    std::exit(EXIT_FAILURE);
+                }
+            }
         }
 
         std::cout << "loading points" << std::endl;

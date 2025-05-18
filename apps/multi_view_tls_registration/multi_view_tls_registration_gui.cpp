@@ -781,11 +781,20 @@ void project_gui()
                 }*/
             }
 
-            ImGui::SameLine();
+            static double angle_diff = 5.0;
+            //ImGui::SameLine();
             if (ImGui::Button("set all fuse_inclination_from_IMU"))
             {
                 for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++){
-                    session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = true;
+                    double om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
+                    double fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
+
+                    std::cout << "om: " << om << " fi " << fi << std::endl;
+                    if (fabs(om) > angle_diff || fabs(fi) > angle_diff)
+                    {
+                    }else{
+                        session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = true;
+                    }
                 }
             }
 
@@ -797,6 +806,9 @@ void project_gui()
                     session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = false;
                 }
             }
+
+            ImGui::SameLine();
+            ImGui::InputDouble("acceptable angle [deg]", &angle_diff);
 
             ImGui::Checkbox("show_with_initial_pose", &session.point_clouds_container.show_with_initial_pose);
             ImGui::SameLine();

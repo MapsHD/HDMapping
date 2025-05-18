@@ -70,7 +70,7 @@ bool load_data(std::vector<std::string>& input_file_names, LidarOdometryParams& 
     }
     std::string working_directory = "";
     std::string imuSnToUse;
-    if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
+    if (input_file_names.size() > 0 && laz_files.size() == csv_files.size() && laz_files.size() == sn_files.size())
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
 
@@ -231,7 +231,7 @@ bool load_data(std::vector<std::string>& input_file_names, LidarOdometryParams& 
         std::cout << "laz_files.size(): " << laz_files.size() << std::endl;
         std::cout << "csv_files.size(): " << csv_files.size() << std::endl;
 
-        std::cout << "condition: input_file_names.size() > 0 && laz_files.size() == csv_files.size() NOT SATISFIED!!!" << std::endl;
+        std::cout << "condition: input_file_names.size() > 0 && laz_files.size() == csv_files.size() && laz_files.size() == sn_files.size() NOT SATISFIED!!!" << std::endl;
         return false;
     }
     int number_of_points = 0;

@@ -1701,14 +1701,14 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 
 			if (this->local_trajectory.size() > 0 && this->fuse_inclination_from_IMU)
 			{
-				double om = local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
-				double fi = local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
+				//double om = local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
+				//double fi = local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
 
-				if (fabs(om) > 5 || fabs(fi) > 5)
-				{
-				}
-				else
-				{
+				//if (fabs(om) > 5 || fabs(fi) > 5)
+				//{
+				//}
+				//else
+				//{
 
 					Eigen::Vector3d a1(-0.2, -0.2, 0);
 					Eigen::Vector3d a2(0.2, -0.2, 0);
@@ -1751,7 +1751,7 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 					glVertex3f(a4t.x(), a4t.y(), a4t.z());
 					glVertex3f(a1t.x(), a1t.y(), a1t.z());
 					glEnd();
-				}
+				//}
 			}
 		}
 	}

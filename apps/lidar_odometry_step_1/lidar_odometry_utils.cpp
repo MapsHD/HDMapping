@@ -717,6 +717,7 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
                 acc.axis.y = row["accY"].get<double>();
                 acc.axis.z = row["accZ"].get<double>();
                 all_data.emplace_back(std::pair(timestamp / 1e9, timestampUnix / 1e9), gyr, acc);
+                //std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z " << acc.axis.z << " imu_id: " << imu_id << std::endl;
             }
         }
     }
@@ -888,6 +889,7 @@ std::unordered_map<int, std::string> MLvxCalib::GetIdToSnMapping(const std::stri
 {
     if (!std::filesystem::exists(filename))
     {
+        std::cout << "!std::filesystem::exists(filename) '" << filename << "'" << std::endl;
         return std::unordered_map<int, std::string>();
     }
     std::unordered_map<int, std::string> dataMap;
@@ -1035,10 +1037,15 @@ int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string> &idToSn,
 {
     if (snToUse.empty() || idToSn.empty())
     {
+        std::cout << "snToUse.empty() || idToSn.empty()" << std::endl;
+        std::cout << "(int)snToUse.empty()" << (int)snToUse.empty() << std::endl;
+        std::cout << "(int)idToSn.empty()" <<  (int)idToSn.empty() << std::endl;
+
         return 0;
     }
     for (const auto &[id, sn] : idToSn)
     {
+        std::cout << "snToUse " << snToUse << " sn " << sn << std::endl;
         if (snToUse == sn)
         {
             return id;

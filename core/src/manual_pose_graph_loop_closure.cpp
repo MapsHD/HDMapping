@@ -544,12 +544,12 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                     continue;
                                 }
 
-                                double om = pc.local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
-                                double fi = pc.local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
+                                //double om = pc.local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
+                                //double fi = pc.local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
 
-                                if (fabs(om) > 5 || fabs(fi) > 5){
-                                    continue;
-                                }
+                                //if (fabs(om) > 5 || fabs(fi) > 5){
+                                //    continue;
+                                //}
 
                                // std::cout << "om: " << om << " fi: " << fi << std::endl;
 #if 0

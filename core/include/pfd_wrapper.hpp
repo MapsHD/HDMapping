@@ -13,7 +13,7 @@ namespace mandeye::fd{
     const std::vector<std::string> Resso_filter = { "Resso, reg", "*.reg" };
     const std::vector<std::string> Dxf_filter = { "dxf", "*.dxf" };
     const std::vector<std::string> Csv_filter = { "Csv", "*.csv" };
-    const std::vector<std::string> All_Filter = {"All Files", "*.png *.jpg *.jpeg *.bmp *.las *.laz *.json *.dxf *.csv"};
+    const std::vector<std::string> All_Filter = {"All Files", "*.png *.jpg *.jpeg *.bmp *.las *.laz *.json *.dxf *.csv *.sn"};
 
     std::string OpenFileDialogOneFile(const std::string& title, const std::vector<std::string>&filter);
     std::vector<std::string> OpenFileDialog(const std::string& title, const std::vector<std::string>&filter, bool multiselect);

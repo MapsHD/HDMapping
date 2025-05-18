@@ -240,7 +240,7 @@ void project_gui()
                 std::sort(std::begin(input_file_names), std::end(input_file_names));
 
                 std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
-                              {
+                {
                     if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
                     {
                         laz_files.push_back(fileName);
@@ -253,15 +253,17 @@ void project_gui()
                     if (fileName.ends_with(".sn"))
                     {
                         sn_files.push_back(fileName);
-                    } });
+                    } 
+                });
 
-                if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
+                if (input_file_names.size() > 0 && laz_files.size() == csv_files.size() && laz_files.size() == sn_files.size())
                 {
                     working_directory = fs::path(input_file_names[0]).parent_path().string();
 
                     const auto calibrationFile = (fs::path(working_directory) / "calibration.json").string();
                     const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
                     imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
+                    std::cout << "imuSnToUse: " << imuSnToUse << std::endl;
                     if (!preloadedCalibration.empty())
                     {
                         std::cout << "Loaded calibration for: \n";
@@ -316,10 +318,13 @@ void project_gui()
                     {
                         const std::string &imufn = csv_files.at(fileNo);
                         const std::string snFn = (fileNo >= sn_files.size()) ? ("") : (sn_files.at(fileNo));
-                        const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
+
+                        std::cout << "parsing sn file '" << snFn << "'" << std::endl;
+
+                            const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
                         // GetId of Imu to use
                         int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
-                        std::cout << "imuNumberToUse  " << imuNumberToUse << " at" << imufn << std::endl;
+                        std::cout << "imuNumberToUse  " << imuNumberToUse << " at: '" << imufn << "'" << std::endl;
                         auto imu = load_imu(imufn.c_str(), imuNumberToUse);
                         std::cout << imufn << " with mapping " << snFn << std::endl;
                         imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
@@ -532,7 +537,7 @@ void project_gui()
                     std::cout << "laz_files.size(): " << laz_files.size() << std::endl;
                     std::cout << "csv_files.size(): " << csv_files.size() << std::endl;
 
-                    std::cout << "condition: input_file_names.size() > 0 && laz_files.size() == csv_files.size() NOT SATISFIED!!!" << std::endl;
+                    std::cout << "condition: input_file_names.size() > 0 && laz_files.size() == csv_files.size() && laz_files.size() == sn_files.size() NOT SATISFIED!!!" << std::endl;
                 }
             }
         }

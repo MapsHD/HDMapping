@@ -941,10 +941,10 @@ void display()
     ImGui::Begin("Image");
     ImGuiLoadSaveButtons();
     TimeStampCount();
-    if (ImGui::Button("apply color to PC (fishEye)"))
-    {
-        SystemData::points = ApplyColorToPointcloudFishEye(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
-    }
+    //if (ImGui::Button("apply color to PC (fishEye)"))
+    //{
+    //    SystemData::points = ApplyColorToPointcloudFishEye(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+    //}
 
     if (ImGui::Button("Optimize"))
     {
@@ -962,7 +962,7 @@ void display()
     }
     ImGui::SameLine();
 
-    if (ImGui::Button("Optimize(fisheye)"))
+    /*if (ImGui::Button("Optimize(fisheye)"))
     {
         optimize_fish_eye();
 
@@ -975,7 +975,7 @@ void display()
         std::cout << "fi " << pose.fi << std::endl;
         std::cout << "ka " << pose.ka << std::endl;
         SystemData::points = ApplyColorToPointcloudFishEye(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
-    }
+    }*/
     ImGui::SameLine();
 
     if (ImGui::Button("Optimize x 100"))
@@ -1298,7 +1298,7 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("MANDEYE with GoPro MAX manual coloring " HDMAPPING_VERSION_STRING);
+    glutCreateWindow("MANDEYE with 360 camera manual coloring " HDMAPPING_VERSION_STRING);
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 

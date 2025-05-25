@@ -6,8 +6,8 @@
 
 #include <GL/glew.h>
 #include <GL/freeglut.h>
-#include <glm.hpp>
-#include <gtc/matrix_transform.hpp>
+#include <glm/glm/glm.hpp>
+#include <glm/glm/gtc/matrix_transform.hpp>
 
 #include <Eigen/Eigen>
 

@@ -6,6 +6,8 @@
 #include <iostream>
 #include <random>
 
+#include <chrono>
+
 #include <point_clouds.h>
 
 #include <transformations.h>

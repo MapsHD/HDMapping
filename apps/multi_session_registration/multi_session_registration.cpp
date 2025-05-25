@@ -519,8 +519,8 @@ void project_gui()
         if (ImGui::Button("add session to project"))
         {
             std::string input_file_name = "";
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
-            std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Add session", mandeye::fd::Session_filter);
+            std::cout << "SESSION file: '" << input_file_name << "'" << std::endl;
 
             if (input_file_name.size() > 0)
             {

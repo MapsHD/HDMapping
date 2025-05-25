@@ -337,6 +337,31 @@ void project_gui()
     {
         session.point_clouds_container.intersection_width = 0.001;
     }
+    if (ImGui::Button("set xz view")){
+        std::cout << rotate_x << " " << rotate_y << std::endl;
+        rotate_x = -90.0;
+        rotate_y = 180.0;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("set yz view"))
+    {
+        std::cout << rotate_x << " " << rotate_y << std::endl;
+        rotate_x = -90.0;
+        rotate_y = 270.0;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("set xy view"))
+    {
+        std::cout << rotate_x << " " << rotate_y << std::endl;
+        rotate_x = 0.0;
+        rotate_y = 0.0;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("set translation view (x=0,y=0)"))
+    {
+        translate_x = 0;
+        translate_y = 0;
+    }
 
     ImGui::Checkbox("xz_intersection", &session.point_clouds_container.xz_intersection);
     if (session.point_clouds_container.xz_intersection)

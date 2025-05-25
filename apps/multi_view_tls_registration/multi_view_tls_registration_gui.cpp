@@ -337,7 +337,8 @@ void project_gui()
     {
         session.point_clouds_container.intersection_width = 0.001;
     }
-    if (ImGui::Button("set xz view")){
+    if (ImGui::Button("set xz view"))
+    {
         std::cout << rotate_x << " " << rotate_y << std::endl;
         rotate_x = -90.0;
         rotate_y = 180.0;
@@ -807,17 +808,20 @@ void project_gui()
             }
 
             static double angle_diff = 5.0;
-            //ImGui::SameLine();
+            // ImGui::SameLine();
             if (ImGui::Button("set all fuse_inclination_from_IMU"))
             {
-                for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++){
+                for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                {
                     double om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
                     double fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
 
                     std::cout << "om: " << om << " fi " << fi << std::endl;
                     if (fabs(om) > angle_diff || fabs(fi) > angle_diff)
                     {
-                    }else{
+                    }
+                    else
+                    {
                         session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = true;
                     }
                 }
@@ -911,6 +915,71 @@ void project_gui()
             //     session.point_clouds_container.hide_all();
             //     session.point_clouds_container.show_all_from_range(index_begin, index_end);
             // }
+
+            static double x_origin = 0.0;
+            static double y_origin = 0.0;
+            static double z_origin = 0.0;
+
+            ImGui::InputDouble("x_origin", &x_origin);
+            ImGui::InputDouble("y_origin", &y_origin);
+            ImGui::InputDouble("z_origin", &z_origin);
+
+            if (ImGui::Button("set xyz_origin"))
+            {
+                if (session.point_clouds_container.point_clouds.size() != 0)
+                {
+                    std::vector<Eigen::Affine3d> all_m_poses2;
+                    for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
+                    {
+                        all_m_poses2.push_back(session.point_clouds_container.point_clouds[j].m_pose);
+                    }
+                    
+                    session.point_clouds_container.point_clouds[0].m_pose(0, 3) = x_origin;
+                    session.point_clouds_container.point_clouds[0].m_pose(1, 3) = y_origin;
+                    session.point_clouds_container.point_clouds[0].m_pose(2, 3) = z_origin;
+
+                    session.point_clouds_container.point_clouds[0].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[0].m_pose);
+
+                    session.point_clouds_container.point_clouds[0].gui_translation[0] = (float)session.point_clouds_container.point_clouds[0].pose.px;
+                    session.point_clouds_container.point_clouds[0].gui_translation[1] = (float)session.point_clouds_container.point_clouds[0].pose.py;
+                    session.point_clouds_container.point_clouds[0].gui_translation[2] = (float)session.point_clouds_container.point_clouds[0].pose.pz;
+
+                    session.point_clouds_container.point_clouds[0].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[0].pose.om * 180.0 / M_PI);
+                    session.point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[0].pose.fi * 180.0 / M_PI);
+                    session.point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[0].pose.ka * 180.0 / M_PI);
+
+                    
+
+                    Eigen::Affine3d curr_m_pose2 = session.point_clouds_container.point_clouds[0].m_pose;
+                    for (int j = 1; j < session.point_clouds_container.point_clouds.size(); j++)
+                    {
+                        curr_m_pose2 = curr_m_pose2 * (all_m_poses2[j - 1].inverse() * all_m_poses2[j]);
+
+                        //std::cout << curr_m_pose2.matrix() << std::endl;
+                        session.point_clouds_container.point_clouds[j]
+                            .m_pose = curr_m_pose2;
+                        session.point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
+
+                        session.point_clouds_container.point_clouds[j].gui_translation[0] = (float)session.point_clouds_container.point_clouds[j].pose.px;
+                        session.point_clouds_container.point_clouds[j].gui_translation[1] = (float)session.point_clouds_container.point_clouds[j].pose.py;
+                        session.point_clouds_container.point_clouds[j].gui_translation[2] = (float)session.point_clouds_container.point_clouds[j].pose.pz;
+
+                        session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                    }
+                }
+            }
+
+            /*
+
+                    ImGui::End();
+
+                    if (!manipulate_only_marked_gizmo)
+                    {
+
+                    }
+            */
 
             for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
             {

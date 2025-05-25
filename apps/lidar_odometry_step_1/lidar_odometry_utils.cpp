@@ -1040,12 +1040,12 @@ int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string> &idToSn,
         std::cout << "snToUse.empty() || idToSn.empty()" << std::endl;
         std::cout << "(int)snToUse.empty()" << (int)snToUse.empty() << std::endl;
         std::cout << "(int)idToSn.empty()" <<  (int)idToSn.empty() << std::endl;
-
+        std::cout << __FILE__ << " " << __LINE__ << std::endl;
         return 0;
     }
     for (const auto &[id, sn] : idToSn)
     {
-        std::cout << "snToUse " << snToUse << " sn " << sn << std::endl;
+        //std::cout << "snToUse " << snToUse << " sn " << sn << std::endl;
         if (snToUse == sn)
         {
             return id;

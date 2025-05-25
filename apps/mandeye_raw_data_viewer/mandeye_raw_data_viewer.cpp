@@ -321,7 +321,7 @@ void project_gui()
 
                         std::cout << "parsing sn file '" << snFn << "'" << std::endl;
 
-                            const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
+                        const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
                         // GetId of Imu to use
                         int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
                         std::cout << "imuNumberToUse  " << imuNumberToUse << " at: '" << imufn << "'" << std::endl;

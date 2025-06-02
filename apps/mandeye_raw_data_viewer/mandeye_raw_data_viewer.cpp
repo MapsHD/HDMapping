@@ -395,6 +395,7 @@ void project_gui()
                     for (const auto &[timestamp_pair, gyr, acc] : imu_data)
                     {
                         const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
+                        //const FusionVector gyroscope = {static_cast<float>(gyr.axis.x), static_cast<float>(gyr.axis.y), static_cast<float>(gyr.axis.z)};
                         const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
 
                         FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
@@ -536,7 +537,8 @@ void project_gui()
                     std::cout << "input_file_names.size(): " << input_file_names.size() << std::endl;
                     std::cout << "laz_files.size(): " << laz_files.size() << std::endl;
                     std::cout << "csv_files.size(): " << csv_files.size() << std::endl;
-
+                    std::cout << "sn_files.size(): " << sn_files.size() << std::endl;
+                    
                     std::cout << "condition: input_file_names.size() > 0 && laz_files.size() == csv_files.size() && laz_files.size() == sn_files.size() NOT SATISFIED!!!" << std::endl;
                 }
             }

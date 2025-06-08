@@ -28,3 +28,9 @@
 [submodule "3rdparty/freeglut"]
 	path = 3rdparty/freeglut
 	url = https://github.com/freeglut/freeglut.git
+[submodule "3rdparty/tinyexif"]
+	path = 3rdparty/tinyexif
+	url = https://github.com/cdcseacave/TinyEXIF.git
+[submodule "3rdparty/exiv2"]
+	path = 3rdparty/exiv2
+	url = https://github.com/Exiv2/exiv2.git

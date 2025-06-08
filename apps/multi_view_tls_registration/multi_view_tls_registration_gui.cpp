@@ -1279,7 +1279,6 @@ void project_gui()
               const auto lat = tls_registration.gnss.WGS84ReferenceLatitude;
               const auto lon = tls_registration.gnss.WGS84ReferenceLongitude;
               const auto alt = tls_registration.gnss.gnss_poses[0].alt;
-
               double Xpuwg92 = 0.0;
               double Ypuwg92 = 0.0;
               wgs84_do_puwg92(lat, lon, &Xpuwg92, &Ypuwg92);

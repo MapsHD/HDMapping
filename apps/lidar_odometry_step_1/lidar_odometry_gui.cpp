@@ -216,7 +216,7 @@ void lidar_odometry_gui()
 
         ImGui::InputDouble("filter_threshold_xy_inner (all local points inside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy_inner);
         ImGui::InputDouble("filter_threshold_xy_outer (all local points outside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy_outer);
-        ImGui::InputDouble("threshould_output_filter (all local points inside lidar xy_circle radius[m] will be removed during save)", &params.threshould_output_filter);
+        ImGui::InputDouble("threshold_output_filter (all local points inside lidar xy_circle radius[m] will be removed during save)", &params.threshould_output_filter);
 
         if (!simple_gui)
         {
@@ -875,7 +875,7 @@ void lidar_odometry_gui()
 void lidar_odometry_basic_gui()
 {
     if (ImGui::Begin("lidar_odometry_simple_gui")) {
-        if (ImGui::Button("Process MANDEYE data in folder"))
+        if (ImGui::Button("Process MANDEYE data in folder (velocity up to 8km/h)"))
         {
             std::chrono::time_point<std::chrono::system_clock> start, end;
             start = std::chrono::system_clock::now();
@@ -896,6 +896,7 @@ void lidar_odometry_basic_gui()
 
             params.filter_threshold_xy_inner = 0.3;
             params.filter_threshold_xy_outer = 70.0;
+            params.threshould_output_filter = 0.3;
 
             params.distance_bucket = 0.2;
             params.polar_angle_deg = 10.0;
@@ -905,7 +906,7 @@ void lidar_odometry_basic_gui()
 
             params.use_robust_and_accurate_lidar_odometry = false;
 
-            params.nr_iter = 50;
+            params.nr_iter = 100;
             
             step2();
 
@@ -947,7 +948,7 @@ void lidar_odometry_basic_gui()
             //exit(1);
         }
 
-        if (ImGui::Button("Process MANDEYE data in folder (quick but less accurate, less precise)"))
+        if (ImGui::Button("Process MANDEYE data in folder (quick but less accurate, less precise, velocity up to 8km/h)"))
         {
             std::chrono::time_point<std::chrono::system_clock> start, end;
             start = std::chrono::system_clock::now();
@@ -967,7 +968,8 @@ void lidar_odometry_basic_gui()
             params.in_out_params_outdoor.resolution_Z = 0.3;
 
             params.filter_threshold_xy_inner = 0.3;
-            params.filter_threshold_xy_outer = 40.0;
+            params.filter_threshold_xy_outer = 70.0;
+            params.threshould_output_filter = 0.3;
 
             params.distance_bucket = 0.2;
             params.polar_angle_deg = 10.0;
@@ -977,7 +979,7 @@ void lidar_odometry_basic_gui()
 
             params.use_robust_and_accurate_lidar_odometry = false;
 
-            params.nr_iter = 10;
+            params.nr_iter = 20;
             params.sliding_window_trajectory_length_threshold = 200;
 
             step2();
@@ -1000,6 +1002,136 @@ void lidar_odometry_basic_gui()
                 message_info.c_str(),
                 pfd::choice::ok, pfd::icon::info);
             message.result();
+        }
+
+        if (ImGui::Button("Process MANDEYE data in folder (fast motion: velocity up to 30 km/h, Mandeye mounted on the car)"))
+        {
+            std::chrono::time_point<std::chrono::system_clock> start, end;
+            start = std::chrono::system_clock::now();
+
+            // auto dir = pfd::select_folder("Select any directory", DEFAULT_PATH).result();
+            // std::cout << "Selected dir: " << dir << "\n";
+
+            step1();
+
+            params.decimation = 0.03;
+            params.in_out_params_indoor.resolution_X = 0.3;
+            params.in_out_params_indoor.resolution_Y = 0.3;
+            params.in_out_params_indoor.resolution_Z = 0.3;
+
+            params.in_out_params_outdoor.resolution_X = 0.5;
+            params.in_out_params_outdoor.resolution_Y = 0.5;
+            params.in_out_params_outdoor.resolution_Z = 0.5;
+
+            params.filter_threshold_xy_inner = 3.0;
+            params.filter_threshold_xy_outer = 70.0;
+            params.threshould_output_filter = 3.0;
+
+            params.distance_bucket = 0.2;
+            params.polar_angle_deg = 10.0;
+            params.azimutal_angle_deg = 10.0;
+            params.robust_and_accurate_lidar_odometry_iterations = 20;
+            params.max_distance_lidar = 30.0;
+
+            params.use_robust_and_accurate_lidar_odometry = false;
+
+            params.nr_iter = 500;
+            params.sliding_window_trajectory_length_threshold = 200;
+
+            step2();
+
+            end = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_seconds = end - start;
+            std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+            std::cout << "calculations finished computation at "
+                      << std::ctime(&end_time)
+                      << "elapsed time: " << elapsed_seconds.count() << "s\n";
+
+            save_results(false, elapsed_seconds.count());
+
+            std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
+                                       std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
+
+            [[maybe_unused]]
+            pfd::message message(
+                "Information",
+                message_info.c_str(),
+                pfd::choice::ok, pfd::icon::info);
+            message.result();
+        }
+
+        if (ImGui::Button("Process MANDEYE data in folder (velocity up to 8km/h, Precise Forestry)"))
+        {
+            std::chrono::time_point<std::chrono::system_clock> start, end;
+            start = std::chrono::system_clock::now();
+
+            // auto dir = pfd::select_folder("Select any directory", DEFAULT_PATH).result();
+            // std::cout << "Selected dir: " << dir << "\n";
+
+            step1();
+
+            params.decimation = 0.01;
+            params.in_out_params_indoor.resolution_X = 0.1;
+            params.in_out_params_indoor.resolution_Y = 0.1;
+            params.in_out_params_indoor.resolution_Z = 0.1;
+
+            params.in_out_params_outdoor.resolution_X = 0.3;
+            params.in_out_params_outdoor.resolution_Y = 0.3;
+            params.in_out_params_outdoor.resolution_Z = 0.3;
+
+            params.filter_threshold_xy_inner = 1.0;
+            params.filter_threshold_xy_outer = 70.0;
+            params.threshould_output_filter = 1.0;
+
+            params.distance_bucket = 0.2;
+            params.polar_angle_deg = 10.0;
+            params.azimutal_angle_deg = 10.0;
+            params.robust_and_accurate_lidar_odometry_iterations = 20;
+            params.max_distance_lidar = 30.0;
+
+            params.use_robust_and_accurate_lidar_odometry = false;
+
+            params.nr_iter = 500;
+            params.sliding_window_trajectory_length_threshold = 10000;
+
+            step2();
+
+            end = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_seconds = end - start;
+            std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+            std::cout << "calculations finished computation at "
+                      << std::ctime(&end_time)
+                      << "elapsed time: " << elapsed_seconds.count() << "s\n";
+
+            save_results(false, elapsed_seconds.count());
+
+            /*for (int i = 0; i < params.num_constistency_iter; i++)
+            {
+                std::cout << "Iteration " << i + 1 << " of " << params.num_constistency_iter << std::endl;
+                for (int ii = 0; ii < worker_data.size(); ii++)
+                {
+                    worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
+                }
+                Consistency(worker_data, params);
+            }
+
+            save_results(false);*/
+
+            // std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
+
+            // std::string message_info = "Data saved to folders '" + working_directory + "\\lidar_odometry_result_0' and '" + working_directory + "\\lidar_odometry_result_1' total_length_of_calculated_trajectory=" +
+            //     std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
+
+            std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
+                                       std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
+
+            [[maybe_unused]]
+            pfd::message message(
+                "Information",
+                message_info.c_str(),
+                pfd::choice::ok, pfd::icon::info);
+            message.result();
+            // exit(1);
         }
 
         ImGui::Checkbox("full_lidar_odometry_gui", &full_lidar_odometry_gui);

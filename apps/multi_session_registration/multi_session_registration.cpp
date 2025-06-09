@@ -1282,6 +1282,631 @@ void project_gui()
                                     {
                                         search_radious = 0.01;
                                     }*/
+
+                                    /////////////////////////////////
+                                    if (ImGui::Button("ICP [search radious 2m]"))
+                                    {
+                                        float sr = 2.0;
+                                        std::cout << "Iterative Closest Point" << std::endl;
+                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                                        {
+                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                                        }
+                                        else
+                                        {
+                                            bool is_with_ground_truth = false;
+                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                                            {
+                                                is_with_ground_truth = true;
+                                            }
+
+                                            if (is_with_ground_truth)
+                                            {
+                                                int index_session_from = -1;
+                                                int index_session_to = -1;
+                                                int index_from = -1;
+                                                int index_to = -1;
+
+                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                                {
+                                                    index_session_from = edges[index_active_edge].index_session_from;
+                                                    index_session_to = edges[index_active_edge].index_session_to;
+                                                    index_from = edges[index_active_edge].index_from;
+                                                    index_to = edges[index_active_edge].index_to;
+                                                }
+                                                else
+                                                {
+                                                    index_session_from = edges[index_active_edge].index_session_to;
+                                                    index_session_to = edges[index_active_edge].index_session_from;
+                                                    index_from = edges[index_active_edge].index_to;
+                                                    index_to = edges[index_active_edge].index_from;
+                                                }
+
+                                                double x_min = 1000000000000.0;
+                                                double y_min = 1000000000000.0;
+                                                double z_min = 1000000000000.0;
+                                                double x_max = -1000000000000.0;
+                                                double y_max = -1000000000000.0;
+                                                double z_max = -1000000000000.0;
+
+                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                                for (const auto &p : points_to.points_local)
+                                                {
+                                                    auto pg = points_to.m_pose * p;
+                                                    if (pg.x() < x_min)
+                                                    {
+                                                        x_min = pg.x();
+                                                    }
+                                                    if (pg.y() < y_min)
+                                                    {
+                                                        y_min = pg.y();
+                                                    }
+                                                    if (pg.z() < z_min)
+                                                    {
+                                                        z_min = pg.z();
+                                                    }
+                                                    if (pg.x() > x_max)
+                                                    {
+                                                        x_max = pg.x();
+                                                    }
+                                                    if (pg.y() > y_max)
+                                                    {
+                                                        y_max = pg.y();
+                                                    }
+                                                    if (pg.z() > z_max)
+                                                    {
+                                                        z_max = pg.z();
+                                                    }
+                                                }
+                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                                std::vector<Eigen::Vector3d> ground_truth;
+                                                for (const auto &p : points_from.points_local)
+                                                {
+                                                    auto pg = points_from.m_pose * p;
+                                                    if (pg.x() > x_min && pg.x() < x_max)
+                                                    {
+                                                        if (pg.y() > y_min && pg.y() < y_max)
+                                                        {
+                                                            if (pg.z() > z_min && pg.z() < z_max)
+                                                            {
+                                                                ground_truth.push_back(p);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                int number_of_iterations = 30;
+                                                PairWiseICP icp;
+                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                                {
+                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                                }
+                                                
+                                            }
+                                            else
+                                            {
+                                                
+                                                int number_of_iterations = 30;
+                                                PairWiseICP icp;
+                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                                {
+                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    ImGui::SameLine();
+                                    if (ImGui::Button("ICP [search radious 1m]"))
+                                    {
+                                        float sr = 1.0;
+                                        std::cout << "Iterative Closest Point" << std::endl;
+                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                                        {
+                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                                        }
+                                        else
+                                        {
+                                            bool is_with_ground_truth = false;
+                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                                            {
+                                                is_with_ground_truth = true;
+                                            }
+
+                                            if (is_with_ground_truth)
+                                            {
+                                                int index_session_from = -1;
+                                                int index_session_to = -1;
+                                                int index_from = -1;
+                                                int index_to = -1;
+
+                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                                {
+                                                    index_session_from = edges[index_active_edge].index_session_from;
+                                                    index_session_to = edges[index_active_edge].index_session_to;
+                                                    index_from = edges[index_active_edge].index_from;
+                                                    index_to = edges[index_active_edge].index_to;
+                                                }
+                                                else
+                                                {
+                                                    index_session_from = edges[index_active_edge].index_session_to;
+                                                    index_session_to = edges[index_active_edge].index_session_from;
+                                                    index_from = edges[index_active_edge].index_to;
+                                                    index_to = edges[index_active_edge].index_from;
+                                                }
+
+                                                double x_min = 1000000000000.0;
+                                                double y_min = 1000000000000.0;
+                                                double z_min = 1000000000000.0;
+                                                double x_max = -1000000000000.0;
+                                                double y_max = -1000000000000.0;
+                                                double z_max = -1000000000000.0;
+
+                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                                for (const auto &p : points_to.points_local)
+                                                {
+                                                    auto pg = points_to.m_pose * p;
+                                                    if (pg.x() < x_min)
+                                                    {
+                                                        x_min = pg.x();
+                                                    }
+                                                    if (pg.y() < y_min)
+                                                    {
+                                                        y_min = pg.y();
+                                                    }
+                                                    if (pg.z() < z_min)
+                                                    {
+                                                        z_min = pg.z();
+                                                    }
+                                                    if (pg.x() > x_max)
+                                                    {
+                                                        x_max = pg.x();
+                                                    }
+                                                    if (pg.y() > y_max)
+                                                    {
+                                                        y_max = pg.y();
+                                                    }
+                                                    if (pg.z() > z_max)
+                                                    {
+                                                        z_max = pg.z();
+                                                    }
+                                                }
+                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                                std::vector<Eigen::Vector3d> ground_truth;
+                                                for (const auto &p : points_from.points_local)
+                                                {
+                                                    auto pg = points_from.m_pose * p;
+                                                    if (pg.x() > x_min && pg.x() < x_max)
+                                                    {
+                                                        if (pg.y() > y_min && pg.y() < y_max)
+                                                        {
+                                                            if (pg.z() > z_min && pg.z() < z_max)
+                                                            {
+                                                                ground_truth.push_back(p);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                int number_of_iterations = 30;
+                                                PairWiseICP icp;
+                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                                {
+                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                                }
+                                            }
+                                            else
+                                            {
+
+                                                int number_of_iterations = 30;
+                                                PairWiseICP icp;
+                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                                {
+                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    ImGui::SameLine();
+                                    if (ImGui::Button("ICP [search radious 0.5m]"))
+                                    {
+                                        float sr = 0.5;
+                                        std::cout << "Iterative Closest Point" << std::endl;
+                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                                        {
+                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                                        }
+                                        else
+                                        {
+                                            bool is_with_ground_truth = false;
+                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                                            {
+                                                is_with_ground_truth = true;
+                                            }
+
+                                            if (is_with_ground_truth)
+                                            {
+                                                int index_session_from = -1;
+                                                int index_session_to = -1;
+                                                int index_from = -1;
+                                                int index_to = -1;
+
+                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                                {
+                                                    index_session_from = edges[index_active_edge].index_session_from;
+                                                    index_session_to = edges[index_active_edge].index_session_to;
+                                                    index_from = edges[index_active_edge].index_from;
+                                                    index_to = edges[index_active_edge].index_to;
+                                                }
+                                                else
+                                                {
+                                                    index_session_from = edges[index_active_edge].index_session_to;
+                                                    index_session_to = edges[index_active_edge].index_session_from;
+                                                    index_from = edges[index_active_edge].index_to;
+                                                    index_to = edges[index_active_edge].index_from;
+                                                }
+
+                                                double x_min = 1000000000000.0;
+                                                double y_min = 1000000000000.0;
+                                                double z_min = 1000000000000.0;
+                                                double x_max = -1000000000000.0;
+                                                double y_max = -1000000000000.0;
+                                                double z_max = -1000000000000.0;
+
+                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                                for (const auto &p : points_to.points_local)
+                                                {
+                                                    auto pg = points_to.m_pose * p;
+                                                    if (pg.x() < x_min)
+                                                    {
+                                                        x_min = pg.x();
+                                                    }
+                                                    if (pg.y() < y_min)
+                                                    {
+                                                        y_min = pg.y();
+                                                    }
+                                                    if (pg.z() < z_min)
+                                                    {
+                                                        z_min = pg.z();
+                                                    }
+                                                    if (pg.x() > x_max)
+                                                    {
+                                                        x_max = pg.x();
+                                                    }
+                                                    if (pg.y() > y_max)
+                                                    {
+                                                        y_max = pg.y();
+                                                    }
+                                                    if (pg.z() > z_max)
+                                                    {
+                                                        z_max = pg.z();
+                                                    }
+                                                }
+                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                                std::vector<Eigen::Vector3d> ground_truth;
+                                                for (const auto &p : points_from.points_local)
+                                                {
+                                                    auto pg = points_from.m_pose * p;
+                                                    if (pg.x() > x_min && pg.x() < x_max)
+                                                    {
+                                                        if (pg.y() > y_min && pg.y() < y_max)
+                                                        {
+                                                            if (pg.z() > z_min && pg.z() < z_max)
+                                                            {
+                                                                ground_truth.push_back(p);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                int number_of_iterations = 30;
+                                                PairWiseICP icp;
+                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                                {
+                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                                }
+                                            }
+                                            else
+                                            {
+
+                                                int number_of_iterations = 30;
+                                                PairWiseICP icp;
+                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                                {
+                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    ImGui::SameLine();
+                                    if (ImGui::Button("ICP [search radious 0.25m]"))
+                                    {
+                                        float sr = 0.25;
+                                        std::cout << "Iterative Closest Point" << std::endl;
+                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                                        {
+                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                                        }
+                                        else
+                                        {
+                                            bool is_with_ground_truth = false;
+                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                                            {
+                                                is_with_ground_truth = true;
+                                            }
+
+                                            if (is_with_ground_truth)
+                                            {
+                                                int index_session_from = -1;
+                                                int index_session_to = -1;
+                                                int index_from = -1;
+                                                int index_to = -1;
+
+                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                                {
+                                                    index_session_from = edges[index_active_edge].index_session_from;
+                                                    index_session_to = edges[index_active_edge].index_session_to;
+                                                    index_from = edges[index_active_edge].index_from;
+                                                    index_to = edges[index_active_edge].index_to;
+                                                }
+                                                else
+                                                {
+                                                    index_session_from = edges[index_active_edge].index_session_to;
+                                                    index_session_to = edges[index_active_edge].index_session_from;
+                                                    index_from = edges[index_active_edge].index_to;
+                                                    index_to = edges[index_active_edge].index_from;
+                                                }
+
+                                                double x_min = 1000000000000.0;
+                                                double y_min = 1000000000000.0;
+                                                double z_min = 1000000000000.0;
+                                                double x_max = -1000000000000.0;
+                                                double y_max = -1000000000000.0;
+                                                double z_max = -1000000000000.0;
+
+                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                                for (const auto &p : points_to.points_local)
+                                                {
+                                                    auto pg = points_to.m_pose * p;
+                                                    if (pg.x() < x_min)
+                                                    {
+                                                        x_min = pg.x();
+                                                    }
+                                                    if (pg.y() < y_min)
+                                                    {
+                                                        y_min = pg.y();
+                                                    }
+                                                    if (pg.z() < z_min)
+                                                    {
+                                                        z_min = pg.z();
+                                                    }
+                                                    if (pg.x() > x_max)
+                                                    {
+                                                        x_max = pg.x();
+                                                    }
+                                                    if (pg.y() > y_max)
+                                                    {
+                                                        y_max = pg.y();
+                                                    }
+                                                    if (pg.z() > z_max)
+                                                    {
+                                                        z_max = pg.z();
+                                                    }
+                                                }
+                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                                std::vector<Eigen::Vector3d> ground_truth;
+                                                for (const auto &p : points_from.points_local)
+                                                {
+                                                    auto pg = points_from.m_pose * p;
+                                                    if (pg.x() > x_min && pg.x() < x_max)
+                                                    {
+                                                        if (pg.y() > y_min && pg.y() < y_max)
+                                                        {
+                                                            if (pg.z() > z_min && pg.z() < z_max)
+                                                            {
+                                                                ground_truth.push_back(p);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                int number_of_iterations = 30;
+                                                PairWiseICP icp;
+                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                                {
+                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                                }
+                                            }
+                                            else
+                                            {
+
+                                                int number_of_iterations = 30;
+                                                PairWiseICP icp;
+                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                                {
+                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    ImGui::SameLine();
+                                    if (ImGui::Button("ICP [search radious 0.1m]"))
+                                    {
+                                        float sr = 0.1;
+                                        std::cout << "Iterative Closest Point" << std::endl;
+                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                                        {
+                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                                        }
+                                        else
+                                        {
+                                            bool is_with_ground_truth = false;
+                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                                            {
+                                                is_with_ground_truth = true;
+                                            }
+
+                                            if (is_with_ground_truth)
+                                            {
+                                                int index_session_from = -1;
+                                                int index_session_to = -1;
+                                                int index_from = -1;
+                                                int index_to = -1;
+
+                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                                {
+                                                    index_session_from = edges[index_active_edge].index_session_from;
+                                                    index_session_to = edges[index_active_edge].index_session_to;
+                                                    index_from = edges[index_active_edge].index_from;
+                                                    index_to = edges[index_active_edge].index_to;
+                                                }
+                                                else
+                                                {
+                                                    index_session_from = edges[index_active_edge].index_session_to;
+                                                    index_session_to = edges[index_active_edge].index_session_from;
+                                                    index_from = edges[index_active_edge].index_to;
+                                                    index_to = edges[index_active_edge].index_from;
+                                                }
+
+                                                double x_min = 1000000000000.0;
+                                                double y_min = 1000000000000.0;
+                                                double z_min = 1000000000000.0;
+                                                double x_max = -1000000000000.0;
+                                                double y_max = -1000000000000.0;
+                                                double z_max = -1000000000000.0;
+
+                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                                for (const auto &p : points_to.points_local)
+                                                {
+                                                    auto pg = points_to.m_pose * p;
+                                                    if (pg.x() < x_min)
+                                                    {
+                                                        x_min = pg.x();
+                                                    }
+                                                    if (pg.y() < y_min)
+                                                    {
+                                                        y_min = pg.y();
+                                                    }
+                                                    if (pg.z() < z_min)
+                                                    {
+                                                        z_min = pg.z();
+                                                    }
+                                                    if (pg.x() > x_max)
+                                                    {
+                                                        x_max = pg.x();
+                                                    }
+                                                    if (pg.y() > y_max)
+                                                    {
+                                                        y_max = pg.y();
+                                                    }
+                                                    if (pg.z() > z_max)
+                                                    {
+                                                        z_max = pg.z();
+                                                    }
+                                                }
+                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                                std::vector<Eigen::Vector3d> ground_truth;
+                                                for (const auto &p : points_from.points_local)
+                                                {
+                                                    auto pg = points_from.m_pose * p;
+                                                    if (pg.x() > x_min && pg.x() < x_max)
+                                                    {
+                                                        if (pg.y() > y_min && pg.y() < y_max)
+                                                        {
+                                                            if (pg.z() > z_min && pg.z() < z_max)
+                                                            {
+                                                                ground_truth.push_back(p);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                int number_of_iterations = 30;
+                                                PairWiseICP icp;
+                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                                {
+                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                                }
+                                            }
+                                            else
+                                            {
+
+                                                int number_of_iterations = 30;
+                                                PairWiseICP icp;
+                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                                {
+                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    //////////////////////////////////
                                 }
                             }
                         }

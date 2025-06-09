@@ -922,6 +922,82 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                 {
                     search_radious = 0.01;
                 }
+
+                if (ImGui::Button("ICP [2.0]"))
+                {
+                    float sr = 2.0;
+                    int number_of_iterations = 30;
+                    PairWiseICP icp;
+                    auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                    std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                    std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                    if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                    {
+                        edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("ICP [1.0]"))
+                {
+                    float sr = 1.0;
+                    int number_of_iterations = 30;
+                    PairWiseICP icp;
+                    auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                    std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                    std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                    if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                    {
+                        edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("ICP [0.5]"))
+                {
+                    float sr = 0.5;
+                    int number_of_iterations = 30;
+                    PairWiseICP icp;
+                    auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                    std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                    std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                    if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                    {
+                        edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("ICP [0.25]"))
+                {
+                    float sr = 0.25;
+                    int number_of_iterations = 30;
+                    PairWiseICP icp;
+                    auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                    std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                    std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                    if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                    {
+                        edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("ICP [0.1]"))
+                {
+                    float sr = 0.1;
+                    int number_of_iterations = 30;
+                    PairWiseICP icp;
+                    auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                    std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                    std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                    if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                    {
+                        edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                    }
+                }
+                
             }
         }
     }

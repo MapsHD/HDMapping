@@ -50,8 +50,10 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         .def_readwrite("filter_threshold_xy_outer", &LidarOdometryParams::filter_threshold_xy_outer)
         .def_readwrite("m_g", &LidarOdometryParams::m_g)
         .def_readwrite("initial_points", &LidarOdometryParams::initial_points)
-        .def_readwrite("in_out_params", &LidarOdometryParams::in_out_params)
-        .def_readwrite("buckets", &LidarOdometryParams::buckets)
+        .def_readwrite("in_out_params_indoor", &LidarOdometryParams::in_out_params_indoor)
+        .def_readwrite("in_out_params_outdoor", &LidarOdometryParams::in_out_params_outdoor)
+        .def_readwrite("buckets_indoor", &LidarOdometryParams::buckets_indoor)
+        .def_readwrite("buckets_outdoor", &LidarOdometryParams::buckets_outdoor)
         .def_readwrite("use_motion_from_previous_step", &LidarOdometryParams::use_motion_from_previous_step)
         .def_readwrite("consecutive_distance", &LidarOdometryParams::consecutive_distance)
         .def_readwrite("nr_iter", &LidarOdometryParams::nr_iter)
@@ -101,5 +103,9 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
     m.def("run_lidar_odometry", &run_lidar_odometry,
           py::arg("input_dir"),
           py::arg("params"),
+          py::arg("working_directory"),
+          py::arg("pc_output_name"),
+          py::arg("traj_output_name"),
+          py::arg("poses_output_name"),
           "Run lidar odometry with given parameters");
 }

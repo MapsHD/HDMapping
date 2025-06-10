@@ -834,27 +834,27 @@ void load_reference_point_clouds(std::vector<std::string> input_file_names, Lida
     params.buckets_indoor = params.reference_buckets;
 }
 
-std::string save_results_automatic(LidarOdometryParams &params, std::vector<WorkerData> &worker_data, Session &session, std::string working_directory, double elapsed_seconds)
+std::string save_results_automatic(LidarOdometryParams &params, std::vector<WorkerData> &worker_data, Session &session, std::string working_directory, double elapsed_seconds, std::string pc_output_name, std::string traj_output_name, std::string poses_output_name)
 {
     int result = get_next_result_id(working_directory);
     fs::path outwd = working_directory / fs::path("lidar_odometry_result_" + std::to_string(result));
     save_result(worker_data, params, outwd, elapsed_seconds);
     if (params.save_laz)
     {
-        save_all_to_las(worker_data, params, (outwd / "all_lo.laz").string(), session);
+        save_all_to_las(worker_data, params, (outwd / pc_output_name).string(), session);
     }
     if (params.save_trajectory)
     {
-        save_trajectory_to_ascii(worker_data, (outwd / "traj_lo.csv").string());
+        save_trajectory_to_ascii(worker_data, (outwd / traj_output_name).string());
     }
     if (params.save_poses)
     {
-        session.point_clouds_container.save_poses((outwd / "poses_lo.reg").string(), false);
+        session.point_clouds_container.save_poses((outwd / poses_output_name).string(), false);
     }
     return outwd.string();
 }
 
-void run_lidar_odometry(std::string input_dir, LidarOdometryParams &params)
+void run_lidar_odometry(std::string input_dir, LidarOdometryParams &params, std::string working_directory, std::string pc_output_name, std::string traj_output_name, std::string poses_output_name)
 {
     Session session;
     std::vector<std::string> input_file_names;
@@ -886,11 +886,14 @@ void run_lidar_odometry(std::string input_dir, LidarOdometryParams &params)
         std::cout << "Calculation failed at step 2 of lidar odometry, exiting." << std::endl;
         return;
     }
-    std::string working_directory = fs::path(input_file_names[0]).parent_path().string();
-    params.current_output_dir = save_results_automatic(params, worker_data, session, working_directory, 0.0);
+    if (working_directory == "")
+    {
+        working_directory = fs::path(input_file_names[0]).parent_path().string();
+    }
+    params.current_output_dir = save_results_automatic(params, worker_data, session, working_directory, 0.0, pc_output_name, traj_output_name, poses_output_name);
     if (params.apply_consistency)
     {
         run_consistency(worker_data, params);
-        params.current_output_dir = save_results_automatic(params, worker_data, session, working_directory, 0.0);
+        params.current_output_dir = save_results_automatic(params, worker_data, session, working_directory, 0.0, pc_output_name, traj_output_name, poses_output_name);
     }
 }

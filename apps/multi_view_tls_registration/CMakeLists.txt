@@ -44,4 +44,8 @@ if(WIN32)
     COMMAND_EXPAND_LISTS)
 endif()
 
+if (MSVC)
+    target_compile_options(multi_view_tls_registration_step_2 PRIVATE /bigobj)
+endif()
+
 install (TARGETS multi_view_tls_registration_step_2 DESTINATION bin)

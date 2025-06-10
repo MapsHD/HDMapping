@@ -52,4 +52,8 @@ if(WIN32)
     COMMAND_EXPAND_LISTS)
 endif()
 
+if (MSVC)
+    target_compile_options(lidar_odometry_step_1 PRIVATE /bigobj)
+endif()
+
 install(TARGETS lidar_odometry_step_1 DESTINATION bin)

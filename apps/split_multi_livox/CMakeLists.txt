@@ -34,4 +34,8 @@ if(WIN32)
     COMMAND_EXPAND_LISTS)
 endif()
 
+if (MSVC)
+    target_compile_options(split_multi_livox PRIVATE /bigobj)
+endif()
+
 install (TARGETS split_multi_livox DESTINATION bin)

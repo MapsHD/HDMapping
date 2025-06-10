@@ -1,11 +1,10 @@
 #include <control_points.h>
-
+#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
+#if WITH_GUI == 1
 #include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
 #include <imgui_internal.h>
-
-#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 
 void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &rotation_center)
 {
@@ -365,3 +364,4 @@ void ControlPoints::draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vector3d &
         }
     }
 }
+#endif

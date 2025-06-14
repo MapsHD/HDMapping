@@ -153,7 +153,8 @@ int get_next_result_id(const std::string working_directory);
 void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
               NDT::GridParameters &rgd_params_indoor, NDTBucketMapType &buckets_indoor,
-              NDT::GridParameters &rgd_params_outdoor, NDTBucketMapType &buckets_outdoor, bool useMultithread, double max_distance, double &delta);
+              NDT::GridParameters &rgd_params_outdoor, NDTBucketMapType &buckets_outdoor, 
+              bool useMultithread, double max_distance, double &delta, double lm_factor);
 
 void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,

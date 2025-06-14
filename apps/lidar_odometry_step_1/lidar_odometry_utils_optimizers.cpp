@@ -1663,7 +1663,8 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
                              std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
                              NDT::GridParameters &rgd_params_indoor, NDTBucketMapType &buckets_indoor,
                              NDT::GridParameters &rgd_params_outdoor, NDTBucketMapType &buckets_outdoor, bool multithread,
-                             double max_distance, double &delta)
+                             double max_distance, double &delta,
+                            double lm_factor)
 {
     std::vector<Eigen::Triplet<double>> tripletListA;
     std::vector<Eigen::Triplet<double>> tripletListP;
@@ -2339,6 +2340,7 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
 
     Eigen::SparseMatrix<double> AtPA_I(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
     AtPA_I.setIdentity();
+    AtPA_I *= lm_factor;
     AtPA += (AtPA_I);
 
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>>
@@ -3109,6 +3111,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             }*/
 
             double delta = 100000.0;
+            double lm_factor = 1.0;
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
 
@@ -3116,12 +3119,18 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 optimize_lidar_odometry(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
                                         params.in_out_params_indoor, params.buckets_indoor,
                                         params.in_out_params_outdoor, params.buckets_outdoor,
-                                        params.useMultithread, params.max_distance, delta /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/);
+                                        params.useMultithread, params.max_distance, delta /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/,
+                                        lm_factor);
                 if (delta < 1e-6)
                 {
                     std::cout << "------------" << std::endl;
                     std::cout << "finished at iteration: " << iter + 1 << " nr_iter: " << params.nr_iter << " delta: " << delta << std::endl;
                     break;
+                }
+
+                if(iter % 10 == 0){
+                    lm_factor *= 10.0;
+                    std::cout << "lm_factor " << lm_factor << " delta " << delta << std::endl;
                 }
                 // std::cout << "[" << iter << "] " << delta << std::endl;
             }

@@ -2056,15 +2056,15 @@ void display()
                 Eigen::Affine3d m_src = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
                 Eigen::Affine3d m_trg = m_src * affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
-                sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_trg).render(m_trg, 1);
+                sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).render(m_src, viewer_decmiate_point_cloud);
+                sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_trg).render(m_trg, viewer_decmiate_point_cloud);
             }
         }
         else
         {
             ObservationPicking observation_picking;
-            sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, 1, false, false, false, false, false, false, false, false, false, false, false, false, 100000);
-            sessions[second_session_index].point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, 1, false, false, false, false, false, false, false, false, false, false, false, false, 100000);
+            sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, viewer_decmiate_point_cloud, false, false, false, false, false, false, false, false, false, false, false, false, 100000);
+            sessions[second_session_index].point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, viewer_decmiate_point_cloud, false, false, false, false, false, false, false, false, false, false, false, false, 100000);
         }
 
         // sessions[first_session_index].point_clouds_container.render();

@@ -69,11 +69,16 @@ bool load_data(std::vector<std::string> &input_file_names, LidarOdometryParams &
     }
     std::string working_directory = "";
     std::string imuSnToUse;
-    if (input_file_names.size() > 0 && laz_files.size() == csv_files.size() && laz_files.size() == sn_files.size())
+
+    int sn_size = sn_files.size();
+    if (sn_size == 0)
+    {
+        sn_size = laz_files.size();
+    }
+
+    if (input_file_names.size() > 0 && laz_files.size() == csv_files.size() && laz_files.size() == sn_size)
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
-
-        // std::cout << "0" << std::endl;
 
         // check if folder exists!
         if (!fs::exists(working_directory))

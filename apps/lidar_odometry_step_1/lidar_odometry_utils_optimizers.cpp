@@ -3128,9 +3128,10 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                     break;
                 }
 
-                if(iter % 10 == 0){
-                    lm_factor *= 10.0;
+                if (iter % 10 == 0 && iter > 0)
+                {
                     std::cout << "lm_factor " << lm_factor << " delta " << delta << std::endl;
+                    lm_factor *= 10.0;
                 }
                 // std::cout << "[" << iter << "] " << delta << std::endl;
             }

@@ -19,29 +19,6 @@
 #include <common/include/cauchy.h>
 #include <pair_wise_iterative_closest_point.h>
 
-// #include "lidar_odometry_utils.h"
-
-// std::random_device rd;
-// std::mt19937 gen(rd());
-
-// inline double random(double low, double high)
-//{
-//     std::uniform_real_distribution<double> dist(low, high);
-//     return dist(gen);
-// }
-
-/*void add_noise_to_poses(std::vector<TaitBryanPose> &poses)
-{
-    for (size_t i = 0; i < poses.size(); i++)
-    {
-        poses[i].px += random(-0.000001, 0.000001);
-        poses[i].py += random(-0.000001, 0.000001);
-        poses[i].pz += random(-0.000001, 0.000001);
-        poses[i].om += random(-0.000001, 0.000001);
-        poses[i].fi += random(-0.000001, 0.000001);
-        poses[i].ka += random(-0.000001, 0.000001);
-    }
-}*/
 
 void ManualPoseGraphLoopClosure::NoGui(PointClouds &point_clouds_container,
                                        GNSS &gnss, GroundControlPoints &gcps, ControlPoints &cps)
@@ -218,44 +195,13 @@ void ManualPoseGraphLoopClosure::NoGui(PointClouds &point_clouds_container,
             tripletListB.emplace_back(ir + 4, 0, normalize_angle(delta(4, 0)));
             tripletListB.emplace_back(ir + 5, 0, normalize_angle(delta(5, 0)));
 
-            // std::cout << "delta(0, 0): " << delta(0, 0) << std::endl;
-            // std::cout << "delta(1, 0): " << delta(0, 0) << std::endl;
-            // std::cout << "delta(2, 0): " << delta(0, 0) << std::endl;
-            // std::cout << "normalize_angle(delta(3, 0)): " << normalize_angle(delta(3, 0)) << std::endl;
-            // std::cout << "normalize_angle(delta(4, 0)): " << normalize_angle(delta(4, 0)) << std::endl;
-            // std::cout << "normalize_angle(delta(5, 0)): " << normalize_angle(delta(5, 0)) << std::endl;
-
-            // for (int r = 0; r < 6; r++) {
-            //     for (int c = 0; c < 6; c++) {
-            //         tripletListP.emplace_back(ir + r, ir + c, edges[i].information_matrix.coeffRef(r, c));
-            //    }
-            // }
-
-            // tripletListP.emplace_back(ir    , ir    , get_cauchy_w(delta(0, 0), 10));
-            // tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 10));
-            // tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta(2, 0), 10));
-            // tripletListP.emplace_back(ir + 3, ir + 3, get_cauchy_w(delta(3, 0), 10));
-            // tripletListP.emplace_back(ir + 4, ir + 4, get_cauchy_w(delta(4, 0), 10));
-            // tripletListP.emplace_back(ir + 5, ir + 5, get_cauchy_w(delta(5, 0), 10));
-
-            // if (i < poses_motion_model.size())
-            //{
             tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px * cauchy((delta(0, 0)), 1));
             tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py * cauchy((delta(1, 0)), 1));
             tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz * cauchy((delta(2, 0)), 1));
             tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om * cauchy(normalize_angle(delta(3, 0)), 1));
             tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi * cauchy(normalize_angle(delta(4, 0)), 1));
             tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka * cauchy(normalize_angle(delta(5, 0)), 1));
-            //}
-            // else
-            //{
-            //    tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
-            //    tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
-            //   tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
-            //   tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
-            //    tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
-            //   tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
-            //}
+            
         }
 
         if (gcps.gpcs.size() == 0)
@@ -346,11 +292,7 @@ void ManualPoseGraphLoopClosure::NoGui(PointClouds &point_clouds_container,
                         tripletListB.emplace_back(ir + 1, 0, delta_y);
                         tripletListB.emplace_back(ir + 2, 0, delta_z);
 
-                        // jacobian3x6 = get_point_to_point_jacobian_tait_bryan(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
-
-                        // auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
-                        // glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-                        // glVertex3f(gnss_poses[i].x - offset_x, gnss_poses[i].y - offset_y, gnss_poses[i].alt - offset_alt);
+                      
                     }
                 }
             }
@@ -447,10 +389,6 @@ void ManualPoseGraphLoopClosure::NoGui(PointClouds &point_clouds_container,
             std::cout << "cp: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
         }
 
-        // fuse_inclination_from_imu
-        // if (fuse_inclination_from_imu)
-        //{
-        //
         double error_imu = 0;
         double error_imu_sum = 0;
 
@@ -466,99 +404,6 @@ void ManualPoseGraphLoopClosure::NoGui(PointClouds &point_clouds_container,
             {
                 continue;
             }
-
-// double om = pc.local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
-// double fi = pc.local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
-
-// if (fabs(om) > 5 || fabs(fi) > 5){
-//     continue;
-// }
-
-// std::cout << "om: " << om << " fi: " << fi << std::endl;
-#if 0
-int ic = index_pose * 6;
-int ir = tripletListB.size();
-
-double delta_om = pc.local_trajectory[0].imu_om_fi_ka.x() - poses[index_pose].om;
-double delta_fi = pc.local_trajectory[0].imu_om_fi_ka.y() - poses[index_pose].fi;
-
-// std::cout << ":" << delta_om << " " << delta_fi << std::endl;
-
-tripletListA.emplace_back(ir + 0, ic + 3, 1);
-tripletListA.emplace_back(ir + 1, ic + 4, 1);
-
-tripletListB.emplace_back(ir, 0, delta_om);
-tripletListB.emplace_back(ir + 1, 0, delta_fi);
-
-tripletListP.emplace_back(ir, ir, 100 * get_cauchy_w(delta_om, 1));
-tripletListP.emplace_back(ir + 1, ir + 1, 100 * get_cauchy_w(delta_fi, 1));
-
-error_imu += sqrt(delta_om * delta_om + delta_fi * delta_fi);
-error_imu_sum++;
-#endif
-#if 0
-TaitBryanPose current_pose = pose_tait_bryan_from_affine_matrix(pc.m_pose); // poses[i];
-TaitBryanPose desired_pose = current_pose;
-desired_pose.om = pc.local_trajectory[0].imu_om_fi_ka.x();
-// imu_om_fi_ka
-// imu_roll_pitch[i]
-//     .first;
-desired_pose.fi = pc.local_trajectory[0].imu_om_fi_ka.y();
-// imu_roll_pitch[i].second;
-
-Eigen::Affine3d desired_mpose = affine_matrix_from_pose_tait_bryan(desired_pose);
-Eigen::Vector3d vx(desired_mpose(0, 0), desired_mpose(1, 0), desired_mpose(2, 0));
-Eigen::Vector3d vy(desired_mpose(0, 1), desired_mpose(1, 1), desired_mpose(2, 1));
-Eigen::Vector3d point_on_target_line(desired_mpose(0, 3), desired_mpose(1, 3), desired_mpose(2, 3));
-
-Eigen::Vector3d point_source_local(0, 0, 1);
-
-Eigen::Matrix<double, 2, 1> delta;
-point_to_line_tait_bryan_wc(delta,
-     current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
-     point_source_local.x(), point_source_local.y(), point_source_local.z(),
-     point_on_target_line.x(), point_on_target_line.y(), point_on_target_line.z(),
-     vx.x(), vx.y(), vx.z(), vy.x(), vy.y(), vy.z());
-
-Eigen::Matrix<double, 2, 6> delta_jacobian;
-point_to_line_tait_bryan_wc_jacobian(delta_jacobian,
-              current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
-              point_source_local.x(), point_source_local.y(), point_source_local.z(),
-              point_on_target_line.x(), point_on_target_line.y(), point_on_target_line.z(),
-              vx.x(), vx.y(), vx.z(), vy.x(), vy.y(), vy.z());
-
-int ir = tripletListB.size();
-
-/*for (int ii = 0; ii < 2; ii++)
-{
-for (int jj = 0; jj < 6; jj++)
-{
-int ic = index_pose * 6;
-if (delta_jacobian(ii, jj) != 0.0)
-{
-tripletListA.emplace_back(ir + ii, ic + jj, -delta_jacobian(ii, jj));
-}
-}
-}*/
-int ic = index_pose * 6;
-tripletListA.emplace_back(ir + 0, ic + 3, -delta_jacobian(0, 3));
-tripletListA.emplace_back(ir + 0, ic + 4, -delta_jacobian(0, 4));
-
-tripletListA.emplace_back(ir + 1, ic + 3, -delta_jacobian(1, 3));
-tripletListA.emplace_back(ir + 1, ic + 4, -delta_jacobian(1, 4));
-
-tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1));
-tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 1));
-// tripletListP.emplace_back(ir, ir, 1);
-// tripletListP.emplace_back(ir + 1, ir + 1, 1);
-
-tripletListB.emplace_back(ir, 0, delta(0, 0));
-tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
-
-error_imu += sqrt(delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0));
-error_imu_sum++;
-
-#endif
         }
 
         if (error_imu_sum > 0)
@@ -566,9 +411,7 @@ error_imu_sum++;
             std::cout << "------------------------------" << std::endl;
             std::cout << "error imu: " << error_imu / error_imu_sum << std::endl;
         }
-        //
-        //}
-
+   
         Eigen::SparseMatrix<double>
             matA(tripletListB.size(), point_clouds_container.point_clouds.size() * 6);
         Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
@@ -613,11 +456,6 @@ error_imu_sum++;
         std::cout << "h_x.size(): " << h_x.size() << std::endl;
 
         std::cout << "AtPA=AtPB SOLVED" << std::endl;
-        // std::cout << "updates:" << std::endl;
-        // for (size_t i = 0; i < h_x.size(); i += 6)
-        //{
-        //     std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << std::endl;
-        // }
 
         if (h_x.size() == 6 * point_clouds_container.point_clouds.size())
         {
@@ -764,9 +602,7 @@ void ManualPoseGraphLoopClosure::FuseTrajectoryWithGNSS(PointClouds &point_cloud
                             }
                         }
                     }
-                    // tripletListP.emplace_back(ir, ir, get_cauchy_w(delta_x, 1) * 0.01);
-                    // tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta_y, 1) * 0.01);
-                    // tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta_z, 1) * 0.01);
+                  
                     tripletListP.emplace_back(ir, ir, 1);
                     tripletListP.emplace_back(ir + 1, ir + 1, 1);
                     tripletListP.emplace_back(ir + 2, ir + 2, 1);
@@ -1093,46 +929,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     {
                         edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
                     }
-                    //{
-                    /*std::cout << "Iterative Closest Point" << std::endl;
-
-                    PointClouds pcs;
-                    pcs.point_clouds.push_back(point_clouds_container.point_clouds[edges[index_active_edge].index_from]);
-                    pcs.point_clouds.push_back(point_clouds_container.point_clouds[edges[index_active_edge].index_to]);
-                    pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
-                    pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    ICP icp;
-                    icp.search_radious = search_radious;
-
-                    for (auto &pc : pcs.point_clouds)
-                    {
-                        pc.rgd_params.resolution_X = icp.search_radious;
-                        pc.rgd_params.resolution_Y = icp.search_radious;
-                        pc.rgd_params.resolution_Z = icp.search_radious;
-                        pc.build_rgd();
-                        pc.cout_rgd();
-                        pc.compute_normal_vectors(0.5);
-                    }
-
-                    icp.number_of_threads = std::thread::hardware_concurrency();
-                    icp.number_of_iterations = 10;
-                    icp.is_adaptive_robust_kernel = false;
-
-                    icp.is_ballanced_horizontal_vs_vertical = false;
-                    icp.is_fix_first_node = true;
-                    icp.is_gauss_newton = true;
-                    icp.is_levenberg_marguardt = false;
-                    icp.is_cw = false;
-                    icp.is_wc = true;
-                    icp.is_tait_bryan_angles = true;
-                    icp.is_quaternion = false;
-                    icp.is_rodrigues = false;
-                    std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                    icp.optimization_point_to_point_source_to_target(pcs);
-
-                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
-                    */
+                    
                 }
                 ImGui::SameLine();
                 ImGui::InputDouble("search_radious", &search_radious);
@@ -1147,9 +944,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     int number_of_iterations = 30;
                     PairWiseICP icp;
                     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                   // std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
+                
                     ////////////////////////////////
                     std::vector<Eigen::Vector3d> source;
                     auto &e = edges[index_active_edge];
@@ -1165,7 +960,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
                                 source.push_back(p_g);
                             }
-                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        
                         }
                     }
 
@@ -1182,7 +977,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
                                 target.push_back(p_g);
                             }
-                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                      
                         }
                     }
 
@@ -1213,9 +1008,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     int number_of_iterations = 30;
                     PairWiseICP icp;
                     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                    //std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
+                  
                     ////////////////////////////////
                     std::vector<Eigen::Vector3d> source;
                     auto &e = edges[index_active_edge];
@@ -1231,7 +1024,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
                                 source.push_back(p_g);
                             }
-                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                         
                         }
                     }
 
@@ -1248,7 +1041,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
                                 target.push_back(p_g);
                             }
-                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                       
                         }
                     }
 
@@ -1279,9 +1072,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     int number_of_iterations = 30;
                     PairWiseICP icp;
                     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                    //std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
+                
                     ////////////////////////////////
                     std::vector<Eigen::Vector3d> source;
                     auto &e = edges[index_active_edge];
@@ -1297,7 +1088,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
                                 source.push_back(p_g);
                             }
-                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                           
                         }
                     }
 
@@ -1314,7 +1105,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
                                 target.push_back(p_g);
                             }
-                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                      
                         }
                     }
 
@@ -1345,9 +1136,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     int number_of_iterations = 30;
                     PairWiseICP icp;
                     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                    //std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
+                 
                     ////////////////////////////////
                     std::vector<Eigen::Vector3d> source;
                     auto &e = edges[index_active_edge];
@@ -1363,7 +1152,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
                                 source.push_back(p_g);
                             }
-                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                          
                         }
                     }
 
@@ -1380,7 +1169,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
                                 target.push_back(p_g);
                             }
-                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                          
                         }
                     }
 
@@ -1411,9 +1200,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     int number_of_iterations = 30;
                     PairWiseICP icp;
                     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                    //std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
+                  
                     ////////////////////////////////
                     std::vector<Eigen::Vector3d> source;
                     auto &e = edges[index_active_edge];
@@ -1429,7 +1216,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
                                 source.push_back(p_g);
                             }
-                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                          
                         }
                     }
 
@@ -1446,7 +1233,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                 Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
                                 target.push_back(p_g);
                             }
-                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                         
                         }
                     }
 

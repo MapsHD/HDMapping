@@ -28,16 +28,8 @@
 namespace fs = std::filesystem;
 
 bool full_lidar_odometry_gui = false;
-
-// std::vector<Point3Di> initial_points;
 NDT ndt;
-// NDT::GridParameters in_out_params;
-
-// NDTBucketMapType buckets;
-// NDTBucketMapType reference_buckets;
 bool show_reference_buckets = true;
-
-// std::vector<Point3Di> reference_points;
 bool show_reference_points = false;
 int dec_reference_points = 100;
 bool show_initial_points = true;
@@ -45,14 +37,6 @@ bool show_trajectory = true;
 bool show_trajectory_as_axes = false;
 bool show_covs = false;
 int dec_covs = 10;
-// double filter_threshold_xy = 0.5;
-// int nr_iter = 100;
-// double sliding_window_trajectory_length_threshold = 50.0;
-//bool fusionConventionNwu = true;
-//bool fusionConventionEnu = false;
-//bool fusionConventionNed = false;
-// bool use_motion_from_previous_step = true;
-// bool useMultithread = true;
 bool simple_gui = true;
 bool step_1_done = false;
 bool step_2_done = false;
@@ -73,20 +57,15 @@ bool gui_mouse_down{false};
 int mouse_buttons = 0;
 float mouse_sensitivity = 1.0;
 std::string working_directory = "";
-// std::string working_directory_preview = "";
-// double decimation = 0.1;
-//int threshold_initial_points = 10000;
 bool initial_transformation_gizmo = false;
-//double threshould_output_filter = 0.5;
+
 
 float m_gizmo[] = {1, 0, 0, 0,
                    0, 1, 0, 0,
                    0, 0, 1, 0,
                    0, 0, 0, 1};
-// Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
-// double consecutive_distance = 0.0;
+
 float x_displacement = 0.01;
-//int num_constistency_iter = 10;
 
 int index_from_inclusive = -1;
 int index_to_inclusive = -1;
@@ -103,17 +82,13 @@ Session session;
 std::vector<std::vector<Point3Di>> pointsPerFile;
 Imu imu_data;
 Trajectory trajectory;
-// std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> global_tmp;
+
 
 void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
-// this function draws ellipse for each bucket
 void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd = 3);
-// bool exportLaz(const std::string &filename, const std::vector<Eigen::Vector3d> &pointcloud, const std::vector<unsigned short> &intensity,
-//                const std::vector<double> &timestamps, double offset_x,
-//                double offset_y,
-//                double offset_alt);
+
 
 #if _WIN32
 #define DEFAULT_PATH "C:\\"
@@ -220,41 +195,7 @@ void lidar_odometry_gui()
 
         if (!simple_gui)
         {
-            /*if (ImGui::Button("set 'narrow spaces' mapping parameters (fastest motion upto 2km/h, gentle rotations, e.g. caves, indoor layouts)"))
-            {
-                params.decimation = 0.01;
-                params.in_out_params_indoor.resolution_X = 0.1;
-                params.in_out_params_indoor.resolution_Y = 0.1;
-                params.in_out_params_indoor.resolution_Z = 0.1;
-                params.filter_threshold_xy_inner = 0.3;
-                params.filter_threshold_xy_outer = 70.0;
-
-                params.distance_bucket = 0.2;
-                params.polar_angle_deg = 10.0;
-                params.azimutal_angle_deg = 10.0;
-                params.robust_and_accurate_lidar_odometry_iterations = 20;
-                params.max_distance_lidar = 30.0;
-
-                params.use_robust_and_accurate_lidar_odometry = false;
-            }
-
-            if (ImGui::Button("set 'regular spaces' mapping parameters (fastest motion upto 8km/h, gentle rotations, e.g. outdoor)"))
-            {
-                params.decimation = 0.1;
-                params.in_out_params_indoor.resolution_X = 0.3;
-                params.in_out_params_indoor.resolution_Y = 0.3;
-                params.in_out_params_indoor.resolution_Z = 0.3;
-                params.filter_threshold_xy_inner = 0.3;
-                params.filter_threshold_xy_outer = 70.0;
-
-                params.distance_bucket = 0.3;
-                params.polar_angle_deg = 10.0;
-                params.azimutal_angle_deg = 10.0;
-                params.robust_and_accurate_lidar_odometry_iterations = 20;
-                params.max_distance_lidar = 30.0;
-
-                params.use_robust_and_accurate_lidar_odometry = false;
-            }*/
+            
 
             ImGui::Checkbox("show_initial_points", &show_initial_points);
             ImGui::Checkbox("show_trajectory", &show_trajectory);
@@ -339,10 +280,7 @@ void lidar_odometry_gui()
         }
         if (!step_1_done)
         {
-            // if (ImGui::Button("alternative_approach"))
-            //{
-            //     alternative_approach();
-            // }
+            
 
             if (ImGui::Button("load data (step 1)"))
             {
@@ -360,21 +298,9 @@ void lidar_odometry_gui()
             }
             ImGui::SameLine();
             ImGui::Text("Press this button for automatic lidar odometry calculation -> it will produce trajectory");
-            // if (ImGui::Button("fix pitch roll"))
-            //{
-            //     fix_ptch_roll(worker_data);
-            // }
+           
         }
-        /*if (step_1_done && !step_2_done)
-        {
-            if (ImGui::Button("compute_all fast forward motion(step 2)"))
-            {
-                compute_step_2_fast_forward_motion(worker_data, params);
-                step_2_done = true;
-            }
-            ImGui::SameLine();
-            ImGui::Text("Press this button for automatic lidar odometry calculation -> it will produce trajectory");
-        }*/
+       
         if (step_1_done && step_2_done)
         {
             ImGui::Text("'Point cloud consistency and trajectory smoothness' makes trajectory smooth, point cloud will be more consistent");
@@ -396,11 +322,7 @@ void lidar_odometry_gui()
             ImGui::Text("Press this button for saving resulting trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program");
         }
         if (step_1_done && step_2_done)
-        {/*
-            ImGui::Text("-------------------------------------------------------------------------------");
-            ImGui::Text(std::string("All data is saved in folder '" + working_directory + "' You can close this program.").c_str());
-            ImGui::Text("Next step is to load 'session.json' with 'multi_view_tls_registration_step_2' program");
-            ImGui::Text("-------------------------------------------------------------------------------");*/
+        {
 
             if (ImGui::Button("save all point clouds to single '*.las or *.laz' file"))
             {
@@ -409,29 +331,7 @@ void lidar_odometry_gui()
                 if (output_file_name.size() > 0)
                 {
                     save_all_to_las(worker_data, params, output_file_name, session, false, true, true, false);
-                    /*for (auto &p : session.point_clouds_container.point_clouds)
-                    {
-                        if (p.visible)
-                        {
-                            for (int i = 0; i < p.points_local.size(); i++)
-                            {
-                                const auto &pp = p.points_local[i];
-                                Eigen::Vector3d vp;
-                                vp = p.m_pose * pp + session.point_clouds_container.offset;
-
-                                pointcloud.push_back(vp);
-                                if (i < p.intensities.size())
-                                {
-                                    intensity.push_back(p.intensities[i]);
-                                }
-                                else
-                                {
-                                    intensity.push_back(0);
-                                }
-                            }
-                        }
-                    }
-                    */
+                    
                 }
             }
         }
@@ -742,26 +642,7 @@ void lidar_odometry_gui()
                         m_gizmo[15] = (float)stretch_gizmo_m(3, 3);
                     }
                 }
-                /*if (index_to_inclusive < worker_data.size())
-                {
-                    if (index_from_inclusive < index_to_inclusive)
-                    {
-                        if (ImGui::Button("Accept_Gizmo"))
-                        {
-                            std::vector<std::vector<Eigen::Affine3d>> all_poses;
-                            for (int i = 0; i < worker_data.size(); i++)
-                            {
-                                std::vector<Eigen::Affine3d> poses;
-                                for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
-                                {
-                                    poses.push_back(worker_data[i].intermediate_trajectory[j]);
-                                }
-                                all_poses.push_back(poses);
-                            }
-                        }
-                    }
-                }*/
-
+                
                 if (ImGui::Button("Accept_Gizmo (only translation)"))
                 {
                     if (index_to_inclusive < worker_data.size())
@@ -821,10 +702,6 @@ void lidar_odometry_gui()
                                     pose.py = first_pose.translation().y() + translation.y() * (counter / number_all_nodes_inside_interval);
                                     pose.pz = first_pose.translation().z() + translation.z() * (counter / number_all_nodes_inside_interval);
 
-                                    // pose.om += pose_diff.om * (counter / number_all_nodes_inside_interval);
-                                    // pose.fi += pose_diff.fi * (counter / number_all_nodes_inside_interval);
-                                    // pose.ka += pose_diff.ka * (counter / number_all_nodes_inside_interval);
-
                                     counter += 1.0f;
 
                                     worker_data[i].intermediate_trajectory[j] = affine_matrix_from_pose_tait_bryan(pose);
@@ -880,9 +757,6 @@ void lidar_odometry_basic_gui()
             std::chrono::time_point<std::chrono::system_clock> start, end;
             start = std::chrono::system_clock::now();
 
-            //auto dir = pfd::select_folder("Select any directory", DEFAULT_PATH).result();
-            //std::cout << "Selected dir: " << dir << "\n";
-
             step1();
 
             params.decimation = 0.01;
@@ -919,23 +793,7 @@ void lidar_odometry_basic_gui()
 
             save_results(false, elapsed_seconds.count());
 
-            /*for (int i = 0; i < params.num_constistency_iter; i++)
-            {
-                std::cout << "Iteration " << i + 1 << " of " << params.num_constistency_iter << std::endl;
-                for (int ii = 0; ii < worker_data.size(); ii++)
-                {
-                    worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
-                }
-                Consistency(worker_data, params);
-            }
-
-            save_results(false);*/
-
-            //std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
-
-            //std::string message_info = "Data saved to folders '" + working_directory + "\\lidar_odometry_result_0' and '" + working_directory + "\\lidar_odometry_result_1' total_length_of_calculated_trajectory=" +
-            //    std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
-
+            
             std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
                                        std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
 
@@ -945,7 +803,7 @@ void lidar_odometry_basic_gui()
                 message_info.c_str(),
                 pfd::choice::ok, pfd::icon::info);
             message.result();
-            //exit(1);
+ 
         }
 
         if (ImGui::Button("Process MANDEYE data in folder (quick but less accurate, less precise, velocity up to 8km/h)"))
@@ -953,8 +811,6 @@ void lidar_odometry_basic_gui()
             std::chrono::time_point<std::chrono::system_clock> start, end;
             start = std::chrono::system_clock::now();
 
-            // auto dir = pfd::select_folder("Select any directory", DEFAULT_PATH).result();
-            // std::cout << "Selected dir: " << dir << "\n";
 
             step1();
 
@@ -1009,9 +865,6 @@ void lidar_odometry_basic_gui()
             std::chrono::time_point<std::chrono::system_clock> start, end;
             start = std::chrono::system_clock::now();
 
-            // auto dir = pfd::select_folder("Select any directory", DEFAULT_PATH).result();
-            // std::cout << "Selected dir: " << dir << "\n";
-
             step1();
 
             params.decimation = 0.03;
@@ -1065,9 +918,6 @@ void lidar_odometry_basic_gui()
             std::chrono::time_point<std::chrono::system_clock> start, end;
             start = std::chrono::system_clock::now();
 
-            // auto dir = pfd::select_folder("Select any directory", DEFAULT_PATH).result();
-            // std::cout << "Selected dir: " << dir << "\n";
-
             step1();
 
             params.decimation = 0.01;
@@ -1104,23 +954,6 @@ void lidar_odometry_basic_gui()
                       << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
             save_results(false, elapsed_seconds.count());
-
-            /*for (int i = 0; i < params.num_constistency_iter; i++)
-            {
-                std::cout << "Iteration " << i + 1 << " of " << params.num_constistency_iter << std::endl;
-                for (int ii = 0; ii < worker_data.size(); ii++)
-                {
-                    worker_data[ii].intermediate_trajectory_motion_model = worker_data[ii].intermediate_trajectory;
-                }
-                Consistency(worker_data, params);
-            }
-
-            save_results(false);*/
-
-            // std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
-
-            // std::string message_info = "Data saved to folders '" + working_directory + "\\lidar_odometry_result_0' and '" + working_directory + "\\lidar_odometry_result_1' total_length_of_calculated_trajectory=" +
-            //     std::to_string(params.total_length_of_calculated_trajectory) + " [m]";
 
             std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
                                        std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
@@ -1267,10 +1100,6 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
-    // reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-    // glTranslatef(translate_x, translate_y, translate_z);
-    // glRotatef(rotate_x, 1.0, 0.0, 0.0);
-    // glRotatef(rotate_y, 0.0, 0.0, 1.0);
 
     reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
@@ -1301,26 +1130,6 @@ void display()
     glVertex3f(0.0f, 0.0f, 100);
     glEnd();
 
-    // nv
-    /*glBegin(GL_LINES);
-    for (const auto &b : buckets)
-    {
-        glColor3f(b.second.normal_vector.x(), b.second.normal_vector.y(), b.second.normal_vector.z());
-        glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-        glVertex3f(b.second.mean.x() + b.second.normal_vector.x(), b.second.mean.y() + b.second.normal_vector.y(), b.second.mean.z() + b.second.normal_vector.z());
-    }
-    glEnd();*/
-
-    /*if (show_all_points)
-    {
-        glColor3d(1.0, 0.0, 0.0);
-        glBegin(GL_POINTS);
-        for (const auto &p : all_points)
-        {
-            glVertex3d(p.x(), p.y(), p.z());
-        }
-        glEnd();
-    }*/
     if (show_initial_points)
     {
         glColor3d(0.0, 1.0, 0.0);
@@ -1332,11 +1141,7 @@ void display()
         }
         glEnd();
     }
-    // if(show_covs){
-    //     for(int i = 0; i < means.size(); i += dec_covs){
-    //         draw_ellipse(covs[i], means[i], Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
-    //     }
-    // }
+   
     if (show_covs)
     {
         for (const auto &b : params.buckets_indoor)
@@ -1374,36 +1179,7 @@ void display()
             glVertex3f(it(0, 3) + it(0, 1), it(1, 3) + it(1, 1), it(2, 3) + it(2, 1));
 
             glEnd();
-            // glLineWidth(1);
-
-            /*glColor3f(0, 0, 1);
-            glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-            glVertex3f(it(0, 3) + it(0, 2), it(1, 3) + it(1, 2), it(2, 3) + it(2, 2));
-            glEnd();
-            {
-                TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[0]);
-                // tb.px = tb.py = tb.pz = tb.om = tb.fi = tb.ka = 0.0;
-                tb.om = worker_data[i].imu_roll_pitch[0].first;
-                tb.fi = worker_data[i].imu_roll_pitch[0].second;
-                Eigen::Affine3d it = affine_matrix_from_pose_tait_bryan(tb);
-                glLineWidth(3);
-                glBegin(GL_LINES);
-
-                glColor3f(1, 0, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + it(0, 0) * 0.5, it(1, 3) + it(1, 0) * 0.5, it(2, 3) + it(2, 0) * 0.5);
-
-                glColor3f(0, 1, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + it(0, 1) * 0.5, it(1, 3) + it(1, 1) * 0.5, it(2, 3) + it(2, 1) * 0.5);
-
-                glColor3f(0, 0, 1);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + it(0, 2) * 0.5, it(1, 3) + it(1, 2) * 0.5, it(2, 3) + it(2, 2) * 0.5);
-
-                glEnd();
-                glLineWidth(1);
-            }*/
+           
         }
     }
 
@@ -1466,7 +1242,7 @@ void display()
         for (const auto &b : params.reference_buckets)
         {
             glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            // std::cout << b.second.mean << " ";
+         
         }
         glEnd();
     }
@@ -1512,15 +1288,7 @@ void display()
             glEnd();
         }
     }
-    // int index_from_inclusive = -1;
-    // int index_to_inclusive = -1;
-
-    /*{
-        for (int k = 0; k < worker_data.size(); k++)
-        {
-            worker_data[k].show = false;
-        }
-    }*/
+  
 
     if (ImGui::GetIO().KeyCtrl)
     {
@@ -1562,8 +1330,7 @@ void display()
 
         ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
 
-        // Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
-
+        
         params.m_g(0, 0) = m_gizmo[0];
         params.m_g(1, 0) = m_gizmo[1];
         params.m_g(2, 0) = m_gizmo[2];
@@ -1616,18 +1383,7 @@ void display()
         stretch_gizmo_m(3, 3) = m_gizmo[15];
     }
 
-    /*for (int i = 0; i < global_tmp.size(); i++)
-    {
-        glColor3f(global_tmp[i].second.x(), global_tmp[i].second.y(), global_tmp[i].second.z());
-        glBegin(GL_LINES);
-            glVertex3f(global_tmp[i].first.x(), global_tmp[i].first.y(), global_tmp[i].first.z());
-
-            glVertex3f(global_tmp[i].first.x() + global_tmp[i].second.x(),
-                       global_tmp[i].first.y() + global_tmp[i].second.y(),
-                       global_tmp[i].first.z() + global_tmp[i].second.z());
-        glEnd();
-    }*/
-
+   
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 

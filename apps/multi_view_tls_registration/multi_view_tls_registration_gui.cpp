@@ -770,31 +770,7 @@ void project_gui()
                                             num_edge_extended_before,
                                             num_edge_extended_after);
 
-        /*if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size()> 0)
-        {
-            int index_src = manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].index_from;
-            int index_trg = manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].index_to;
-
-            Eigen::Affine3d m_from = point_clouds_container.point_clouds.at(index_src).m_pose;
-            Eigen::Affine3d m_to = m_from * affine_matrix_from_pose_tait_bryan(manual_pose_graph_loop_closure.edges[manual_pose_graph_loop_closure.index_active_edge].relative_pose_tb);
-
-            m_gizmo[0] = (float)m_to(0, 0);
-            m_gizmo[1] = (float)m_to(1, 0);
-            m_gizmo[2] = (float)m_to(2, 0);
-            m_gizmo[3] = (float)m_to(3, 0);
-            m_gizmo[4] = (float)m_to(0, 1);
-            m_gizmo[5] = (float)m_to(1, 1);
-            m_gizmo[6] = (float)m_to(2, 1);
-            m_gizmo[7] = (float)m_to(3, 1);
-            m_gizmo[8] = (float)m_to(0, 2);
-            m_gizmo[9] = (float)m_to(1, 2);
-            m_gizmo[10] = (float)m_to(2, 2);
-            m_gizmo[11] = (float)m_to(3, 2);
-            m_gizmo[12] = (float)m_to(0, 3);
-            m_gizmo[13] = (float)m_to(1, 3);
-            m_gizmo[14] = (float)m_to(2, 3);
-            m_gizmo[15] = (float)m_to(3, 3);
-        }*/
+        
     }
     else
     {
@@ -813,21 +789,11 @@ void project_gui()
             if (ImGui::Button("reset poses"))
             {
                 reset_poses(session);
-                /*for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
-                {
-                    point_clouds_container.point_clouds[i].m_pose = point_clouds_container.point_clouds[i].m_initial_pose;
-                    point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
-                    point_clouds_container.point_clouds[i].gui_translation[0] = (float)point_clouds_container.point_clouds[i].pose.px;
-                    point_clouds_container.point_clouds[i].gui_translation[1] = (float)point_clouds_container.point_clouds[i].pose.py;
-                    point_clouds_container.point_clouds[i].gui_translation[2] = (float)point_clouds_container.point_clouds[i].pose.pz;
-                    point_clouds_container.point_clouds[i].gui_rotation[0] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.om);
-                    point_clouds_container.point_clouds[i].gui_rotation[1] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.fi);
-                    point_clouds_container.point_clouds[i].gui_rotation[2] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.ka);
-                }*/
+                
             }
 
             static double angle_diff = 5.0;
-            // ImGui::SameLine();
+            
             if (ImGui::Button("set all fuse_inclination_from_IMU"))
             {
                 for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
@@ -929,12 +895,6 @@ void project_gui()
                 session.point_clouds_container.show_all_from_range(index_begin, index_end);
             }
 
-            // if (ImGui::Button("mark all pcs from range <index_begin, index_end>"))
-            //{
-            //     session.point_clouds_container.hide_all();
-            //     session.point_clouds_container.show_all_from_range(index_begin, index_end);
-            // }
-
             static double x_origin = 0.0;
             static double y_origin = 0.0;
             static double z_origin = 0.0;
@@ -987,16 +947,6 @@ void project_gui()
                     }
                 }
             }
-
-            /*
-
-                    ImGui::End();
-
-                    if (!manipulate_only_marked_gizmo)
-                    {
-
-                    }
-            */
 
             for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
             {
@@ -1171,16 +1121,6 @@ void project_gui()
                 ImGui::SameLine();
                 ImGui::Checkbox(std::string("#" + std::to_string(i) + " fuse inclination from IMU").c_str(), &session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU);
 
-                // if (session.point_clouds_container.point_clouds[i].choosing_geo)
-                // {
-                //     for (int gp = 0; gp < session.point_clouds_container.point_clouds[i].available_geo_points.size(); gp++)
-                //     {
-                //         ImGui::Checkbox(std::string("#" + std::to_string(i) + " " + std::to_string(gp) + "[" +
-                //                                     session.point_clouds_container.point_clouds[i].available_geo_points[gp].name + "]")
-                //                             .c_str(),
-                //                         &session.point_clouds_container.point_clouds[i].available_geo_points[gp].choosen);
-                //     }
-                // }
             }
             ImGui::Separator();
             int total_number_of_points = 0;
@@ -1194,11 +1134,9 @@ void project_gui()
             ImGui::Separator();
             ImGui::Separator();
         }
-        // gnss.offset_x, gnss.offset_y, gnss.offset_alt
+       
         ImGui::Text("Set offsets x y z to export point cloud in global coordinate system (each local coordinate of the point += offset)");
-        // ImGui::InputDouble("offset_x", &gnss.offset_x);
-        // ImGui::InputDouble("offset_y", &gnss.offset_y);
-        // ImGui::InputDouble("offset_z", &gnss.offset_alt);
+        
         ImGui::InputDouble("offset_x", &session.point_clouds_container.offset.x());
         ImGui::InputDouble("offset_y", &session.point_clouds_container.offset.y());
         ImGui::InputDouble("offset_z", &session.point_clouds_container.offset.z());
@@ -1222,12 +1160,7 @@ void project_gui()
             if (output_file_name.size() > 0)
             {
                 save_all_to_las(session, output_file_name);
-                // for (int i = 0; i < 10; i++)
-                //{
-                //     std::cout << pointcloud[i].x() << " " << pointcloud[i].y() << " " << pointcloud[i].z() << std::endl;
-                // }
-
-                // if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+                
             }
         }
         ImGui::SameLine();
@@ -1413,17 +1346,7 @@ void project_gui()
 
         if (session.point_clouds_container.point_clouds.size() > 0)
         {
-            /*if (ImGui::Button("load georefence points"))
-            {
-                std::string input_file_name = "";
-                input_file_name = mandeye::fd::OpenFileDialogOneFile("Load geo-reference file", {});
-                std::cout << "geo-reference file: '" << input_file_name << "'" << std::endl;
-
-                if (input_file_name.size() > 0)
-                {
-                    load_available_geo_points(session, input_file_name);
-                }
-            }*/
+            
 
             if (ImGui::Button("load gnss files and convert from wgs84 to puwg92"))
             {
@@ -1452,10 +1375,6 @@ void project_gui()
                     }
                 }
             }
-
-            // ImGui::InputDouble("WGS84ReferenceLatitude", &gnss.WGS84ReferenceLatitude);
-            // ImGui::InputDouble("WGS84ReferenceLongitude", &gnss.WGS84ReferenceLongitude);
-            // ImGui::InputDouble("OffsetAltitude", &gnss.offset_alt);
 
             ImGui::Checkbox("setWGS84ReferenceFromFirstPose", &tls_registration.gnss.setWGS84ReferenceFromFirstPose);
 
@@ -1489,8 +1408,8 @@ void project_gui()
                         {
                             const auto &pp = p.points_local[i];
                             Eigen::Vector3d vp;
-                            vp = p.m_pose * pp; // + session.point_clouds_container.offset;
-                            // std::cout << vp << std::endl;
+                            vp = p.m_pose * pp;
+                          
                             pointcloud.push_back(vp);
                             if (i < p.intensities.size())
                             {
@@ -1549,7 +1468,7 @@ void project_gui()
 
 void ndt_gui()
 {
-    // static bool compute_mean_and_cov_for_bucket = false;
+   
     ImGui::Begin("Normal Distributions Transform");
 
     ImGui::InputFloat3("bucket_size (x[m],y[m],z[m])", tls_registration.ndt.bucket_size);
@@ -1633,8 +1552,7 @@ void ndt_gui()
         double rms_initial = 0.0;
         double rms_final = 0.0;
         double mui = 0.0;
-        // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
-        // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
+       
         tls_registration.ndt.optimize(session.point_clouds_container.point_clouds, true, tls_registration.compute_mean_and_cov_for_bucket);
     }
 
@@ -1642,12 +1560,12 @@ void ndt_gui()
 
     if (ImGui::Button("ndt_optimization(Lie-algebra left Jacobian)"))
     {
-        // icp.optimize_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
+       
         tls_registration.ndt.optimize_lie_algebra_left_jacobian(session.point_clouds_container.point_clouds, tls_registration.compute_mean_and_cov_for_bucket);
     }
     if (ImGui::Button("ndt_optimization(Lie-algebra right Jacobian)"))
     {
-        // icp.optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
+        
         tls_registration.ndt.optimize_lie_algebra_right_jacobian(session.point_clouds_container.point_clouds, tls_registration.compute_mean_and_cov_for_bucket);
     }
 
@@ -2239,22 +2157,6 @@ void observation_picking_gui()
 
     ImGui::SameLine();
 
-    /*if (ImGui::Button("add intersections from loaded observations")) {
-        for (const auto& obs : observation_picking.observations) {
-            for (const auto& [key, value] : obs) {
-                if (point_clouds_container.show_with_initial_pose) {
-                    auto p = point_clouds_container.point_clouds[key].m_initial_pose * value;
-                    observation_picking.add_intersection(p);
-                }
-                else {
-                    auto p = point_clouds_container.point_clouds[key].m_pose * value;
-                    observation_picking.add_intersection(p);
-                }
-                break;
-            }
-        }
-    }*/
-
     int index_intersetion_to_remove = -1;
     for (int i = 0; i < observation_picking.intersections.size(); i++)
     {
@@ -2427,62 +2329,7 @@ void display()
         }
         else
         {
-            /*if (session.point_clouds_container.point_clouds.size() > 0)
-            {
-                for (const auto &g : session.point_clouds_container.point_clouds[0].available_geo_points)
-                {
-                    glBegin(GL_LINES);
-                    glColor3f(1.0f, 0.0f, 0.0f);
-                    auto c = g.coordinates - session.point_clouds_container.offset;
-                    glVertex3f(c.x() - 0.5, c.y(), c.z());
-                    glVertex3f(c.x() + 0.5, c.y(), c.z());
-
-                    glVertex3f(c.x(), c.y() - 0.5, c.z());
-                    glVertex3f(c.x(), c.y() + 0.5, c.z());
-
-                    glVertex3f(c.x(), c.y(), c.z() - 0.5);
-                    glVertex3f(c.x(), c.y(), c.z() + 0.5);
-                    glEnd();
-                }
-            }*/
-
-            //
-            /*for (const auto &pc : session.point_clouds_container.point_clouds)
-            {
-                for (const auto &gp : pc.available_geo_points)
-                {
-                    if (gp.choosen)
-                    {
-                        auto c = pc.m_pose * gp.coordinates;
-                        glBegin(GL_LINES);
-                        glColor3f(1.0f, 0.0f, 0.0f);
-                        glVertex3f(c.x() - 0.5, c.y(), c.z());
-                        glVertex3f(c.x() + 0.5, c.y(), c.z());
-
-                        glVertex3f(c.x(), c.y() - 0.5, c.z());
-                        glVertex3f(c.x(), c.y() + 0.5, c.z());
-
-                        glVertex3f(c.x(), c.y(), c.z() - 0.5);
-                        glVertex3f(c.x(), c.y(), c.z() + 0.5);
-                        glEnd();
-
-                        glBegin(GL_LINES);
-                        glColor3f(0.0f, 1.0f, 0.0f);
-                        glVertex3f(c.x(), c.y(), c.z());
-                        glVertex3f(gp.coordinates.x(), gp.coordinates.y(), gp.coordinates.z());
-                        glEnd();
-
-                        glColor3f(0.0f, 0.0f, 0.0f);
-                        glBegin(GL_LINES);
-                        glVertex3f(c.x(), c.y(), c.z());
-                        glVertex3f(c.x() + 10, c.y(), c.z());
-                        glEnd();
-
-                        glRasterPos3f(c.x() + 10, c.y(), c.z());
-                        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)gp.name.c_str());
-                    }
-                }
-            }*/
+           
         }
 
         tls_registration.gnss.render(session.point_clouds_container);
@@ -2524,10 +2371,7 @@ void display()
             session.ground_control_points.imgui(session.point_clouds_container);
         }
     }
-    // if (manual_pose_graph_loop_closure_mode)
-    //{
-    //      manual_pose_graph_loop_closure.Gui();
-    // }
+    
     project_gui();
 
     if (!session.control_points.is_imgui)
@@ -2878,50 +2722,15 @@ void mouse(int glut_button, int state, int x, int y)
                         }
                     }
                 }
-
-                // std::cout << "i: " << index_i << " j: " << index_j << std::endl;
-                // rotation_center
-
-                /*
-                int PointPicking::pick_point(int x, int y, const std::vector<underground_mining::PointInsideROI>& points_global) {
-    underground_mining::LaserBeam lb = GLWidgetGetOGLPos(x, y);
-
-    double min_distance = 10000000000;
-    int index = -1;
-    for (size_t j = 0; j < points_global.size(); j++) {
-        double dist = distance_point_to_line(points_global[j].coordinates_global, lb);
-        if (dist < min_distance) {
-            min_distance = dist;
-            index = j;
-            //if (dist < 0.0005) {
-            //	return index;
-            //}
-        }
-    }
-
-    if (index != -1) {
-        std::cout << "min_distance_to_line: " << min_distance << std::endl;
-    }
-
-    if (min_distance > 0.1) {
-        return -1;
-    }
-
-    return index;
-}
-                */
             }
             else if (session.control_points.picking_mode)
             {
                 std::cout << "control point picking" << std::endl;
                 const auto laser_beam = GetLaserBeam(x, y);
                 double min_distance = 10000000000;
-                // int index_i = -1;
-                // int index_j = -1;
+             
                 session.control_points.index_picked_point = -1;
-                // session.control_points.found_picked = false;
-
-                // for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                
                 int i = session.control_points.index_pose;
                 if (session.control_points.index_pose >= 0 && session.control_points.index_pose < session.point_clouds_container.point_clouds.size())
                 {
@@ -2935,26 +2744,12 @@ void mouse(int glut_button, int state, int x, int y)
                         if (dist < min_distance && dist < 0.1)
                         {
                             min_distance = dist;
-                            // index_i = i;
-                            // index_j = j;
-
+                           
                             rotation_center.x() = vp.x();
                             rotation_center.y() = vp.y();
                             rotation_center.z() = vp.z();
 
-                            // session.control_points.picked_control_point.x_source_local = p.x();
-                            // session.control_points.picked_control_point.y_source_local = p.y();
-                            // session.control_points.picked_control_point.z_source_local = p.z();
-                            // session.control_points.picked_control_point.x_target_global = vp.x();
-                            // session.control_points.picked_control_point.y_target_global = vp.y();
-                            // session.control_points.picked_control_point.z_target_global = vp.z();
-
-                            // session.control_points.found_picked = true;
                             session.control_points.index_picked_point = j;
-                            // session.ground_control_points.picking_mode_index_to_node_inner = index_i;
-                            // session.ground_control_points.picking_mode_index_to_node_outer = index_j;
-
-                            // if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
                         }
                     }
                 }

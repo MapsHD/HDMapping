@@ -20,6 +20,14 @@ class ManualPoseGraphLoopClosure: public PoseGraphLoopClosure{
         ManualPoseGraphLoopClosure(){};
         ~ManualPoseGraphLoopClosure(){};
 
+        void NoGui(PointClouds &point_clouds_container,
+                   GNSS &gnss,
+                   GroundControlPoints &gcps,
+                   ControlPoints &cps);
+                   
+        void FuseTrajectoryWithGNSS(PointClouds &point_clouds_container,
+                                    GNSS &gnss);
+
         void Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss,
                  GroundControlPoints &gcps, ControlPoints &cps);
         void Render(PointClouds &point_clouds_container, int index_loop_closure_source, int index_loop_closure_target);

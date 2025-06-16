@@ -109,6 +109,9 @@ Session session;
 bool simple_gui = true;
 bool session_loaded = false;
 
+int num_edge_extended_before = 0;
+int num_edge_extended_after = 0;
+
 void export_result_to_folder(std::string output_folder_name, ObservationPicking &observation_picking, Session &session);
 void reshape(int w, int h);
 
@@ -743,13 +746,29 @@ void project_gui()
 
     if (manual_pose_graph_loop_closure_mode)
     {
+        ImGui::InputInt("num_edge_extended_before", &num_edge_extended_before);
+        if (num_edge_extended_before < 0)
+        {
+            num_edge_extended_before = 0;
+        }
+
+        ImGui::InputInt("num_edge_extended_after", &num_edge_extended_after);
+        if (num_edge_extended_after < 0)
+        {
+            num_edge_extended_after = 0;
+        }
+
+        ImGui::Text("--");
+
         session.pose_graph_loop_closure.Gui(session.point_clouds_container,
                                             index_loop_closure_source,
                                             index_loop_closure_target,
                                             m_gizmo,
                                             tls_registration.gnss,
                                             session.ground_control_points,
-                                            session.control_points);
+                                            session.control_points,
+                                            num_edge_extended_before,
+                                            num_edge_extended_after);
 
         /*if (manual_pose_graph_loop_closure.gizmo && manual_pose_graph_loop_closure.edges.size()> 0)
         {
@@ -933,7 +952,7 @@ void project_gui()
                     {
                         all_m_poses2.push_back(session.point_clouds_container.point_clouds[j].m_pose);
                     }
-                    
+
                     session.point_clouds_container.point_clouds[0].m_pose(0, 3) = x_origin;
                     session.point_clouds_container.point_clouds[0].m_pose(1, 3) = y_origin;
                     session.point_clouds_container.point_clouds[0].m_pose(2, 3) = z_origin;
@@ -948,14 +967,12 @@ void project_gui()
                     session.point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[0].pose.fi * 180.0 / M_PI);
                     session.point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[0].pose.ka * 180.0 / M_PI);
 
-                    
-
                     Eigen::Affine3d curr_m_pose2 = session.point_clouds_container.point_clouds[0].m_pose;
                     for (int j = 1; j < session.point_clouds_container.point_clouds.size(); j++)
                     {
                         curr_m_pose2 = curr_m_pose2 * (all_m_poses2[j - 1].inverse() * all_m_poses2[j]);
 
-                        //std::cout << curr_m_pose2.matrix() << std::endl;
+                        // std::cout << curr_m_pose2.matrix() << std::endl;
                         session.point_clouds_container.point_clouds[j]
                             .m_pose = curr_m_pose2;
                         session.point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
@@ -2405,7 +2422,8 @@ void display()
     {
         if (manual_pose_graph_loop_closure_mode)
         {
-            session.pose_graph_loop_closure.Render(session.point_clouds_container, index_loop_closure_source, index_loop_closure_target);
+            session.pose_graph_loop_closure.Render(session.point_clouds_container, index_loop_closure_source, index_loop_closure_target,
+                                                   num_edge_extended_before, num_edge_extended_after);
         }
         else
         {

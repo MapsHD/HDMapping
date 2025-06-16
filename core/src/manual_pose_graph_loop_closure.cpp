@@ -864,7 +864,10 @@ void ManualPoseGraphLoopClosure::FuseTrajectoryWithGNSS(PointClouds &point_cloud
 }
 
 void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
-                                     int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss, GroundControlPoints &gcps, ControlPoints &cps)
+                                     int &index_loop_closure_source,
+                                     int &index_loop_closure_target, float *m_gizmo, GNSS &gnss, GroundControlPoints &gcps, ControlPoints &cps,
+                                     int num_edge_extended_before,
+                                     int num_edge_extended_after)
 {
     if (point_clouds_container.point_clouds.size() > 0)
     {
@@ -1033,8 +1036,58 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     int number_of_iterations = 10;
                     PairWiseICP icp;
                     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                    std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                    //std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                    ////////////////////////////////
+                    std::vector<Eigen::Vector3d> source;
+                    auto &e = edges[index_active_edge];
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_src = e.index_to + i;
+                        if (index_src >= 0 && index_src < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_src].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
+                                source.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    std::vector<Eigen::Vector3d> target;
+
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_trg = e.index_from + i;
+                        if (index_trg >= 0 && index_trg < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_trg = point_clouds_container.point_clouds.at(index_trg).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_trg].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
+                                target.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    Eigen::Affine3d m_src_inv = point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
+
+                    for (auto &p : source)
+                    {
+                        p = m_src_inv * p;
+                    }
+
+                    Eigen::Affine3d m_trg_inv = point_clouds_container.point_clouds[e.index_from].m_pose.inverse();
+
+                    for (auto &p : target)
+                    {
+                        p = m_trg_inv * p; 
+                    }
+                    ////////////////////////////////
 
                     if (icp.compute(source, target, search_radious, number_of_iterations, m_pose))
                     {
@@ -1094,8 +1147,59 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     int number_of_iterations = 30;
                     PairWiseICP icp;
                     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                    std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                   // std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                    ////////////////////////////////
+                    std::vector<Eigen::Vector3d> source;
+                    auto &e = edges[index_active_edge];
+
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_src = e.index_to + i;
+                        if (index_src >= 0 && index_src < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_src].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
+                                source.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    std::vector<Eigen::Vector3d> target;
+
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_trg = e.index_from + i;
+                        if (index_trg >= 0 && index_trg < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_trg = point_clouds_container.point_clouds.at(index_trg).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_trg].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
+                                target.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    Eigen::Affine3d m_src_inv = point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
+
+                    for (auto &p : source)
+                    {
+                        p = m_src_inv * p;
+                    }
+
+                    Eigen::Affine3d m_trg_inv = point_clouds_container.point_clouds[e.index_from].m_pose.inverse();
+
+                    for (auto &p : target)
+                    {
+                        p = m_trg_inv * p;
+                    }
+                    ////////////////////////////////
 
                     if (icp.compute(source, target, sr, number_of_iterations, m_pose))
                     {
@@ -1109,8 +1213,59 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     int number_of_iterations = 30;
                     PairWiseICP icp;
                     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                    std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                    //std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                    ////////////////////////////////
+                    std::vector<Eigen::Vector3d> source;
+                    auto &e = edges[index_active_edge];
+
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_src = e.index_to + i;
+                        if (index_src >= 0 && index_src < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_src].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
+                                source.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    std::vector<Eigen::Vector3d> target;
+
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_trg = e.index_from + i;
+                        if (index_trg >= 0 && index_trg < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_trg = point_clouds_container.point_clouds.at(index_trg).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_trg].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
+                                target.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    Eigen::Affine3d m_src_inv = point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
+
+                    for (auto &p : source)
+                    {
+                        p = m_src_inv * p;
+                    }
+
+                    Eigen::Affine3d m_trg_inv = point_clouds_container.point_clouds[e.index_from].m_pose.inverse();
+
+                    for (auto &p : target)
+                    {
+                        p = m_trg_inv * p;
+                    }
+                    ////////////////////////////////
 
                     if (icp.compute(source, target, sr, number_of_iterations, m_pose))
                     {
@@ -1124,8 +1279,59 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     int number_of_iterations = 30;
                     PairWiseICP icp;
                     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                    std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                    //std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                    ////////////////////////////////
+                    std::vector<Eigen::Vector3d> source;
+                    auto &e = edges[index_active_edge];
+
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_src = e.index_to + i;
+                        if (index_src >= 0 && index_src < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_src].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
+                                source.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    std::vector<Eigen::Vector3d> target;
+
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_trg = e.index_from + i;
+                        if (index_trg >= 0 && index_trg < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_trg = point_clouds_container.point_clouds.at(index_trg).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_trg].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
+                                target.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    Eigen::Affine3d m_src_inv = point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
+
+                    for (auto &p : source)
+                    {
+                        p = m_src_inv * p;
+                    }
+
+                    Eigen::Affine3d m_trg_inv = point_clouds_container.point_clouds[e.index_from].m_pose.inverse();
+
+                    for (auto &p : target)
+                    {
+                        p = m_trg_inv * p;
+                    }
+                    ////////////////////////////////
 
                     if (icp.compute(source, target, sr, number_of_iterations, m_pose))
                     {
@@ -1139,8 +1345,59 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     int number_of_iterations = 30;
                     PairWiseICP icp;
                     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                    std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                    //std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                    ////////////////////////////////
+                    std::vector<Eigen::Vector3d> source;
+                    auto &e = edges[index_active_edge];
+                    
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_src = e.index_to + i;
+                        if (index_src >= 0 && index_src < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_src].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
+                                source.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    std::vector<Eigen::Vector3d> target;
+
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_trg = e.index_from + i;
+                        if (index_trg >= 0 && index_trg < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_trg = point_clouds_container.point_clouds.at(index_trg).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_trg].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
+                                target.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    Eigen::Affine3d m_src_inv = point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
+
+                    for (auto &p : source)
+                    {
+                        p = m_src_inv * p;
+                    }
+
+                    Eigen::Affine3d m_trg_inv = point_clouds_container.point_clouds[e.index_from].m_pose.inverse();
+
+                    for (auto &p : target)
+                    {
+                        p = m_trg_inv * p;
+                    }
+                    ////////////////////////////////
 
                     if (icp.compute(source, target, sr, number_of_iterations, m_pose))
                     {
@@ -1154,44 +1411,128 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     int number_of_iterations = 30;
                     PairWiseICP icp;
                     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                    std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                    std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+                    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                    //std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                    ////////////////////////////////
+                    std::vector<Eigen::Vector3d> source;
+                    auto &e = edges[index_active_edge];
+                    
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_src = e.index_to + i;
+                        if (index_src >= 0 && index_src < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_src].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
+                                source.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    std::vector<Eigen::Vector3d> target;
+
+                    for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                    {
+                        int index_trg = e.index_from + i;
+                        if (index_trg >= 0 && index_trg < point_clouds_container.point_clouds.size())
+                        {
+                            Eigen::Affine3d m_trg = point_clouds_container.point_clouds.at(index_trg).m_pose;
+                            for (int k = 0; k < point_clouds_container.point_clouds[index_trg].points_local.size(); k++)
+                            {
+                                Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
+                                target.push_back(p_g);
+                            }
+                            // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                        }
+                    }
+
+                    Eigen::Affine3d m_src_inv = point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
+
+                    for (auto &p : source)
+                    {
+                        p = m_src_inv * p;
+                    }
+
+                    Eigen::Affine3d m_trg_inv = point_clouds_container.point_clouds[e.index_from].m_pose.inverse();
+
+                    for (auto &p : target)
+                    {
+                        p = m_trg_inv * p;
+                    }
+                    ////////////////////////////////
 
                     if (icp.compute(source, target, sr, number_of_iterations, m_pose))
                     {
                         edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
                     }
                 }
-                
             }
         }
     }
 }
 
 void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
-                                        int index_loop_closure_source, int index_loop_closure_target)
+                                        int index_loop_closure_source, int index_loop_closure_target,
+                                        int num_edge_extended_before,
+                                        int num_edge_extended_after)
 {
     point_clouds_container.point_clouds.at(index_loop_closure_source).visible = true;
     point_clouds_container.point_clouds.at(index_loop_closure_target).visible = true;
 
     if (!manipulate_active_edge)
     {
-        ObservationPicking observation_picking;
-        point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, 1, false, false, false, false, false, false, false, false, false, false, false, false, 10000);
-        point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, 1, false, false, false, false, false, false, false, false, false, false, false, false, 10000);
+        for (int i = index_loop_closure_source - num_edge_extended_before; i <= index_loop_closure_source + num_edge_extended_after; i++)
+        {
+            if (i >= 0 && i < point_clouds_container.point_clouds.size() && point_clouds_container.point_clouds.size() > 0)
+            {
+                ObservationPicking observation_picking;
+                point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, false, false, false, false, false, false, false, false, false, false, false, false, 10000);
+            }
+        }
+
+        for (int i = index_loop_closure_target - num_edge_extended_before; i <= index_loop_closure_target + num_edge_extended_after; i++)
+        {
+            if (i >= 0 && i < point_clouds_container.point_clouds.size() && point_clouds_container.point_clouds.size() > 0)
+            {
+                ObservationPicking observation_picking;
+                point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, false, false, false, false, false, false, false, false, false, false, false, false, 10000);
+            }
+        }
     }
     else
     {
         if (edges.size() > 0)
         {
-            int index_src = edges[index_active_edge].index_from;
-            int index_trg = edges[index_active_edge].index_to;
+            for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+            {
+                int index_src = edges[index_active_edge].index_from + i;
+                if (index_src >= 0 && index_src < point_clouds_container.point_clouds.size())
+                {
+                    Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
+                    point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                }
+            }
 
-            Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
-            Eigen::Affine3d m_trg = m_src * affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+            for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+            {
+                int index_trg = edges[index_active_edge].index_to;
+                int index_src = edges[index_active_edge].index_from;
+                Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
 
-            point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
-            point_clouds_container.point_clouds.at(index_trg).render(m_trg, 1);
+                if (index_trg + i >= 0 && index_trg + i < point_clouds_container.point_clouds.size())
+                {
+                    Eigen::Affine3d m_trg = m_src * affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                    Eigen::Affine3d m_rel = point_clouds_container.point_clouds.at(index_trg).m_pose.inverse() *
+                                            point_clouds_container.point_clouds.at(index_trg + i).m_pose;
+                    m_trg = m_trg * m_rel;
+                    point_clouds_container.point_clouds.at(index_trg + i).render(m_trg, 1);
+                }
+            }
         }
     }
 

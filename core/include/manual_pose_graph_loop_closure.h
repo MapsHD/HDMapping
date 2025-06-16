@@ -10,27 +10,29 @@
 #include <imgui.h>
 #include <GL/freeglut.h>
 
-class ManualPoseGraphLoopClosure: public PoseGraphLoopClosure{
-    public:
-        int index_active_edge = 0;
-        bool manipulate_active_edge = false;
-        bool gizmo = false;
-        double search_radious = 0.1;
+class ManualPoseGraphLoopClosure : public PoseGraphLoopClosure
+{
+public:
+    int index_active_edge = 0;
+    bool manipulate_active_edge = false;
+    bool gizmo = false;
+    double search_radious = 0.1;
 
-        ManualPoseGraphLoopClosure(){};
-        ~ManualPoseGraphLoopClosure(){};
+    ManualPoseGraphLoopClosure() {};
+    ~ManualPoseGraphLoopClosure() {};
 
-        void NoGui(PointClouds &point_clouds_container,
-                   GNSS &gnss,
-                   GroundControlPoints &gcps,
-                   ControlPoints &cps);
-                   
-        void FuseTrajectoryWithGNSS(PointClouds &point_clouds_container,
-                                    GNSS &gnss);
+    void NoGui(PointClouds &point_clouds_container,
+               GNSS &gnss,
+               GroundControlPoints &gcps,
+               ControlPoints &cps);
 
-        void Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss,
-                 GroundControlPoints &gcps, ControlPoints &cps);
-        void Render(PointClouds &point_clouds_container, int index_loop_closure_source, int index_loop_closure_target);
+    void FuseTrajectoryWithGNSS(PointClouds &point_clouds_container,
+                                GNSS &gnss);
+
+    void Gui(PointClouds &point_clouds_container, int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss,
+             GroundControlPoints &gcps, ControlPoints &cps, int num_edge_extended_before, int num_edge_extended_after);
+    void Render(PointClouds &point_clouds_container,
+                int index_loop_closure_source, int index_loop_closure_target, int num_edge_extended_before, int num_edge_extended_after);
 };
 
 #endif

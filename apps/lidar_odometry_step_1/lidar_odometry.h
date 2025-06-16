@@ -28,10 +28,6 @@ void save_all_to_las(
     std::vector<WorkerData>& worker_data, LidarOdometryParams& params, std::string output_file_name, Session& session,
     bool export_selected = false, bool filter_on_export = true, bool apply_pose = true, bool add_to_pc_container = false);
 std::string save_results_automatic(
-    LidarOdometryParams &params, const std::vector<WorkerData> &worker_data,
-    Session &session, std::string working_directory, double elapsed_seconds,
-    std::string pc_output_name = "all_lo.laz", std::string traj_output_name = "traj_lo.csv", std::string poses_output_name = "poses_lo.reg");
-void run_lidar_odometry(
-    std::string input_dir, LidarOdometryParams& params, std::string working_directory = "",
-    std::string pc_output_name = "all_lo.laz", std::string traj_output_name = "traj_lo.csv", std::string poses_output_name = "poses_lo.reg");
+    LidarOdometryParams &params, std::vector<WorkerData> &worker_data, std::string working_directory, double elapsed_seconds);
+std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryParams& params);
 #endif

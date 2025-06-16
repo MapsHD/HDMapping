@@ -1392,6 +1392,20 @@ void project_gui()
                 }
             }
 
+            if (ImGui::Button("load nmea files and convert from wgs84 to Cartesian using Mercator projection"))
+            {
+                std::vector<std::string> input_file_names;
+                input_file_names = mandeye::fd::OpenFileDialog("Load nmea files", {"NMEA", "*.nmea"}, true);
+
+                if (input_file_names.size() > 0)
+                {
+                    if (!tls_registration.gnss.load_nmea_mercator_projection(input_file_names))
+                    {
+                        std::cout << "problem with loading gnss files" << std::endl;
+                    }
+                }
+            }
+
             if (ImGui::Button("save metascan points in PUWG92"))
             {
 

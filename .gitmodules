@@ -31,3 +31,6 @@
 [submodule "3rdparty/glm"]
 	path = 3rdparty/glm
 	url = https://github.com/g-truc/glm.git
+[submodule "3rdparty/minmea"]
+	path = 3rdparty/minmea
+	url = https://github.com/kosma/minmea.git

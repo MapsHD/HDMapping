@@ -24,6 +24,7 @@ set(CORE_SOURCE_FILES
     src/wgs84_do_puwg92.cc
     src/pair_wise_iterative_closest_point.cpp
     src/hash_utils.cpp
+    src/minmea.c
 )
 
 set(CORE_SOURCE_FILES_GUI
@@ -53,6 +54,7 @@ set(CORE_INCLUDE_FILES
     include/transformations.h
     include/wgs84_do_puwg92.h
     include/WGS84toCartesian.hpp
+    include/minmea.h
 )
 
 set(CORE_INCLUDE_FILES_GUI
@@ -89,3 +91,4 @@ target_include_directories(core PRIVATE
     ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
     ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
 )
+

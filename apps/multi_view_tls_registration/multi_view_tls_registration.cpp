@@ -440,58 +440,6 @@ void save_trajectories(
 	}
 }
 
-/*void load_available_geo_points(Session& session, std::string input_file_name)
-{
-	std::vector<GeoPoint> available_geo_points;
-	std::ifstream f;
-	f.open(input_file_name.c_str());
-	if (f.good())
-	{
-		std::cout << "parsing file: " << input_file_name << std::endl;
-
-		std::string s;
-		getline(f, s);
-		while (!f.eof())
-		{
-			getline(f, s);
-
-			// underground_mining::Intersection intersection;
-			std::string name;
-			double x;
-			double y;
-			double z;
-
-			stringstream ss(s);
-			ss >> name;
-			ss >> x;
-			ss >> y;
-			ss >> z;
-
-			GeoPoint geopoint;
-			geopoint.choosen = false;
-			geopoint.coordinates.x() = x;
-			geopoint.coordinates.y() = y;
-			geopoint.coordinates.z() = z;
-			geopoint.name = name;
-
-			std::cout << "adding geo point: " << geopoint.name << " " << geopoint.coordinates.x() << " " << geopoint.coordinates.y() << " " << geopoint.coordinates.z() << std::endl;
-
-			available_geo_points.push_back(geopoint);
-		}
-		f.close();
-
-		auto geo = available_geo_points;
-		for (auto& g : geo)
-		{
-			g.coordinates -= session.point_clouds_container.offset;
-		}
-		for (auto& p : session.point_clouds_container.point_clouds)
-		{
-			p.available_geo_points = geo;
-		}
-	}
-}*/
-
 void save_scale_board_to_laz(const Session &session, std::string output_file_name, float dec, float side_len)
 {
 	std::vector<Eigen::Vector3d> pointcloud;

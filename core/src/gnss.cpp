@@ -11,6 +11,8 @@
 #include <GL/freeglut.h>
 #endif
 
+#include <minmea.h>
+
 inline void split(std::string &str, char delim, std::vector<std::string> &out)
 {
     size_t start;
@@ -70,7 +72,7 @@ bool GNSS::load(const std::vector<std::string> &input_file_names, bool localize)
                 double B = gp.lat;
 
                 wgs84_do_puwg92(B, L, &gp.y, &gp.x);
-                
+
                 if (Eigen::Vector3d(gp.y, gp.x, gp.alt).norm() > 0)
                 {
                     gnss_poses.push_back(gp);
@@ -84,7 +86,6 @@ bool GNSS::load(const std::vector<std::string> &input_file_names, bool localize)
     std::sort(gnss_poses.begin(), gnss_poses.end(), [](GNSS::GlobalPose &a, GNSS::GlobalPose &b)
               { return (a.timestamp < b.timestamp); });
 
-    
     auto firstGNSSIt = std::find_if(gnss_poses.begin(), gnss_poses.end(), [](const GNSS::GlobalPose &gp)
                                     { return gp.x != 0 && gp.y != 0 && gp.alt != 0; });
     if (firstGNSSIt == gnss_poses.end())
@@ -100,7 +101,6 @@ bool GNSS::load(const std::vector<std::string> &input_file_names, bool localize)
     WGS84ReferenceLatitude = firstGNSS.lat;
     WGS84ReferenceLongitude = firstGNSS.lon;
 
-  
     if (localize)
     {
         for (auto &pose : gnss_poses)
@@ -209,6 +209,127 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
     return true;
 }
 
+bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_file_names)
+{
+    gnss_poses.clear();
+
+    std::cout << "loading NMEA data from following files:" << std::endl;
+    for (const auto &fn : input_file_names)
+    {
+        std::cout << fn << std::endl;
+    }
+
+    for (const auto &fn : input_file_names)
+    {
+        std::ifstream infile(fn);
+        if (!infile.good())
+        {
+            std::cout << "problem with file: '" << fn << "'" << std::endl;
+            return false;
+        }
+        std::string line;
+        while (!infile.eof())
+        {
+            getline(infile, line);
+
+            std::vector<std::string> strs;
+            split(line, ' ', strs);
+
+            if (strs.size() == 3){
+                std::string l = strs[2];
+
+                bool is_vaild = minmea_check(l.c_str(), true);
+
+                if (is_vaild)
+                {
+                    minmea_sentence_gga gga;
+                    bool isGGA = minmea_parse_gga(&gga, l.c_str());
+                    if (isGGA)
+                    {
+
+                        //std::cout << "GGA" << std::endl;
+                        //std::cout << std::setprecision(20);
+                        //std::cout << minmea_tocoord(&gga.latitude) << " " << minmea_tocoord(&gga.longitude) << std::endl;
+                        /* oss << minmea_tocoord(&gga.latitude) << " ";
+                         oss << minmea_tocoord(&gga.longitude) << " ";
+                         oss << minmea_tofloat(&gga.altitude) << " ";
+                         oss << minmea_tofloat(&gga.hdop) << " ";
+                         oss << gga.satellites_tracked << " ";
+                         oss << minmea_tofloat(&gga.height) << " ";
+                         oss << minmea_tofloat(&gga.dgps_age) << " ";
+                         oss << gga.time.hours << ":" << gga.time.minutes << ":" << gga.time.seconds << " ";
+                         oss << gga.fix_quality << " ";
+                         oss << millis.count() << "\n";*/
+
+                        GlobalPose gp;
+                        std::istringstream(strs[0]) >> gp.timestamp;
+                        gp.lat = minmea_tocoord(&gga.latitude);
+                        gp.lon = minmea_tocoord(&gga.longitude);
+                        gp.alt = minmea_tofloat(&gga.altitude);
+                        gp.hdop = minmea_tofloat(&gga.hdop);
+                        gga.satellites_tracked = gp.satelites_tracked;
+                        gp.height = minmea_tofloat(&gga.height);
+                        gp.age = minmea_tofloat(&gga.dgps_age);
+                        gp.time = 0; //ToDo change it
+                        gp.fix_quality = gga.fix_quality;
+
+                        if (gp.lat == gp.lat)
+                        {
+                            if (gp.lon == gp.lon)
+                            {
+                                if (gp.alt == gp.alt)
+                                {
+                                    if (gp.lat != 0)
+                                    {
+                                        if (gp.lon != 0)
+                                        {
+                                            gnss_poses.push_back(gp);
+                                            std::cout << std::setprecision(20);
+                                            std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << " gp.alt " << gp.alt << std::endl;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        infile.close();
+    }
+
+    std::sort(gnss_poses.begin(), gnss_poses.end(), [](GNSS::GlobalPose &a, GNSS::GlobalPose &b)
+              { return (a.timestamp < b.timestamp); });
+
+    std::array<double, 2> WGS84Reference{0, 0};
+
+    if (gnss_poses.size() > 0)
+    {
+        if (setWGS84ReferenceFromFirstPose)
+        {
+            WGS84Reference[0] = gnss_poses[0].lat;
+            WGS84Reference[1] = gnss_poses[0].lon;
+            WGS84ReferenceLatitude = gnss_poses[0].lat;
+            WGS84ReferenceLongitude = gnss_poses[0].lon;
+        }
+        else
+        {
+            WGS84Reference[0] = WGS84ReferenceLatitude;
+            WGS84Reference[1] = WGS84ReferenceLongitude;
+        }
+    }
+
+    for (int i = 0; i < gnss_poses.size(); i++)
+    {
+        std::array<double, 2> WGS84Position{gnss_poses[i].lat, gnss_poses[i].lon};
+        std::array<double, 2> result{wgs84::toCartesian(WGS84Reference, WGS84Position)};
+        gnss_poses[i].x = result[0];
+        gnss_poses[i].y = result[1];
+    }
+
+    return true;
+}
+
 #if WITH_GUI == 1
 void GNSS::render(const PointClouds &point_clouds_container)
 {
@@ -243,7 +364,7 @@ void GNSS::render(const PointClouds &point_clouds_container)
                     {
                         auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
                         glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-                       
+
                         glVertex3f(gnss_poses[i].x - point_clouds_container.offset.x(), gnss_poses[i].y - point_clouds_container.offset.y(), gnss_poses[i].alt - point_clouds_container.offset.z());
                     }
                 }

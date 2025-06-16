@@ -31,6 +31,7 @@ class GNSS{
     //! \param localize - if true, the data is moved to the first point
     bool load(const std::vector<std::string> &input_file_names, bool localize = false);
     bool load_mercator_projection(const std::vector<std::string> &input_file_names);
+    bool load_nmea_mercator_projection(const std::vector<std::string> &input_file_names);
     void render(const PointClouds &point_clouds_container);
     bool save_to_laz(const std::string &output_file_names, double offset_x, double offset_y, double offset_alt);
 

@@ -6,6 +6,13 @@
 
 class PoseGraphLoopClosure{
     public:
+        enum EdgeType
+        {
+            motion_model_1,
+            motion_model_2,
+            loop_closure
+        };
+
         struct Edge
         {
             TaitBryanPose relative_pose_tb;
@@ -18,6 +25,7 @@ class PoseGraphLoopClosure{
             bool is_fixed_om = false;
             bool is_fixed_fi = false;
             bool is_fixed_ka = false;
+            EdgeType type;
         };
 
         std::vector<Edge> edges;

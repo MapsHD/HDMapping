@@ -179,7 +179,7 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
                                 if (gp.lon != 0)
                                 {
                                     gnss_poses.push_back(gp);
-                                    std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << " gp.alt " << gp.alt << std::endl;
+                                    //std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << " gp.alt " << gp.alt << std::endl;
                                 }
                             }
                         }
@@ -213,7 +213,7 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
         std::array<double, 2> result{wgs84::toCartesian(WGS84Reference, WGS84Position)};
         gnss_poses[i].x = result[0];
         gnss_poses[i].y = result[1];
-        std::cout << "x: " << result[0] << " y: " << result[1] << std::endl;
+        //std::cout << "x: " << result[0] << " y: " << result[1] << std::endl;
     }
 
     /*constexpr std::array<double, 2> WGS84Reference1{52.247041, 10.575830};

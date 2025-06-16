@@ -301,26 +301,7 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_f
     std::sort(gnss_poses.begin(), gnss_poses.end(), [](GNSS::GlobalPose &a, GNSS::GlobalPose &b)
               { return (a.timestamp < b.timestamp); });
 
-    Eigen::Vector3<double> latitudeLongitudeAltitudeOffset;
-
-    for (int i = 0; i < gnss_poses.size(); i++){
-        Eigen::Vector3<double> latitudeLongitudeAltitude;
-        latitudeLongitudeAltitude.x() = gnss_poses[i].lat;
-        latitudeLongitudeAltitude.y() = gnss_poses[i].lon;
-        latitudeLongitudeAltitude.z() = gnss_poses[i].alt;
-
-        Eigen::Vector3<double>
-            res = GeographicalUtils::WGS84ToECEF(latitudeLongitudeAltitude);
-
-        if(i == 0){
-            latitudeLongitudeAltitudeOffset = res;
-        }
-
-        gnss_poses[i].x = res.x() - latitudeLongitudeAltitudeOffset.x();
-        gnss_poses[i].y = res.y() - latitudeLongitudeAltitudeOffset.y();
-        gnss_poses[i].alt = res.z() - latitudeLongitudeAltitudeOffset.z();
-    }
-        
+            
     return true;
 }
 

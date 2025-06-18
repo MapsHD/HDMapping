@@ -1942,6 +1942,8 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
         for (int i = 0; i < worker_data.size(); i++)
         {
             // std::cout << "jojo" << std::endl;
+
+            //auto tmp_trj = 
             Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
             if (i > 1 && params.use_motion_from_previous_step)
             {

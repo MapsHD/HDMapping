@@ -1679,6 +1679,14 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
                                                                  w_motion_model_om * cauchy(relative_pose_measurement_odo(3, 0), 1), // 100000000, //
                                                                  w_motion_model_fi * cauchy(relative_pose_measurement_odo(4, 0), 1),  // 100000000, //
                                                                  w_motion_model_ka * cauchy(relative_pose_measurement_odo(5, 0), 1));
+
+        //std::cout << relative_pose_measurement_odo(0, 0) << " "
+        //         << relative_pose_measurement_odo(1, 0) << " "
+        //         << relative_pose_measurement_odo(2, 0) << " "
+        //         << relative_pose_measurement_odo(3, 0) << " "
+        //         << relative_pose_measurement_odo(4, 0) << " "
+        //         << relative_pose_measurement_odo(5, 0) << std::endl;
+
         int ic_1 = odo_edges[i].first * 6;
         int ic_2 = odo_edges[i].second * 6;
 

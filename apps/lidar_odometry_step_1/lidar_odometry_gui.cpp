@@ -23,7 +23,7 @@
 // This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system https://github.com/JanuszBedkowski/mandeye_controller
 // The output is a session proving trajekctory and point clouds that can be  further processed by "multi_view_tls_registration" program.
 
-#define SAMPLE_PERIOD (1.0 / 200.0)
+//#define SAMPLE_PERIOD (1.0 / 200.0)
 
 namespace fs = std::filesystem;
 
@@ -1670,12 +1670,27 @@ void alternative_approach()
     std::map<double, Eigen::Matrix4d> trajectory;
 
     int counter = 1;
+    static bool first = true;
+    static double last_ts;
+
     for (const auto &[timestamp_pair, gyr, acc] : imu_data)
     {
         const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
         const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
 
-        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
+        //FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
+        if (first)
+        {
+            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
+            first = false;
+        }
+        else
+        {
+            double curr_ts = timestamp_pair.first;
+            double ts_diff = curr_ts - last_ts;
+            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+        }
+        last_ts = timestamp_pair.first;
 
         FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
 

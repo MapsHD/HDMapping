@@ -967,6 +967,18 @@ void lidar_odometry_basic_gui()
             // exit(1);
         }
 
+        //TaitBryanPose motion_model_correction;
+
+        ImGui::InputDouble("motion_model_correction.om (rotation via X in deg)", &params.motion_model_correction.om);
+        ImGui::InputDouble("motion_model_correction.fi (rotation via Y in deg)", &params.motion_model_correction.fi);
+        ImGui::InputDouble("motion_model_correction.ka (rotation via Z in deg)", &params.motion_model_correction.ka);
+
+        if (ImGui::Button("Set example motion_model_corrections for LiDAR X-axis: forward direction")){
+            params.motion_model_correction.om = 0.0;
+            params.motion_model_correction.fi = 0.05;
+            params.motion_model_correction.ka = 0.0;
+        }
+
         ImGui::Checkbox("full_lidar_odometry_gui", &full_lidar_odometry_gui);
 
         ImGui::End();

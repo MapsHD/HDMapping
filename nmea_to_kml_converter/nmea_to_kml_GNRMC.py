@@ -15,7 +15,7 @@ output_kml_path = os.path.join(input_folder, "output_all_gnmrc.kml")
 placemarks = []
 
 for filename in os.listdir(input_folder):
-    if filename.lower().endswith((".nmea", ".txt")):
+    if filename.lower().endswith((".nmea")):
         input_path = os.path.join(input_folder, filename)
         gnrmc_points = []
 

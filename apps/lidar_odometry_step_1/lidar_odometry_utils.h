@@ -104,6 +104,9 @@ struct LidarOdometryParams
     bool save_laz = true;
     bool filter_ref_buckets = false;
     bool save_poses = true;
+
+    TaitBryanPose motion_model_correction;
+  
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);
@@ -151,10 +154,10 @@ int get_next_result_id(const std::string working_directory);
 
 // this function performs main LiDAR odometry calculations
 void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
-              std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params_indoor, NDTBucketMapType &buckets_indoor,
-              NDT::GridParameters &rgd_params_outdoor, NDTBucketMapType &buckets_outdoor, 
-              bool useMultithread, double max_distance, double &delta, double lm_factor);
+                             std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
+                             NDT::GridParameters &rgd_params_indoor, NDTBucketMapType &buckets_indoor,
+                             NDT::GridParameters &rgd_params_outdoor, NDTBucketMapType &buckets_outdoor,
+                             bool useMultithread, double max_distance, double &delta, double lm_factor, TaitBryanPose motion_model_correction);
 
 void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,

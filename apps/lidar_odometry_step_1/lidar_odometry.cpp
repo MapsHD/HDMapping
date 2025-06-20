@@ -233,6 +233,10 @@ bool load_data(std::vector<std::string> &input_file_names, LidarOdometryParams &
                            //
                        });
         std::cout << "std::transform finished" << std::endl;
+
+        if (pointsPerFile.size() > 0){ 
+            pointsPerFile[0].clear();
+        }
     }
     else
     {

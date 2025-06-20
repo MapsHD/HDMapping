@@ -468,6 +468,14 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
         }
         update_rgd(params.in_out_params_indoor, params.buckets_indoor, pp, params.m_g.translation());
 
+        TaitBryanPose motion_model_correction;
+        motion_model_correction.px = 0.0;
+        motion_model_correction.py = 0.0;
+        motion_model_correction.pz = 0.0;
+        motion_model_correction.om = 0.0;
+        motion_model_correction.fi = 0.0;
+        motion_model_correction.ka = 0.0;
+
         for (int i = 0; i < worker_data.size(); i++)
         {
             Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
@@ -515,7 +523,8 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
             {
                 double delta = 1000000.0;
                 optimize_lidar_odometry(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
-                                        params.in_out_params_indoor, params.buckets_indoor, params.in_out_params_outdoor, params.buckets_outdoor, /*params.useMultithread*/ false, 70.0, delta, 1.0);
+                                        params.in_out_params_indoor, params.buckets_indoor, params.in_out_params_outdoor,
+                                        params.buckets_outdoor, /*params.useMultithread*/ false, 70.0, delta, 1.0, motion_model_correction);
             }
 
             end1 = std::chrono::system_clock::now();

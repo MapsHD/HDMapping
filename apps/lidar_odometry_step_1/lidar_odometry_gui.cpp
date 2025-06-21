@@ -84,7 +84,7 @@ Imu imu_data;
 Trajectory trajectory;
 
 
-void alternative_approach();
+//void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
 void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd = 3);
@@ -860,7 +860,7 @@ void lidar_odometry_basic_gui()
             message.result();
         }
 
-        if (ImGui::Button("Process MANDEYE data in folder (fast motion: velocity up to 30 km/h, Mandeye mounted on the car)"))
+        if (ImGui::Button("Process MANDEYE data in folder (fast motion: velocity up to 30 km/h, Mandeye mounted on the vehicle)"))
         {
             std::chrono::time_point<std::chrono::system_clock> start, end;
             start = std::chrono::system_clock::now();
@@ -1625,6 +1625,7 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
     saveLaz(fn2, points_global);
 }
 
+#if 0
 void alternative_approach()
 {
     int point_count_threshold = 10000;
@@ -1700,7 +1701,15 @@ void alternative_approach()
         {
             double curr_ts = timestamp_pair.first;
             double ts_diff = curr_ts - last_ts;
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+            if (ts_diff < 0.01)
+            {
+                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+            }
+            else
+            {
+                std::cout << "IMU TS jump!!!" << std::endl;
+                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0/200.0);
+            }
         }
         last_ts = timestamp_pair.first;
 
@@ -1765,6 +1774,7 @@ void alternative_approach()
         find_best_stretch(all_points[i], timestamps, poses, fn1, fn2);
     }
 }
+#endif
 
 LaserBeam GetLaserBeam(int x, int y)
 {

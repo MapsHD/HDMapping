@@ -188,6 +188,12 @@ bool load_data(std::vector<std::string> &input_file_names, LidarOdometryParams &
             }
         }
 
+        std::sort(imu_data.begin(), imu_data.end(),
+                  [](const std::tuple<std::pair<double, double>, FusionVector, FusionVector> &a, const std::tuple<std::pair<double, double>, FusionVector, FusionVector> &b)
+                  {
+                      return std::get<0>(a).first < std::get<0>(b).first;
+                  });
+
         std::cout << "loading points" << std::endl;
         pointsPerFile.resize(laz_files.size());
         std::mutex mtx;
@@ -234,7 +240,8 @@ bool load_data(std::vector<std::string> &input_file_names, LidarOdometryParams &
                        });
         std::cout << "std::transform finished" << std::endl;
 
-        if (pointsPerFile.size() > 0){ 
+        if (pointsPerFile.size() > 0)
+        {
             pointsPerFile[0].clear();
         }
     }
@@ -289,12 +296,15 @@ void calculate_trajectory(
 
     double provious_time_stamp = 0.0;
 
+    static bool first = true;
+    static double last_ts;
+
     for (const auto &[timestamp_pair, gyr, acc] : imu_data)
     {
         const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
         const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
 
-        if (provious_time_stamp == 0.0)
+        /*if (provious_time_stamp == 0.0)
         {
             double SAMPLE_PERIOD = (1.0 / 200.0);
             FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
@@ -308,7 +318,43 @@ void calculate_trajectory(
                 sp = 0.1;
             }
             FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, sp);
+        }*/
+
+        if (first)
+        {
+            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0/200.0);
+            first = false;
+            // last_ts = timestamp_pair.first;
         }
+        else
+        {
+            double curr_ts = timestamp_pair.first;
+
+            double ts_diff = curr_ts - last_ts;
+
+            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+
+            /*if (ts_diff < 0)
+            {
+                std::cout << "WARNING!!!!" << std::endl;
+                std::cout << "WARNING!!!!" << std::endl;
+                std::cout << "WARNING!!!!" << std::endl;
+                std::cout << "WARNING!!!!" << std::endl;
+                std::cout << "WARNING!!!!" << std::endl;
+                std::cout << "WARNING!!!!" << std::endl;
+            }
+
+            if (ts_diff < 0.01)
+            {
+                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+            }
+            else
+            {
+                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0/200.0);
+            }*/
+        }
+
+        last_ts = timestamp_pair.first;
 
         FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
 
@@ -435,14 +481,42 @@ bool compute_step_1(
             auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp,
                                           [](std::pair<double, double> lhs, double rhs) -> bool
                                           { return lhs.first < rhs; });
-            p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
+            // p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
+
+            int index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower) - 1;
+            p.index_pose = index_pose;
+
+            if (index_pose >= 0 && index_pose < wd.intermediate_trajectory_timestamps.size())
+            {
+                if (fabs(p.timestamp - wd.intermediate_trajectory_timestamps[index_pose].first) < 0.004)
+                {
+                    p.index_pose = -1;
+                }
+            }
+            else
+            {
+                p.index_pose = -1;
+            }
         }
 
-        if (params.decimation > 0.0)
+        std::vector<Point3Di> filtered_points;
+        for (unsigned long long int k = 0; k < wd.original_points.size(); k++)
+        {
+            if (wd.original_points[k].index_pose != -1){
+                filtered_points.push_back(wd.original_points[k]);
+            }
+        }
+        wd.original_points = filtered_points;
+
+        if (params.decimation > 0.0 && wd.original_points.size() > 1000)
         {
             wd.intermediate_points = decimate(wd.original_points, params.decimation, params.decimation, params.decimation);
         }
-        worker_data.push_back(wd);
+
+        //std::cout << "number of points: " << wd.original_points.size() << std::endl;
+        if (wd.original_points.size() > 1000){
+            worker_data.push_back(wd);
+        }
     }
     params.m_g = worker_data[0].intermediate_trajectory[0];
     return true;

@@ -240,7 +240,7 @@ void project_gui()
                 std::sort(std::begin(input_file_names), std::end(input_file_names));
 
                 std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
-                {
+                              {
                     if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
                     {
                         laz_files.push_back(fileName);
@@ -253,8 +253,7 @@ void project_gui()
                     if (fileName.ends_with(".sn"))
                     {
                         sn_files.push_back(fileName);
-                    } 
-                });
+                    } });
 
                 if (input_file_names.size() > 0 && laz_files.size() == csv_files.size() && laz_files.size() == sn_files.size())
                 {
@@ -330,7 +329,16 @@ void project_gui()
                         imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
                     }
 
-                    std::cout << "loading points" << std::endl;
+                    // sort IMU data
+                    // imu_data
+                    std::sort(imu_data.begin(), imu_data.end(),
+                              [](const std::tuple<std::pair<double, double>, FusionVector, FusionVector> &a, const std::tuple<std::pair<double, double>, FusionVector, FusionVector> &b)
+                              {
+                                  return std::get<0>(a).first < std::get<0>(b).first;
+                              });
+
+                    std::cout
+                        << "loading points" << std::endl;
                     std::vector<std::vector<Point3Di>> pointsPerFile;
                     pointsPerFile.resize(laz_files.size());
                     // std::vector<std::vector<int>> indexesPerFile;
@@ -399,19 +407,41 @@ void project_gui()
                     for (const auto &[timestamp_pair, gyr, acc] : imu_data)
                     {
                         const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
-                        //const FusionVector gyroscope = {static_cast<float>(gyr.axis.x), static_cast<float>(gyr.axis.y), static_cast<float>(gyr.axis.z)};
+                        // const FusionVector gyroscope = {static_cast<float>(gyr.axis.x), static_cast<float>(gyr.axis.y), static_cast<float>(gyr.axis.z)};
                         const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
 
-                        if (first){
+                        if (first)
+                        {
                             FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
                             first = false;
-                            //last_ts = timestamp_pair.first;
-                        }else{
+                            // last_ts = timestamp_pair.first;
+                        }
+                        else
+                        {
                             double curr_ts = timestamp_pair.first;
 
                             double ts_diff = curr_ts - last_ts;
 
                             FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+
+                            /*if (ts_diff < 0)
+                            {
+                                std::cout << "WARNING!!!!" << std::endl;
+                                std::cout << "WARNING!!!!" << std::endl;
+                                std::cout << "WARNING!!!!" << std::endl;
+                                std::cout << "WARNING!!!!" << std::endl;
+                                std::cout << "WARNING!!!!" << std::endl;
+                                std::cout << "WARNING!!!!" << std::endl;
+                            }
+
+                            if (ts_diff < 0.01)
+                            {
+                                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+                            }
+                            else
+                            {
+                                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
+                            }*/
                         }
 
                         last_ts = timestamp_pair.first;
@@ -555,7 +585,7 @@ void project_gui()
                     std::cout << "laz_files.size(): " << laz_files.size() << std::endl;
                     std::cout << "csv_files.size(): " << csv_files.size() << std::endl;
                     std::cout << "sn_files.size(): " << sn_files.size() << std::endl;
-                    
+
                     std::cout << "condition: input_file_names.size() > 0 && laz_files.size() == csv_files.size() && laz_files.size() == sn_files.size() NOT SATISFIED!!!" << std::endl;
                 }
             }
@@ -633,7 +663,9 @@ void project_gui()
         }
         ImGui::Checkbox("show_mean_cov", &show_mean_cov);
 
-        if(ImGui::Button("debug text")){
+        if (ImGui::Button("debug text"))
+        {
+            double max_diff = 0;
             std::cout << std::setprecision(20);
             if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
             {
@@ -645,29 +677,16 @@ void project_gui()
 
                     int index_pose = std::distance(all_data[index_rendered_points_local].timestamps.begin(), lower) - 1;
 
-                    if (index_pose >= 0 && index_pose < all_data[index_rendered_points_local].poses.size()){
-                        std::cout << index_pose << " " << all_data[index_rendered_points_local].points_local[i].timestamp - 
-                            all_data[index_rendered_points_local].timestamps[index_pose].first << std::endl;
+                    if (index_pose >= 0 && index_pose < all_data[index_rendered_points_local].poses.size())
+                    {
+                        if (fabs(all_data[index_rendered_points_local].points_local[i].timestamp - all_data[index_rendered_points_local].timestamps[index_pose].first) > max_diff)
+                        {
+                            std::cout << index_pose << " " << all_data[index_rendered_points_local].points_local[i].timestamp - all_data[index_rendered_points_local].timestamps[index_pose].first << std::endl;
+                            max_diff = fabs(all_data[index_rendered_points_local].points_local[i].timestamp - all_data[index_rendered_points_local].timestamps[index_pose].first);
+                        }
                     }
-                        
-
-                    /*if (index_pose >= 0 && index_pose < all_data[index_rendered_points_local].poses.size())
-{
-    Eigen::Affine3d m = all_data[index_rendered_points_local].poses[index_pose];
-    Eigen::Vector3d p = m * all_data[index_rendered_points_local].points_local[i].point;
-
-    if (all_data[index_rendered_points_local].lidar_ids[i] == 0)
-    {
-        glColor3f(pc_color.x, pc_color.y, pc_color.z);
-    }
-    else
-    {
-        glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
-    }
-    glVertex3f(p.x(), p.y(), p.z());
-}*/
                 }
-
+                std::cout << "max_diff " << max_diff << std::endl;
                 std::cout << "----------------" << std::endl;
                 for (int k = 0; k < all_data[index_rendered_points_local].timestamps.size(); k++)
                 {
@@ -675,7 +694,6 @@ void project_gui()
                 }
             }
         }
-
 
         ImGui::End();
     }
@@ -819,6 +837,24 @@ void display()
     glBegin(GL_POINTS);
     if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
     {
+
+        double max_diff = 0.0;
+        for (int i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
+        {
+            auto lower = std::lower_bound(all_data[index_rendered_points_local].timestamps.begin(), all_data[index_rendered_points_local].timestamps.end(), all_data[index_rendered_points_local].points_local[i].timestamp,
+                                          [](std::pair<double, double> lhs, double rhs) -> bool
+                                          { return lhs.first < rhs; });
+            int index_pose = std::distance(all_data[index_rendered_points_local].timestamps.begin(), lower) - 1;
+            if (index_pose >= 0 && index_pose < all_data[index_rendered_points_local].poses.size())
+            {
+                if (fabs(all_data[index_rendered_points_local].points_local[i].timestamp - all_data[index_rendered_points_local].timestamps[index_pose].first) > max_diff)
+                {
+                    // std::cout << index_pose << " " << all_data[index_rendered_points_local].points_local[i].timestamp - all_data[index_rendered_points_local].timestamps[index_pose].first << std::endl;
+                    max_diff = fabs(all_data[index_rendered_points_local].points_local[i].timestamp - all_data[index_rendered_points_local].timestamps[index_pose].first);
+                }
+            }
+        }
+
         for (int i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
         {
             auto lower = std::lower_bound(all_data[index_rendered_points_local].timestamps.begin(), all_data[index_rendered_points_local].timestamps.end(), all_data[index_rendered_points_local].points_local[i].timestamp,
@@ -827,22 +863,28 @@ void display()
 
             int index_pose = std::distance(all_data[index_rendered_points_local].timestamps.begin(), lower) - 1;
 
-            //std::cout << index_pose << std::endl;
+            // std::cout << index_pose << std::endl;
 
-            if (index_pose >= 0 && index_pose < all_data[index_rendered_points_local].poses.size())
+            if (max_diff < 0.1)
             {
-                Eigen::Affine3d m = all_data[index_rendered_points_local].poses[index_pose];
-                Eigen::Vector3d p = m * all_data[index_rendered_points_local].points_local[i].point;
+                if (index_pose >= 0 && index_pose < all_data[index_rendered_points_local].poses.size())
+                {
+                    // if (fabs(all_data[index_rendered_points_local].timestamps[index_pose].first - all_data[index_rendered_points_local].points_local[i].timestamp) < 0.001)
+                    //{
+                    Eigen::Affine3d m = all_data[index_rendered_points_local].poses[index_pose];
+                    Eigen::Vector3d p = m * all_data[index_rendered_points_local].points_local[i].point;
 
-                if (all_data[index_rendered_points_local].lidar_ids[i] == 0)
-                {
-                    glColor3f(pc_color.x, pc_color.y, pc_color.z);
+                    if (all_data[index_rendered_points_local].lidar_ids[i] == 0)
+                    {
+                        glColor3f(pc_color.x, pc_color.y, pc_color.z);
+                    }
+                    else
+                    {
+                        glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
+                    }
+                    glVertex3f(p.x(), p.y(), p.z());
+                    //}
                 }
-                else
-                {
-                    glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
-                }
-                glVertex3f(p.x(), p.y(), p.z());
             }
         }
     }
@@ -879,7 +921,7 @@ void display()
                 glBegin(GL_LINES);
                 glColor3f(1.0f, 0.0f, 0.0f);
                 glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-                glVertex3f(m(0, 3) + m(0,0), m(1, 3) + m(1,0), m(2, 3) + m(2,0));
+                glVertex3f(m(0, 3) + m(0, 0), m(1, 3) + m(1, 0), m(2, 3) + m(2, 0));
 
                 glColor3f(0.0f, 1.0f, 0.0f);
                 glVertex3f(m(0, 3), m(1, 3), m(2, 3));

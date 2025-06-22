@@ -167,6 +167,11 @@ MANDEYE georeferencing to GPS (NMEA data stream)
 [![MANDEYE georeferencing to GPS (NMEA data stream)](https://img.youtube.com/vi/FOWPGCgOKI4/default.jpg)](https://youtu.be/FOWPGCgOKI4)
 
 
+MANDEYE georeferencing to GCPs (ground control points)
+
+[![MANDEYE georeferencing to GCPs (ground control points)](https://img.youtube.com/vi/iLlU7xzYDe0/default.jpg)](https://youtu.be/iLlU7xzYDe0)
+
+------------------------------------------
 
 # Compatible commercial products
 [![MANDEYE-PRO](https://img.youtube.com/vi/EBUxUBWKIco/default.jpg)](https://youtu.be/EBUxUBWKIco)

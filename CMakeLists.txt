@@ -40,6 +40,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 include(cmake/platform.cmake)
 include(cmake/imgui.cmake)
 include(cmake/imguizmo.cmake)
+include(cmake/implot.cmake)
 
 # Option to build with bundled Eigen
 option(BUILD_WITH_BUNDLED_EIGEN "Build with bundled Eigen" ON)
@@ -117,7 +118,7 @@ add_subdirectory(core)
 add_subdirectory(core_hd_mapping)
 
 set(CORE_LIBRARIES core core-hd-mapping)
-set(GUI_LIBRARIES imgui imguizmo)
+set(GUI_LIBRARIES imgui imguizmo implot)
 
 add_subdirectory(apps/hd_mapper)
 add_subdirectory(apps/lidar_odometry_step_1)    

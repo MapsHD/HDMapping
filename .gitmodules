@@ -34,3 +34,6 @@
 [submodule "3rdparty/minmea"]
 	path = 3rdparty/minmea
 	url = https://github.com/kosma/minmea.git
+[submodule "3rdparty/implot"]
+	path = 3rdparty/implot
+	url = https://github.com/epezent/implot.git

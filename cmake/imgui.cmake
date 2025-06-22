@@ -18,7 +18,7 @@ set(IMGUI_HEADER_FILES
     ${IMGUI_LIBRARY_BACKEND_DIRECTORY}/imgui_impl_opengl2.h)
 
 set(IMGUI_FILES ${IMGUI_SOURCE_FILES} ${IMGUI_HEADER_FILES})
-
+add_definitions(-DImDrawIdx=unsigned\ int)
 add_library(imgui STATIC ${IMGUI_FILES})
 target_include_directories(
     imgui PRIVATE ${IMGUI_LIBRARY_DIRECTORY} ${IMGUI_LIBRARY_BACKEND_DIRECTORY}

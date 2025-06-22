@@ -1,7 +1,7 @@
 #include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
-#include <ImGuizmo.h>
+#include <implot/implot.h>
 #include <imgui_internal.h>
 
 #include <GL/glew.h>
@@ -69,6 +69,19 @@ struct AllData
     std::vector<int> lidar_ids;
 };
 
+struct ImuData{
+    std::vector<double> timestampLidar;
+    std::vector<double> angX;
+    std::vector<double> angY;
+    std::vector<double> angZ;
+    std::vector<double> accX;
+    std::vector<double> accY;
+    std::vector<double> accZ;
+    std::vector <double> yaw;
+    std::vector <double> pitch;
+    std::vector <double> roll;
+};
+ImuData imu_data_plot;
 std::vector<AllData> all_data;
 
 std::vector<std::string> laz_files;
@@ -460,6 +473,19 @@ void project_gui()
                         {
                             printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
                         }
+
+                        // log it for implot
+                        imu_data_plot.timestampLidar.push_back(timestamp_pair.first);
+                        imu_data_plot.angX.push_back(gyr.axis.x);
+                        imu_data_plot.angY.push_back(gyr.axis.y);
+                        imu_data_plot.angZ.push_back(gyr.axis.z);
+                        imu_data_plot.accX.push_back(acc.axis.x);
+                        imu_data_plot.accX.push_back(acc.axis.x);
+                        imu_data_plot.accY.push_back(acc.axis.y);
+                        imu_data_plot.accZ.push_back(acc.axis.z);
+                        imu_data_plot.yaw.push_back(euler.angle.yaw);
+                        imu_data_plot.pitch.push_back(euler.angle.pitch);
+                        imu_data_plot.roll.push_back(euler.angle.roll);
                     }
 
                     std::vector<std::pair<double, double>> timestamps;
@@ -694,8 +720,52 @@ void project_gui()
                 }
             }
         }
-
         ImGui::End();
+        ImGui::Begin("ImuData");
+
+        if (imu_data_plot.timestampLidar.size() > 0) {
+
+            static double x_min = imu_data_plot.timestampLidar.front();
+            static double x_max = imu_data_plot.timestampLidar.back();
+            double annotation = 0;
+            if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
+            {
+                if (all_data[index_rendered_points_local].timestamps.size() > 0) {
+                    annotation = all_data[index_rendered_points_local].timestamps.front().first;
+                }
+            }
+            if (ImPlot::BeginPlot("Imu - acceleration 'm/s^2", ImVec2(-1,0))){
+                ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Once);
+                ImPlot::SetupAxisLinks(ImAxis_X1, &x_min, &x_max);
+                ImPlot::PlotLine("accX", imu_data_plot.timestampLidar.data(), imu_data_plot.accX.data(), (int)imu_data_plot.timestampLidar.size());
+                ImPlot::PlotLine("accY", imu_data_plot.timestampLidar.data(), imu_data_plot.accY.data(), (int)imu_data_plot.timestampLidar.size());
+                ImPlot::PlotLine("accZ", imu_data_plot.timestampLidar.data(), imu_data_plot.accZ.data(), (int)imu_data_plot.timestampLidar.size());
+                ImPlot::TagX(annotation,  ImVec4(1,0,0,1));
+                ImPlot::EndPlot();
+            }
+
+            if (ImPlot::BeginPlot("Imu - gyro", ImVec2(-1,0))){
+                ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Once);
+                ImPlot::SetupAxisLinks(ImAxis_X1, &x_min, &x_max);
+                ImPlot::PlotLine("angX", imu_data_plot.timestampLidar.data(), imu_data_plot.angX.data(), (int)imu_data_plot.timestampLidar.size());
+                ImPlot::PlotLine("angY", imu_data_plot.timestampLidar.data(), imu_data_plot.angY.data(), (int)imu_data_plot.timestampLidar.size());
+                ImPlot::PlotLine("angZ", imu_data_plot.timestampLidar.data(), imu_data_plot.angZ.data(), (int)imu_data_plot.timestampLidar.size());
+                ImPlot::TagX(annotation,  ImVec4(1,0,0,1));
+                ImPlot::EndPlot();
+            }
+
+            if (ImPlot::BeginPlot("Imu - AHRS angles [deg]", ImVec2(-1,0))){
+                ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Once);
+                ImPlot::SetupAxisLinks(ImAxis_X1, &x_min, &x_max);
+                ImPlot::PlotLine("yaw", imu_data_plot.timestampLidar.data(), imu_data_plot.yaw.data(), (int)imu_data_plot.timestampLidar.size());
+                ImPlot::PlotLine("pitch", imu_data_plot.timestampLidar.data(), imu_data_plot.pitch.data(), (int)imu_data_plot.timestampLidar.size());
+                ImPlot::PlotLine("roll", imu_data_plot.timestampLidar.data(), imu_data_plot.roll.data(), (int)imu_data_plot.timestampLidar.size());
+                ImPlot::TagX(annotation,  ImVec4(1,0,0,1));
+                ImPlot::EndPlot();
+            }
+        }
+        ImGui::End();
+
     }
     return;
 }
@@ -991,6 +1061,7 @@ bool initGL(int *argc, char **argv)
     gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01, 10000.0);
     glutReshapeFunc(reshape);
     ImGui::CreateContext();
+    ImPlot::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     (void)io;
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
@@ -1048,6 +1119,15 @@ void mouse(int glut_button, int state, int x, int y)
 
 void wheel(int button, int dir, int x, int y)
 {
+    ImGuiIO &io = ImGui::GetIO();
+    io.MouseWheel += (float)dir;
+    if (io.WantCaptureMouse)
+    {
+        // ImGui is handling the mouse wheel
+        return;
+    }
+
+
     if (dir > 0)
     {
         if (is_ortho)
@@ -1075,7 +1155,6 @@ void wheel(int button, int dir, int x, int y)
             translate_z += 0.05f * translate_z;
         }
     }
-
     return;
 }
 
@@ -1091,6 +1170,7 @@ int main(int argc, char *argv[])
     ImGui_ImplOpenGL2_Shutdown();
     ImGui_ImplGLUT_Shutdown();
 
+    ImPlot::DestroyContext();
     ImGui::DestroyContext();
     return 0;
 }

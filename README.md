@@ -44,8 +44,8 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 [[PDF]](https://www.ibles.pl/wp-content/uploads/2024/06/Torana-Arya.pdf)
 - Janusz Będkowski. Novel wearable mobile mapping system for Forensic and Security, mountable on trained dog and human. TechRxiv. April 24, 2025.
 DOI: 10.36227/techrxiv.174552824.47146860/v1 [[PDF]](https://www.techrxiv.org/users/915148/articles/1288112-novel-wearable-mobile-mapping-system-for-forensic-and-security-mountable-on-trained-dog-and-human)
-- Janusz Bedkowski et al. Method for spherical camera to 3D LiDAR calibration and synchronization with example on Insta360 X4 and LiVOX MID 360 [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W4-2025/13/2025/isprs-archives-XLVIII-1-W4-2025-13-2025.pdf)
-- Janusz Bedkowski et al. Affordable air-ground mobile mapping system for precise forestry applications [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W4-2025/5/2025/isprs-archives-XLVIII-1-W4-2025-5-2025.pdf)
+- Janusz Będkowski et al. Method for spherical camera to 3D LiDAR calibration and synchronization with example on Insta360 X4 and LiVOX MID 360 [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W4-2025/13/2025/isprs-archives-XLVIII-1-W4-2025-13-2025.pdf)
+- Janusz Będkowski et al. Affordable air-ground mobile mapping system for precise forestry applications [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W4-2025/5/2025/isprs-archives-XLVIII-1-W4-2025-5-2025.pdf)
 
 # To cite this work please use as follows:
 Mobile mapping system: hardware and software is elaborated in following paper:

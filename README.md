@@ -160,6 +160,14 @@ MANDEYE Mission Recorder calibration
 
 [![MANDEYE Mission Recorder calibration](https://img.youtube.com/vi/V9L0a6aqsJ8/default.jpg)](https://youtu.be/V9L0a6aqsJ8)
 
+------------------------------------------
+
+MANDEYE georeferencing to GPS (NMEA data stream)
+
+[![MANDEYE georeferencing to GPS (NMEA data stream)](https://img.youtube.com/vi/FOWPGCgOKI4/default.jpg)](https://youtu.be/FOWPGCgOKI4)
+
+
+
 # Compatible commercial products
 [![MANDEYE-PRO](https://img.youtube.com/vi/EBUxUBWKIco/default.jpg)](https://youtu.be/EBUxUBWKIco)
 

@@ -171,6 +171,10 @@ MANDEYE georeferencing to GCPs (ground control points)
 
 [![MANDEYE georeferencing to GCPs (ground control points)](https://img.youtube.com/vi/iLlU7xzYDe0/default.jpg)](https://youtu.be/iLlU7xzYDe0)
 
+MANDEYE georeferencing to CPs (control points)
+
+[![MANDEYE georeferencing to CPs (control points)](https://img.youtube.com/vi/ogeAjzJvLeY/default.jpg)](https://youtu.be/ogeAjzJvLeY)
+
 ------------------------------------------
 
 # Compatible commercial products

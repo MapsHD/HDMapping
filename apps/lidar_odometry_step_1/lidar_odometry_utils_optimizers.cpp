@@ -1591,8 +1591,9 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
         poses_desired.push_back(pose_tait_bryan_from_affine_matrix(intermediate_trajectory_motion_model[i]));
     }
 
-    double sigma_motion_model_om = 0.001 * M_PI / 180.0;
-    double sigma_motion_model_fi = 0.001 * M_PI / 180.0;
+    double sigma_motion_model_om = 0.01 * M_PI / 180.0;
+    double sigma_motion_model_fi = 0.01 * M_PI / 180.0;
+    //double sigma_motion_model_ka = 0.01 * M_PI / 180.0;
     double sigma_motion_model_ka = 0.01 * M_PI / 180.0;
 
     double w_motion_model_om = 1.0 / (sigma_motion_model_om * sigma_motion_model_om);
@@ -1642,11 +1643,12 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
                                                                  poses[odo_edges[i].second].om,
                                                                  poses[odo_edges[i].second].fi,
                                                                  poses[odo_edges[i].second].ka,
+                                                                 // 1000000,
+                                                                 //  10000000000,
+                                                                 //  10000000000,
                                                                  1000000,
-                                                                 // 10000000000,
-                                                                 // 10000000000,
-                                                                 100000000,
-                                                                 100000000,
+                                                                 1000000,
+                                                                 1000000,
                                                                  w_motion_model_om * cauchy(relative_pose_measurement_odo(3, 0), 1),  // 100000000, //
                                                                  w_motion_model_fi * cauchy(relative_pose_measurement_odo(4, 0), 1),  // 100000000, //
                                                                  w_motion_model_ka * cauchy(relative_pose_measurement_odo(5, 0), 1)); // 100000000);
@@ -1670,11 +1672,12 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
                                                                  relative_pose_measurement_odo(3, 0),
                                                                  relative_pose_measurement_odo(4, 0),
                                                                  relative_pose_measurement_odo(5, 0),
+                                                                 // 1000000,
+                                                                 //  10000000000,
+                                                                 //  10000000000,
                                                                  1000000,
-                                                                 // 10000000000,
-                                                                 // 10000000000,
-                                                                 100000000,
-                                                                 100000000,
+                                                                 1000000,
+                                                                 1000000,
                                                                  w_motion_model_om * cauchy(relative_pose_measurement_odo(3, 0), 1), // 100000000, //
                                                                  w_motion_model_fi * cauchy(relative_pose_measurement_odo(4, 0), 1), // 100000000, //
                                                                  w_motion_model_ka * cauchy(relative_pose_measurement_odo(5, 0), 1));
@@ -1908,6 +1911,7 @@ void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &
 
 bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure)
 {
+    //exit(1);
     bool debug = false;
     bool debug2 = true;
 
@@ -2139,7 +2143,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                                         params.useMultithread, params.max_distance, delta /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/,
                                         lm_factor,
                                         params.motion_model_correction);
-                if (delta < 1e-6)
+                if (delta < 1e-12)
                 {
                     std::cout << "------------" << std::endl;
                     std::cout << "finished at iteration: " << iter + 1 << " nr_iter: " << params.nr_iter << " delta: " << delta << std::endl;
@@ -2153,7 +2157,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 }
             }
 
-            if (delta > 1e-6)
+            if (delta > 1e-12)
             {
                 std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
                 std::cout << "finished with delta: " << delta << std::endl;

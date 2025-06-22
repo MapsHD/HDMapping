@@ -780,7 +780,7 @@ void lidar_odometry_basic_gui()
 
             params.use_robust_and_accurate_lidar_odometry = false;
 
-            params.nr_iter = 100;
+            params.nr_iter = 1000;
             
             step2();
 

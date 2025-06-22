@@ -257,6 +257,59 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_f
                 std::string l = strs[2];
 
                 //std::array<double, 3> coord = {0.0, 0.0, 0.0}; // lon, lat, alt
+                static double last_h = -1000000.0;
+                minmea_sentence_gga gga;
+                bool isGGA = minmea_parse_gga(&gga, l.c_str());
+                if (isGGA)
+                {
+
+                    // std::cout << "GGA" << std::endl;
+                    // std::cout << std::setprecision(20);
+                    // std::cout << minmea_tocoord(&gga.latitude) << " " << minmea_tocoord(&gga.longitude) << std::endl;
+                    /* oss << minmea_tocoord(&gga.latitude) << " ";
+                     oss << minmea_tocoord(&gga.longitude) << " ";
+                     oss << minmea_tofloat(&gga.altitude) << " ";
+                     oss << minmea_tofloat(&gga.hdop) << " ";
+                     oss << gga.satellites_tracked << " ";
+                     oss << minmea_tofloat(&gga.height) << " ";
+                     oss << minmea_tofloat(&gga.dgps_age) << " ";
+                     oss << gga.time.hours << ":" << gga.time.minutes << ":" << gga.time.seconds << " ";
+                     oss << gga.fix_quality << " ";
+                     oss << millis.count() << "\n";*/
+
+                    GlobalPose gp;
+                    std::istringstream(strs[0]) >> gp.timestamp;
+                    gp.lat = minmea_tocoord(&gga.latitude);
+                    gp.lon = minmea_tocoord(&gga.longitude);
+                    gp.alt = minmea_tofloat(&gga.altitude);
+                    gp.hdop = minmea_tofloat(&gga.hdop);
+                    gga.satellites_tracked = gp.satelites_tracked;
+                    gp.height = minmea_tofloat(&gga.height);
+                    gp.age = minmea_tofloat(&gga.dgps_age);
+                    gp.time = 0; // ToDo change it
+                    gp.fix_quality = gga.fix_quality;
+
+                    if (gp.lat == gp.lat)
+                    {
+                        if (gp.lon == gp.lon)
+                        {
+                            if (gp.alt == gp.alt)
+                            {
+                                if (gp.lat != 0)
+                                {
+                                    if (gp.lon != 0)
+                                    {
+                                        last_h = gp.alt;
+                                        //gnss_poses.push_back(gp);
+                                        // std::cout << std::setprecision(20);
+                                        // std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << " gp.alt " << gp.alt << std::endl;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
 
                 {
                     //$GNRMC,094833.00,A,0734.33134,S,11049.73215,E,2.863,276.61,160625,,,A,V*16
@@ -294,7 +347,7 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_f
                     std::istringstream(strs[0]) >> gp.timestamp;
                     gp.lat = latitude;
                     gp.lon = longitude;
-                    gp.alt = 0;//minmea_tofloat(&gga.altitude);
+                    gp.alt = last_h; // minmea_tofloat(&gga.altitude);
                     gp.hdop = 0;//minmea_tofloat(&gga.hdop);
                     //gp.satellites_tracked = 0;//gp.satelites_tracked;
                     gp.height = 0.0;//minmea_tofloat(&gga.height);
@@ -306,7 +359,7 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_f
                     {
                         if (gp.lon == gp.lon)
                         {
-                            if (gp.alt == gp.alt)
+                            if (gp.alt == gp.alt && gp.alt != -1000000.0)
                             {
                                 if (gp.lat != 0)
                                 {

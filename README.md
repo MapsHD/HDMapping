@@ -164,11 +164,11 @@ MANDEYE Mission Recorder calibration
 
 MANDEYE georeferencing to GPS (NMEA data stream)
 
-[![MANDEYE georeferencing to GPS (NMEA data stream)](https://img.youtube.com/vi/gcUV22D4YrY/default.jpg)](https://youtu.be/gcUV22D4YrY)
+[![MANDEYE georeferencing to GPS (NMEA data stream)](https://img.youtube.com/vi/FOWPGCgOKI4/default.jpg)](https://youtu.be/FOWPGCgOKI4)
 
 Removing GPS inconsistency after MANDEYE georeferencing to GPS (NMEA data stream)
 
-[![Removing GPS inconsistency after MANDEYE georeferencing to GPS (NMEA data stream)](https://img.youtube.com/vi/cUV22D4YrY/default.jpg)](https://youtu.be/cUV22D4YrY)
+[![Removing GPS inconsistency after MANDEYE georeferencing to GPS (NMEA data stream)](https://img.youtube.com/vi/gcUV22D4YrY/default.jpg)](https://youtu.be/gcUV22D4YrY)
 
 
 MANDEYE georeferencing to GCPs (ground control points)

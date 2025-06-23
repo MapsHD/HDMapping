@@ -322,7 +322,7 @@ void calculate_trajectory(
 
         if (first)
         {
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0/200.0);
+            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
             first = false;
             // last_ts = timestamp_pair.first;
         }
@@ -475,6 +475,27 @@ bool compute_step_1(
         }
 
         wd.original_points = points;
+
+        // correct points timestamps
+        if (wd.intermediate_trajectory_timestamps.size() > 2)
+        {
+
+            double ts_begin = wd.intermediate_trajectory_timestamps[0].first;
+            double ts_step = (wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first -
+                              wd.intermediate_trajectory_timestamps[0].first) /
+                             wd.original_points.size();
+
+            // std::cout << "ts_begin " << ts_begin << std::endl;
+            // std::cout << "ts_step " << ts_step << std::endl;
+            // std::cout << "ts_end " << wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first << std::endl;
+
+            for (int pp = 0; pp < wd.original_points.size(); pp++)
+            {
+                wd.original_points[pp].timestamp = ts_begin + pp * ts_step;
+            }
+        }
+        //////////////////////////////////////////
+
         for (unsigned long long int k = 0; k < wd.original_points.size(); k++)
         {
             Point3Di &p = wd.original_points[k];
@@ -488,7 +509,7 @@ bool compute_step_1(
 
             if (index_pose >= 0 && index_pose < wd.intermediate_trajectory_timestamps.size())
             {
-                if (fabs(p.timestamp - wd.intermediate_trajectory_timestamps[index_pose].first) < 0.004)
+                if (fabs(p.timestamp - wd.intermediate_trajectory_timestamps[index_pose].first) > 0.01)
                 {
                     p.index_pose = -1;
                 }
@@ -502,7 +523,8 @@ bool compute_step_1(
         std::vector<Point3Di> filtered_points;
         for (unsigned long long int k = 0; k < wd.original_points.size(); k++)
         {
-            if (wd.original_points[k].index_pose != -1){
+            if (wd.original_points[k].index_pose != -1)
+            {
                 filtered_points.push_back(wd.original_points[k]);
             }
         }
@@ -513,8 +535,9 @@ bool compute_step_1(
             wd.intermediate_points = decimate(wd.original_points, params.decimation, params.decimation, params.decimation);
         }
 
-        //std::cout << "number of points: " << wd.original_points.size() << std::endl;
-        if (wd.original_points.size() > 1000){
+        // std::cout << "number of points: " << wd.original_points.size() << std::endl;
+        if (wd.original_points.size() > 1000)
+        {
             worker_data.push_back(wd);
         }
     }

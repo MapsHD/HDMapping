@@ -588,6 +588,23 @@ void project_gui()
                                         data.poses.push_back(poses[i]);
                                     }
                                 }
+
+                                // correct points timestamps
+                                if (data.timestamps.size() > 2)
+                                {
+                                    double ts_begin = data.timestamps[0].first;
+                                    double ts_step = (data.timestamps[data.timestamps.size() - 1].first - data.timestamps[0].first) / data.points_local.size();
+
+                                    std::cout << "ts_begin " << ts_begin << std::endl;
+                                    std::cout << "ts_step " << ts_step << std::endl;
+                                    std::cout << "ts_end " << data.timestamps[data.timestamps.size() - 1].first << std::endl;
+
+                                    for (int pp = 0; pp < data.points_local.size(); pp++)
+                                    {
+                                        data.points_local[pp].timestamp = ts_begin + pp * ts_step;
+                                    }
+                                }
+
                                 all_data.push_back(data);
 
                                 points_local.clear();
@@ -706,9 +723,11 @@ void project_gui()
 
                     if (index_pose >= 0 && index_pose < all_data[index_rendered_points_local].poses.size())
                     {
+                        std::cout << index_pose << " total nr of poses: [" << all_data[index_rendered_points_local].poses.size() << "] " << all_data[index_rendered_points_local].points_local[i].timestamp - all_data[index_rendered_points_local].timestamps[index_pose].first << " ts point: " << all_data[index_rendered_points_local].points_local[i].timestamp << " pose ts: " << all_data[index_rendered_points_local].timestamps[index_pose].first << std::endl;
+
                         if (fabs(all_data[index_rendered_points_local].points_local[i].timestamp - all_data[index_rendered_points_local].timestamps[index_pose].first) > max_diff)
                         {
-                            std::cout << index_pose << " " << all_data[index_rendered_points_local].points_local[i].timestamp - all_data[index_rendered_points_local].timestamps[index_pose].first << std::endl;
+                            // std::cout << all_data[index_rendered_points_local].points_local[i].timestamp << std::endl;
                             max_diff = fabs(all_data[index_rendered_points_local].points_local[i].timestamp - all_data[index_rendered_points_local].timestamps[index_pose].first);
                         }
                     }

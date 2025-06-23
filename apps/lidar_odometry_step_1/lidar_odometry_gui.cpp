@@ -929,9 +929,9 @@ void lidar_odometry_basic_gui()
             params.in_out_params_outdoor.resolution_Y = 0.3;
             params.in_out_params_outdoor.resolution_Z = 0.3;
 
-            params.filter_threshold_xy_inner = 1.0;
+            params.filter_threshold_xy_inner = 1.5;
             params.filter_threshold_xy_outer = 70.0;
-            params.threshould_output_filter = 1.0;
+            params.threshould_output_filter = 1.5;
 
             params.distance_bucket = 0.2;
             params.polar_angle_deg = 10.0;

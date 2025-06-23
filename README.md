@@ -27,7 +27,7 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 - Initial trajectory estimation (lidar_odometry_step_1)
 - Single trajectory refinement (multi_view_tls_registration_step_2)
 - Multiple trajectory refinement (multi_session_registration_step_3)
-- Georeferencing (referenced point cloud, ground control points, GNSS data)
+- Georeferencing (referenced point cloud [e.g. from ALS Airborne Laser Scanning], ground control points, control points, GNSS data)
 - Multi view terrestrial laser scanning registration (all available methods from literature and more)
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems etc...) 

@@ -660,8 +660,11 @@ int minmea_getdatetime(struct tm *tm, const struct minmea_date *date, const stru
     return 0;
 }
 
-//for windows --> ToDo make it work on linux
-#define timegm _mkgmtime
+#ifdef _WIN32
+    #define timegm _mkgmtime
+#endif
+
+
 
 int minmea_gettime(struct timespec *ts, const struct minmea_date *date, const struct minmea_time *time_)
 {

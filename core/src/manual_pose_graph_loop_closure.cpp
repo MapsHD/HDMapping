@@ -22,7 +22,9 @@
 
 
 void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
-                                     int &index_loop_closure_source, int &index_loop_closure_target, float *m_gizmo, GNSS &gnss, GroundControlPoints &gcps, ControlPoints &cps)
+                                     int &index_loop_closure_source, int &index_loop_closure_target, 
+                                     float *m_gizmo, GNSS &gnss, GroundControlPoints &gcps, ControlPoints &cps,
+                                     int num_edge_extended_before, int num_edge_extended_after)
 {
     if (point_clouds_container.point_clouds.size() > 0)
     {

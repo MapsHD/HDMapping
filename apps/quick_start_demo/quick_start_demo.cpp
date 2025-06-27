@@ -524,7 +524,19 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
                 double delta = 1000000.0;
                 optimize_lidar_odometry(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
                                         params.in_out_params_indoor, params.buckets_indoor, params.in_out_params_outdoor,
-                                        params.buckets_outdoor, /*params.useMultithread*/ false, 70.0, delta, 1.0, motion_model_correction);
+                                        params.buckets_outdoor, /*params.useMultithread*/ false, 70.0, delta, 1.0, motion_model_correction,
+                                        params.lidar_odometry_motion_model_x_1_sigma_m,
+                                        params.lidar_odometry_motion_model_y_1_sigma_m,
+                                        params.lidar_odometry_motion_model_z_1_sigma_m,
+                                        params.lidar_odometry_motion_model_om_1_sigma_deg,
+                                        params.lidar_odometry_motion_model_fi_1_sigma_deg,
+                                        params.lidar_odometry_motion_model_ka_1_sigma_deg,
+                                        params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m,
+                                        params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m,
+                                        params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m,
+                                        params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg,
+                                        params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg,
+                                        params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
             }
 
             end1 = std::chrono::system_clock::now();

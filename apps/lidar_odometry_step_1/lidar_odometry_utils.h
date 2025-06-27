@@ -106,7 +106,21 @@ struct LidarOdometryParams
     bool save_poses = true;
 
     TaitBryanPose motion_model_correction;
-  
+
+    double lidar_odometry_motion_model_x_1_sigma_m = 0.0005;
+    double lidar_odometry_motion_model_y_1_sigma_m = 0.0005;
+    double lidar_odometry_motion_model_z_1_sigma_m = 0.0005;
+
+    double lidar_odometry_motion_model_om_1_sigma_deg = 0.01;
+    double lidar_odometry_motion_model_fi_1_sigma_deg = 0.01;
+    double lidar_odometry_motion_model_ka_1_sigma_deg = 0.01;
+
+    double lidar_odometry_motion_model_fix_origin_x_1_sigma_m = 0.000001;
+    double lidar_odometry_motion_model_fix_origin_y_1_sigma_m = 0.000001;
+    double lidar_odometry_motion_model_fix_origin_z_1_sigma_m = 0.000001;
+    double lidar_odometry_motion_model_fix_origin_om_1_sigma_deg = 0.000001;
+    double lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg = 0.000001;
+    double lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg = 0.000001;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);
@@ -157,7 +171,19 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points, std::ve
                              std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
                              NDT::GridParameters &rgd_params_indoor, NDTBucketMapType &buckets_indoor,
                              NDT::GridParameters &rgd_params_outdoor, NDTBucketMapType &buckets_outdoor,
-                             bool useMultithread, double max_distance, double &delta, double lm_factor, TaitBryanPose motion_model_correction);
+                             bool useMultithread, double max_distance, double &delta, double lm_factor, TaitBryanPose motion_model_correction,
+                             double lidar_odometry_motion_model_x_1_sigma_m,
+                             double lidar_odometry_motion_model_y_1_sigma_m,
+                             double lidar_odometry_motion_model_z_1_sigma_m,
+                             double lidar_odometry_motion_model_om_1_sigma_deg,
+                             double lidar_odometry_motion_model_fi_1_sigma_deg,
+                             double lidar_odometry_motion_model_ka_1_sigma_deg,
+                             double lidar_odometry_motion_model_fix_origin_x_1_sigma_m,
+                             double lidar_odometry_motion_model_fix_origin_y_1_sigma_m,
+                             double lidar_odometry_motion_model_fix_origin_z_1_sigma_m,
+                             double lidar_odometry_motion_model_fix_origin_om_1_sigma_deg,
+                             double lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg,
+                             double lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
 
 void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
               std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,

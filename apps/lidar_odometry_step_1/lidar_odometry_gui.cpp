@@ -979,6 +979,20 @@ void lidar_odometry_basic_gui()
             params.motion_model_correction.ka = 0.0;
         }
 
+        ImGui::InputDouble("lidar_odometry_motion_model_x_1_sigma_m", &params.lidar_odometry_motion_model_x_1_sigma_m);
+        ImGui::InputDouble("lidar_odometry_motion_model_y_1_sigma_m", &params.lidar_odometry_motion_model_y_1_sigma_m);
+        ImGui::InputDouble("lidar_odometry_motion_model_z_1_sigma_m", &params.lidar_odometry_motion_model_z_1_sigma_m);
+        ImGui::InputDouble("lidar_odometry_motion_model_om_1_sigma_deg", &params.lidar_odometry_motion_model_om_1_sigma_deg);
+        ImGui::InputDouble("lidar_odometry_motion_model_fi_1_sigma_deg", &params.lidar_odometry_motion_model_fi_1_sigma_deg);
+        ImGui::InputDouble("lidar_odometry_motion_model_ka_1_sigma_deg", &params.lidar_odometry_motion_model_ka_1_sigma_deg);
+
+        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_x_1_sigma_m", &params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m);
+        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_y_1_sigma_m", &params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m);
+        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_z_1_sigma_m", &params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m);
+        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_om_1_sigma_deg", &params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg);
+        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg", &params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg);
+        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg", &params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
+
         ImGui::Checkbox("full_lidar_odometry_gui", &full_lidar_odometry_gui);
 
         ImGui::End();

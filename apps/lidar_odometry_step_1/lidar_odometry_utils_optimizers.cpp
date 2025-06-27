@@ -1363,8 +1363,35 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
                              NDT::GridParameters &rgd_params_outdoor, NDTBucketMapType &buckets_outdoor, bool multithread,
                              double max_distance, double &delta,
                              double lm_factor,
-                             TaitBryanPose motion_model_correction)
+                             TaitBryanPose motion_model_correction,
+                             double lidar_odometry_motion_model_x_1_sigma_m,
+                             double lidar_odometry_motion_model_y_1_sigma_m,
+                             double lidar_odometry_motion_model_z_1_sigma_m,
+                             double lidar_odometry_motion_model_om_1_sigma_deg,
+                             double lidar_odometry_motion_model_fi_1_sigma_deg,
+                             double lidar_odometry_motion_model_ka_1_sigma_deg,
+                             double lidar_odometry_motion_model_fix_origin_x_1_sigma_m,
+                             double lidar_odometry_motion_model_fix_origin_y_1_sigma_m,
+                             double lidar_odometry_motion_model_fix_origin_z_1_sigma_m,
+                             double lidar_odometry_motion_model_fix_origin_om_1_sigma_deg,
+                             double lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg,
+                             double lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg)
 {
+
+    double sigma_motion_model_om = lidar_odometry_motion_model_om_1_sigma_deg * M_PI / 180.0;
+    double sigma_motion_model_fi = lidar_odometry_motion_model_fi_1_sigma_deg * M_PI / 180.0;
+    double sigma_motion_model_ka = lidar_odometry_motion_model_ka_1_sigma_deg * M_PI / 180.0;
+
+    double w_motion_model_om = 1.0 / (sigma_motion_model_om * sigma_motion_model_om);
+    double w_motion_model_fi = 1.0 / (sigma_motion_model_fi * sigma_motion_model_fi);
+    double w_motion_model_ka = 1.0 / (sigma_motion_model_ka * sigma_motion_model_ka);
+
+    double w_motion_model_x = 1.0 / (lidar_odometry_motion_model_x_1_sigma_m * lidar_odometry_motion_model_x_1_sigma_m);
+    double w_motion_model_y = 1.0 / (lidar_odometry_motion_model_y_1_sigma_m * lidar_odometry_motion_model_y_1_sigma_m);
+    double w_motion_model_z = 1.0 / (lidar_odometry_motion_model_z_1_sigma_m * lidar_odometry_motion_model_z_1_sigma_m);
+
+
+
     std::vector<Eigen::Triplet<double>> tripletListA;
     std::vector<Eigen::Triplet<double>> tripletListP;
     std::vector<Eigen::Triplet<double>> tripletListB;
@@ -1591,14 +1618,7 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
         poses_desired.push_back(pose_tait_bryan_from_affine_matrix(intermediate_trajectory_motion_model[i]));
     }
 
-    double sigma_motion_model_om = 0.01 * M_PI / 180.0;
-    double sigma_motion_model_fi = 0.01 * M_PI / 180.0;
-    //double sigma_motion_model_ka = 0.01 * M_PI / 180.0;
-    double sigma_motion_model_ka = 0.01 * M_PI / 180.0;
-
-    double w_motion_model_om = 1.0 / (sigma_motion_model_om * sigma_motion_model_om);
-    double w_motion_model_fi = 1.0 / (sigma_motion_model_fi * sigma_motion_model_fi);
-    double w_motion_model_ka = 1.0 / (sigma_motion_model_ka * sigma_motion_model_ka);
+    
 
     for (size_t i = 0; i < odo_edges.size(); i++)
     {
@@ -1646,9 +1666,9 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
                                                                  // 1000000,
                                                                  //  10000000000,
                                                                  //  10000000000,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 1000000,
+                                                                 w_motion_model_x,
+                                                                 w_motion_model_y,
+                                                                 w_motion_model_z,
                                                                  w_motion_model_om * cauchy(relative_pose_measurement_odo(3, 0), 1),  // 100000000, //
                                                                  w_motion_model_fi * cauchy(relative_pose_measurement_odo(4, 0), 1),  // 100000000, //
                                                                  w_motion_model_ka * cauchy(relative_pose_measurement_odo(5, 0), 1)); // 100000000);
@@ -1675,9 +1695,9 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
                                                                  // 1000000,
                                                                  //  10000000000,
                                                                  //  10000000000,
-                                                                 1000000,
-                                                                 1000000,
-                                                                 1000000,
+                                                                 w_motion_model_x,
+                                                                 w_motion_model_y,
+                                                                 w_motion_model_z,
                                                                  w_motion_model_om * cauchy(relative_pose_measurement_odo(3, 0), 1), // 100000000, //
                                                                  w_motion_model_fi * cauchy(relative_pose_measurement_odo(4, 0), 1), // 100000000, //
                                                                  w_motion_model_ka * cauchy(relative_pose_measurement_odo(5, 0), 1));
@@ -1712,12 +1732,12 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
     tripletListA.emplace_back(ir + 4, ic * 6 + 4, 1);
     tripletListA.emplace_back(ir + 5, ic * 6 + 5, 1);
 
-    tripletListP.emplace_back(ir, ir, 1000000);
-    tripletListP.emplace_back(ir + 1, ir + 1, 1000000);
-    tripletListP.emplace_back(ir + 2, ir + 2, 1000000);
-    tripletListP.emplace_back(ir + 3, ir + 3, w_motion_model_om); // 100000000
-    tripletListP.emplace_back(ir + 4, ir + 4, w_motion_model_fi); // 100000000
-    tripletListP.emplace_back(ir + 5, ir + 5, w_motion_model_ka);
+    tripletListP.emplace_back(ir, ir, 1.0 / (lidar_odometry_motion_model_fix_origin_x_1_sigma_m * lidar_odometry_motion_model_fix_origin_x_1_sigma_m));
+    tripletListP.emplace_back(ir + 1, ir + 1, 1.0 / (lidar_odometry_motion_model_fix_origin_y_1_sigma_m * lidar_odometry_motion_model_fix_origin_y_1_sigma_m));
+    tripletListP.emplace_back(ir + 2, ir + 2, 1.0 / (lidar_odometry_motion_model_fix_origin_z_1_sigma_m * lidar_odometry_motion_model_fix_origin_z_1_sigma_m));
+    tripletListP.emplace_back(ir + 3, ir + 3, 1.0 / (lidar_odometry_motion_model_fix_origin_om_1_sigma_deg * lidar_odometry_motion_model_fix_origin_om_1_sigma_deg)); 
+    tripletListP.emplace_back(ir + 4, ir + 4, 1.0 / (lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg * lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg)); 
+    tripletListP.emplace_back(ir + 5, ir + 5, 1.0 / (lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg * lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg));
 
     tripletListB.emplace_back(ir, 0, 0);
     tripletListB.emplace_back(ir + 1, 0, 0);
@@ -2142,7 +2162,19 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                                         params.in_out_params_outdoor, params.buckets_outdoor,
                                         params.useMultithread, params.max_distance, delta /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/,
                                         lm_factor,
-                                        params.motion_model_correction);
+                                        params.motion_model_correction,
+                                        params.lidar_odometry_motion_model_x_1_sigma_m,
+                                        params.lidar_odometry_motion_model_y_1_sigma_m,
+                                        params.lidar_odometry_motion_model_z_1_sigma_m,
+                                        params.lidar_odometry_motion_model_om_1_sigma_deg,
+                                        params.lidar_odometry_motion_model_fi_1_sigma_deg,
+                                        params.lidar_odometry_motion_model_ka_1_sigma_deg,
+                                        params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m,
+                                        params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m,
+                                        params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m,
+                                        params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg,
+                                        params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg,
+                                        params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
                 if (delta < 1e-12)
                 {
                     std::cout << "------------" << std::endl;

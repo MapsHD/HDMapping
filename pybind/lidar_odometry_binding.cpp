@@ -118,7 +118,6 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         .def_readwrite("fusionConventionEnu", &LidarOdometryParams::fusionConventionEnu)
         .def_readwrite("fusionConventionNed", &LidarOdometryParams::fusionConventionNed)
         .def_readwrite("threshold_initial_points", &LidarOdometryParams::threshold_initial_points)
-        .def_readwrite("apply_consistency", &LidarOdometryParams::apply_consistency)
         .def_readwrite("use_mutliple_gaussian", &LidarOdometryParams::use_mutliple_gaussian)
         .def_readwrite("num_constistency_iter", &LidarOdometryParams::num_constistency_iter)
         .def_readwrite("threshould_output_filter", &LidarOdometryParams::threshould_output_filter)
@@ -126,6 +125,18 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         .def_readwrite("threshold_nr_poses", &LidarOdometryParams::threshold_nr_poses)
         .def_readwrite("current_output_dir", &LidarOdometryParams::current_output_dir)
         .def_readwrite("min_counter", &LidarOdometryParams::min_counter)
+        .def_readwrite("lidar_odometry_motion_model_x_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_x_1_sigma_m)
+        .def_readwrite("lidar_odometry_motion_model_y_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_y_1_sigma_m)
+        .def_readwrite("lidar_odometry_motion_model_z_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_z_1_sigma_m)
+        .def_readwrite("lidar_odometry_motion_model_om_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_om_1_sigma_deg)
+        .def_readwrite("lidar_odometry_motion_model_fi_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_fi_1_sigma_deg)
+        .def_readwrite("lidar_odometry_motion_model_ka_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_ka_1_sigma_deg)
+        .def_readwrite("lidar_odometry_motion_model_fix_origin_x_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_x_1_sigma_m)
+        .def_readwrite("lidar_odometry_motion_model_fix_origin_y_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_y_1_sigma_m)
+        .def_readwrite("lidar_odometry_motion_model_fix_origin_z_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_z_1_sigma_m)
+        .def_readwrite("lidar_odometry_motion_model_fix_origin_om_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_om_1_sigma_deg)
+        .def_readwrite("lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg)
+        .def_readwrite("lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg)
         ;
 
     // Bind run_lidar_odometry function

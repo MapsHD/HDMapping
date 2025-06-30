@@ -595,9 +595,9 @@ void project_gui()
                                     double ts_begin = data.timestamps[0].first;
                                     double ts_step = (data.timestamps[data.timestamps.size() - 1].first - data.timestamps[0].first) / data.points_local.size();
 
-                                    std::cout << "ts_begin " << ts_begin << std::endl;
-                                    std::cout << "ts_step " << ts_step << std::endl;
-                                    std::cout << "ts_end " << data.timestamps[data.timestamps.size() - 1].first << std::endl;
+                                    //std::cout << "ts_begin " << ts_begin << std::endl;
+                                    //std::cout << "ts_step " << ts_step << std::endl;
+                                    //std::cout << "ts_end " << data.timestamps[data.timestamps.size() - 1].first << std::endl;
 
                                     for (int pp = 0; pp < data.points_local.size(); pp++)
                                     {

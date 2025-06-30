@@ -45,4 +45,8 @@ if(WIN32)
     COMMAND_EXPAND_LISTS)
 endif()
 
+if (MSVC)
+    target_compile_options(precision_forestry_tools PRIVATE /bigobj)
+endif()
+
 install (TARGETS precision_forestry_tools DESTINATION bin)

@@ -48,4 +48,8 @@ if(WIN32)
     COMMAND_EXPAND_LISTS)
 endif()
 
+if (MSVC)
+    target_compile_options(mandeye_single_session_viewer PRIVATE /bigobj)
+endif()
+
 install(TARGETS mandeye_single_session_viewer DESTINATION bin)

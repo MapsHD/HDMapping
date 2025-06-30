@@ -43,4 +43,8 @@ if(WIN32)
     COMMAND_EXPAND_LISTS)
 endif()
 
+if (MSVC)
+    target_compile_options(single_session_manual_coloring PRIVATE /bigobj)
+endif()
+
 install(TARGETS single_session_manual_coloring DESTINATION bin)

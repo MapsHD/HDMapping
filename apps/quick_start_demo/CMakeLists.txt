@@ -49,4 +49,8 @@ if(WIN32)
     COMMAND_EXPAND_LISTS)
 endif()
 
+if (MSVC)
+    target_compile_options(quick_start_demo PRIVATE /bigobj)
+endif()
+
 install(TARGETS quick_start_demo DESTINATION bin)

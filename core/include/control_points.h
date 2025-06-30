@@ -4,7 +4,9 @@
 #include <vector>
 #include <string>
 #include <point_clouds.h>
+#if WITH_GUI == 1
 #include <GL/freeglut.h>
+#endif
 
 struct ControlPoint{
     char name[64];
@@ -27,6 +29,7 @@ class ControlPoints{
 
         bool is_imgui = false;
         std::vector<ControlPoint> cps;
+#if WITH_GUI == 1
         bool picking_mode = false;
         //int picking_mode_index_to_node_inner = -1;
         //int picking_mode_index_to_node_outer = -1;
@@ -41,6 +44,7 @@ class ControlPoints{
         void imgui(PointClouds &point_clouds_container, Eigen::Vector3f &rotation_center);
         void render(const PointClouds &point_clouds_container);
         void draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd = 1);
+#endif
 };
 
 #endif

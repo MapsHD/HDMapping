@@ -19,18 +19,20 @@ set(CORE_SOURCE_FILES
     src/point_cloud.cpp
     src/point_clouds.cpp
     src/pose_graph_slam.cpp
-    src/registration_plane_feature.cpp
+    src/pose_graph_slam.cpp
+    src/pose_graph_loop_closure.cpp
     src/session.cpp
     src/wgs84_do_puwg92.cc
     src/pair_wise_iterative_closest_point.cpp
     src/hash_utils.cpp
     src/minmea.c
+    src/ground_control_points.cpp
+    src/control_points.cpp
+    src/registration_plane_feature.cpp
 )
 
 set(CORE_SOURCE_FILES_GUI
     src/pfd_wrapper.cpp
-    src/ground_control_points.cpp
-    src/control_points.cpp
     src/manual_pose_graph_loop_closure.cpp
     src/observation_picking.cpp
 )
@@ -66,6 +68,7 @@ set(CORE_INCLUDE_FILES_GUI
 # GUI-independent target
 add_library(core_no_gui STATIC ${CORE_SOURCE_FILES} ${CORE_INCLUDE_FILES})
 target_compile_definitions(core_no_gui PRIVATE WITH_GUI=0)
+target_compile_options(core_no_gui PRIVATE -fPIC)
 target_link_libraries(core_no_gui PRIVATE ${PLATFORM_LASZIP_LIB} ${PLATFORM_MISCELLANEOUS_LIBS})
 target_include_directories(core_no_gui PRIVATE 
     include

@@ -29,9 +29,15 @@ message(STATUS "Configuring pybind with Python executable: ${PYTHON_EXECUTABLE}"
 
 add_library(lidar_odometry_py MODULE lidar_odometry_binding.cpp)
 target_compile_definitions(lidar_odometry_py PRIVATE -DWITH_GUI=0)
+if (MSVC)
+    target_compile_options(lidar_odometry_py PRIVATE /bigobj)
+endif()
 
 add_library(multi_view_tls_registration_py MODULE tls_registration_binding.cpp)
 target_compile_definitions(multi_view_tls_registration_py PRIVATE -DWITH_GUI=0)
+if (MSVC)
+    target_compile_options(multi_view_tls_registration_py PRIVATE /bigobj)
+endif()
 
 target_sources(lidar_odometry_py
     PRIVATE

@@ -48,4 +48,8 @@ if(WIN32)
     COMMAND_EXPAND_LISTS)
 endif()
 
+if (MSVC)
+    target_compile_options(mandeye_compare_trajectories PRIVATE /bigobj)
+endif()
+
 install(TARGETS mandeye_compare_trajectories DESTINATION bin)

@@ -7,6 +7,7 @@
 #include <vector>
 #include <Fusion.h>
 #include <map>
+#include <filesystem>
 #include <execution>
 #include <structures.h>
 #include <ndt.h>
@@ -21,6 +22,7 @@
 #include <common/include/cauchy.h>
 #include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
 
+namespace fs = std::filesystem;
 
 struct WorkerData
 {
@@ -96,14 +98,10 @@ struct LidarOdometryParams
     double threshould_output_filter = 0.5;
     double ahrs_gain = 0.5;
     int threshold_nr_poses = 20;
+    int min_counter = 10;
 
     // for automatic mode
     std::string current_output_dir = "";
-    bool apply_consistency = true;
-    bool save_trajectory = true;
-    bool save_laz = true;
-    bool filter_ref_buckets = false;
-    bool save_poses = true;
 
     TaitBryanPose motion_model_correction;
 
@@ -160,7 +158,7 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
 std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy_inner, double filter_threshold_xy_outer,
                                        const std::unordered_map<int, Eigen::Affine3d> &calibrations);
 
-bool saveLaz(const std::string &filename, const WorkerData &data, double threshould_output_filter);
+bool saveLaz(const std::string &filename, const WorkerData &data, double threshould_output_filter, std::vector<int>* index_poses = nullptr);
 bool saveLaz(const std::string &filename, const std::vector<Point3Di> &points_global);
 bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_poses, std::vector<std::string> filenames);
 
@@ -207,6 +205,17 @@ void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &
 
 bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure);
 void compute_step_2_fast_forward_motion(std::vector<WorkerData> &worker_data, LidarOdometryParams &params);
+
+// for reconstructing worker data from step 1 output
+bool loadLaz(const std::string &filename, std::vector<Point3Di> &points_out, std::vector<int> index_poses_i, std::vector<Eigen::Affine3d>& intermediate_trajectory, const Eigen::Affine3d& inverse_pose);
+bool load_poses(const fs::path& poses_file, std::vector<Eigen::Affine3d>& out_poses);
+bool load_trajectory_csv(const std::string& filename, const Eigen::Affine3d& m_pose,
+    std::vector<std::pair<double, double>>& intermediate_trajectory_timestamps,
+    std::vector<Eigen::Affine3d>& intermediate_trajectory,
+    std::vector<Eigen::Vector3d>& imu_om_fi_ka);
+bool load_point_sizes(const std::filesystem::path& path, std::vector<int>& vector);
+bool load_index_poses(const std::filesystem::path& path, std::vector<std::vector<int>>& index_poses_out);
+bool load_worker_data_from_results(const fs::path& session_file, std::vector<WorkerData>& worker_data_out);
 
 //! This namespace contains functions for loading calibration file (.json and .sn).
 //!

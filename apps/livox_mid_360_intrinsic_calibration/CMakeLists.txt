@@ -49,4 +49,8 @@ if(WIN32)
     COMMAND_EXPAND_LISTS)
 endif()
 
+if (MSVC)
+    target_compile_options(livox_mid_360_intrinsic_calibration PRIVATE /bigobj)
+endif()
+
 install(TARGETS livox_mid_360_intrinsic_calibration DESTINATION bin)

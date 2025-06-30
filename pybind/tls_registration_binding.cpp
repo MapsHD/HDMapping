@@ -2,6 +2,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
+#include <pose_graph_loop_closure.h>
 #include <multi_view_tls_registration.h>
 #include <icp.h>
 #include <gnss.h>
@@ -119,6 +120,49 @@ PYBIND11_MODULE(multi_view_tls_registration_py, m) {
         .def_readwrite("show_correspondences", &GNSS::show_correspondences)
         .def_readwrite("WGS84ReferenceLatitude", &GNSS::WGS84ReferenceLatitude)
         .def_readwrite("WGS84ReferenceLongitude", &GNSS::WGS84ReferenceLongitude);
+
+    py::class_<TaitBryanPose>(m, "TaitBryanPose")
+        .def(py::init<>())
+        .def_readwrite("px", &TaitBryanPose::px)
+        .def_readwrite("py", &TaitBryanPose::py)
+        .def_readwrite("pz", &TaitBryanPose::pz)
+        .def_readwrite("om", &TaitBryanPose::om)
+        .def_readwrite("fi", &TaitBryanPose::fi)
+        .def_readwrite("ka", &TaitBryanPose::ka);
+
+    py::class_<PoseGraphLoopClosure::Edge>(m, "Edge")
+        .def(py::init<>())
+        .def_readwrite("relative_pose_tb", &PoseGraphLoopClosure::Edge::relative_pose_tb)
+        .def_readwrite("relative_pose_tb_weights", &PoseGraphLoopClosure::Edge::relative_pose_tb_weights)
+        .def_readwrite("index_from", &PoseGraphLoopClosure::Edge::index_from)
+        .def_readwrite("index_to", &PoseGraphLoopClosure::Edge::index_to)
+        .def_readwrite("is_fixed_px", &PoseGraphLoopClosure::Edge::is_fixed_px)
+        .def_readwrite("is_fixed_py", &PoseGraphLoopClosure::Edge::is_fixed_py)
+        .def_readwrite("is_fixed_pz", &PoseGraphLoopClosure::Edge::is_fixed_pz)
+        .def_readwrite("is_fixed_om", &PoseGraphLoopClosure::Edge::is_fixed_om)
+        .def_readwrite("is_fixed_fi", &PoseGraphLoopClosure::Edge::is_fixed_fi)
+        .def_readwrite("is_fixed_ka", &PoseGraphLoopClosure::Edge::is_fixed_ka);       
+
+    py::class_<PoseGraphLoopClosure>(m, "PoseGraphLoopClosure")
+        .def(py::init<>())
+        .def_readwrite("edges", &PoseGraphLoopClosure::edges)
+        .def_readwrite("poses_motion_model", &PoseGraphLoopClosure::poses_motion_model)
+        .def("set_initial_poses_as_motion_model",
+            &PoseGraphLoopClosure::set_initial_poses_as_motion_model,
+            "Set initial poses as motion model")
+        .def("set_current_poses_as_motion_model",
+            &PoseGraphLoopClosure::set_current_poses_as_motion_model,
+            "Set current poses as motion model")
+        .def("graph_slam",
+            &PoseGraphLoopClosure::graph_slam,
+            "Run graph SLAM for given point clouds, GNSS and control points")
+        .def("run_icp",
+            &PoseGraphLoopClosure::run_icp,
+            "Run ICP for the selected active edge")
+        .def("add_edge",
+            &PoseGraphLoopClosure::add_edge,
+            "Add new edge to the pose graph")
+        ;
 
     m.def("run_multi_view_tls_registration", &run_multi_view_tls_registration,
           py::arg("input_file_name"),

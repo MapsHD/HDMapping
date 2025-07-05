@@ -9,6 +9,9 @@ This is an open-source software for large-scale 3D mapping using an open-hardwar
 - Info for Windows users: please use latest release https://github.com/MapsHD/HDMapping/releases 
 - Contact email: januszbedkowski@gmail.com
 
+# Compatible cummunity projects
+- Handheld Setup for Recording with Mid360 Lidar and Camera https://github.com/RomanStadlhuber/livo-handheld 
+
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z
 - unpack `quick_start_demo.7z` with 7-Zip (https://7-zip.org/)

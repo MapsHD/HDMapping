@@ -22,6 +22,8 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
           ${FREEGLUT_INCLUDE_DIR})
 
+target_compile_definitions(single_session_manual_coloring PRIVATE WITH_GUI=1)
+
 target_link_libraries(
   single_session_manual_coloring
   PRIVATE ${FREEGLUT_LIBRARY}

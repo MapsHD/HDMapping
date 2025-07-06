@@ -1005,9 +1005,9 @@ void display()
         SystemData::point_size = 1;
     }
 
-    if (ImGui::Button("save camera to lidar relative pose"))
+    if (ImGui::Button("save camera to lidar relative pose (*.reg)"))
     {
-        auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", {}, "");
+        auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", mandeye::fd::Resso_filter /*mandeye::fd::reg_filter*/, "");
         std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
 
         std::ofstream outfile;
@@ -1031,7 +1031,7 @@ void display()
 
     ImGui::SameLine();
 
-    if (ImGui::Button("load camera to lidar relative pose"))
+    if (ImGui::Button("load camera to lidar relative pose (*.reg)"))
     {
         std::string input_file_name = "";
         input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO", mandeye::fd::Resso_filter);

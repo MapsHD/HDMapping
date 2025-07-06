@@ -154,6 +154,8 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             gcp.index_to_node_inner = gcp_json["index_to_node_inner"];
             gcp.index_to_node_outer = gcp_json["index_to_node_outer"];
             ground_control_points.gpcs.push_back(gcp);
+
+            std::cout << "adding gcp[" << name << "]" << std::endl;
         };
 #endif
 
@@ -175,6 +177,8 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             cp.sigma_z = cp_json["sigma_z"];
             cp.index_to_pose = cp_json["index_to_pose"];
             control_points.cps.push_back(cp);
+
+            std::cout << "adding cp[" << name << "]" << std::endl;
         };
 #endif
 

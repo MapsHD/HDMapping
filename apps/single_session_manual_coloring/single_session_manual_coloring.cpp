@@ -1333,53 +1333,57 @@ void project_gui()
                 session.load(fs::path(input_file_name).string(), false, 0.0, 0.0, 0.0, false);
             }
         }
-/*
-        ImGui::InputInt("point_size", &point_size);
-        if (point_size < 1)
-        {
-            point_size = 1;
+
+        if (ImGui::Button("load equirectangular images")){
+            
         }
+            /*
+                    ImGui::InputInt("point_size", &point_size);
+                    if (point_size < 1)
+                    {
+                        point_size = 1;
+                    }
 
-        
 
-        if (session.point_clouds_container.point_clouds.size() > 0)
-        {
-            ImGui::InputFloat("offset_intensity", &offset_intensity, 0.01, 0.1);
-            if (offset_intensity < 0)
-            {
-                offset_intensity = 0;
-            }
-            if (offset_intensity > 1)
-            {
-                offset_intensity = 1;
-            }
 
-            ImGui::Checkbox("show_neighbouring_scans", &show_neighbouring_scans);
+                    if (session.point_clouds_container.point_clouds.size() > 0)
+                    {
+                        ImGui::InputFloat("offset_intensity", &offset_intensity, 0.01, 0.1);
+                        if (offset_intensity < 0)
+                        {
+                            offset_intensity = 0;
+                        }
+                        if (offset_intensity > 1)
+                        {
+                            offset_intensity = 1;
+                        }
 
-            if (show_neighbouring_scans)
-            {
-                ImGui::ColorEdit3("pc_neigbouring_color", (float *)&pc_neigbouring_color);
-            }
+                        ImGui::Checkbox("show_neighbouring_scans", &show_neighbouring_scans);
 
-            ImGui::Text("----------- navigate with index_rendered_points_local ---------");
+                        if (show_neighbouring_scans)
+                        {
+                            ImGui::ColorEdit3("pc_neigbouring_color", (float *)&pc_neigbouring_color);
+                        }
 
-            ImGui::InputInt("index_rendered_points_local", &index_rendered_points_local, 1, 10);
-            if (index_rendered_points_local < 0)
-            {
-                index_rendered_points_local = 0;
-            }
-            if (index_rendered_points_local >= session.point_clouds_container.point_clouds.size() - 1)
-            {
-                index_rendered_points_local = session.point_clouds_container.point_clouds.size() - 1;
-            }
+                        ImGui::Text("----------- navigate with index_rendered_points_local ---------");
 
-            ImGui::Text(session.point_clouds_container.point_clouds[index_rendered_points_local].file_name.c_str());
+                        ImGui::InputInt("index_rendered_points_local", &index_rendered_points_local, 1, 10);
+                        if (index_rendered_points_local < 0)
+                        {
+                            index_rendered_points_local = 0;
+                        }
+                        if (index_rendered_points_local >= session.point_clouds_container.point_clouds.size() - 1)
+                        {
+                            index_rendered_points_local = session.point_clouds_container.point_clouds.size() - 1;
+                        }
 
-            double ts = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps[0] / 1e9;
-            ImGui::Text((std::string("ts: ") + std::to_string(ts)).c_str());
-        }
-*/
-        ImGui::End();
+                        ImGui::Text(session.point_clouds_container.point_clouds[index_rendered_points_local].file_name.c_str());
+
+                        double ts = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps[0] / 1e9;
+                        ImGui::Text((std::string("ts: ") + std::to_string(ts)).c_str());
+                    }
+            */
+            ImGui::End();
     }
     return;
 }

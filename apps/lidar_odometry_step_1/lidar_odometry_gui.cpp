@@ -102,14 +102,14 @@ void step1()
     //input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
     input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
 
-    std::cout << "input_file_names START" << std::endl;
+    std::cout << "input_file_names list begin" << std::endl;
     std::cout << "----------------------" << std::endl;
     for (const auto &fn : input_file_names)
     {
         std::cout << "'" << fn << "'" << std::endl;
     }
     std::cout << "----------------------" << std::endl;
-    std::cout << "input_file_names FINISH" << std::endl;
+    std::cout << "input_file_names list end" << std::endl;
 
     if (load_data(input_file_names, params, pointsPerFile, imu_data))
     {

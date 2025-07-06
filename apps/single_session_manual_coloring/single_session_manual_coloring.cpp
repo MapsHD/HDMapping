@@ -235,7 +235,29 @@ void project_gui()
         ImGui::SameLine();
         if (ImGui::Button("save colored pointcloud"))
         {
+            
+            const auto input_file_names = mandeye::fd::SaveFileDialog("Colored point cloud", mandeye::fd::LazFilter);
+            if (!input_file_names.empty())
+            {
+                std::vector<mandeye::PointRGB> pointsRGB;
 
+                for (const auto &p : session.point_clouds_container.point_clouds){
+                    if(p.visible){
+                        for (int index = 0; index < p.points_local.size(); index++){
+                            mandeye::PointRGB out;
+                            out.point = p.m_pose * p.points_local[index];
+                            out.intensity = p.intensities[index];
+                            out.rgb[0] = p.colors[index].x();
+                            out.rgb[1] = p.colors[index].y();
+                            out.rgb[2] = p.colors[index].z();
+                            out.rgb[3] = 1.0;
+                            pointsRGB.push_back(out);
+                        }
+                    }
+                }
+
+                mandeye::saveLaz(input_file_names, pointsRGB);
+            }
         }
 
         if (ImGui::Button("load equirectangular images"))
@@ -349,6 +371,8 @@ void project_gui()
             {
                 if (session.point_clouds_container.point_clouds.size() == corresponding_images.size() && images_file_names.size() > 0)
                 {
+                    int prev = corresponding_images[i];
+                    
                     ImGui::InputInt((std::string("image[") + std::to_string(i) + std::string("]")).c_str(), &corresponding_images[i]);
                     if (corresponding_images[i] < 0)
                     {
@@ -359,18 +383,62 @@ void project_gui()
                         corresponding_images[i] = images_file_names.size() - 1;
                     }
 
-                    ImGui::InputInt((std::string("trajectory offset[") + std::to_string(i) + std::string("]")).c_str(), &offsets[i]);
-                    if (offsets[i] < 0)
-                    {
-                        offsets[i] = 0;
+                    if (prev != corresponding_images[i]){
+                        namespace SD = SystemData;
+                        SD::imageData = stbi_load(images_file_names[corresponding_images[i]].c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
+                        std::cout << "imageWidth: " << SD::imageWidth << std::endl;
+                        std::cout << "imageHeight: " << SD::imageHeight << std::endl;
+                        std::cout << "imageNrChannels: " << SD::imageNrChannels << std::endl;
+
+                        ///////////////
+                        // std::vector<mandeye::PointRGB> newCloud(session.point_clouds_container.point_clouds[i]..size());
+
+                        session.point_clouds_container.point_clouds[i].colors.resize(session.point_clouds_container.point_clouds[i].points_local.size());
+                        for (auto &c : session.point_clouds_container.point_clouds[i].colors)
+                        {
+                            c.x() = c.y() = c.z() = 0.0;
+                        }
+
+                        Eigen::Affine3d transfom = SystemData::camera_pose; // * pc.local_trajectory[offsets[i]].m_pose.inverse();
+
+                        std::vector<mandeye::PointRGB> pointsRGB;
+
+                        for (int p = 0; p < session.point_clouds_container.point_clouds[i].points_local.size(); p++)
+                        {
+                            mandeye::PointRGB point;
+                            point.point = session.point_clouds_container.point_clouds[i].points_local[p];
+                            // point.point = pc.local_trajectory[0].m_pose.inverse() * point.point;
+                            // point.point = pc.local_trajectory[offsets[i]].m_pose * point.point;
+                            point.rgb = {0.f, 0.f, 0.f, 1.f};
+                            pointsRGB.push_back(point);
+                        }
+
+                        std::vector<mandeye::PointRGB>
+                            pc = ApplyColorToPointcloud(pointsRGB, SD::imageData, SD::imageWidth, SD::imageHeight, SD::imageNrChannels, transfom);
+
+                        for (int color_idx = 0; color_idx < pc.size(); color_idx++)
+                        {
+                            session.point_clouds_container.point_clouds[i].colors[color_idx].x() = pc[color_idx].rgb.x();
+                            session.point_clouds_container.point_clouds[i].colors[color_idx].y() = pc[color_idx].rgb.y();
+                            session.point_clouds_container.point_clouds[i].colors[color_idx].z() = pc[color_idx].rgb.z();
+                        }
+
+                        session.point_clouds_container.point_clouds[i].show_color = true;
                     }
-                    if (offsets[i] >= pc.local_trajectory.size() - 1)
-                    {
-                        offsets[i] = pc.local_trajectory.size() - 1;
-                    }
+
+                    //ImGui::InputInt((std::string("trajectory offset[") + std::to_string(i) + std::string("]")).c_str(), &offsets[i]);
+                    //if (offsets[i] < 0)
+                    //{
+                    //    offsets[i] = 0;
+                    //}
+                    //if (offsets[i] >= pc.local_trajectory.size() - 1)
+                    //{
+                    //    offsets[i] = pc.local_trajectory.size() - 1;
+                    //}
 
 
 
+                    /*
                     if (ImGui::Button(("colorize with '" + images_file_names[corresponding_images[i]] + "'").c_str()))
                     {
                         //
@@ -421,7 +489,7 @@ void project_gui()
                         session.point_clouds_container.point_clouds[i].show_color = true;
                         // return newCloud;
                         ///////////////
-                    }
+                    }*/
                 }
             }
 

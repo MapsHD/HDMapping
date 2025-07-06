@@ -99,7 +99,17 @@ void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eig
 void step1()
 {
     std::vector<std::string> input_file_names;
-    input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
+    //input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
+    input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
+
+    std::cout << "input_file_names START" << std::endl;
+    std::cout << "----------------------" << std::endl;
+    for (const auto &fn : input_file_names)
+    {
+        std::cout << "'" << fn << "'" << std::endl;
+    }
+    std::cout << "----------------------" << std::endl;
+    std::cout << "input_file_names FINISH" << std::endl;
 
     if (load_data(input_file_names, params, pointsPerFile, imu_data))
     {

@@ -5,6 +5,8 @@ namespace fs = std::filesystem;
 
 bool load_data(std::vector<std::string> &input_file_names, LidarOdometryParams &params, std::vector<std::vector<Point3Di>> &pointsPerFile, Imu &imu_data)
 {
+    
+
     std::sort(std::begin(input_file_names), std::end(input_file_names));
     std::vector<std::string> csv_files;
     std::vector<std::string> laz_files;

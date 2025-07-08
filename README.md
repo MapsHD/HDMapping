@@ -185,6 +185,12 @@ MANDEYE georeferencing to CPs (control points)
 
 ------------------------------------------
 
+Manual coloring
+
+[![MANDEYE manual coloring](https://img.youtube.com/vi/EUbAaJp-XmY/default.jpg)](https://youtu.be/EUbAaJp-XmY)
+
+------------------------------------------
+
 # Compatible commercial products
 [![MANDEYE-PRO](https://img.youtube.com/vi/EBUxUBWKIco/default.jpg)](https://youtu.be/EBUxUBWKIco)
 

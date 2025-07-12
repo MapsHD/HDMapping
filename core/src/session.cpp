@@ -176,6 +176,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             cp.sigma_y = cp_json["sigma_y"];
             cp.sigma_z = cp_json["sigma_z"];
             cp.index_to_pose = cp_json["index_to_pose"];
+            cp.is_z_0 = cp_json["is_z_0"];
             control_points.cps.push_back(cp);
 
             std::cout << "adding cp[" << name << "]" << std::endl;
@@ -345,7 +346,8 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
             {"sigma_x", cp.sigma_x},
             {"sigma_y", cp.sigma_y},
             {"sigma_z", cp.sigma_z},
-            {"index_to_pose", cp.index_to_pose}};
+            {"index_to_pose", cp.index_to_pose},
+            {"is_z_0", cp.is_z_0}};
         jcps.push_back(jcp);
     }
     jj["control_points"] = jcps;

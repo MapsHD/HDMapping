@@ -52,9 +52,9 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
                     cp.y_target_global = rotation_center.y();
                     cp.z_target_global = rotation_center.z();
 
-                    cp.sigma_x = 0.1;
-                    cp.sigma_y = 0.1;
-                    cp.sigma_z = 0.1;
+                    cp.sigma_x = 0.01;
+                    cp.sigma_y = 0.01;
+                    cp.sigma_z = 0.01;
                     strcpy(cp.name, "default_name");
                     cp.index_to_pose = index_pose;
 
@@ -78,19 +78,29 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
             std::string text = "[" + std::to_string(i) + "]_" + cps[i].name;
 
             ImGui::InputText(text.c_str(), cps[i].name, IM_ARRAYSIZE(cps[i].name));
+            text = "[" + std::to_string(i) + "]_is_z_0";
+            ImGui::Checkbox(text.c_str(), &cps[i].is_z_0);
 
-            text = "[" + std::to_string(i) + "]_sigma_x";
-            ImGui::InputDouble(text.c_str(), &cps[i].sigma_x);
-            text = "[" + std::to_string(i) + "]_sigma_y";
-            ImGui::InputDouble(text.c_str(), &cps[i].sigma_y);
-            text = "[" + std::to_string(i) + "]_sigma_z";
-            ImGui::InputDouble(text.c_str(), &cps[i].sigma_z);
-            text = "[" + std::to_string(i) + "]_x_target_global";
-            ImGui::InputDouble(text.c_str(), &cps[i].x_target_global);
-            text = "[" + std::to_string(i) + "]_y_target_global";
-            ImGui::InputDouble(text.c_str(), &cps[i].y_target_global);
-            text = "[" + std::to_string(i) + "]_z_target_global";
-            ImGui::InputDouble(text.c_str(), &cps[i].z_target_global);
+            if (!cps[i].is_z_0)
+            {
+                text = "[" + std::to_string(i) + "]_sigma_x";
+                ImGui::InputDouble(text.c_str(), &cps[i].sigma_x);
+                text = "[" + std::to_string(i) + "]_sigma_y";
+                ImGui::InputDouble(text.c_str(), &cps[i].sigma_y);
+                text = "[" + std::to_string(i) + "]_sigma_z";
+                ImGui::InputDouble(text.c_str(), &cps[i].sigma_z);
+                text = "[" + std::to_string(i) + "]_x_target_global";
+                ImGui::InputDouble(text.c_str(), &cps[i].x_target_global);
+                text = "[" + std::to_string(i) + "]_y_target_global";
+                ImGui::InputDouble(text.c_str(), &cps[i].y_target_global);
+                text = "[" + std::to_string(i) + "]_z_target_global";
+                ImGui::InputDouble(text.c_str(), &cps[i].z_target_global);
+            }
+            else
+            {
+                text = "[" + std::to_string(i) + "]_sigma_z";
+                ImGui::InputDouble(text.c_str(), &cps[i].sigma_z);
+            }
         }
 
         if (remove_gcp_index != -1)
@@ -126,44 +136,88 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
                 // GCPs
                 for (int i = 0; i < cps.size(); i++)
                 {
-                    Eigen::Vector3d p_s(cps[i].x_source_local, cps[i].y_source_local, cps[i].z_source_local);
-                    p_s = point_clouds_container.point_clouds[cps[i].index_to_pose].m_pose * p_s;
-
-                    Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
-
-                    point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                           p_s.x(), p_s.y(), p_s.z());
-
-                    double delta_x;
-                    double delta_y;
-                    double delta_z;
-                    Eigen::Vector3d p_t(cps[i].x_target_global, cps[i].y_target_global, cps[i].z_target_global);
-                    point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                                                                  pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                  p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
-
-                    int ir = tripletListB.size();
-                    int ic = 0;
-
-                    for (int row = 0; row < 3; row++)
+                    if (!cps[i].is_z_0)
                     {
-                        for (int col = 0; col < 6; col++)
+                        Eigen::Vector3d p_s(cps[i].x_source_local, cps[i].y_source_local, cps[i].z_source_local);
+                        p_s = point_clouds_container.point_clouds[cps[i].index_to_pose].m_pose * p_s;
+
+                        Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+
+                        point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                               p_s.x(), p_s.y(), p_s.z());
+
+                        double delta_x;
+                        double delta_y;
+                        double delta_z;
+                        Eigen::Vector3d p_t(cps[i].x_target_global, cps[i].y_target_global, cps[i].z_target_global);
+                        point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                                      pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                      p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+
+                        int ir = tripletListB.size();
+                        int ic = 0;
+
+                        for (int row = 0; row < 3; row++)
                         {
-                            if (jacobian(row, col) != 0.0)
+                            for (int col = 0; col < 6; col++)
                             {
-                                tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
+                                if (jacobian(row, col) != 0.0)
+                                {
+                                    tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
+                                }
                             }
                         }
+                        tripletListP.emplace_back(ir + 0, ir + 0, 1.0 / (cps[i].sigma_x * cps[i].sigma_x));
+                        tripletListP.emplace_back(ir + 1, ir + 1, 1.0 / (cps[i].sigma_y * cps[i].sigma_y));
+                        tripletListP.emplace_back(ir + 2, ir + 2, 1.0 / (cps[i].sigma_z * cps[i].sigma_z));
+
+                        tripletListB.emplace_back(ir, 0, delta_x);
+                        tripletListB.emplace_back(ir + 1, 0, delta_y);
+                        tripletListB.emplace_back(ir + 2, 0, delta_z);
+
+                        std::cout << "cps: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
                     }
-                    tripletListP.emplace_back(ir + 0, ir + 0, 1.0 / (cps[i].sigma_x * cps[i].sigma_x));
-                    tripletListP.emplace_back(ir + 1, ir + 1, 1.0 / (cps[i].sigma_y * cps[i].sigma_y));
-                    tripletListP.emplace_back(ir + 2, ir + 2, 1.0 / (cps[i].sigma_z * cps[i].sigma_z));
+                    else
+                    {
+                        Eigen::Vector3d p_s(cps[i].x_source_local, cps[i].y_source_local, cps[i].z_source_local);
+                        p_s = point_clouds_container.point_clouds[cps[i].index_to_pose].m_pose * p_s;
 
-                    tripletListB.emplace_back(ir, 0, delta_x);
-                    tripletListB.emplace_back(ir + 1, 0, delta_y);
-                    tripletListB.emplace_back(ir + 2, 0, delta_z);
+                        Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
 
-                    std::cout << "cps: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
+                        point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                               p_s.x(), p_s.y(), p_s.z());
+
+                        double delta_x;
+                        double delta_y;
+                        double delta_z;
+                        Eigen::Vector3d p_t(cps[i].x_target_global, cps[i].y_target_global, 0.0);
+                        point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                                      pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                      p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+
+                        int ir = tripletListB.size();
+                        int ic = 0;
+
+                        for (int row = 0; row < 3; row++)
+                        {
+                            for (int col = 0; col < 6; col++)
+                            {
+                                if (jacobian(row, col) != 0.0)
+                                {
+                                    tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
+                                }
+                            }
+                        }
+                        tripletListP.emplace_back(ir + 0, ir + 0, 0.000001);
+                        tripletListP.emplace_back(ir + 1, ir + 1, 0.000001);
+                        tripletListP.emplace_back(ir + 2, ir + 2, 1.0 / (cps[i].sigma_z * cps[i].sigma_z));
+
+                        tripletListB.emplace_back(ir, 0, delta_x);
+                        tripletListB.emplace_back(ir + 1, 0, delta_y);
+                        tripletListB.emplace_back(ir + 2, 0, delta_z);
+
+                        std::cout << "cps: delta_z " << delta_z << std::endl;
+                    }
                 }
 
                 Eigen::SparseMatrix<double> matA(tripletListB.size(), 6);
@@ -294,18 +348,34 @@ void ControlPoints::render(const PointClouds &point_clouds_container)
         if (draw_uncertainty)
         {
             Eigen::Matrix3d covar;
-            covar(0, 0) = cps[i].sigma_x * cps[i].sigma_x;
-            covar(0, 1) = 0;
-            covar(0, 2) = 0;
+            if (cps[i].is_z_0)
+            {
+                covar(0, 0) = 0.01 * 0.01;
+                covar(0, 1) = 0;
+                covar(0, 2) = 0;
 
-            covar(1, 0) = 0;
-            covar(1, 1) = cps[i].sigma_y * cps[i].sigma_y;
-            covar(1, 2) = 0;
+                covar(1, 0) = 0;
+                covar(1, 1) = 0.01 * 0.01;
+                covar(1, 2) = 0;
 
-            covar(2, 0) = 0;
-            covar(2, 1) = 0;
-            covar(2, 2) = cps[i].sigma_z * cps[i].sigma_z;
+                covar(2, 0) = 0;
+                covar(2, 1) = 0;
+                covar(2, 2) = cps[i].sigma_z * cps[i].sigma_z;
+            }
+            else
+            {
+                covar(0, 0) = cps[i].sigma_x * cps[i].sigma_x;
+                covar(0, 1) = 0;
+                covar(0, 2) = 0;
 
+                covar(1, 0) = 0;
+                covar(1, 1) = cps[i].sigma_y * cps[i].sigma_y;
+                covar(1, 2) = 0;
+
+                covar(2, 0) = 0;
+                covar(2, 1) = 0;
+                covar(2, 2) = cps[i].sigma_z * cps[i].sigma_z;
+            }
             Eigen::Vector3d gcp(cps[i].x_target_global, cps[i].y_target_global, cps[i].z_target_global);
             draw_ellipse(covar, gcp, Eigen::Vector3f(0.5, 0.5, 0.5), 1.0f);
         }

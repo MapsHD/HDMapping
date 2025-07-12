@@ -20,6 +20,7 @@ struct ControlPoint{
     double sigma_y;
     double sigma_z;
     int index_to_pose;
+    bool is_z_0 = false;
 };
 
 class ControlPoints{

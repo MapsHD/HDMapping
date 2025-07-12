@@ -11,8 +11,8 @@
 #include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 
-void PoseGraphLoopClosure::add_edge(PointClouds &point_clouds_container, 
-    int index_loop_closure_source, int index_loop_closure_target)
+void PoseGraphLoopClosure::add_edge(PointClouds &point_clouds_container,
+                                    int index_loop_closure_source, int index_loop_closure_target)
 {
     Edge edge;
     edge.index_from = index_loop_closure_source;
@@ -233,7 +233,6 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
             tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om * cauchy(normalize_angle(delta(3, 0)), 1));
             tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi * cauchy(normalize_angle(delta(4, 0)), 1));
             tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka * cauchy(normalize_angle(delta(5, 0)), 1));
-            
         }
 
         if (gcps.gpcs.size() == 0)
@@ -323,7 +322,6 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
                         tripletListB.emplace_back(ir, 0, delta_x);
                         tripletListB.emplace_back(ir + 1, 0, delta_y);
                         tripletListB.emplace_back(ir + 2, 0, delta_z);
-
                     }
                 }
             }
@@ -377,47 +375,96 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
         // CPs
         for (int i = 0; i < cps.cps.size(); i++)
         {
-            Eigen::Vector3d p_s(cps.cps[i].x_source_local,
-                                cps.cps[i].y_source_local, cps.cps[i].z_source_local);
-
-            Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
-            TaitBryanPose pose_s;
-            pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[cps.cps[i].index_to_pose].m_pose);
-
-            point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                   p_s.x(), p_s.y(), p_s.z());
-
-            double delta_x;
-            double delta_y;
-            double delta_z;
-            Eigen::Vector3d p_t(cps.cps[i].x_target_global,
-                                cps.cps[i].y_target_global, cps.cps[i].z_target_global);
-            point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                                                          pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                          p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
-
-            int ir = tripletListB.size();
-            int ic = cps.cps[i].index_to_pose * 6;
-
-            for (int row = 0; row < 3; row++)
+            if (!cps.cps[i].is_z_0)
             {
-                for (int col = 0; col < 6; col++)
+                Eigen::Vector3d p_s(cps.cps[i].x_source_local,
+                                    cps.cps[i].y_source_local, cps.cps[i].z_source_local);
+
+                Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+                TaitBryanPose pose_s;
+                pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[cps.cps[i].index_to_pose].m_pose);
+
+                point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                       p_s.x(), p_s.y(), p_s.z());
+
+                double delta_x;
+                double delta_y;
+                double delta_z;
+                Eigen::Vector3d p_t(cps.cps[i].x_target_global,
+                                    cps.cps[i].y_target_global, cps.cps[i].z_target_global);
+                point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                              pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                              p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+
+                int ir = tripletListB.size();
+                int ic = cps.cps[i].index_to_pose * 6;
+
+                for (int row = 0; row < 3; row++)
                 {
-                    if (jacobian(row, col) != 0.0)
+                    for (int col = 0; col < 6; col++)
                     {
-                        tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
+                        if (jacobian(row, col) != 0.0)
+                        {
+                            tripletListA.emplace_back(ir + row, ic + col, -jacobian(row, col));
+                        }
                     }
                 }
+                tripletListP.emplace_back(ir + 0, ir + 0, (1.0 / (cps.cps[i].sigma_x * cps.cps[i].sigma_x)) * get_cauchy_w(delta_x, 1));
+                tripletListP.emplace_back(ir + 1, ir + 1, (1.0 / (cps.cps[i].sigma_y * cps.cps[i].sigma_y)) * get_cauchy_w(delta_y, 1));
+                tripletListP.emplace_back(ir + 2, ir + 2, (1.0 / (cps.cps[i].sigma_z * cps.cps[i].sigma_z)) * get_cauchy_w(delta_z, 1));
+
+                tripletListB.emplace_back(ir, 0, delta_x);
+                tripletListB.emplace_back(ir + 1, 0, delta_y);
+                tripletListB.emplace_back(ir + 2, 0, delta_z);
+
+                std::cout << "cp [not z == 0]: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
             }
-            tripletListP.emplace_back(ir + 0, ir + 0, (1.0 / (cps.cps[i].sigma_x * cps.cps[i].sigma_x)) * get_cauchy_w(delta_x, 1));
-            tripletListP.emplace_back(ir + 1, ir + 1, (1.0 / (cps.cps[i].sigma_y * cps.cps[i].sigma_y)) * get_cauchy_w(delta_y, 1));
-            tripletListP.emplace_back(ir + 2, ir + 2, (1.0 / (cps.cps[i].sigma_z * cps.cps[i].sigma_z)) * get_cauchy_w(delta_z, 1));
+            else
+            {
+                
+                Eigen::Vector3d p_s(cps.cps[i].x_source_local,
+                                    cps.cps[i].y_source_local, cps.cps[i].z_source_local);
 
-            tripletListB.emplace_back(ir, 0, delta_x);
-            tripletListB.emplace_back(ir + 1, 0, delta_y);
-            tripletListB.emplace_back(ir + 2, 0, delta_z);
+                Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+                TaitBryanPose pose_s;
+                pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[cps.cps[i].index_to_pose].m_pose);
 
-            std::cout << "cp: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
+                point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                                       p_s.x(), p_s.y(), p_s.z());
+
+                double delta_x;
+                double delta_y;
+                double delta_z;
+                Eigen::Vector3d p_t(cps.cps[i].x_target_global,
+                                    cps.cps[i].y_target_global, 0.0/*cps.cps[i].z_target_global*/);
+                point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
+                                                              pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                              p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+
+                int ir = tripletListB.size();
+                int ic = cps.cps[i].index_to_pose * 6;
+
+                for (int row = 2; row < 3; row++)
+                {
+                    for (int col = 0; col < 6; col++)
+                    {
+                        if (jacobian(row, col) != 0.0)
+                        {
+                            tripletListA.emplace_back(ir, ic + col, -jacobian(row, col));
+                        }
+                    }
+                }
+                //tripletListP.emplace_back(ir + 0, ir + 0, (1.0 / (cps.cps[i].sigma_x * cps.cps[i].sigma_x)) * get_cauchy_w(delta_x, 1));
+                //tripletListP.emplace_back(ir + 1, ir + 1, (1.0 / (cps.cps[i].sigma_y * cps.cps[i].sigma_y)) * get_cauchy_w(delta_y, 1));
+                tripletListP.emplace_back(ir, ir, (1.0 / (cps.cps[i].sigma_z * cps.cps[i].sigma_z)));
+
+                //tripletListB.emplace_back(ir, 0, delta_x);
+                //tripletListB.emplace_back(ir + 1, 0, delta_y);
+                tripletListB.emplace_back(ir, 0, delta_z);
+
+                std::cout << "cp [not z == 0]: delta_z " << delta_z << std::endl;
+                
+            }
         }
 
         // fuse_inclination_from_imu
@@ -440,11 +487,11 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
                 continue;
             }
 
-            TaitBryanPose current_pose = pose_tait_bryan_from_affine_matrix(pc.m_pose); 
+            TaitBryanPose current_pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
             TaitBryanPose desired_pose = current_pose;
             desired_pose.om = pc.local_trajectory[0].imu_om_fi_ka.x();
             desired_pose.fi = pc.local_trajectory[0].imu_om_fi_ka.y();
-           
+
             Eigen::Affine3d desired_mpose = affine_matrix_from_pose_tait_bryan(desired_pose);
             Eigen::Vector3d vx(desired_mpose(0, 0), desired_mpose(1, 0), desired_mpose(2, 0));
             Eigen::Vector3d vy(desired_mpose(0, 1), desired_mpose(1, 1), desired_mpose(2, 1));
@@ -476,7 +523,7 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
 
             tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1));
             tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 1));
-           
+
             tripletListB.emplace_back(ir, 0, delta(0, 0));
             tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
 
@@ -680,7 +727,7 @@ void PoseGraphLoopClosure::FuseTrajectoryWithGNSS(PointClouds &point_clouds_cont
                             }
                         }
                     }
-                  
+
                     tripletListP.emplace_back(ir, ir, 1);
                     tripletListP.emplace_back(ir + 1, ir + 1, 1);
                     tripletListP.emplace_back(ir + 2, ir + 2, 1);
@@ -781,8 +828,8 @@ void PoseGraphLoopClosure::run_icp(PointClouds &point_clouds_container, int inde
 {
     PairWiseICP icp;
     auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-    //std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-    //std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+    // std::vector<Eigen::Vector3d> source = point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+    // std::vector<Eigen::Vector3d> target = point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
 
     ////////////////////////////////
     std::vector<Eigen::Vector3d> source;
@@ -829,7 +876,7 @@ void PoseGraphLoopClosure::run_icp(PointClouds &point_clouds_container, int inde
 
     for (auto &p : target)
     {
-        p = m_trg_inv * p; 
+        p = m_trg_inv * p;
     }
     ////////////////////////////////
 

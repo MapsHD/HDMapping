@@ -439,6 +439,49 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
             {
                 continue;
             }
+
+            TaitBryanPose current_pose = pose_tait_bryan_from_affine_matrix(pc.m_pose); 
+            TaitBryanPose desired_pose = current_pose;
+            desired_pose.om = pc.local_trajectory[0].imu_om_fi_ka.x();
+            desired_pose.fi = pc.local_trajectory[0].imu_om_fi_ka.y();
+           
+            Eigen::Affine3d desired_mpose = affine_matrix_from_pose_tait_bryan(desired_pose);
+            Eigen::Vector3d vx(desired_mpose(0, 0), desired_mpose(1, 0), desired_mpose(2, 0));
+            Eigen::Vector3d vy(desired_mpose(0, 1), desired_mpose(1, 1), desired_mpose(2, 1));
+            Eigen::Vector3d point_on_target_line(desired_mpose(0, 3), desired_mpose(1, 3), desired_mpose(2, 3));
+
+            Eigen::Vector3d point_source_local(0, 0, 1);
+
+            Eigen::Matrix<double, 2, 1> delta;
+            point_to_line_tait_bryan_wc(delta,
+                                        current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                        point_source_local.x(), point_source_local.y(), point_source_local.z(),
+                                        point_on_target_line.x(), point_on_target_line.y(), point_on_target_line.z(),
+                                        vx.x(), vx.y(), vx.z(), vy.x(), vy.y(), vy.z());
+
+            Eigen::Matrix<double, 2, 6> delta_jacobian;
+            point_to_line_tait_bryan_wc_jacobian(delta_jacobian,
+                                                 current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                                 point_source_local.x(), point_source_local.y(), point_source_local.z(),
+                                                 point_on_target_line.x(), point_on_target_line.y(), point_on_target_line.z(),
+                                                 vx.x(), vx.y(), vx.z(), vy.x(), vy.y(), vy.z());
+
+            int ir = tripletListB.size();
+            int ic = index_pose * 6;
+            tripletListA.emplace_back(ir + 0, ic + 3, -delta_jacobian(0, 3));
+            tripletListA.emplace_back(ir + 0, ic + 4, -delta_jacobian(0, 4));
+
+            tripletListA.emplace_back(ir + 1, ic + 3, -delta_jacobian(1, 3));
+            tripletListA.emplace_back(ir + 1, ic + 4, -delta_jacobian(1, 4));
+
+            tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1));
+            tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 1));
+           
+            tripletListB.emplace_back(ir, 0, delta(0, 0));
+            tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
+
+            error_imu += sqrt(delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0));
+            error_imu_sum++;
         }
 
         if (error_imu_sum > 0)

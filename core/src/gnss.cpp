@@ -439,7 +439,7 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_f
         infile.close();
     }
 
-    std::cout << "loade " << gnss_poses.size() << " gps poses" << std::endl;
+    std::cout << "loaded " << gnss_poses.size() << " gps poses" << std::endl;
     
     std::sort(gnss_poses.begin(), gnss_poses.end(), [](GNSS::GlobalPose &a, GNSS::GlobalPose &b)
                                                   { return (a.timestamp < b.timestamp); });

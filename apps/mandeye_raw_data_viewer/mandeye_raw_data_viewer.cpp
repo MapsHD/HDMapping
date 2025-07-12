@@ -248,6 +248,10 @@ void project_gui()
         {
             if (ImGui::Button("load data"))
             {
+                laz_files.clear();
+                csv_files.clear();
+                sn_files.clear();
+                all_file_names.clear();
                 std::vector<std::string> input_file_names;
                 input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
 
@@ -752,7 +756,7 @@ void project_gui()
             if (imu_data_plot.timestampLidar.size() > 0)
             {
                 static double x_min = imu_data_plot.timestampLidar.front();
-                static double x_max = imu_data_plot.timestampLidar.back();
+                static double x_max = x_min + 20.0;
                 double annotation = 0;
                 if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
                 {

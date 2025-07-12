@@ -676,7 +676,7 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
             return;
         }
 
-        outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 timestampUnix_nanoseconds" << std::endl;
+        outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 timestampUnix_nanoseconds om_rad fi_rad ka_rad" << std::endl;
         for (int j = 0; j < worker_data_concatenated[i].intermediate_trajectory.size(); j++)
         {
             auto pose = worker_data_concatenated[i].intermediate_trajectory[0].inverse() * worker_data_concatenated[i].intermediate_trajectory[j];

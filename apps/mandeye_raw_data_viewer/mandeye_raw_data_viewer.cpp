@@ -481,7 +481,6 @@ void project_gui()
                         imu_data_plot.angY.push_back(gyr.axis.y);
                         imu_data_plot.angZ.push_back(gyr.axis.z);
                         imu_data_plot.accX.push_back(acc.axis.x);
-                        imu_data_plot.accX.push_back(acc.axis.x);
                         imu_data_plot.accY.push_back(acc.axis.y);
                         imu_data_plot.accZ.push_back(acc.axis.z);
                         imu_data_plot.yaw.push_back(euler.angle.yaw);
@@ -793,6 +792,32 @@ void project_gui()
                     ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
                     ImPlot::EndPlot();
                 }
+            }
+
+            if (ImGui::Button("Save 'ts gyr_x gyr_y gyr_z acc_x acc_y acc_z yaw_rad pitch_rad roll_rad' to csv"))
+            {
+                std::string output_file_name = "";
+                output_file_name = mandeye::fd::SaveFileDialog("Save imu data", {}, "");
+                std::cout << "file to save: '" << output_file_name << "'" << std::endl;
+
+                ofstream file;
+                file.open(output_file_name);
+                file << std::setprecision(20);
+                for (int i = 0; i < imu_data_plot.timestampLidar.size(); i++)
+                {
+                    file << imu_data_plot.timestampLidar[i] << " " << 
+                        imu_data_plot.angX[i] << " " << 
+                        imu_data_plot.angY[i] << " " << 
+                        imu_data_plot.angZ[i] << " " << 
+                        imu_data_plot.accX[i] << " " << 
+                        imu_data_plot.accY[i] << " " << 
+                        imu_data_plot.accZ[i] << " " <<
+                        imu_data_plot.yaw[i] << " " << 
+                        imu_data_plot.pitch[i] << " " << 
+                        imu_data_plot.roll[i] << std::endl;
+                }
+
+                file.close();
             }
             ImGui::End();
         }

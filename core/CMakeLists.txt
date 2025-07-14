@@ -25,7 +25,6 @@ set(CORE_SOURCE_FILES
     src/wgs84_do_puwg92.cc
     src/pair_wise_iterative_closest_point.cpp
     src/hash_utils.cpp
-    src/minmea.c
     src/ground_control_points.cpp
     src/control_points.cpp
     src/registration_plane_feature.cpp
@@ -56,7 +55,6 @@ set(CORE_INCLUDE_FILES
     include/transformations.h
     include/wgs84_do_puwg92.h
     include/WGS84toCartesian.hpp
-    include/minmea.h
 )
 
 set(CORE_INCLUDE_FILES_GUI

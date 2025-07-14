@@ -203,7 +203,7 @@ void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &
 // this function apply correction to pitch and roll
 // void fix_ptch_roll(std::vector<WorkerData> &worker_data);
 
-bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure);
+bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure, std::atomic<float> &loProgress);
 void compute_step_2_fast_forward_motion(std::vector<WorkerData> &worker_data, LidarOdometryParams &params);
 
 // for reconstructing worker data from step 1 output

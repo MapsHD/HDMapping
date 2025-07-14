@@ -1929,7 +1929,8 @@ void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &
     }
 }
 
-bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure)
+//extern nglobals::icpProgress.store((float)i / globals::registeredFrames.size());
+bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure, std::atomic<float> &loProgress)
 {
     //exit(1);
     bool debug = false;
@@ -2198,6 +2199,8 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             end1 = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds1 = end1 - start1;
             std::cout << "optimizing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << " elapsed time: " << elapsed_seconds1.count() << std::endl;
+
+            loProgress.store((float)(i + 1) / worker_data.size());
 
             // temp save
             if (i % 100 == 0)

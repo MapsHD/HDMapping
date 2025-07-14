@@ -23,7 +23,7 @@
 // This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system https://github.com/JanuszBedkowski/mandeye_controller
 // The output is a session proving trajekctory and point clouds that can be  further processed by "multi_view_tls_registration" program.
 
-//#define SAMPLE_PERIOD (1.0 / 200.0)
+// #define SAMPLE_PERIOD (1.0 / 200.0)
 
 namespace fs = std::filesystem;
 
@@ -59,7 +59,6 @@ float mouse_sensitivity = 1.0;
 std::string working_directory = "";
 bool initial_transformation_gizmo = false;
 
-
 float m_gizmo[] = {1, 0, 0, 0,
                    0, 1, 0, 0,
                    0, 0, 1, 0,
@@ -82,13 +81,13 @@ Session session;
 std::vector<std::vector<Point3Di>> pointsPerFile;
 Imu imu_data;
 Trajectory trajectory;
+std::atomic<bool> loRunning{false};
+std::atomic<float> loProgress{0.0};
 
-
-//void alternative_approach();
+// void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
-void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd = 3);
-
+void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd = 3);
 
 #if _WIN32
 #define DEFAULT_PATH "C:\\"
@@ -99,7 +98,7 @@ void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eig
 void step1()
 {
     std::vector<std::string> input_file_names;
-    //input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
+    // input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
     input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
 
     std::cout << "input_file_names list begin" << std::endl;
@@ -124,7 +123,7 @@ void step1()
 void step2()
 {
     double ts_failure = 0.0;
-    if (compute_step_2(worker_data, params, ts_failure))
+    if (compute_step_2(worker_data, params, ts_failure, loProgress))
     {
         step_2_done = true;
     }
@@ -132,7 +131,7 @@ void step2()
     {
         for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
         {
-            const std::string& imufn = csv_files.at(fileNo);
+            const std::string &imufn = csv_files.at(fileNo);
             const std::string snFn = (fileNo >= sn_files.size()) ? ("") : (sn_files.at(fileNo));
             const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
             // GetId of Imu to use
@@ -205,7 +204,6 @@ void lidar_odometry_gui()
 
         if (!simple_gui)
         {
-            
 
             ImGui::Checkbox("show_initial_points", &show_initial_points);
             ImGui::Checkbox("show_trajectory", &show_trajectory);
@@ -290,7 +288,6 @@ void lidar_odometry_gui()
         }
         if (!step_1_done)
         {
-            
 
             if (ImGui::Button("load data (step 1)"))
             {
@@ -308,9 +305,8 @@ void lidar_odometry_gui()
             }
             ImGui::SameLine();
             ImGui::Text("Press this button for automatic lidar odometry calculation -> it will produce trajectory");
-           
         }
-       
+
         if (step_1_done && step_2_done)
         {
             ImGui::Text("'Point cloud consistency and trajectory smoothness' makes trajectory smooth, point cloud will be more consistent");
@@ -321,9 +317,9 @@ void lidar_odometry_gui()
             {
                 run_consistency(worker_data, params);
             }
-            //ImGui::SameLine();
+            // ImGui::SameLine();
             ImGui::Checkbox("use mutliple Gaussians for each bucket", &params.use_mutliple_gaussian);
-            
+
             if (ImGui::Button("Save result (step 3)"))
             {
                 save_results(true, 0.0);
@@ -341,7 +337,6 @@ void lidar_odometry_gui()
                 if (output_file_name.size() > 0)
                 {
                     save_all_to_las(worker_data, params, output_file_name, session, false, true, true, false);
-                    
                 }
             }
         }
@@ -652,7 +647,7 @@ void lidar_odometry_gui()
                         m_gizmo[15] = (float)stretch_gizmo_m(3, 3);
                     }
                 }
-                
+
                 if (ImGui::Button("Accept_Gizmo (only translation)"))
                 {
                     if (index_to_inclusive < worker_data.size())
@@ -761,11 +756,15 @@ void lidar_odometry_gui()
 
 void lidar_odometry_basic_gui()
 {
-    if (ImGui::Begin("lidar_odometry_simple_gui")) {
+    if (ImGui::Begin("lidar_odometry_simple_gui"))
+    {
         if (ImGui::Button("Process MANDEYE data in folder (velocity up to 8km/h)"))
         {
-            std::chrono::time_point<std::chrono::system_clock> start, end;
-            start = std::chrono::system_clock::now();
+            if (loRunning)
+            {
+                return;
+            }
+            loRunning.store(true);
 
             step1();
 
@@ -791,36 +790,44 @@ void lidar_odometry_basic_gui()
             params.use_robust_and_accurate_lidar_odometry = false;
 
             params.nr_iter = 1000;
-            
-            step2();
 
-            end = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_seconds = end - start;
-            std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-            std::cout << "calculations finished computation at "
-                      << std::ctime(&end_time)
-                      << "elapsed time: " << elapsed_seconds.count() << "s\n";
+            std::thread loThread(
+                []()
+                {
+                    std::chrono::time_point<std::chrono::system_clock> start, end;
+                    start = std::chrono::system_clock::now();
 
-            save_results(false, elapsed_seconds.count());
+                    step2();
 
-            
-            std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
-                                       std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
+                    end = std::chrono::system_clock::now();
+                    std::chrono::duration<double> elapsed_seconds = end - start;
+                    std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+                    std::cout << "calculations finished computation at "
+                              << std::ctime(&end_time)
+                              << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
-            [[maybe_unused]]
-            pfd::message message(
-                "Information",
-                message_info.c_str(),
-                pfd::choice::ok, pfd::icon::info);
-            message.result();
- 
+                    save_results(false, elapsed_seconds.count());
+
+                    std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
+                                               std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
+
+                    [[maybe_unused]]
+                    pfd::message message(
+                        "Information",
+                        message_info.c_str(),
+                        pfd::choice::ok, pfd::icon::info);
+                    message.result();
+                });
+            loThread.detach();
         }
 
         if (ImGui::Button("Process MANDEYE data in folder (quick but less accurate, less precise, velocity up to 8km/h)"))
         {
-            std::chrono::time_point<std::chrono::system_clock> start, end;
-            start = std::chrono::system_clock::now();
-
+            if (loRunning)
+            {
+                return;
+            }
+            loRunning.store(true);
 
             step1();
 
@@ -848,32 +855,43 @@ void lidar_odometry_basic_gui()
             params.nr_iter = 20;
             params.sliding_window_trajectory_length_threshold = 200;
 
-            step2();
+            std::thread loThread(
+                []()
+                {
+                    std::chrono::time_point<std::chrono::system_clock> start, end;
+                    start = std::chrono::system_clock::now();
 
-            end = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_seconds = end - start;
-            std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-            std::cout << "calculations finished computation at "
-                      << std::ctime(&end_time)
-                      << "elapsed time: " << elapsed_seconds.count() << "s\n";
+                    step2();
 
-            save_results(false, elapsed_seconds.count());
+                    end = std::chrono::system_clock::now();
+                    std::chrono::duration<double> elapsed_seconds = end - start;
+                    std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+                    std::cout << "calculations finished computation at "
+                              << std::ctime(&end_time)
+                              << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
-            std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
-                                       std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
+                    save_results(false, elapsed_seconds.count());
 
-            [[maybe_unused]]
-            pfd::message message(
-                "Information",
-                message_info.c_str(),
-                pfd::choice::ok, pfd::icon::info);
-            message.result();
+                    std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
+                                               std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
+
+                    [[maybe_unused]]
+                    pfd::message message(
+                        "Information",
+                        message_info.c_str(),
+                        pfd::choice::ok, pfd::icon::info);
+                    message.result();
+                });
+            loThread.detach();
         }
 
         if (ImGui::Button("Process MANDEYE data in folder (fast motion: velocity up to 30 km/h, Mandeye mounted on the vehicle)"))
         {
-            std::chrono::time_point<std::chrono::system_clock> start, end;
-            start = std::chrono::system_clock::now();
+            if (loRunning)
+            {
+                return;
+            }
+            loRunning.store(true);
 
             step1();
 
@@ -901,32 +919,43 @@ void lidar_odometry_basic_gui()
             params.nr_iter = 500;
             params.sliding_window_trajectory_length_threshold = 200;
 
-            step2();
+            std::thread loThread(
+                []()
+                {
+                    std::chrono::time_point<std::chrono::system_clock> start, end;
+                    start = std::chrono::system_clock::now();
 
-            end = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_seconds = end - start;
-            std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-            std::cout << "calculations finished computation at "
-                      << std::ctime(&end_time)
-                      << "elapsed time: " << elapsed_seconds.count() << "s\n";
+                    step2();
 
-            save_results(false, elapsed_seconds.count());
+                    end = std::chrono::system_clock::now();
+                    std::chrono::duration<double> elapsed_seconds = end - start;
+                    std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+                    std::cout << "calculations finished computation at "
+                              << std::ctime(&end_time)
+                              << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
-            std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
-                                       std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
+                    save_results(false, elapsed_seconds.count());
 
-            [[maybe_unused]]
-            pfd::message message(
-                "Information",
-                message_info.c_str(),
-                pfd::choice::ok, pfd::icon::info);
-            message.result();
+                    std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
+                                               std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
+
+                    [[maybe_unused]]
+                    pfd::message message(
+                        "Information",
+                        message_info.c_str(),
+                        pfd::choice::ok, pfd::icon::info);
+                    message.result();
+                });
+            loThread.detach();
         }
 
         if (ImGui::Button("Process MANDEYE data in folder (velocity up to 8km/h, Precise Forestry)"))
         {
-            std::chrono::time_point<std::chrono::system_clock> start, end;
-            start = std::chrono::system_clock::now();
+            if (loRunning)
+            {
+                return;
+            }
+            loRunning.store(true);
 
             step1();
 
@@ -954,56 +983,79 @@ void lidar_odometry_basic_gui()
             params.nr_iter = 500;
             params.sliding_window_trajectory_length_threshold = 10000;
 
-            step2();
+            std::thread loThread(
+                []()
+                {
+                    std::chrono::time_point<std::chrono::system_clock> start, end;
+                    start = std::chrono::system_clock::now();
 
-            end = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_seconds = end - start;
-            std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-            std::cout << "calculations finished computation at "
-                      << std::ctime(&end_time)
-                      << "elapsed time: " << elapsed_seconds.count() << "s\n";
+                    step2();
 
-            save_results(false, elapsed_seconds.count());
+                    end = std::chrono::system_clock::now();
+                    std::chrono::duration<double> elapsed_seconds = end - start;
+                    std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+                    std::cout << "calculations finished computation at "
+                              << std::ctime(&end_time)
+                              << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
-            std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
-                                       std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
+                    save_results(false, elapsed_seconds.count());
 
-            [[maybe_unused]]
-            pfd::message message(
-                "Information",
-                message_info.c_str(),
-                pfd::choice::ok, pfd::icon::info);
-            message.result();
-            // exit(1);
+                    std::string message_info = "Data saved to folder '" + working_directory + "\\lidar_odometry_result_0' total_length_of_calculated_trajectory=" +
+                                               std::to_string(params.total_length_of_calculated_trajectory) + " [m] elapsed_seconds: " + std::to_string(elapsed_seconds.count());
+
+                    [[maybe_unused]]
+                    pfd::message message(
+                        "Information",
+                        message_info.c_str(),
+                        pfd::choice::ok, pfd::icon::info);
+                    message.result();
+                });
+            loThread.detach();
         }
 
-        //TaitBryanPose motion_model_correction;
+        if (!loRunning)
+        {
+            // TaitBryanPose motion_model_correction;
 
-        ImGui::InputDouble("motion_model_correction.om (rotation via X in deg)", &params.motion_model_correction.om);
-        ImGui::InputDouble("motion_model_correction.fi (rotation via Y in deg)", &params.motion_model_correction.fi);
-        ImGui::InputDouble("motion_model_correction.ka (rotation via Z in deg)", &params.motion_model_correction.ka);
+            ImGui::InputDouble("motion_model_correction.om (rotation via X in deg)", &params.motion_model_correction.om);
+            ImGui::InputDouble("motion_model_correction.fi (rotation via Y in deg)", &params.motion_model_correction.fi);
+            ImGui::InputDouble("motion_model_correction.ka (rotation via Z in deg)", &params.motion_model_correction.ka);
 
-        if (ImGui::Button("Set example motion_model_corrections for LiDAR X-axis: forward direction")){
-            params.motion_model_correction.om = 0.0;
-            params.motion_model_correction.fi = 0.05;
-            params.motion_model_correction.ka = 0.0;
+            if (ImGui::Button("Set example motion_model_corrections for LiDAR X-axis: forward direction"))
+            {
+                params.motion_model_correction.om = 0.0;
+                params.motion_model_correction.fi = 0.05;
+                params.motion_model_correction.ka = 0.0;
+            }
+
+            ImGui::InputDouble("lidar_odometry_motion_model_x_1_sigma_m", &params.lidar_odometry_motion_model_x_1_sigma_m);
+            ImGui::InputDouble("lidar_odometry_motion_model_y_1_sigma_m", &params.lidar_odometry_motion_model_y_1_sigma_m);
+            ImGui::InputDouble("lidar_odometry_motion_model_z_1_sigma_m", &params.lidar_odometry_motion_model_z_1_sigma_m);
+            ImGui::InputDouble("lidar_odometry_motion_model_om_1_sigma_deg", &params.lidar_odometry_motion_model_om_1_sigma_deg);
+            ImGui::InputDouble("lidar_odometry_motion_model_fi_1_sigma_deg", &params.lidar_odometry_motion_model_fi_1_sigma_deg);
+            ImGui::InputDouble("lidar_odometry_motion_model_ka_1_sigma_deg", &params.lidar_odometry_motion_model_ka_1_sigma_deg);
+
+            ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_x_1_sigma_m", &params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m);
+            ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_y_1_sigma_m", &params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m);
+            ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_z_1_sigma_m", &params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m);
+            ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_om_1_sigma_deg", &params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg);
+            ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg", &params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg);
+            ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg", &params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
         }
 
-        ImGui::InputDouble("lidar_odometry_motion_model_x_1_sigma_m", &params.lidar_odometry_motion_model_x_1_sigma_m);
-        ImGui::InputDouble("lidar_odometry_motion_model_y_1_sigma_m", &params.lidar_odometry_motion_model_y_1_sigma_m);
-        ImGui::InputDouble("lidar_odometry_motion_model_z_1_sigma_m", &params.lidar_odometry_motion_model_z_1_sigma_m);
-        ImGui::InputDouble("lidar_odometry_motion_model_om_1_sigma_deg", &params.lidar_odometry_motion_model_om_1_sigma_deg);
-        ImGui::InputDouble("lidar_odometry_motion_model_fi_1_sigma_deg", &params.lidar_odometry_motion_model_fi_1_sigma_deg);
-        ImGui::InputDouble("lidar_odometry_motion_model_ka_1_sigma_deg", &params.lidar_odometry_motion_model_ka_1_sigma_deg);
+        if (!loRunning)
+        {
+            ImGui::Checkbox("full_lidar_odometry_gui", &full_lidar_odometry_gui);
+        }
+        else
+        {
+            full_lidar_odometry_gui = false;
+        }
 
-        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_x_1_sigma_m", &params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m);
-        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_y_1_sigma_m", &params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m);
-        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_z_1_sigma_m", &params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m);
-        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_om_1_sigma_deg", &params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg);
-        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg", &params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg);
-        ImGui::InputDouble("lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg", &params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
-
-        ImGui::Checkbox("full_lidar_odometry_gui", &full_lidar_odometry_gui);
+        if (loRunning)
+        {
+            ImGui::ProgressBar(loProgress);
+        }
 
         ImGui::End();
     }
@@ -1136,7 +1188,6 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
-
     reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
     viewTranslation.translate(rotation_center);
@@ -1177,7 +1228,7 @@ void display()
         }
         glEnd();
     }
-   
+
     if (show_covs)
     {
         for (const auto &b : params.buckets_indoor)
@@ -1215,7 +1266,6 @@ void display()
             glVertex3f(it(0, 3) + it(0, 1), it(1, 3) + it(1, 1), it(2, 3) + it(2, 1));
 
             glEnd();
-           
         }
     }
 
@@ -1278,7 +1328,6 @@ void display()
         for (const auto &b : params.reference_buckets)
         {
             glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-         
         }
         glEnd();
     }
@@ -1324,7 +1373,6 @@ void display()
             glEnd();
         }
     }
-  
 
     if (ImGui::GetIO().KeyCtrl)
     {
@@ -1366,7 +1414,6 @@ void display()
 
         ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
 
-        
         params.m_g(0, 0) = m_gizmo[0];
         params.m_g(1, 0) = m_gizmo[1];
         params.m_g(2, 0) = m_gizmo[2];
@@ -1419,7 +1466,6 @@ void display()
         stretch_gizmo_m(3, 3) = m_gizmo[15];
     }
 
-   
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 
@@ -1877,4 +1923,3 @@ Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationP
 
     return out_point;
 }
-

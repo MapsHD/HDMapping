@@ -904,7 +904,10 @@ std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryP
         return worker_data;
     }
     double ts_failure = 0.0;
-    if (!compute_step_2(worker_data, params, ts_failure))
+    
+    std::atomic<float> loProgress;
+    
+    if (!compute_step_2(worker_data, params, ts_failure, loProgress))
     {
         std::cout << "Calculation failed at step 2 of lidar odometry, exiting." << std::endl;
         return worker_data;

@@ -1,9 +1,9 @@
-# Open source (Windows and Linux), open hardware hand-held mobile mapping system for large-scale surveys:
+# Open-source (Windows and Linux), open hardware hand-held mobile mapping system for large-scale surveys:
 This is open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
 - The introductory paper is available here: https://www.sciencedirect.com/science/article/pii/S235271102300314X
 - Sample data is available at https://github.com/MapsHD/OmniWarsawDataset 
 - VIDEO (how to build mobile mapping hardware) https://www.youtube.com/watch?v=BXBbuSJMFEo
-- If You are the ROS user please visit https://github.com/MapsHD/mandeye_to_bag to convert MANDEYE data to ROSBAG
+- If you are a ROS user, please visit https://github.com/MapsHD/mandeye_to_bag to convert MANDEYE data to ROSBAG
 - ROSCON 2024 workshop (sample data sets and more ...): https://michalpelka.github.io/RosCon2024_workshop/
 - You can use it also for multi-view Terrestrial Laser Scanner Registration (Faro, Leica, Z+F, Riegl, etc...) https://www.sciencedirect.com/science/article/abs/pii/S0263224123007637
 - Info for Windows users: please use the latest release https://github.com/MapsHD/HDMapping/releases 
@@ -34,7 +34,7 @@ This is open-source software for large-scale 3D mapping using an open-hardware h
 - Georeferencing (georeferenced point cloud [e.g. from ALS Airborne Laser Scanning], ground control points, control points, GNSS data)
 - Multi-view terrestrial laser scanning registration (all available methods from literature and more)
 
-# Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc...) 
+# Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.) 
 - Będkowski Janusz, et al. "A Novel Approach to Global Positioning System Accuracy Assessment, Verified on LiDAR Alignment of One Million Kilometers at a Continent Scale, as a Foundation for Autonomous DRIVING Safety Analysis." Sensors 2021, 21, 5691 [[PDF]](https://www.mdpi.com/1424-8220/21/17/5691)
 - Loris Redovniković, Antun Jakopec, Janusz Będkowski, Jurica Jagetić. "The affordable DIY Mandeye LiDAR system for surveying caves, and how to convert 3D clouds into traditional cave ground plans and extended profiles." International Journal of Speleology, 53(3), 2024 [[PDF]](https://digitalcommons.usf.edu/ijs/vol53/iss3/7/) 
 - Bartosz Mitka, Klapa Przemysław and Gawronek Pelagia. "Laboratory Tests of Metrological Characteristics of a Non-Repetitive Low-Cost Mobile Handheld Laser Scanner." Sensors 24.18 (2024): 6010. [[PDF]](https://www.mdpi.com/1424-8220/24/18/6010)

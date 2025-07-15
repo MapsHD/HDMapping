@@ -9,6 +9,7 @@ set(CORE_SOURCE_FILES
     src/icp.cpp
     src/ndt.cpp
     src/nns.cpp
+    src/nmea.cpp
     src/optimization_point_to_point_source_to_target.cpp
     src/optimize_distance_point_to_plane_source_to_target.cpp
     src/optimize_plane_to_plane_source_to_target.cpp
@@ -44,6 +45,7 @@ set(CORE_INCLUDE_FILES
     include/pose_graph_loop_closure.h
     include/ndt.h
     include/nns.h
+    include/nmea.h
     include/pcl_wrapper.h
     include/plycpp.h
     include/point_cloud.h

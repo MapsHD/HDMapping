@@ -96,7 +96,7 @@ std::optional<GNGGAData> parseGNGGA(const std::string &nmea) {
   const auto& latStr = fields[2];
   const auto& lonStr = fields[4];
   const char latDir = fields[3].empty() ? 'N' : fields[3][0];
-  const char lonDir = fields[5].empty() ? 'E' : fields[5][0];;
+  const char lonDir = fields[5].empty() ? 'E' : fields[5][0];
 
 
   GNGGAData data;

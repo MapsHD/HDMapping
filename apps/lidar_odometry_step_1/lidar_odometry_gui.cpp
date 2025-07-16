@@ -19,6 +19,8 @@
 #include <pfd_wrapper.hpp>
 #include <export_laz.h>
 
+#include <toml.hpp>
+
 // This is LiDAR odometry (step 1)
 // This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system https://github.com/JanuszBedkowski/mandeye_controller
 // The output is a session proving trajekctory and point clouds that can be  further processed by "multi_view_tls_registration" program.
@@ -178,6 +180,93 @@ void lidar_odometry_gui()
         ImGui::Text(("It saves session.json file in " + working_directory + "\\lidar_odometry_result_*").c_str());
         ImGui::Text("Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program.");
         ImGui::Checkbox("simple_gui", &simple_gui);
+
+        if (ImGui::Button("save parameters"))
+        {
+            auto output_file_name = mandeye::fd::SaveFileDialog("Save parameters file", mandeye::fd::Toml_filter, ".toml");
+            std::cout << "Parameters file to save: '" << output_file_name << "'" << std::endl;
+
+            if (!output_file_name.empty())
+            {
+                bool success = SaveParametersToTomlFile(output_file_name, params);
+                if (success)
+                {
+                    std::cout << "Parameters file generated: " << output_file_name << std::endl;
+                }
+                else
+                {
+                    std::cerr << "Failed to save parameters." << std::endl;
+                }
+
+                /*std::ofstream configFile(output_file_name);
+
+                if (!configFile.is_open())
+                {
+                    std::cerr << "Error: Could not create or open output_param.toml" << std::endl;
+                    return;
+                }
+
+                configFile << "[lidar_odometry]" << std::endl;
+                configFile << "version = " << HDMAPPING_VERSION_MINOR << std::endl;
+                configFile << "filter_threshold_xy_inner = " << params.filter_threshold_xy_inner << std::endl;
+                configFile << "filter_threshold_xy_outer = " << params.filter_threshold_xy_outer << std::endl;
+                configFile << "use_motion_from_previous_step = " << (int)params.use_motion_from_previous_step << std::endl;
+
+                configFile.close();
+                std::cout << "Output parameters file has been successfully saved to '" << output_file_name << "'" << std::endl;*/
+            }
+        }
+
+        if (ImGui::Button("load parameters"))
+        {
+            auto input_file_names = mandeye::fd::OpenFileDialog("Load parameters file", mandeye::fd::Toml_filter, ".toml");
+
+            if (input_file_names.size() > 0)
+            {
+                try
+                {
+                    bool success = LoadParametersFromTomlFile(input_file_names[0], params);
+                    if (success)
+                    {
+                        std::cout << "Parameters loaded OK" << std::endl;
+                    }
+                    else
+                    {
+                        std::cerr << "Failed to load parameters from file" << std::endl;
+                    }
+                }
+                catch (const std::exception &e)
+                {
+                    std::cerr << "Error loading TOML file: " << e.what() << std::endl;
+                }
+
+                /*
+                std::cout << "Parameters file to load: '" << input_file_names[0] << "'" << std::endl;
+
+                auto data = toml::parse(input_file_names[0]);
+
+                std::cout << "-----------------------------------" << std::endl;
+
+                if (data.contains("lidar_odometry"))
+                {
+                    const auto &tls = data["lidar_odometry"].as_table();
+
+                    int version = toml::get<int>(data.at("version"));
+                    std::cout << "version: '" << version << "'" << std::endl;
+
+                    params.filter_threshold_xy_inner = toml::get<double>(data.at("filter_threshold_xy_inner"));
+                    std::cout << "filter_threshold_xy_inner: '" << params.filter_threshold_xy_inner << "'" << std::endl;
+
+                    //params.filter_threshold_xy_outer = toml::get<double>(tls.at("filter_threshold_xy_outer"));
+                    //std::cout << "filter_threshold_xy_outer: '" << params.filter_threshold_xy_outer << "'" << std::endl;
+
+                    //params.use_motion_from_previous_step = toml::get<int>(tls.at("use_motion_from_previous_step"));
+                    //std::cout << "use_motion_from_previous_step: '" << (int)params.use_motion_from_previous_step << "'" << std::endl;
+                }
+                */
+            }
+        }
+
         if (!simple_gui)
         {
             ImGui::SliderFloat("mouse_sensitivity_xy", &mouse_sensitivity, 0.1, 10);
@@ -1506,31 +1595,114 @@ bool initGL(int *argc, char **argv)
     return true;
 }
 
+void step1(const std::string &folder,
+           LidarOdometryParams &params,
+           std::vector<std::vector<Point3Di>> &pointsPerFile,
+           Imu &imu_data,
+           std::string &working_directory,
+           Trajectory &trajectory,
+           std::vector<WorkerData> &worker_data)
+{
+    std::vector<std::string> input_file_names;
+
+    for (const auto &entry : fs::directory_iterator(folder))
+    {
+        if (!entry.is_directory())
+        {
+            std::cout << entry.path() << std::endl;
+            input_file_names.push_back(entry.path().string());
+        }
+    }
+
+    if (load_data(input_file_names, params, pointsPerFile, imu_data))
+    {
+        working_directory = fs::path(input_file_names[0]).parent_path().string();
+        calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain);
+        compute_step_1(pointsPerFile, params, trajectory, worker_data);
+        std::cout << "step_1_done" << std::endl;
+    }
+}
+
+void step2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params)
+{
+    double ts_failure = 0.0;
+    std::atomic<float> loProgress;
+    compute_step_2(worker_data, params, ts_failure, loProgress);
+}
+
+void save_results(bool info, double elapsed_seconds, std::string &working_directory,
+                  std::vector<WorkerData> &worker_data, LidarOdometryParams &params, fs::path outwd)
+{
+    save_result(worker_data, params, outwd, elapsed_seconds);
+}
+
 int main(int argc, char *argv[])
 {
     try
     {
-        params.in_out_params_indoor.resolution_X = 0.1;
-        params.in_out_params_indoor.resolution_Y = 0.1;
-        params.in_out_params_indoor.resolution_Z = 0.1;
-        params.in_out_params_indoor.bounding_box_extension = 20.0;
+        if (argc == 4)
+        {
+            bool success = LoadParametersFromTomlFile(argv[2], params);
+            if (success)
+            {
+                std::cout << "Parameters loaded OK" << std::endl;
+            }
+            else
+            {
+                std::cerr << "Failed to load parameters from file" << std::endl;
+                return 1;
+            }
 
-        params.in_out_params_outdoor.resolution_X = 0.3;
-        params.in_out_params_outdoor.resolution_Y = 0.3;
-        params.in_out_params_outdoor.resolution_Z = 0.3;
-        params.in_out_params_outdoor.bounding_box_extension = 20.0;
+            std::string working_directory;
+            std::vector<WorkerData> worker_data;
 
-        initGL(&argc, argv);
-        glutDisplayFunc(display);
-        glutMouseFunc(mouse);
-        glutMotionFunc(motion);
-        glutMouseWheelFunc(wheel);
-        glutMainLoop();
+            std::chrono::time_point<std::chrono::system_clock> start, end;
+            start = std::chrono::system_clock::now();
 
-        ImGui_ImplOpenGL2_Shutdown();
-        ImGui_ImplGLUT_Shutdown();
+            step1(argv[1],
+                  params,
+                  pointsPerFile,
+                  imu_data,
+                  working_directory,
+                  trajectory,
+                  worker_data);
 
-        ImGui::DestroyContext();
+            step2(worker_data, params);
+
+            end = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_seconds = end - start;
+            std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+            std::cout << "calculations finished computation at "
+                      << std::ctime(&end_time)
+                      << "elapsed time: " << elapsed_seconds.count() << "s\n";
+
+            save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);
+        }
+        else
+        {
+
+            params.in_out_params_indoor.resolution_X = 0.1;
+            params.in_out_params_indoor.resolution_Y = 0.1;
+            params.in_out_params_indoor.resolution_Z = 0.1;
+            params.in_out_params_indoor.bounding_box_extension = 20.0;
+
+            params.in_out_params_outdoor.resolution_X = 0.3;
+            params.in_out_params_outdoor.resolution_Y = 0.3;
+            params.in_out_params_outdoor.resolution_Z = 0.3;
+            params.in_out_params_outdoor.bounding_box_extension = 20.0;
+
+            initGL(&argc, argv);
+            glutDisplayFunc(display);
+            glutMouseFunc(mouse);
+            glutMotionFunc(motion);
+            glutMouseWheelFunc(wheel);
+            glutMainLoop();
+
+            ImGui_ImplOpenGL2_Shutdown();
+            ImGui_ImplGLUT_Shutdown();
+
+            ImGui::DestroyContext();
+        }
     }
     catch (const std::bad_alloc e)
     {

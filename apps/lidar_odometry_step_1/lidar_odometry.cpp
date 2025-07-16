@@ -1,12 +1,11 @@
 #include "lidar_odometry.h"
 #include <mutex>
+#include <toml.hpp>
 
 namespace fs = std::filesystem;
 
 bool load_data(std::vector<std::string> &input_file_names, LidarOdometryParams &params, std::vector<std::vector<Point3Di>> &pointsPerFile, Imu &imu_data)
 {
-    
-
     std::sort(std::begin(input_file_names), std::end(input_file_names));
     std::vector<std::string> csv_files;
     std::vector<std::string> laz_files;
@@ -915,3 +914,647 @@ std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryP
     return worker_data;
 }
 
+bool SaveParametersToTomlFile(const std::string &filepath, const LidarOdometryParams &params)
+{
+    try
+    {
+        std::ofstream file(filepath);
+        if (!file.is_open())
+        {
+            std::cerr << "Cannot open file for writing!" << std::endl;
+            return false;
+        }
+
+        file << "[version]\n";
+        file << "version = " << HDMAPPING_VERSION_MINOR << "\n\n";
+
+        file << "[nr_iter]\n";
+        file << "value = " << params.nr_iter << "\n\n";
+
+        file << std::fixed << std::setprecision(7);
+
+        file << "[decimation]\n";
+        file << "value = " << params.decimation << "\n\n";
+
+        file << "[in_out_params_indoor]\n";
+        file << "resolution_X = " << params.in_out_params_indoor.resolution_X << "\n";
+        file << "resolution_Y = " << params.in_out_params_indoor.resolution_Y << "\n";
+        file << "resolution_Z = " << params.in_out_params_indoor.resolution_Z << "\n\n";
+
+        file << "[in_out_params_outdoor]\n";
+        file << "resolution_X = " << params.in_out_params_outdoor.resolution_X << "\n";
+        file << "resolution_Y = " << params.in_out_params_outdoor.resolution_Y << "\n";
+        file << "resolution_Z = " << params.in_out_params_outdoor.resolution_Z << "\n\n";
+
+        file << "[filter_threshold_xy_inner]\n";
+        file << "value = " << params.filter_threshold_xy_inner << "\n\n";
+
+        file << "[filter_threshold_xy_outer]\n";
+        file << "value = " << params.filter_threshold_xy_outer << "\n\n";
+
+        file << "[threshould_output_filter]\n";
+        file << "value = " << params.threshould_output_filter << "\n\n";
+
+        file << "[distance_bucket]\n";
+        file << "value = " << params.distance_bucket << "\n\n";
+
+        file << "[polar_angle_deg]\n";
+        file << "value = " << params.polar_angle_deg << "\n\n";
+
+        file << "[azimutal_angle_deg]\n";
+        file << "value = " << params.azimutal_angle_deg << "\n\n";
+
+        file << std::setprecision(0);
+        file << "[robust_and_accurate_lidar_odometry_iterations]\n";
+        file << "value = " << params.robust_and_accurate_lidar_odometry_iterations << "\n\n";
+
+        file << std::fixed << std::setprecision(7);
+        file << "[max_distance_lidar]\n";
+        file << "value = " << params.max_distance_lidar << "\n\n";
+
+        file << std::boolalpha;
+        file << "[use_robust_and_accurate_lidar_odometry]\n";
+        file << "value = " << params.use_robust_and_accurate_lidar_odometry << "\n\n";
+
+        file << "[fusionConventionNed]\n";
+        file << "Ned = " << params.fusionConventionNed << "\n\n";
+
+        file << "[fusionConventionNwu]\n";
+        file << "Nwu = " << params.fusionConventionNwu << "\n\n";
+
+        file << "[fusionConventionEnu]\n";
+        file << "Enu = " << params.fusionConventionEnu << "\n\n";
+
+        file << "[use_motion_from_previous_step]\n";
+        file << "value = " << params.use_motion_from_previous_step << "\n\n";
+
+        file << "[useMultithread]\n";
+        file << "value = " << params.useMultithread << "\n\n";
+
+        file << "[sliding_window_trajectory_length_threshold]\n";
+        file << "value = " << params.sliding_window_trajectory_length_threshold << "\n\n";
+
+        file << "[save_calibration_validation]\n";
+        file << "value = " << params.save_calibration_validation << "\n\n";
+
+        file << "[calibration_validation_points]\n";
+        file << "value = " << params.calibration_validation_points << "\n\n";
+
+        file << "[distance_bucket_rigid_sf]\n";
+        file << "value = " << params.distance_bucket_rigid_sf << "\n\n";
+
+        file << "[polar_angle_deg_rigid_sf]\n";
+        file << "value = " << params.polar_angle_deg_rigid_sf << "\n\n";
+
+        file << "[azimutal_angle_deg_rigid_sf]\n";
+        file << "value = " << params.azimutal_angle_deg_rigid_sf << "\n\n";
+
+        file << "[robust_and_accurate_lidar_odometry_rigid_sf_iterations]\n";
+        file << "value = " << params.robust_and_accurate_lidar_odometry_rigid_sf_iterations << "\n\n";
+
+        file << "[max_distance_lidar_rigid_sf]\n";
+        file << "value = " << params.max_distance_lidar_rigid_sf << "\n\n";
+
+        file << "[rgd_sf_sigma_x_m]\n";
+        file << "value = " << params.rgd_sf_sigma_x_m << "\n\n";
+
+        file << "[rgd_sf_sigma_y_m]\n";
+        file << "value = " << params.rgd_sf_sigma_y_m << "\n\n";
+
+        file << "[rgd_sf_sigma_z_m]\n";
+        file << "value = " << params.rgd_sf_sigma_z_m << "\n\n";
+        
+        file << "[rgd_sf_sigma_om_deg]\n";
+        file << "value = " << params.rgd_sf_sigma_om_deg << "\n\n";
+
+        file << "[rgd_sf_sigma_fi_deg]\n";
+        file << "value = " << params.rgd_sf_sigma_fi_deg << "\n\n";
+
+        file << "[rgd_sf_sigma_ka_deg]\n";
+        file << "value = " << params.rgd_sf_sigma_ka_deg << "\n\n";
+
+        file << "[threshold_initial_points]\n";
+        file << "value = " << params.threshold_initial_points << "\n\n";
+
+        file << "[use_mutliple_gaussian]\n";
+        file << "value = " << params.use_mutliple_gaussian << "\n\n";
+
+        file << "[num_constistency_iter]\n";
+        file << "value = " << params.num_constistency_iter << "\n\n";
+
+        file << "[ahrs_gain]\n";
+        file << "value = " << params.ahrs_gain << "\n\n";
+
+        file << "[threshold_nr_poses]\n";
+        file << "value = " << params.threshold_nr_poses << "\n\n";
+
+        file << "[min_counter]\n";
+        file << "value = " << params.min_counter << "\n\n";
+
+        file << "[motion_model_correction.px]\n";
+        file << "value = " << params.motion_model_correction.px << "\n\n";
+
+        file << "[motion_model_correction.py]\n";
+        file << "value = " << params.motion_model_correction.py << "\n\n";
+
+        file << "[motion_model_correction.pz]\n";
+        file << "value = " << params.motion_model_correction.pz << "\n\n";
+
+        file << "[motion_model_correction.om]\n";
+        file << "value = " << params.motion_model_correction.om << "\n\n";
+
+        file << "[motion_model_correction.fi]\n";
+        file << "value = " << params.motion_model_correction.fi << "\n\n";
+
+        file << "[motion_model_correction.ka]\n";
+        file << "value = " << params.motion_model_correction.ka << "\n\n";
+
+        file << "[lidar_odometry_motion_model_x_1_sigma_m]\n";
+        file << "value = " << params.lidar_odometry_motion_model_x_1_sigma_m << "\n\n";
+
+        file << "[lidar_odometry_motion_model_y_1_sigma_m]\n";
+        file << "value = " << params.lidar_odometry_motion_model_y_1_sigma_m << "\n\n";
+
+        file << "[lidar_odometry_motion_model_z_1_sigma_m]\n";
+        file << "value = " << params.lidar_odometry_motion_model_z_1_sigma_m << "\n\n";
+
+        file << "[lidar_odometry_motion_model_om_1_sigma_deg]\n";
+        file << "value = " << params.lidar_odometry_motion_model_om_1_sigma_deg << "\n\n";
+
+        file << "[lidar_odometry_motion_model_fi_1_sigma_deg]\n";
+        file << "value = " << params.lidar_odometry_motion_model_fi_1_sigma_deg << "\n\n";
+
+        file << "[lidar_odometry_motion_model_ka_1_sigma_deg]\n";
+        file << "value = " << params.lidar_odometry_motion_model_ka_1_sigma_deg << "\n\n";
+
+        file << "[lidar_odometry_motion_model_fix_origin_x_1_sigma_m]\n";
+        file << "value = " << params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m << "\n\n";
+
+        file << "[lidar_odometry_motion_model_fix_origin_y_1_sigma_m]\n";
+        file << "value = " << params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m << "\n\n";
+
+        file << "[lidar_odometry_motion_model_fix_origin_z_1_sigma_m]\n";
+        file << "value = " << params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m << "\n\n";
+
+        file << "[lidar_odometry_motion_model_fix_origin_om_1_sigma_deg]\n";
+        file << "value = " << params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg << "\n\n";
+
+        file << "[lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg]\n";
+        file << "value = " << params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg << "\n\n";
+
+        file << "[lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg]\n";
+        file << "value = " << params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg << "\n\n";
+
+       
+
+
+
+            //-----------------------
+
+            file.close();
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error while saving file: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams &params)
+{
+    try
+    {
+        toml::value data = toml::parse(filepath);
+
+        if (data.contains("nr_iter"))
+        {
+            auto &tbl = toml::find(data, "nr_iter");
+            if (tbl.contains("value"))
+                params.nr_iter = toml::find<int>(tbl, "value");
+        }
+
+        if (data.contains("decimation"))
+        {
+            auto &tbl = toml::find(data, "decimation");
+            if (tbl.contains("value"))
+                params.decimation = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("in_out_params_indoor"))
+        {
+            auto &indoor = toml::find(data, "in_out_params_indoor");
+            if (indoor.contains("resolution_X"))
+                params.in_out_params_indoor.resolution_X = toml::find<double>(indoor, "resolution_X");
+            if (indoor.contains("resolution_Y"))
+                params.in_out_params_indoor.resolution_Y = toml::find<double>(indoor, "resolution_Y");
+            if (indoor.contains("resolution_Z"))
+                params.in_out_params_indoor.resolution_Z = toml::find<double>(indoor, "resolution_Z");
+        }
+
+        if (data.contains("in_out_params_outdoor"))
+        {
+            auto &outdoor = toml::find(data, "in_out_params_outdoor");
+            if (outdoor.contains("resolution_X"))
+                params.in_out_params_outdoor.resolution_X = toml::find<double>(outdoor, "resolution_X");
+            if (outdoor.contains("resolution_Y"))
+                params.in_out_params_outdoor.resolution_Y = toml::find<double>(outdoor, "resolution_Y");
+            if (outdoor.contains("resolution_Z"))
+                params.in_out_params_outdoor.resolution_Z = toml::find<double>(outdoor, "resolution_Z");
+        }
+
+        if (data.contains("filter_threshold_xy_inner"))
+        {
+            auto &tbl = toml::find(data, "filter_threshold_xy_inner");
+            if (tbl.contains("value"))
+                params.filter_threshold_xy_inner = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("filter_threshold_xy_outer"))
+        {
+            auto &tbl = toml::find(data, "filter_threshold_xy_outer");
+            if (tbl.contains("value"))
+                params.filter_threshold_xy_outer = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("threshould_output_filter"))
+        {
+            auto &tbl = toml::find(data, "threshould_output_filter");
+            if (tbl.contains("value"))
+                params.threshould_output_filter = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("distance_bucket"))
+        {
+            auto &tbl = toml::find(data, "distance_bucket");
+            if (tbl.contains("value"))
+                params.distance_bucket = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("polar_angle_deg"))
+        {
+            auto &tbl = toml::find(data, "polar_angle_deg");
+            if (tbl.contains("value"))
+                params.polar_angle_deg = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("azimutal_angle_deg"))
+        {
+            auto &tbl = toml::find(data, "azimutal_angle_deg");
+            if (tbl.contains("value"))
+                params.azimutal_angle_deg = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("robust_and_accurate_lidar_odometry_iterations"))
+        {
+            auto &tbl = toml::find(data, "robust_and_accurate_lidar_odometry_iterations");
+            if (tbl.contains("value"))
+                params.robust_and_accurate_lidar_odometry_iterations = toml::find<int>(tbl, "value");
+        }
+
+        if (data.contains("max_distance_lidar"))
+        {
+            auto &tbl = toml::find(data, "max_distance_lidar");
+            if (tbl.contains("value"))
+                params.max_distance_lidar = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("use_robust_and_accurate_lidar_odometry"))
+        {
+            auto &tbl = toml::find(data, "use_robust_and_accurate_lidar_odometry");
+            if (tbl.contains("use_robust_and_accurate"))
+            {
+                params.use_robust_and_accurate_lidar_odometry = toml::find<bool>(tbl, "use_robust_and_accurate");
+            }
+        }
+
+        if (data.contains("fusionConventionNed"))
+        {
+            const auto &ned_tbl = toml::find<toml::value>(data, "fusionConventionNed");
+            if (ned_tbl.contains("Ned"))
+                params.fusionConventionNed = toml::find<bool>(ned_tbl, "Ned");
+        }
+
+        if (data.contains("fusionConventionNwu"))
+        {
+            const auto &nwu_tbl = toml::find<toml::value>(data, "fusionConventionNwu");
+            if (nwu_tbl.contains("Nwu"))
+                params.fusionConventionNwu = toml::find<bool>(nwu_tbl, "Nwu");
+        }
+
+        if (data.contains("fusionConventionEnu"))
+        {
+            const auto &enu_tbl = toml::find<toml::value>(data, "fusionConventionEnu");
+            if (enu_tbl.contains("Enu"))
+                params.fusionConventionEnu = toml::find<bool>(enu_tbl, "Enu");
+        }
+
+        if (params.fusionConventionNed)
+        {
+            params.fusionConventionNwu = false;
+            params.fusionConventionEnu = false;
+        }
+        else if (params.fusionConventionNwu)
+        {
+            params.fusionConventionNed = false;
+            params.fusionConventionEnu = false;
+        }
+        else if (params.fusionConventionEnu)
+        {
+            params.fusionConventionNed = false;
+            params.fusionConventionNwu = false;
+        }
+
+        if (data.contains("use_motion_from_previous_step"))
+        {
+            auto &tbl = toml::find(data, "use_motion_from_previous_step");
+            if (tbl.contains("value"))
+            {
+                params.use_motion_from_previous_step = toml::find<bool>(tbl, "value");
+            }
+        }
+
+        if (data.contains("useMultithread"))
+        {
+            auto &tbl = toml::find(data, "useMultithread");
+            if (tbl.contains("value"))
+            {
+                params.useMultithread = toml::find<bool>(tbl, "value");
+            }
+        }
+
+        if (data.contains("sliding_window_trajectory_length_threshold"))
+        {
+            auto &tbl = toml::find(data, "sliding_window_trajectory_length_threshold");
+            if (tbl.contains("value"))
+                params.sliding_window_trajectory_length_threshold = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("save_calibration_validation"))
+        {
+            auto &tbl = toml::find(data, "save_calibration_validation");
+            if (tbl.contains("value"))
+                params.save_calibration_validation = toml::find<bool>(tbl, "value");
+        }
+
+        if (data.contains("calibration_validation_points"))
+        {
+            auto &tbl = toml::find(data, "calibration_validation_points");
+            if (tbl.contains("value"))
+                params.calibration_validation_points = toml::find<int>(tbl, "value");
+        }
+
+        if (data.contains("distance_bucket_rigid_sf"))
+        {
+            auto &tbl = toml::find(data, "distance_bucket_rigid_sf");
+            if (tbl.contains("value"))
+                params.distance_bucket_rigid_sf = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("polar_angle_deg_rigid_sf"))
+        {
+            auto &tbl = toml::find(data, "polar_angle_deg_rigid_sf");
+            if (tbl.contains("value"))
+                params.polar_angle_deg_rigid_sf = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("azimutal_angle_deg_rigid_sf"))
+        {
+            auto &tbl = toml::find(data, "azimutal_angle_deg_rigid_sf");
+            if (tbl.contains("value"))
+                params.azimutal_angle_deg_rigid_sf = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("robust_and_accurate_lidar_odometry_rigid_sf_iterations"))
+        {
+            auto &tbl = toml::find(data, "robust_and_accurate_lidar_odometry_rigid_sf_iterations");
+            if (tbl.contains("value"))
+                params.robust_and_accurate_lidar_odometry_rigid_sf_iterations = toml::find<int>(tbl, "value");
+        }
+
+        if (data.contains("max_distance_lidar_rigid_sf"))
+        {
+            auto &tbl = toml::find(data, "max_distance_lidar_rigid_sf");
+            if (tbl.contains("value"))
+                params.max_distance_lidar_rigid_sf = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("rgd_sf_sigma_x_m"))
+        {
+            auto &tbl = toml::find(data, "rgd_sf_sigma_x_m");
+            if (tbl.contains("value"))
+                params.rgd_sf_sigma_x_m = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("rgd_sf_sigma_y_m"))
+        {
+            auto &tbl = toml::find(data, "rgd_sf_sigma_y_m");
+            if (tbl.contains("value"))
+                params.rgd_sf_sigma_y_m = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("rgd_sf_sigma_z_m"))
+        {
+            auto &tbl = toml::find(data, "rgd_sf_sigma_z_m");
+            if (tbl.contains("value"))
+                params.rgd_sf_sigma_z_m = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("rgd_sf_sigma_om_deg"))
+        {
+            auto &tbl = toml::find(data, "rgd_sf_sigma_om_deg");
+            if (tbl.contains("value"))
+                params.rgd_sf_sigma_om_deg = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("rgd_sf_sigma_fi_deg"))
+        {
+            auto &tbl = toml::find(data, "rgd_sf_sigma_fi_deg");
+            if (tbl.contains("value"))
+                params.rgd_sf_sigma_fi_deg = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("rgd_sf_sigma_ka_deg"))
+        {
+            auto &tbl = toml::find(data, "rgd_sf_sigma_ka_deg");
+            if (tbl.contains("value"))
+                params.rgd_sf_sigma_ka_deg = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("threshold_initial_points"))
+        {
+            auto &tbl = toml::find(data, "threshold_initial_points");
+            if (tbl.contains("value"))
+                params.threshold_initial_points = toml::find<int>(tbl, "value");
+        }
+
+        if (data.contains("use_mutliple_gaussian"))
+        {
+            auto &tbl = toml::find(data, "use_mutliple_gaussian");
+            if (tbl.contains("value"))
+                params.use_mutliple_gaussian = toml::find<bool>(tbl, "value");
+        }
+
+        if (data.contains("num_constistency_iter"))
+        {
+            auto &tbl = toml::find(data, "num_constistency_iter");
+            if (tbl.contains("value"))
+                params.num_constistency_iter = toml::find<int>(tbl, "value");
+        }
+
+        if (data.contains("ahrs_gain"))
+        {
+            auto &tbl = toml::find(data, "ahrs_gain");
+            if (tbl.contains("value"))
+                params.ahrs_gain = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("threshold_nr_poses"))
+        {
+            auto &tbl = toml::find(data, "threshold_nr_poses");
+            if (tbl.contains("value"))
+                params.threshold_nr_poses = toml::find<int>(tbl, "value");
+        }
+
+        if (data.contains("min_counter"))
+        {
+            auto &tbl = toml::find(data, "min_counter");
+            if (tbl.contains("value"))
+                params.min_counter = toml::find<int>(tbl, "value");
+        }
+
+        if (data.contains("motion_model_correction.px"))
+        {
+            auto &tbl = toml::find(data, "motion_model_correction.px");
+            if (tbl.contains("value"))
+                params.motion_model_correction.px = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("motion_model_correction.py"))
+        {
+            auto &tbl = toml::find(data, "motion_model_correction.py");
+            if (tbl.contains("value"))
+                params.motion_model_correction.py = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("motion_model_correction.pz"))
+        {
+            auto &tbl = toml::find(data, "motion_model_correction.pz");
+            if (tbl.contains("value"))
+                params.motion_model_correction.pz = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("motion_model_correction.om"))
+        {
+            auto &tbl = toml::find(data, "motion_model_correction.om");
+            if (tbl.contains("value"))
+                params.motion_model_correction.om = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("motion_model_correction.fi"))
+        {
+            auto &tbl = toml::find(data, "motion_model_correction.fi");
+            if (tbl.contains("value"))
+                params.motion_model_correction.fi = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("motion_model_correction.ka"))
+        {
+            auto &tbl = toml::find(data, "motion_model_correction.ka");
+            if (tbl.contains("value"))
+                params.motion_model_correction.ka = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_x_1_sigma_m"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_x_1_sigma_m");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_x_1_sigma_m = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_y_1_sigma_m"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_y_1_sigma_m");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_y_1_sigma_m = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_z_1_sigma_m"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_z_1_sigma_m");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_z_1_sigma_m = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_om_1_sigma_deg"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_om_1_sigma_deg");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_om_1_sigma_deg = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_fi_1_sigma_deg"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_fi_1_sigma_deg");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_fi_1_sigma_deg = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_ka_1_sigma_deg"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_ka_1_sigma_deg");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_ka_1_sigma_deg = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_fix_origin_x_1_sigma_m"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_x_1_sigma_m");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_fix_origin_y_1_sigma_m"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_y_1_sigma_m");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_fix_origin_z_1_sigma_m"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_z_1_sigma_m");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_fix_origin_om_1_sigma_deg"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_om_1_sigma_deg");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg = toml::find<double>(tbl, "value");
+        }
+
+        if (data.contains("lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg"))
+        {
+            auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg");
+            if (tbl.contains("value"))
+                params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg = toml::find<double>(tbl, "value");
+        }
+
+        std::cout << "Parameters loaded from TOML.\n";
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Failed to load parameters: " << e.what() << "\n";
+        return false;
+    }
+}

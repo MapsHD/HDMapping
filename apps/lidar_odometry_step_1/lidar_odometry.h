@@ -30,4 +30,6 @@ void save_all_to_las(
 std::string save_results_automatic(
     LidarOdometryParams &params, std::vector<WorkerData> &worker_data, std::string working_directory, double elapsed_seconds);
 std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryParams& params);
+bool SaveParametersToTomlFile(const std::string &filepath, const LidarOdometryParams &params);
+bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams &params);
 #endif

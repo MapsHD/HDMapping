@@ -344,6 +344,7 @@ void lidar_odometry_gui()
             ImGui::Checkbox("save_calibration_validation_file", &params.save_calibration_validation);
             ImGui::InputInt("number of calibration validation points", &params.calibration_validation_points);
             ImGui::Checkbox("use_multithread", &params.useMultithread);
+            ImGui::InputDouble("real_time_threshold_seconds", &params.real_time_threshold_seconds);
 
             ImGui::Checkbox("fusionConventionNwu", &params.fusionConventionNwu);
             if (params.fusionConventionNwu)
@@ -1680,6 +1681,8 @@ int main(int argc, char *argv[])
         }
         else
         {
+            std::cout << "console usage: " << std::endl;
+            std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
 
             params.in_out_params_indoor.resolution_X = 0.1;
             params.in_out_params_indoor.resolution_Y = 0.1;

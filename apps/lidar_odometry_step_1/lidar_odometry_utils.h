@@ -119,6 +119,8 @@ struct LidarOdometryParams
     double lidar_odometry_motion_model_fix_origin_om_1_sigma_deg = 0.000001;
     double lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg = 0.000001;
     double lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg = 0.000001;
+
+    double real_time_threshold_seconds = 10.0;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);

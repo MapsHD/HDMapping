@@ -2154,6 +2154,10 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
             double delta = 100000.0;
             double lm_factor = 1.0;
+
+            std::chrono::time_point<std::chrono::system_clock> start, end;
+            start = std::chrono::system_clock::now();
+
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
 
@@ -2187,6 +2191,13 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 {
                     std::cout << "lm_factor " << lm_factor << " delta " << delta << std::endl;
                     lm_factor *= 10.0;
+                }
+
+                end = std::chrono::system_clock::now();
+                std::chrono::duration<double> elapsed_seconds = end - start;
+
+                if (elapsed_seconds.count() > params.real_time_threshold_seconds){
+                    break;
                 }
             }
 

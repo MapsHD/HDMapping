@@ -7,11 +7,10 @@
 #include <algorithm>
 #include <WGS84toCartesian.hpp>
 #include <laszip/laszip_api.h>
+#include <nmea.h>
 #if WITH_GUI == 1
 #include <GL/freeglut.h>
 #endif
-
-#include <minmea.h>
 
 inline void split(std::string &str, char delim, std::vector<std::string> &out)
 {
@@ -236,7 +235,8 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_f
     {
         std::cout << fn << std::endl;
     }
-
+    std::optional<hd_mapping::nmea::GNGGAData> lastGGAData;
+    std::optional<hd_mapping::nmea::GNRMCData> lastRMCData;
     for (const auto &fn : input_file_names)
     {
         std::ifstream infile(fn);
@@ -249,191 +249,39 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_f
         while (!infile.eof())
         {
             getline(infile, line);
+            using namespace hd_mapping::nmea;
 
-            std::vector<std::string> strs;
-            split(line, ' ', strs);
+            auto [timestampLidar, timestampUnix, nmeaSentence] = BreakLineFromNMEAFile(line);
+            if (!validateNMEAChecksum(nmeaSentence)) {
+                  std::cout << "Invalid NMEA checksum in line: " << line << std::endl;
+                  continue;
+            }
 
-            if (strs.size() == 3){
-                std::string l = strs[2];
+            const auto gga = parseGNGGA(nmeaSentence);
+            const auto rmc = parseGNRMC(nmeaSentence);
+            if (rmc.has_value()) {
+                lastRMCData = rmc;
+            }
+            if (gga.has_value()) {
+                    lastGGAData = gga;
+            }
+            if (gga.has_value()) {
+              GlobalPose gp;
+              gp.timestamp = timestampLidar;
+              gp.lat = gga->latitude;
+              gp.lon = gga->longitude;
+              gp.alt = gga->altitude;
+              gp.hdop = gga->hdop;
+              gp.height = gga->altitude;
+              gp.age = gga->age_of_data;
+              gp.time = 0; // todo convert to seconds from string
+              gp.fix_quality = gga->fix_quality;
 
-                //std::array<double, 3> coord = {0.0, 0.0, 0.0}; // lon, lat, alt
-                static double last_h = -1000000.0;
-                minmea_sentence_gga gga;
-                bool isGGA = minmea_parse_gga(&gga, l.c_str());
-                if (isGGA)
-                {
-
-                    // std::cout << "GGA" << std::endl;
-                    // std::cout << std::setprecision(20);
-                    // std::cout << minmea_tocoord(&gga.latitude) << " " << minmea_tocoord(&gga.longitude) << std::endl;
-                    /* oss << minmea_tocoord(&gga.latitude) << " ";
-                     oss << minmea_tocoord(&gga.longitude) << " ";
-                     oss << minmea_tofloat(&gga.altitude) << " ";
-                     oss << minmea_tofloat(&gga.hdop) << " ";
-                     oss << gga.satellites_tracked << " ";
-                     oss << minmea_tofloat(&gga.height) << " ";
-                     oss << minmea_tofloat(&gga.dgps_age) << " ";
-                     oss << gga.time.hours << ":" << gga.time.minutes << ":" << gga.time.seconds << " ";
-                     oss << gga.fix_quality << " ";
-                     oss << millis.count() << "\n";*/
-
-                    GlobalPose gp;
-                    std::istringstream(strs[0]) >> gp.timestamp;
-                    gp.lat = minmea_tocoord(&gga.latitude);
-                    gp.lon = minmea_tocoord(&gga.longitude);
-                    gp.alt = minmea_tofloat(&gga.altitude);
-                    gp.hdop = minmea_tofloat(&gga.hdop);
-                    gga.satellites_tracked = gp.satelites_tracked;
-                    gp.height = minmea_tofloat(&gga.height);
-                    gp.age = minmea_tofloat(&gga.dgps_age);
-                    gp.time = 0; // ToDo change it
-                    gp.fix_quality = gga.fix_quality;
-
-                    if (gp.lat == gp.lat)
-                    {
-                        if (gp.lon == gp.lon)
-                        {
-                            if (gp.alt == gp.alt)
-                            {
-                                if (gp.lat != 0)
-                                {
-                                    if (gp.lon != 0)
-                                    {
-                                        last_h = gp.alt;
-                                        //gnss_poses.push_back(gp);
-                                        // std::cout << std::setprecision(20);
-                                        // std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << " gp.alt " << gp.alt << std::endl;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-
-                {
-                    //$GNRMC,094833.00,A,0734.33134,S,11049.73215,E,2.863,276.61,160625,,,A,V*16
-                    const auto startRMC = line.find("$GNRMC");
-                    if (startRMC == std::string::npos)
-                    {
-                        continue;
-                    }
-                    const std::string rmcSentence = line.substr(startRMC);
-                    std::stringstream ss(rmcSentence);
-
-                    std::string latValue, latDirection, lonValue, lonDirection, token;
-                    std::getline(ss, token, ',');        // Skip the first token (sentence type)
-                    std::getline(ss, token, ',');        // Time
-                    std::getline(ss, token, ',');        // Status (A or V)
-                    std::getline(ss, latValue, ',');     // Latitude
-                    std::getline(ss, latDirection, ','); // Latitude direction (N or S)
-                    std::getline(ss, lonValue, ',');     // Longitude
-                    std::getline(ss, lonDirection, ','); // Longitude direction (E or W)
-                    std::getline(ss, token, ',');        // Speed
-                    std::getline(ss, token, ',');        // Course
-                    std::getline(ss, token, ',');        // Date
-                    std::getline(ss, token, ',');        // Magnetic variation
-                    std::getline(ss, token, ',');        // Mode indicator
-
-                    const auto latitude = dm_to_dd(latValue, latDirection[0], true);
-                    const auto longitude = dm_to_dd(lonValue, lonDirection[0], false);
-                    // Altitude is not provided in RMC, set to 0 or some default value
-                    //coord[0] = longitude; // lon
-                    //coord[1] = latitude;  // lat
-                    //coord[2] = 0.0;       // alt, set to 0 or some default value
-                    //coordinates.push_back(coord);
-
-                    GlobalPose gp;
-                    std::istringstream(strs[0]) >> gp.timestamp;
-                    gp.lat = latitude;
-                    gp.lon = longitude;
-                    gp.alt = last_h; // minmea_tofloat(&gga.altitude);
-                    gp.hdop = 0;//minmea_tofloat(&gga.hdop);
-                    //gp.satellites_tracked = 0;//gp.satelites_tracked;
-                    gp.height = 0.0;//minmea_tofloat(&gga.height);
-                    gp.age = 0.0;//minmea_tofloat(&gga.dgps_age);
-                    gp.time = 0; // ToDo change it
-                    gp.fix_quality = 0.0;//gga.fix_quality;
-
-                    if (gp.lat == gp.lat)
-                    {
-                        if (gp.lon == gp.lon)
-                        {
-                            if (gp.alt == gp.alt && gp.alt != -1000000.0)
-                            {
-                                if (gp.lat != 0)
-                                {
-                                    if (gp.lon != 0)
-                                    {
-                                        gnss_poses.push_back(gp);
-                                        // std::cout << std::setprecision(20);
-                                        // std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << " gp.alt " << gp.alt << std::endl;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // is_vaild = minmea_check(l.c_str(), true);
-
-                //if (is_vaild)
-                //{
-
-
-                    #if 0
-                    minmea_sentence_gga gga;
-                    bool isGGA = minmea_parse_gga(&gga, l.c_str());
-                    if (isGGA)
-                    {
-
-                        //std::cout << "GGA" << std::endl;
-                        //std::cout << std::setprecision(20);
-                        //std::cout << minmea_tocoord(&gga.latitude) << " " << minmea_tocoord(&gga.longitude) << std::endl;
-                        /* oss << minmea_tocoord(&gga.latitude) << " ";
-                         oss << minmea_tocoord(&gga.longitude) << " ";
-                         oss << minmea_tofloat(&gga.altitude) << " ";
-                         oss << minmea_tofloat(&gga.hdop) << " ";
-                         oss << gga.satellites_tracked << " ";
-                         oss << minmea_tofloat(&gga.height) << " ";
-                         oss << minmea_tofloat(&gga.dgps_age) << " ";
-                         oss << gga.time.hours << ":" << gga.time.minutes << ":" << gga.time.seconds << " ";
-                         oss << gga.fix_quality << " ";
-                         oss << millis.count() << "\n";*/
-
-                        GlobalPose gp;
-                        std::istringstream(strs[0]) >> gp.timestamp;
-                        gp.lat = minmea_tocoord(&gga.latitude);
-                        gp.lon = minmea_tocoord(&gga.longitude);
-                        gp.alt = minmea_tofloat(&gga.altitude);
-                        gp.hdop = minmea_tofloat(&gga.hdop);
-                        gga.satellites_tracked = gp.satelites_tracked;
-                        gp.height = minmea_tofloat(&gga.height);
-                        gp.age = minmea_tofloat(&gga.dgps_age);
-                        gp.time = 0; //ToDo change it
-                        gp.fix_quality = gga.fix_quality;
-
-                        if (gp.lat == gp.lat)
-                        {
-                            if (gp.lon == gp.lon)
-                            {
-                                if (gp.alt == gp.alt)
-                                {
-                                    if (gp.lat != 0)
-                                    {
-                                        if (gp.lon != 0)
-                                        {
-                                            gnss_poses.push_back(gp);
-                                            //std::cout << std::setprecision(20);
-                                            //std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << " gp.alt " << gp.alt << std::endl;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    #endif
-                //}
+              // register if there  is not nans
+              if (gp.lat == gp.lat && gp.lon == gp.lon &&
+                  gp.alt == gp.alt) {
+                gnss_poses.push_back(gp);
+              }
             }
         }
         infile.close();

@@ -9,6 +9,7 @@ set(CORE_SOURCE_FILES
     src/icp.cpp
     src/ndt.cpp
     src/nns.cpp
+    src/nmea.cpp
     src/optimization_point_to_point_source_to_target.cpp
     src/optimize_distance_point_to_plane_source_to_target.cpp
     src/optimize_plane_to_plane_source_to_target.cpp
@@ -25,7 +26,6 @@ set(CORE_SOURCE_FILES
     src/wgs84_do_puwg92.cc
     src/pair_wise_iterative_closest_point.cpp
     src/hash_utils.cpp
-    src/minmea.c
     src/ground_control_points.cpp
     src/control_points.cpp
     src/registration_plane_feature.cpp
@@ -45,6 +45,7 @@ set(CORE_INCLUDE_FILES
     include/pose_graph_loop_closure.h
     include/ndt.h
     include/nns.h
+    include/nmea.h
     include/pcl_wrapper.h
     include/plycpp.h
     include/point_cloud.h
@@ -56,7 +57,6 @@ set(CORE_INCLUDE_FILES
     include/transformations.h
     include/wgs84_do_puwg92.h
     include/WGS84toCartesian.hpp
-    include/minmea.h
 )
 
 set(CORE_INCLUDE_FILES_GUI

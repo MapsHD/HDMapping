@@ -1541,6 +1541,9 @@ int main(int argc, char *argv[])
     {
         if (argc == 4)
         {
+            TomlIO toml_io;
+            toml_io.LoadParametersFromTomlFile(argv[2], params);
+
             // bool success = LoadParametersFromTomlFile(argv[2], params);
             // if (success)
             // {

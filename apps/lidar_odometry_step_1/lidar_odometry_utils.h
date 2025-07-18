@@ -44,36 +44,35 @@ struct LidarOdometryParams
     double filter_threshold_xy_outer = 70.0;
     Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
     std::vector<Point3Di> initial_points;
-    
+
     NDT::GridParameters in_out_params_indoor;
     NDTBucketMapType buckets_indoor;
 
     NDT::GridParameters in_out_params_outdoor;
     NDTBucketMapType buckets_outdoor;
 
-
     bool use_motion_from_previous_step = true;
     double consecutive_distance = 0.0;
     int nr_iter = 100;
     bool useMultithread = true;
     std::vector<Point3Di> reference_points;
-    //double decimation = 0.1;
+    // double decimation = 0.1;
     double decimation = 0.01;
     NDTBucketMapType reference_buckets;
     std::string working_directory_preview = "";
     double sliding_window_trajectory_length_threshold = 5.0;
     bool save_calibration_validation = true;
     int calibration_validation_points = 1000000;
-    double max_distance = 70.0;
+    double max_distance_lidar = 70.0;
+    // double max_distance = 70.0;
 
-    //rgd_sf
+    // rgd_sf
     bool use_robust_and_accurate_lidar_odometry = false;
     double distance_bucket = 0.2;
     double polar_angle_deg = 10.0;
     double azimutal_angle_deg = 10.0;
     int robust_and_accurate_lidar_odometry_iterations = 20;
-    double max_distance_lidar = 30.0;
-
+    
     double distance_bucket_rigid_sf = 0.5;
     double polar_angle_deg_rigid_sf = 10.0;
     double azimutal_angle_deg_rigid_sf = 10.0;
@@ -92,7 +91,7 @@ struct LidarOdometryParams
     bool fusionConventionEnu = false;
     bool fusionConventionNed = false;
     int threshold_initial_points = 10000;
-    
+
     bool use_mutliple_gaussian = false;
     int num_constistency_iter = 10;
     double threshould_output_filter = 0.5;
@@ -160,7 +159,7 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
 std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy_inner, double filter_threshold_xy_outer,
                                        const std::unordered_map<int, Eigen::Affine3d> &calibrations);
 
-bool saveLaz(const std::string &filename, const WorkerData &data, double threshould_output_filter, std::vector<int>* index_poses = nullptr);
+bool saveLaz(const std::string &filename, const WorkerData &data, double threshould_output_filter, std::vector<int> *index_poses = nullptr);
 bool saveLaz(const std::string &filename, const std::vector<Point3Di> &points_global);
 bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_poses, std::vector<std::string> filenames);
 
@@ -186,8 +185,8 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points, std::ve
                              double lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
 
 void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
-              std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
-              NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread );
+                 std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
+                 NDT::GridParameters &rgd_params, NDTBucketMapType &buckets, bool useMultithread);
 
 void optimize_sf2(std::vector<Point3Di> &intermediate_points, std::vector<Point3Di> &intermediate_points_sf, std::vector<Eigen::Affine3d> &intermediate_trajectory,
                   const std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,
@@ -209,15 +208,15 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 void compute_step_2_fast_forward_motion(std::vector<WorkerData> &worker_data, LidarOdometryParams &params);
 
 // for reconstructing worker data from step 1 output
-bool loadLaz(const std::string &filename, std::vector<Point3Di> &points_out, std::vector<int> index_poses_i, std::vector<Eigen::Affine3d>& intermediate_trajectory, const Eigen::Affine3d& inverse_pose);
-bool load_poses(const fs::path& poses_file, std::vector<Eigen::Affine3d>& out_poses);
-bool load_trajectory_csv(const std::string& filename, const Eigen::Affine3d& m_pose,
-    std::vector<std::pair<double, double>>& intermediate_trajectory_timestamps,
-    std::vector<Eigen::Affine3d>& intermediate_trajectory,
-    std::vector<Eigen::Vector3d>& imu_om_fi_ka);
-bool load_point_sizes(const std::filesystem::path& path, std::vector<int>& vector);
-bool load_index_poses(const std::filesystem::path& path, std::vector<std::vector<int>>& index_poses_out);
-bool load_worker_data_from_results(const fs::path& session_file, std::vector<WorkerData>& worker_data_out);
+bool loadLaz(const std::string &filename, std::vector<Point3Di> &points_out, std::vector<int> index_poses_i, std::vector<Eigen::Affine3d> &intermediate_trajectory, const Eigen::Affine3d &inverse_pose);
+bool load_poses(const fs::path &poses_file, std::vector<Eigen::Affine3d> &out_poses);
+bool load_trajectory_csv(const std::string &filename, const Eigen::Affine3d &m_pose,
+                         std::vector<std::pair<double, double>> &intermediate_trajectory_timestamps,
+                         std::vector<Eigen::Affine3d> &intermediate_trajectory,
+                         std::vector<Eigen::Vector3d> &imu_om_fi_ka);
+bool load_point_sizes(const std::filesystem::path &path, std::vector<int> &vector);
+bool load_index_poses(const std::filesystem::path &path, std::vector<std::vector<int>> &index_poses_out);
+bool load_worker_data_from_results(const fs::path &session_file, std::vector<WorkerData> &worker_data_out);
 
 //! This namespace contains functions for loading calibration file (.json and .sn).
 //!

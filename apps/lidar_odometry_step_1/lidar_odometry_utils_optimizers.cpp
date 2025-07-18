@@ -2048,7 +2048,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                     double r_l = worker_data[i].intermediate_points[ii].point.norm();
 
                     // std::cout << worker_data[i].intermediate_points[ii].index_pose << " ";
-                    if (r_l > 0.5 && worker_data[i].intermediate_points[ii].index_pose != -1 && r_l < params.max_distance_lidar)
+                    if (r_l > 0.5 && worker_data[i].intermediate_points[ii].index_pose != -1 && r_l < params.max_distance_lidar_rigid_sf)
                     {
                         double polar_angle_deg_l = atan2(worker_data[i].intermediate_points[ii].point.y(), worker_data[i].intermediate_points[ii].point.x()) / M_PI * 180.0;
                         double azimutal_angle_deg_l = acos(worker_data[i].intermediate_points[ii].point.z() / r_l) / M_PI * 180.0;
@@ -2165,7 +2165,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 optimize_lidar_odometry(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
                                         params.in_out_params_indoor, params.buckets_indoor,
                                         params.in_out_params_outdoor, params.buckets_outdoor,
-                                        params.useMultithread, params.max_distance, delta /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/,
+                                        params.useMultithread, params.max_distance_lidar, delta /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/,
                                         lm_factor,
                                         params.motion_model_correction,
                                         params.lidar_odometry_motion_model_x_1_sigma_m,

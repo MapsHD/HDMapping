@@ -625,7 +625,7 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
             pose_offset = 0;
         }
     }
-    
+
     if (counter > params.min_counter)
     {
         worker_data_concatenated.push_back(wd);
@@ -656,7 +656,7 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
         std::cout << "saving to: " << path << std::endl;
         std::vector<int> index_poses_i;
         saveLaz(path.string(), worker_data_concatenated[i], params.threshould_output_filter, &index_poses_i);
-        index_poses.push_back(index_poses_i); 
+        index_poses.push_back(index_poses_i);
         m_poses.push_back(worker_data_concatenated[i].intermediate_trajectory[0]);
         file_names.push_back(filename);
 
@@ -896,16 +896,16 @@ std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryP
     }
     Trajectory trajectory;
     calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain);
-    
+
     if (!compute_step_1(pointsPerFile, params, trajectory, worker_data))
     {
         std::cout << "Calculation failed at step 1 of lidar odometry, exiting." << std::endl;
         return worker_data;
     }
     double ts_failure = 0.0;
-    
+
     std::atomic<float> loProgress;
-    
+
     if (!compute_step_2(worker_data, params, ts_failure, loProgress))
     {
         std::cout << "Calculation failed at step 2 of lidar odometry, exiting." << std::endl;
@@ -1025,7 +1025,7 @@ bool SaveParametersToTomlFile(const std::string &filepath, const LidarOdometryPa
 
         file << "[rgd_sf_sigma_z_m]\n";
         file << "value = " << params.rgd_sf_sigma_z_m << "\n\n";
-        
+
         file << "[rgd_sf_sigma_om_deg]\n";
         file << "value = " << params.rgd_sf_sigma_om_deg << "\n\n";
 
@@ -1132,7 +1132,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("nr_iter"))
         {
             auto &tbl = toml::find(data, "nr_iter");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.nr_iter = toml::find<int>(tbl, "value");
                 std::cout << "params.nr_iter: " << params.nr_iter << std::endl;
             }
@@ -1141,7 +1142,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("decimation"))
         {
             auto &tbl = toml::find(data, "decimation");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.decimation = toml::find<double>(tbl, "value");
                 std::cout << "params.decimation: " << params.decimation << std::endl;
             }
@@ -1150,15 +1152,18 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("in_out_params_indoor"))
         {
             auto &indoor = toml::find(data, "in_out_params_indoor");
-            if (indoor.contains("resolution_X")){
+            if (indoor.contains("resolution_X"))
+            {
                 params.in_out_params_indoor.resolution_X = toml::find<double>(indoor, "resolution_X");
                 std::cout << "params.in_out_params_indoor.resolution_X: " << params.in_out_params_indoor.resolution_X << std::endl;
             }
-            if (indoor.contains("resolution_Y")){
+            if (indoor.contains("resolution_Y"))
+            {
                 params.in_out_params_indoor.resolution_Y = toml::find<double>(indoor, "resolution_Y");
                 std::cout << "params.in_out_params_indoor.resolution_Y: " << params.in_out_params_indoor.resolution_Y << std::endl;
             }
-            if (indoor.contains("resolution_Z")){
+            if (indoor.contains("resolution_Z"))
+            {
                 params.in_out_params_indoor.resolution_Z = toml::find<double>(indoor, "resolution_Z");
                 std::cout << "params.in_out_params_indoor.resolution_Z: " << params.in_out_params_indoor.resolution_Z << std::endl;
             }
@@ -1167,15 +1172,18 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("in_out_params_outdoor"))
         {
             auto &outdoor = toml::find(data, "in_out_params_outdoor");
-            if (outdoor.contains("resolution_X")){
+            if (outdoor.contains("resolution_X"))
+            {
                 params.in_out_params_outdoor.resolution_X = toml::find<double>(outdoor, "resolution_X");
                 std::cout << "params.in_out_params_outdoor.resolution_X: " << params.in_out_params_outdoor.resolution_X << std::endl;
             }
-            if (outdoor.contains("resolution_Y")){
+            if (outdoor.contains("resolution_Y"))
+            {
                 params.in_out_params_outdoor.resolution_Y = toml::find<double>(outdoor, "resolution_Y");
                 std::cout << "params.in_out_params_outdoor.resolution_Y: " << params.in_out_params_outdoor.resolution_Y << std::endl;
             }
-            if (outdoor.contains("resolution_Z")){
+            if (outdoor.contains("resolution_Z"))
+            {
                 params.in_out_params_outdoor.resolution_Z = toml::find<double>(outdoor, "resolution_Z");
                 std::cout << "params.in_out_params_outdoor.resolution_Z: " << params.in_out_params_outdoor.resolution_Z << std::endl;
             }
@@ -1184,7 +1192,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("filter_threshold_xy_inner"))
         {
             auto &tbl = toml::find(data, "filter_threshold_xy_inner");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.filter_threshold_xy_inner = toml::find<double>(tbl, "value");
                 std::cout << "params.filter_threshold_xy_inner: " << params.filter_threshold_xy_inner << std::endl;
             }
@@ -1193,7 +1202,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("filter_threshold_xy_outer"))
         {
             auto &tbl = toml::find(data, "filter_threshold_xy_outer");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.filter_threshold_xy_outer = toml::find<double>(tbl, "value");
                 std::cout << "params.filter_threshold_xy_outer: " << params.filter_threshold_xy_outer << std::endl;
             }
@@ -1202,7 +1212,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("threshould_output_filter"))
         {
             auto &tbl = toml::find(data, "threshould_output_filter");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.threshould_output_filter = toml::find<double>(tbl, "value");
                 std::cout << "params.threshould_output_filter: " << params.threshould_output_filter << std::endl;
             }
@@ -1211,7 +1222,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("distance_bucket"))
         {
             auto &tbl = toml::find(data, "distance_bucket");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.distance_bucket = toml::find<double>(tbl, "value");
                 std::cout << "params.distance_bucket: " << params.distance_bucket << std::endl;
             }
@@ -1220,7 +1232,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("polar_angle_deg"))
         {
             auto &tbl = toml::find(data, "polar_angle_deg");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.polar_angle_deg = toml::find<double>(tbl, "value");
                 std::cout << "params.polar_angle_deg: " << params.polar_angle_deg << std::endl;
             }
@@ -1229,7 +1242,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("azimutal_angle_deg"))
         {
             auto &tbl = toml::find(data, "azimutal_angle_deg");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.azimutal_angle_deg = toml::find<double>(tbl, "value");
                 std::cout << "params.azimutal_angle_deg: " << params.azimutal_angle_deg << std::endl;
             }
@@ -1238,7 +1252,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("robust_and_accurate_lidar_odometry_iterations"))
         {
             auto &tbl = toml::find(data, "robust_and_accurate_lidar_odometry_iterations");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.robust_and_accurate_lidar_odometry_iterations = toml::find<int>(tbl, "value");
                 std::cout << "params.robust_and_accurate_lidar_odometry_iterations: " << params.robust_and_accurate_lidar_odometry_iterations << std::endl;
             }
@@ -1247,7 +1262,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("max_distance_lidar"))
         {
             auto &tbl = toml::find(data, "max_distance_lidar");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.max_distance_lidar = toml::find<double>(tbl, "value");
                 std::cout << "params.max_distance_lidar: " << params.max_distance_lidar << std::endl;
             }
@@ -1266,7 +1282,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("fusionConventionNed"))
         {
             const auto &ned_tbl = toml::find<toml::value>(data, "fusionConventionNed");
-            if (ned_tbl.contains("Ned")){
+            if (ned_tbl.contains("Ned"))
+            {
                 params.fusionConventionNed = toml::find<bool>(ned_tbl, "Ned");
                 std::cout << "params.fusionConventionNed: " << (int)params.fusionConventionNed << std::endl;
             }
@@ -1275,7 +1292,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("fusionConventionNwu"))
         {
             const auto &nwu_tbl = toml::find<toml::value>(data, "fusionConventionNwu");
-            if (nwu_tbl.contains("Nwu")){
+            if (nwu_tbl.contains("Nwu"))
+            {
                 params.fusionConventionNwu = toml::find<bool>(nwu_tbl, "Nwu");
                 std::cout << "params.fusionConventionNwu: " << (int)params.fusionConventionNwu << std::endl;
             }
@@ -1284,7 +1302,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("fusionConventionEnu"))
         {
             const auto &enu_tbl = toml::find<toml::value>(data, "fusionConventionEnu");
-            if (enu_tbl.contains("Enu")){
+            if (enu_tbl.contains("Enu"))
+            {
                 params.fusionConventionEnu = toml::find<bool>(enu_tbl, "Enu");
                 std::cout << "params.fusionConventionEnu: " << (int)params.fusionConventionEnu << std::endl;
             }
@@ -1329,7 +1348,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("sliding_window_trajectory_length_threshold"))
         {
             auto &tbl = toml::find(data, "sliding_window_trajectory_length_threshold");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.sliding_window_trajectory_length_threshold = toml::find<double>(tbl, "value");
                 std::cout << "params.sliding_window_trajectory_length_threshold: " << params.sliding_window_trajectory_length_threshold << std::endl;
             }
@@ -1338,7 +1358,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("save_calibration_validation"))
         {
             auto &tbl = toml::find(data, "save_calibration_validation");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.save_calibration_validation = toml::find<bool>(tbl, "value");
                 std::cout << "params.save_calibration_validation: " << (int)params.save_calibration_validation << std::endl;
             }
@@ -1347,7 +1368,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("calibration_validation_points"))
         {
             auto &tbl = toml::find(data, "calibration_validation_points");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.calibration_validation_points = toml::find<int>(tbl, "value");
                 std::cout << "params.calibration_validation_points: " << params.calibration_validation_points << std::endl;
             }
@@ -1356,7 +1378,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("distance_bucket_rigid_sf"))
         {
             auto &tbl = toml::find(data, "distance_bucket_rigid_sf");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.distance_bucket_rigid_sf = toml::find<double>(tbl, "value");
                 std::cout << "params.distance_bucket_rigid_sf: " << params.distance_bucket_rigid_sf << std::endl;
             }
@@ -1365,7 +1388,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("polar_angle_deg_rigid_sf"))
         {
             auto &tbl = toml::find(data, "polar_angle_deg_rigid_sf");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.polar_angle_deg_rigid_sf = toml::find<double>(tbl, "value");
                 std::cout << "params.polar_angle_deg_rigid_sf: " << params.polar_angle_deg_rigid_sf << std::endl;
             }
@@ -1374,7 +1398,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("azimutal_angle_deg_rigid_sf"))
         {
             auto &tbl = toml::find(data, "azimutal_angle_deg_rigid_sf");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.azimutal_angle_deg_rigid_sf = toml::find<double>(tbl, "value");
                 std::cout << "params.azimutal_angle_deg_rigid_sf: " << params.azimutal_angle_deg_rigid_sf << std::endl;
             }
@@ -1383,7 +1408,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("robust_and_accurate_lidar_odometry_rigid_sf_iterations"))
         {
             auto &tbl = toml::find(data, "robust_and_accurate_lidar_odometry_rigid_sf_iterations");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.robust_and_accurate_lidar_odometry_rigid_sf_iterations = toml::find<int>(tbl, "value");
                 std::cout << "params.robust_and_accurate_lidar_odometry_rigid_sf_iterations: " << params.robust_and_accurate_lidar_odometry_rigid_sf_iterations << std::endl;
             }
@@ -1392,7 +1418,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("max_distance_lidar_rigid_sf"))
         {
             auto &tbl = toml::find(data, "max_distance_lidar_rigid_sf");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.max_distance_lidar_rigid_sf = toml::find<double>(tbl, "value");
                 std::cout << "params.max_distance_lidar_rigid_sf: " << params.max_distance_lidar_rigid_sf << std::endl;
             }
@@ -1401,7 +1428,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("rgd_sf_sigma_x_m"))
         {
             auto &tbl = toml::find(data, "rgd_sf_sigma_x_m");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.rgd_sf_sigma_x_m = toml::find<double>(tbl, "value");
                 std::cout << "params.rgd_sf_sigma_x_m: " << params.rgd_sf_sigma_x_m << std::endl;
             }
@@ -1410,7 +1438,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("rgd_sf_sigma_y_m"))
         {
             auto &tbl = toml::find(data, "rgd_sf_sigma_y_m");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.rgd_sf_sigma_y_m = toml::find<double>(tbl, "value");
                 std::cout << "params.rgd_sf_sigma_y_m: " << params.rgd_sf_sigma_y_m << std::endl;
             }
@@ -1419,7 +1448,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("rgd_sf_sigma_z_m"))
         {
             auto &tbl = toml::find(data, "rgd_sf_sigma_z_m");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.rgd_sf_sigma_z_m = toml::find<double>(tbl, "value");
                 std::cout << "params.rgd_sf_sigma_z_m: " << params.rgd_sf_sigma_z_m << std::endl;
             }
@@ -1428,7 +1458,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("rgd_sf_sigma_om_deg"))
         {
             auto &tbl = toml::find(data, "rgd_sf_sigma_om_deg");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.rgd_sf_sigma_om_deg = toml::find<double>(tbl, "value");
                 std::cout << "params.rgd_sf_sigma_om_deg: " << params.rgd_sf_sigma_om_deg << std::endl;
             }
@@ -1437,7 +1468,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("rgd_sf_sigma_fi_deg"))
         {
             auto &tbl = toml::find(data, "rgd_sf_sigma_fi_deg");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.rgd_sf_sigma_fi_deg = toml::find<double>(tbl, "value");
                 std::cout << "params.rgd_sf_sigma_fi_deg: " << params.rgd_sf_sigma_fi_deg << std::endl;
             }
@@ -1446,7 +1478,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("rgd_sf_sigma_ka_deg"))
         {
             auto &tbl = toml::find(data, "rgd_sf_sigma_ka_deg");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.rgd_sf_sigma_ka_deg = toml::find<double>(tbl, "value");
                 std::cout << "params.rgd_sf_sigma_ka_deg: " << params.rgd_sf_sigma_ka_deg << std::endl;
             }
@@ -1455,7 +1488,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("threshold_initial_points"))
         {
             auto &tbl = toml::find(data, "threshold_initial_points");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.threshold_initial_points = toml::find<int>(tbl, "value");
                 std::cout << "params.threshold_initial_points: " << params.threshold_initial_points << std::endl;
             }
@@ -1464,7 +1498,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("use_mutliple_gaussian"))
         {
             auto &tbl = toml::find(data, "use_mutliple_gaussian");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.use_mutliple_gaussian = toml::find<bool>(tbl, "value");
                 std::cout << "params.use_mutliple_gaussian: " << (int)params.use_mutliple_gaussian << std::endl;
             }
@@ -1473,7 +1508,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("num_constistency_iter"))
         {
             auto &tbl = toml::find(data, "num_constistency_iter");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.num_constistency_iter = toml::find<int>(tbl, "value");
                 std::cout << "params.num_constistency_iter: " << params.num_constistency_iter << std::endl;
             }
@@ -1482,7 +1518,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("ahrs_gain"))
         {
             auto &tbl = toml::find(data, "ahrs_gain");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.ahrs_gain = toml::find<double>(tbl, "value");
                 std::cout << "params.ahrs_gain: " << params.ahrs_gain << std::endl;
             }
@@ -1491,7 +1528,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("threshold_nr_poses"))
         {
             auto &tbl = toml::find(data, "threshold_nr_poses");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.threshold_nr_poses = toml::find<int>(tbl, "value");
                 std::cout << "params.threshold_nr_poses: " << params.threshold_nr_poses << std::endl;
             }
@@ -1500,7 +1538,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("min_counter"))
         {
             auto &tbl = toml::find(data, "min_counter");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.min_counter = toml::find<int>(tbl, "value");
                 std::cout << "params.min_counter: " << params.min_counter << std::endl;
             }
@@ -1509,7 +1548,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("motion_model_correction.px"))
         {
             auto &tbl = toml::find(data, "motion_model_correction.px");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.motion_model_correction.px = toml::find<double>(tbl, "value");
                 std::cout << "params.motion_model_correction.px: " << params.motion_model_correction.px << std::endl;
             }
@@ -1518,7 +1558,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("motion_model_correction.py"))
         {
             auto &tbl = toml::find(data, "motion_model_correction.py");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.motion_model_correction.py = toml::find<double>(tbl, "value");
                 std::cout << "params.motion_model_correction.py: " << params.motion_model_correction.py << std::endl;
             }
@@ -1527,7 +1568,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("motion_model_correction.pz"))
         {
             auto &tbl = toml::find(data, "motion_model_correction.pz");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.motion_model_correction.pz = toml::find<double>(tbl, "value");
                 std::cout << "params.motion_model_correction.pz: " << params.motion_model_correction.pz << std::endl;
             }
@@ -1536,7 +1578,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("motion_model_correction.om_deg"))
         {
             auto &tbl = toml::find(data, "motion_model_correction.om");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.motion_model_correction.om = toml::find<double>(tbl, "value");
                 std::cout << "params.motion_model_correction.om_deg: " << params.motion_model_correction.om << std::endl;
             }
@@ -1545,16 +1588,18 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("motion_model_correction.fi_deg"))
         {
             auto &tbl = toml::find(data, "motion_model_correction.fi");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.motion_model_correction.fi = toml::find<double>(tbl, "value");
                 std::cout << "params.motion_model_correction.fi_deg: " << params.motion_model_correction.fi << std::endl;
-             }
+            }
         }
 
         if (data.contains("motion_model_correction.ka_deg"))
         {
             auto &tbl = toml::find(data, "motion_model_correction.ka");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.motion_model_correction.ka = toml::find<double>(tbl, "value");
                 std::cout << "params.motion_model_correction.ka_deg: " << params.motion_model_correction.ka << std::endl;
             }
@@ -1563,7 +1608,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_x_1_sigma_m"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_x_1_sigma_m");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_x_1_sigma_m = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_x_1_sigma_m: " << params.lidar_odometry_motion_model_x_1_sigma_m << std::endl;
             }
@@ -1572,7 +1618,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_y_1_sigma_m"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_y_1_sigma_m");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_y_1_sigma_m = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_y_1_sigma_m: " << params.lidar_odometry_motion_model_y_1_sigma_m << std::endl;
             }
@@ -1581,7 +1628,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_z_1_sigma_m"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_z_1_sigma_m");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_z_1_sigma_m = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_z_1_sigma_m: " << params.lidar_odometry_motion_model_z_1_sigma_m << std::endl;
             }
@@ -1590,7 +1638,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_om_1_sigma_deg"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_om_1_sigma_deg");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_om_1_sigma_deg = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_om_1_sigma_deg: " << params.lidar_odometry_motion_model_om_1_sigma_deg << std::endl;
             }
@@ -1599,7 +1648,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_fi_1_sigma_deg"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_fi_1_sigma_deg");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_fi_1_sigma_deg = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_fi_1_sigma_deg: " << params.lidar_odometry_motion_model_fi_1_sigma_deg << std::endl;
             }
@@ -1608,7 +1658,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_ka_1_sigma_deg"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_ka_1_sigma_deg");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_ka_1_sigma_deg = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_ka_1_sigma_deg: " << params.lidar_odometry_motion_model_ka_1_sigma_deg << std::endl;
             }
@@ -1617,7 +1668,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_fix_origin_x_1_sigma_m"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_x_1_sigma_m");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m: " << params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m << std::endl;
             }
@@ -1626,7 +1678,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_fix_origin_y_1_sigma_m"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_y_1_sigma_m");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m: " << params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m << std::endl;
             }
@@ -1635,7 +1688,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_fix_origin_z_1_sigma_m"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_z_1_sigma_m");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m: " << params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m << std::endl;
             }
@@ -1644,7 +1698,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_fix_origin_om_1_sigma_deg"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_om_1_sigma_deg");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg: " << params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg << std::endl;
             }
@@ -1653,7 +1708,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg: " << params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg << std::endl;
             }
@@ -1662,7 +1718,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg"))
         {
             auto &tbl = toml::find(data, "lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg = toml::find<double>(tbl, "value");
                 std::cout << "params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg: " << params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg << std::endl;
             }
@@ -1671,7 +1728,8 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         if (data.contains("real_time_threshold_seconds"))
         {
             auto &tbl = toml::find(data, "real_time_threshold_seconds");
-            if (tbl.contains("value")){
+            if (tbl.contains("value"))
+            {
                 params.real_time_threshold_seconds = toml::find<double>(tbl, "value");
                 std::cout << "params.real_time_threshold_seconds: " << params.real_time_threshold_seconds << std::endl;
             }

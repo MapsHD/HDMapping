@@ -119,7 +119,7 @@ const std::vector<std::string>
 double distance_bucket = 0.5;
 double polar_angle_deg = 5;
 double azimutal_angle_deg = 5;
-double max_distance_lidar = 30.0;
+double max_distance_lidar = 70.0;
 int robust_and_accurate_lidar_odometry_iterations = 20;
 bool useMultithread = true;
 

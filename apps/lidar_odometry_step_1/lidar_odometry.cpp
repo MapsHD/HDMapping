@@ -626,7 +626,7 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
         }
     }
 
-    if (counter > params.min_counter)
+    if (counter > params.min_counter_concatenated_trajectory_nodes)
     {
         worker_data_concatenated.push_back(wd);
     }
@@ -927,37 +927,62 @@ bool SaveParametersToTomlFile(const std::string &filepath, const LidarOdometryPa
 
         file << "# This is toml file with lidar odometry params\n";
 
-        file << "[version]\n";
-        file << "version = " << HDMAPPING_VERSION_MINOR << "\n\n";
+        //file << "[version]\n";
+        //file << "version = " << HDMAPPING_VERSION_MINOR << "\n\n";
 
-        file << "[nr_iter]\n";
+
+
+        file.close();
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error while saving file: " << e.what() << std::endl;
+        return false;
+    }
+
+#if 0
+    try
+    {
+        std::ofstream file(filepath);
+        if (!file.is_open())
+        {
+            std::cerr << "Cannot open file for writing!" << std::endl;
+            return false;
+        }
+
+        
+
+        
+
+        file << "[nr_iter] # Number of LIDAR ODOMETRY iterations, more iterations --> better accuracy and precision, but worse performance \n";
         file << "value = " << params.nr_iter << "\n\n";
 
         file << std::fixed << std::setprecision(7);
 
-        file << "[decimation] # it remains single point per bucket (dim_x_m, dim_y_m, dim_z_m) = (value, value, value)\n";
+        file << "[decimation] # It remains single point per bucket (dim_x_m, dim_y_m, dim_z_m) = (value, value, value)\n";
         file << "value = " << params.decimation << "\n\n";
 
-        file << "[in_out_params_indoor]\n";
+        file << "[in_out_params_indoor] # Bucket size of the inner Normal Distributions Transform (NDT) regular grid decomposition\n";
         file << "resolution_X = " << params.in_out_params_indoor.resolution_X << "\n";
         file << "resolution_Y = " << params.in_out_params_indoor.resolution_Y << "\n";
         file << "resolution_Z = " << params.in_out_params_indoor.resolution_Z << "\n\n";
 
-        file << "[in_out_params_outdoor]\n";
+        file << "[in_out_params_outdoor] # Bucket size of the outer Normal Distributions Transform (NDT) regular grid decomposition \n";
         file << "resolution_X = " << params.in_out_params_outdoor.resolution_X << "\n";
         file << "resolution_Y = " << params.in_out_params_outdoor.resolution_Y << "\n";
         file << "resolution_Z = " << params.in_out_params_outdoor.resolution_Z << "\n\n";
 
-        file << "[filter_threshold_xy_inner] # remove all local points from cylider R < value\n";
+        file << "[filter_threshold_xy_inner] # remove all local points from cylider R < value (during optimisation step)\n";
         file << "value = " << params.filter_threshold_xy_inner << "\n\n";
 
-        file << "[filter_threshold_xy_outer] # remove all local points from cylider R > value\n";
+        file << "[filter_threshold_xy_outer] # remove all local points from cylider R > value (during optimisation step)\n";
         file << "value = " << params.filter_threshold_xy_outer << "\n\n";
 
-        file << "[threshould_output_filter] # remove all local points from cylider R < value (remove shadow points from operator posture)\n";
+        file << "[threshould_output_filter] # remove all local points from cylider R < value (remove shadow points from operator posture during export)\n";
         file << "value = " << params.threshould_output_filter << "\n\n";
 
-        file << "[distance_bucket]\n";
+        file << "[distance_bucket] # experimental (do not change)\n";
         file << "value = " << params.distance_bucket << "\n\n";
 
         file << "[polar_angle_deg]\n";
@@ -978,25 +1003,25 @@ bool SaveParametersToTomlFile(const std::string &filepath, const LidarOdometryPa
         file << "[use_robust_and_accurate_lidar_odometry] # this is experimental --> not yet tested well\n";
         file << "value = " << params.use_robust_and_accurate_lidar_odometry << "\n\n";
 
-        file << "[fusionConventionNed]\n";
+        file << "[fusionConventionNed] # Madgwick filter param: North East Down\n";
         file << "Ned = " << params.fusionConventionNed << "\n\n";
 
-        file << "[fusionConventionNwu]\n";
+        file << "[fusionConventionNwu] # Madgwick filter param: North West Up\n";
         file << "Nwu = " << params.fusionConventionNwu << "\n\n";
 
-        file << "[fusionConventionEnu]\n";
+        file << "[fusionConventionEnu] # Madgwick filter param: East North Up\n";
         file << "Enu = " << params.fusionConventionEnu << "\n\n";
 
-        file << "[use_motion_from_previous_step]\n";
+        file << "[use_motion_from_previous_step] # Prediction model --> it will calculate x,y,z offset from previous optimisation step\n";
         file << "value = " << params.use_motion_from_previous_step << "\n\n";
 
-        file << "[useMultithread]\n";
+        file << "[useMultithread] # Use all CPU cores for better performance\n";
         file << "value = " << params.useMultithread << "\n\n";
 
-        file << "[sliding_window_trajectory_length_threshold] # local map size measured as trajectory lenght\n";
+        file << "[sliding_window_trajectory_length_threshold] # local map size measured as trajectory lenght, all incoming data will be registered with this local map, so the odometry drift can occur when this map is to small or for long straight trajectory \n";
         file << "value = " << params.sliding_window_trajectory_length_threshold << "\n\n";
 
-        file << "[save_calibration_validation]\n";
+        file << "[save_calibration_validation] # save initial lidar data to verify 2xLidars extrinsic calibration in CloudCompare (see file 'calibrationValidation.asc' in folder preview)\n";
         file << "value = " << params.save_calibration_validation << "\n\n";
 
         file << "[calibration_validation_points]\n";
@@ -1121,10 +1146,13 @@ bool SaveParametersToTomlFile(const std::string &filepath, const LidarOdometryPa
         std::cerr << "Error while saving file: " << e.what() << std::endl;
         return false;
     }
+#endif
 }
 
 bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams &params)
 {
+
+#if 0
     try
     {
         toml::value data = toml::parse(filepath);
@@ -1743,4 +1771,6 @@ bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams
         std::cerr << "Failed to load parameters: " << e.what() << "\n";
         return false;
     }
+
+#endif
 }

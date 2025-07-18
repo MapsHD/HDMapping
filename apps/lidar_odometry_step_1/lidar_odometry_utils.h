@@ -40,70 +40,42 @@ using NDTBucketMapType2 = std::unordered_map<uint64_t, NDT::Bucket2>;
 
 struct LidarOdometryParams
 {
-    double filter_threshold_xy_inner = 0.3;
-    double filter_threshold_xy_outer = 70.0;
-    Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
-    std::vector<Point3Di> initial_points;
-
-    NDT::GridParameters in_out_params_indoor;
-    NDTBucketMapType buckets_indoor;
-
-    NDT::GridParameters in_out_params_outdoor;
-    NDTBucketMapType buckets_outdoor;
-
-    bool use_motion_from_previous_step = true;
-    double consecutive_distance = 0.0;
-    int nr_iter = 100;
+    //perfromance
     bool useMultithread = true;
-    std::vector<Point3Di> reference_points;
-    // double decimation = 0.1;
-    double decimation = 0.01;
-    NDTBucketMapType reference_buckets;
-    std::string working_directory_preview = "";
-    double sliding_window_trajectory_length_threshold = 5.0;
-    bool save_calibration_validation = true;
-    int calibration_validation_points = 1000000;
-    double max_distance_lidar = 70.0;
-    // double max_distance = 70.0;
+    double real_time_threshold_seconds = 10.0; // for realtime use: threshold_nr_poses * 0.005, where 0.005 is related with IMU frequency
 
-    // rgd_sf
-    bool use_robust_and_accurate_lidar_odometry = false;
-    double distance_bucket = 0.2;
-    double polar_angle_deg = 10.0;
-    double azimutal_angle_deg = 10.0;
-    int robust_and_accurate_lidar_odometry_iterations = 20;
-    
-    double distance_bucket_rigid_sf = 0.5;
-    double polar_angle_deg_rigid_sf = 10.0;
-    double azimutal_angle_deg_rigid_sf = 10.0;
-    int robust_and_accurate_lidar_odometry_rigid_sf_iterations = 30;
-    double max_distance_lidar_rigid_sf = 70.0;
+    //filter points
+    double filter_threshold_xy_inner = 0.3; //filtering points during load
+    double filter_threshold_xy_outer = 70.0; //filtering points during load
+    double decimation = 0.01;                // filtering points during load
+    double threshould_output_filter = 0.5; //for export --> all points xyz.norm() < threshould_output_filter will be removed
+    int min_counter_concatenated_trajectory_nodes = 10; //for export
 
-    double rgd_sf_sigma_x_m = 0.001;
-    double rgd_sf_sigma_y_m = 0.001;
-    double rgd_sf_sigma_z_m = 0.001;
-    double rgd_sf_sigma_om_deg = 0.01;
-    double rgd_sf_sigma_fi_deg = 0.01;
-    double rgd_sf_sigma_ka_deg = 0.01;
-
-    double total_length_of_calculated_trajectory = 0.0;
+    //Madgwick filter
     bool fusionConventionNwu = true;
     bool fusionConventionEnu = false;
     bool fusionConventionNed = false;
-    int threshold_initial_points = 10000;
-
-    bool use_mutliple_gaussian = false;
-    int num_constistency_iter = 10;
-    double threshould_output_filter = 0.5;
     double ahrs_gain = 0.5;
+
+    //lidar odometry control
+    bool use_motion_from_previous_step = true;
+    int nr_iter = 100;
+    NDT::GridParameters in_out_params_indoor;
+    NDT::GridParameters in_out_params_outdoor;
+    double sliding_window_trajectory_length_threshold = 5.0;
+    double max_distance_lidar = 70.0; // I am not processing data above dist distance in lidar odometry
+    int threshold_initial_points = 10000;
     int threshold_nr_poses = 20;
-    int min_counter = 10;
 
-    // for automatic mode
-    std::string current_output_dir = "";
+    //lidar odometry debug info
+    bool save_calibration_validation = true;
+    int calibration_validation_points = 1000000;
 
-    TaitBryanPose motion_model_correction;
+    //consistency
+    int num_constistency_iter = 10;
+    bool use_mutliple_gaussian = false;
 
+    // motion_model uncertainty
     double lidar_odometry_motion_model_x_1_sigma_m = 0.0005;
     double lidar_odometry_motion_model_y_1_sigma_m = 0.0005;
     double lidar_odometry_motion_model_z_1_sigma_m = 0.0005;
@@ -112,6 +84,7 @@ struct LidarOdometryParams
     double lidar_odometry_motion_model_fi_1_sigma_deg = 0.01;
     double lidar_odometry_motion_model_ka_1_sigma_deg = 0.01;
 
+    // motion_model first trajectory node prior uncertainty
     double lidar_odometry_motion_model_fix_origin_x_1_sigma_m = 0.000001;
     double lidar_odometry_motion_model_fix_origin_y_1_sigma_m = 0.000001;
     double lidar_odometry_motion_model_fix_origin_z_1_sigma_m = 0.000001;
@@ -119,7 +92,40 @@ struct LidarOdometryParams
     double lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg = 0.000001;
     double lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg = 0.000001;
 
-    double real_time_threshold_seconds = 10.0;
+    // motion model correction (experimental --> not recommended yet)
+    TaitBryanPose motion_model_correction;
+
+    // robust lidar odometry control (experimental --> not recommended yet)
+    bool use_robust_and_accurate_lidar_odometry = false;
+    double distance_bucket = 0.2;
+    double polar_angle_deg = 10.0;
+    double azimutal_angle_deg = 10.0;
+    int robust_and_accurate_lidar_odometry_iterations = 20;
+    double distance_bucket_rigid_sf = 0.5;
+    double polar_angle_deg_rigid_sf = 10.0;
+    double azimutal_angle_deg_rigid_sf = 10.0;
+    int robust_and_accurate_lidar_odometry_rigid_sf_iterations = 30;
+    double max_distance_lidar_rigid_sf = 70.0;
+    double rgd_sf_sigma_x_m = 0.001;
+    double rgd_sf_sigma_y_m = 0.001;
+    double rgd_sf_sigma_z_m = 0.001;
+    double rgd_sf_sigma_om_deg = 0.01;
+    double rgd_sf_sigma_fi_deg = 0.01;
+    double rgd_sf_sigma_ka_deg = 0.01;
+
+    //paths
+    std::string current_output_dir = "";
+    std::string working_directory_preview = "";
+
+    //other
+    Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
+    std::vector<Point3Di> initial_points;
+    double consecutive_distance = 0.0;
+    std::vector<Point3Di> reference_points;
+    NDTBucketMapType reference_buckets;
+    double total_length_of_calculated_trajectory = 0.0;
+    NDTBucketMapType buckets_indoor;
+    NDTBucketMapType buckets_outdoor;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);

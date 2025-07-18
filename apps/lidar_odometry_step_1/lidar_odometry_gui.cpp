@@ -19,7 +19,7 @@
 #include <pfd_wrapper.hpp>
 #include <export_laz.h>
 
-#include <toml.hpp>
+#include "toml_io.h"
 
 // This is LiDAR odometry (step 1)
 // This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system https://github.com/JanuszBedkowski/mandeye_controller
@@ -188,7 +188,8 @@ void lidar_odometry_gui()
 
             if (!output_file_name.empty())
             {
-                bool success = SaveParametersToTomlFile(output_file_name, params);
+                TomlIO toml_io;
+                bool success = toml_io.SaveParametersToTomlFile(output_file_name, params);
                 if (success)
                 {
                     std::cout << "Parameters file generated: " << output_file_name << std::endl;
@@ -225,15 +226,18 @@ void lidar_odometry_gui()
             {
                 try
                 {
-                    bool success = LoadParametersFromTomlFile(input_file_names[0], params);
-                    if (success)
-                    {
-                        std::cout << "Parameters loaded OK" << std::endl;
-                    }
-                    else
-                    {
-                        std::cerr << "Failed to load parameters from file" << std::endl;
-                    }
+                    TomlIO toml_io;
+                    toml_io.LoadParametersFromTomlFile(input_file_names[0], params);
+                    
+                    // bool success = LoadParametersFromTomlFile(input_file_names[0], params);
+                    // if (success)
+                    // {
+                    //     std::cout << "Parameters loaded OK" << std::endl;
+                    // }
+                    // else
+                    // {
+                    //     std::cerr << "Failed to load parameters from file" << std::endl;
+                    // }
                 }
                 catch (const std::exception &e)
                 {
@@ -1537,16 +1541,16 @@ int main(int argc, char *argv[])
     {
         if (argc == 4)
         {
-            bool success = LoadParametersFromTomlFile(argv[2], params);
-            if (success)
-            {
-                std::cout << "Parameters loaded OK" << std::endl;
-            }
-            else
-            {
-                std::cerr << "Failed to load parameters from file" << std::endl;
-                return 1;
-            }
+            // bool success = LoadParametersFromTomlFile(argv[2], params);
+            // if (success)
+            // {
+            //     std::cout << "Parameters loaded OK" << std::endl;
+            // }
+            // else
+            // {
+            //     std::cerr << "Failed to load parameters from file" << std::endl;
+            //     return 1;
+            // }
 
             std::string working_directory;
             std::vector<WorkerData> worker_data;

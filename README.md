@@ -18,6 +18,7 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-kiss-icp-to-hdmapping
 - https://github.com/MapsHD/benchmark-DLO-to-hdmapping
 - https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping 
+- https://github.com/MapsHD/benchmark-DLIO-to-hdmapping
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

@@ -14,8 +14,10 @@ This is open-source software for large-scale 3D mapping using an open-hardware h
 - Lidar odometry for HDMapping project utilizing KISS-ICP https://github.com/michalpelka/kiss-lidarodometry
 
 # Compatible other SOTA algorithms (benchmark) 
+All following algorithms are generating session compatible with 'multi_view_tls_registration_step_2'
 - https://github.com/MapsHD/benchmark-kiss-icp-to-hdmapping
 - https://github.com/MapsHD/benchmark-DLO-to-hdmapping
+- https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping 
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

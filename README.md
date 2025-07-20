@@ -13,6 +13,10 @@ This is open-source software for large-scale 3D mapping using an open-hardware h
 - Handheld Setup for Recording with Mid360 Lidar and Camera https://github.com/RomanStadlhuber/livo-handheld 
 - Lidar odometry for HDMapping project utilizing KISS-ICP https://github.com/michalpelka/kiss-lidarodometry
 
+# Compatible other SOTA algorithms (benchmark) 
+- https://github.com/MapsHD/benchmark-kiss-icp-to-hdmapping
+- https://github.com/MapsHD/benchmark-DLO-to-hdmapping
+
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z
 - unpack `quick_start_demo.7z` with 7-Zip (https://7-zip.org/)

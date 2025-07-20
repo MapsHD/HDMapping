@@ -198,23 +198,6 @@ void lidar_odometry_gui()
                 {
                     std::cerr << "Failed to save parameters." << std::endl;
                 }
-
-                /*std::ofstream configFile(output_file_name);
-
-                if (!configFile.is_open())
-                {
-                    std::cerr << "Error: Could not create or open output_param.toml" << std::endl;
-                    return;
-                }
-
-                configFile << "[lidar_odometry]" << std::endl;
-                configFile << "version = " << HDMAPPING_VERSION_MINOR << std::endl;
-                configFile << "filter_threshold_xy_inner = " << params.filter_threshold_xy_inner << std::endl;
-                configFile << "filter_threshold_xy_outer = " << params.filter_threshold_xy_outer << std::endl;
-                configFile << "use_motion_from_previous_step = " << (int)params.use_motion_from_previous_step << std::endl;
-
-                configFile.close();
-                std::cout << "Output parameters file has been successfully saved to '" << output_file_name << "'" << std::endl;*/
             }
         }
 
@@ -229,45 +212,11 @@ void lidar_odometry_gui()
                     TomlIO toml_io;
                     toml_io.LoadParametersFromTomlFile(input_file_names[0], params);
                     
-                    // bool success = LoadParametersFromTomlFile(input_file_names[0], params);
-                    // if (success)
-                    // {
-                    //     std::cout << "Parameters loaded OK" << std::endl;
-                    // }
-                    // else
-                    // {
-                    //     std::cerr << "Failed to load parameters from file" << std::endl;
-                    // }
                 }
                 catch (const std::exception &e)
                 {
                     std::cerr << "Error loading TOML file: " << e.what() << std::endl;
                 }
-
-                /*
-                std::cout << "Parameters file to load: '" << input_file_names[0] << "'" << std::endl;
-
-                auto data = toml::parse(input_file_names[0]);
-
-                std::cout << "-----------------------------------" << std::endl;
-
-                if (data.contains("lidar_odometry"))
-                {
-                    const auto &tls = data["lidar_odometry"].as_table();
-
-                    int version = toml::get<int>(data.at("version"));
-                    std::cout << "version: '" << version << "'" << std::endl;
-
-                    params.filter_threshold_xy_inner = toml::get<double>(data.at("filter_threshold_xy_inner"));
-                    std::cout << "filter_threshold_xy_inner: '" << params.filter_threshold_xy_inner << "'" << std::endl;
-
-                    //params.filter_threshold_xy_outer = toml::get<double>(tls.at("filter_threshold_xy_outer"));
-                    //std::cout << "filter_threshold_xy_outer: '" << params.filter_threshold_xy_outer << "'" << std::endl;
-
-                    //params.use_motion_from_previous_step = toml::get<int>(tls.at("use_motion_from_previous_step"));
-                    //std::cout << "use_motion_from_previous_step: '" << (int)params.use_motion_from_previous_step << "'" << std::endl;
-                }
-                */
             }
         }
 
@@ -1025,11 +974,11 @@ void lidar_odometry_basic_gui()
                         message_info.c_str(),
                         pfd::choice::ok, pfd::icon::info);
                     message.result();
+
+                    loRunning = false;
                 });
             loThread.detach();
         }
-
-        
 
         if (!loRunning)
         {

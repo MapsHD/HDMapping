@@ -20,7 +20,8 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping 
 - https://github.com/MapsHD/benchmark-DLIO-to-hdmapping
 - https://github.com/MapsHD/benchmark-Point-LIO-to-HDMapping
-- https://github.com/MapsHD/fast-lio-to-hdmapping
+- https://github.com/MapsHD/benchmark-fast-lio-to-hdmapping
+- https://github.com/MapsHD/benchmark-Faster-LIO-to-hdmapping
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

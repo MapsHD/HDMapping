@@ -21,6 +21,7 @@ class GNSS{
         double fix_quality;
         double x;
         double y;
+        double dist_xy_along;
     };
 
     GNSS(){;};

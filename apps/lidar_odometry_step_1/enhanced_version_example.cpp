@@ -24,27 +24,27 @@ void example_robust_version_handling() {
         auto version_info = toml_io.CheckConfigVersion(config_file);
         
         if (!version_info.found) {
-            std::cout << "📄 Legacy config detected (no version info)" << std::endl;
-            std::cout << "   → Will auto-update during load" << std::endl;
+            std::cout << "[LEGACY] Legacy config detected (no version info)" << std::endl;
+            std::cout << "   -> Will auto-update during load" << std::endl;
         } else {
-            std::cout << "📄 Config version: " << version_info.software_version << std::endl;
+            std::cout << "[CONFIG] Config version: " << version_info.software_version << std::endl;
             std::cout << "   Created on: " << version_info.build_date << std::endl;
             
             std::string current = get_software_version();
             if (toml_io.IsVersionCompatible(version_info.software_version, current)) {
-                std::cout << "   Status: ✅ Compatible" << std::endl;
+                std::cout << "   Status: [COMPATIBLE] Compatible" << std::endl;
             } else {
-                std::cout << "   Status: ⚠️  May need update" << std::endl;
+                std::cout << "   Status: [WARNING] May need update" << std::endl;
             }
         }
         
         // 2. Load configuration (with automatic version handling)
         LidarOdometryParams params;
         if (toml_io.LoadParametersFromTomlFile(config_file, params)) {
-            std::cout << "✅ Configuration loaded successfully!" << std::endl;
+            std::cout << "[SUCCESS] Configuration loaded successfully!" << std::endl;
             std::cout << "   Final version: " << params.software_version << std::endl;
         } else {
-            std::cout << "❌ Failed to load configuration" << std::endl;
+            std::cout << "[ERROR] Failed to load configuration" << std::endl;
         }
     }
 }
@@ -60,7 +60,7 @@ void application_version_handling_example() {
     auto version_info = toml_io.CheckConfigVersion(config_file);
     
     if (!version_info.found) {
-        std::cout << "🔄 Detected legacy configuration without version info" << std::endl;
+        std::cout << "[LEGACY] Detected legacy configuration without version info" << std::endl;
         std::cout << "   Options:" << std::endl;
         std::cout << "   1. Load and auto-update (recommended)" << std::endl;
         std::cout << "   2. Create backup before loading" << std::endl;
@@ -68,22 +68,22 @@ void application_version_handling_example() {
         
         // Example: Create backup for safety
         std::string backup_file = config_file + ".backup";
-        std::cout << "   → Creating backup: " << backup_file << std::endl;
+        std::cout << "   -> Creating backup: " << backup_file << std::endl;
         // std::filesystem::copy_file(config_file, backup_file); // Uncomment in real code
         
     } else {
         std::string current_version = get_software_version();
         if (!toml_io.IsVersionCompatible(version_info.software_version, current_version)) {
-            std::cout << "🔄 Version mismatch detected" << std::endl;
+            std::cout << "[VERSION] Version mismatch detected" << std::endl;
             std::cout << "   File version: " << version_info.software_version << std::endl;
             std::cout << "   Current version: " << current_version << std::endl;
             
             // Determine action based on version difference
             if (version_info.software_version < current_version) {
-                std::cout << "   → Config is older, will upgrade during load" << std::endl;
+                std::cout << "   -> Config is older, will upgrade during load" << std::endl;
             } else {
-                std::cout << "   → Config is newer, potential compatibility issues" << std::endl;
-                std::cout << "   → Recommend updating HDMapping software" << std::endl;
+                std::cout << "   -> Config is newer, potential compatibility issues" << std::endl;
+                std::cout << "   -> Recommend updating HDMapping software" << std::endl;
             }
         }
     }
@@ -95,14 +95,14 @@ void application_version_handling_example() {
     if (loaded) {
         // Check if version was updated and offer to save
         if (!version_info.found || version_info.software_version != params.software_version) {
-            std::cout << "💾 Configuration was updated with current version" << std::endl;
+            std::cout << "[SAVE] Configuration was updated with current version" << std::endl;
             std::cout << "   Save updated config? (y/n): ";
             
             // In real application, get user input
             char response = 'y'; // Simulated user response
             if (response == 'y' || response == 'Y') {
                 if (toml_io.SaveParametersToTomlFile(config_file, params)) {
-                    std::cout << "   ✅ Updated configuration saved" << std::endl;
+                    std::cout << "   [SUCCESS] Updated configuration saved" << std::endl;
                 }
             }
         }
@@ -131,20 +131,20 @@ What happens when version info is missing from TOML:
    Console output examples:
    
    For missing version:
-   ⚠️  No version information found in config file: legacy_config.toml
+   WARNING: No version information found in config file: legacy_config.toml
       This config was created with an older version of HDMapping.
-      → Updated config with current version: 0.84.0
-      → Consider saving the config to persist version information.
+      -> Updated config with current version: 0.84.0
+      -> Consider saving the config to persist version information.
    
    For version mismatch:
-   ⚠️  Version mismatch detected:
+   WARNING: Version mismatch detected:
       Config version: 0.83.0
       Current version: 0.84.0
       Config created on: Jul 15 2025
       Consider updating the configuration file.
       
    For compatible version:
-   ✅ Version compatible: 0.84.0
+   SUCCESS: Version compatible: 0.84.0
 
 BEST PRACTICES:
 - Always call CheckConfigVersion() before loading for user feedback

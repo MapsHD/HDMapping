@@ -10,6 +10,15 @@ bool TomlIO::SaveParametersToTomlFile(const std::string &filepath, LidarOdometry
         {
             if (attribute == "in_out_params_indoor" || attribute == "in_out_params_outdoor")
                 continue;
+            
+            // Check if it's a motion_model_correction parameter
+            auto motion_it = MOTION_MODEL_CORRECTION_POINTERS.find(attribute);
+            if (motion_it != MOTION_MODEL_CORRECTION_POINTERS.end())
+            {
+                cat_tbl.insert(attribute, params.motion_model_correction.*(motion_it->second));
+                continue;
+            }
+            
             auto it = POINTERS.find(attribute);
             if (it == POINTERS.end())
                 continue;
@@ -112,6 +121,19 @@ bool TomlIO::LoadParametersFromTomlFile(const std::string &filepath, LidarOdomet
             // grid params will be processed separately
             if (attribute == "in_out_params_indoor" || attribute == "in_out_params_outdoor")
                 continue;
+            
+            // Check if it's a motion_model_correction parameter
+            auto motion_it = MOTION_MODEL_CORRECTION_POINTERS.find(attribute);
+            if (motion_it != MOTION_MODEL_CORRECTION_POINTERS.end())
+            {
+                auto attr_it = cat_tbl->find(attribute);
+                if (attr_it != cat_tbl->end())
+                {
+                    params.motion_model_correction.*(motion_it->second) = attr_it->second.value_or(0.0);
+                }
+                continue;
+            }
+            
             auto it = POINTERS.find(attribute);
             if (it == POINTERS.end())
                 continue;

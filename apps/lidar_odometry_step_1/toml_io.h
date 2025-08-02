@@ -20,6 +20,11 @@ public:
         std::string LidarOdometryParams::*>;
 
     const std::map<std::string, ParamValue> POINTERS = {
+        // version information
+        {"software_version", &LidarOdometryParams::software_version},
+        {"config_version", &LidarOdometryParams::config_version},
+        {"build_date", &LidarOdometryParams::build_date},
+        
         {"useMultithread", &LidarOdometryParams::useMultithread},
         {"real_time_threshold_seconds", &LidarOdometryParams::real_time_threshold_seconds},
         {"filter_threshold_xy_inner", &LidarOdometryParams::filter_threshold_xy_inner},
@@ -79,6 +84,7 @@ public:
         {"motion_model_correction_ka", &TaitBryanPose::ka}};
 
     std::map<std::string, std::vector<std::string>> CATEGORIES = {
+        {"version_info", {"software_version", "config_version", "build_date"}},
         {"performance", {"useMultithread", "real_time_threshold_seconds"}},
         {"filter_points", {"filter_threshold_xy_inner", "filter_threshold_xy_outer", "decimation", "threshould_output_filter", "min_counter_concatenated_trajectory_nodes"}},
         {"madgwick_filter", {"fusionConventionNwu", "fusionConventionEnu", "fusionConventionNed", "ahrs_gain"}},

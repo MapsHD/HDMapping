@@ -97,6 +97,19 @@ public:
         {"paths", {"current_output_dir", "working_directory_preview"}}};
 
     bool SaveParametersToTomlFile(const std::string &filepath, LidarOdometryParams &params);
+    
+    // Version validation and handling functions
+    struct VersionInfo {
+        std::string software_version;
+        std::string config_version;
+        std::string build_date;
+        bool found = false;
+    };
+    
+    VersionInfo CheckConfigVersion(const std::string &filepath);
+    bool IsVersionCompatible(const std::string &file_version, const std::string &current_version);
+    void HandleMissingVersion(LidarOdometryParams &params);
+    
     template <typename T>
     void set_if_exists(NDT::GridParameters &grid, const toml::table *tbl, const std::string &key, T NDT::GridParameters::*member);
     void read_grid_params(NDT::GridParameters &grid, const toml::table *grid_tbl);

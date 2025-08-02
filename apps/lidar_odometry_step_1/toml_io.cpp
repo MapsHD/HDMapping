@@ -1,4 +1,6 @@
 #include "toml_io.h"
+#include <iostream>
+#include <sstream>
 
 bool TomlIO::SaveParametersToTomlFile(const std::string &filepath, LidarOdometryParams &params)
 {
@@ -159,5 +161,89 @@ bool TomlIO::LoadParametersFromTomlFile(const std::string &filepath, LidarOdomet
     }
     read_grid_params(params.in_out_params_indoor, tbl["in_out_params_indoor"].as_table());
     read_grid_params(params.in_out_params_outdoor, tbl["in_out_params_outdoor"].as_table());
+    
+    // Check and handle version information
+    auto version_info = CheckConfigVersion(filepath);
+    if (!version_info.found) {
+        std::cout << "⚠️  No version information found in config file: " << filepath << std::endl;
+        std::cout << "   This config was created with an older version of HDMapping." << std::endl;
+        HandleMissingVersion(params);
+    } else {
+        std::string current_version = get_software_version();
+        if (!IsVersionCompatible(version_info.software_version, current_version)) {
+            std::cout << "⚠️  Version mismatch detected:" << std::endl;
+            std::cout << "   Config version: " << version_info.software_version << std::endl;
+            std::cout << "   Current version: " << current_version << std::endl;
+            std::cout << "   Config created on: " << version_info.build_date << std::endl;
+            std::cout << "   Consider updating the configuration file." << std::endl;
+        } else {
+            std::cout << "✅ Version compatible: " << current_version << std::endl;
+        }
+    }
+    
     return true;
+}
+
+// Version validation and handling implementations
+TomlIO::VersionInfo TomlIO::CheckConfigVersion(const std::string &filepath) {
+    VersionInfo info;
+    
+    try {
+        auto config = toml::parse_file(filepath);
+        
+        if (config.contains("version_info")) {
+            auto version_section = config["version_info"].as_table();
+            if (version_section) {
+                info.software_version = version_section->get("software_version").value_or("");
+                info.config_version = version_section->get("config_version").value_or("");
+                info.build_date = version_section->get("build_date").value_or("");
+                info.found = true;
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error checking version in config: " << e.what() << std::endl;
+    }
+    
+    return info;
+}
+
+bool TomlIO::IsVersionCompatible(const std::string &file_version, const std::string &current_version) {
+    if (file_version.empty() || current_version.empty()) {
+        return false;
+    }
+    
+    // Parse version numbers (simple implementation)
+    auto parse_version = [](const std::string& version) {
+        std::vector<int> parts;
+        std::stringstream ss(version);
+        std::string item;
+        while (std::getline(ss, item, '.')) {
+            try {
+                parts.push_back(std::stoi(item));
+            } catch (...) {
+                parts.push_back(0);
+            }
+        }
+        return parts;
+    };
+    
+    auto file_parts = parse_version(file_version);
+    auto current_parts = parse_version(current_version);
+    
+    // Ensure both have at least 3 parts (major.minor.patch)
+    while (file_parts.size() < 3) file_parts.push_back(0);
+    while (current_parts.size() < 3) current_parts.push_back(0);
+    
+    // Compatible if major and minor versions match
+    return (file_parts[0] == current_parts[0]) && (file_parts[1] == current_parts[1]);
+}
+
+void TomlIO::HandleMissingVersion(LidarOdometryParams &params) {
+    // Set current version information for missing version configs
+    params.software_version = get_software_version();
+    params.config_version = "1.0";
+    params.build_date = __DATE__;
+    
+    std::cout << "   → Updated config with current version: " << params.software_version << std::endl;
+    std::cout << "   → Consider saving the config to persist version information." << std::endl;
 }

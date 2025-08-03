@@ -20,7 +20,6 @@
 #include <export_laz.h>
 #include <ctime>
 #include <chrono>
-
 #include "toml_io.h"
 
 // This is LiDAR odometry (step 1)
@@ -228,6 +227,7 @@ void lidar_odometry_gui()
 
             if (!output_file_name.empty())
             {
+                // Use the original TomlIO class for saving parameters in GUI
                 TomlIO toml_io;
                 bool success = toml_io.SaveParametersToTomlFile(output_file_name, params);
                 if (success)
@@ -249,9 +249,10 @@ void lidar_odometry_gui()
             {
                 try
                 {
+                    // Use the original TomlIO class for loading parameters in GUI
                     TomlIO toml_io;
                     toml_io.LoadParametersFromTomlFile(input_file_names[0], params);
-                    
+                    std::cout << "Parameters loaded from: " << input_file_names[0] << std::endl;
                 }
                 catch (const std::exception &e)
                 {
@@ -1569,19 +1570,10 @@ int main(int argc, char *argv[])
     {
         if (argc == 4)
         {
+            // Load parameters from file using original TomlIO class
             TomlIO toml_io;
             toml_io.LoadParametersFromTomlFile(argv[2], params);
-
-            // bool success = LoadParametersFromTomlFile(argv[2], params);
-            // if (success)
-            // {
-            //     std::cout << "Parameters loaded OK" << std::endl;
-            // }
-            // else
-            // {
-            //     std::cerr << "Failed to load parameters from file" << std::endl;
-            //     return 1;
-            // }
+            std::cout << "Parameters loaded OK from: " << argv[2] << std::endl;
 
             std::string working_directory;
             std::vector<WorkerData> worker_data;

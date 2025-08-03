@@ -766,6 +766,12 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     std::ofstream fs(path3.string());
     fs << jj.dump(2);
     fs.close();
+    
+    // Save parameters to TOML file (loadable parameters only)
+    save_parameters_toml(params, outwd, elapsed_time_s);
+    
+    // Save processing results and complex data to JSON file
+    save_processing_results_json(params, outwd, elapsed_time_s);
 }
 
 void filter_reference_buckets(LidarOdometryParams &params)
@@ -911,4 +917,124 @@ std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryP
         return worker_data;
     }
     return worker_data;
+}
+
+void save_parameters_toml(const LidarOdometryParams &params, const fs::path &outwd, double elapsed_seconds)
+{
+    // Get current date and time
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    auto tm = *std::localtime(&time_t);
+    
+    // Format: YYYY-MM-DD_HH-MM
+    std::ostringstream datetime_stream;
+    datetime_stream << std::put_time(&tm, "%Y-%m-%d_%H-%M");
+    std::string datetime_str = datetime_stream.str();
+    
+    // Create filename with version info and datetime for TOML parameters
+    std::string toml_filename = "HDMapping_params_" + params.software_version + "_" + datetime_str + ".toml";
+    fs::path toml_path = outwd / toml_filename;
+    
+    try {
+        // Use existing TomlIO class to save loadable parameters
+        TomlIO toml_io;
+        
+        // Make a non-const copy for the TomlIO class (it needs non-const reference)
+        LidarOdometryParams params_copy = params;
+        
+        bool success = toml_io.SaveParametersToTomlFile(toml_path.string(), params_copy);
+        
+        if (success) {
+            std::cout << "Parameters saved to TOML file: " << toml_path << std::endl;
+        } else {
+            std::cerr << "Failed to save parameters to TOML file: " << toml_path << std::endl;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error saving parameters to TOML file: " << e.what() << std::endl;
+    }
+}
+
+void save_processing_results_json(const LidarOdometryParams &params, const fs::path &outwd, double elapsed_seconds)
+{
+    // Get current date and time
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    auto tm = *std::localtime(&time_t);
+    
+    // Format: YYYY-MM-DD_HH-MM
+    std::ostringstream datetime_stream;
+    datetime_stream << std::put_time(&tm, "%Y-%m-%d_%H-%M");
+    std::string datetime_str = datetime_stream.str();
+    
+    // Create filename for processing results and complex data
+    std::string json_filename = "HDMapping_results_" + params.software_version + "_" + datetime_str + ".json";
+    fs::path json_path = outwd / json_filename;
+    
+    try {
+        // Create JSON structure for processing results and complex data
+        nlohmann::json results;
+        
+        // Processing metadata
+        results["processing_info"]["software_version"] = params.software_version;
+        results["processing_info"]["config_version"] = params.config_version;
+        results["processing_info"]["build_date"] = params.build_date;
+        results["processing_info"]["processing_date"] = datetime_str;
+        results["processing_info"]["elapsed_time_seconds"] = elapsed_seconds;
+        
+        // Processing results and computed values
+        results["trajectory_results"]["total_length_calculated"] = params.total_length_of_calculated_trajectory;
+        results["trajectory_results"]["consecutive_distance"] = params.consecutive_distance;
+        results["directory_info"]["current_output_dir"] = params.current_output_dir;
+        results["directory_info"]["working_directory_preview"] = params.working_directory_preview;
+        
+        // Complex data structures that can't be easily loaded back as parameters
+        // NDT grid parameters (read-only results)
+        results["ndt_grid_indoor"]["bounding_box_min_X"] = params.in_out_params_indoor.bounding_box_min_X;
+        results["ndt_grid_indoor"]["bounding_box_min_Y"] = params.in_out_params_indoor.bounding_box_min_Y;
+        results["ndt_grid_indoor"]["bounding_box_min_Z"] = params.in_out_params_indoor.bounding_box_min_Z;
+        results["ndt_grid_indoor"]["bounding_box_max_X"] = params.in_out_params_indoor.bounding_box_max_X;
+        results["ndt_grid_indoor"]["bounding_box_max_Y"] = params.in_out_params_indoor.bounding_box_max_Y;
+        results["ndt_grid_indoor"]["bounding_box_max_Z"] = params.in_out_params_indoor.bounding_box_max_Z;
+        results["ndt_grid_indoor"]["resolution_X"] = params.in_out_params_indoor.resolution_X;
+        results["ndt_grid_indoor"]["resolution_Y"] = params.in_out_params_indoor.resolution_Y;
+        results["ndt_grid_indoor"]["resolution_Z"] = params.in_out_params_indoor.resolution_Z;
+        results["ndt_grid_indoor"]["number_of_buckets"] = static_cast<long long>(params.in_out_params_indoor.number_of_buckets);
+        
+        results["ndt_grid_outdoor"]["bounding_box_min_X"] = params.in_out_params_outdoor.bounding_box_min_X;
+        results["ndt_grid_outdoor"]["bounding_box_min_Y"] = params.in_out_params_outdoor.bounding_box_min_Y;
+        results["ndt_grid_outdoor"]["bounding_box_min_Z"] = params.in_out_params_outdoor.bounding_box_min_Z;
+        results["ndt_grid_outdoor"]["bounding_box_max_X"] = params.in_out_params_outdoor.bounding_box_max_X;
+        results["ndt_grid_outdoor"]["bounding_box_max_Y"] = params.in_out_params_outdoor.bounding_box_max_Y;
+        results["ndt_grid_outdoor"]["bounding_box_max_Z"] = params.in_out_params_outdoor.bounding_box_max_Z;
+        results["ndt_grid_outdoor"]["resolution_X"] = params.in_out_params_outdoor.resolution_X;
+        results["ndt_grid_outdoor"]["resolution_Y"] = params.in_out_params_outdoor.resolution_Y;
+        results["ndt_grid_outdoor"]["resolution_Z"] = params.in_out_params_outdoor.resolution_Z;
+        results["ndt_grid_outdoor"]["number_of_buckets"] = static_cast<long long>(params.in_out_params_outdoor.number_of_buckets);
+        
+        // Motion model correction (complex structure)
+        results["motion_model_correction"]["om"] = params.motion_model_correction.om;
+        results["motion_model_correction"]["fi"] = params.motion_model_correction.fi;
+        results["motion_model_correction"]["ka"] = params.motion_model_correction.ka;
+        
+        // Transformation matrix (if needed for debugging)
+        auto& m_g = params.m_g;
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                results["transformation_matrix"][i][j] = m_g(i, j);
+            }
+        }
+        
+        // Save JSON file
+        std::ofstream file(json_path);
+        if (file.is_open()) {
+            file << results.dump(4);  // Pretty print with 4-space indentation
+            file.close();
+            std::cout << "Processing results saved to JSON file: " << json_path << std::endl;
+            std::cout << "Processing time: " << elapsed_seconds << " seconds" << std::endl;
+        } else {
+            std::cerr << "Failed to create results JSON file: " << json_path << std::endl;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error saving processing results to JSON file: " << e.what() << std::endl;
+    }
 }

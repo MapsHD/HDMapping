@@ -22,6 +22,7 @@ The `HD_CPU_OPTIMIZATION` CMake variable controls which optimization strategy is
 | `AUTO` | **Default** - Automatically detects CPU and applies optimal flags | Recommended for most users |
 | `AMD` | Aggressive optimizations for AMD processors | Force AMD optimizations |
 | `INTEL` | Conservative optimizations for Intel processors | Force Intel optimizations |
+| `ARM` | ARM processor optimizations (ARMv7, ARMv8, ARM64 with NEON SIMD) | ARM-based systems |
 | `GENERIC` | Safe, universal optimizations | Maximum compatibility |
 
 ## 🔧 Build Configuration
@@ -50,6 +51,9 @@ cmake .. -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=AMD
 # Force Intel optimizations (conservative, stable)
 cmake .. -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=INTEL
 
+# Force ARM optimizations (ARM processors with NEON SIMD)
+cmake .. -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=ARM
+
 # Generic optimizations (maximum compatibility)
 cmake .. -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=GENERIC
 
@@ -62,15 +66,22 @@ cmake .. -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=AUTO
 ### AUTO Mode (Default Behavior)
 When `HD_CPU_OPTIMIZATION=AUTO` (or not specified), the system:
 
-1. **Detects your CPU** using `cmake_host_system_information`
+1. **Detects your CPU** using `cmake_host_system_information` and `CMAKE_SYSTEM_PROCESSOR`
 2. **Automatically selects** the best optimization strategy:
    - **AMD processors** → Uses AMD optimization profile
    - **Intel/Generic processors** → Uses Intel optimization profile
+   - **ARM processors** → Uses ARM optimization profile
 
 #### Example Output:
 ```
 -- Auto-detected AMD processor - enabling AMD optimizations
 -- Enabling AVX2 optimizations for AMD processor
+
+-- Auto-detected ARM64 processor - enabling ARM optimizations  
+-- Enabling Advanced SIMD (NEON) optimizations for ARM64 processor
+
+-- Auto-detected Intel/Generic processor - using Intel optimizations
+-- Enabling AVX optimizations for Intel processor
 ```
 
 ### AMD Optimizations (`HD_CPU_OPTIMIZATION=AMD`)
@@ -104,6 +115,24 @@ When `HD_CPU_OPTIMIZATION=AUTO` (or not specified), the system:
 - **Defines:** `-DNDEBUG`
 
 **Best for:** Intel processors, stability-critical applications, production environments
+
+### ARM Optimizations (`HD_CPU_OPTIMIZATION=ARM`)
+**Target:** ARM processors (ARMv7, ARMv8, ARM64/AArch64)
+
+#### MSVC (Visual Studio):
+- **Optimization flags:** `/O2` (maximum optimization)
+- **ARM64:** Uses ARM64 Advanced SIMD (NEON is standard)
+- **ARM32:** `/arch:NEON` (when NEON is available)
+
+#### GCC/Clang (Linux/ARM):
+- **ARM64/AArch64:** `-march=armv8-a+simd` (Advanced SIMD/NEON)
+- **ARM32:** `-march=armv7-a -mfpu=neon` (explicit NEON)
+- **Optimization:** `-O2` with ARM-specific tuning
+- **Defines:** `-DNDEBUG`
+
+**Best for:** ARM-based systems, embedded devices, Apple Silicon (M1/M2), ARM servers, Raspberry Pi 4+
+
+**Note:** AUTO mode automatically detects ARM architecture using `CMAKE_SYSTEM_PROCESSOR` and applies ARM optimizations when ARM/AArch64 is detected.
 
 ### Generic Optimizations (`HD_CPU_OPTIMIZATION=GENERIC`)
 **Target:** Any x86-64 processor, maximum compatibility

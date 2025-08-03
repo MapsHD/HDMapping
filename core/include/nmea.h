@@ -1,9 +1,11 @@
+#pragma once
 #include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <variant>
 #include <vector>
+#include <cstdint>
 
 namespace hd_mapping::nmea {
 struct GNRMCData {

@@ -18,6 +18,8 @@
 #include <session.h>
 #include <pfd_wrapper.hpp>
 #include <export_laz.h>
+#include <ctime>
+#include <chrono>
 
 #include "toml_io.h"
 
@@ -85,6 +87,44 @@ Imu imu_data;
 Trajectory trajectory;
 std::atomic<bool> loRunning{false};
 std::atomic<float> loProgress{0.0};
+std::chrono::time_point<std::chrono::system_clock> loStartTime;
+std::atomic<double> loElapsedSeconds{0.0};
+std::atomic<double> loEstimatedTimeRemaining{0.0};
+
+// Helper function to format time in human-readable format
+std::string formatTime(double seconds) {
+    if (seconds < 0) return "Calculating...";
+    
+    int hours = static_cast<int>(seconds / 3600);
+    int minutes = static_cast<int>((seconds - hours * 3600) / 60);
+    int secs = static_cast<int>(seconds - hours * 3600 - minutes * 60);
+    
+    if (hours > 0) {
+        return std::to_string(hours) + "h " + std::to_string(minutes) + "m " + std::to_string(secs) + "s";
+    } else if (minutes > 0) {
+        return std::to_string(minutes) + "m " + std::to_string(secs) + "s";
+    } else {
+        return std::to_string(secs) + "s";
+    }
+}
+
+// Helper function to format estimated completion time
+std::string formatCompletionTime(double remainingSeconds) {
+    if (remainingSeconds < 0) return "Calculating...";
+    
+    auto now = std::chrono::system_clock::now();
+    auto estimatedCompletion = now + std::chrono::seconds(static_cast<long long>(remainingSeconds));
+    auto completion_time_t = std::chrono::system_clock::to_time_t(estimatedCompletion);
+    
+    // Format as HH:MM:SS
+    struct tm completion_tm;
+    localtime_s(&completion_tm, &completion_time_t);
+    
+    char timeStr[32];
+    strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &completion_tm);
+    
+    return std::string(timeStr);
+}
 
 // void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
@@ -945,6 +985,10 @@ void lidar_odometry_basic_gui()
                 return;
             }
             loRunning.store(true);
+            loProgress.store(0.0f);
+            loElapsedSeconds.store(0.0);
+            loEstimatedTimeRemaining.store(0.0);
+            loStartTime = std::chrono::system_clock::now();
 
             step1();
 
@@ -991,7 +1035,42 @@ void lidar_odometry_basic_gui()
 
         if (loRunning)
         {
-            ImGui::ProgressBar(loProgress);
+            // Calculate elapsed time and ETA
+            auto currentTime = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed = currentTime - loStartTime;
+            double elapsedSeconds = elapsed.count();
+            loElapsedSeconds.store(elapsedSeconds);
+            
+            float progress = loProgress.load();
+            double estimatedTimeRemaining = 0.0;
+            
+            if (progress > 0.01f) { // Only estimate when we have meaningful progress
+                double totalEstimatedTime = elapsedSeconds / progress;
+                estimatedTimeRemaining = totalEstimatedTime - elapsedSeconds;
+                loEstimatedTimeRemaining.store(estimatedTimeRemaining);
+            }
+            
+            // Format progress text with time information
+            char progressText[256];
+            char timeInfo[512];
+            
+            if (progress > 0.01f) {
+                std::string completionTime = formatCompletionTime(estimatedTimeRemaining);
+                snprintf(progressText, sizeof(progressText), "Processing: %.1f%% Complete", progress * 100.0f);
+                snprintf(timeInfo, sizeof(timeInfo), 
+                    "Elapsed: %s | Remaining: %s | Estimated finish: %s", 
+                    formatTime(elapsedSeconds).c_str(),
+                    formatTime(estimatedTimeRemaining).c_str(),
+                    completionTime.c_str());
+            } else {
+                snprintf(progressText, sizeof(progressText), "Processing: %.1f%% Complete", progress * 100.0f);
+                snprintf(timeInfo, sizeof(timeInfo), 
+                    "Elapsed: %s | Calculating completion time...", 
+                    formatTime(elapsedSeconds).c_str());
+            }
+            
+            ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), progressText);
+            ImGui::Text("%s", timeInfo);
         }
 
         ImGui::End();

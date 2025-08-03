@@ -2,7 +2,14 @@
 
 ## 🚀 Overview
 
-HDMapping includes a configurable CPU optimization system that automatically detects your processor architecture and applies the best compilation flags for optimal performance. This system replaces the previous AMD64-only optimizations with a flexible approach supporting multiple CPU architectures.
+HDMapping includes a configurable CPU optimization system that automatically detects your processor architecture and applies the best compilation flags for optimal performance. This system replaces the previous hard-coded AMD64-only optimizations with a flexible approach supporting multiple CPU architectures.
+
+**🔄 Original Build Equivalent:** To get the **exact same behavior** as the original HDMapping v0.84.0 build (before our optimization system), use:
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=GENERIC
+```
+
+The original version had **NO optimizations** - it relied purely on CMake's default Release flags. Our `GENERIC` mode provides the closest equivalent while maintaining compatibility.
 
 ## ⚙️ CPU Optimization Options
 
@@ -111,7 +118,29 @@ When `HD_CPU_OPTIMIZATION=AUTO` (or not specified), the system:
 - **No SIMD assumptions**
 - **Defines:** `-DNDEBUG`
 
-**Best for:** Distribution builds, unknown target hardware, debugging compatibility issues
+**Best for:** Distribution builds, unknown target hardware, debugging compatibility issues, **matching original v0.84.0 behavior**
+
+## 📈 HDMapping Optimization Evolution
+
+### Version History:
+
+1. **v0.84.0 Original (July 2025):** No specific optimizations - used CMake defaults only
+2. **v0.84.0 + AMD64 (July 25, 2025):** Added aggressive AMD64 optimizations for all users
+3. **v0.84.0 + Smart Optimizations (August 2025):** Our configurable system with AUTO detection
+
+### Build Equivalents:
+
+| HDMapping Version | Equivalent Modern Command |
+|------------------|---------------------------|
+| **Original v0.84.0** | `cmake .. -DHD_CPU_OPTIMIZATION=GENERIC` |
+| **v0.84.0 + AMD64** | `cmake .. -DHD_CPU_OPTIMIZATION=AMD` |
+| **v0.84.0 + Smart** | `cmake .. -DHD_CPU_OPTIMIZATION=AUTO` ✅ **(Recommended)** |
+
+### Migration Guide:
+
+- **Coming from Original v0.84.0:** Use `GENERIC` for identical behavior, or `AUTO` for better performance
+- **Coming from AMD64 version:** Use `AMD` for identical behavior, or `AUTO` for smart detection
+- **New users:** Use `AUTO` mode for best results
 
 ## 🎯 Performance Impact
 

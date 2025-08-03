@@ -115,9 +115,13 @@ std::string formatCompletionTime(double remainingSeconds) {
     auto estimatedCompletion = now + std::chrono::seconds(static_cast<long long>(remainingSeconds));
     auto completion_time_t = std::chrono::system_clock::to_time_t(estimatedCompletion);
     
-    // Format as HH:MM:SS
+    // Format as HH:MM:SS - Cross-platform time formatting
     struct tm completion_tm;
+#ifdef _WIN32
     localtime_s(&completion_tm, &completion_time_t);
+#else
+    localtime_r(&completion_time_t, &completion_tm);
+#endif
     
     char timeStr[32];
     strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &completion_tm);

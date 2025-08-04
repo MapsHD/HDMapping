@@ -318,3 +318,12 @@ set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
 set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
 
 include(CPack)
+
+# Enable testing support
+option(BUILD_TESTING "Build tests" OFF)
+
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+    message(STATUS "Testing enabled - HDMapping tests will be built")
+endif()

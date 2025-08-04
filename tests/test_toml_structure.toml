@@ -1,0 +1,36 @@
+# HDMapping TOML Configuration Template and Test File
+# 
+# Purpose: 
+# - Template for creating new HDMapping TOML configuration files
+# - Test file for CheckConfigVersion() function validation
+# - Reference for correct version_info structure
+#
+# Usage:
+# - Copy this file as base for new configurations
+# - Use with enhanced_version_example.cpp for testing
+# - Validate TOML parsing and version compatibility
+#
+# Location: tests/test_toml_structure.toml
+# Created: 2025-08-04
+# Version: 0.85.0
+
+[version_info]
+software_version = "0.85.0"
+config_version = "1.0"
+build_date = "2025-08-04"
+
+# Example application parameters to test complete TOML loading
+[test_parameters]
+test_parameter = "value"
+another_setting = 42.5
+enable_feature = true
+
+[motion_model_uncertainty]
+lidar_odometry_motion_model_fi_1_sigma_deg = 0.01
+lidar_odometry_motion_model_ka_1_sigma_deg = 0.01
+lidar_odometry_motion_model_om_1_sigma_deg = 0.01
+
+[motion_model_correction]
+motion_model_correction_fi = 0.0
+motion_model_correction_ka = 0.0
+motion_model_correction_om = 0.0

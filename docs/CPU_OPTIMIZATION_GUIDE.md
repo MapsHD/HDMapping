@@ -328,6 +328,37 @@ If you encounter issues with CPU optimizations:
 3. **Report issues** with CPU model and compiler information
 4. **Include build logs** showing the detected optimization messages
 
+## 🛠️ Troubleshooting
+
+### CMake Version Compatibility Error
+
+**Problem:** Error message about CMake < 3.5 compatibility being removed:
+```
+CMake Error: Compatibility with CMake < 3.5 has been removed from CMake.
+Add -DCMAKE_POLICY_VERSION_MINIMUM=3.5 to try configuring anyway.
+```
+
+**Solution:** Add the suggested CMake policy flag:
+```bash
+# Windows (PowerShell/CMD)
+cmake .. -DHD_CPU_OPTIMIZATION=GENERIC -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+# Linux/macOS
+cmake .. -DHD_CPU_OPTIMIZATION=AUTO -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+```
+
+This handles compatibility issues with third-party dependencies that use older CMake syntax.
+
+### Build Verification
+After successful configuration, verify your build:
+```bash
+# Test a simple application
+cmake --build . --config Release --target hd_mapper
+
+# Run tests
+ctest -C Release
+```
+
 ---
 
 *This optimization system ensures HDMapping delivers optimal performance across different CPU architectures while maintaining compatibility and stability.*

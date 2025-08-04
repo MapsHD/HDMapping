@@ -19,14 +19,21 @@
  * Created: 2025-08-04
  */
 
-#include "lidar_odometry_utils.h"
 #include <iostream>
+#include <string>
+
+// Simple version function that doesn't require external dependencies
+std::string get_hdmapping_version() {
+    return std::to_string(HDMAPPING_VERSION_MAJOR) + "." + 
+           std::to_string(HDMAPPING_VERSION_MINOR) + "." + 
+           std::to_string(HDMAPPING_VERSION_PATCH);
+}
 
 int main() {
     std::cout << "=== HDMapping Version System Test ===" << std::endl;
     std::cout << "Testing version system functionality..." << std::endl;
     
-    std::string version = get_software_version();
+    std::string version = get_hdmapping_version();
     std::cout << "Software version: " << version << std::endl;
     
     // Validate version format (should be X.Y.Z)

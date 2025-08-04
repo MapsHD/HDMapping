@@ -3,17 +3,15 @@
  * 
  * Purpose:
  * - Validate HDMapping version system integration
- * - Test get_software_version() function
+ * - Test version macro availability and functionality
  * - Verify CMake version macros are properly defined
  * 
  * Requirements:
- * - lidar_odometry_utils.h (for get_software_version function)
  * - CMake version macros (HDMAPPING_VERSION_*)
+ * - Standard C++ library support
  * 
  * Compilation:
- * g++ -I../apps/lidar_odometry_step_1 -I../shared/include \
- *     -DHDMAPPING_VERSION_MAJOR=0 -DHDMAPPING_VERSION_MINOR=85 -DHDMAPPING_VERSION_PATCH=0 \
- *     test_version_system.cpp -o test_version_system
+ * cmake --build . --config Release --target test_version_system
  * 
  * Location: tests/test_version_system.cpp
  * Created: 2025-08-04

@@ -37,6 +37,10 @@ public:
 
     bool load(const std::string &file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset);
     bool save(const std::string &file_name, const std::string &poses_file_name, const std::string &initial_poses_file_name, bool is_subsession);
+    void fill_session_from_worker_data(
+        const std::vector<WorkerData> &worker_data, bool save_selected, 
+        bool filter_on_export, bool apply_pose, double threshould_output_filter
+    );
 };
 
 #endif

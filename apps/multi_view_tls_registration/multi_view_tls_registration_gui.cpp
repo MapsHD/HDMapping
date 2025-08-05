@@ -1148,7 +1148,7 @@ void project_gui()
 
             if (output_file_name.size() > 0)
             {
-                save_all_to_las_as_local(session, output_file_name);
+                save_all_to_las(session, output_file_name, true);
             }
         }
 
@@ -1159,7 +1159,7 @@ void project_gui()
 
             if (output_file_name.size() > 0)
             {
-                save_all_to_las(session, output_file_name);
+                save_all_to_las(session, output_file_name, false);
                 
             }
         }

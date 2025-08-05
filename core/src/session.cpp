@@ -360,3 +360,35 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
     fs.close();
     return true;
 }
+
+void Session::fill_session_from_worker_data(
+    const std::vector<WorkerData> &worker_data, bool save_selected, 
+    bool filter_on_export, bool apply_pose, double threshould_output_filter
+)
+{
+    this->point_clouds_container.point_clouds.clear();  // clear whatever was there
+    for (int i = 0; i < worker_data.size(); i++)
+    {
+        if (!save_selected || worker_data[i].show)
+        {
+            PointCloud pc;
+            for (const auto &p : worker_data[i].intermediate_points)
+            {
+                if (!filter_on_export || (p.point.norm() > threshould_output_filter))
+                {
+                    Eigen::Vector3d pt = p.point;
+                    if (apply_pose)
+                    {
+                        pt = worker_data[i].intermediate_trajectory[p.index_pose] * p.point;
+                    }
+                    pc.points_local.push_back(pt);
+                    pc.intensities.push_back(p.intensity);
+                    pc.timestamps.push_back(p.timestamp);
+                }
+            }
+            // TODO: check if this is correct pose to be applied
+            pc.m_pose = worker_data[i].intermediate_trajectory[0].inverse(); 
+            this->point_clouds_container.point_clouds.push_back(pc);
+        }
+    }
+}

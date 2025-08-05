@@ -1,4 +1,4 @@
-#ifndef _EXPORT_LAZ_H_
+﻿#ifndef _EXPORT_LAZ_H_
 #define _EXPORT_LAZ_H_
 
 #include <string>
@@ -6,6 +6,7 @@
 #include <Eigen/Eigen>
 #include <filesystem>
 #include <iostream>
+#include <session.h>
 
 namespace fs = std::filesystem;
 
@@ -13,7 +14,7 @@ inline bool exportLaz(const std::string &filename,
                const std::vector<Eigen::Vector3d> &pointcloud,
                const std::vector<unsigned short> &intensity,
                const std::vector<double> &timestamps,
-               double offset_x, double offset_y, double offset_alt)
+               double offset_x = 0.0, double offset_y = 0.0, double offset_alt = 0.0)
 {
 
     constexpr float scale = 0.0001f; // one tenth of milimeter
@@ -123,11 +124,9 @@ inline bool exportLaz(const std::string &filename,
 
     for (int i = 0; i < pointcloud.size(); i++)
     {
-        point->intensity = intensity[i];
-
         const auto &p = pointcloud[i];
+        point->intensity = intensity[i];
         point->gps_time = timestamps[i] * 1e9;
-
         p_count++;
         coordinates[0] = p.x() + offset_x;
         coordinates[1] = p.y() + offset_y;
@@ -137,13 +136,6 @@ inline bool exportLaz(const std::string &filename,
             fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);
             return false;
         }
-
-        // p.SetIntensity(pp.intensity);
-
-        // if (i < intensity.size()) {
-        //     point->intensity = intensity[i];
-        // }
-        // laszip_set_point
 
         if (laszip_write_point(laszip_writer))
         {
@@ -396,5 +388,102 @@ inline void save_processed_pc(const fs::path &file_path_in, const fs::path &file
     }
 
     std::cout << "saving to " << file_path_put << std::endl;
+}
+
+
+inline void points_to_vector(
+    const std::vector<Point3Di> points, std::vector<Eigen::Affine3d> &trajectory, double threshold_output_filter, std::vector<int>* index_poses,
+    std::vector<Eigen::Vector3d> &pointcloud, std::vector<unsigned short> &intensity, std::vector<double> &timestamps, bool use_first_pose
+)
+{
+    Eigen::Affine3d m_pose = trajectory[0].inverse();
+    for (const auto &org_p : points)
+    {
+        Point3Di p = org_p;
+        if (p.point.norm() > threshold_output_filter)
+        {
+            if (use_first_pose)
+            {
+                p.point = m_pose * (trajectory[org_p.index_pose] * org_p.point);    
+            }
+            else
+            {
+                p.point = trajectory[org_p.index_pose] * org_p.point; 
+            }
+            pointcloud.push_back(p.point);
+            intensity.push_back(p.intensity);
+            timestamps.push_back(p.timestamp);
+            if (index_poses) {
+                index_poses->push_back(org_p.index_pose);
+            }
+        }
+    }
+}
+
+inline void save_all_to_las(const Session& session, std::string output_las_name, bool as_local)
+{
+    std::vector<Eigen::Vector3d> pointcloud;
+    std::vector<unsigned short> intensity;
+    std::vector<double> timestamps;
+
+    Eigen::Affine3d first_pose_inv = Eigen::Affine3d::Identity();
+    bool found_first_pose = false;
+
+    for (const auto& p : session.point_clouds_container.point_clouds)  
+    {
+        if (p.visible)
+        {
+            if (!found_first_pose)
+            {
+                found_first_pose = true;
+                first_pose_inv = p.m_pose.inverse();  // valid
+            }
+
+            for (size_t i = 0; i < p.points_local.size(); ++i)
+            {
+                const auto& pp = p.points_local[i];
+                Eigen::Vector3d vp = p.m_pose * pp;
+
+                pointcloud.push_back(vp);
+
+                if (i < p.intensities.size())
+                {
+                    intensity.push_back(p.intensities[i]);
+                }
+                else
+                {
+                    intensity.push_back(0);
+                }
+
+                if (i < p.timestamps.size())
+                {
+                    timestamps.push_back(p.timestamps[i]);
+                }
+            }
+        }
+    }
+
+    if (as_local)
+    {
+        for (auto& pt : pointcloud)  
+        {
+            pt = first_pose_inv * pt;
+        }
+
+        std::cout << "----------------------" << std::endl;
+        std::cout << first_pose_inv.inverse().matrix() << std::endl;
+    }
+
+    if (!exportLaz(
+        output_las_name,
+        pointcloud,
+        intensity,
+        timestamps,
+        session.point_clouds_container.offset.x(),
+        session.point_clouds_container.offset.y(),
+        session.point_clouds_container.offset.z()))
+    {
+        std::cout << "problem with saving file: " << output_las_name << std::endl;
+    }
 }
 #endif

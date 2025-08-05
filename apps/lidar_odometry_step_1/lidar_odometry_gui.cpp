@@ -12,6 +12,7 @@
 #include "lidar_odometry_utils.h"
 #include "lidar_odometry.h"
 #include <registration_plane_feature.h>
+#include <export_laz.h>
 
 #include <mutex>
 #include <HDMapping/Version.hpp>
@@ -454,7 +455,8 @@ void lidar_odometry_gui()
 
                 if (output_file_name.size() > 0)
                 {
-                    save_all_to_las(worker_data, params, output_file_name, session, false, true, true, false);
+                    session.fill_session_from_worker_data(worker_data, false, true, true, params.threshould_output_filter);
+                    save_all_to_las(session, output_file_name, false);
                 }
             }
         }
@@ -692,7 +694,8 @@ void lidar_odometry_gui()
                 Eigen::Affine3d pose;
                 if (output_file_name.size() > 0)
                 {
-                    save_all_to_las(worker_data, params, output_file_name, session, true, false, false, true);
+                    session.fill_session_from_worker_data(worker_data, true, false, false, params.threshould_output_filter);
+                    save_all_to_las(session, output_file_name, false);
                 }
                 // TODO: give value to pose even if output_file_name is wrong
 
@@ -1775,24 +1778,30 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
         trajectory_for_interpolation[ts[i]] = best_trajectory[i].matrix();
     }
 
-    std::vector<Point3Di> points_global = points_reindexed;
-    for (auto &p : points_global)
+    std::vector<Eigen::Vector3d> pointcloud_global; 
+    std::vector<unsigned short> intensity;
+    std::vector<double> timestamps_;
+    for (const auto &p : points_reindexed)
     {
-        Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, /*ts[p.index_pose]*/ p.timestamp);
+        Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, p.timestamp);
         Eigen::Affine3d b;
         b.matrix() = pose;
-        p.point = b * p.point;
+        Eigen::Vector3d vec  = b * p.point;
+        pointcloud_global.push_back(vec);
+        intensity.push_back(p.intensity);
+        timestamps_.push_back(p.timestamp);
     }
 
     std::cout << "saving file: " << fn1 << std::endl;
-    saveLaz(fn1, points_global);
+    exportLaz(fn1, pointcloud_global, intensity, timestamps_);
 
-    points_global = points_reindexed;
-    for (auto &p : points_global)
+    pointcloud_global.clear();
+    for (const auto &p : points_reindexed)
     {
-        p.point = trajectory[p.index_pose] * p.point;
+        Eigen::Vector3d vec = trajectory[p.index_pose] * p.point;
+        pointcloud_global.push_back(vec);
     }
-    saveLaz(fn2, points_global);
+    exportLaz(fn2, pointcloud_global, intensity, timestamps_);
 }
 
 #if 0

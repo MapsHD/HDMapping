@@ -2216,16 +2216,15 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             // temp save
             if (i % 100 == 0)
             {
-                std::vector<Point3Di> global_points;
-                for (int k = 0; k < worker_data[i].intermediate_points.size(); k++)
-                {
-                    Point3Di p = worker_data[i].intermediate_points[k];
-                    int index_pose = p.index_pose;
-                    p.point = worker_data[i].intermediate_trajectory[index_pose] * p.point;
-                    global_points.push_back(p);
-                }
+                std::vector<Eigen::Vector3d> global_pointcloud;
+                std::vector<unsigned short> intensity; 
+                std::vector<double> timestamps;
+                points_to_vector(
+                    worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory,
+                    0, nullptr, global_pointcloud, intensity, timestamps, false
+                );
                 std::string fn = params.working_directory_preview + "/temp_point_cloud_" + std::to_string(i) + ".laz";
-                saveLaz(fn.c_str(), global_points);
+                exportLaz(fn.c_str(), global_pointcloud, intensity, timestamps);
             }
             auto acc_distance_tmp = acc_distance;
             acc_distance += ((worker_data[i].intermediate_trajectory[0].inverse()) *

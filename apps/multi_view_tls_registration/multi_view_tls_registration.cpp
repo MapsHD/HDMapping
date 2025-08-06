@@ -27,62 +27,6 @@ void initial_pose_to_identity(Session &session)
 	}
 }
 
-void save_all_to_las_as_local(const Session &session, std::string output_las_name)
-{
-	std::vector<Eigen::Vector3d> pointcloud;
-	std::vector<unsigned short> intensity;
-	std::vector<double> timestamps;
-
-	Eigen::Affine3d first_pose_inv = Eigen::Affine3d::Identity();
-
-	bool found_first_pose = false;
-
-	for (auto &p : session.point_clouds_container.point_clouds)
-	{
-		if (p.visible)
-		{
-			if (!found_first_pose)
-			{
-				found_first_pose = true;
-				first_pose_inv = p.m_pose.inverse();
-			}
-			for (int i = 0; i < p.points_local.size(); i++)
-			{
-				const auto &pp = p.points_local[i];
-				Eigen::Vector3d vp;
-				vp = p.m_pose * pp; // + session.point_clouds_container.offset;
-				// std::cout << vp << std::endl;
-				pointcloud.push_back(vp);
-				if (i < p.intensities.size())
-				{
-					intensity.push_back(p.intensities[i]);
-				}
-				else
-				{
-					intensity.push_back(0);
-				}
-				if (i < p.timestamps.size())
-				{
-					timestamps.push_back(p.timestamps[i]);
-				}
-			}
-		}
-	}
-
-	for (int i = 0; i < pointcloud.size(); i++)
-	{
-		pointcloud[i] = first_pose_inv * pointcloud[i];
-	}
-
-	std::cout << "----------------------" << std::endl;
-	std::cout << first_pose_inv.inverse().matrix() << std::endl;
-
-	if (!exportLaz(output_las_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
-	{
-		std::cout << "problem with saving file: " << output_las_name << std::endl;
-	}
-}
-
 void save_intersection(const Session &session, std::string output_las_name, bool xz_intersection, bool yz_intersection, bool xy_intersection, 
 	double intersection_width)
 {
@@ -139,46 +83,6 @@ void save_intersection(const Session &session, std::string output_las_name, bool
 					{
 						timestamps.push_back(p.timestamps[i]);
 					}
-				}
-			}
-		}
-	}
-	if (!exportLaz(output_las_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
-	{
-		std::cout << "problem with saving file: " << output_las_name << std::endl;
-	}
-}
-
-void save_all_to_las(const Session &session, std::string output_las_name)
-{
-	//std::vector<mandeye::PointRGB> color_points;
-
-	std::vector<Eigen::Vector3d> pointcloud;
-	std::vector<unsigned short> intensity;
-	std::vector<double> timestamps;
-
-	for (auto &p : session.point_clouds_container.point_clouds)
-	{
-		if (p.visible)
-		{
-			for (int i = 0; i < p.points_local.size(); i++)
-			{
-				const auto &pp = p.points_local[i];
-				Eigen::Vector3d vp;
-				vp = p.m_pose * pp; // + session.point_clouds_container.offset;
-				// std::cout << vp << std::endl;
-				pointcloud.push_back(vp);
-				if (i < p.intensities.size())
-				{
-					intensity.push_back(p.intensities[i]);
-				}
-				else
-				{
-					intensity.push_back(0);
-				}
-				if (i < p.timestamps.size())
-				{
-					timestamps.push_back(p.timestamps[i]);
 				}
 			}
 		}
@@ -809,11 +713,11 @@ void run_multi_view_tls_registration(
 
 	if (tls_registration.save_laz)
 	{
-		save_all_to_las(session, (outwd / "all_step_2.laz").string());
+		save_all_to_las(session, (outwd / "all_step_2.laz").string(), false);
 	}
 	if (tls_registration.save_las)
 	{
-		save_all_to_las(session, (outwd / "all_step_2.las").string());
+		save_all_to_las(session, (outwd / "all_step_2.las").string(), false);
 	}
 	if (tls_registration.save_as_separate_las)
 	{

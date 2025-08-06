@@ -251,4 +251,16 @@ struct GeoPoint {
 	double w_z = 1000000.0;
 };
 
+
+struct WorkerData
+{
+    std::vector<Point3Di> intermediate_points;
+    std::vector<Point3Di> original_points;
+    std::vector<Eigen::Affine3d> intermediate_trajectory;
+    std::vector<Eigen::Affine3d> intermediate_trajectory_motion_model;
+    std::vector<std::pair<double, double>> intermediate_trajectory_timestamps;
+    std::vector<Eigen::Vector3d> imu_om_fi_ka;
+    bool show = false;
+};
+
 #endif

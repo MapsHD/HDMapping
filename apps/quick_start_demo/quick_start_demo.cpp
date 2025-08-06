@@ -18,7 +18,7 @@
 
 #include <filesystem>
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
-
+#include <export_laz.h>
 #include <HDMapping/Version.hpp>
 
 #include <mutex>
@@ -567,16 +567,15 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
             // temp save
             if (i % 100 == 0)
             {
-                std::vector<Point3Di> global_points;
-                for (int k = 0; k < worker_data[i].intermediate_points.size(); k++)
-                {
-                    Point3Di p = worker_data[i].intermediate_points[k];
-                    int index_pose = p.index_pose;
-                    p.point = worker_data[i].intermediate_trajectory[index_pose] * p.point;
-                    global_points.push_back(p);
-                }
+                std::vector<Eigen::Vector3d> global_pointcloud;
+                std::vector<unsigned short> intensity; 
+                std::vector<double> timestamps;
+                points_to_vector(
+                    worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, 0,
+                    nullptr, global_pointcloud, intensity, timestamps, false
+                );
                 std::string fn = params.working_directory_preview + "/temp_point_cloud_" + std::to_string(i) + ".laz";
-                saveLaz(fn.c_str(), global_points);
+                exportLaz(fn, global_pointcloud, intensity, timestamps);
             }
             auto acc_distance_tmp = acc_distance;
             acc_distance += ((worker_data[i].intermediate_trajectory[0].inverse()) *
@@ -1091,20 +1090,19 @@ int main(int argc, char *argv[])
     std::thread th([&]()
                    {
         compute_step_2_demo(worker_data, params, ts_failure);
-
         {
         std::lock_guard<std::mutex> lock(renderPtrLock);
-        std::vector<Point3Di> global_points;
 
+        std::vector<Eigen::Vector3d> global_pointcloud;
+        std::vector<unsigned short> intensity; 
+        std::vector<double> timestamps;
         for (int k = 0; k < render_pointcloud.size(); k++)
         {
-            Point3Di p;
-            p.point = render_pointcloud[k].first;
-            p.intensity = render_pointcloud[k].second * 256;
-            global_points.push_back(p);
+            global_pointcloud.push_back(render_pointcloud[k].first);
+            intensity.push_back(render_pointcloud[k].second * 256);
+            timestamps.push_back(0.0);
         }
-        
-        saveLaz("out_demo_point_cloud.laz", global_points);
+        exportLaz("out_demo_point_cloud.laz", global_pointcloud, intensity, timestamps);
         std::cout << "file: out_demo_point_cloud.laz saved" << std::endl;
         } });
 

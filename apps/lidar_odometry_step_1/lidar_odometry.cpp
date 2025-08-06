@@ -654,7 +654,15 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
         path /= filename;
         std::cout << "saving to: " << path << std::endl;
         std::vector<int> index_poses_i;
-        saveLaz(path.string(), worker_data_concatenated[i], params.threshould_output_filter, &index_poses_i);
+
+        std::vector<Eigen::Vector3d> global_pointcloud;
+        std::vector<unsigned short> intensity; 
+        std::vector<double> timestamps;
+        points_to_vector(
+            worker_data_concatenated[i].original_points, worker_data_concatenated[i].intermediate_trajectory,
+            params.threshould_output_filter, &index_poses_i, global_pointcloud, intensity, timestamps, true
+        );
+        exportLaz(path.string(), global_pointcloud, intensity, timestamps);
         index_poses.push_back(index_poses_i);
         m_poses.push_back(worker_data_concatenated[i].intermediate_trajectory[0]);
         file_names.push_back(filename);
@@ -797,48 +805,6 @@ void filter_reference_buckets(LidarOdometryParams &params)
         }
     }
     params.reference_buckets = reference_buckets_out;
-}
-
-void save_all_to_las(
-    std::vector<WorkerData> &worker_data, LidarOdometryParams &params, std::string output_file_name, Session &session,
-    bool export_selected, bool filter_on_export, bool apply_pose, bool add_to_pc_container)
-{
-    std::vector<Eigen::Vector3d> pointcloud;
-    std::vector<unsigned short> intensity;
-    std::vector<double> timestamps;
-    Eigen::Affine3d pose;
-    for (int i = 0; i < worker_data.size(); i++)
-    {
-        if (!export_selected || worker_data[i].show)
-        {
-            for (const auto &p : worker_data[i].intermediate_points)
-            {
-                if (!filter_on_export || (p.point.norm() > params.threshould_output_filter))
-                {
-                    Eigen::Vector3d pt = p.point;
-                    if (apply_pose)
-                    {
-                        pt = worker_data[i].intermediate_trajectory[p.index_pose] * p.point;
-                    }
-                    pointcloud.push_back(pt);
-                    intensity.push_back(p.intensity);
-                    timestamps.push_back(p.timestamp);
-                    pose = worker_data[i].intermediate_trajectory[p.index_pose];
-                }
-            }
-        }
-    }
-    if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
-    {
-        std::cout << "problem with saving file: " << output_file_name << std::endl;
-    }
-    else if (add_to_pc_container)
-    {
-        PointCloud pc;
-        pc.file_name = output_file_name;
-        pc.m_pose = pose;
-        session.point_clouds_container.point_clouds.push_back(pc);
-    }
 }
 
 void save_trajectory_to_ascii(std::vector<WorkerData> &worker_data, std::string output_file_name)

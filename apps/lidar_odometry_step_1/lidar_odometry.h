@@ -29,9 +29,6 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
 void save_parameters_toml(const LidarOdometryParams &params, const fs::path &outwd, double elapsed_seconds);
 void save_processing_results_json(const LidarOdometryParams &params, const fs::path &outwd, double elapsed_seconds);
 void save_trajectory_to_ascii(std::vector<WorkerData>& worker_data, std::string output_file_name);
-void save_all_to_las(
-    std::vector<WorkerData>& worker_data, LidarOdometryParams& params, std::string output_file_name, Session& session,
-    bool export_selected = false, bool filter_on_export = true, bool apply_pose = true, bool add_to_pc_container = false);
 std::string save_results_automatic(
     LidarOdometryParams &params, std::vector<WorkerData> &worker_data, std::string working_directory, double elapsed_seconds);
 std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryParams& params);

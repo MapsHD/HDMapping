@@ -136,10 +136,6 @@ bool has_extension(const std::string file_path, const std::string extension);
 
 void initial_pose_to_identity(Session &session);
 
-void save_all_to_las(const Session &session, std::string output_las_name);
-
-void save_all_to_las_as_local(const Session &session, std::string output_las_name);
-
 void save_intersection(const Session &session, std::string output_las_name, bool xz_intersection, bool yz_intersection, bool xy_intersection, double intersection_width);
 
 void save_separately_to_las(const Session &session, fs::path outwd, std::string extension = ".las");

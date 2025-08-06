@@ -37,17 +37,18 @@ Second step of HDMapping pipeline: performs multi-view terrestrial laser scannin
 ```
 
 ## Notes
-- Requires Step 1 results as input
-- GNSS integration significantly improves accuracy
-- Loop closure detection helps with drift correction
-- Final step in the HDMapping pipeline
+- **Step 2 Integration**: Requires Step 1 session.json as input
+- **Export Centralization**: Uses unified export functions from core library (PR #160)  
+- **GNSS Fusion**: Optional but significantly improves accuracy
+- **Loop Closure**: Automatic drift correction and trajectory optimization
+- **Final Pipeline Stage**: Produces final registered point cloud maps
+
+## Related Applications
+- Requires: `lidar_odometry_step_1` output session
+- Outputs compatible with: Various export and analysis tools
 
 ---
-*Documentation status: ⚠️ Basic template - needs detailed documentation*
-
-<!-- 
-TODO for detailed documentation:
-- [ ] Add registration algorithm details
+*Documentation status: ✅ Updated for HDMapping v0.85.0 with PR #160 export centralization*
 - [ ] Add GNSS integration workflow
 - [ ] Add loop closure configuration
 - [ ] Add quality assessment metrics

@@ -10,8 +10,8 @@ HDMapping includes 15 specialized applications for different aspects of point cl
 | Application | Purpose | Input | Output | Documentation Status |
 |-------------|---------|-------|--------|---------------------|
 | **[hd_mapper](hd_mapper/README.md)** | Main GUI application | Point clouds, config | Maps, trajectories | ⚠️ Basic |
-| **[lidar_odometry_step_1](lidar_odometry_step_1/README.md)** | Initial trajectory estimation | Raw lidar data | Session file, initial trajectory | ⚠️ Basic |
-| **[multi_view_tls_registration](multi_view_tls_registration/README.md)** | Final registration & mapping | Step 1 session | Final map, trajectory | ⚠️ Basic |
+| **[lidar_odometry_step_1](lidar_odometry_step_1/README.md)** | Initial trajectory estimation | Raw lidar data | Session file, initial trajectory | ✅ Updated v0.85 |
+| **[multi_view_tls_registration](multi_view_tls_registration/README.md)** | Final registration & mapping | Step 1 session | Final map, trajectory | ✅ Updated v0.85 |
 | **[quick_start_demo](quick_start_demo/README.md)** | Tutorial and demonstration | Sample data | Demo results | ⚠️ Basic |
 
 ## 👁️ Visualization & Analysis
@@ -41,7 +41,7 @@ HDMapping includes 15 specialized applications for different aspects of point cl
 | Application | Purpose | Input | Output | Documentation Status |
 |-------------|---------|-------|--------|---------------------|
 | **[multi_session_registration](multi_session_registration/README.md)** | Multi-session fusion | Multiple sessions | Fused map | ⚠️ Basic |
-| **[split_multi_livox](split_multi_livox/README.md)** | Livox data splitting | Multi-sensor data | Individual streams | ⚠️ Basic |
+| **[split_multi_livox](split_multi_livox/README.md)** | Livox data splitting | Multi-sensor data | Individual streams | ✅ Updated v0.85 |
 | **[precision_forestry_tools](precision_forestry_tools/README.md)** | Forestry analysis | Forest point clouds | Tree metrics | ⚠️ Basic |
 
 ### Visualization Tools

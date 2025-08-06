@@ -34,10 +34,15 @@ Utility for splitting multi-sensor Livox data streams into individual sensor fil
 ```
 
 ## Notes
-- Preserves temporal synchronization between sensors
-- Useful for individual sensor calibration
-- Enables parallel processing of sensor streams
-- Maintains sensor ID and timing information
+- **Code Simplification**: Streamlined in PR #160 with unified export functions
+- **Temporal Synchronization**: Preserves timing between sensors  
+- **Sensor Calibration**: Useful for individual sensor calibration workflows
+- **Parallel Processing**: Enables concurrent processing of sensor streams
+- **ID Preservation**: Maintains sensor ID and timing information
+
+## Related Applications
+- Often used before: `lidar_odometry_step_1` for individual sensor processing
+- Export compatible with: Standard HDMapping pipeline tools
 
 ---
-*Documentation status: 📝 TODO - needs detailed documentation*
+*Documentation status: ✅ Updated for HDMapping v0.85.0 with PR #160 simplifications*

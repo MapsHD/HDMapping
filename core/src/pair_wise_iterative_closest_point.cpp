@@ -116,36 +116,36 @@ bool PairWiseICP::compute(const std::vector<Eigen::Vector3d> &source, const std:
     std::cout << "PairWiseICP::compute" << std::endl;
     bool multithread = true;
 
+    std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
+
+    for (int i = 0; i < target.size(); i++)
+    {
+        unsigned long long int index = get_rgd_index(target[i], {search_radious, search_radious, search_radious});
+        indexes.emplace_back(index, i);
+    }
+
+    std::sort(indexes.begin(), indexes.end(),
+              [](const std::pair<unsigned long long int, unsigned int> &a, const std::pair<unsigned long long int, unsigned int> &b)
+              { return a.first < b.first; });
+
+    std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
+
+    for (unsigned int i = 0; i < indexes.size(); i++)
+    {
+        unsigned long long int index_of_bucket = indexes[i].first;
+        if (buckets.contains(index_of_bucket))
+        {
+            buckets[index_of_bucket].second = i;
+        }
+        else
+        {
+            buckets[index_of_bucket].first = i;
+            buckets[index_of_bucket].second = i;
+        }
+    }
+
     for (int iter = 0; iter < number_of_iterations; iter++)
     {
-        std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
-
-        for (int i = 0; i < target.size(); i++)
-        {
-            unsigned long long int index = get_rgd_index(target[i], {search_radious, search_radious, search_radious});
-            indexes.emplace_back(index, i);
-        }
-
-        std::sort(indexes.begin(), indexes.end(),
-                  [](const std::pair<unsigned long long int, unsigned int> &a, const std::pair<unsigned long long int, unsigned int> &b)
-                  { return a.first < b.first; });
-
-        std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
-
-        for (unsigned int i = 0; i < indexes.size(); i++)
-        {
-            unsigned long long int index_of_bucket = indexes[i].first;
-            if (buckets.contains(index_of_bucket))
-            {
-                buckets[index_of_bucket].second = i;
-            }
-            else
-            {
-                buckets[index_of_bucket].first = i;
-                buckets[index_of_bucket].second = i;
-            }
-        }
-    
         std::cout << "iteration: " << iter + 1 << " of: " << number_of_iterations << std::endl;
         Eigen::MatrixXd AtPA(6, 6);
         AtPA.setZero();
@@ -154,8 +154,7 @@ bool PairWiseICP::compute(const std::vector<Eigen::Vector3d> &source, const std:
         Eigen::Vector3d b(search_radious, search_radious, search_radious);
 
         std::mutex mutex;
-        int counter_nn = 0;
-        
+
         const auto hessian_fun = [&](const Eigen::Vector3d &source_i)
         {
             if (source_i.norm() < 0.1)
@@ -225,7 +224,6 @@ bool PairWiseICP::compute(const std::vector<Eigen::Vector3d> &source, const std:
                 std::unique_lock lck(mutex);
                 AtPA.block<6, 6>(0, 0) += AtPA_;
                 AtPB.block<6, 1>(0, 0) -= AtPB_;
-                counter_nn ++;
             }
         };
 
@@ -238,27 +236,15 @@ bool PairWiseICP::compute(const std::vector<Eigen::Vector3d> &source, const std:
             std::for_each(std::begin(source), std::end(source), hessian_fun);
         }
 
-        if (AtPB(0, 0) == 0.0 && AtPB(1, 0) == 0.0 && AtPB(2, 0) == 0.0 && AtPB(3, 0) == 0.0 && AtPB(4, 0) == 0.0 && AtPB(5, 0) == 0.0)
-        {
-            std::cout << "PairWiseICP::compute FAILED (Relative pose is not changed/solved/optimized --> please consider removing this edge)" << std::endl;
-            return false;
-        }
-
-        if (counter_nn < 100){
-            std::cout << "not suficient number of observations" << std::endl;
-            std::cout << "PairWiseICP::compute FAILED (Relative pose is not changed/solved/optimized --> please consider removing this edge)" << std::endl;
-            return false;
-        }
-
         Eigen::SparseMatrix<double> AtPAc(6, 6);
         Eigen::SparseMatrix<double> AtPBc(6, 1);
 
         AtPAc = AtPA.sparseView();
         AtPBc = AtPB.sparseView();
 
-        Eigen::SparseMatrix<double> AtPA_I(6, 6);
-        AtPA_I.setIdentity();
-        AtPA += (AtPA_I * 100);
+        // Eigen::SparseMatrix<double> AtPA_I(6, 6);
+        // AtPA_I.setIdentity();
+        // AtPA += AtPA_I;
 
         Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPAc);
         Eigen::SparseMatrix<double> x = solver.solve(AtPBc);
@@ -291,7 +277,7 @@ bool PairWiseICP::compute(const std::vector<Eigen::Vector3d> &source, const std:
         }
         else
         {
-            std::cout << "PairWiseICP::compute FAILED (Relative pose is not changed/solved/optimized --> please consider removing this edge)" << std::endl;
+            std::cout << "PairWiseICP::compute FAILED" << std::endl;
             return false;
         }
     }

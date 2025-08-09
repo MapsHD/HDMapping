@@ -38,8 +38,24 @@ struct WorkerData
 using NDTBucketMapType = std::unordered_map<uint64_t, NDT::Bucket>;
 using NDTBucketMapType2 = std::unordered_map<uint64_t, NDT::Bucket2>;
 
+// Helper function for getting software version from CMake macros
+inline std::string get_software_version() {
+    #ifdef HDMAPPING_VERSION_MAJOR
+        return std::to_string(HDMAPPING_VERSION_MAJOR) + "." + 
+               std::to_string(HDMAPPING_VERSION_MINOR) + "." + 
+               std::to_string(HDMAPPING_VERSION_PATCH);
+    #else
+        return "0.84.0"; // fallback if CMake macros not available
+    #endif
+}
+
 struct LidarOdometryParams
 {
+    // version information - automatically generated from CMake build system
+    std::string software_version = get_software_version();
+    std::string config_version = "1.0";
+    std::string build_date = __DATE__;
+    
     //perfromance
     bool useMultithread = true;
     double real_time_threshold_seconds = 10.0; // for realtime use: threshold_nr_poses * 0.005, where 0.005 is related with IMU frequency

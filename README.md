@@ -214,16 +214,46 @@ Manual coloring
 
 
 # Building commands
-```
+
+## Quick Start (Recommended)
+```bash
 git clone https://github.com/MapsHD/HDMapping.git
 cd HDMapping
 mkdir build
 git submodule init
 git submodule update --recursive
 cd build
+
+# Auto-optimized build (detects your CPU automatically)
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j
 ```
+
+## Advanced CPU Optimization Options
+
+HDMapping includes automatic CPU optimization that detects your processor and applies the best compilation flags:
+
+```bash
+# Auto-detect CPU and optimize (default, recommended)
+cmake -DCMAKE_BUILD_TYPE=Release ..
+
+# Force AMD optimizations (aggressive performance)
+cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=AMD ..
+
+# Force Intel optimizations (conservative, stable)  
+cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=INTEL ..
+
+# Generic optimizations (maximum compatibility)
+cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=GENERIC ..
+```
+
+**CPU Optimization Options:**
+- `AUTO` (default) - Automatically detects and optimizes for your CPU
+- `AMD` - Aggressive optimizations for AMD Ryzen/EPYC (AVX2, /Oi /Ot /Oy)
+- `INTEL` - Conservative optimizations for Intel Core/Xeon (AVX, /O2)
+- `GENERIC` - Safe universal optimizations for any x86-64 CPU
+
+📖 **For detailed optimization information, see:** [`docs/CPU_OPTIMIZATION_GUIDE.md`](docs/CPU_OPTIMIZATION_GUIDE.md)
 
 # Building Debian package.
 

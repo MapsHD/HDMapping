@@ -1,0 +1,18 @@
+# CMake generation dependency list for this directory.
+C:/Program Files/CMake/share/cmake-4.0/Modules/CPack.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CPackComponent.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CheckIncludeFileCXX.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/FeatureSummary.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/ProcessorCount.cmake
+C:/Program Files/CMake/share/cmake-4.0/Templates/CPackConfig.cmake.in
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/LASzip/CMakeLists.txt
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/LASzip/cmake/common.cmake
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/LASzip/cmake/compiler_options.cmake
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/LASzip/cmake/cpack.cmake
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/LASzip/cmake/directories.cmake
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/LASzip/cmake/libraries.cmake
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/LASzip/cmake/macros.cmake
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/LASzip/cmake/modules.cmake
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/LASzip/cmake/policies.cmake
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/LASzip/cmake/win32_compiler_options.cmake
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/LASzip/laszip_api_version.h.in

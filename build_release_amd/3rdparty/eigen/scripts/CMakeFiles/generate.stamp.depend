@@ -1,0 +1,6 @@
+# CMake generation dependency list for this directory.
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/eigen/scripts/CMakeLists.txt
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/eigen/scripts/buildtests.in
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/eigen/scripts/check.in
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/eigen/scripts/debug.in
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/eigen/scripts/release.in

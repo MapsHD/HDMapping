@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_amd\CMakeFiles\389fd89b019a2fcece63c27728591757\uninstall.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_amd\3rdparty\eigen\CMakeFiles\uninstall" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{E756042D-BD46-3BC2-8B87-279FE0C7BB3D}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

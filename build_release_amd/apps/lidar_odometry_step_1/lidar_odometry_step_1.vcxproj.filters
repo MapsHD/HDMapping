@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_gui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_utils_optimizers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_gui_utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\toml_io.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_gui_utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\toml.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\toml_io.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{7DA9FFD3-224C-3021-B63D-E34BC7BFA730}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{762D2470-ED7B-3CD6-8464-1F2615F96827}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,10 @@
+^D:\@GITHUB\HDMAPPING085-2025-08-08_17\BUILD_RELEASE_GENERIC\CMAKEFILES\4CE2D8DE70A0996D95EBC18C30707DB0\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/@Github/HDMapping085-2025-08-08_17 -BD:/@Github/HDMapping085-2025-08-08_17/build_release_generic --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/hd-mapping.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

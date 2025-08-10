@@ -1,0 +1,73 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\arithmeticdecoder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\arithmeticencoder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\arithmeticmodel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\integercompressor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\lasindex.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\lasinterval.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\lasquadtree.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\lasreaditemcompressed_v1.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\lasreaditemcompressed_v2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\lasreaditemcompressed_v3.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\lasreaditemcompressed_v4.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\lasreadpoint.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\laswriteitemcompressed_v1.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\laswriteitemcompressed_v2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\laswriteitemcompressed_v3.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\laswriteitemcompressed_v4.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\laswritepoint.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\laszip.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\laszip_dll.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\mydefs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\src\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{762D2470-ED7B-3CD6-8464-1F2615F96827}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

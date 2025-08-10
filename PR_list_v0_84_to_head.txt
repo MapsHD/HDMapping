@@ -1,0 +1,75 @@
+c44def5 | JanuszBedkowski | 2025-08-02 | Merge pull request #150 from dancmari/HDmapping084_test
+8495fbf | JanuszBedkowski | 2025-08-02 | Merge pull request #151 from dancmari/HDmapping084_test
+2c2e125 | JanuszBedkowski | 2025-08-02 | Merge pull request #152 from MapsHD/mp/revert_sumbodule
+bfe9b1a | JanuszBedkowski | 2025-08-03 | Merge pull request #154 from dancmari/HDmapping084_optimizations_only
+backup_bisect_2025_08_10
+54911f3 | JanuszBedkowski | 2025-08-03 | Merge pull request #156 from dancmari/fix-toml-issue-155
+37c0d37 | JanuszBedkowski | 2025-08-03 | Merge pull request #158 from dancmari/hdmapping-arm-only
+0eb387e | JanuszBedkowski | 2025-08-03 | Merge pull request #147 from MapsHD/mp/fix_missing_include
+ddc6412 | JanuszBedkowski | 2025-08-06 | Merge pull request #160 from iegorval/cleaning
+
+PR-ul #150 (c44def5) conține următoarele commituri:
+
+4b5e4d4 iproved info when ICP fail
+91defb7 Compatible other SOTA algorithms (benchmark)
+c760491 Compatible other SOTA algorithms (benchmark) ...
+7bad01e Compatible other SOTA algorithms (benchmark) ... dlio
+a0af412 Compatible other SOTA algorithms (benchmark) ... point-lio
+d8991cf fast-lio-to-hdmapping
+47ebe13 https://github.com/MapsHD/benchmark-Faster-LIO-to-hdmapping
+3c857e8 https://github.com/MapsHD/benchmark-LIO-SAM-to-hdmapping
+8052760 https://github.com/MapsHD/benchmark-LeGO-LOAM-to-hdmapping
+6ff17c5 https://github.com/MapsHD/benchmark-loam-livox-to-hdmapping
+2e83f91 Update freeglut
+-3079bd1 Add AMD64 optimizations for better performance
+ddff270 extend gnss struct
+4b33569 Add missing TOML parameters: motion_model_correction (om,fi,ka) and max_distance_lidar_rigid_sf
+
+
+Commiturile din PR151 (8495fbf) sunt:
+
+1041efe – Fix freeglut submodule: revert to stable v3.2.2 tag
+84b30e9 – Revert freeglut to working commit 9fa5fc3b
+
+
+Commiturile din PR152 (2c2e125) sunt:
+
+9569346 – revereted submodule version
+2c2e125 – Merge pull request #152 from MapsHD/mp/revert_sumbodule
+
+
+Commiturile din PR154 (bfe9b1a) sunt:
+
+f6d9c09 – Add configurable CPU architecture optimizations
+840a687 – Add dynamic version information system to TOML configuration
+dff639c – Add comprehensive version usage example and best practices
+b73218b – Add robust version handling for TOML configuration loading
+a74fa7f – Add comprehensive documentation for CPU optimization system
+a178971 – feat(toml): Implement dynamic version system with optimized TOML structure
+3405938 – fix(examples): Replace emoji with ASCII encoding for compatibility
+7368cb5 – test: Add test files for version system validation
+c5dba26 – feat: enhanced progress bar with ETA and exact completion time display
+068cd1d – docs: add comprehensive PR description for HDMapping optimizations
+ee8d77c – feat: Enhanced progress bar with ETA and dual-file saving system
+e6dbf4d – fix: Replace localtime_s with cross-platform time formatting
+bfe9b1a – Merge pull request #154 from dancmari/HDmapping084_optimizations_only
+
+
+Commiturile din PR156 (54911f3) sunt:
+
+54911f3 – Merge pull request #156 from dancmari/fix-toml-issue-155
+
+
+Lista commituri PR158 (conform fișierului tău):
+
+37c0d37 – Merge pull request #158 from dancmari/hdmapping-arm-only
+
+
+Commiturile din PR147 (0eb387e) sunt:
+
+0eb387e – Merge pull request #147 from MapsHD/mp/fix_missing_include
+
+
+Commiturile din PR160 (ddc6412) sunt:
+
+ddc6412 – Merge pull request #160 from iegorval/cleaning

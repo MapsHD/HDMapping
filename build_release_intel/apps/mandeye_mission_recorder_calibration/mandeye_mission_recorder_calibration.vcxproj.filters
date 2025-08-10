@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\mandeye_mission_recorder_calibration\mandeye_mission_recorder_calibration.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_utils_optimizers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\@Github\HDMapping085-2025-08-08_17\apps\mandeye_mission_recorder_calibration\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{54277669-332A-3724-A71B-29E8F2447793}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

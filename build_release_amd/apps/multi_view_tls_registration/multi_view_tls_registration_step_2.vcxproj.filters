@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\multi_view_tls_registration\multi_view_tls_registration.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\multi_view_tls_registration\perform_experiment.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\multi_view_tls_registration\multi_view_tls_registration_gui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\apps\multi_view_tls_registration\multi_view_tls_registration.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\@Github\HDMapping085-2025-08-08_17\apps\multi_view_tls_registration\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{7DA9FFD3-224C-3021-B63D-E34BC7BFA730}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{762D2470-ED7B-3CD6-8464-1F2615F96827}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

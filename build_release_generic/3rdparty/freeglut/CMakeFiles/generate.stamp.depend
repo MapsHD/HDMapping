@@ -1,0 +1,23 @@
+# CMake generation dependency list for this directory.
+C:/Program Files/CMake/share/cmake-4.0/Modules/BasicConfigVersion-AnyNewerVersion.cmake.in
+C:/Program Files/CMake/share/cmake-4.0/Modules/CMakePackageConfigHelpers.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CheckCCompilerFlag.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CheckCSourceCompiles.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CheckFunctionExists.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CheckIncludeFile.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CheckIncludeFileCXX.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CheckIncludeFiles.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/CheckTypeSize.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/FindOpenGL.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/FindPackageHandleStandardArgs.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/FindPackageMessage.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/GNUInstallDirs.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/Internal/CheckCompilerFlag.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/Internal/CheckSourceCompiles.cmake
+C:/Program Files/CMake/share/cmake-4.0/Modules/WriteBasicConfigVersionFile.cmake
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/freeglut/CMakeLists.txt
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/freeglut/FreeGLUTConfig.cmake.in
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/freeglut/config.h.in
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/freeglut/freeglut.pc.in
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/freeglut/freeglut.rc.in
+D:/@Github/HDMapping085-2025-08-08_17/3rdparty/freeglut/src/fg_version.h.in

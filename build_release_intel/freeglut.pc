@@ -1,0 +1,10 @@
+prefix=C:/Program Files/hd-mapping
+libdir=C:/Program Files/hd-mapping/lib
+includedir=${prefix}/include
+
+Name: glut
+Description: A freely licensed and improved alternative to the GLUT library
+Version: 3.2.2
+Libs: -L${libdir} -lfreeglut
+Libs.private: -lopengl32 -lwinmm -lgdi32 -lm
+Cflags: -I${includedir} -DFREEGLUT_STATIC

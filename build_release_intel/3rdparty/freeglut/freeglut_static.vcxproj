@@ -1,0 +1,342 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{005FE5E9-3E7C-36E2-B0C0-A43A18F55F0B}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>freeglut_static</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_intel\3rdparty\freeglut\lib\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">freeglut_static.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">freeglut_staticd</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_intel\3rdparty\freeglut\lib\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">freeglut_static.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">freeglut_static</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_intel\3rdparty\freeglut\lib\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">freeglut_static.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">freeglut_static</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_intel\3rdparty\freeglut\lib\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">freeglut_static.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">freeglut_static</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.lib</TargetExt>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;FREEGLUT_STATIC;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0601;WINVER=0x0601;HAVE_CONFIG_H;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;FREEGLUT_STATIC;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0601;WINVER=0x0601;HAVE_CONFIG_H;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64 /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;FREEGLUT_STATIC;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0601;WINVER=0x0601;HAVE_CONFIG_H;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;FREEGLUT_STATIC;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0601;WINVER=0x0601;HAVE_CONFIG_H;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64 /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;FREEGLUT_STATIC;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0601;WINVER=0x0601;HAVE_CONFIG_H;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;FREEGLUT_STATIC;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0601;WINVER=0x0601;HAVE_CONFIG_H;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64 /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;FREEGLUT_STATIC;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0601;WINVER=0x0601;HAVE_CONFIG_H;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;FREEGLUT_STATIC;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0601;WINVER=0x0601;HAVE_CONFIG_H;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\build_release_intel;D:\@Github\HDMapping085-2025-08-08_17\shared\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64 /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule D:/@Github/HDMapping085-2025-08-08_17/3rdparty/freeglut/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/@Github/HDMapping085-2025-08-08_17 -BD:/@Github/HDMapping085-2025-08-08_17/build_release_intel --check-stamp-file D:/@Github/HDMapping085-2025-08-08_17/build_release_intel/3rdparty/freeglut/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files\CMake\share\cmake-4.0\Modules\BasicConfigVersion-AnyNewerVersion.cmake.in;C:\Program Files\CMake\share\cmake-4.0\Modules\CMakePackageConfigHelpers.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckCCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckCSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckFunctionExists.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFile.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFileCXX.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckTypeSize.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindOpenGL.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\GNUInstallDirs.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\Internal\CheckCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\Internal\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\WriteBasicConfigVersionFile.cmake;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\FreeGLUTConfig.cmake.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\config.h.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\freeglut.pc.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\freeglut.rc.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_version.h.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_intel\3rdparty\freeglut\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule D:/@Github/HDMapping085-2025-08-08_17/3rdparty/freeglut/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/@Github/HDMapping085-2025-08-08_17 -BD:/@Github/HDMapping085-2025-08-08_17/build_release_intel --check-stamp-file D:/@Github/HDMapping085-2025-08-08_17/build_release_intel/3rdparty/freeglut/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Program Files\CMake\share\cmake-4.0\Modules\BasicConfigVersion-AnyNewerVersion.cmake.in;C:\Program Files\CMake\share\cmake-4.0\Modules\CMakePackageConfigHelpers.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckCCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckCSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckFunctionExists.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFile.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFileCXX.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckTypeSize.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindOpenGL.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\GNUInstallDirs.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\Internal\CheckCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\Internal\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\WriteBasicConfigVersionFile.cmake;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\FreeGLUTConfig.cmake.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\config.h.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\freeglut.pc.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\freeglut.rc.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_version.h.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_intel\3rdparty\freeglut\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule D:/@Github/HDMapping085-2025-08-08_17/3rdparty/freeglut/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/@Github/HDMapping085-2025-08-08_17 -BD:/@Github/HDMapping085-2025-08-08_17/build_release_intel --check-stamp-file D:/@Github/HDMapping085-2025-08-08_17/build_release_intel/3rdparty/freeglut/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Program Files\CMake\share\cmake-4.0\Modules\BasicConfigVersion-AnyNewerVersion.cmake.in;C:\Program Files\CMake\share\cmake-4.0\Modules\CMakePackageConfigHelpers.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckCCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckCSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckFunctionExists.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFile.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFileCXX.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckTypeSize.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindOpenGL.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\GNUInstallDirs.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\Internal\CheckCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\Internal\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\WriteBasicConfigVersionFile.cmake;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\FreeGLUTConfig.cmake.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\config.h.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\freeglut.pc.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\freeglut.rc.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_version.h.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_intel\3rdparty\freeglut\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule D:/@Github/HDMapping085-2025-08-08_17/3rdparty/freeglut/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/@Github/HDMapping085-2025-08-08_17 -BD:/@Github/HDMapping085-2025-08-08_17/build_release_intel --check-stamp-file D:/@Github/HDMapping085-2025-08-08_17/build_release_intel/3rdparty/freeglut/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Program Files\CMake\share\cmake-4.0\Modules\BasicConfigVersion-AnyNewerVersion.cmake.in;C:\Program Files\CMake\share\cmake-4.0\Modules\CMakePackageConfigHelpers.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckCCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckCSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckFunctionExists.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFile.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFileCXX.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckIncludeFiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\CheckTypeSize.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindOpenGL.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\GNUInstallDirs.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\Internal\CheckCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\Internal\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.0\Modules\WriteBasicConfigVersionFile.cmake;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\FreeGLUTConfig.cmake.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\config.h.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\freeglut.pc.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\freeglut.rc.in;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_version.h.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_intel\3rdparty\freeglut\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include\GL\freeglut.h" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include\GL\freeglut_ucall.h" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include\GL\freeglut_ext.h" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include\GL\freeglut_std.h" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_callbacks.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_cursor.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_display.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_ext.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_font_data.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_gamemode.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_geometry.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_gl2.c" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_gl2.h" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_init.c" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_init.h" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_internal.h" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_callback_macros.h" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_input_devices.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_joystick.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_main.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_misc.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_overlay.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_spaceball.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_state.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_stroke_mono_roman.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_stroke_roman.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_structure.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_teapot.c" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_teapot_data.h" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_videoresize.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_window.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_font.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\fg_menu.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_cursor_mswin.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_display_mswin.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_ext_mswin.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_gamemode_mswin.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_init_mswin.c" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_internal_mswin.h" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_input_devices_mswin.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_joystick_mswin.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_main_mswin.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_menu_mswin.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_spaceball_mswin.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_state_mswin.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_structure_mswin.c" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\mswin\fg_window_mswin.c" />
+    <ResourceCompile Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_intel\freeglut.rc" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\util\xparsegeometry_repl.c" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\src\util\xparsegeometry_repl.h" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_intel\ZERO_CHECK.vcxproj">
+      <Project>{A122BE2D-3C94-3BB0-A8B0-27183FA552CD}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

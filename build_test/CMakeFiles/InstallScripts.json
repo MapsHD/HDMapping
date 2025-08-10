@@ -1,0 +1,37 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/eigen/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/eigen/blas/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/eigen/lapack/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/eigen/unsupported/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/eigen/unsupported/Eigen/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/eigen/unsupported/Eigen/CXX11/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/eigen/demos/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/eigen/scripts/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/freeglut/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/LASzip/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/LASzip/src/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/LASzip/dll/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/3rdparty/Fusion/Fusion/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/core/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/core_hd_mapping/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/hd_mapper/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/lidar_odometry_step_1/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/manual_color/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/matrix_mul/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/multi_session_registration/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/multi_view_tls_registration/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/split_multi_livox/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/precision_forestry_tools/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/mandeye_raw_data_viewer/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/compare_trajectories/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/quick_start_demo/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/mandeye_mission_recorder_calibration/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/mandeye_single_session_viewer/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/livox_mid_360_intrinsic_calibration/cmake_install.cmake",
+		"D:/@Github/HDMapping085-2025-08-08_17/build_test/apps/single_session_manual_coloring/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

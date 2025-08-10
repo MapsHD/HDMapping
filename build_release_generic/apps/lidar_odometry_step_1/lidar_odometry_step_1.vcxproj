@@ -1,0 +1,439 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{7CD7A40A-BF05-3FDA-BCCC-8BD777FB66BC}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>lidar_odometry_step_1</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\bin\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">lidar_odometry_step_1.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">lidar_odometry_step_1</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\bin\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">lidar_odometry_step_1.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">lidar_odometry_step_1</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\bin\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">lidar_odometry_step_1.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">lidar_odometry_step_1</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\bin\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">lidar_odometry_step_1.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">lidar_odometry_step_1</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</GenerateManifest>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /bigobj</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;WITH_GUI=1;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;WITH_GUI=1;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PostBuildEvent>
+      <Message></Message>
+      <Command>setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/3rdparty/freeglut/bin/Debug/freeglutd.dll D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/3rdparty/LASzip/bin/laszip3.dll D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/bin/Debug
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>..\..\lib\Debug\Fusion.lib;..\..\3rdparty\freeglut\lib\Debug\freeglutd.lib;opengl32.lib;glu32.lib;..\..\lib\Debug\core.lib;..\..\lib\Debug\core-hd-mapping.lib;..\..\lib\Debug\imgui.lib;..\..\lib\Debug\imguizmo.lib;..\..\lib\Debug\implot.lib;winmm.lib;opengl32.lib;..\..\lib\Debug\core.lib;..\..\3rdparty\LASzip\lib\laszip3.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/lib/Debug/lidar_odometry_step_1.lib</ImportLibrary>
+      <ProgramDataBaseFile>D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/bin/Debug/lidar_odometry_step_1.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /bigobj</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;WITH_GUI=1;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;WITH_GUI=1;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PostBuildEvent>
+      <Message></Message>
+      <Command>setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/3rdparty/freeglut/bin/Release/freeglut.dll D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/3rdparty/LASzip/bin/laszip3.dll D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/bin/Release
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>..\..\lib\Release\Fusion.lib;..\..\3rdparty\freeglut\lib\Release\freeglut.lib;opengl32.lib;glu32.lib;..\..\lib\Release\core.lib;..\..\lib\Release\core-hd-mapping.lib;..\..\lib\Release\imgui.lib;..\..\lib\Release\imguizmo.lib;..\..\lib\Release\implot.lib;winmm.lib;opengl32.lib;..\..\lib\Release\core.lib;..\..\3rdparty\LASzip\lib\laszip3.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/lib/Release/lidar_odometry_step_1.lib</ImportLibrary>
+      <ProgramDataBaseFile>D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/bin/Release/lidar_odometry_step_1.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /bigobj</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;WITH_GUI=1;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;WITH_GUI=1;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PostBuildEvent>
+      <Message></Message>
+      <Command>setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/3rdparty/freeglut/bin/MinSizeRel/freeglut.dll D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/3rdparty/LASzip/bin/laszip3.dll D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/bin/MinSizeRel
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>..\..\lib\MinSizeRel\Fusion.lib;..\..\3rdparty\freeglut\lib\MinSizeRel\freeglut.lib;opengl32.lib;glu32.lib;..\..\lib\MinSizeRel\core.lib;..\..\lib\MinSizeRel\core-hd-mapping.lib;..\..\lib\MinSizeRel\imgui.lib;..\..\lib\MinSizeRel\imguizmo.lib;..\..\lib\MinSizeRel\implot.lib;winmm.lib;opengl32.lib;..\..\lib\MinSizeRel\core.lib;..\..\3rdparty\LASzip\lib\laszip3.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/lib/MinSizeRel/lidar_odometry_step_1.lib</ImportLibrary>
+      <ProgramDataBaseFile>D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/bin/MinSizeRel/lidar_odometry_step_1.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /bigobj</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <SupportJustMyCode></SupportJustMyCode>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;WITH_GUI=1;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;WITH_GUI=1;HDMAPPING_VERSION_MAJOR=0;HDMAPPING_VERSION_MINOR=84;HDMAPPING_VERSION_PATCH=0;_HAS_STD_BYTE=0;_USE_MATH_DEFINES;ImDrawIdx=unsigned int;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\@Github\HDMapping085-2025-08-08_17\shared\include;D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\include;D:\@Github\HDMapping085-2025-08-08_17\core\include;D:\@Github\HDMapping085-2025-08-08_17\core_hd_mapping\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glm;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\eigen;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\imgui\backends;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\ImGuizmo;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\glew-2.2.0\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\freeglut\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\json\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\portable-file-dialogs-master;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\LASzip\include;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\observation_equations\codes;D:\@Github\HDMapping085-2025-08-08_17\3rdparty\Fusion\Fusion;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PostBuildEvent>
+      <Message></Message>
+      <Command>setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/3rdparty/freeglut/bin/RelWithDebInfo/freeglut.dll D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/3rdparty/LASzip/bin/laszip3.dll D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/bin/RelWithDebInfo
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>..\..\lib\RelWithDebInfo\Fusion.lib;..\..\3rdparty\freeglut\lib\RelWithDebInfo\freeglut.lib;opengl32.lib;glu32.lib;..\..\lib\RelWithDebInfo\core.lib;..\..\lib\RelWithDebInfo\core-hd-mapping.lib;..\..\lib\RelWithDebInfo\imgui.lib;..\..\lib\RelWithDebInfo\imguizmo.lib;..\..\lib\RelWithDebInfo\implot.lib;winmm.lib;opengl32.lib;..\..\lib\RelWithDebInfo\core.lib;..\..\3rdparty\LASzip\lib\laszip3.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/lib/RelWithDebInfo/lidar_odometry_step_1.lib</ImportLibrary>
+      <ProgramDataBaseFile>D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/bin/RelWithDebInfo/lidar_odometry_step_1.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule D:/@Github/HDMapping085-2025-08-08_17/apps/lidar_odometry_step_1/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/@Github/HDMapping085-2025-08-08_17 -BD:/@Github/HDMapping085-2025-08-08_17/build_release_generic --check-stamp-file D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/apps/lidar_odometry_step_1/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\apps\lidar_odometry_step_1\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule D:/@Github/HDMapping085-2025-08-08_17/apps/lidar_odometry_step_1/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/@Github/HDMapping085-2025-08-08_17 -BD:/@Github/HDMapping085-2025-08-08_17/build_release_generic --check-stamp-file D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/apps/lidar_odometry_step_1/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\apps\lidar_odometry_step_1\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule D:/@Github/HDMapping085-2025-08-08_17/apps/lidar_odometry_step_1/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/@Github/HDMapping085-2025-08-08_17 -BD:/@Github/HDMapping085-2025-08-08_17/build_release_generic --check-stamp-file D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/apps/lidar_odometry_step_1/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\apps\lidar_odometry_step_1\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule D:/@Github/HDMapping085-2025-08-08_17/apps/lidar_odometry_step_1/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/@Github/HDMapping085-2025-08-08_17 -BD:/@Github/HDMapping085-2025-08-08_17/build_release_generic --check-stamp-file D:/@Github/HDMapping085-2025-08-08_17/build_release_generic/apps/lidar_odometry_step_1/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\apps\lidar_odometry_step_1\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_gui.cpp" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_utils.h" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_utils.cpp" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_utils_optimizers.cpp" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry.cpp" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry.h" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_gui_utils.cpp" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\lidar_odometry_gui_utils.h" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\toml.hpp" />
+    <ClInclude Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\toml_io.h" />
+    <ClCompile Include="D:\@Github\HDMapping085-2025-08-08_17\apps\lidar_odometry_step_1\toml_io.cpp" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\ZERO_CHECK.vcxproj">
+      <Project>{664FA744-CA48-39F5-93D7-990D07A349D2}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\3rdparty\Fusion\Fusion\Fusion.vcxproj">
+      <Project>{BCA24492-1601-3789-A940-8F7E9732A34F}</Project>
+      <Name>Fusion</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\core\core.vcxproj">
+      <Project>{E037003B-720A-3559-818C-AF97DCFCB5F9}</Project>
+      <Name>core</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\core_hd_mapping\core-hd-mapping.vcxproj">
+      <Project>{471CC37A-27C4-35D0-8586-84506141FDA9}</Project>
+      <Name>core-hd-mapping</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\3rdparty\freeglut\freeglut.vcxproj">
+      <Project>{0606E2A6-DA4A-3BF5-A04E-2EC77F75848A}</Project>
+      <Name>freeglut</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\imgui.vcxproj">
+      <Project>{02826289-8FD1-3858-8CF5-2A83CBCFCB38}</Project>
+      <Name>imgui</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\imguizmo.vcxproj">
+      <Project>{EB6DA59E-00E1-39E2-987E-929416C710C7}</Project>
+      <Name>imguizmo</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\implot.vcxproj">
+      <Project>{BD260357-F24F-3728-90AF-04FB02C7C436}</Project>
+      <Name>implot</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\@Github\HDMapping085-2025-08-08_17\build_release_generic\3rdparty\LASzip\src\laszip3.vcxproj">
+      <Project>{C165BB74-5866-3BCA-8147-14B11C218F65}</Project>
+      <Name>laszip3</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

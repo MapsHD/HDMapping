@@ -7,7 +7,7 @@ Windows - ghid rapid de build (x64) + variante optimizate
 
 2) Setup o singura data (clone + submodule)
 - Daca esti deja pe un branch in acest repo, sari peste clone.
-  git clone https://github.com/MapsHD/HDMapping.git
+  git clone https://github.com/dancmari/HDMapping.git
   cd HDMapping
   git submodule init
   git submodule update --recursive
@@ -26,14 +26,14 @@ A. Cu scriptul existent (recomandat pentru lidar_odometry_step_1):
   Explicatii de rulare (PowerShell):
     1) Deschide Windows PowerShell.
     2) Mergi in radacina repo-ului (directorul care contine fisierul build_all_vs17.ps1):
-      cd D:\@Github\HDMapping085-2025-08-08_17
+    cd C:\cale\catre\HDMapping
     3) Ruleaza scriptul (daca politica de executie blocheaza scripturile, permite temporar pe sesiunea curenta):
       Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
       .\build_all_vs17.ps1
 
   - Scriptul creeaza: build_release_generic, build_release_amd, build_release_intel,
   compileaza tinta lidar_odometry_step_1 si copiaza binarele in folderul binaries\
-  ca: lidar_odometry_step_1_release_{generic|amd|intel}_pr160_vs17.exe
+  ca: lidar_odometry_step_1_release_{generic|amd|intel}_v085_vs17.exe
 
 B. Manual per profil (exemplu pentru AMD; repeta pentru INTEL si GENERIC):
   # AMD

@@ -7,7 +7,7 @@ Windows - szybki przewodnik budowania (x64) + warianty zoptymalizowane
 
 2) Jednorazowa konfiguracja (clone + submodules)
 - Jeśli już jesteś na gałęzi w tym repozytorium, pomiń klonowanie.
-  git clone https://github.com/MapsHD/HDMapping.git
+  git clone https://github.com/dancmari/HDMapping.git
   cd HDMapping
   git submodule init
   git submodule update --recursive
@@ -26,14 +26,14 @@ A. Z użyciem istniejącego skryptu (zalecane dla lidar_odometry_step_1):
 Instrukcje uruchomienia (PowerShell):
   1) Otwórz Windows PowerShell.
   2) Przejdź do katalogu głównego repozytorium (katalog zawierający build_all_vs17.ps1):
-    cd D:\@Github\HDMapping085-2025-08-08_17
+    cd C:\sciezka\do\HDMapping
   3) Uruchom skrypt (jeśli polityka wykonywania blokuje skrypty, tymczasowo zezwól w tej sesji):
     Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
     .\build_all_vs17.ps1
 
 - Skrypt tworzy: build_release_generic, build_release_amd, build_release_intel,
   buduje cel lidar_odometry_step_1 i kopiuje binaria do folderu binaries\
-  jako: lidar_odometry_step_1_release_{generic|amd|intel}_pr160_vs17.exe
+  jako: lidar_odometry_step_1_release_{generic|amd|intel}_v085_vs17.exe
 
 B. Ręcznie per profil (przykład dla AMD; powtórz dla INTEL i GENERIC):
   # AMD

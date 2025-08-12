@@ -7,7 +7,7 @@ Windows - ghid rapid de build (x64) + variante optimizate
 
 2) Setup o singura data (clone + submodule)
 - Daca esti deja pe un branch in acest repo, sari peste clone.
-  git clone https://github.com/dancmari/HDMapping.git
+  git clone https://github.com/MapsHD/HDMapping.git
   cd HDMapping
   git submodule init
   git submodule update --recursive

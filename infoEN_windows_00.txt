@@ -7,7 +7,7 @@ Windows - quick build guide (x64) + optimized variants
 
 2) One-time setup (clone + submodules)
 - If you are already on a branch in this repo, skip the clone.
-  git clone https://github.com/dancmari/HDMapping.git
+  git clone https://github.com/MapsHD/HDMapping.git
   cd HDMapping
   git submodule init
   git submodule update --recursive

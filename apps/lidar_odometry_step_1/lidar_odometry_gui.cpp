@@ -12,13 +12,15 @@
 #include "lidar_odometry_utils.h"
 #include "lidar_odometry.h"
 #include <registration_plane_feature.h>
+#include <export_laz.h>
 
 #include <mutex>
 #include <HDMapping/Version.hpp>
 #include <session.h>
 #include <pfd_wrapper.hpp>
 #include <export_laz.h>
-
+#include <ctime>
+#include <chrono>
 #include "toml_io.h"
 
 // This is LiDAR odometry (step 1)
@@ -85,6 +87,48 @@ Imu imu_data;
 Trajectory trajectory;
 std::atomic<bool> loRunning{false};
 std::atomic<float> loProgress{0.0};
+std::chrono::time_point<std::chrono::system_clock> loStartTime;
+std::atomic<double> loElapsedSeconds{0.0};
+std::atomic<double> loEstimatedTimeRemaining{0.0};
+
+// Helper function to format time in human-readable format
+std::string formatTime(double seconds) {
+    if (seconds < 0) return "Calculating...";
+    
+    int hours = static_cast<int>(seconds / 3600);
+    int minutes = static_cast<int>((seconds - hours * 3600) / 60);
+    int secs = static_cast<int>(seconds - hours * 3600 - minutes * 60);
+    
+    if (hours > 0) {
+        return std::to_string(hours) + "h " + std::to_string(minutes) + "m " + std::to_string(secs) + "s";
+    } else if (minutes > 0) {
+        return std::to_string(minutes) + "m " + std::to_string(secs) + "s";
+    } else {
+        return std::to_string(secs) + "s";
+    }
+}
+
+// Helper function to format estimated completion time
+std::string formatCompletionTime(double remainingSeconds) {
+    if (remainingSeconds < 0) return "Calculating...";
+    
+    auto now = std::chrono::system_clock::now();
+    auto estimatedCompletion = now + std::chrono::seconds(static_cast<long long>(remainingSeconds));
+    auto completion_time_t = std::chrono::system_clock::to_time_t(estimatedCompletion);
+    
+    // Format as HH:MM:SS - Cross-platform time formatting
+    struct tm completion_tm;
+#ifdef _WIN32
+    localtime_s(&completion_tm, &completion_time_t);
+#else
+    localtime_r(&completion_time_t, &completion_tm);
+#endif
+    
+    char timeStr[32];
+    strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &completion_tm);
+    
+    return std::string(timeStr);
+}
 
 // void alternative_approach();
 LaserBeam GetLaserBeam(int x, int y);
@@ -188,6 +232,7 @@ void lidar_odometry_gui()
 
             if (!output_file_name.empty())
             {
+                // Use the original TomlIO class for saving parameters in GUI
                 TomlIO toml_io;
                 bool success = toml_io.SaveParametersToTomlFile(output_file_name, params);
                 if (success)
@@ -209,9 +254,10 @@ void lidar_odometry_gui()
             {
                 try
                 {
+                    // Use the original TomlIO class for loading parameters in GUI
                     TomlIO toml_io;
                     toml_io.LoadParametersFromTomlFile(input_file_names[0], params);
-                    
+                    std::cout << "Parameters loaded from: " << input_file_names[0] << std::endl;
                 }
                 catch (const std::exception &e)
                 {
@@ -409,7 +455,8 @@ void lidar_odometry_gui()
 
                 if (output_file_name.size() > 0)
                 {
-                    save_all_to_las(worker_data, params, output_file_name, session, false, true, true, false);
+                    session.fill_session_from_worker_data(worker_data, false, true, true, params.threshould_output_filter);
+                    save_all_to_las(session, output_file_name, false);
                 }
             }
         }
@@ -647,7 +694,8 @@ void lidar_odometry_gui()
                 Eigen::Affine3d pose;
                 if (output_file_name.size() > 0)
                 {
-                    save_all_to_las(worker_data, params, output_file_name, session, true, false, false, true);
+                    session.fill_session_from_worker_data(worker_data, true, false, false, params.threshould_output_filter);
+                    save_all_to_las(session, output_file_name, false);
                 }
                 // TODO: give value to pose even if output_file_name is wrong
 
@@ -945,6 +993,10 @@ void lidar_odometry_basic_gui()
                 return;
             }
             loRunning.store(true);
+            loProgress.store(0.0f);
+            loElapsedSeconds.store(0.0);
+            loEstimatedTimeRemaining.store(0.0);
+            loStartTime = std::chrono::system_clock::now();
 
             step1();
 
@@ -991,7 +1043,42 @@ void lidar_odometry_basic_gui()
 
         if (loRunning)
         {
-            ImGui::ProgressBar(loProgress);
+            // Calculate elapsed time and ETA
+            auto currentTime = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed = currentTime - loStartTime;
+            double elapsedSeconds = elapsed.count();
+            loElapsedSeconds.store(elapsedSeconds);
+            
+            float progress = loProgress.load();
+            double estimatedTimeRemaining = 0.0;
+            
+            if (progress > 0.01f) { // Only estimate when we have meaningful progress
+                double totalEstimatedTime = elapsedSeconds / progress;
+                estimatedTimeRemaining = totalEstimatedTime - elapsedSeconds;
+                loEstimatedTimeRemaining.store(estimatedTimeRemaining);
+            }
+            
+            // Format progress text with time information
+            char progressText[256];
+            char timeInfo[512];
+            
+            if (progress > 0.01f) {
+                std::string completionTime = formatCompletionTime(estimatedTimeRemaining);
+                snprintf(progressText, sizeof(progressText), "Processing: %.1f%% Complete", progress * 100.0f);
+                snprintf(timeInfo, sizeof(timeInfo), 
+                    "Elapsed: %s | Remaining: %s | Estimated finish: %s", 
+                    formatTime(elapsedSeconds).c_str(),
+                    formatTime(estimatedTimeRemaining).c_str(),
+                    completionTime.c_str());
+            } else {
+                snprintf(progressText, sizeof(progressText), "Processing: %.1f%% Complete", progress * 100.0f);
+                snprintf(timeInfo, sizeof(timeInfo), 
+                    "Elapsed: %s | Calculating completion time...", 
+                    formatTime(elapsedSeconds).c_str());
+            }
+            
+            ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), progressText);
+            ImGui::Text("%s", timeInfo);
         }
 
         ImGui::End();
@@ -1490,19 +1577,10 @@ int main(int argc, char *argv[])
     {
         if (argc == 4)
         {
+            // Load parameters from file using original TomlIO class
             TomlIO toml_io;
             toml_io.LoadParametersFromTomlFile(argv[2], params);
-
-            // bool success = LoadParametersFromTomlFile(argv[2], params);
-            // if (success)
-            // {
-            //     std::cout << "Parameters loaded OK" << std::endl;
-            // }
-            // else
-            // {
-            //     std::cerr << "Failed to load parameters from file" << std::endl;
-            //     return 1;
-            // }
+            std::cout << "Parameters loaded OK from: " << argv[2] << std::endl;
 
             std::string working_directory;
             std::vector<WorkerData> worker_data;
@@ -1700,24 +1778,30 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
         trajectory_for_interpolation[ts[i]] = best_trajectory[i].matrix();
     }
 
-    std::vector<Point3Di> points_global = points_reindexed;
-    for (auto &p : points_global)
+    std::vector<Eigen::Vector3d> pointcloud_global; 
+    std::vector<unsigned short> intensity;
+    std::vector<double> timestamps_;
+    for (const auto &p : points_reindexed)
     {
-        Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, /*ts[p.index_pose]*/ p.timestamp);
+        Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, p.timestamp);
         Eigen::Affine3d b;
         b.matrix() = pose;
-        p.point = b * p.point;
+        Eigen::Vector3d vec  = b * p.point;
+        pointcloud_global.push_back(vec);
+        intensity.push_back(p.intensity);
+        timestamps_.push_back(p.timestamp);
     }
 
     std::cout << "saving file: " << fn1 << std::endl;
-    saveLaz(fn1, points_global);
+    exportLaz(fn1, pointcloud_global, intensity, timestamps_);
 
-    points_global = points_reindexed;
-    for (auto &p : points_global)
+    pointcloud_global.clear();
+    for (const auto &p : points_reindexed)
     {
-        p.point = trajectory[p.index_pose] * p.point;
+        Eigen::Vector3d vec = trajectory[p.index_pose] * p.point;
+        pointcloud_global.push_back(vec);
     }
-    saveLaz(fn2, points_global);
+    exportLaz(fn2, pointcloud_global, intensity, timestamps_);
 }
 
 #if 0

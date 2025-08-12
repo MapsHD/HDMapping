@@ -24,22 +24,28 @@
 
 namespace fs = std::filesystem;
 
-struct WorkerData
-{
-    std::vector<Point3Di> intermediate_points;
-    std::vector<Point3Di> original_points;
-    std::vector<Eigen::Affine3d> intermediate_trajectory;
-    std::vector<Eigen::Affine3d> intermediate_trajectory_motion_model;
-    std::vector<std::pair<double, double>> intermediate_trajectory_timestamps;
-    std::vector<Eigen::Vector3d> imu_om_fi_ka;
-    bool show = false;
-};
 
 using NDTBucketMapType = std::unordered_map<uint64_t, NDT::Bucket>;
 using NDTBucketMapType2 = std::unordered_map<uint64_t, NDT::Bucket2>;
 
+// Helper function for getting software version from CMake macros
+inline std::string get_software_version() {
+    #ifdef HDMAPPING_VERSION_MAJOR
+        return std::to_string(HDMAPPING_VERSION_MAJOR) + "." + 
+               std::to_string(HDMAPPING_VERSION_MINOR) + "." + 
+               std::to_string(HDMAPPING_VERSION_PATCH);
+    #else
+        return "0.84.0"; // fallback if CMake macros not available
+    #endif
+}
+
 struct LidarOdometryParams
 {
+    // version information - automatically generated from CMake build system
+    std::string software_version = get_software_version();
+    std::string config_version = "1.0";
+    std::string build_date = __DATE__;
+    
     //perfromance
     bool useMultithread = true;
     double real_time_threshold_seconds = 10.0; // for realtime use: threshold_nr_poses * 0.005, where 0.005 is related with IMU frequency
@@ -165,8 +171,6 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
 std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy_inner, double filter_threshold_xy_outer,
                                        const std::unordered_map<int, Eigen::Affine3d> &calibrations);
 
-bool saveLaz(const std::string &filename, const WorkerData &data, double threshould_output_filter, std::vector<int> *index_poses = nullptr);
-bool saveLaz(const std::string &filename, const std::vector<Point3Di> &points_global);
 bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_poses, std::vector<std::string> filenames);
 
 int get_next_result_id(const std::string working_directory);

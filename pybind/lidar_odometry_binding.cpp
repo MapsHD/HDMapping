@@ -2,41 +2,16 @@
 #include <pybind11/stl/filesystem.h>
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
-#include <structures.h>
-#include <session.h>
 #include <lidar_odometry.h>
 #include <lidar_odometry_utils.h>
+#include <structures.h>
+#include <session.h>
+#include <export_laz.h>
 
 namespace py = pybind11;
 
 PYBIND11_MODULE(lidar_odometry_py, m) {
     m.doc() = "Python bindings for lidar odometry";
-
-    // Bind Point3Di
-    py::class_<Point3Di>(m, "Point3Di")
-        .def(py::init<>())
-        .def_readwrite("point", &Point3Di::point)
-        .def_readwrite("timestamp", &Point3Di::timestamp)
-        .def_readwrite("intensity", &Point3Di::intensity)
-        .def_readwrite("index_pose", &Point3Di::index_pose)
-        .def_readwrite("lidarid", &Point3Di::lidarid)
-        .def_readwrite("index_point", &Point3Di::index_point);
-
-    // Bind WorkerData
-    py::class_<WorkerData>(m, "WorkerData")
-        .def(py::init<>())
-        .def_readwrite("intermediate_points", &WorkerData::intermediate_points)
-        .def_readwrite("original_points", &WorkerData::original_points)
-        .def_readwrite("intermediate_trajectory", &WorkerData::intermediate_trajectory)
-        .def_readwrite("intermediate_trajectory_motion_model", &WorkerData::intermediate_trajectory_motion_model)
-        .def_readwrite("intermediate_trajectory_timestamps", &WorkerData::intermediate_trajectory_timestamps)
-        .def_readwrite("imu_om_fi_ka", &WorkerData::imu_om_fi_ka);
-
-    // Bind Session
-    py::class_<Session>(m, "Session")
-        .def(py::init<>())
-        .def("load", &Session::load)
-        .def("save", &Session::save);
 
     // Bind GridParameters
     py::class_<NDT::GridParameters>(m, "GridParameters")
@@ -95,7 +70,7 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         .def_readwrite("sliding_window_trajectory_length_threshold", &LidarOdometryParams::sliding_window_trajectory_length_threshold)
         .def_readwrite("save_calibration_validation", &LidarOdometryParams::save_calibration_validation)
         .def_readwrite("calibration_validation_points", &LidarOdometryParams::calibration_validation_points)
-        .def_readwrite("max_distance", &LidarOdometryParams::max_distance)
+        //.def_readwrite("max_distance", &LidarOdometryParams::max_distance)
         .def_readwrite("use_robust_and_accurate_lidar_odometry", &LidarOdometryParams::use_robust_and_accurate_lidar_odometry)
         .def_readwrite("distance_bucket", &LidarOdometryParams::distance_bucket)
         .def_readwrite("polar_angle_deg", &LidarOdometryParams::polar_angle_deg)
@@ -124,7 +99,7 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         .def_readwrite("ahrs_gain", &LidarOdometryParams::ahrs_gain)
         .def_readwrite("threshold_nr_poses", &LidarOdometryParams::threshold_nr_poses)
         .def_readwrite("current_output_dir", &LidarOdometryParams::current_output_dir)
-        .def_readwrite("min_counter", &LidarOdometryParams::min_counter)
+        //.def_readwrite("min_counter", &LidarOdometryParams::min_counter)
         .def_readwrite("lidar_odometry_motion_model_x_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_x_1_sigma_m)
         .def_readwrite("lidar_odometry_motion_model_y_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_y_1_sigma_m)
         .def_readwrite("lidar_odometry_motion_model_z_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_z_1_sigma_m)
@@ -159,18 +134,6 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         py::arg("elapsed_seconds"),
         "Save output results from lidar odometry pipeline.");
 
-    // Bind save_all_to_las function
-    m.def("save_all_to_las", &save_all_to_las,
-        py::arg("worker_data"),
-        py::arg("params"),
-        py::arg("output_file_name"),
-        py::arg("session"),
-        py::arg("export_selected"),
-        py::arg("filter_on_export"),
-        py::arg("apply_pose"),
-        py::arg("add_to_pc_container"),
-        "Save output point cloud to a single file.");
-
     // Bind functions from utils
     m.def("loadLaz", &loadLaz,
         py::arg("filename"),
@@ -203,14 +166,14 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         py::arg("vector"),
         "Load index poses from JSON file");
 
-m.def("load_worker_data_from_results",
-    [](const fs::path& session_file) {
-        std::vector<WorkerData> worker_data_out;
-        if (!load_worker_data_from_results(session_file, worker_data_out)) {
-            throw std::runtime_error("Failed to load worker data from session file: " + session_file.string());
-        }
-        return worker_data_out;
-    },
-    py::arg("session_file"),
-    "Load worker data from session file results and return it as a list.");
+    m.def("load_worker_data_from_results",
+        [](const fs::path& session_file) {
+            std::vector<WorkerData> worker_data_out;
+            if (!load_worker_data_from_results(session_file, worker_data_out)) {
+                throw std::runtime_error("Failed to load worker data from session file: " + session_file.string());
+            }
+            return worker_data_out;
+        },
+        py::arg("session_file"),
+        "Load worker data from session file results and return it as a list.");
 }

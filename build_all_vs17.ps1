@@ -19,7 +19,7 @@ foreach ($b in $builds) {
     cmake -S . -B $buildDir -G "Visual Studio 17 2022" -A x64 -DHD_CPU_OPTIMIZATION=$($b.Opt) -DCMAKE_BUILD_TYPE=Release
     cmake --build $buildDir --config Release --target lidar_odometry_step_1
     $src = Join-Path $buildDir 'bin\Release\lidar_odometry_step_1.exe'
-    $dst = Join-Path $binDir ("lidar_odometry_step_1_release_{0}_v085_vs17.exe" -f $b.Name)
+    $dst = Join-Path $binDir ("lidar_odometry_step_1_release_{0}_v085-vs17.exe" -f $b.Name)
     Copy-Item $src $dst -Force
 }
 

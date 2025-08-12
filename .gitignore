@@ -63,4 +63,9 @@ cmake-*
 3pbinary/
 
 # imgui
-imgui.ini
+imgui.inibuild/
+build_release_amd/
+build_release_generic/
+build_release_intel/
+build_test/
+binaries/

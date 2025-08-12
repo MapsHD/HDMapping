@@ -35,18 +35,60 @@
 *.project
 moc_*
 
+# Build directories and outputs
 BUILD
 build
+build/
+binaries/
+build_*/
+build_release/
+build_debug/
+build_amd/
+build_intel/
+build_generic/
+bin/
+lib/
 
-*.aux
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Visual Studio generated files
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+*.user
+*.aps
+*.pch
+*.vspscc
+*_i.c
+*_p.c
+*.ncb
+*.tlb
+*.tlh
+*.bak
+*.cache
+*.ilk
 *.log
-*.synctex.gz
-*.toc
-#*.pdf
-*.bbl
-*.blg
+*.lib
+*.sbr
+*.sdf
+*.opensdf
+*.obj
+*.tlog
+*.lastbuildstate
+*.idb
+*.pdb
 
-*.orig
+# Windows Temp files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
 .ipynb_checkpoints/
 
 *.pyc

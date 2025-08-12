@@ -1,0 +1,106 @@
+Windows - ghid rapid de build (x64) + variante optimizate
+
+1) Cerinte
+- Visual Studio 2022 (Desktop development with C++)
+- CMake 3.15+ (cmake in PATH)
+- Git (pentru submodule)
+
+2) Setup o singura data (clone + submodule)
+- Daca esti deja pe un branch in acest repo, sari peste clone.
+  git clone https://github.com/MapsHD/HDMapping.git
+  cd HDMapping
+  git submodule init
+  git submodule update --recursive
+
+3) Build x64 Release - varianta de baza (AUTO)
+  mkdir build
+  cd build
+  cmake -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 17 2022" -A x64 ..
+  cmake --build . --config Release --parallel
+- Executabilele se gasesc in build\bin\Release\
+
+4) Variante optimizate (AMD / INTEL / GENERIC / AUTO)
+A. Cu scriptul existent (recomandat pentru lidar_odometry_step_1):
+  # din radacina repo-ului
+  ./build_all_vs17.ps1
+  Explicatii de rulare (PowerShell):
+    1) Deschide Windows PowerShell.
+    2) Mergi in radacina repo-ului (directorul care contine fisierul build_all_vs17.ps1):
+      cd D:\@Github\HDMapping085-2025-08-08_17
+    3) Ruleaza scriptul (daca politica de executie blocheaza scripturile, permite temporar pe sesiunea curenta):
+      Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+      .\build_all_vs17.ps1
+
+  - Scriptul creeaza: build_release_generic, build_release_amd, build_release_intel,
+  compileaza tinta lidar_odometry_step_1 si copiaza binarele in folderul binaries\
+  ca: lidar_odometry_step_1_release_{generic|amd|intel}_pr160_vs17.exe
+
+B. Manual per profil (exemplu pentru AMD; repeta pentru INTEL si GENERIC):
+  # AMD
+  cmake -S . -B build_release_amd -G "Visual Studio 17 2022" -A x64 -DHD_CPU_OPTIMIZATION=AMD -DCMAKE_BUILD_TYPE=Release
+  cmake --build build_release_amd --config Release --target lidar_odometry_step_1 --parallel
+  # (Optional) copiere intr-un folder comun
+  if not exist binaries mkdir binaries
+  copy build_release_amd\bin\Release\lidar_odometry_step_1.exe binaries\lidar_odometry_step_1_release_amd_vs17.exe
+
+  # INTEL
+  cmake -S . -B build_release_intel -G "Visual Studio 17 2022" -A x64 -DHD_CPU_OPTIMIZATION=INTEL -DCMAKE_BUILD_TYPE=Release
+  cmake --build build_release_intel --config Release --target lidar_odometry_step_1 --parallel
+  copy build_release_intel\bin\Release\lidar_odometry_step_1.exe binaries\lidar_odometry_step_1_release_intel_vs17.exe
+
+  # GENERIC (portabil)
+  cmake -S . -B build_release_generic -G "Visual Studio 17 2022" -A x64 -DHD_CPU_OPTIMIZATION=GENERIC -DCMAKE_BUILD_TYPE=Release
+  cmake --build build_release_generic --config Release --target lidar_odometry_step_1 --parallel
+  copy build_release_generic\bin\Release\lidar_odometry_step_1.exe binaries\lidar_odometry_step_1_release_generic_vs17.exe
+
+Observatii profil:
+- AUTO (implicit): alege automat pe baza CPU-ului (in MSVC aplica optimizari moderate; pe AMD aplica /Oi /Ot /Oy).
+- AMD / INTEL: forteaza profilul dorit.
+- GENERIC: cea mai portabila varianta.
+
+5) Build pentru alte aplicatii (nu doar lidar_odometry_step_1)
+Aplicatiile adaugate in CMake pe acest branch includ (exemple):
+- hd_mapper, lidar_odometry_step_1, manual_color, matrix_mul,
+  multi_session_registration, multi_view_tls_registration, split_multi_livox,
+  precision_forestry_tools, mandeye_raw_data_viewer, compare_trajectories,
+  quick_start_demo, mandeye_mission_recorder_calibration,
+  mandeye_single_session_viewer, livox_mid_360_intrinsic_calibration,
+  single_session_manual_coloring
+
+Exemple:
+  # hd_mapper (AMD)
+  cmake -S . -B build_release_amd -G "Visual Studio 17 2022" -A x64 -DHD_CPU_OPTIMIZATION=AMD -DCMAKE_BUILD_TYPE=Release
+  cmake --build build_release_amd --config Release --target hd_mapper --parallel
+  copy build_release_amd\bin\Release\hd_mapper.exe binaries\hd_mapper_release_amd_vs17.exe
+
+  # multi_session_registration (GENERIC)
+  cmake -S . -B build_release_generic -G "Visual Studio 17 2022" -A x64 -DHD_CPU_OPTIMIZATION=GENERIC -DCMAKE_BUILD_TYPE=Release
+  cmake --build build_release_generic --config Release --target multi_session_registration --parallel
+  copy build_release_generic\bin\Release\multi_session_registration.exe binaries\multi_session_registration_release_generic_vs17.exe
+
+Sfat: refoloseste acelasi build dir per profil (ex. build_release_amd) si doar schimbi tinta cu --target <nume_app>.
+
+6) Alte arhitecturi
+- Configuratia curenta e orientata pe x64 (-A x64). Pentru Win32 (x86) sau ARM64 se pot incerca:
+  -A Win32   (x86)   - posibil sa apara incompatibilitati in 3rdparty; ne-testat pe acest branch
+  -A ARM64   (ARM64) - foarte probabil necesita dependinte/portari suplimentare; ne-testat
+- Recomandare: pe Windows, foloseste x64. Daca incerci alta arhitectura, incepe cu profil GENERIC.
+
+7) Curatare / rebuild
+  rmdir /S /Q build
+  rmdir /S /Q build_release_amd
+  rmdir /S /Q build_release_intel
+  rmdir /S /Q build_release_generic
+  mkdir build & cd build & cmake -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 17 2022" -A x64 .. & cmake --build . --config Release --parallel
+
+8) Probleme frecvente
+- "make" nu este recunoscut: pe Windows se foloseste Visual Studio generator + cmake --build, nu make.
+- CMake nu gaseste MSVC: instaleaza "Desktop development with C++" in Visual Studio Installer.
+- Erori la submodule: ruleaza din nou git submodule init && git submodule update --recursive.
+
+9) Alegerea profilului - scurt
+- CPU AMD: AMD sau AUTO
+- CPU Intel: INTEL sau AUTO
+- Distribuibil/portabil: GENERIC
+
+Sfarsit.

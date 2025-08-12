@@ -1,0 +1,106 @@
+Windows - quick build guide (x64) + optimized variants
+
+1) Requirements
+- Visual Studio 2022 (Desktop development with C++)
+- CMake 3.15+ (cmake in PATH)
+- Git (for submodules)
+
+2) One-time setup (clone + submodules)
+- If you are already on a branch in this repo, skip the clone.
+  git clone https://github.com/MapsHD/HDMapping.git
+  cd HDMapping
+  git submodule init
+  git submodule update --recursive
+
+3) Build x64 Release - basic variant (AUTO)
+  mkdir build
+  cd build
+  cmake -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 17 2022" -A x64 ..
+  cmake --build . --config Release --parallel
+- Executables are located in build\bin\Release\
+
+4) Optimized variants (AMD / INTEL / GENERIC / AUTO)
+A. Using the existing script (recommended for lidar_odometry_step_1):
+  # from the repository root
+  ./build_all_vs17.ps1
+Running instructions (PowerShell):
+  1) Open Windows PowerShell.
+  2) Go to the repository root (the directory that contains build_all_vs17.ps1):
+    cd D:\@Github\HDMapping085-2025-08-08_17
+  3) Run the script (if the execution policy blocks scripts, temporarily allow it for this session):
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+    .\build_all_vs17.ps1
+
+- The script creates: build_release_generic, build_release_amd, build_release_intel,
+  builds the target lidar_odometry_step_1 and copies the binaries to the binaries\ folder
+  as: lidar_odometry_step_1_release_{generic|amd|intel}_pr160_vs17.exe
+
+B. Manual per profile (example for AMD; repeat for INTEL and GENERIC):
+  # AMD
+  cmake -S . -B build_release_amd -G "Visual Studio 17 2022" -A x64 -DHD_CPU_OPTIMIZATION=AMD -DCMAKE_BUILD_TYPE=Release
+  cmake --build build_release_amd --config Release --target lidar_odometry_step_1 --parallel
+  # (Optional) copy to a common folder
+  if not exist binaries mkdir binaries
+  copy build_release_amd\bin\Release\lidar_odometry_step_1.exe binaries\lidar_odometry_step_1_release_amd_vs17.exe
+
+  # INTEL
+  cmake -S . -B build_release_intel -G "Visual Studio 17 2022" -A x64 -DHD_CPU_OPTIMIZATION=INTEL -DCMAKE_BUILD_TYPE=Release
+  cmake --build build_release_intel --config Release --target lidar_odometry_step_1 --parallel
+  copy build_release_intel\bin\Release\lidar_odometry_step_1.exe binaries\lidar_odometry_step_1_release_intel_vs17.exe
+
+  # GENERIC (portable)
+  cmake -S . -B build_release_generic -G "Visual Studio 17 2022" -A x64 -DHD_CPU_OPTIMIZATION=GENERIC -DCMAKE_BUILD_TYPE=Release
+  cmake --build build_release_generic --config Release --target lidar_odometry_step_1 --parallel
+  copy build_release_generic\bin\Release\lidar_odometry_step_1.exe binaries\lidar_odometry_step_1_release_generic_vs17.exe
+
+Profile notes:
+- AUTO (default): automatically chooses based on CPU (on MSVC applies moderate optimizations; on AMD it applies /Oi /Ot /Oy).
+- AMD / INTEL: forces the desired profile.
+- GENERIC: most portable variant.
+
+5) Build for other applications (not only lidar_odometry_step_1)
+Applications added in CMake on this branch include (examples):
+- hd_mapper, lidar_odometry_step_1, manual_color, matrix_mul,
+  multi_session_registration, multi_view_tls_registration, split_multi_livox,
+  precision_forestry_tools, mandeye_raw_data_viewer, compare_trajectories,
+  quick_start_demo, mandeye_mission_recorder_calibration,
+  mandeye_single_session_viewer, livox_mid_360_intrinsic_calibration,
+  single_session_manual_coloring
+
+Examples:
+  # hd_mapper (AMD)
+  cmake -S . -B build_release_amd -G "Visual Studio 17 2022" -A x64 -DHD_CPU_OPTIMIZATION=AMD -DCMAKE_BUILD_TYPE=Release
+  cmake --build build_release_amd --config Release --target hd_mapper --parallel
+  copy build_release_amd\bin\Release\hd_mapper.exe binaries\hd_mapper_release_amd_vs17.exe
+
+  # multi_session_registration (GENERIC)
+  cmake -S . -B build_release_generic -G "Visual Studio 17 2022" -A x64 -DHD_CPU_OPTIMIZATION=GENERIC -DCMAKE_BUILD_TYPE=Release
+  cmake --build build_release_generic --config Release --target multi_session_registration --parallel
+  copy build_release_generic\bin\Release\multi_session_registration.exe binaries\multi_session_registration_release_generic_vs17.exe
+
+Tip: reuse the same build directory per profile (e.g., build_release_amd) and just change the target with --target <app_name>.
+
+6) Other architectures
+- The current configuration targets x64 (-A x64). For Win32 (x86) or ARM64 you can try:
+  -A Win32   (x86)   - incompatibilities in 3rdparty may appear; untested on this branch
+  -A ARM64   (ARM64) - likely requires additional dependencies/porting; untested
+- Recommendation: on Windows, use x64. If you try another architecture, start with the GENERIC profile.
+
+7) Clean / rebuild
+  rmdir /S /Q build
+  rmdir /S /Q build_release_amd
+  rmdir /S /Q build_release_intel
+  rmdir /S /Q build_release_generic
+  mkdir build & cd build & cmake -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 17 2022" -A x64 .. & cmake --build . --config Release --parallel
+
+8) Common issues
+- "make" is not recognized: on Windows use the Visual Studio generator + cmake --build, not make.
+- CMake cannot find MSVC: install "Desktop development with C++" using the Visual Studio Installer.
+- Submodule errors: run git submodule init && git submodule update --recursive again.
+
+9) Profile choice - quick
+- AMD CPU: AMD or AUTO
+- Intel CPU: INTEL or AUTO
+- Distributable/portable: GENERIC
+
+End.

@@ -348,10 +348,10 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
     if (hasTsColumn)
     {
         is_legacy = false;
-        if (!hasAccsColumns && !hasGyrosColumns)
+        if (!hasAccsColumns && !hasGyrosColumns && !hasUnixTimestampColumn)
         {
             std::cerr << "Input csv file is missing one of the mandatory columns :\n";
-            std::cerr << "timestamp,gyroX,gyroY,gyroZ,accX,accY,accZ";
+            std::cerr << "timestamp,timestampUnix,gyroX,gyroY,gyroZ,accX,accY,accZ";
             return all_data;
         }
     }

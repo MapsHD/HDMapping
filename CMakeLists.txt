@@ -298,6 +298,7 @@ add_subdirectory(apps/mandeye_mission_recorder_calibration)
 add_subdirectory(apps/mandeye_single_session_viewer)
 add_subdirectory(apps/livox_mid_360_intrinsic_calibration)
 add_subdirectory(apps/single_session_manual_coloring)
+add_subdirectory(apps/concatenate_multi_livox)
 
 # CPack configuration
 set(CPACK_PACKAGE_NAME "hd_mapping")

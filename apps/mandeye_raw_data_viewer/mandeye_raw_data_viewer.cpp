@@ -273,7 +273,7 @@ void project_gui()
                         sn_files.push_back(fileName);
                     } });
 
-                if (input_file_names.size() > 0 && laz_files.size() == csv_files.size() && laz_files.size() == sn_files.size())
+                if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
                 {
                     working_directory = fs::path(input_file_names[0]).parent_path().string();
 

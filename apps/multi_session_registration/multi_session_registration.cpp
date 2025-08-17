@@ -1,6 +1,9 @@
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
 #endif
+
+//#include <export_laz.h>
+
 #include <cmath>
 #include <filesystem>
 
@@ -40,6 +43,8 @@
 
 #include <pair_wise_iterative_closest_point.h>
 #include <observation_picking.h>
+
+//#include <export_laz.h>
 
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
@@ -1906,7 +1911,51 @@ void project_gui()
                                             }
                                         }
                                     }
+#if 0
+                                    if (ImGui::Button("Save src"))
+                                    {
+                                        const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
+                                        if (output_file_name.size() > 0)
+                                        {
+                                            std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                            std::vector<Eigen::Vector3d> pointcloud;
+                                            std::vector<unsigned short> intensity;
+                                            std::vector<double> timestamps;
+
+                                            for (int i = 0; i < source.size(); i++)
+                                            {
+                                                pointcloud.push_back(source[i]);
+                                                intensity.push_back(0);
+                                                timestamps.push_back(0.0);
+                                            }
+
+                                            exportLaz(
+                                                output_file_name[0],
+                                                pointcloud,
+                                                intensity,
+                                                timestamps);
+                                        }
+
+                                        /*int number_of_iterations = 30;
+                                        PairWiseICP icp;
+                                        auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                        std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                        std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                        if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                        {
+                                            edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                        }*/
+                                        //save
+                                    }
+                                    ImGui::SameLine();
+                                    if (ImGui::Button("Save trg (transfromed only by rotation)"))
+                                    {
+                                    }
+                                    #endif
                                     //////////////////////////////////
                                 }
                             }
@@ -3450,10 +3499,10 @@ bool optimize(std::vector<Session> &sessions)
                 poses[i].fi += h_x[counter++] * 0.1;
                 poses[i].ka += h_x[counter++] * 0.1;
 
-                //if (i == 0 && is_fix_first_node)
+                // if (i == 0 && is_fix_first_node)
                 //{
-                //    poses[i] = pose;
-                //}
+                //     poses[i] = pose;
+                // }
             }
             // std::cout << "optimizing with tait bryan finished" << std::endl;
         }

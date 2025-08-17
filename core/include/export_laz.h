@@ -8,6 +8,7 @@
 #include <iostream>
 #include <session.h>
 #include <laszip/laszip_api.h>
+//#include <laszip_api.h>
 
 namespace fs = std::filesystem;
 

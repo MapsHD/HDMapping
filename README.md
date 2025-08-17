@@ -28,6 +28,7 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-GLIM-to-HDMapping
 - https://github.com/MapsHD/benchmark-ct-icp-to-hdmapping
 - https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping
+- https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

@@ -92,30 +92,39 @@ std::atomic<double> loElapsedSeconds{0.0};
 std::atomic<double> loEstimatedTimeRemaining{0.0};
 
 // Helper function to format time in human-readable format
-std::string formatTime(double seconds) {
-    if (seconds < 0) return "Calculating...";
-    
+std::string formatTime(double seconds)
+{
+    if (seconds < 0)
+        return "Calculating...";
+
     int hours = static_cast<int>(seconds / 3600);
     int minutes = static_cast<int>((seconds - hours * 3600) / 60);
     int secs = static_cast<int>(seconds - hours * 3600 - minutes * 60);
-    
-    if (hours > 0) {
+
+    if (hours > 0)
+    {
         return std::to_string(hours) + "h " + std::to_string(minutes) + "m " + std::to_string(secs) + "s";
-    } else if (minutes > 0) {
+    }
+    else if (minutes > 0)
+    {
         return std::to_string(minutes) + "m " + std::to_string(secs) + "s";
-    } else {
+    }
+    else
+    {
         return std::to_string(secs) + "s";
     }
 }
 
 // Helper function to format estimated completion time
-std::string formatCompletionTime(double remainingSeconds) {
-    if (remainingSeconds < 0) return "Calculating...";
-    
+std::string formatCompletionTime(double remainingSeconds)
+{
+    if (remainingSeconds < 0)
+        return "Calculating...";
+
     auto now = std::chrono::system_clock::now();
     auto estimatedCompletion = now + std::chrono::seconds(static_cast<long long>(remainingSeconds));
     auto completion_time_t = std::chrono::system_clock::to_time_t(estimatedCompletion);
-    
+
     // Format as HH:MM:SS - Cross-platform time formatting
     struct tm completion_tm;
 #ifdef _WIN32
@@ -123,10 +132,10 @@ std::string formatCompletionTime(double remainingSeconds) {
 #else
     localtime_r(&completion_time_t, &completion_tm);
 #endif
-    
+
     char timeStr[32];
     strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &completion_tm);
-    
+
     return std::string(timeStr);
 }
 
@@ -468,7 +477,7 @@ void lidar_odometry_gui()
             ImGui::InputDouble("polar_angle_deg", &params.polar_angle_deg);
             ImGui::InputDouble("azimutal_angle_deg", &params.azimutal_angle_deg);
             ImGui::InputInt("number of iterations", &params.robust_and_accurate_lidar_odometry_iterations);
-            //ImGui::InputDouble("max distance lidar", &params.max_distance_lidar);
+            // ImGui::InputDouble("max distance lidar", &params.max_distance_lidar);
 
             ImGui::Text("....... rigid ICP using spherical coordinates.........");
             ImGui::InputDouble("distance_bucket_rigid_icp", &params.distance_bucket_rigid_sf);
@@ -879,7 +888,7 @@ void lidar_odometry_basic_gui()
 {
     if (ImGui::Begin("lidar_odometry_simple_gui"))
     {
-        if (ImGui::Button("Set parameters for process MANDEYE data in folder (velocity up to 8km/h)"))
+        if (ImGui::Button("Set parameters for process MANDEYE data in folder (velocity up to 8km/h, tiny spaces)"))
         {
             params.decimation = 0.01;
             params.in_out_params_indoor.resolution_X = 0.1;
@@ -894,15 +903,18 @@ void lidar_odometry_basic_gui()
             params.filter_threshold_xy_outer = 70.0;
             params.threshould_output_filter = 0.3;
 
+            params.use_robust_and_accurate_lidar_odometry = false;
             params.distance_bucket = 0.2;
             params.polar_angle_deg = 10.0;
             params.azimutal_angle_deg = 10.0;
             params.robust_and_accurate_lidar_odometry_iterations = 20;
-            params.max_distance_lidar = 30.0;
 
-            params.use_robust_and_accurate_lidar_odometry = false;
-
+            params.max_distance_lidar = 70.0;
             params.nr_iter = 1000;
+            params.sliding_window_trajectory_length_threshold = 200;
+            params.real_time_threshold_seconds = 10;
+
+            std::cout << "clicked: Set parameters for process MANDEYE data in folder (velocity up to 8km/h, tiny spaces)" << std::endl;
         }
 
         if (ImGui::Button("Set parameters for process MANDEYE data in folder (quick but less accurate, less precise, velocity up to 8km/h)"))
@@ -920,19 +932,21 @@ void lidar_odometry_basic_gui()
             params.filter_threshold_xy_outer = 70.0;
             params.threshould_output_filter = 0.3;
 
+            params.use_robust_and_accurate_lidar_odometry = false;
             params.distance_bucket = 0.2;
             params.polar_angle_deg = 10.0;
             params.azimutal_angle_deg = 10.0;
             params.robust_and_accurate_lidar_odometry_iterations = 20;
+
             params.max_distance_lidar = 30.0;
-
-            params.use_robust_and_accurate_lidar_odometry = false;
-
-            params.nr_iter = 20;
+            params.nr_iter = 30;
             params.sliding_window_trajectory_length_threshold = 200;
+            params.real_time_threshold_seconds = 0.3;
+
+            std::cout << "clicked: Set parameters for process MANDEYE data in folder (quick but less accurate, less precise, velocity up to 8km/h)" << std::endl;
         }
 
-        if (ImGui::Button("Set parameters for process MANDEYE data in folder (fast motion: velocity up to 30 km/h, Mandeye mounted on the vehicle)"))
+        if (ImGui::Button("Set parameters for process MANDEYE data in folder (fast motion: velocity up to 30 km/h, open spaces)"))
         {
             params.decimation = 0.03;
             params.in_out_params_indoor.resolution_X = 0.3;
@@ -947,16 +961,18 @@ void lidar_odometry_basic_gui()
             params.filter_threshold_xy_outer = 70.0;
             params.threshould_output_filter = 3.0;
 
+            params.use_robust_and_accurate_lidar_odometry = false;
             params.distance_bucket = 0.2;
             params.polar_angle_deg = 10.0;
             params.azimutal_angle_deg = 10.0;
             params.robust_and_accurate_lidar_odometry_iterations = 20;
+
             params.max_distance_lidar = 70.0;
-
-            params.use_robust_and_accurate_lidar_odometry = false;
-
             params.nr_iter = 500;
             params.sliding_window_trajectory_length_threshold = 200;
+            params.real_time_threshold_seconds = 10;
+
+            std::cout << "clicked: Set parameters for process MANDEYE data in folder (fast motion: velocity up to 30 km/h, open spaces)" << std::endl;
         }
 
         if (ImGui::Button("Set parameters for process MANDEYE data in folder (velocity up to 8km/h, Precise Forestry)"))
@@ -974,16 +990,19 @@ void lidar_odometry_basic_gui()
             params.filter_threshold_xy_outer = 70.0;
             params.threshould_output_filter = 1.5;
 
+            params.use_robust_and_accurate_lidar_odometry = false;
             params.distance_bucket = 0.2;
             params.polar_angle_deg = 10.0;
             params.azimutal_angle_deg = 10.0;
             params.robust_and_accurate_lidar_odometry_iterations = 20;
-            params.max_distance_lidar = 30.0;
 
-            params.use_robust_and_accurate_lidar_odometry = false;
-
+            params.max_distance_lidar = 70.0;
             params.nr_iter = 500;
             params.sliding_window_trajectory_length_threshold = 10000;
+            params.real_time_threshold_seconds = 10;
+
+            std::cout
+                << "clicked: Set parameters for process MANDEYE data in folder (velocity up to 8km/h, Precise Forestry)" << std::endl;
         }
 
         if (ImGui::Button("Process MANDEYE data"))
@@ -1048,35 +1067,39 @@ void lidar_odometry_basic_gui()
             std::chrono::duration<double> elapsed = currentTime - loStartTime;
             double elapsedSeconds = elapsed.count();
             loElapsedSeconds.store(elapsedSeconds);
-            
+
             float progress = loProgress.load();
             double estimatedTimeRemaining = 0.0;
-            
-            if (progress > 0.01f) { // Only estimate when we have meaningful progress
+
+            if (progress > 0.01f)
+            { // Only estimate when we have meaningful progress
                 double totalEstimatedTime = elapsedSeconds / progress;
                 estimatedTimeRemaining = totalEstimatedTime - elapsedSeconds;
                 loEstimatedTimeRemaining.store(estimatedTimeRemaining);
             }
-            
+
             // Format progress text with time information
             char progressText[256];
             char timeInfo[512];
-            
-            if (progress > 0.01f) {
+
+            if (progress > 0.01f)
+            {
                 std::string completionTime = formatCompletionTime(estimatedTimeRemaining);
                 snprintf(progressText, sizeof(progressText), "Processing: %.1f%% Complete", progress * 100.0f);
-                snprintf(timeInfo, sizeof(timeInfo), 
-                    "Elapsed: %s | Remaining: %s | Estimated finish: %s", 
-                    formatTime(elapsedSeconds).c_str(),
-                    formatTime(estimatedTimeRemaining).c_str(),
-                    completionTime.c_str());
-            } else {
-                snprintf(progressText, sizeof(progressText), "Processing: %.1f%% Complete", progress * 100.0f);
-                snprintf(timeInfo, sizeof(timeInfo), 
-                    "Elapsed: %s | Calculating completion time...", 
-                    formatTime(elapsedSeconds).c_str());
+                snprintf(timeInfo, sizeof(timeInfo),
+                         "Elapsed: %s | Remaining: %s | Estimated finish: %s",
+                         formatTime(elapsedSeconds).c_str(),
+                         formatTime(estimatedTimeRemaining).c_str(),
+                         completionTime.c_str());
             }
-            
+            else
+            {
+                snprintf(progressText, sizeof(progressText), "Processing: %.1f%% Complete", progress * 100.0f);
+                snprintf(timeInfo, sizeof(timeInfo),
+                         "Elapsed: %s | Calculating completion time...",
+                         formatTime(elapsedSeconds).c_str());
+            }
+
             ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), progressText);
             ImGui::Text("%s", timeInfo);
         }
@@ -1343,6 +1366,27 @@ void display()
         }
         glEnd();
         glPointSize(1);
+
+        glColor3f(1, 0, 0);
+        glBegin(GL_LINES);
+        if (worker_data.size() > 0)
+        {
+            const auto &wd = worker_data[worker_data.size() - 1];
+            if (wd.intermediate_trajectory.size() > 0)
+            {
+                const auto &it = wd.intermediate_trajectory[wd.intermediate_trajectory.size() - 1];
+
+                glVertex3f(it(0, 3) - 1, it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + 1, it(1, 3), it(2, 3));
+
+                glVertex3f(it(0, 3), it(1, 3) - 1, it(2, 3));
+                glVertex3f(it(0, 3), it(1, 3) + 1, it(2, 3));
+
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3) - 1);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3) + 1);
+            }
+        }
+        glEnd();
     }
 
     if (show_reference_buckets)
@@ -1778,7 +1822,7 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
         trajectory_for_interpolation[ts[i]] = best_trajectory[i].matrix();
     }
 
-    std::vector<Eigen::Vector3d> pointcloud_global; 
+    std::vector<Eigen::Vector3d> pointcloud_global;
     std::vector<unsigned short> intensity;
     std::vector<double> timestamps_;
     for (const auto &p : points_reindexed)
@@ -1786,7 +1830,7 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
         Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, p.timestamp);
         Eigen::Affine3d b;
         b.matrix() = pose;
-        Eigen::Vector3d vec  = b * p.point;
+        Eigen::Vector3d vec = b * p.point;
         pointcloud_global.push_back(vec);
         intensity.push_back(p.intensity);
         timestamps_.push_back(p.timestamp);

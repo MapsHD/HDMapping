@@ -67,6 +67,7 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 DOI: 10.36227/techrxiv.174552824.47146860/v1 [[PDF]](https://www.techrxiv.org/users/915148/articles/1288112-novel-wearable-mobile-mapping-system-for-forensic-and-security-mountable-on-trained-dog-and-human)
 - Janusz Będkowski et al. Method for spherical camera to 3D LiDAR calibration and synchronization with example on Insta360 X4 and LiVOX MID 360 [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W4-2025/13/2025/isprs-archives-XLVIII-1-W4-2025-13-2025.pdf)
 - Janusz Będkowski et al. Affordable air-ground mobile mapping system for precise forestry applications [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W4-2025/5/2025/isprs-archives-XLVIII-1-W4-2025-5-2025.pdf)
+- Jozef Výbošťok et al. An Open and Low-Cost Terrestrial Laser Scanner Prototype: Delivering Reliable Accuracy for Forest Practice on a Budget [[PDF]](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5386703)
 
 # To cite this work please use as follows:
 Mobile mapping system: hardware and software are elaborated in the following paper:

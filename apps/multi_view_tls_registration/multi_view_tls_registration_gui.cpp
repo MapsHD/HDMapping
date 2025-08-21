@@ -62,6 +62,7 @@ bool gui_mouse_down{false};
 float mouse_sensitivity = 1.0;
 bool show_axes = false;
 bool is_ortho = false;
+bool block_z = false;
 bool manual_pose_graph_loop_closure_mode = false;
 
 bool is_ndt_gui = false;
@@ -481,6 +482,9 @@ void project_gui()
     ImGui::SameLine();
     ImGui::Checkbox("show_axes", &show_axes);
     ImGui::SameLine();
+
+    ImGui::Checkbox("block_z", &block_z);
+
 
     ImGui::SliderFloat("mouse_sensitivity", &mouse_sensitivity, 0.01f, 10.0f);
 
@@ -2275,8 +2279,14 @@ void display()
         viewTranslation.translate(rotation_center);
         Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
         viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-        viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
-        viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
+        
+        if (!block_z){
+            viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
+            viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
+        }else{
+            viewLocal.rotate(Eigen::AngleAxisf( -90.0 * M_PI / 180.f, Eigen::Vector3f::UnitX()));
+            viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
+        }
 
         Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
         viewTranslation2.translate(-rotation_center);

@@ -767,7 +767,9 @@ void project_gui()
 
                 if (number_visible_sessions == 1 || number_visible_sessions == 2)
                 {
+                    //bool prev_manual_pose_graph_loop_closure_mode = manual_pose_graph_loop_closure_mode;
                     ImGui::Checkbox("Manual Pose Graph Loop Closure Mode", &manual_pose_graph_loop_closure_mode);
+                    
                     if (manual_pose_graph_loop_closure_mode)
                     {
                         if (!manipulate_active_edge)
@@ -1964,11 +1966,14 @@ void project_gui()
                             }
                         }
                     }
+
+                    
+
                 }
 
-                // if (!manual_pose_graph_loop_closure_mode)
+                //if (!manual_pose_graph_loop_closure_mode && prev_manual_pose_graph_loop_closure_mode)
                 //{
-
+                //    exit(1);
                 //}
             }
         }
@@ -3017,14 +3022,29 @@ bool optimize(std::vector<Session> &sessions)
     std::vector<int> sums;
     sums.push_back(0);
     int sum = 0;
+    std::vector<bool> vfixed_x;
+    std::vector<bool> vfixed_y;
+    std::vector<bool> vfixed_z;
+    std::vector<bool> vfixed_om;
+    std::vector<bool> vfixed_fi;
+    std::vector<bool> vfixed_ka;
 
     for (int i = 0; i < sessions.size(); i++)
     {
         sum += sessions[i].point_clouds_container.point_clouds.size();
         sums.push_back(sum);
-    }
 
-    // std::cout << "Compute Pose Graph SLAM" << std::endl;
+        for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+        {
+            vfixed_x.push_back(sessions[i].point_clouds_container.point_clouds[j].fixed_x);
+            vfixed_y.push_back(sessions[i].point_clouds_container.point_clouds[j].fixed_y);
+            vfixed_z.push_back(sessions[i].point_clouds_container.point_clouds[j].fixed_z);
+
+            vfixed_om.push_back(sessions[i].point_clouds_container.point_clouds[j].fixed_om);
+            vfixed_fi.push_back(sessions[i].point_clouds_container.point_clouds[j].fixed_fi);
+            vfixed_ka.push_back(sessions[i].point_clouds_container.point_clouds[j].fixed_ka);
+        }
+    }
 
     ///////////////////////////////////////////////////////////////////
     // graph slam
@@ -3050,12 +3070,6 @@ bool optimize(std::vector<Session> &sessions)
     bool is_cw = false;
     int iterations = 1;
     bool is_fix_first_node = true;
-
-    // if (gnss.gnss_poses.size() > 0)
-    //{
-    //     is_fix_first_node = false;
-    // }
-
     std::vector<int> indexes_ground_truth;
     for (int j = 0; j < sessions.size(); j++)
     {
@@ -3107,7 +3121,6 @@ bool optimize(std::vector<Session> &sessions)
     {
         for (int j = 0; j < sessions[i].pose_graph_loop_closure.edges.size(); j++)
         {
-            // std::cout << "add manual_pose_graph_loop_closure.edge" << std::endl;
             Edge edge;
             edge.index_from = sessions[i].pose_graph_loop_closure.edges[j].index_from + sums[i];
             edge.index_to = sessions[i].pose_graph_loop_closure.edges[j].index_to + sums[i];
@@ -3120,7 +3133,6 @@ bool optimize(std::vector<Session> &sessions)
 
     for (int i = 0; i < edges.size(); i++)
     {
-        // std::cout << "add edges" << std::endl;
         Edge edge;
         edge.index_from = edges[i].index_from + sums[edges[i].index_session_from];
         edge.index_to = edges[i].index_to + sums[edges[i].index_session_to];
@@ -3486,6 +3498,77 @@ bool optimize(std::vector<Session> &sessions)
             }
         }
 
+        ///////////////////////////////////////////////////////
+        for (int i = 0; i < sessions.size(); i++)
+        {
+            for (int index_pose = 0; index_pose < sessions[i].point_clouds_container.point_clouds.size(); index_pose++)
+            {
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_x)
+                {
+                    int ir = tripletListB.size();
+                    int ic = (index_pose + sums[i]) * 6;
+                    tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                    tripletListP.emplace_back(ir, ir, 1);
+                    tripletListB.emplace_back(ir, 0, 0);
+                }
+
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_y)
+                {
+                    int ir = tripletListB.size();
+                    int ic = (index_pose + sums[i]) * 6 + 1;
+                    tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                    tripletListP.emplace_back(ir, ir, 1);
+                    tripletListB.emplace_back(ir, 0, 0);
+                }
+
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_z)
+                {
+                    int ir = tripletListB.size();
+                    int ic = (index_pose + sums[i]) * 6 + 2;
+                    tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                    tripletListP.emplace_back(ir, ir, 1);
+                    tripletListB.emplace_back(ir, 0, 0);
+                }
+
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_om)
+                {
+                    int ir = tripletListB.size();
+                    int ic = (index_pose + sums[i]) * 6 + 3;
+                    tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                    tripletListP.emplace_back(ir, ir, 1);
+                    tripletListB.emplace_back(ir, 0, 0);
+                }
+
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_fi)
+                {
+                    int ir = tripletListB.size();
+                    int ic = (index_pose + sums[i]) * 6 + 4;
+                    tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                    tripletListP.emplace_back(ir, ir, 1);
+                    tripletListB.emplace_back(ir, 0, 0);
+                }
+
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_ka)
+                {
+                    int ir = tripletListB.size();
+                    int ic = (index_pose + sums[i]) * 6 + 5;
+                    tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                    tripletListP.emplace_back(ir, ir, 1);
+                    tripletListB.emplace_back(ir, 0, 0);
+                }
+
+                // std::cout << "add manual_pose_graph_loop_closure.edge" << std::endl;
+                // Edge edge;
+                // edge.index_from = sessions[i].pose_graph_loop_closure.edges[j].index_from + sums[i];
+                // edge.index_to = sessions[i].pose_graph_loop_closure.edges[j].index_to + sums[i];
+                // edge.relative_pose_tb = sessions[i].pose_graph_loop_closure.edges[j].relative_pose_tb;
+                // edge.relative_pose_tb_weights = sessions[i].pose_graph_loop_closure.edges[j].relative_pose_tb_weights;
+                // edge.is_fixed_fi = ToDo
+                // all_edges.push_back(edge);
+            }
+        }
+
+        //////////////////////////////////////////////////////
         // for (int i = 0; i < gcps.gpcs.size(); i++)
         //{
 
@@ -3546,12 +3629,37 @@ bool optimize(std::vector<Session> &sessions)
             {
 
                 TaitBryanPose pose = poses[i];
-                poses[i].px += h_x[counter++] * 0.1;
-                poses[i].py += h_x[counter++] * 0.1;
-                poses[i].pz += h_x[counter++] * 0.1;
-                poses[i].om += h_x[counter++] * 0.1;
-                poses[i].fi += h_x[counter++] * 0.1;
-                poses[i].ka += h_x[counter++] * 0.1;
+                pose.px += h_x[counter++] * 0.1;
+                pose.py += h_x[counter++] * 0.1;
+                pose.pz += h_x[counter++] * 0.1;
+                pose.om += h_x[counter++] * 0.1;
+                pose.fi += h_x[counter++] * 0.1;
+                pose.ka += h_x[counter++] * 0.1;
+
+                if (!vfixed_x[i])
+                {
+                    poses[i].px = pose.px;
+                }
+                if (!vfixed_y[i])
+                {
+                    poses[i].py = pose.py;
+                }
+                if (!vfixed_z[i])
+                {
+                    poses[i].pz = pose.pz;
+                }
+                if (!vfixed_om[i])
+                {
+                    poses[i].om = pose.om;
+                }
+                if (!vfixed_fi[i])
+                {
+                    poses[i].fi = pose.fi;
+                }
+                if (!vfixed_ka[i])
+                {
+                    poses[i].ka = pose.ka;
+                }
 
                 // if (i == 0 && is_fix_first_node)
                 //{

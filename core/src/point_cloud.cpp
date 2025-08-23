@@ -1756,24 +1756,31 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 
 			if (this->fixed_om && this->fixed_fi)
 			{
-				Eigen::Vector3d a1(-1.0, -1.0, 0);
-				Eigen::Vector3d a2(1.0, -1.0, 0);
-				Eigen::Vector3d a3(1.0, 1.0, 0);
-				Eigen::Vector3d a4(-1.0, 1.0, 0);
+				for (double x = -1.0; x <= 1.0; x += 0.1)
+				{
+					if(fabs(x) < 0.3){
+						continue;
+					}
 
-				Eigen::Vector3d a1t = this->m_pose * a1;
-				Eigen::Vector3d a2t = this->m_pose * a2;
-				Eigen::Vector3d a3t = this->m_pose * a3;
-				Eigen::Vector3d a4t = this->m_pose * a4;
+					Eigen::Vector3d a1(-x, -x, 0);
+					Eigen::Vector3d a2(x, -x, 0);
+					Eigen::Vector3d a3(x, x, 0);
+					Eigen::Vector3d a4(-x, x, 0);
 
-				glColor3f(0, 1, 0);
-				glBegin(GL_LINE_STRIP);
-				glVertex3f(a1t.x(), a1t.y(), a1t.z());
-				glVertex3f(a2t.x(), a2t.y(), a2t.z());
-				glVertex3f(a3t.x(), a3t.y(), a3t.z());
-				glVertex3f(a4t.x(), a4t.y(), a4t.z());
-				glVertex3f(a1t.x(), a1t.y(), a1t.z());
-				glEnd();
+					Eigen::Vector3d a1t = this->m_pose * a1;
+					Eigen::Vector3d a2t = this->m_pose * a2;
+					Eigen::Vector3d a3t = this->m_pose * a3;
+					Eigen::Vector3d a4t = this->m_pose * a4;
+
+					glColor3f(1, 0, 0);
+					glBegin(GL_LINE_STRIP);
+					glVertex3f(a1t.x(), a1t.y(), a1t.z());
+					glVertex3f(a2t.x(), a2t.y(), a2t.z());
+					glVertex3f(a3t.x(), a3t.y(), a3t.z());
+					glVertex3f(a4t.x(), a4t.y(), a4t.z());
+					glVertex3f(a1t.x(), a1t.y(), a1t.z());
+					glEnd();
+				}
 			}
 		}
 	}

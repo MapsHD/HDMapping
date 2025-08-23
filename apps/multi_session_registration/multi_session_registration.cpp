@@ -2,7 +2,7 @@
 #define _USE_MATH_DEFINES
 #endif
 
-//#include <export_laz.h>
+// #include <export_laz.h>
 
 #include <cmath>
 #include <filesystem>
@@ -44,7 +44,7 @@
 #include <pair_wise_iterative_closest_point.h>
 #include <observation_picking.h>
 
-//#include <export_laz.h>
+// #include <export_laz.h>
 
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
@@ -1958,7 +1958,7 @@ void project_gui()
                                     if (ImGui::Button("Save trg (transfromed only by rotation)"))
                                     {
                                     }
-                                    #endif
+#endif
                                     //////////////////////////////////
                                 }
                             }
@@ -2036,12 +2036,52 @@ void display()
         reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
         glTranslatef(translate_x, translate_y, translate_z);
 
+        // janusz
+        if (manual_pose_graph_loop_closure_mode)
+        {
+            // sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, viewer_decmiate_point_cloud, false, false, false, false, false, false, false, false, false, false, false, false, 100000);
+            // sessions[second_session_index].point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, viewer_decmiate_point_cloud, false, false, false, false, false, false, false, false, false, false, false, false, 100000);
+
+            if (first_session_index < sessions[first_session_index].point_clouds_container.point_clouds.size())
+            {
+                rotation_center.x() = sessions[first_session_index].point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().x();
+                rotation_center.y() = sessions[first_session_index].point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().y();
+                rotation_center.z() = sessions[first_session_index].point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().z();
+            }
+
+            if (manipulate_active_edge)
+            {
+                if (edges.size() > 0)
+                {
+                    int index_src = edges[index_active_edge].index_from;
+                    Eigen::Affine3d m_src = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
+
+                    rotation_center.x() = m_src(0, 3);
+                    rotation_center.y() = m_src(1, 3);
+                    rotation_center.z() = m_src(2, 3);
+                }
+            }
+
+            /*if (session.pose_graph_loop_closure.manipulate_active_edge)
+            {
+                if (session.pose_graph_loop_closure.edges.size() > 0)
+                {
+                    if (session.pose_graph_loop_closure.index_active_edge < session.pose_graph_loop_closure.edges.size())
+                    {
+                        rotation_center.x() = session.point_clouds_container.point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from].m_pose(0, 3);
+                        rotation_center.y() = session.point_clouds_container.point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from].m_pose(1, 3);
+                        rotation_center.z() = session.point_clouds_container.point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from].m_pose(2, 3);
+                    }
+                }
+            }*/
+        }
+
         Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
         viewTranslation.translate(rotation_center);
         Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
         viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-        //viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
-        //viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
+        // viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
+        // viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
 
         if (!block_z)
         {

@@ -421,7 +421,7 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
             }
             else
             {
-                
+
                 Eigen::Vector3d p_s(cps.cps[i].x_source_local,
                                     cps.cps[i].y_source_local, cps.cps[i].z_source_local);
 
@@ -436,7 +436,7 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
                 double delta_y;
                 double delta_z;
                 Eigen::Vector3d p_t(cps.cps[i].x_target_global,
-                                    cps.cps[i].y_target_global, 0.0/*cps.cps[i].z_target_global*/);
+                                    cps.cps[i].y_target_global, 0.0 /*cps.cps[i].z_target_global*/);
                 point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
                                                               pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
                                                               p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
@@ -454,16 +454,15 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
                         }
                     }
                 }
-                //tripletListP.emplace_back(ir + 0, ir + 0, (1.0 / (cps.cps[i].sigma_x * cps.cps[i].sigma_x)) * get_cauchy_w(delta_x, 1));
-                //tripletListP.emplace_back(ir + 1, ir + 1, (1.0 / (cps.cps[i].sigma_y * cps.cps[i].sigma_y)) * get_cauchy_w(delta_y, 1));
+                // tripletListP.emplace_back(ir + 0, ir + 0, (1.0 / (cps.cps[i].sigma_x * cps.cps[i].sigma_x)) * get_cauchy_w(delta_x, 1));
+                // tripletListP.emplace_back(ir + 1, ir + 1, (1.0 / (cps.cps[i].sigma_y * cps.cps[i].sigma_y)) * get_cauchy_w(delta_y, 1));
                 tripletListP.emplace_back(ir, ir, (1.0 / (cps.cps[i].sigma_z * cps.cps[i].sigma_z)));
 
-                //tripletListB.emplace_back(ir, 0, delta_x);
-                //tripletListB.emplace_back(ir + 1, 0, delta_y);
+                // tripletListB.emplace_back(ir, 0, delta_x);
+                // tripletListB.emplace_back(ir + 1, 0, delta_y);
                 tripletListB.emplace_back(ir, 0, delta_z);
 
                 std::cout << "cp [not z == 0]: delta_z " << delta_z << std::endl;
-                
             }
         }
 
@@ -537,6 +536,62 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
             std::cout << "error imu: " << error_imu / error_imu_sum << std::endl;
         }
 
+        for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
+        {
+            if (point_clouds_container.point_clouds[index_pose].fixed_x){
+                int ir = tripletListB.size();
+                int ic = index_pose * 6;
+                tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                tripletListP.emplace_back(ir, ir, 1);
+                tripletListB.emplace_back(ir, 0, 0);
+            }
+
+            if (point_clouds_container.point_clouds[index_pose].fixed_y)
+            {
+                int ir = tripletListB.size();
+                int ic = index_pose * 6 + 1;
+                tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                tripletListP.emplace_back(ir, ir, 1);
+                tripletListB.emplace_back(ir, 0, 0);
+            }
+
+            if (point_clouds_container.point_clouds[index_pose].fixed_z)
+            {
+                int ir = tripletListB.size();
+                int ic = index_pose * 6 + 2;
+                tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                tripletListP.emplace_back(ir, ir, 1);
+                tripletListB.emplace_back(ir, 0, 0);
+            }
+
+            if (point_clouds_container.point_clouds[index_pose].fixed_om)
+            {
+                int ir = tripletListB.size();
+                int ic = index_pose * 6 + 3;
+                tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                tripletListP.emplace_back(ir, ir, 1);
+                tripletListB.emplace_back(ir, 0, 0);
+            }
+
+            if (point_clouds_container.point_clouds[index_pose].fixed_fi)
+            {
+                int ir = tripletListB.size();
+                int ic = index_pose * 6 + 4;
+                tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                tripletListP.emplace_back(ir, ir, 1);
+                tripletListB.emplace_back(ir, 0, 0);
+            }
+
+            if (point_clouds_container.point_clouds[index_pose].fixed_ka)
+            {
+                int ir = tripletListB.size();
+                int ic = index_pose * 6 + 5;
+                tripletListA.emplace_back(ir + 0, ic, 1000000000000);
+                tripletListP.emplace_back(ir, ir, 1);
+                tripletListB.emplace_back(ir, 0, 0);
+            }
+        }
+
         Eigen::SparseMatrix<double>
             matA(tripletListB.size(), point_clouds_container.point_clouds.size() * 6);
         Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
@@ -589,12 +644,36 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
             for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
             {
                 TaitBryanPose pose = poses[i];
-                poses[i].px += h_x[counter++];
-                poses[i].py += h_x[counter++];
-                poses[i].pz += h_x[counter++];
-                poses[i].om += h_x[counter++];
-                poses[i].fi += h_x[counter++];
-                poses[i].ka += h_x[counter++];
+                pose.px += h_x[counter++];
+                pose.py += h_x[counter++];
+                pose.pz += h_x[counter++];
+                pose.om += h_x[counter++];
+                pose.fi += h_x[counter++];
+                pose.ka += h_x[counter++];
+
+                if (!point_clouds_container.point_clouds[i].fixed_x){
+                    poses[i].px = pose.px;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_y)
+                {
+                    poses[i].py = pose.py;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_z)
+                {
+                    poses[i].pz = pose.pz;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_om)
+                {
+                    poses[i].om = pose.om;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_fi)
+                {
+                    poses[i].fi = pose.fi;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_ka)
+                {
+                    poses[i].ka = pose.ka;
+                }
             }
             std::cout << "optimizing with tait bryan finished" << std::endl;
         }

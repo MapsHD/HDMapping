@@ -1,6 +1,8 @@
 #include <session.h>
 #include <nlohmann/json.hpp>
 #include <filesystem>
+#include "../../shared/include/HDMapping/Version.hpp"
+
 namespace fs = std::filesystem;
 
 std::string pathUpdater(std::string path, std::string newPath)
@@ -32,6 +34,13 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
 
     std::vector<PoseGraphLoopClosure::Edge> loop_closure_edges;
     std::vector<std::string> laz_file_names;
+    std::vector<bool> vfuse_inclination_from_IMU;
+    std::vector<bool> vfixed_x;
+    std::vector<bool> vfixed_y;
+    std::vector<bool> vfixed_z;
+    std::vector<bool> vfixed_om;
+    std::vector<bool> vfixed_fi;
+    std::vector<bool> vfixed_ka;
 
     // Get a loaded file directory
     std::string directory = fs::path(file_name).parent_path().string();
@@ -92,6 +101,77 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         for (const auto &fn_json : data["laz_file_names"])
         {
             std::string fn = pathUpdater(fn_json["file_name"], directory);
+        
+            if (fn_json.contains("fixed_x")){
+                bool fixed_x = fn_json["fixed_x"];
+                vfixed_x.push_back(fixed_x);
+            }else{
+                vfixed_x.push_back(false);
+            }
+                
+            if (fn_json.contains("fixed_y")){
+                bool fixed_y = fn_json["fixed_y"];
+                vfixed_y.push_back(fixed_y);
+            }else{
+                vfixed_y.push_back(false);
+            }
+
+            if (fn_json.contains("fixed_z"))
+            {
+                bool fixed_z = fn_json["fixed_z"];
+                vfixed_z.push_back(fixed_z);
+            }
+            else
+            {
+                vfixed_z.push_back(false);
+            }
+
+            if (fn_json.contains("fixed_om"))
+            {
+                bool fixed_om = fn_json["fixed_om"];
+                vfixed_om.push_back(fixed_om);
+            }
+            else
+            {
+                vfixed_om.push_back(false);
+            }
+
+            if (fn_json.contains("fixed_fi"))
+            {
+                bool fixed_fi = fn_json["fixed_fi"];
+                vfixed_fi.push_back(fixed_fi);
+            }
+            else
+            {
+                vfixed_fi.push_back(false);
+            }
+
+            if (fn_json.contains("fixed_ka"))
+            {
+                bool fixed_ka = fn_json["fixed_ka"];
+                vfixed_ka.push_back(fixed_ka);
+            }
+            else
+            {
+                vfixed_ka.push_back(false);
+            }
+
+            if (fn_json.contains("fuse_inclination_from_IMU"))
+            {
+                bool fuse_inclination_from_IMU = fn_json["fuse_inclination_from_IMU"];
+                vfuse_inclination_from_IMU.push_back(fuse_inclination_from_IMU);
+            }
+            else
+            {
+                vfuse_inclination_from_IMU.push_back(false);
+            }
+
+            //bool fixed_y = fn_json["fixed_y"];
+           // bool fixed_z = fn_json["fixed_z"];
+           // bool fixed_om = fn_json["fixed_om"];
+           // bool fixed_fi = fn_json["fixed_fi"];
+            //bool fixed_ka = fn_json["fixed_ka"];
+
             laz_file_names.push_back(fn);
         }
 
@@ -226,11 +306,20 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         render_color[1] = float(rand() % 255) / 255.0;
         render_color[2] = float(rand() % 255) / 255.0;
 
+        int index = 0;
         for (auto &pc : point_clouds_container.point_clouds)
         {
             pc.render_color[0] = render_color[0];
             pc.render_color[1] = render_color[1];
             pc.render_color[2] = render_color[2];
+            pc.fixed_x = vfixed_x[index];
+            pc.fixed_y = vfixed_y[index];
+            pc.fixed_z = vfixed_z[index];
+            pc.fixed_om = vfixed_om[index];
+            pc.fixed_fi = vfixed_fi[index];
+            pc.fixed_ka = vfixed_ka[index];
+            pc.fuse_inclination_from_IMU = vfuse_inclination_from_IMU[index];
+            index++;
         }
 
         return true;
@@ -258,6 +347,7 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
     j["initial_poses_file_name"] = initial_poses_file_name; // point_clouds_container.initial_poses_file_name;
     j["out_poses_file_name"] = point_clouds_container.out_poses_file_name;
     j["ground_truth"] = is_ground_truth;
+    j["exporting_software_version"] = HDMAPPING_VERSION_STRING;
     jj["Session Settings"] = j;
 
     nlohmann::json jloop_closure_edges;
@@ -299,14 +389,28 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
             if (pc.visible)
             {
                 nlohmann::json jfn{
-                    {"file_name", pc.file_name}};
+                    {"file_name", pc.file_name},
+                    {"fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU},
+                    {"fixed_x", pc.fixed_x},
+                    {"fixed_y", pc.fixed_y},
+                    {"fixed_z", pc.fixed_z},
+                    {"fixed_om", pc.fixed_om},
+                    {"fixed_fi", pc.fixed_fi},
+                    {"fixed_ka", pc.fixed_ka}};
                 jlaz_file_names.push_back(jfn);
             }
         }
         else
         {
             nlohmann::json jfn{
-                {"file_name", pc.file_name}};
+                {"file_name", pc.file_name},
+                {"fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU},
+                {"fixed_x", pc.fixed_x},
+                {"fixed_y", pc.fixed_y},
+                {"fixed_z", pc.fixed_z},
+                {"fixed_om", pc.fixed_om},
+                {"fixed_fi", pc.fixed_fi},
+                {"fixed_ka", pc.fixed_ka}};
             jlaz_file_names.push_back(jfn);
         }
     }
@@ -362,11 +466,10 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
 }
 
 void Session::fill_session_from_worker_data(
-    const std::vector<WorkerData> &worker_data, bool save_selected, 
-    bool filter_on_export, bool apply_pose, double threshould_output_filter
-)
+    const std::vector<WorkerData> &worker_data, bool save_selected,
+    bool filter_on_export, bool apply_pose, double threshould_output_filter)
 {
-    this->point_clouds_container.point_clouds.clear();  // clear whatever was there
+    this->point_clouds_container.point_clouds.clear(); // clear whatever was there
     for (int i = 0; i < worker_data.size(); i++)
     {
         if (!save_selected || worker_data[i].show)
@@ -387,7 +490,7 @@ void Session::fill_session_from_worker_data(
                 }
             }
             // TODO: check if this is correct pose to be applied
-            pc.m_pose = worker_data[i].intermediate_trajectory[0].inverse(); 
+            pc.m_pose = worker_data[i].intermediate_trajectory[0].inverse();
             this->point_clouds_container.point_clouds.push_back(pc);
         }
     }

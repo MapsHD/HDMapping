@@ -290,7 +290,7 @@ bool ICP::optimize_source_to_target_wc(PointClouds& point_clouds_container, bool
                     continue;
                 }
 
-                if (!point_clouds_container.point_clouds[i].fixed) {
+                /*if (!point_clouds_container.point_clouds[i].fixed) {
                     point_clouds_container.point_clouds[i].m_pose = affine_matrix_from_pose_tait_bryan(pose);
                     point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
                     point_clouds_container.point_clouds[i].gui_translation[0] = point_clouds_container.point_clouds[i].pose.px;
@@ -302,7 +302,44 @@ bool ICP::optimize_source_to_target_wc(PointClouds& point_clouds_container, bool
                 }
                 else {
                     std::cout << "point cloud: " << point_clouds_container.point_clouds[i].file_name << " is fixed" << std::endl;
+                }*/
+
+                auto pose_res = pose;
+                auto pose_src = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+
+                if (!point_clouds_container.point_clouds[i].fixed_x)
+                {
+                    pose_src.px = pose_res.px;
                 }
+                if (!point_clouds_container.point_clouds[i].fixed_y)
+                {
+                    pose_src.py = pose_res.py;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_z)
+                {
+                    pose_src.pz = pose_res.pz;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_om)
+                {
+                    pose_src.om = pose_res.om;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_fi)
+                {
+                    pose_src.fi = pose_res.fi;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_ka)
+                {
+                    pose_src.ka = pose_res.ka;
+                }
+
+                point_clouds_container.point_clouds[i].m_pose = affine_matrix_from_pose_tait_bryan(pose_src);
+                point_clouds_container.point_clouds[i].pose = pose_src;
+                point_clouds_container.point_clouds[i].gui_translation[0] = pose_src.px;
+                point_clouds_container.point_clouds[i].gui_translation[1] = pose_src.py;
+                point_clouds_container.point_clouds[i].gui_translation[2] = pose_src.pz;
+                point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(pose_src.om);
+                point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(pose_src.fi);
+                point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(pose_src.ka);
             }
         }
         else {
@@ -559,7 +596,7 @@ bool ICP::optimize_source_to_target_lie_algebra_left_jacobian(PointClouds& point
                     continue;
                 }
 
-                if (!point_clouds_container.point_clouds[i].fixed) {
+                /*if (!point_clouds_container.point_clouds[i].fixed) {
                     point_clouds_container.point_clouds[i].m_pose = affine_matrix_from_pose_rodrigues(pose_update) * point_clouds_container.point_clouds[i].m_pose;
 
                     point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
@@ -569,7 +606,43 @@ bool ICP::optimize_source_to_target_lie_algebra_left_jacobian(PointClouds& point
                     point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(point_clouds_container.point_clouds[i].pose.om);
                     point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(point_clouds_container.point_clouds[i].pose.fi);
                     point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(point_clouds_container.point_clouds[i].pose.ka);
+                }*/
+
+                auto pose_res = pose_tait_bryan_from_affine_matrix(affine_matrix_from_pose_rodrigues(pose_update) * point_clouds_container.point_clouds[i].m_pose);
+                auto pose_src = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+
+                if (!point_clouds_container.point_clouds[i].fixed_x)
+                {
+                    pose_src.px = pose_res.px;
                 }
+                if (!point_clouds_container.point_clouds[i].fixed_y)
+                {
+                    pose_src.py = pose_res.py;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_z)
+                {
+                    pose_src.pz = pose_res.pz;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_om)
+                {
+                    pose_src.om = pose_res.om;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_fi)
+                {
+                    pose_src.fi = pose_res.fi;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_ka)
+                {
+                    pose_src.ka = pose_res.ka;
+                }
+
+                point_clouds_container.point_clouds[i].pose = pose_src;
+                point_clouds_container.point_clouds[i].gui_translation[0] = pose_src.px;
+                point_clouds_container.point_clouds[i].gui_translation[1] = pose_src.py;
+                point_clouds_container.point_clouds[i].gui_translation[2] = pose_src.pz;
+                point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(pose_src.om);
+                point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(pose_src.fi);
+                point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(pose_src.ka);
             }
         }
         else {
@@ -822,7 +895,7 @@ bool ICP::optimize_source_to_target_lie_algebra_right_jacobian(PointClouds& poin
                     continue;
                 }
 
-                if (!point_clouds_container.point_clouds[i].fixed) {
+                /*if (!point_clouds_container.point_clouds[i].fixed) {
                     point_clouds_container.point_clouds[i].m_pose = point_clouds_container.point_clouds[i].m_pose * affine_matrix_from_pose_rodrigues(pose_update);
 
                     point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
@@ -832,7 +905,42 @@ bool ICP::optimize_source_to_target_lie_algebra_right_jacobian(PointClouds& poin
                     point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(point_clouds_container.point_clouds[i].pose.om);
                     point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(point_clouds_container.point_clouds[i].pose.fi);
                     point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(point_clouds_container.point_clouds[i].pose.ka);
+                }*/
+                auto pose_res = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose * affine_matrix_from_pose_rodrigues(pose_update));
+                auto pose_src = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+
+                if (!point_clouds_container.point_clouds[i].fixed_x)
+                {
+                    pose_src.px = pose_res.px;
                 }
+                if (!point_clouds_container.point_clouds[i].fixed_y)
+                {
+                    pose_src.py = pose_res.py;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_z)
+                {
+                    pose_src.pz = pose_res.pz;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_om)
+                {
+                    pose_src.om = pose_res.om;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_fi)
+                {
+                    pose_src.fi = pose_res.fi;
+                }
+                if (!point_clouds_container.point_clouds[i].fixed_ka)
+                {
+                    pose_src.ka = pose_res.ka;
+                }
+
+                point_clouds_container.point_clouds[i].pose = pose_src;
+                point_clouds_container.point_clouds[i].gui_translation[0] = pose_src.px;
+                point_clouds_container.point_clouds[i].gui_translation[1] = pose_src.py;
+                point_clouds_container.point_clouds[i].gui_translation[2] = pose_src.pz;
+                point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(pose_src.om);
+                point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(pose_src.fi);
+                point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(pose_src.ka);
             }
         }
         else {

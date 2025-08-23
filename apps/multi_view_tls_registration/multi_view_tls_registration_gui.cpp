@@ -485,7 +485,6 @@ void project_gui()
 
     ImGui::Checkbox("block_z", &block_z);
 
-
     ImGui::SliderFloat("mouse_sensitivity", &mouse_sensitivity, 0.01f, 10.0f);
 
     ImGui::InputFloat3("rotation center", rotation_center.data());
@@ -773,8 +772,6 @@ void project_gui()
                                             session.control_points,
                                             num_edge_extended_before,
                                             num_edge_extended_after);
-
-        
     }
     else
     {
@@ -793,11 +790,10 @@ void project_gui()
             if (ImGui::Button("reset poses"))
             {
                 reset_poses(session);
-                
             }
 
             static double angle_diff = 5.0;
-            
+
             if (ImGui::Button("set all fuse_inclination_from_IMU"))
             {
                 for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
@@ -960,6 +956,8 @@ void project_gui()
                 ImGui::Text("--");
                 ImGui::SameLine();
                 ImGui::Checkbox((std::string("gizmo_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
+
+#if 0
                 ImGui::SameLine();
                 ImGui::Checkbox((std::string("fixed_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed);
                 ImGui::SameLine();
@@ -997,6 +995,7 @@ void project_gui()
                 {
                     session.point_clouds_container.point_clouds[i].shift_to_center();
                 }
+#endif
                 if (session.point_clouds_container.point_clouds[i].gizmo)
                 {
                     for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
@@ -1026,7 +1025,7 @@ void project_gui()
 
                 if (session.point_clouds_container.point_clouds[i].visible)
                 {
-                    ImGui::Text("--");
+                    // ImGui::Text("--");
                     ImGui::SameLine();
                     ImGui::Checkbox(std::string(std::to_string(i) + ": show_color").c_str(), &session.point_clouds_container.point_clouds[i].show_color); //
 
@@ -1036,6 +1035,7 @@ void project_gui()
                         ImGui::ColorEdit3(std::string(std::to_string(i) + ": pc_color").c_str(), session.point_clouds_container.point_clouds[i].render_color);
                     }
 
+#if 0
                     ImGui::SameLine();
                     if (ImGui::Button(std::string("#" + std::to_string(i) + "_ICP").c_str()))
                     {
@@ -1115,16 +1115,38 @@ void project_gui()
                             }
                         }
                     }
+#endif
                 }
+#if 0
                 ImGui::SameLine();
                 if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str()))
                 {
                     std::cout << session.point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
                 }
+#endif
 
+                // ImGui::SameLine();
+                ImGui::Text("--");
                 ImGui::SameLine();
                 ImGui::Checkbox(std::string("#" + std::to_string(i) + " fuse inclination from IMU").c_str(), &session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU);
 
+                ImGui::SameLine();
+                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_x").c_str(), &session.point_clouds_container.point_clouds[i].fixed_x);
+
+                ImGui::SameLine();
+                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_y").c_str(), &session.point_clouds_container.point_clouds[i].fixed_y);
+
+                ImGui::SameLine();
+                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_z").c_str(), &session.point_clouds_container.point_clouds[i].fixed_z);
+
+                ImGui::SameLine();
+                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_om(X angle)").c_str(), &session.point_clouds_container.point_clouds[i].fixed_om);
+
+                ImGui::SameLine();
+                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_fi(Y angle)").c_str(), &session.point_clouds_container.point_clouds[i].fixed_fi);
+
+                ImGui::SameLine();
+                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_ka(Z angle)").c_str(), &session.point_clouds_container.point_clouds[i].fixed_ka);
             }
             ImGui::Separator();
             int total_number_of_points = 0;
@@ -1138,9 +1160,9 @@ void project_gui()
             ImGui::Separator();
             ImGui::Separator();
         }
-       
+
         ImGui::Text("Set offsets x y z to export point cloud in global coordinate system (each local coordinate of the point += offset)");
-        
+
         ImGui::InputDouble("offset_x", &session.point_clouds_container.offset.x());
         ImGui::InputDouble("offset_y", &session.point_clouds_container.offset.y());
         ImGui::InputDouble("offset_z", &session.point_clouds_container.offset.z());
@@ -1164,7 +1186,6 @@ void project_gui()
             if (output_file_name.size() > 0)
             {
                 save_all_to_las(session, output_file_name, false);
-                
             }
         }
         ImGui::SameLine();
@@ -1350,7 +1371,6 @@ void project_gui()
 
         if (session.point_clouds_container.point_clouds.size() > 0)
         {
-            
 
             if (ImGui::Button("load gnss files and convert from wgs84 to puwg92"))
             {
@@ -1427,7 +1447,7 @@ void project_gui()
                             const auto &pp = p.points_local[i];
                             Eigen::Vector3d vp;
                             vp = p.m_pose * pp;
-                          
+
                             pointcloud.push_back(vp);
                             if (i < p.intensities.size())
                             {
@@ -1486,7 +1506,7 @@ void project_gui()
 
 void ndt_gui()
 {
-   
+
     ImGui::Begin("Normal Distributions Transform");
 
     ImGui::InputFloat3("bucket_size (x[m],y[m],z[m])", tls_registration.ndt.bucket_size);
@@ -1570,7 +1590,7 @@ void ndt_gui()
         double rms_initial = 0.0;
         double rms_final = 0.0;
         double mui = 0.0;
-       
+
         tls_registration.ndt.optimize(session.point_clouds_container.point_clouds, true, tls_registration.compute_mean_and_cov_for_bucket);
     }
 
@@ -1578,12 +1598,12 @@ void ndt_gui()
 
     if (ImGui::Button("ndt_optimization(Lie-algebra left Jacobian)"))
     {
-       
+
         tls_registration.ndt.optimize_lie_algebra_left_jacobian(session.point_clouds_container.point_clouds, tls_registration.compute_mean_and_cov_for_bucket);
     }
     if (ImGui::Button("ndt_optimization(Lie-algebra right Jacobian)"))
     {
-        
+
         tls_registration.ndt.optimize_lie_algebra_right_jacobian(session.point_clouds_container.point_clouds, tls_registration.compute_mean_and_cov_for_bucket);
     }
 
@@ -2276,19 +2296,48 @@ void display()
         reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
 
         Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
+
+        // janusz
+        if (manual_pose_graph_loop_closure_mode)
+        {
+            if (index_loop_closure_source < session.point_clouds_container.point_clouds.size())
+            {
+                rotation_center.x() = session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().x();
+                rotation_center.y() = session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().y();
+                rotation_center.z() = session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().z();
+            }
+
+            if (session.pose_graph_loop_closure.manipulate_active_edge){
+                if (session.pose_graph_loop_closure.edges.size() > 0)
+                {
+                    if (session.pose_graph_loop_closure.index_active_edge < session.pose_graph_loop_closure.edges.size())
+                    {
+                        rotation_center.x() = session.point_clouds_container.point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from].m_pose(0, 3);
+                        rotation_center.y() = session.point_clouds_container.point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from].m_pose(1, 3);
+                        rotation_center.z() = session.point_clouds_container.point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from].m_pose(2, 3);
+                    }
+                }
+            }
+        }
+
         viewTranslation.translate(rotation_center);
+
         Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
         viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-        
-        if (!block_z){
+
+        if (!block_z)
+        {
             viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
             viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
-        }else{
-            viewLocal.rotate(Eigen::AngleAxisf( -90.0 * M_PI / 180.f, Eigen::Vector3f::UnitX()));
+        }
+        else
+        {
+            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * M_PI / 180.f, Eigen::Vector3f::UnitX()));
             viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
         }
 
         Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
+
         viewTranslation2.translate(-rotation_center);
 
         Eigen::Affine3f result = viewTranslation * viewLocal * viewTranslation2;
@@ -2353,7 +2402,6 @@ void display()
         }
         else
         {
-           
         }
 
         tls_registration.gnss.render(session.point_clouds_container);
@@ -2395,7 +2443,7 @@ void display()
             session.ground_control_points.imgui(session.point_clouds_container);
         }
     }
-    
+
     project_gui();
 
     if (!session.control_points.is_imgui)
@@ -2752,9 +2800,9 @@ void mouse(int glut_button, int state, int x, int y)
                 std::cout << "control point picking" << std::endl;
                 const auto laser_beam = GetLaserBeam(x, y);
                 double min_distance = 10000000000;
-             
+
                 session.control_points.index_picked_point = -1;
-                
+
                 int i = session.control_points.index_pose;
                 if (session.control_points.index_pose >= 0 && session.control_points.index_pose < session.point_clouds_container.point_clouds.size())
                 {
@@ -2768,7 +2816,7 @@ void mouse(int glut_button, int state, int x, int y)
                         if (dist < min_distance && dist < 0.1)
                         {
                             min_distance = dist;
-                           
+
                             rotation_center.x() = vp.x();
                             rotation_center.y() = vp.y();
                             rotation_center.z() = vp.z();

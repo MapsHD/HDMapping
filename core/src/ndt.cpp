@@ -2441,6 +2441,52 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_maha
 
 				if (is_wc)
 				{
+					// point_clouds[i].m_pose = m_pose;
+				}
+				else
+				{
+					m_pose = m_pose.inverse();
+				}
+
+				auto pose_res = pose_tait_bryan_from_affine_matrix(m_pose);
+				auto pose_src = pose_tait_bryan_from_affine_matrix(point_clouds[i].m_pose);
+
+				if (!point_clouds[i].fixed_x)
+				{
+					pose_src.px = pose_res.px;
+				}
+				if (!point_clouds[i].fixed_y)
+				{
+					pose_src.py = pose_res.py;
+				}
+				if (!point_clouds[i].fixed_z)
+				{
+					pose_src.pz = pose_res.pz;
+				}
+				if (!point_clouds[i].fixed_om)
+				{
+					pose_src.om = pose_res.om;
+				}
+				if (!point_clouds[i].fixed_fi)
+				{
+					pose_src.fi = pose_res.fi;
+				}
+				if (!point_clouds[i].fixed_ka)
+				{
+					pose_src.ka = pose_res.ka;
+				}
+
+				point_clouds[i].m_pose = affine_matrix_from_pose_tait_bryan(pose_src);
+				point_clouds[i].pose = pose_src;
+				point_clouds[i].gui_translation[0] = pose_src.px;
+				point_clouds[i].gui_translation[1] = pose_src.py;
+				point_clouds[i].gui_translation[2] = pose_src.pz;
+				point_clouds[i].gui_rotation[0] = rad2deg(pose_src.om);
+				point_clouds[i].gui_rotation[1] = rad2deg(pose_src.fi);
+				point_clouds[i].gui_rotation[2] = rad2deg(pose_src.ka);
+
+				/*if (is_wc)
+				{
 					point_clouds[i].m_pose = m_pose;
 				}
 				else
@@ -2456,7 +2502,7 @@ bool NDT::optimize(std::vector<PointCloud> &point_clouds, bool compute_only_maha
 					point_clouds[i].gui_rotation[0] = rad2deg(point_clouds[i].pose.om);
 					point_clouds[i].gui_rotation[1] = rad2deg(point_clouds[i].pose.fi);
 					point_clouds[i].gui_rotation[2] = rad2deg(point_clouds[i].pose.ka);
-				}
+				}*/
 			}
 			if (is_levenberg_marguardt)
 			{
@@ -3075,6 +3121,51 @@ bool NDT::optimize(std::vector<Session> &sessions, bool compute_only_mahalanobis
 
 					if (is_wc)
 					{
+					}
+					else
+					{
+						m_pose = m_pose.inverse(); 
+					}
+
+					auto pose_res = pose_tait_bryan_from_affine_matrix(m_pose);
+					auto pose_src = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+
+					if (!pc.fixed_x)
+					{
+						pose_src.px = pose_res.px;
+					}
+					if (!pc.fixed_y)
+					{
+						pose_src.py = pose_res.py;
+					}
+					if (!pc.fixed_z)
+					{
+						pose_src.pz = pose_res.pz;
+					}
+					if (!pc.fixed_om)
+					{
+						pose_src.om = pose_res.om;
+					}
+					if (!pc.fixed_fi)
+					{
+						pose_src.fi = pose_res.fi;
+					}
+					if (!pc.fixed_ka)
+					{
+						pose_src.ka = pose_res.ka;
+					}
+
+					pc.pose = pose_src;
+					pc.gui_translation[0] = pose_src.px;
+					pc.gui_translation[1] = pose_src.py;
+					pc.gui_translation[2] = pose_src.pz;
+					pc.gui_rotation[0] = rad2deg(pose_src.om);
+					pc.gui_rotation[1] = rad2deg(pose_src.fi);
+					pc.gui_rotation[2] = rad2deg(pose_src.ka);
+
+					/*
+					if (is_wc)
+					{
 						// if (!s.is_ground_truth)
 						//{
 						pc.m_pose = m_pose; // ToDo check if !pc.fixed needed
@@ -3097,7 +3188,7 @@ bool NDT::optimize(std::vector<Session> &sessions, bool compute_only_mahalanobis
 						pc.gui_rotation[0] = rad2deg(pc.pose.om);
 						pc.gui_rotation[1] = rad2deg(pc.pose.fi);
 						pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-					}
+					}*/
 				}
 			}
 			if (is_levenberg_marguardt)
@@ -3131,7 +3222,8 @@ bool NDT::optimize(std::vector<Session> &sessions, bool compute_only_mahalanobis
 
 			sessions[0].point_clouds_container = tmp_session.point_clouds_container;
 
-			for (int i = 1; i < sessions.size(); i++){
+			for (int i = 1; i < sessions.size(); i++)
+			{
 				for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
 				{
 					sessions[i].point_clouds_container.point_clouds[j].m_pose = sessions[i].point_clouds_container.point_clouds[j].m_pose * pose_inv0;

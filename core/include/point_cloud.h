@@ -105,8 +105,14 @@ public:
 	bool visible;
 	bool gizmo;
 	int num_threads = 16;
-	bool fixed = false;
+	//bool fixed = false;
 	//double search_radious = 2.0;
+	bool fixed_x = false;
+	bool fixed_y = false;
+	bool fixed_z = false;
+	bool fixed_om = false;
+	bool fixed_fi = false;
+	bool fixed_ka = false;
 
 	bool load(const std::string& file_name);
 	void update_from_gui();

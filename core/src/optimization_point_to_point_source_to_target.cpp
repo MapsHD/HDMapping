@@ -236,18 +236,36 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
     {
         for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
         {
-            if (!point_clouds_container.point_clouds[i].fixed)
+            // if (!point_clouds_container.point_clouds[i].fixed)
+            //{
+            TaitBryanPose pose;
+            if (!point_clouds_container.point_clouds[i].fixed_x)
             {
-                TaitBryanPose pose;
                 pose.px = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-                pose.py = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-                pose.pz = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-                pose.om = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-                pose.fi = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-                pose.ka = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
-                Eigen::Affine3d m = affine_matrix_from_pose_tait_bryan(pose);
-                point_clouds_container.point_clouds[i].m_pose = point_clouds_container.point_clouds[i].m_pose * m;
             }
+            if (!point_clouds_container.point_clouds[i].fixed_y)
+            {
+                pose.py = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+            }
+            if (!point_clouds_container.point_clouds[i].fixed_z)
+            {
+                pose.pz = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+            }
+            if (!point_clouds_container.point_clouds[i].fixed_om)
+            {
+                pose.om = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+            }
+            if (!point_clouds_container.point_clouds[i].fixed_fi)
+            {
+                pose.fi = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+            }
+            if (!point_clouds_container.point_clouds[i].fixed_ka)
+            {
+                pose.ka = (((rand() % 1000000000) / 1000000000.0) - 0.5) * 2.0 * 0.000001;
+            }
+            Eigen::Affine3d m = affine_matrix_from_pose_tait_bryan(pose);
+            point_clouds_container.point_clouds[i].m_pose = point_clouds_container.point_clouds[i].m_pose * m;
+            //}
         }
     }
 
@@ -822,13 +840,12 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
                             tripletListB.emplace_back(ir + 2, 0, delta(2, 0));
                         }
 
-
                         rms += delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0) + delta(2, 0) * delta(2, 0);
                         sum_obs += 3.0;
 
-                        //if(sqrt(delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0) + delta(2, 0) * delta(2, 0)) > 0.1){
-                        //    std::cout << sqrt(delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0) + delta(2, 0) * delta(2, 0)) << std::endl;
-                        //}
+                        // if(sqrt(delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0) + delta(2, 0) * delta(2, 0)) > 0.1){
+                        //     std::cout << sqrt(delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0) + delta(2, 0) * delta(2, 0)) << std::endl;
+                        // }
                     }
 
                     double curr_rms = sqrt(rms / sum_obs);
@@ -1155,10 +1172,11 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
                     {
                         continue;
                     }
-                    if (point_clouds_container.point_clouds[i].fixed){
-                        std::cout << "point cloud " << i << " is fixed, continue" << std::endl;
-                        continue;
-                    }
+                    //if (point_clouds_container.point_clouds[i].fixed) //ToDo
+                    //{
+                    //    std::cout << "point cloud " << i << " is fixed, continue" << std::endl;
+                    //    continue;
+                    //}
 
                     if (pose_convention == PoseConvention::wc)
                     {
@@ -1192,11 +1210,11 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
                     {
                         continue;
                     }
-                    if (point_clouds_container.point_clouds[i].fixed)
-                    {
-                        std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed" << std::endl;
-                        continue;
-                    }
+                    //if (point_clouds_container.point_clouds[i].fixed) //ToDo
+                    //{
+                    //    std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed" << std::endl;
+                    //    continue;
+                    //}
 
                     if (pose_convention == PoseConvention::wc)
                     {
@@ -1231,11 +1249,11 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
                     {
                         continue;
                     }
-                    if (point_clouds_container.point_clouds[i].fixed)
-                    {
-                        std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed" << std::endl;
-                        continue;
-                    }
+                    //if (point_clouds_container.point_clouds[i].fixed)//ToDo
+                    //{
+                    //    std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed" << std::endl;
+                    //    continue;
+                    //}
 
                     if (pose_convention == PoseConvention::wc)
                     {
@@ -1247,8 +1265,8 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
                     }
                 }
 
-                if (!point_clouds_container.point_clouds[i].fixed)
-                {
+                //if (!point_clouds_container.point_clouds[i].fixed)//ToDo
+                //{
                     point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
                     point_clouds_container.point_clouds[i].gui_translation[0] = (float)point_clouds_container.point_clouds[i].pose.px;
                     point_clouds_container.point_clouds[i].gui_translation[1] = (float)point_clouds_container.point_clouds[i].pose.py;
@@ -1256,11 +1274,11 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
                     point_clouds_container.point_clouds[i].gui_rotation[0] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.om);
                     point_clouds_container.point_clouds[i].gui_rotation[1] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.fi);
                     point_clouds_container.point_clouds[i].gui_rotation[2] = (float)rad2deg(point_clouds_container.point_clouds[i].pose.ka);
-                }
-                else
-                {
+               // }
+                //else
+                //{
                     std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed (check it!!!)" << std::endl;
-                }
+                //}
             }
 
             if (optimization_algorithm == OptimizationAlgorithm::levenberg_marguardt)

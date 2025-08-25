@@ -82,6 +82,7 @@ struct ImuData
     std::vector<double> pitch;
     std::vector<double> roll;
 };
+std::vector<double> pointsTimestamps;
 ImuData imu_data_plot;
 std::vector<AllData> all_data;
 
@@ -533,6 +534,7 @@ void project_gui()
                         std::cout << "indexed: " << i + 1 << " of " << pointsPerFile.size() << " files" << std::endl;
                         for (const auto &pp : pointsPerFile[i])
                         {
+                            pointsTimestamps.push_back(pp.timestamp);
                             auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), pp.timestamp,
                                                           [](std::pair<double, double> lhs, double rhs) -> bool
                                                           { return lhs.first < rhs; });
@@ -616,6 +618,8 @@ void project_gui()
                             }
                         }
                     }
+                    // sort timestamps
+                    std::sort(pointsTimestamps.begin(), pointsTimestamps.end());
 
                     std::cout << "indexing points finished" << std::endl;
 
@@ -745,10 +749,43 @@ void project_gui()
         }
 
         static bool show_imu_data = false;
+        static bool show_points_timestamp = false;
         ImGui::Checkbox("show_imu_data", &show_imu_data);
+        ImGui::Checkbox("show_pointcloud_timestamps", &show_points_timestamp);
 
         ImGui::End();
 
+        if (show_points_timestamp)
+        {
+            ImGui::Begin("PointsTimestampsData");
+            static double x_min1 = 0;
+            static double x_max1 = pointsTimestamps.size();
+
+            static double y_min1 = pointsTimestamps.front();
+            static double y_max1 = pointsTimestamps.back();
+
+
+            double annotation = 0;
+
+            if (ImPlot::BeginPlot("Point timestamp", ImVec2(-1, 0)))
+            {
+                auto my_lambda = [](int idx, void*) {
+
+                    return ImPlotPoint(idx, pointsTimestamps[idx]);
+                };
+
+                ImPlot::SetupAxisLimits(ImAxis_X1, x_min1, x_max1, ImGuiCond_Once);
+                ImPlot::SetupAxisLinks(ImAxis_X1, &x_min1, &x_max1);
+                ImPlot::SetupAxisLimits(ImAxis_Y1, y_min1, y_max1, ImGuiCond_Once);
+                ImPlot::SetupAxisLinks(ImAxis_Y1, &y_min1, &y_max1);
+
+                ImPlot::PlotLineG("line", my_lambda, nullptr, pointsTimestamps.size());
+                ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
+                ImPlot::EndPlot();
+            }
+
+            ImGui::End();
+        }
         if (show_imu_data)
         {
             ImGui::Begin("ImuData");

@@ -483,6 +483,7 @@ void Session::fill_session_from_worker_data(
                     if (apply_pose)
                     {
                         pt = worker_data[i].intermediate_trajectory[p.index_pose] * p.point;
+                        pt = worker_data[i].intermediate_trajectory[0].inverse() * pt;
                     }
                     pc.points_local.push_back(pt);
                     pc.intensities.push_back(p.intensity);
@@ -490,7 +491,8 @@ void Session::fill_session_from_worker_data(
                 }
             }
             // TODO: check if this is correct pose to be applied
-            pc.m_pose = worker_data[i].intermediate_trajectory[0].inverse();
+            //pc.m_pose = worker_data[i].intermediate_trajectory[0].inverse();
+            pc.m_pose = worker_data[i].intermediate_trajectory[0];
             this->point_clouds_container.point_clouds.push_back(pc);
         }
     }

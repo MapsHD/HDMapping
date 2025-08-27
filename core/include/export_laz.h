@@ -428,7 +428,7 @@ inline void save_all_to_las(const Session& session, std::string output_las_name,
     std::vector<unsigned short> intensity;
     std::vector<double> timestamps;
 
-    Eigen::Affine3d first_pose_inv = Eigen::Affine3d::Identity();
+    Eigen::Affine3d first_pose = Eigen::Affine3d::Identity();
     bool found_first_pose = false;
 
     for (const auto& p : session.point_clouds_container.point_clouds)  
@@ -438,7 +438,7 @@ inline void save_all_to_las(const Session& session, std::string output_las_name,
             if (!found_first_pose)
             {
                 found_first_pose = true;
-                first_pose_inv = p.m_pose.inverse();  // valid
+                first_pose = p.m_pose;//.inverse();  // valid
             }
 
             for (size_t i = 0; i < p.points_local.size(); ++i)
@@ -469,11 +469,11 @@ inline void save_all_to_las(const Session& session, std::string output_las_name,
     {
         for (auto& pt : pointcloud)  
         {
-            pt = first_pose_inv * pt;
+            pt = first_pose * pt;
         }
 
-        std::cout << "----------------------" << std::endl;
-        std::cout << first_pose_inv.inverse().matrix() << std::endl;
+        //std::cout << "----------------------" << std::endl;
+        //std::cout << first_pose.matrix() << std::endl;
     }
 
     if (!exportLaz(

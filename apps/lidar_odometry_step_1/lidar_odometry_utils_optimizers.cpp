@@ -1930,7 +1930,7 @@ void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &
 }
 
 //extern nglobals::icpProgress.store((float)i / globals::registeredFrames.size());
-bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure, std::atomic<float> &loProgress)
+bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure, std::atomic<float> &loProgress, const std::atomic<bool> &pause)
 {
     //exit(1);
     bool debug = false;
@@ -1966,7 +1966,14 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
         for (int i = 0; i < worker_data.size(); i++)
         {
-            // std::cout << "jojo" << std::endl;
+            if (pause)
+            {
+                while (pause)
+                {
+                    std::cout << "pause" << std::endl;
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                }
+            }
 
             // auto tmp_trj =
             Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);

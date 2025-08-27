@@ -20,8 +20,8 @@ bool load_data(std::vector<std::string>& input_file_names, LidarOdometryParams& 
 void calculate_trajectory(
     Trajectory& trajectory, Imu& imu_data, bool fusionConventionNwu, bool fusionConventionEnu, bool fusionConventionNed, double ahrs_gain);
 bool compute_step_1(
-    std::vector<std::vector<Point3Di>>& pointsPerFile, LidarOdometryParams& params, 
-    Trajectory& trajectory, std::vector<WorkerData>& worker_data);
+    std::vector<std::vector<Point3Di>> &pointsPerFile, LidarOdometryParams &params,
+    Trajectory &trajectory, std::vector<WorkerData> &worker_data, const std::atomic<bool> &pause);
 void run_consistency(std::vector<WorkerData>& worker_data, LidarOdometryParams& params);
 void filter_reference_buckets(LidarOdometryParams& params);
 void load_reference_point_clouds(std::vector<std::string> input_file_names, LidarOdometryParams& params);

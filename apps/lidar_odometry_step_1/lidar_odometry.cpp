@@ -374,7 +374,7 @@ void calculate_trajectory(
 }
 
 bool compute_step_1(
-    std::vector<std::vector<Point3Di>> &pointsPerFile, LidarOdometryParams &params, Trajectory &trajectory, std::vector<WorkerData> &worker_data)
+    std::vector<std::vector<Point3Di>> &pointsPerFile, LidarOdometryParams &params, Trajectory &trajectory, std::vector<WorkerData> &worker_data, const std::atomic<bool> &pause)
 {
     int number_of_initial_points = 0;
     double timestamp_begin = 0.0;
@@ -535,10 +535,16 @@ bool compute_step_1(
             wd.intermediate_points = decimate(wd.original_points, params.decimation, params.decimation, params.decimation);
         }
 
-        // std::cout << "number of points: " << wd.original_points.size() << std::endl;
         if (wd.original_points.size() > 1000)
         {
             worker_data.push_back(wd);
+        }
+
+        if (pause)
+        {
+            while (pause){
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
         }
     }
     params.m_g = worker_data[0].intermediate_trajectory[0];
@@ -868,7 +874,9 @@ std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryP
     Trajectory trajectory;
     calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain);
 
-    if (!compute_step_1(pointsPerFile, params, trajectory, worker_data))
+    std::atomic<bool> pause{false};
+
+    if (!compute_step_1(pointsPerFile, params, trajectory, worker_data, pause))
     {
         std::cout << "Calculation failed at step 1 of lidar odometry, exiting." << std::endl;
         return worker_data;
@@ -877,7 +885,7 @@ std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryP
 
     std::atomic<float> loProgress;
 
-    if (!compute_step_2(worker_data, params, ts_failure, loProgress))
+    if (!compute_step_2(worker_data, params, ts_failure, loProgress, pause))
     {
         std::cout << "Calculation failed at step 2 of lidar odometry, exiting." << std::endl;
         return worker_data;

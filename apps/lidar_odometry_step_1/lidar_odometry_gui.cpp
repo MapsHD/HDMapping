@@ -87,7 +87,7 @@ Imu imu_data;
 Trajectory trajectory;
 std::atomic<bool> loRunning{false};
 std::atomic<float> loProgress{0.0};
-std::atomic<bool> pause{false};
+std::atomic<bool> loPause{false};
 std::chrono::time_point<std::chrono::system_clock> loStartTime;
 std::atomic<double> loElapsedSeconds{0.0};
 std::atomic<double> loEstimatedTimeRemaining{0.0};
@@ -151,7 +151,7 @@ void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eig
 #define DEFAULT_PATH "~"
 #endif
 
-void step1(const std::atomic<bool> &pause)
+void step1(const std::atomic<bool> &loPause)
 {
     std::vector<std::string> input_file_names;
     // input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
@@ -170,16 +170,16 @@ void step1(const std::atomic<bool> &pause)
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
         calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain);
-        compute_step_1(pointsPerFile, params, trajectory, worker_data, pause);
+        compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
         step_1_done = true;
         std::cout << "step_1_done please click 'compute_all (step 2)' to continue calculations" << std::endl;
     }
 }
 
-void step2(const std::atomic<bool> &pause)
+void step2(const std::atomic<bool> &loPause)
 {
     double ts_failure = 0.0;
-    if (compute_step_2(worker_data, params, ts_failure, loProgress, pause))
+    if (compute_step_2(worker_data, params, ts_failure, loProgress, loPause))
     {
         step_2_done = true;
     }
@@ -421,7 +421,7 @@ void lidar_odometry_gui()
             if (ImGui::Button("load data (step 1)"))
             {
 
-                step1(pause);
+                step1(loPause);
             }
             ImGui::SameLine();
             ImGui::Text("Select all imu *.csv and lidar *.laz files produced by MANDEYE saved in 'continousScanning_*' folder");
@@ -430,7 +430,7 @@ void lidar_odometry_gui()
         {
             if (ImGui::Button("compute_all (step 2)"))
             {
-                step2(pause);
+                step2(loPause);
             }
             ImGui::SameLine();
             ImGui::Text("Press this button for automatic lidar odometry calculation -> it will produce trajectory");
@@ -1019,7 +1019,7 @@ void lidar_odometry_basic_gui()
             loEstimatedTimeRemaining.store(0.0);
             loStartTime = std::chrono::system_clock::now();
 
-            step1(pause);
+            step1(loPause);
 
             std::thread loThread(
                 []()
@@ -1027,7 +1027,7 @@ void lidar_odometry_basic_gui()
                     std::chrono::time_point<std::chrono::system_clock> start, end;
                     start = std::chrono::system_clock::now();
 
-                    step2(pause);
+                    step2(loPause);
 
                     end = std::chrono::system_clock::now();
                     std::chrono::duration<double> elapsed_seconds = end - start;
@@ -1106,18 +1106,18 @@ void lidar_odometry_basic_gui()
             ImGui::Text("%s", timeInfo);
         }
 
-        if (!pause)
+        if (!loPause)
         {
-            if (ImGui::Button("Pause"))
+            if (ImGui::Button("loPause"))
             {
-                pause.store(true);
+                loPause.store(true);
             }
         }
         else
         {
             if (ImGui::Button("Resume"))
             {
-                pause.store(false);
+                loPause.store(false);
             }
         }
 
@@ -1598,7 +1598,7 @@ void step1(const std::string &folder,
            std::string &working_directory,
            Trajectory &trajectory,
            std::vector<WorkerData> &worker_data,
-           const std::atomic<bool> &pause)
+           const std::atomic<bool> &loPause)
 {
     std::vector<std::string> input_file_names;
 
@@ -1615,16 +1615,16 @@ void step1(const std::string &folder,
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
         calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain);
-        compute_step_1(pointsPerFile, params, trajectory, worker_data, pause);
+        compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
         std::cout << "step_1_done" << std::endl;
     }
 }
 
-void step2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, const std::atomic<bool> &pause)
+void step2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, const std::atomic<bool> &loPause)
 {
     double ts_failure = 0.0;
     std::atomic<float> loProgress;
-    compute_step_2(worker_data, params, ts_failure, loProgress, pause);
+    compute_step_2(worker_data, params, ts_failure, loProgress, loPause);
 }
 
 void save_results(bool info, double elapsed_seconds, std::string &working_directory,
@@ -1650,7 +1650,7 @@ int main(int argc, char *argv[])
             std::chrono::time_point<std::chrono::system_clock> start, end;
             start = std::chrono::system_clock::now();
 
-            std::atomic<bool> pause{false};
+            std::atomic<bool> loPause{false};
             step1(argv[1],
                   params,
                   pointsPerFile,
@@ -1658,9 +1658,9 @@ int main(int argc, char *argv[])
                   working_directory,
                   trajectory,
                   worker_data,
-                  pause);
+                  loPause);
 
-            step2(worker_data, params, pause);
+            step2(worker_data, params, loPause);
 
             end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds = end - start;

@@ -1786,7 +1786,7 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
     }
     ///
     std::vector<Eigen::Affine3d> best_trajectory = trajectory;
-    int min_buckets = 1000000000000;
+    unsigned long long min_buckets = ULLONG_MAX;
 
     for (double x = 0.0; x < 0.2; x += 0.0005)
     {

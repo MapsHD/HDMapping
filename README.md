@@ -24,9 +24,9 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping
 - https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping
 - https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping
-- https://github.com/MapsHD/benchmark-loam-livox-to-hdmapping
+- https://github.com/MapsHD/benchmark-LOAM-Livox-to-HDMapping
 - https://github.com/MapsHD/benchmark-GLIM-to-HDMapping
-- https://github.com/MapsHD/benchmark-ct-icp-to-hdmapping
+- https://github.com/MapsHD/benchmark-CT-ICP-to-HDMapping
 - https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping
 - https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping
 - https://github.com/MapsHD/benchmark-SLICT-to-HDMapping

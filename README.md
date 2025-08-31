@@ -15,15 +15,15 @@ This is open-source software for large-scale 3D mapping using an open-hardware h
 
 # Compatible other SOTA algorithms (benchmark) 
 All following algorithms are generating session compatible with 'multi_view_tls_registration_step_2'
-- https://github.com/MapsHD/benchmark-kiss-icp-to-hdmapping
-- https://github.com/MapsHD/benchmark-DLO-to-hdmapping
+- https://github.com/MapsHD/benchmark-KISS-ICP-to-HDMapping
+- https://github.com/MapsHD/benchmark-DLO-to-HDMapping
 - https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping 
-- https://github.com/MapsHD/benchmark-DLIO-to-hdmapping
+- https://github.com/MapsHD/benchmark-DLIO-to-HDMapping
 - https://github.com/MapsHD/benchmark-Point-LIO-to-HDMapping
-- https://github.com/MapsHD/benchmark-fast-lio-to-hdmapping
-- https://github.com/MapsHD/benchmark-Faster-LIO-to-hdmapping
-- https://github.com/MapsHD/benchmark-LIO-SAM-to-hdmapping
-- https://github.com/MapsHD/benchmark-LeGO-LOAM-to-hdmapping
+- https://github.com/MapsHD/benchmark-FAST-LIO-to-HDMapping
+- https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping
+- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping
+- https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping
 - https://github.com/MapsHD/benchmark-loam-livox-to-hdmapping
 - https://github.com/MapsHD/benchmark-GLIM-to-HDMapping
 - https://github.com/MapsHD/benchmark-ct-icp-to-hdmapping

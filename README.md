@@ -36,6 +36,10 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping
 - https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping
 
+ToDo
+
+- https://github.com/XikunLiu-huskit/GLIO
+
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z
 - unpack `quick_start_demo.7z` with 7-Zip (https://7-zip.org/)

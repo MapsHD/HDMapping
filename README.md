@@ -40,6 +40,7 @@ ToDo
 
 - https://github.com/XikunLiu-huskit/GLIO
 - https://github.com/MapsHD/rko_lio
+- https://github.com/PRBonn/kiss-slam
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

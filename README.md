@@ -40,6 +40,10 @@ ToDo
 
 - https://github.com/XikunLiu-huskit/GLIO
 - https://github.com/MapsHD/rko_lio
+- https://github.com/HKUST-Aerial-Robotics/A-LOAM
+- https://github.com/wh200720041/floam
+- https://github.com/BrenYi/Light-LOAM
+- https://github.com/ZikangYuan/sr_lio
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

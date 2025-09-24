@@ -242,6 +242,28 @@ Manual coloring
 
 # Building commands
 
+## Requirements
+
+### CMake 4.0.0 or Higher
+
+This project requires **CMake 4.0.0** or higher. If you don't have it installed, you can download it from:
+
+**Official CMake Downloads:**
+- **Linux/macOS/Windows:** https://cmake.org/download/
+- **GitHub Releases (Linux binaries):** https://github.com/Kitware/CMake/releases/tag/v4.0.0
+
+**Installation on Linux:**
+```bash
+wget https://github.com/Kitware/CMake/releases/download/v4.0.0/cmake-4.0.0-linux-x86_64.sh
+sudo sh cmake-4.0.0-linux-x86_64.sh --skip-license --prefix=/usr/local
+cmake --version
+```
+
+**Installation on Windows:**
+- Download the installer from https://cmake.org/download/
+- Run the installer and follow the instructions
+- Ensure CMake is added to your system PATH
+
 ## Quick Start (Recommended)
 ```bash
 git clone https://github.com/MapsHD/HDMapping.git

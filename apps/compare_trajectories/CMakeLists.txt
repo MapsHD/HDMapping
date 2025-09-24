@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15.0)
+cmake_minimum_required(VERSION 4.0.0)
 
 project(mandeye_compare_trajectories)
 

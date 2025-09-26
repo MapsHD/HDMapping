@@ -30,8 +30,8 @@ if (MSVC)
     
     # Architecture-specific optimizations
     if(HD_CPU_OPTIMIZATION STREQUAL "AMD")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Oi /Ot /Oy")
-        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Oi /Ot /Oy")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Oi /Ot /Oy /fp:fast")
+        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Oi /Ot /Oy /fp:fast")
         message(STATUS "Enabling AMD-optimized build for MSVC")
     elseif(HD_CPU_OPTIMIZATION STREQUAL "INTEL")
         set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2")
@@ -50,8 +50,8 @@ if (MSVC)
             set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /O2")
             message(STATUS "Auto-detected ARM processor - enabling ARM optimizations")
         elseif(CPU_VENDOR MATCHES "AMD")
-            set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Oi /Ot /Oy")
-            set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Oi /Ot /Oy")
+            set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Oi /Ot /Oy /fp:fast")
+            set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Oi /Ot /Oy /fp:fast")
             message(STATUS "Auto-detected AMD processor - enabling AMD optimizations")
         else()
             message(STATUS "Auto-detected Intel/Generic processor - using conservative optimizations")
@@ -190,10 +190,6 @@ endif()
 
 find_package(OpenGL REQUIRED)
 
-if(NOT WIN32)
-    find_package(TBB REQUIRED)
-endif()
-
 add_definitions(-D_USE_MATH_DEFINES)
 
 get_filename_component(REPOSITORY_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} ABSOLUTE)
@@ -241,6 +237,24 @@ else()
     set(PLATFORM_LASZIP_LIB ${LASZIP_LIBRARY})
     MESSAGE(STATUS "LASzip include dir: ${LASZIP_INCLUDE_DIR}, LASzip library: ${LASZIP_LIBRARY}")
 endif ()
+
+# Option to build with bundled oneTBB
+option(BUILD_WITH_BUNDLED_ONETBB "Build with bundled oneTBB" ON)
+if (BUILD_WITH_BUNDLED_ONETBB)
+    # Disable oneTBB components we don't need
+    set(TBB_TEST OFF CACHE BOOL "" FORCE)
+    set(TBB_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(TBB_STRICT OFF CACHE BOOL "" FORCE)
+    set(TBBMALLOC_BUILD OFF CACHE BOOL "" FORCE)
+    set(TBB_CPF OFF CACHE BOOL "" FORCE)
+    
+    add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/oneTBB)
+    MESSAGE(STATUS "Using bundled oneTBB from: ${EXTERNAL_LIBRARIES_DIRECTORY}/oneTBB")
+else()
+    # Find TBB from system
+    find_package(TBB REQUIRED)
+    MESSAGE(STATUS "Found system TBB")
+endif()
 
 option(PYBIND "Enable pybind11 bindings" OFF)
 if(PYBIND)

@@ -293,7 +293,7 @@ Next build Debian package:
 ```
 cmake .. -DBUILD_WITH_BUNDLED_FREEGLUT=0 -DBUILD_WITH_BUNDLED_EIGEN=0 -DBUILD_WITH_BUNDLED_LIBLASZIP=0 -DCMAKE_BUILD_TYPE=Release 
 make -j16
-make pack
+make package
 ```
 To install package :
 ```

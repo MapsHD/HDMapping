@@ -46,6 +46,8 @@ ToDo
 - https://github.com/BrenYi/Light-LOAM
 - https://github.com/ZikangYuan/sr_lio
 - https://github.com/93won/lidar_odometry?tab=readme-ov-file
+- https://github.com/StephLin/LIO-SEGMOT
+
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

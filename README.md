@@ -15,39 +15,37 @@ This is open-source software for large-scale 3D mapping using an open-hardware h
 
 # Compatible other SOTA algorithms (benchmark) 
 All following algorithms are generating session compatible with 'multi_view_tls_registration_step_2'
-- https://github.com/MapsHD/benchmark-KISS-ICP-to-HDMapping
-- https://github.com/MapsHD/benchmark-DLO-to-HDMapping
-- https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping 
-- https://github.com/MapsHD/benchmark-DLIO-to-HDMapping
-- https://github.com/MapsHD/benchmark-Point-LIO-to-HDMapping
-- https://github.com/MapsHD/benchmark-FAST-LIO-to-HDMapping
-- https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping
-- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping
-- https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping
-- https://github.com/MapsHD/benchmark-LOAM-Livox-to-HDMapping
-- https://github.com/MapsHD/benchmark-GLIM-to-HDMapping
-- https://github.com/MapsHD/benchmark-CT-ICP-to-HDMapping
-- https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping
-- https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping
-- https://github.com/MapsHD/benchmark-SLICT-to-HDMapping
-- https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping
-- https://github.com/MapsHD/benchmark-iG-LIO-to-HDMapping
-- https://github.com/MapsHD/benchmark-LIO-EKF-to-HDMapping
-- https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping
-- https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping
+- https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping (2018)
+- https://github.com/MapsHD/benchmark-LOAM-Livox-to-HDMapping (2019)
+- https://github.com/MapsHD/benchmark-FAST-LIO-to-HDMapping (2020)
+- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020)
+- https://github.com/MapsHD/benchmark-CT-ICP-to-HDMapping (2021)
+- https://github.com/MapsHD/benchmark-DLO-to-HDMapping (2022)
+- https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping (2022)
+- https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping (2022)
+- https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022)
+- https://github.com/MapsHD/benchmark-KISS-ICP-to-HDMapping (2023)
+- https://github.com/MapsHD/benchmark-SLICT-to-HDMapping (2023)
+- https://github.com/MapsHD/benchmark-DLIO-to-HDMapping (2023)
+- https://github.com/MapsHD/benchmark-Point-LIO-to-HDMapping (2024)
+- https://github.com/MapsHD/benchmark-GLIM-to-HDMapping (2024)
+- https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping (2024)
+- https://github.com/MapsHD/benchmark-iG-LIO-to-HDMapping (2024)
+- https://github.com/MapsHD/benchmark-LIO-EKF-to-HDMapping (2024)
+- https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping (2024)
+- https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025)
+- https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025)
 
 ToDo
-
-- https://github.com/XikunLiu-huskit/GLIO
-- https://github.com/MapsHD/rko_lio
-- https://github.com/PRBonn/kiss-slam
-- https://github.com/HKUST-Aerial-Robotics/A-LOAM
-- https://github.com/wh200720041/floam
-- https://github.com/BrenYi/Light-LOAM
-- https://github.com/ZikangYuan/sr_lio
-- https://github.com/93won/lidar_odometry?tab=readme-ov-file
-- https://github.com/StephLin/LIO-SEGMOT
-
+- https://github.com/HKUST-Aerial-Robotics/A-LOAM (2019)
+- https://github.com/wh200720041/floam (2021)
+- https://github.com/XikunLiu-huskit/GLIO (2023)
+- https://github.com/StephLin/LIO-SEGMOT (2023)
+- https://github.com/BrenYi/Light-LOAM (2024)
+- https://github.com/ZikangYuan/sr_lio (2024)
+- https://github.com/MapsHD/rko_lio (2025)
+- https://github.com/PRBonn/kiss-slam (2025)
+- https://github.com/93won/lidar_odometry?tab=readme-ov-file (2025)
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

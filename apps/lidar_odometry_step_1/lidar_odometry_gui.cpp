@@ -1073,7 +1073,7 @@ void lidar_odometry_basic_gui()
             float progress = loProgress.load();
             double estimatedTimeRemaining = 0.0;
 
-            if (progress > 0.01f)
+            if (progress > 0.01f && progress < 100.0f)
             { // Only estimate when we have meaningful progress
                 double totalEstimatedTime = elapsedSeconds / progress;
                 estimatedTimeRemaining = totalEstimatedTime - elapsedSeconds;
@@ -1088,11 +1088,20 @@ void lidar_odometry_basic_gui()
             {
                 std::string completionTime = formatCompletionTime(estimatedTimeRemaining);
                 snprintf(progressText, sizeof(progressText), "Processing: %.1f%% Complete", progress * 100.0f);
-                snprintf(timeInfo, sizeof(timeInfo),
-                         "Elapsed: %s | Remaining: %s | Estimated finish: %s",
-                         formatTime(elapsedSeconds).c_str(),
-                         formatTime(estimatedTimeRemaining).c_str(),
-                         completionTime.c_str());
+                if (progress < 100.0f)
+                {
+                    snprintf(timeInfo, sizeof(timeInfo),
+                             "Elapsed: %s | Remaining: %s | Estimated finish: %s",
+                             formatTime(elapsedSeconds).c_str(),
+                             formatTime(estimatedTimeRemaining).c_str(),
+                             completionTime.c_str());
+                }
+                else
+                {
+                    snprintf(timeInfo, sizeof(timeInfo),
+                             "Completed in: %s",
+                             formatTime(elapsedSeconds).c_str());
+                }
             }
             else
             {

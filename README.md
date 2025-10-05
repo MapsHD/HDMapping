@@ -295,11 +295,17 @@ HDMapping includes automatic CPU optimization that detects your processor and ap
 # Auto-detect CPU and optimize (default, recommended)
 cmake -DCMAKE_BUILD_TYPE=Release ..
 
-# Force AMD optimizations (aggressive performance)
+# Force AMD optimizations (AVX2, aggressive performance)
 cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=AMD ..
 
-# Force Intel optimizations (conservative, stable)  
+# Force AMD AVX-512 (Ryzen 7000+ only, maximum performance)
+cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=AMD_AVX512 ..
+
+# Force Intel optimizations (AVX2, stable)  
 cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=INTEL ..
+
+# Force Intel AVX-512 (may throttle, use with caution)
+cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=INTEL_AVX512 ..
 
 # Generic optimizations (maximum compatibility)
 cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=GENERIC ..
@@ -308,7 +314,9 @@ cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=GENERIC ..
 **CPU Optimization Options:**
 - `AUTO` (default) - Automatically detects and optimizes for your CPU
 - `AMD` - Aggressive optimizations for AMD Ryzen/EPYC (AVX2, /Oi /Ot /Oy)
-- `INTEL` - Conservative optimizations for Intel Core/Xeon (AVX, /O2)
+- `AMD_AVX512` - Maximum performance for AMD Zen 4+ (Ryzen 7000+, AVX-512)
+- `INTEL` - Optimizations for Intel Core/Xeon (AVX2, /Qpar, /favor:INTEL64)
+- `INTEL_AVX512` - AVX-512 for Intel (may cause frequency throttling)
 - `GENERIC` - Safe universal optimizations for any x86-64 CPU
 
 📖 **For detailed optimization information, see:** [`docs/CPU_OPTIMIZATION_GUIDE.md`](docs/CPU_OPTIMIZATION_GUIDE.md)

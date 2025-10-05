@@ -443,7 +443,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
         fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", lazFile.c_str());
         std::abort();
     }
-    std::cout << "compressed : " << is_compressed << std::endl;
+    //std::cout << "compressed : " << is_compressed << std::endl;
     laszip_header *header;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
@@ -451,7 +451,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
         fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
         std::abort();
     }
-    fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
+    //fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
     laszip_point *point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
@@ -461,8 +461,6 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
 
     int counter_ts0 = 0;
     int counter_filtered_points = 0;
-
-    std::cout << "header->number_of_point_records:  " << header->number_of_point_records << std::endl;
 
     for (laszip_U32 j = 0; j < header->number_of_point_records; j++)
     {
@@ -540,9 +538,14 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
             }
         }
     }
-    std::cout << "number points with ts == 0: " << counter_ts0 << std::endl;
-    std::cout << "counter_filtered_points: " << counter_filtered_points << std::endl;
-    std::cout << "total number points: " << points.size() << std::endl;
+
+    std::cout << header->number_of_point_records << " - " << counter_filtered_points << " = " << points.size();
+    if (counter_ts0 > 0)
+    {
+        std::cout << " (points with 0 timestamp: " << counter_ts0 << ")";
+    }
+    std::cout << std::endl;
+
     laszip_close_reader(laszip_reader);
     return points;
 }
@@ -593,12 +596,12 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
     {
         const std::string &lidarSn = calibrationEntry.key();
         Eigen::Matrix4d value;
-        std::cout << "lidarSn : " << lidarSn << std::endl;
+        //std::cout << "lidarSn : " << lidarSn << std::endl;
 
         if (calibrationEntry.value().contains("identity"))
         {
             std::string identity = calibrationEntry.value()["identity"].get<std::string>();
-            std::cout << "identity : " << identity << std::endl;
+            //std::cout << "identity : " << identity << std::endl;
             std::transform(identity.begin(), identity.end(), identity.begin(), ::toupper);
             if (identity == "TRUE")
             {
@@ -623,7 +626,7 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
         if (calibrationEntry.value().contains("order"))
         {
             std::string order = calibrationEntry.value()["order"].get<std::string>();
-            std::cout << "order : " << order << std::endl;
+            //std::cout << "order : " << order << std::endl;
             std::transform(order.begin(), order.end(), order.begin(), ::toupper);
             if (order == "COLUMN")
             {
@@ -635,7 +638,7 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
         if (calibrationEntry.value().contains("inverted"))
         {
             std::string inverted = calibrationEntry.value()["inverted"].get<std::string>();
-            std::cout << "inverted : " << inverted << std::endl;
+            //std::cout << "inverted : " << inverted << std::endl;
             std::transform(inverted.begin(), inverted.end(), inverted.begin(), ::toupper);
             if (inverted == "TRUE")
             {
@@ -646,8 +649,8 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
 
         Eigen::IOFormat HeavyFmt(Eigen::FullPrecision, 0, ", ", ";\n", "[", "]", "[", "]");
 
-        std::cout << "Calibration for " << lidarSn << std::endl;
-        std::cout << value.format(HeavyFmt) << std::endl;
+        //std::cout << "Calibration for " << lidarSn << std::endl;
+        //std::cout << value.format(HeavyFmt) << std::endl;
         // Insert into the map
         dataMap[lidarSn] = value;
     }

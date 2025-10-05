@@ -110,7 +110,7 @@ inline bool exportLaz(const std::string &filename,
         return false;
     }
 
-    fprintf(stderr, "writing file '%s' %scompressed\n", filename.c_str(), (compress ? "" : "un"));
+    fprintf(stderr, "writing %scompressed file '%s'\n", (compress ? "" : "un"), filename.c_str());
 
     // get a pointer to the point of the writer that we will populate and write
 
@@ -169,8 +169,6 @@ inline bool exportLaz(const std::string &filename,
         fprintf(stderr, "DLL ERROR: destroying laszip writer\n");
         return false;
     }
-
-    std::cout << "exportLaz DONE" << std::endl;
 
     return true;
 }

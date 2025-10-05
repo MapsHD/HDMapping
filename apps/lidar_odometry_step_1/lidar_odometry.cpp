@@ -922,7 +922,7 @@ std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryP
     }
     std::vector<std::vector<Point3Di>> pointsPerFile;
     Imu imu_data;
-    if (!load_data(input_file_names, params, pointsPerFile, imu_data, TRUE))
+    if (!load_data(input_file_names, params, pointsPerFile, imu_data, true))
     {
         std::cout << "Calculation failed at data loading, exiting." << std::endl;
         return worker_data;
@@ -941,7 +941,7 @@ std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryP
 
     std::atomic<float> loProgress;
 
-    if (!compute_step_2(worker_data, params, ts_failure, loProgress, pause, TRUE))
+    if (!compute_step_2(worker_data, params, ts_failure, loProgress, pause, true))
     {
         std::cout << "Calculation failed at step 2 of lidar odometry, exiting." << std::endl;
         return worker_data;

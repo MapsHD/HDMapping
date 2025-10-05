@@ -1930,7 +1930,7 @@ void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &
 }
 
 //extern nglobals::icpProgress.store((float)i / globals::registeredFrames.size());
-bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure, std::atomic<float> &loProgress, const std::atomic<bool> &pause)
+bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure, std::atomic<float> &loProgress, const std::atomic<bool> &pause, bool debugMsg)
 {
     //exit(1);
     bool debug = false;
@@ -1938,7 +1938,6 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
     if (worker_data.size() != 0)
     {
-
         std::chrono::time_point<std::chrono::system_clock> start, end;
         start = std::chrono::system_clock::now();
         double acc_distance = 0.0;
@@ -2190,13 +2189,17 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 if (delta < 1e-12)
                 {
                     std::cout << "------------" << std::endl;
-                    std::cout << "finished at iteration: " << iter + 1 << " nr_iter: " << params.nr_iter << " delta: " << delta << std::endl;
+                    std::cout << "finished at iteration " << iter + 1 << "/" << params.nr_iter << ", delta: " << delta << std::endl;
                     break;
                 }
 
                 if (iter % 10 == 0 && iter > 0)
                 {
-                    std::cout << "lm_factor " << lm_factor << " delta " << delta << std::endl;
+                    if (debugMsg)
+                    {
+                        std::cout << "lm_factor " << lm_factor << ", delta " << delta << std::endl;
+                    }
+
                     lm_factor *= 10.0;
                 }
 
@@ -2208,15 +2211,18 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 }
             }
 
+            end1 = std::chrono::system_clock::now();
+
+            std::chrono::duration<double> elapsed_seconds1 = end1 - start1;
+            std::cout << "optimizing worker_data " << i + 1 << "/" << worker_data.size()
+                << " with acc_distance " << fixed << std::setprecision(1) << acc_distance
+                << "[m] in " << fixed << std::setprecision(2) << elapsed_seconds1.count() << "[s].";
             if (delta > 1e-12)
             {
-                std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
-                std::cout << "finished with delta: " << delta << std::endl;
+                std::cout << " finished with delta: " << std::setprecision(10) << delta << "!!!";
             }
 
-            end1 = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_seconds1 = end1 - start1;
-            std::cout << "optimizing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << " elapsed time: " << elapsed_seconds1.count() << std::endl;
+            std::cout << "\n";
 
             loProgress.store((float)(i + 1) / worker_data.size());
 
@@ -2239,7 +2245,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                                 .translation()
                                 .norm();
 
-            if (!(acc_distance == acc_distance))
+			if (!(acc_distance == acc_distance)) //NaN check
             {
                 worker_data[i].intermediate_trajectory = tmp_worker_data;
                 std::cout << "CHALLENGING DATA OCCURED!!!" << std::endl;
@@ -2307,8 +2313,8 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 std::chrono::duration<double> elapsed_secondsu = endu - startu;
                 std::time_t end_timeu = std::chrono::system_clock::to_time_t(endu);
 
-                std::cout << "finished computation at " << std::ctime(&end_timeu)
-                          << "elapsed time update: " << elapsed_secondsu.count() << "s\n";
+                //std::cout << "finished computation at " << std::ctime(&end_timeu)
+                //          << "elapsed time update: " << std::setprecision(0) << elapsed_secondsu.count() << "s\n";
             }
             else
             {
@@ -2343,8 +2349,9 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
         std::chrono::duration<double> elapsed_seconds = end - start;
         std::time_t end_time = std::chrono::system_clock::to_time_t(end);
 
-        std::cout << "finished computation at " << std::ctime(&end_time)
-                  << "elapsed time: " << elapsed_seconds.count() << "s\n";
+        std::tm local_tm = *std::localtime(&end_time);
+        std::cout << "finished computation at " << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S")
+            << ", elapsed time: " << std::setprecision(2) << elapsed_seconds.count() << "s\n";
 
         params.total_length_of_calculated_trajectory = 0;
         for (int i = 1; i < worker_data.size(); i++)

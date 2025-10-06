@@ -1046,18 +1046,20 @@ void lidar_odometry_basic_gui()
         ImGui::Text("Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program.");
         ImGui::NewLine();
 
-        bool justPushed = false;
+        bool isActive1 = (lastPar == 1);
+        bool isActive2 = (lastPar == 2);
+        bool isActive3= (lastPar == 3);
+        bool isActive4 = (lastPar == 4);
 
         if (!loRunning)
         {
 
             ImGui::Text("Set parameters for MANDEYE data processing:");
 
-            if (lastPar == 1) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (isActive1) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
             if (ImGui::Button("> velocity up to 8km/h, tiny spaces"))
             {
                 lastPar = 1;
-				justPushed = true;
 
                 params.decimation = 0.01;
                 params.in_out_params_indoor.resolution_X = 0.1;
@@ -1087,13 +1089,12 @@ void lidar_odometry_basic_gui()
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Apply preselected setings");
-            if (lastPar == 1 && !justPushed) ImGui::PopStyleColor();
+            if (isActive1) ImGui::PopStyleColor();
 
-            if (lastPar == 2) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (isActive2) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
             if (ImGui::Button("> quick but less accurate, less precise, velocity up to 8km/h"))
             {
                 lastPar = 2;
-				justPushed = true;
 
                 params.decimation = 0.03;
                 params.in_out_params_indoor.resolution_X = 0.1;
@@ -1123,13 +1124,12 @@ void lidar_odometry_basic_gui()
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Apply preselected setings");
-            if (lastPar == 2 && !justPushed) ImGui::PopStyleColor();
+            if (isActive2) ImGui::PopStyleColor();
 
-            if (lastPar == 3) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (isActive3) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
             if (ImGui::Button("> fast motion: velocity up to 30 km/h, open spaces"))
             {
                 lastPar = 3;
-                justPushed = true;
 
                 params.decimation = 0.03;
                 params.in_out_params_indoor.resolution_X = 0.3;
@@ -1159,13 +1159,12 @@ void lidar_odometry_basic_gui()
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Apply preselected setings");
-            if (lastPar == 3 && !justPushed) ImGui::PopStyleColor();
+            if (isActive3) ImGui::PopStyleColor();
 
-            if (lastPar == 4) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (isActive4) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
             if (ImGui::Button("> velocity up to 8km/h, precise forestry"))
             {
                 lastPar = 4;
-                justPushed = true;
 
                 params.decimation = 0.01;
                 params.in_out_params_indoor.resolution_X = 0.1;
@@ -1195,7 +1194,7 @@ void lidar_odometry_basic_gui()
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Apply preselected setings");
-            if (lastPar == 4 && !justPushed) ImGui::PopStyleColor();
+            if (isActive4) ImGui::PopStyleColor();
 
             ImGui::Checkbox("full_lidar_odometry_gui", &full_lidar_odometry_gui);
             ImGui::SameLine();

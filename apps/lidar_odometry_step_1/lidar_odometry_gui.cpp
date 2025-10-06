@@ -289,7 +289,7 @@ void lidar_odometry_gui()
                     toml_io.LoadParametersFromTomlFile(input_file_names[0], params);
                     std::cout << "Parameters loaded from: " << input_file_names[0] << std::endl;
                 }
-                catch (const std::exception &e)
+                catch (const std::exception& e)
                 {
                     std::cerr << "Error loading TOML file: " << e.what() << std::endl;
                 }
@@ -308,11 +308,11 @@ void lidar_odometry_gui()
                 ImGui::SetTooltip(omText);
             ImGui::InputDouble("fi, rotation via Y", &params.motion_model_correction.fi);
             if (ImGui::IsItemHovered())
-				ImGui::SetTooltip(fiText);
+                ImGui::SetTooltip(fiText);
             ImGui::InputDouble("ka, rotation via Z", &params.motion_model_correction.ka);
             if (ImGui::IsItemHovered())
-				ImGui::SetTooltip(kaText);
-			ImGui::PopItemWidth();
+                ImGui::SetTooltip(kaText);
+            ImGui::PopItemWidth();
 
             if (ImGui::Button("Set example"))
             {
@@ -328,33 +328,33 @@ void lidar_odometry_gui()
             ImGui::Text("lidar_odometry_motion_model sigmas [m] / [deg]:");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("position/rotational uncertainties");
-            
+
             ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputDouble("x_1", &params.lidar_odometry_motion_model_x_1_sigma_m);
+            ImGui::InputDouble("x_1", &params.lidar_odometry_motion_model_x_1_sigma_m, 0.0, 0.0, "%.4f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(xText);
             ImGui::SameLine();
-            ImGui::InputDouble("om_1", &params.lidar_odometry_motion_model_om_1_sigma_deg);
+            ImGui::InputDouble("om_1", &params.lidar_odometry_motion_model_om_1_sigma_deg, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(omText);
 
-            ImGui::InputDouble("y_1", &params.lidar_odometry_motion_model_y_1_sigma_m);
+            ImGui::InputDouble("y_1", &params.lidar_odometry_motion_model_y_1_sigma_m, 0.0, 0.0, "%.4f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(yText);
             ImGui::SameLine();
-            ImGui::InputDouble("fi_1", &params.lidar_odometry_motion_model_fi_1_sigma_deg);
+            ImGui::InputDouble("fi_1", &params.lidar_odometry_motion_model_fi_1_sigma_deg, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(fiText);
 
-            ImGui::InputDouble("z_1", &params.lidar_odometry_motion_model_z_1_sigma_m);
+            ImGui::InputDouble("z_1", &params.lidar_odometry_motion_model_z_1_sigma_m, 0.0, 0.0, "%.4f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(zText);
             ImGui::SameLine();
-            ImGui::InputDouble("ka_1", &params.lidar_odometry_motion_model_ka_1_sigma_deg);
+            ImGui::InputDouble("ka_1", &params.lidar_odometry_motion_model_ka_1_sigma_deg, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(kaText);
 
-			ImGui::PopItemWidth();
+            ImGui::PopItemWidth();
 
             ImGui::Text("lidar_odometry_motion_model_fix_origin sigmas [m] / [deg]:");
 
@@ -377,20 +377,20 @@ void lidar_odometry_gui()
 
             ImGui::InputDouble("z_1", &params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m);
             if (ImGui::IsItemHovered())
-				ImGui::SetTooltip(zText);
+                ImGui::SetTooltip(zText);
             ImGui::SameLine();
             ImGui::InputDouble("ka_1", &params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(kaText);
 
-			ImGui::PopItemWidth();
+            ImGui::PopItemWidth();
         }
 
         ImGui::NewLine();
 
         if (!simple_gui)
         {
-            ImGui::SliderFloat("mouse_sensitivity_xy", &mouse_sensitivity, 0.1, 10);
+            ImGui::SliderFloat("mouse_sensitivity_xy", &mouse_sensitivity, 0.1, 10, "%.1f");
             ImGui::InputInt("THRESHOLD_NR_POSES", &params.threshold_nr_poses);
             if (params.threshold_nr_poses < 1)
             {
@@ -413,10 +413,24 @@ void lidar_odometry_gui()
         ImGui::PushItemWidth(ImGuiNumberWidth);
         ImGui::InputDouble("filter_threshold_xy_inner [m]", &params.filter_threshold_xy_inner);
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("all local points inside lidar xy_circle radius will be removed during load");
+        {
+            ImGui::BeginTooltip();
+            ImGui::Text("all local points inside lidar xy_circle radius will be removed during load");
+            ImGui::Text("Minimum value is given by Lidar's specs (Close Proximity Blind Zone)");
+            ImGui::Text("e.g.: 0.1[m] for Livox Mid-360");
+            ImGui::Text("value can be higher to filter out close range permanent obstacles");
+            ImGui::EndTooltip();
+        }
         ImGui::InputDouble("filter_threshold_xy_outer [m]", &params.filter_threshold_xy_outer);
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("all local points outside lidar xy_circle radius will be removed during load");
+        {
+            ImGui::BeginTooltip();
+            ImGui::Text("all local points outside lidar xy_circle radius will be removed during load");
+            ImGui::Text("Maximum value is given by Lidar's specs (Detection Range)");
+            ImGui::Text("e.g.: 70[m] @ 80% reflectivity for Livox Mid-360");
+            ImGui::Text("value can be lower to adapt for different reflectivity or real world contrains");
+            ImGui::EndTooltip();
+        }
         ImGui::InputDouble("threshold_output_filter [m]", &params.threshould_output_filter);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("all local points inside lidar xy_circle radius will be removed during save");
@@ -434,37 +448,37 @@ void lidar_odometry_gui()
 			ImGui::NewLine();
             ImGui::Text("NDT bucket size (inner/outer)");
             ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputDouble("", &params.in_out_params_indoor.resolution_X);
+            ImGui::InputDouble("", &params.in_out_params_indoor.resolution_X, 0.0, 0.0, "%.3f");
             if (params.in_out_params_indoor.resolution_X < 0.01)
             {
                 params.in_out_params_indoor.resolution_X = 0.01;
             }
             ImGui::SameLine();
-            ImGui::InputDouble("X", &params.in_out_params_outdoor.resolution_X);
+            ImGui::InputDouble("X", &params.in_out_params_outdoor.resolution_X, 0.0, 0.0, "%.3f");
             if (params.in_out_params_outdoor.resolution_X < 0.01)
             {
                 params.in_out_params_outdoor.resolution_X = 0.01;
             }
 
-            ImGui::InputDouble("", &params.in_out_params_indoor.resolution_Y);
+            ImGui::InputDouble("", &params.in_out_params_indoor.resolution_Y, 0.0, 0.0, "%.3f");
             if (params.in_out_params_indoor.resolution_Y < 0.01)
             {
                 params.in_out_params_indoor.resolution_Y = 0.01;
             }
             ImGui::SameLine();
-            ImGui::InputDouble("Y", &params.in_out_params_outdoor.resolution_Y);
+            ImGui::InputDouble("Y", &params.in_out_params_outdoor.resolution_Y, 0.0, 0.0, "%.3f");
             if (params.in_out_params_outdoor.resolution_Y < 0.01)
             {
                 params.in_out_params_outdoor.resolution_Y = 0.01;
             }
 
-            ImGui::InputDouble("", &params.in_out_params_indoor.resolution_Z);
+            ImGui::InputDouble("", &params.in_out_params_indoor.resolution_Z, 0.0, 0.0, "%.3f");
             if (params.in_out_params_indoor.resolution_Z < 0.01)
             {
                 params.in_out_params_indoor.resolution_Z = 0.01;
             }
             ImGui::SameLine();
-            ImGui::InputDouble("Z", &params.in_out_params_outdoor.resolution_Z);
+            ImGui::InputDouble("Z", &params.in_out_params_outdoor.resolution_Z, 0.0, 0.0, "%.3f");
             if (params.in_out_params_outdoor.resolution_Z < 0.01)
             {
                 params.in_out_params_outdoor.resolution_Z = 0.01;
@@ -475,21 +489,23 @@ void lidar_odometry_gui()
             // ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy);
             // ImGui::InputDouble("threshould_output_filter (all local points inside lidar xy_circle radius[m] will be removed during save)", &threshould_output_filter);
 
-            ImGui::InputDouble("decimation", &params.decimation);
+            ImGui::InputDouble("decimation", &params.decimation, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("larger value of decimation better performance, but worse accuracy");
 
-            ImGui::InputDouble("max_distance of processed points", &params.max_distance_lidar);
+            ImGui::InputDouble("max distance of processed points [m]", &params.max_distance_lidar, 0.0, 0.0, "%.2f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("local LiDAR coordinates");
 
             ImGui::InputInt("number iterations", &params.nr_iter);
-            ImGui::InputDouble("sliding window trajectory length threshold [m]", &params.sliding_window_trajectory_length_threshold);
+            ImGui::InputDouble("sliding window trajectory length threshold [m]", &params.sliding_window_trajectory_length_threshold, 0.0, 0.0, "%.2f");
             ImGui::InputInt("threshold initial points", &params.threshold_initial_points);
             ImGui::Checkbox("save_calibration_validation_file", &params.save_calibration_validation);
             ImGui::InputInt("number of calibration validation points", &params.calibration_validation_points);
             ImGui::Checkbox("use_multithread", &params.useMultithread);
-            ImGui::InputDouble("real_time_threshold [s]", &params.real_time_threshold_seconds);
+            ImGui::InputDouble("real_time_threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.0f");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("optimization timeout");
 
 			ImGui::NewLine();
 
@@ -523,7 +539,7 @@ void lidar_odometry_gui()
 			ImGui::NewLine();
 
             ImGui::Checkbox("use_motion_from_previous_step", &params.use_motion_from_previous_step);
-            ImGui::InputDouble("ahrs_gain", &params.ahrs_gain);
+            ImGui::InputDouble("ahrs_gain", &params.ahrs_gain, 0.0, 0.0, "%.3f");
 
             ImGui::PopItemWidth();
         }
@@ -592,9 +608,9 @@ void lidar_odometry_gui()
 
             if (params.use_robust_and_accurate_lidar_odometry) {
                 ImGui::PushItemWidth(ImGuiNumberWidth);
-                ImGui::InputDouble("distance_bucket [m]", &params.distance_bucket);
-                ImGui::InputDouble("polar_angle [deg]", &params.polar_angle_deg);
-                ImGui::InputDouble("azimutal_angle [deg]", &params.azimutal_angle_deg);
+                ImGui::InputDouble("distance_bucket [m]", &params.distance_bucket, 0.0, 0.0, "%.3f");
+                ImGui::InputDouble("polar_angle [deg]", &params.polar_angle_deg, 0.0, 0.0, "%.3f");
+                ImGui::InputDouble("azimutal_angle [deg]", &params.azimutal_angle_deg, 0.0, 0.0, "%.3f");
                 ImGui::InputInt("number of iterations", &params.robust_and_accurate_lidar_odometry_iterations);
                 // ImGui::InputDouble("max distance lidar", &params.max_distance_lidar);
                 ImGui::PopItemWidth();
@@ -604,38 +620,38 @@ void lidar_odometry_gui()
 
             ImGui::Text("rigid ICP using spherical coordinates");
             ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputDouble("distance_bucket_rigid_icp [m]", &params.distance_bucket_rigid_sf);
-            ImGui::InputDouble("polar_angle_rigid_icp [deg]", &params.polar_angle_deg_rigid_sf);
-            ImGui::InputDouble("azimutal_angle_rigid_icp [deg]", &params.azimutal_angle_deg_rigid_sf);
+            ImGui::InputDouble("distance_bucket_rigid_icp [m]", &params.distance_bucket_rigid_sf, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("polar_angle_rigid_icp [deg]", &params.polar_angle_deg_rigid_sf, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("azimutal_angle_rigid_icp [deg]", &params.azimutal_angle_deg_rigid_sf, 0.0, 0.0, "%.3f");
             ImGui::InputInt("number_of_iterations_rigid_icp", &params.robust_and_accurate_lidar_odometry_rigid_sf_iterations);
-            ImGui::InputDouble("max_distance_rgd_rigid_icp [m]", &params.max_distance_lidar_rigid_sf);
+            ImGui::InputDouble("max_distance_rgd_rigid_icp [m]", &params.max_distance_lidar_rigid_sf, 0.0, 0.0, "%.2f");
             ImGui::PopItemWidth();
 
             ImGui::NewLine();
 
             ImGui::Text("rgd_sf sigmas [m] / [deg]:");
             ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputDouble("x", &params.rgd_sf_sigma_x_m);
+            ImGui::InputDouble("x", &params.rgd_sf_sigma_x_m, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(xText);
 			ImGui::SameLine();
-            ImGui::InputDouble("om", &params.rgd_sf_sigma_om_deg);
+            ImGui::InputDouble("om", &params.rgd_sf_sigma_om_deg, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(omText);
 
-            ImGui::InputDouble("y", &params.rgd_sf_sigma_y_m);
+            ImGui::InputDouble("y", &params.rgd_sf_sigma_y_m, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(yText);
             ImGui::SameLine();
-            ImGui::InputDouble("fi", &params.rgd_sf_sigma_fi_deg);
+            ImGui::InputDouble("fi", &params.rgd_sf_sigma_fi_deg, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(fiText);
 
-            ImGui::InputDouble("z", &params.rgd_sf_sigma_z_m);
+            ImGui::InputDouble("z", &params.rgd_sf_sigma_z_m, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(zText);
             ImGui::SameLine();
-            ImGui::InputDouble("ka", &params.rgd_sf_sigma_ka_deg);
+            ImGui::InputDouble("ka", &params.rgd_sf_sigma_ka_deg, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(kaText);
 

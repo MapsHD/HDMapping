@@ -2171,7 +2171,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 optimize_lidar_odometry(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
                                         params.in_out_params_indoor, params.buckets_indoor,
                                         params.in_out_params_outdoor, params.buckets_outdoor,
-                                        params.useMultithread, params.max_distance_lidar, delta /*, add_pitch_roll_constraint, worker_data[i].imu_roll_pitch*/,
+                                        params.useMultithread, params.max_distance_lidar, delta, /*add_pitch_roll_constraint, worker_data[i].imu_roll_pitch,*/
                                         lm_factor,
                                         params.motion_model_correction,
                                         params.lidar_odometry_motion_model_x_1_sigma_m,
@@ -2188,8 +2188,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                                         params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
                 if (delta < 1e-12)
                 {
-                    std::cout << "------------" << std::endl;
-                    std::cout << "finished at iteration " << iter + 1 << "/" << params.nr_iter << ", delta: " << delta << std::endl;
+                    std::cout << "finished at iteration " << iter + 1 << "/" << params.nr_iter;
                     break;
                 }
 
@@ -2197,7 +2196,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 {
                     if (debugMsg)
                     {
-                        std::cout << "lm_factor " << lm_factor << ", delta " << delta << std::endl;
+                        std::cout << "\nlm_factor " << lm_factor << ", delta " << std::setprecision(10) << delta << "\n";
                     }
 
                     lm_factor *= 10.0;
@@ -2214,12 +2213,17 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             end1 = std::chrono::system_clock::now();
 
             std::chrono::duration<double> elapsed_seconds1 = end1 - start1;
-            std::cout << "optimizing worker_data " << i + 1 << "/" << worker_data.size()
-                << " with acc_distance " << fixed << std::setprecision(1) << acc_distance
-                << "[m] in " << fixed << std::setprecision(2) << elapsed_seconds1.count() << "[s].";
+            std::cout << " optimizing worker_data " << i + 1 << "/" << worker_data.size()
+                << " with acc_distance " << fixed << std::setprecision(2) << acc_distance << "[m] in "
+                << fixed << std::setprecision(2) << elapsed_seconds1.count()
+                << "[s], delta ";
             if (delta > 1e-12)
             {
-                std::cout << " finished with delta: " << std::setprecision(10) << delta << "!!!";
+                std::cout << std::setprecision(10) << delta << "!!!";
+            }
+            else
+            {
+                std::cout << "< 1e-12";
             }
 
             std::cout << "\n";

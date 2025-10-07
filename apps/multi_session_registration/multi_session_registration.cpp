@@ -99,6 +99,8 @@ bool gizmo_all_sessions = false;
 bool is_ndt_gui = false;
 NDT ndt;
 
+double time_stamp_offset = 0.0;
+
 struct ProjectSettings
 {
     std::vector<std::string> session_file_names;
@@ -525,6 +527,49 @@ void project_gui()
         ImGui::InputDouble("bucket_z", &bucket_z);
 
         ImGui::Text("---------------------------------------------");
+
+        ImGui::Text("-------BENCHMARK SETTINGS BEGIN----------------");
+
+        ImGui::InputDouble("time_stamp_offset", &time_stamp_offset, 100000000000.0, 1000000000000.0);
+
+        if (ImGui::Button("set to origin")){
+            
+            for(auto &session:sessions){
+                int index_point_clouds = -1;
+                int index_local_trajectory = -1;
+                bool found = false;
+                for (int a = 0; a < session.point_clouds_container.point_clouds.size(); a++)
+                {
+                    for (int b = 0; b < session.point_clouds_container.point_clouds[a].local_trajectory.size(); b++)
+                    {
+                        if (session.point_clouds_container.point_clouds[a].local_trajectory[b].timestamps.first > time_stamp_offset)
+                        {
+                            if (!found)
+                            {
+                                found = true;
+                                index_point_clouds = a;
+                                index_local_trajectory = b;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (index_point_clouds != -1 && index_local_trajectory != -1){
+                    auto m1 = session.point_clouds_container.point_clouds[index_point_clouds].m_pose;
+                    auto m2 = session.point_clouds_container.point_clouds[index_point_clouds].local_trajectory[index_local_trajectory].m_pose;
+
+                    auto inv = (m1 * m2).inverse();
+
+                    for (int index = 0; index < session.point_clouds_container.point_clouds.size(); index ++){
+                        session.point_clouds_container.point_clouds[index].m_pose = inv * session.point_clouds_container.point_clouds[index].m_pose;
+                    }
+                }
+            }
+        }
+
+        ImGui::Text("-------BENCHMARK SETTINGS END----------------");
+
         ImGui::Text("-------PROJECT SETTINGS BEGIN----------------");
         if (ImGui::Button("add session to project"))
         {
@@ -702,6 +747,19 @@ void project_gui()
                     for (const auto &s : sessions)
                     {
                         std::cout << "session: '" << s.session_file_name << "' ground truth [" << int(s.is_ground_truth) << "]" << std::endl;
+                    }
+
+                    //update time_stamp_offset
+                    std::cout << "update time_stamp_offset" << std::endl;
+                    for (const auto &s : sessions)
+                    {
+                        if(s.point_clouds_container.point_clouds.size() > 0){
+                            if(s.point_clouds_container.point_clouds[0].local_trajectory.size() > 0){
+                                if(s.point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first > time_stamp_offset){
+                                    time_stamp_offset = s.point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2275,6 +2333,44 @@ void display()
             {
                 session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, false, false, false, false, false, false, false, false, false, false, false, false, 10000);
                 session.ground_control_points.render(session.point_clouds_container);
+
+////
+                int index_point_clouds = -1;
+                int index_local_trajectory = -1;
+                bool found = false;
+                for(int a = 0; a < session.point_clouds_container.point_clouds.size(); a++){
+                    for(int b = 0; b < session.point_clouds_container.point_clouds[a].local_trajectory.size(); b++){
+                        if(session.point_clouds_container.point_clouds[a].local_trajectory[b].timestamps.first > time_stamp_offset){
+                            if(!found){
+                                found = true;
+                                index_point_clouds = a;
+                                index_local_trajectory = b;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if(index_point_clouds != -1 && index_local_trajectory != -1){
+                    glColor3f(session.point_clouds_container.point_clouds[index_point_clouds].render_color[0], session.point_clouds_container.point_clouds[index_point_clouds].render_color[1], session.point_clouds_container.point_clouds[index_point_clouds].render_color[2]);
+                    glBegin(GL_LINES);
+
+                    auto m1 = session.point_clouds_container.point_clouds[index_point_clouds].m_pose;
+                    auto m2 = session.point_clouds_container.point_clouds[index_point_clouds].local_trajectory[index_local_trajectory].m_pose;
+                         
+                    auto v1 = (m1*m2).translation();
+
+                    glVertex3f(v1.x() - 0.1, v1.y(), v1.z());
+                    glVertex3f(v1.x() + 0.1, v1.y(), v1.z());
+
+                    glVertex3f(v1.x(), v1.y() - 0.1, v1.z());
+                    glVertex3f(v1.x(), v1.y() + 0.1, v1.z());
+
+                    glVertex3f(v1.x(), v1.y(), v1.z() - 0.1);
+                    glVertex3f(v1.x(), v1.y(), v1.z() + 0.1);
+
+                    glEnd();
+                }
             }
         }
     }

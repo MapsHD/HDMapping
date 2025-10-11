@@ -44,7 +44,7 @@
 #include <pair_wise_iterative_closest_point.h>
 #include <observation_picking.h>
 
-// #include <export_laz.h>
+#include <export_laz.h>
 
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
@@ -397,6 +397,238 @@ bool load_project_settings(const std::string &file_name, ProjectSettings &_proje
     return true;
 }
 
+void save_trajectories_to_laz(const Session &session, std::string output_file_name, float curve_consecutive_distance_meters, float not_curve_consecutive_distance_meters, bool is_trajectory_export_downsampling)
+{
+	std::vector<Eigen::Vector3d> pointcloud;
+	std::vector<unsigned short> intensity;
+	std::vector<double> timestamps;
+
+	float consecutive_distance = 0;
+	for (auto &p : session.point_clouds_container.point_clouds)
+	{
+		if (p.visible)
+		{
+			for (int i = 0; i < p.local_trajectory.size(); i++)
+			{
+				const auto &pp = p.local_trajectory[i].m_pose.translation();
+				Eigen::Vector3d vp;
+				vp = p.m_pose * pp; // + session.point_clouds_container.offset;
+
+				if (i > 0)
+				{
+					double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
+					consecutive_distance += dist;
+				}
+
+				bool is_curve = false;
+
+				if (i > 100 && i < p.local_trajectory.size() - 100)
+				{
+					Eigen::Vector3d position_prev = p.local_trajectory[i - 100].m_pose.translation();
+					Eigen::Vector3d position_curr = p.local_trajectory[i].m_pose.translation();
+					Eigen::Vector3d position_next = p.local_trajectory[i + 100].m_pose.translation();
+
+					Eigen::Vector3d v1 = position_curr - position_prev;
+					Eigen::Vector3d v2 = position_next - position_curr;
+
+					if (v1.norm() > 0 && v2.norm() > 0)
+					{
+						double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+
+						if (angle_deg > 10.0)
+						{
+							is_curve = true;
+						}
+					}
+				}
+				double tol = not_curve_consecutive_distance_meters;
+
+				if (is_curve)
+				{
+					tol = curve_consecutive_distance_meters;
+				}
+
+				if (!is_trajectory_export_downsampling)
+				{
+					pointcloud.push_back(vp);
+					intensity.push_back(0);
+					timestamps.push_back(p.local_trajectory[i].timestamps.first);
+				}
+				else
+				{
+					if (consecutive_distance >= tol)
+					{
+						consecutive_distance = 0;
+						pointcloud.push_back(vp);
+						intensity.push_back(0);
+						timestamps.push_back(p.local_trajectory[i].timestamps.first);
+					}
+				}
+			}
+		}
+	}
+	// if (!exportLaz(output_file_name, pointcloud, intensity, gnss.offset_x, gnss.offset_y, gnss.offset_alt))
+	if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z()))
+	{
+		std::cout << "problem with saving file: " << output_file_name << std::endl;
+	}
+}
+
+void createDXFPolyline(const std::string &filename, const std::vector<Eigen::Vector3d> &points)
+{
+	std::ofstream dxfFile(filename);
+	dxfFile << std::setprecision(20);
+	if (!dxfFile.is_open())
+	{
+		std::cerr << "Failed to open file: " << filename << std::endl;
+		return;
+	}
+
+	// DXF header
+	dxfFile << "0\nSECTION\n2\nHEADER\n0\nENDSEC\n";
+	dxfFile << "0\nSECTION\n2\nTABLES\n0\nENDSEC\n";
+
+	// Start the ENTITIES section
+	dxfFile << "0\nSECTION\n2\nENTITIES\n";
+
+	// Start the POLYLINE entity
+	dxfFile << "0\nPOLYLINE\n";
+	dxfFile << "8\n0\n";  // Layer 0
+	dxfFile << "66\n1\n"; // Indicates the presence of vertices
+	dxfFile << "70\n8\n"; // 1 = Open polyline
+
+	// Write the VERTEX entities
+	for (const auto &point : points)
+	{
+		dxfFile << "0\nVERTEX\n";
+		dxfFile << "8\n0\n"; // Layer 0
+		dxfFile << "10\n"
+				<< point.x() << "\n"; // X coordinate
+		dxfFile << "20\n"
+				<< point.y() << "\n"; // Y coordinate
+		dxfFile << "30\n"
+				<< point.z() << "\n"; // Z coordinate
+	}
+
+	// End the POLYLINE
+	dxfFile << "0\nSEQEND\n";
+
+	// End the ENTITIES section
+	dxfFile << "0\nENDSEC\n";
+
+	// End the DXF file
+	dxfFile << "0\nEOF\n";
+
+	dxfFile.close();
+	std::cout << "DXF file created: " << filename << std::endl;
+}
+
+void save_trajectories(
+	Session &session, std::string output_file_name, float curve_consecutive_distance_meters,
+	float not_curve_consecutive_distance_meters, bool is_trajectory_export_downsampling,
+	bool write_lidar_timestamp, bool write_unix_timestamp, bool use_quaternions,
+	bool save_to_dxf)
+{
+	std::ofstream outfile;
+	if (!save_to_dxf)
+	{
+		outfile.open(output_file_name);
+	}
+	if (save_to_dxf || outfile.good())
+	{
+		float consecutive_distance = 0;
+		std::vector<Eigen::Vector3d> polylinePoints;
+		for (auto &p : session.point_clouds_container.point_clouds)
+		{
+			if (p.visible)
+			{
+				for (int i = 0; i < p.local_trajectory.size(); i++)
+				{
+					const auto &m = p.local_trajectory[i].m_pose;
+					Eigen::Affine3d pose = p.m_pose * m;
+					pose.translation() += session.point_clouds_container.offset;
+
+					if (i > 0)
+					{
+						double dist = (p.local_trajectory[i].m_pose.translation() - p.local_trajectory[i - 1].m_pose.translation()).norm();
+						consecutive_distance += dist;
+					}
+
+					bool is_curve = false;
+
+					if (i > 100 && i < p.local_trajectory.size() - 100)
+					{
+						Eigen::Vector3d position_prev = p.local_trajectory[i - 100].m_pose.translation();
+						Eigen::Vector3d position_curr = p.local_trajectory[i].m_pose.translation();
+						Eigen::Vector3d position_next = p.local_trajectory[i + 100].m_pose.translation();
+
+						Eigen::Vector3d v1 = position_curr - position_prev;
+						Eigen::Vector3d v2 = position_next - position_curr;
+
+						if (v1.norm() > 0 && v2.norm() > 0)
+						{
+							double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+
+							if (angle_deg > 10.0)
+							{
+								is_curve = true;
+							}
+						}
+					}
+					double tol = not_curve_consecutive_distance_meters;
+
+					if (is_curve)
+					{
+						tol = curve_consecutive_distance_meters;
+					}
+
+					if (!is_trajectory_export_downsampling || (is_trajectory_export_downsampling && consecutive_distance >= tol))
+					{
+						if (is_trajectory_export_downsampling)
+						{
+							consecutive_distance = 0;
+						}
+						if (save_to_dxf)
+						{
+							polylinePoints.push_back(pose.translation());
+						}
+						else
+						{
+							outfile << std::setprecision(20);
+							if (write_lidar_timestamp)
+							{
+								outfile << p.local_trajectory[i].timestamps.first << ",";
+							}
+							if (write_unix_timestamp)
+							{
+								outfile << p.local_trajectory[i].timestamps.second << ",";
+							}
+							outfile << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << ",";
+							if (use_quaternions)
+							{
+								Eigen::Quaterniond q(pose.rotation());
+								outfile << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
+							}
+							else
+							{
+								outfile << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
+							}
+						}
+					}
+				}
+			}
+		}
+		if (!save_to_dxf)
+		{
+			outfile.close();
+		}
+		else
+		{
+			createDXFPolyline(output_file_name, polylinePoints);
+		}
+	}
+}
+
 bool save_project_settings(const std::string &file_name, const ProjectSettings &_project_settings)
 {
     std::cout << "saving file: '" << file_name << "'" << std::endl;
@@ -450,6 +682,25 @@ bool save_project_settings(const std::string &file_name, const ProjectSettings &
     fs.close();
 
     return true;
+}
+
+void update_timestamp_offset()
+{
+    std::cout << "update_timestamp" << std::endl;
+    time_stamp_offset = 0.0;
+
+    for (const auto &s : sessions)
+    {
+        if (!s.point_clouds_container.point_clouds.empty() &&
+            !s.point_clouds_container.point_clouds[0].local_trajectory.empty())
+        {
+            double ts = s.point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first;
+            if (ts > time_stamp_offset)
+                time_stamp_offset = ts;
+        }
+    }
+
+    std::cout << "new time_stamp_offset = " << time_stamp_offset << std::endl;
 }
 
 void project_gui()
@@ -526,7 +777,8 @@ void project_gui()
         ImGui::InputDouble("bucket_y", &bucket_y);
         ImGui::InputDouble("bucket_z", &bucket_z);
 
-        ImGui::Text("---------------------------------------------");
+     //  ImGui::Text("---------------------------------------------");
+        ImGui::NewLine();
 
         ImGui::Text("-------BENCHMARK SETTINGS BEGIN----------------");
 
@@ -567,8 +819,10 @@ void project_gui()
                 }
             }
         }
-
+    
         ImGui::Text("-------BENCHMARK SETTINGS END----------------");
+
+        ImGui::NewLine();
 
         ImGui::Text("-------PROJECT SETTINGS BEGIN----------------");
         if (ImGui::Button("add session to project"))
@@ -580,7 +834,72 @@ void project_gui()
             if (input_file_name.size() > 0)
             {
                 project_settings.session_file_names.push_back(input_file_name);
+                loaded_sessions = false;
+                time_stamp_offset = 0.0;
             }
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("remove selected sessions from project"))
+        {
+            ImGui::OpenPopup("Remove Sessions");
+        }
+
+        if (ImGui::BeginPopupModal("Remove Sessions", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            static std::vector<bool> session_marked_for_removal;
+            if (session_marked_for_removal.size() != project_settings.session_file_names.size())
+                session_marked_for_removal.resize(project_settings.session_file_names.size(), false);
+
+            ImGui::Text("Select sessions to remove:");
+            ImGui::Separator();
+
+            for (int i = 0; i < project_settings.session_file_names.size(); i++)
+            {
+                bool checked = session_marked_for_removal[i];
+                if (ImGui::Checkbox(project_settings.session_file_names[i].c_str(), &checked))
+                    session_marked_for_removal[i] = checked;
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::Button("Remove"))
+            {
+                for (int i = project_settings.session_file_names.size() - 1; i >= 0; i--)
+                {
+                    if (session_marked_for_removal[i])
+                    {
+                        std::cout << "Removing session: " << project_settings.session_file_names[i] << std::endl;
+                        project_settings.session_file_names.erase(project_settings.session_file_names.begin() + i);
+                        if (loaded_sessions && i < sessions.size())
+                            sessions.erase(sessions.begin() + i);
+                    }
+                }
+
+                session_marked_for_removal.clear();
+                
+                if (!sessions.empty())
+                {
+                    update_timestamp_offset();
+                }
+                else
+                {
+                    loaded_sessions = false;
+                    time_stamp_offset = 0.0;
+                }
+
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel"))
+            {
+                session_marked_for_removal.clear();
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
         }
 
         if (ImGui::Button("load project"))
@@ -592,13 +911,15 @@ void project_gui()
             if (input_file_name.size() > 0)
             {
                 load_project_settings(fs::path(input_file_name).string(), project_settings);
+                loaded_sessions = false;
+                time_stamp_offset = 0.0;
             }
         }
         ImGui::SameLine();
         if (ImGui::Button("save project"))
         {
             std::string output_file_name = "";
-            output_file_name = mandeye::fd::SaveFileDialog("Save project file", Project_filter);
+            output_file_name = mandeye::fd::SaveFileDialog("Save project file", Project_filter,".json");
 
             if (output_file_name.size() > 0)
             {
@@ -693,6 +1014,8 @@ void project_gui()
         ImGui::Text("-----------session_file_names end------------");
 
         ImGui::Text("-------PROJECT SETTINGS END------------------");
+    
+        ImGui::NewLine();
 
         if (project_settings.session_file_names.size() > 0)
         {
@@ -762,6 +1085,409 @@ void project_gui()
                         }
                     }
                 }
+            }
+            
+            if(loaded_sessions)
+            {
+                ImGui::Text("-------TRAJECTORY EXPORT SECTION BEGIN------------------");
+
+                if (ImGui::Button("save all marked trajectories to laz (as one global scan)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto &session_path = project_settings.session_file_names[i];
+
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session &session = sessions[i];
+
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string laz_path = (dir / (folder_name + "_trajectory_laz.laz")).string();
+
+                        std::cout << "Saving trajectory to LAZ: " << laz_path << std::endl;
+
+                        save_trajectories_to_laz(session,
+                                                laz_path,
+                                                0.0f,  
+                                                0.0f,
+                                                false);
+                    }
+
+                    std::cout << "Finished saving all trajectories to .laz files." << std::endl;
+                }
+
+                // timestampLidar, x,y,z,r00..r22
+                if (ImGui::Button("save all marked trajectories to csv (timestampLidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto &session_path = project_settings.session_file_names[i];
+
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session &session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidar_r.csv")).string();
+
+                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampLidar,x,y,z,"
+                                    << "r00,r01,r02,"
+                                    << "r10,r11,r12,"
+                                    << "r20,r21,r22\n";
+
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible) continue;
+
+                                for (const auto &traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Matrix3d rot = pose.rotation();
+
+                                    outfile << std::fixed << std::setprecision(0)
+                                            << traj.timestamps.first << ","
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << rot(0,0) << "," << rot(0,1) << "," << rot(0,2) << ","
+                                            << rot(1,0) << "," << rot(1,1) << "," << rot(1,2) << ","
+                                            << rot(2,0) << "," << rot(2,1) << "," << rot(2,2) << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception &e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+
+                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
+                }
+
+                // timestampUnix, x,y,z,r00..r22
+                if (ImGui::Button("save all marked trajectories to csv (timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto &session_path = project_settings.session_file_names[i];
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session &session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampUnix_r.csv")).string();
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampUnix,x,y,z,"
+                                    << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
+
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible) continue;
+                                for (const auto &traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Matrix3d rot = pose.rotation();
+                                    outfile << std::fixed << std::setprecision(0)
+                                            << traj.timestamps.second << "," // Unix timestamp
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << rot(0,0) << "," << rot(0,1) << "," << rot(0,2) << ","
+                                            << rot(1,0) << "," << rot(1,1) << "," << rot(1,2) << ","
+                                            << rot(2,0) << "," << rot(2,1) << "," << rot(2,2) << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception &e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+                }
+
+                // timestampLidar, timestampUnix, x,y,z,r00..r22
+                if (ImGui::Button("save all marked trajectories to csv (timestampLidar,timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto &session_path = project_settings.session_file_names[i];
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session &session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidarUnix_r.csv")).string();
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampLidar,timestampUnix,x,y,z,"
+                                    << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
+
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible) continue;
+                                for (const auto &traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Matrix3d rot = pose.rotation();
+                                    outfile << std::fixed << std::setprecision(0)
+                                            << traj.timestamps.first << ","  // Lidar timestamp
+                                            << traj.timestamps.second << "," // Unix timestamp
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << rot(0,0) << "," << rot(0,1) << "," << rot(0,2) << ","
+                                            << rot(1,0) << "," << rot(1,1) << "," << rot(1,2) << ","
+                                            << rot(2,0) << "," << rot(2,1) << "," << rot(2,2) << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception &e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+                }
+
+                // timestampLidar, x,y,z,qx,qy,qz,qw
+                if (ImGui::Button("save all marked trajectories to csv (timestampLidar,x,y,z,qx,qy,qz,qw)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto &session_path = project_settings.session_file_names[i];
+
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session &session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidar_q.csv")).string();
+
+                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampLidar,x,y,z,qx,qy,qz,qw\n";
+
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible) continue;
+
+                                for (const auto &traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Quaterniond q(pose.rotation());
+
+                                    outfile << std::fixed << std::setprecision(0)
+                                            << traj.timestamps.first << ","  // Lidar timestamp
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception &e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+
+                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
+                }
+
+                // timestampUnix, x,y,z,qx,qy,qz,qw
+                if (ImGui::Button("save all marked trajectories to csv (timestampUnix,x,y,z,qx,qy,qz,qw)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto &session_path = project_settings.session_file_names[i];
+
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session &session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampUnix_q.csv")).string();
+
+                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampUnix,x,y,z,qx,qy,qz,qw\n";
+
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible) continue;
+
+                                for (const auto &traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Quaterniond q(pose.rotation());
+
+                                    outfile << std::fixed << std::setprecision(0)
+                                            << traj.timestamps.second << ","  // Unix timestamp
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception &e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+
+                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
+                }
+
+                // timestampLidar, timestampUnix, x,y,z,qx,qy,qz,qw
+                if (ImGui::Button("save all marked trajectories to csv (timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto &session_path = project_settings.session_file_names[i];
+
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session &session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidarUnix_q.csv")).string();
+
+                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw\n";
+
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible) continue;
+
+                                for (const auto &traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Quaterniond q(pose.rotation());
+
+                                    outfile << std::fixed << std::setprecision(0)
+                                            << traj.timestamps.first << ","  // Lidar timestamp
+                                            << traj.timestamps.second << "," // Unix timestamp
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception &e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+
+                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
+                }
+
+                ImGui::Text("-------TRAJECTORY EXPORT SECTION END------------------");
+                ImGui::NewLine();
             }
 
             if (project_settings.session_file_names.size() == sessions.size())

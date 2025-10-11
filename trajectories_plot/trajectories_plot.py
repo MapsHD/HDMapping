@@ -2,6 +2,10 @@ import os
 import matplotlib.pyplot as plt
 import laspy
 
+plot_title = input("Enter plot title (Press Enter for default): ").strip()
+if not plot_title:
+    plot_title = "Trajectories from CSV and LAZ files"
+
 folder = input("Enter the path to the folder with LAZ or CSV files (Enter = current directory): ").strip()
 if not folder:
     folder = '.'
@@ -34,22 +38,26 @@ for filename in files:
                 if not line:
                     continue
 
-                if ',' in line:
-                    parts = line.split(',')
+                parts = line.split(',') if ',' in line else line.split()
+                n = len(parts)
+
+                if n in [8, 13]: 
+                    try:
+                        x = float(parts[1])
+                        y = float(parts[2])
+                    except:
+                        continue
+                elif n in [9, 14]:  
+                    try:
+                        x = float(parts[2])
+                        y = float(parts[3])
+                    except:
+                        continue
                 else:
-                    parts = line.split()
-
-                if len(parts) < 3:
-                    print(f"Line {i+1} too short: {parts}")
-                    continue
-
-                try:
-                    x = float(parts[1].replace(',', '').strip())
-                    y = float(parts[2].replace(',', '').strip())
-                    xs.append(x)
-                    ys.append(y)
-                except:
                     continue 
+
+                xs.append(x)
+                ys.append(y)
 
         except Exception as e:
             print(f"Error reading CSV file {filename}: {e}")
@@ -72,14 +80,16 @@ for filename in files:
 if data_found:
     plt.xlabel('(X)')
     plt.ylabel('(Y)')
-    plt.title('Trajectories from CSV and LAZ files')
-    plt.legend()
+    plt.title(plot_title)
+    plt.subplots_adjust(right=0.75)
+    plt.legend(loc='best', fontsize=8, framealpha=0.5)
+    plt.tight_layout()
     plt.grid(True)
-    
+
     output_path = os.path.join(folder, 'trajectories_plot.png')
     plt.savefig(output_path)
     print(f"Plot saved as: {output_path}")
-    
+
     plt.show()
 else:
     print("No data found to plot.")

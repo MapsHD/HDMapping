@@ -960,6 +960,7 @@ bool load_index_poses(const std::filesystem::path& path, std::vector<std::vector
 
 bool load_worker_data_from_results(const fs::path& session_file, std::vector<WorkerData>& worker_data_out)
 {
+    #if 0
     std::ifstream f(session_file);
     if (!f.is_open()) {
         std::cerr << "Cannot open session file: " << session_file << std::endl;
@@ -1074,6 +1075,8 @@ bool load_worker_data_from_results(const fs::path& session_file, std::vector<Wor
         }
     }
     return true;
+    #endif
+    return false;
 }
 
 

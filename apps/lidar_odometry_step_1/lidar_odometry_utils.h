@@ -122,7 +122,8 @@ struct LidarOdometryParams
     //paths
     std::string current_output_dir = "";
     std::string working_directory_preview = "";
-
+    std::string working_directory_cash = "";
+    
     //other
     Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
     std::vector<Point3Di> initial_points;

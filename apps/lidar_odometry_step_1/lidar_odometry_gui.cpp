@@ -1536,6 +1536,7 @@ void display()
         }
     }
 
+    #if 0 //ToDo
     for (int i = 0; i < worker_data.size(); i++)
     {
         if (worker_data[i].show)
@@ -1567,6 +1568,7 @@ void display()
             glEnd();
         }
     }
+    #endif
 
     if (show_reference_points)
     {

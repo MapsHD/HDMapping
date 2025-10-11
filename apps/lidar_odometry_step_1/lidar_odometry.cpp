@@ -181,6 +181,15 @@ bool load_data(std::vector<std::string> &input_file_names, LidarOdometryParams &
 
         params.working_directory_preview = wdp.string();
 
+        fs::path wdp2 = fs::path(input_file_names[0]).parent_path();
+        wdp2 /= "cash";
+        if (!fs::exists(wdp2))
+        {
+            std::cout << "creating folder: '" << wdp2 << "'" << std::endl;
+            fs::create_directory(wdp2);
+        }
+        params.working_directory_cash = wdp2.string();
+
         //for (size_t i = 0; i < input_file_names.size(); i++)
         //{
         //    std::cout << input_file_names[i] << std::endl;
@@ -522,7 +531,7 @@ bool compute_step_1(
             }
         }
 
-        wd.original_points = points;
+        //wd.original_points = points;
 
         // correct points timestamps
         if (wd.intermediate_trajectory_timestamps.size() > 2)
@@ -531,22 +540,22 @@ bool compute_step_1(
             double ts_begin = wd.intermediate_trajectory_timestamps[0].first;
             double ts_step = (wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first -
                               wd.intermediate_trajectory_timestamps[0].first) /
-                             wd.original_points.size();
+                             points.size();
 
             // std::cout << "ts_begin " << ts_begin << std::endl;
             // std::cout << "ts_step " << ts_step << std::endl;
             // std::cout << "ts_end " << wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first << std::endl;
 
-            for (int pp = 0; pp < wd.original_points.size(); pp++)
+            for (int pp = 0; pp < points.size(); pp++)
             {
-                wd.original_points[pp].timestamp = ts_begin + pp * ts_step;
+                points[pp].timestamp = ts_begin + pp * ts_step;
             }
         }
         //////////////////////////////////////////
 
-        for (unsigned long long int k = 0; k < wd.original_points.size(); k++)
+        for (unsigned long long int k = 0; k < points.size(); k++)
         {
-            Point3Di &p = wd.original_points[k];
+            Point3Di &p = points[k];
             auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp,
                                           [](std::pair<double, double> lhs, double rhs) -> bool
                                           { return lhs.first < rhs; });
@@ -569,21 +578,52 @@ bool compute_step_1(
         }
 
         std::vector<Point3Di> filtered_points;
-        for (unsigned long long int k = 0; k < wd.original_points.size(); k++)
+        for (unsigned long long int k = 0; k < points.size(); k++)
         {
-            if (wd.original_points[k].index_pose != -1)
+            if (points[k].index_pose != -1)
             {
-                filtered_points.push_back(wd.original_points[k]);
+                filtered_points.push_back(points[k]);
             }
         }
-        wd.original_points = filtered_points;
+        //wd.original_points = filtered_points;
 
-        if (params.decimation > 0.0 && wd.original_points.size() > 1000)
+        std::filesystem::path path = params.working_directory_cash; //ToDo
+        //path /= "cash";
+        std::string original_points_cash_filename = "cash_original_points_" + std::to_string(worker_data.size()) + ".cash";
+        path /= original_points_cash_filename;
+        wd.original_points_cash_file_name = path;
+
+        // std::cout << "original_points_cash_file_name " << path.string() << std::endl;
+        //  wd.save_points(filtered_points, wd.original_points_cash_file_name);
+        //  wd.original_points = filtered_points;
+        if (!save_vector_data(wd.original_points_cash_file_name.string(), filtered_points))
         {
-            wd.intermediate_points = decimate(wd.original_points, params.decimation, params.decimation, params.decimation);
+            std::cout << "problem with save_vector_data file '" << wd.original_points_cash_file_name.string() << "'" << std::endl;
+            std::cout << __FILE__ << " " << __LINE__ << std::endl;
         }
 
-        if (wd.original_points.size() > 1000)
+        std::vector<Point3Di> intermediate_points;
+
+        if (params.decimation > 0.0 && filtered_points.size() > 1000)
+        {
+            intermediate_points = decimate(filtered_points, params.decimation, params.decimation, params.decimation);
+        }
+
+        std::filesystem::path path2 = params.working_directory_cash;
+        //path2 /= "cash";
+        std::string intermediate_points_cash_filename = "cash_intermediate_points_" + std::to_string(worker_data.size()) + ".cash";
+        path2 /= intermediate_points_cash_filename;
+        wd.intermediate_points_cash_file_name = path2;
+
+        std::cout << "intermediate_points_cash_file_name " << path2.string() << std::endl;
+
+        // wd.save_points(intermediate_points, wd.intermediate_points_cash_file_name);
+        if (!save_vector_data(wd.intermediate_points_cash_file_name.string(), intermediate_points))
+        {
+            std::cout << "problem with save_vector_data for file '" << wd.intermediate_points_cash_file_name.string() << "'" << std::endl;
+        }
+
+        if (filtered_points.size() > 1000)
         {
             worker_data.push_back(wd);
         }
@@ -627,6 +667,7 @@ void run_consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &
 
 void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, fs::path outwd, double elapsed_time_s)
 {
+    #if 0
     std::filesystem::create_directory(outwd);
     // concatenate data
     std::vector<WorkerData> worker_data_concatenated;
@@ -840,6 +881,267 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     // Save parameters to TOML file (loadable parameters only)
     save_parameters_toml(params, outwd, elapsed_time_s);
     
+    // Save processing results and complex data to JSON file
+    save_processing_results_json(params, outwd, elapsed_time_s);
+    #endif
+
+    std::filesystem::create_directory(outwd);
+    // concatenate data
+    std::vector<WorkerData> worker_data_concatenated;
+    WorkerData wd;
+    int counter = 0;
+    int pose_offset = 0;
+    std::vector<int> point_sizes_per_chunk;
+
+    std::vector<Point3Di> original_points_to_save;
+    int original_points_to_save_counter = 0;
+    for (int i = 0; i < worker_data.size(); i++)
+    {
+        std::vector<Point3Di> original_points; // = worker_data[i].load_points(worker_data[i].original_points_cash_file_name);
+        if (!load_vector_data(worker_data[i].original_points_cash_file_name.string(), original_points))
+        {
+            std::cout << "problem with load_vector_data file '" << worker_data[i].original_points_cash_file_name.string() << "'" << std::endl;
+        }
+
+        if (i % 1000 == 0)
+        {
+            printf("processing worker_data [%d] of %d \n", i + 1, (int)worker_data.size());
+        }
+        auto tmp_data = original_points;
+        point_sizes_per_chunk.push_back(tmp_data.size());
+        /*// filter data
+        std::vector<Point3Di> filtered_local_point_cloud;
+        for (auto &t : tmp_data)
+        {
+            auto pp = worker_data[i].intermediate_trajectory[t.index_pose].inverse() * t.point;
+            if(pp.norm() > threshould_output_filter){
+                filtered_local_point_cloud.push_back(t);
+            }
+        }
+        tmp_data = filtered_local_point_cloud;*/
+        for (auto &t : tmp_data)
+        {
+            t.index_pose += pose_offset;
+        }
+
+        wd.intermediate_trajectory.insert(std::end(wd.intermediate_trajectory),
+                                          std::begin(worker_data[i].intermediate_trajectory), std::end(worker_data[i].intermediate_trajectory));
+
+        wd.intermediate_trajectory_timestamps.insert(std::end(wd.intermediate_trajectory_timestamps),
+                                                     std::begin(worker_data[i].intermediate_trajectory_timestamps), std::end(worker_data[i].intermediate_trajectory_timestamps));
+
+        original_points_to_save.insert(std::end(original_points_to_save),
+                                       std::begin(tmp_data), std::end(tmp_data));
+
+        wd.imu_om_fi_ka.insert(std::end(wd.imu_om_fi_ka), std::begin(worker_data[i].imu_om_fi_ka), std::end(worker_data[i].imu_om_fi_ka));
+        pose_offset += worker_data[i].intermediate_trajectory.size();
+
+        counter++;
+        if (counter > 50)
+        {
+            std::filesystem::path path = params.working_directory_preview;
+            //path /= "cash";
+            std::string fn = "cash_session_chunk_" + std::to_string(original_points_to_save_counter) + ".cash";
+            path /= fn;
+            wd.original_points_to_save_cash_file_name = path;
+
+            std::cout << "original_points_to_save_cash_file_name " << path.string() << std::endl;
+
+            if (!save_vector_data(wd.original_points_to_save_cash_file_name.string(), original_points_to_save))
+            {
+                std::cout << "problem with save_vector_data for file '" << wd.original_points_to_save_cash_file_name.string() << "'" << std::endl;
+                std::cout << __FILE__ << " " << __LINE__ << std::endl;
+            }
+
+            original_points_to_save_counter++;
+
+            worker_data_concatenated.push_back(wd);
+            wd.intermediate_trajectory.clear();
+            wd.intermediate_trajectory_timestamps.clear();
+            original_points_to_save.clear();
+            wd.imu_om_fi_ka.clear();
+
+            counter = 0;
+            pose_offset = 0;
+        }
+    }
+
+    if (counter > params.min_counter_concatenated_trajectory_nodes)
+    {
+        std::filesystem::path path = params.working_directory_preview;
+        //path /= "cash";
+        std::string fn = "cash_session_chunk_" + std::to_string(original_points_to_save_counter) + ".cash";
+        path /= fn;
+        wd.original_points_to_save_cash_file_name = path;
+
+        std::cout << "original_points_to_save_cash_file_name " << path.string() << std::endl;
+
+        if (!save_vector_data(wd.original_points_to_save_cash_file_name.string(), original_points_to_save))
+        {
+            std::cout << "problem with save_vector_data for file '" << wd.original_points_to_save_cash_file_name.string() << "'" << std::endl;
+            std::cout << __FILE__ << " " << __LINE__ << std::endl;
+        }
+
+        original_points_to_save_counter++;
+
+        worker_data_concatenated.push_back(wd);
+    }
+
+    fs::path point_sizes_path = outwd / "point_sizes_per_chunk.json";
+    nlohmann::json j_point_sizes = point_sizes_per_chunk;
+    std::ofstream out_point_sizes(point_sizes_path);
+    if (!out_point_sizes)
+    {
+        std::cerr << "Failed to open " << point_sizes_path << " for writing point sizes per chunk.\n";
+    }
+    else
+    {
+        out_point_sizes << j_point_sizes.dump(2);
+        out_point_sizes.close();
+    }
+
+    std::vector<Eigen::Affine3d> m_poses;
+    std::vector<std::string> file_names;
+    std::vector<std::vector<int>> index_poses;
+    for (int i = 0; i < worker_data_concatenated.size(); i++)
+    {
+        std::cout << "------------------------" << std::endl;
+        fs::path path(outwd);
+        std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
+        path /= filename;
+        std::cout << "saving to: " << path << std::endl;
+        std::vector<int> index_poses_i;
+
+        std::vector<Eigen::Vector3d> global_pointcloud;
+        std::vector<unsigned short> intensity;
+        std::vector<double> timestamps;
+
+        std::vector<Point3Di> original_points_to_save; // = worker_data[i].load_points(worker_data[i].original_points_cash_file_name);
+        if (!load_vector_data(worker_data_concatenated[i].original_points_to_save_cash_file_name.string(), original_points_to_save))
+        {
+            std::cout << "problem with load_vector_data file '" << worker_data_concatenated[i].original_points_to_save_cash_file_name.string() << "'" << std::endl;
+            std::cout << __FILE__ << " " << __LINE__ << std::endl;
+        }
+
+        points_to_vector(
+            original_points_to_save, worker_data_concatenated[i].intermediate_trajectory,
+            params.threshould_output_filter, &index_poses_i, global_pointcloud, intensity, timestamps, true);
+        exportLaz(path.string(), global_pointcloud, intensity, timestamps);
+        index_poses.push_back(index_poses_i);
+        m_poses.push_back(worker_data_concatenated[i].intermediate_trajectory[0]);
+        file_names.push_back(filename);
+
+        // save trajectory
+        std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
+        fs::path pathtrj(outwd);
+        pathtrj /= trajectory_filename;
+        std::cout << "saving to: " << pathtrj << std::endl;
+
+        ///
+        std::ofstream outfile;
+        outfile.open(pathtrj);
+        if (!outfile.good())
+        {
+            std::cout << "can not save file: " << pathtrj << std::endl;
+            return;
+        }
+
+        outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 timestampUnix_nanoseconds om_rad fi_rad ka_rad" << std::endl;
+        for (int j = 0; j < worker_data_concatenated[i].intermediate_trajectory.size(); j++)
+        {
+            auto pose = worker_data_concatenated[i].intermediate_trajectory[0].inverse() * worker_data_concatenated[i].intermediate_trajectory[j];
+
+            outfile
+                << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].first * 1e9 << " " << std::setprecision(10)
+                << pose(0, 0) << " "
+                << pose(0, 1) << " "
+                << pose(0, 2) << " "
+                << pose(0, 3) << " "
+                << pose(1, 0) << " "
+                << pose(1, 1) << " "
+                << pose(1, 2) << " "
+                << pose(1, 3) << " "
+                << pose(2, 0) << " "
+                << pose(2, 1) << " "
+                << pose(2, 2) << " "
+                << pose(2, 3) << " "
+                << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].second * 1e9 << " "
+                << worker_data_concatenated[i].imu_om_fi_ka[j].x() << " "
+                << worker_data_concatenated[i].imu_om_fi_ka[j].y() << " "
+                << worker_data_concatenated[i].imu_om_fi_ka[j].z() << " "
+                << std::endl;
+        }
+        outfile.close();
+        //
+    }
+    fs::path path(outwd);
+    path /= "lio_initial_poses.reg";
+    save_poses(path.string(), m_poses, file_names);
+    fs::path path2(outwd);
+    path2 /= "poses.reg";
+    save_poses(path2.string(), m_poses, file_names);
+
+    fs::path index_poses_path = outwd / "index_poses.json";
+    nlohmann::json j_index_poses = index_poses;
+    std::ofstream out_index(index_poses_path);
+    if (!out_index)
+    {
+        std::cerr << "Failed to open " << index_poses_path << " for writing index poses.\n";
+    }
+    else
+    {
+        out_index << j_index_poses.dump(2);
+        out_index.close();
+    }
+
+    fs::path path3(outwd);
+    path3 /= "session.json";
+
+    // save session file
+    std::cout << "saving file: '" << path3 << "'" << std::endl;
+
+    nlohmann::json jj;
+    nlohmann::json j;
+
+    j["offset_x"] = 0.0;
+    j["offset_y"] = 0.0;
+    j["offset_z"] = 0.0;
+    j["folder_name"] = outwd;
+    j["out_folder_name"] = outwd;
+    j["poses_file_name"] = path2.string();
+    j["initial_poses_file_name"] = path.string();
+    j["out_poses_file_name"] = path2.string();
+    j["lidar_odometry_version"] = HDMAPPING_VERSION_STRING;
+    j["length of trajectory[m]"] = params.total_length_of_calculated_trajectory;
+    j["elapsed time seconds"] = elapsed_time_s;
+    j["index_poses_path"] = index_poses_path.string();
+    j["point_sizes_path"] = point_sizes_path.string();
+    j["decimation"] = params.decimation;
+    j["threshold_nr_poses"] = params.threshold_nr_poses;
+
+    jj["Session Settings"] = j;
+
+    nlohmann::json jlaz_file_names;
+    for (int i = 0; i < worker_data_concatenated.size(); i++)
+    {
+        fs::path path(outwd);
+        std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
+        path /= filename;
+        std::cout << "adding file: " << path << std::endl;
+
+        nlohmann::json jfn{
+            {"file_name", path.string()}};
+        jlaz_file_names.push_back(jfn);
+    }
+    jj["laz_file_names"] = jlaz_file_names;
+
+    std::ofstream fs(path3.string());
+    fs << jj.dump(2);
+    fs.close();
+
+    // Save parameters to TOML file (loadable parameters only)
+    save_parameters_toml(params, outwd, elapsed_time_s);
+
     // Save processing results and complex data to JSON file
     save_processing_results_json(params, outwd, elapsed_time_s);
 }

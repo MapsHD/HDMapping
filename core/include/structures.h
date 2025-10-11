@@ -8,6 +8,8 @@
 
 #include <Eigen/Eigen>
 
+#include <filesystem>
+
 struct PerspectiveCameraParams {
 	double cx;
 	double cy;
@@ -254,13 +256,16 @@ struct GeoPoint {
 
 struct WorkerData
 {
-    std::vector<Point3Di> intermediate_points;
-    std::vector<Point3Di> original_points;
-    std::vector<Eigen::Affine3d> intermediate_trajectory;
-    std::vector<Eigen::Affine3d> intermediate_trajectory_motion_model;
-    std::vector<std::pair<double, double>> intermediate_trajectory_timestamps;
-    std::vector<Eigen::Vector3d> imu_om_fi_ka;
-    bool show = false;
+	// std::vector<Point3Di> intermediate_points;
+	std::filesystem::path intermediate_points_cash_file_name;
+	// std::vector<Point3Di> original_points_to_save;
+	std::filesystem::path original_points_cash_file_name;
+	std::filesystem::path original_points_to_save_cash_file_name;
+	std::vector<Eigen::Affine3d> intermediate_trajectory;
+	std::vector<Eigen::Affine3d> intermediate_trajectory_motion_model;
+	std::vector<std::pair<double, double>> intermediate_trajectory_timestamps;
+	std::vector<Eigen::Vector3d> imu_om_fi_ka;
+	bool show = false;
 };
 
 #endif

@@ -472,10 +472,17 @@ void Session::fill_session_from_worker_data(
     this->point_clouds_container.point_clouds.clear(); // clear whatever was there
     for (int i = 0; i < worker_data.size(); i++)
     {
+        WorkerData wd;
+        std::vector<Point3Di> intermediate_points;
+        if (!load_vector_data(worker_data[i].intermediate_points_cash_file_name.string(), intermediate_points))
+        {
+            std::cout << "problem with load_vector_data '" << worker_data[i].intermediate_points_cash_file_name.string() << "'" << std::endl;
+        }
+
         if (!save_selected || worker_data[i].show)
         {
             PointCloud pc;
-            for (const auto &p : worker_data[i].intermediate_points)
+            for (const auto &p : intermediate_points)
             {
                 if (!filter_on_export || (p.point.norm() > threshould_output_filter))
                 {

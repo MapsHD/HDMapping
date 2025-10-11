@@ -1965,6 +1965,12 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
 
         for (int i = 0; i < worker_data.size(); i++)
         {
+            std::vector<Point3Di> intermediate_points;
+            // = worker_data[i].load_points(worker_data[i].intermediate_points_cash_file_name);
+            load_vector_data(worker_data[i].intermediate_points_cash_file_name.string(), intermediate_points);
+
+
+
             if (pause)
             {
                 while (pause)
@@ -2049,20 +2055,20 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 std::vector<Point3Di> points_local;
 
                 ///
-                for (int ii = 0; ii < worker_data[i].intermediate_points.size(); ii++)
+                for (int ii = 0; ii < intermediate_points.size(); ii++)
                 {
-                    double r_l = worker_data[i].intermediate_points[ii].point.norm();
+                    double r_l = intermediate_points[ii].point.norm();
 
                     // std::cout << worker_data[i].intermediate_points[ii].index_pose << " ";
-                    if (r_l > 0.5 && worker_data[i].intermediate_points[ii].index_pose != -1 && r_l < params.max_distance_lidar_rigid_sf)
+                    if (r_l > 0.5 && intermediate_points[ii].index_pose != -1 && r_l < params.max_distance_lidar_rigid_sf)
                     {
-                        double polar_angle_deg_l = atan2(worker_data[i].intermediate_points[ii].point.y(), worker_data[i].intermediate_points[ii].point.x()) / M_PI * 180.0;
-                        double azimutal_angle_deg_l = acos(worker_data[i].intermediate_points[ii].point.z() / r_l) / M_PI * 180.0;
+                        double polar_angle_deg_l = atan2(intermediate_points[ii].point.y(), intermediate_points[ii].point.x()) / M_PI * 180.0;
+                        double azimutal_angle_deg_l = acos(intermediate_points[ii].point.z() / r_l) / M_PI * 180.0;
 
-                        points_local.push_back(worker_data[i].intermediate_points[ii]);
+                        points_local.push_back(intermediate_points[ii]);
 
                         ///////////////////////////////////////////////////////
-                        Point3Di p_sl = worker_data[i].intermediate_points[ii];
+                        Point3Di p_sl = intermediate_points[ii];
                         p_sl.point.x() = r_l;
                         p_sl.point.y() = polar_angle_deg_l;
                         p_sl.point.z() = azimutal_angle_deg_l;
@@ -2138,7 +2144,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 worker_data[i].intermediate_trajectory = tr;
                 worker_data[i].intermediate_trajectory_motion_model = tr;
 
-                optimize_rigid_sf(worker_data[i].intermediate_points,
+                optimize_rigid_sf(intermediate_points,
                                   worker_data[i].intermediate_trajectory,
                                   worker_data[i].intermediate_trajectory_motion_model,
                                   params.buckets_indoor,
@@ -2168,7 +2174,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             {
 
                 delta = 100000.0;
-                optimize_lidar_odometry(worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
+                optimize_lidar_odometry(intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
                                         params.in_out_params_indoor, params.buckets_indoor,
                                         params.in_out_params_outdoor, params.buckets_outdoor,
                                         params.useMultithread, params.max_distance_lidar, delta, /*add_pitch_roll_constraint, worker_data[i].imu_roll_pitch,*/
@@ -2237,7 +2243,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 std::vector<unsigned short> intensity; 
                 std::vector<double> timestamps;
                 points_to_vector(
-                    worker_data[i].intermediate_points, worker_data[i].intermediate_trajectory,
+                    intermediate_points, worker_data[i].intermediate_trajectory,
                     0, nullptr, global_pointcloud, intensity, timestamps, false
                 );
                 std::string fn = params.working_directory_preview + "/temp_point_cloud_" + std::to_string(i) + ".laz";
@@ -2275,10 +2281,10 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 }
             }
 
-            for (int j = 0; j < worker_data[i].intermediate_points.size(); j++)
+            for (int j = 0; j < intermediate_points.size(); j++)
             {
-                Point3Di pp = worker_data[i].intermediate_points[j];
-                pp.point = worker_data[i].intermediate_trajectory[worker_data[i].intermediate_points[j].index_pose] * pp.point;
+                Point3Di pp = intermediate_points[j];
+                pp.point = worker_data[i].intermediate_trajectory[intermediate_points[j].index_pose] * pp.point;
                 points_global.push_back(pp);
             }
 
@@ -2324,10 +2330,10 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             {
 
                 std::vector<Point3Di> pg;
-                for (int j = 0; j < worker_data[i].intermediate_points.size(); j++)
+                for (int j = 0; j < intermediate_points.size(); j++)
                 {
-                    Point3Di pp = worker_data[i].intermediate_points[j];
-                    pp.point = worker_data[i].intermediate_trajectory[worker_data[i].intermediate_points[j].index_pose] * pp.point;
+                    Point3Di pp = intermediate_points[j];
+                    pp.point = worker_data[i].intermediate_trajectory[intermediate_points[j].index_pose] * pp.point;
                     pg.push_back(pp);
                 }
                 update_rgd(params.in_out_params_indoor, params.buckets_indoor, pg, worker_data[i].intermediate_trajectory[0].translation());
@@ -2397,9 +2403,16 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
 
     for (int i = 0; i < worker_data.size(); i++)
     {
-        for (int j = 0; j < worker_data[i].intermediate_points.size(); j++)
+        std::vector<Point3Di> intermediate_points;
+
+        if (!load_vector_data(worker_data[i].intermediate_points_cash_file_name.string(), intermediate_points))
         {
-            all_points_local.push_back(worker_data[i].intermediate_points[j]);
+            std::cout << "problem with load_vector_data file '" << worker_data[i].intermediate_points_cash_file_name.string() << "'" << std::endl;
+        }
+
+        for (int j = 0; j < intermediate_points.size(); j++)
+        {
+            all_points_local.push_back(intermediate_points[j]);
         }
     }
 
@@ -2768,9 +2781,15 @@ void Consistency2(std::vector<WorkerData> &worker_data, LidarOdometryParams &par
 
     for (int i = 0; i < worker_data.size(); i++)
     {
-        for (int j = 0; j < worker_data[i].intermediate_points.size(); j++)
+        std::vector<Point3Di> intermediate_points;
+        if (!load_vector_data(worker_data[i].intermediate_points_cash_file_name.string(), intermediate_points))
         {
-            all_points_local.push_back(worker_data[i].intermediate_points[j]);
+            std::cout << "problem with load_vector_data for file '" << worker_data[i].intermediate_points_cash_file_name.string() << "'" << std::endl;
+        }
+
+        for (int j = 0; j < intermediate_points.size(); j++)
+        {
+            all_points_local.push_back(intermediate_points[j]);
         }
     }
 

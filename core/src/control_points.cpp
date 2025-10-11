@@ -6,13 +6,19 @@
 #include <imgui_impl_opengl2.h>
 #include <imgui_internal.h>
 
+static constexpr float ImGuiNumberWidth = 120.0f;
+static constexpr const char* xText = "Longitudinal (forward/backward)";
+static constexpr const char* yText = "Lateral (left/right)";
+static constexpr const char* zText = "Vertical (up/down)";
+
 void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &rotation_center)
 {
-    if (ImGui::Begin("Control Point"))
+    if (ImGui::Begin("Control Point", &is_imgui))
     {
         ImGui::Checkbox("draw_uncertainty", &draw_uncertainty);
 
         int prev_index_pose = index_pose;
+        ImGui::SetNextItemWidth(ImGuiNumberWidth);
         ImGui::InputInt("index_pose", &index_pose, 1, 1);
         if (index_pose < 0)
         {
@@ -31,76 +37,87 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
             rotation_center.z() = point_clouds_container.point_clouds[index_pose].m_pose.translation().z();
         }
 
-        // ImGui::Checkbox("picking_trajectory_node_and_adding_GCP_mode", &picking_mode);
-        ImGui::Checkbox("picking_control_point_mode", &picking_mode);
+        ImGui::Text("To show Control Point (CP) candidate please press 'ctrl'");
+        ImGui::Text("To pick point node please press 'ctrl' + 'left/middle mouse'");
+        ImGui::Text("At least 3 CPs needed!");
 
-        if (picking_mode)
+        if (index_picked_point != -1)
         {
-            ImGui::Text("To pick point node please press 'ctrl' + 'middle mouse'");
-            ImGui::Text("To show Control Point candidate please press 'ctrl'");
-
-            if (index_picked_point != -1)
+            if (ImGui::Button("Add CP"))
             {
-                if (ImGui::Button("Add Ground Control Point"))
-                {
-                    ControlPoint cp; // = picked_control_point;
-                    cp.x_source_local = point_clouds_container.point_clouds[index_pose].points_local[index_picked_point].x();
-                    cp.y_source_local = point_clouds_container.point_clouds[index_pose].points_local[index_picked_point].y();
-                    cp.z_source_local = point_clouds_container.point_clouds[index_pose].points_local[index_picked_point].z();
+                ControlPoint cp; // = picked_control_point;
+                cp.x_source_local = point_clouds_container.point_clouds[index_pose].points_local[index_picked_point].x();
+                cp.y_source_local = point_clouds_container.point_clouds[index_pose].points_local[index_picked_point].y();
+                cp.z_source_local = point_clouds_container.point_clouds[index_pose].points_local[index_picked_point].z();
 
-                    cp.x_target_global = rotation_center.x();
-                    cp.y_target_global = rotation_center.y();
-                    cp.z_target_global = rotation_center.z();
+                cp.x_target_global = rotation_center.x();
+                cp.y_target_global = rotation_center.y();
+                cp.z_target_global = rotation_center.z();
 
-                    cp.sigma_x = 0.01;
-                    cp.sigma_y = 0.01;
-                    cp.sigma_z = 0.01;
-                    strcpy(cp.name, "default_name");
-                    cp.index_to_pose = index_pose;
+                cp.sigma_x = 0.01;
+                cp.sigma_y = 0.01;
+                cp.sigma_z = 0.01;
+                strcpy(cp.name, "default_name");
+                cp.index_to_pose = index_pose;
 
-                    cps.push_back(cp);
+                cps.push_back(cp);
 
-                    index_picked_point = -1;
-                }
+                index_picked_point = -1;
             }
         }
-        ImGui::Text("-------------------------------------");
+
+        ImGui::Separator();
+
         int remove_gcp_index = -1;
         for (int i = 0; i < cps.size(); i++)
         {
-            ImGui::Text((std::string("cp_") + std::to_string(i) + "[" + cps[i].name + "]").c_str());
+            ImGui::Text((std::string("CP_") + std::to_string(i) + " [" + cps[i].name + "]").c_str());
             ImGui::SameLine();
             if (ImGui::Button(std::string("remove: '" + std::to_string(i) + "'").c_str()))
             {
                 remove_gcp_index = i;
             }
 
-            std::string text = "[" + std::to_string(i) + "]_" + cps[i].name;
+            ImGui::PushItemWidth(ImGuiNumberWidth);
 
-            ImGui::InputText(text.c_str(), cps[i].name, IM_ARRAYSIZE(cps[i].name));
-            text = "[" + std::to_string(i) + "]_is_z_0";
-            ImGui::Checkbox(text.c_str(), &cps[i].is_z_0);
+            ImGui::InputText("CP name", cps[i].name, IM_ARRAYSIZE(cps[i].name));
+            ImGui::Checkbox("is z_0", &cps[i].is_z_0);
 
             if (!cps[i].is_z_0)
             {
-                text = "[" + std::to_string(i) + "]_sigma_x";
-                ImGui::InputDouble(text.c_str(), &cps[i].sigma_x);
-                text = "[" + std::to_string(i) + "]_sigma_y";
-                ImGui::InputDouble(text.c_str(), &cps[i].sigma_y);
-                text = "[" + std::to_string(i) + "]_sigma_z";
-                ImGui::InputDouble(text.c_str(), &cps[i].sigma_z);
-                text = "[" + std::to_string(i) + "]_x_target_global";
-                ImGui::InputDouble(text.c_str(), &cps[i].x_target_global);
-                text = "[" + std::to_string(i) + "]_y_target_global";
-                ImGui::InputDouble(text.c_str(), &cps[i].y_target_global);
-                text = "[" + std::to_string(i) + "]_z_target_global";
-                ImGui::InputDouble(text.c_str(), &cps[i].z_target_global);
+                ImGui::Text("sigma [m]:");
+                ImGui::InputDouble("X", &cps[i].sigma_x, 0.0, 0.0, "%.3f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(xText);
+                ImGui::SameLine();
+                ImGui::InputDouble("X", &cps[i].sigma_y, 0.0, 0.0, "%.3f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(yText);
+                ImGui::SameLine();
+                ImGui::InputDouble("Z", &cps[i].sigma_z, 0.0, 0.0, "%.3f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(zText);
+
+                ImGui::Text("target_global [m]:");
+                ImGui::InputDouble("X", &cps[i].x_target_global);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(xText);
+                ImGui::SameLine();
+                ImGui::InputDouble("Y", &cps[i].y_target_global);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(yText);
+                ImGui::SameLine();
+                ImGui::InputDouble("Z", &cps[i].z_target_global);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(zText);
             }
             else
             {
-                text = "[" + std::to_string(i) + "]_sigma_z";
-                ImGui::InputDouble(text.c_str(), &cps[i].sigma_z);
+                ImGui::InputDouble("sigma_z", &cps[i].sigma_z);
             }
+            ImGui::PopItemWidth();
+
+            ImGui::NewLine();
         }
 
         if (remove_gcp_index != -1)
@@ -118,7 +135,7 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
 
         if (cps.size() >= 3)
         {
-            if (ImGui::Button("Register session to Control Points (trajectory is rigid)"))
+            if (ImGui::Button("Register session to CPs"))
             {
                 ////////////////////////////////////
                 TaitBryanPose pose_s;
@@ -291,6 +308,8 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
                     std::cout << "AtPA=AtPB FAILED" << std::endl;
                 }
             }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("trajectory is rigid");
         }
         ImGui::End();
     }

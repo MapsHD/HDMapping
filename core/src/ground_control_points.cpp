@@ -6,78 +6,93 @@
 #include <imgui_impl_opengl2.h>
 #include <imgui_internal.h>
 
+static constexpr float ImGuiNumberWidth = 120.0f;
+static constexpr const char* xText = "Longitudinal (forward/backward)";
+static constexpr const char* yText = "Lateral (left/right)";
+static constexpr const char* zText = "Vertical (up/down)";
+
 void GroundControlPoints::imgui(PointClouds &point_clouds_container)
 {
-    if (ImGui::Begin("Ground Control Point"))
+    if (ImGui::Begin("Ground Control Point", &is_imgui))
     {
         ImGui::Checkbox("draw_uncertainty", &draw_uncertainty);
-        ImGui::InputDouble("default_lidar_height_above_ground", &default_lidar_height_above_ground, 0.0, 10.0);
-        ImGui::Checkbox("picking_trajectory_node_and_adding_GCP_mode", &picking_mode);
+        ImGui::SetNextItemWidth(ImGuiNumberWidth);
+        ImGui::InputDouble("default_lidar_height_above_ground [m]", &default_lidar_height_above_ground, 0.0, 10.0, "%.3f");
 
-        if (picking_mode)
+        ImGui::Text("To show Ground Control Point (GCP) candidate please press 'ctrl'");
+        ImGui::Text("To pick trajectory node please press 'ctrl' + 'left/middle mouse'");
+        ImGui::Text("At least 3 GCPs needed!");
+
+        if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
         {
-
-            // ImGui::SameLine();
-            ImGui::Text("To pick trajectory node please press 'ctrl' + 'middle mouse'");
-            ImGui::Text("To show Ground Control Point candidate please press 'ctrl'");
-
-            if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
+            if (ImGui::Button("Add GCP"))
             {
-                if (ImGui::Button("Add Ground Control Point"))
-                {
-                    GroundControlPoint gcp;
-                    gcp.index_to_node_inner = picking_mode_index_to_node_inner;
-                    gcp.index_to_node_outer = picking_mode_index_to_node_outer;
-                    gcp.lidar_height_above_ground = default_lidar_height_above_ground;
-                    gcp.sigma_x = 0.1;
-                    gcp.sigma_y = 0.1;
-                    gcp.sigma_z = 0.1;
-                    const auto &p = point_clouds_container.point_clouds[gcp.index_to_node_inner].local_trajectory[gcp.index_to_node_outer].m_pose.translation();
-                    Eigen::Vector3d position_global = point_clouds_container.point_clouds[gcp.index_to_node_inner].m_pose * p;
+                GroundControlPoint gcp;
+                gcp.index_to_node_inner = picking_mode_index_to_node_inner;
+                gcp.index_to_node_outer = picking_mode_index_to_node_outer;
+                gcp.lidar_height_above_ground = default_lidar_height_above_ground;
+                gcp.sigma_x = 0.1;
+                gcp.sigma_y = 0.1;
+                gcp.sigma_z = 0.1;
+                const auto &p = point_clouds_container.point_clouds[gcp.index_to_node_inner].local_trajectory[gcp.index_to_node_outer].m_pose.translation();
+                Eigen::Vector3d position_global = point_clouds_container.point_clouds[gcp.index_to_node_inner].m_pose * p;
 
-                    gcp.x = position_global.x();
-                    gcp.y = position_global.y();
-                    gcp.z = position_global.z();
-                    strcpy(gcp.name, "default_name");
+                gcp.x = position_global.x();
+                gcp.y = position_global.y();
+                gcp.z = position_global.z();
+                strcpy(gcp.name, "default_name");
 
-                    gpcs.push_back(gcp);
-                }
-                // int picking_mode_index_to_node_inner = -1;
-                // int picking_mode_index_to_node_outer = -1;
+                gpcs.push_back(gcp);
             }
+            // int picking_mode_index_to_node_inner = -1;
+            // int picking_mode_index_to_node_outer = -1;
         }
 
-        ImGui::Text("-------------------------------------");
+        ImGui::Separator();
 
-        // ImGui::SameLine();
         int remove_gcp_index = -1;
         for (int i = 0; i < gpcs.size(); i++)
         {
-            ImGui::Text((std::string("gcp_") + std::to_string(i) + "[" + gpcs[i].name + "]").c_str());
+            ImGui::Text((std::string("GCP_") + std::to_string(i) + " (" + gpcs[i].name + ")").c_str());
             ImGui::SameLine();
             if (ImGui::Button(std::string("remove: '" + std::to_string(i) + "'").c_str()))
             {
                 remove_gcp_index = i;
             }
 
-            std::string text = "[" + std::to_string(i) + "]_" + gpcs[i].name;
+            ImGui::PushItemWidth(ImGuiNumberWidth);
+            ImGui::InputText("GCP name", gpcs[i].name, IM_ARRAYSIZE(gpcs[i].name));
 
-            ImGui::InputText(text.c_str(), gpcs[i].name, IM_ARRAYSIZE(gpcs[i].name));
+			ImGui::Text("sigma [m]:");
+            ImGui::InputDouble("X", &gpcs[i].sigma_x, 0.0, 0.0, "%.3f");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(xText);
+            ImGui::SameLine();
+            ImGui::InputDouble("X", &gpcs[i].sigma_y, 0.0, 0.0, "%.3f");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(yText);
+            ImGui::SameLine();
+            ImGui::InputDouble("Z", &gpcs[i].sigma_z, 0.0, 0.0, "%.3f");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(zText);
 
-            text = "[" + std::to_string(i) + "]_sigma_x";
-            ImGui::InputDouble(text.c_str(), &gpcs[i].sigma_x);
-            text = "[" + std::to_string(i) + "]_sigma_y";
-            ImGui::InputDouble(text.c_str(), &gpcs[i].sigma_y);
-            text = "[" + std::to_string(i) + "]_sigma_z";
-            ImGui::InputDouble(text.c_str(), &gpcs[i].sigma_z);
-            text = "[" + std::to_string(i) + "]_x";
-            ImGui::InputDouble(text.c_str(), &gpcs[i].x);
-            text = "[" + std::to_string(i) + "]_y";
-            ImGui::InputDouble(text.c_str(), &gpcs[i].y);
-            text = "[" + std::to_string(i) + "]_z";
-            ImGui::InputDouble(text.c_str(), &gpcs[i].z);
-            text = "[" + std::to_string(i) + "]_lidar_height_above_ground";
-            ImGui::InputDouble(text.c_str(), &gpcs[i].lidar_height_above_ground);
+            ImGui::Text("coordinates [m]:");      
+            ImGui::InputDouble("X", &gpcs[i].x);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(xText);
+            ImGui::SameLine();
+            ImGui::InputDouble("Y", &gpcs[i].y);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(yText);
+            ImGui::SameLine();
+            ImGui::InputDouble("Z", &gpcs[i].z);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(zText);
+            
+            ImGui::InputDouble("lidar_height_above_ground [m]", &gpcs[i].lidar_height_above_ground);
+			ImGui::PopItemWidth();
+
+            ImGui::NewLine();
         }
 
         if (remove_gcp_index != -1)
@@ -95,7 +110,7 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
 
         if (gpcs.size() >= 3)
         {
-            if (ImGui::Button("Register session to Ground Control Points (trajectory is rigid)"))
+            if (ImGui::Button("Register session to GSPs"))
             {
                 ////////////////////////////////////
                 TaitBryanPose pose_s;
@@ -153,7 +168,7 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
                     tripletListB.emplace_back(ir + 1, 0, delta_y);
                     tripletListB.emplace_back(ir + 2, 0, delta_z);
 
-                    std::cout << "gcp: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
+                    std::cout << "GCP: delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
                 }
 
                 Eigen::SparseMatrix<double> matA(tripletListB.size(), 6);
@@ -227,6 +242,8 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
                     std::cout << "AtPA=AtPB FAILED" << std::endl;
                 }
             }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("trajectory is rigid");
         }
 
         ImGui::End();

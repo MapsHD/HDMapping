@@ -474,9 +474,9 @@ void Session::fill_session_from_worker_data(
     {
         WorkerData wd;
         std::vector<Point3Di> intermediate_points;
-        if (!load_vector_data(worker_data[i].intermediate_points_cash_file_name.string(), intermediate_points))
+        if (!load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points))
         {
-            std::cout << "problem with load_vector_data '" << worker_data[i].intermediate_points_cash_file_name.string() << "'" << std::endl;
+            std::cout << "problem with load_vector_data '" << worker_data[i].intermediate_points_cache_file_name.string() << "'" << std::endl;
         }
 
         if (!save_selected || worker_data[i].show)

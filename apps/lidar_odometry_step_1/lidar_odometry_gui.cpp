@@ -359,27 +359,27 @@ void lidar_odometry_gui()
             ImGui::Text("lidar_odometry_motion_model_fix_origin sigmas [m] / [deg]:");
 
             ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputDouble("x_1", &params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m);
+            ImGui::InputDouble("x_1##o", &params.lidar_odometry_motion_model_fix_origin_x_1_sigma_m);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(xText);
             ImGui::SameLine();
-            ImGui::InputDouble("om_1", &params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg);
+            ImGui::InputDouble("om_1##o", &params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(omText);
 
-            ImGui::InputDouble("y_1", &params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m);
+            ImGui::InputDouble("y_1##o", &params.lidar_odometry_motion_model_fix_origin_y_1_sigma_m);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(yText);
             ImGui::SameLine();
-            ImGui::InputDouble("fi_1", &params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg);
+            ImGui::InputDouble("fi_1##o", &params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(fiText);
 
-            ImGui::InputDouble("z_1", &params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m);
+            ImGui::InputDouble("z_1##o", &params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(zText);
             ImGui::SameLine();
-            ImGui::InputDouble("ka_1", &params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
+            ImGui::InputDouble("ka_1##o", &params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(kaText);
 
@@ -448,7 +448,7 @@ void lidar_odometry_gui()
 			ImGui::NewLine();
             ImGui::Text("NDT bucket size (inner/outer)");
             ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputDouble("", &params.in_out_params_indoor.resolution_X, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("##x", &params.in_out_params_indoor.resolution_X, 0.0, 0.0, "%.3f");
             if (params.in_out_params_indoor.resolution_X < 0.01)
             {
                 params.in_out_params_indoor.resolution_X = 0.01;
@@ -460,7 +460,7 @@ void lidar_odometry_gui()
                 params.in_out_params_outdoor.resolution_X = 0.01;
             }
 
-            ImGui::InputDouble("", &params.in_out_params_indoor.resolution_Y, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("##y", &params.in_out_params_indoor.resolution_Y, 0.0, 0.0, "%.3f");
             if (params.in_out_params_indoor.resolution_Y < 0.01)
             {
                 params.in_out_params_indoor.resolution_Y = 0.01;
@@ -472,7 +472,7 @@ void lidar_odometry_gui()
                 params.in_out_params_outdoor.resolution_Y = 0.01;
             }
 
-            ImGui::InputDouble("", &params.in_out_params_indoor.resolution_Z, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("##z", &params.in_out_params_indoor.resolution_Z, 0.0, 0.0, "%.3f");
             if (params.in_out_params_indoor.resolution_Z < 0.01)
             {
                 params.in_out_params_indoor.resolution_Z = 0.01;
@@ -503,7 +503,7 @@ void lidar_odometry_gui()
             ImGui::Checkbox("save_calibration_validation_file", &params.save_calibration_validation);
             ImGui::InputInt("number of calibration validation points", &params.calibration_validation_points);
             ImGui::Checkbox("use_multithread", &params.useMultithread);
-            ImGui::InputDouble("real_time_threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.0f");
+            ImGui::InputDouble("real_time_threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.1f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("optimization timeout");
 
@@ -589,7 +589,7 @@ void lidar_odometry_gui()
         if (step_1_done && step_2_done)
         {
 
-            if (ImGui::Button("save all point clouds to single '*.las or *.laz' file"))
+            if (ImGui::Button("save all point clouds to single las/laz file"))
             {
                 const auto output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
 
@@ -672,7 +672,7 @@ void lidar_odometry_gui()
             }
             if (ImGui::Button("load reference point clouds (laz)"))
             {
-                auto input_file_names = mandeye::fd::OpenFileDialog("Load *.laz/*.las files", mandeye::fd::LAS_LAZ_filter, true);
+                auto input_file_names = mandeye::fd::OpenFileDialog("Load laz/las files", mandeye::fd::LAS_LAZ_filter, true);
                 if (input_file_names.size() > 0)
                 {
                     show_reference_points = true;
@@ -866,7 +866,7 @@ void lidar_odometry_gui()
 
             if (ImGui::Button("export selected scans"))
             {
-                auto output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
+                auto output_file_name = mandeye::fd::SaveFileDialog("Save las/laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
                 Eigen::Affine3d pose;
                 if (output_file_name.size() > 0)
                 {
@@ -1215,7 +1215,7 @@ void lidar_odometry_basic_gui()
             ImGui::Checkbox("full_lidar_odometry_gui", &full_lidar_odometry_gui);
             ImGui::SameLine();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Show power user settings window with more setting");
+                ImGui::SetTooltip("Show power user settings window with more parameters");
             ImGui::Checkbox("full_processing_messages", &full_debug_messages);
             ImGui::NewLine();
             if (ImGui::IsItemHovered())

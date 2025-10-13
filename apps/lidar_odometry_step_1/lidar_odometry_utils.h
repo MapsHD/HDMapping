@@ -122,7 +122,7 @@ struct LidarOdometryParams
     //paths
     std::string current_output_dir = "";
     std::string working_directory_preview = "";
-    std::string working_directory_cash = "";
+    std::string working_directory_cache = "";
     
     //other
     Eigen::Affine3d m_g = Eigen::Affine3d::Identity();

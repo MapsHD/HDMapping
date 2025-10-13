@@ -182,13 +182,13 @@ bool load_data(std::vector<std::string> &input_file_names, LidarOdometryParams &
         params.working_directory_preview = wdp.string();
 
         fs::path wdp2 = fs::path(input_file_names[0]).parent_path();
-        wdp2 /= "cash";
+        wdp2 /= "cache";
         if (!fs::exists(wdp2))
         {
             std::cout << "creating folder: '" << wdp2 << "'" << std::endl;
             fs::create_directory(wdp2);
         }
-        params.working_directory_cash = wdp2.string();
+        params.working_directory_cache = wdp2.string();
 
         //for (size_t i = 0; i < input_file_names.size(); i++)
         //{
@@ -256,12 +256,6 @@ bool load_data(std::vector<std::string> &input_file_names, LidarOdometryParams &
 
         std::transform(std::execution::par_unseq, std::begin(laz_files), std::begin(laz_files) + minSize, std::begin(pointsPerFile), [&](const std::string &fn)
         {
-            // Load mapping from id to sn
-            fs::path fnSn(fn);
-            fnSn.replace_extension(".sn");
-
-            // GetId of Imu to use
-            const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
             auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
             auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy_inner, params.filter_threshold_xy_outer, calibration);
 
@@ -587,18 +581,18 @@ bool compute_step_1(
         }
         //wd.original_points = filtered_points;
 
-        std::filesystem::path path = params.working_directory_cash; //ToDo
-        //path /= "cash";
-        std::string original_points_cash_filename = "cash_original_points_" + std::to_string(worker_data.size()) + ".cash";
-        path /= original_points_cash_filename;
-        wd.original_points_cash_file_name = path;
+        std::filesystem::path path = params.working_directory_cache; //ToDo
+        //path /= "cache";
+        std::string original_points_cache_filename = "original_points_" + std::to_string(worker_data.size()) + ".cache";
+        path /= original_points_cache_filename;
+        wd.original_points_cache_file_name = path;
 
-        // std::cout << "original_points_cash_file_name " << path.string() << std::endl;
-        //  wd.save_points(filtered_points, wd.original_points_cash_file_name);
+        // std::cout << "original_points_cache_file_name " << path.string() << std::endl;
+        //  wd.save_points(filtered_points, wd.original_points_cache_file_name);
         //  wd.original_points = filtered_points;
-        if (!save_vector_data(wd.original_points_cash_file_name.string(), filtered_points))
+        if (!save_vector_data(wd.original_points_cache_file_name.string(), filtered_points))
         {
-            std::cout << "problem with save_vector_data file '" << wd.original_points_cash_file_name.string() << "'" << std::endl;
+            std::cout << "problem with save_vector_data file '" << wd.original_points_cache_file_name.string() << "'" << std::endl;
             std::cout << __FILE__ << " " << __LINE__ << std::endl;
         }
 
@@ -609,18 +603,19 @@ bool compute_step_1(
             intermediate_points = decimate(filtered_points, params.decimation, params.decimation, params.decimation);
         }
 
-        std::filesystem::path path2 = params.working_directory_cash;
-        //path2 /= "cash";
-        std::string intermediate_points_cash_filename = "cash_intermediate_points_" + std::to_string(worker_data.size()) + ".cash";
-        path2 /= intermediate_points_cash_filename;
-        wd.intermediate_points_cash_file_name = path2;
+        std::filesystem::path path2 = params.working_directory_cache;
+        //path2 /= "cache";
+        std::string intermediate_points_cache_filename = "intermediate_points_" + std::to_string(worker_data.size()) + ".cache";
+        path2 /= intermediate_points_cache_filename;
+        wd.intermediate_points_cache_file_name = path2;
 
-        std::cout << "intermediate_points_cash_file_name " << path2.string() << std::endl;
+        //remove "flooding" messages from console. this also interfered with previous message of "running iterations: i/total"
+        //std::cout << "intermediate_points_cache_file_name " << path2.string() << std::endl;
 
-        // wd.save_points(intermediate_points, wd.intermediate_points_cash_file_name);
-        if (!save_vector_data(wd.intermediate_points_cash_file_name.string(), intermediate_points))
+        // wd.save_points(intermediate_points, wd.intermediate_points_cache_file_name);
+        if (!save_vector_data(wd.intermediate_points_cache_file_name.string(), intermediate_points))
         {
-            std::cout << "problem with save_vector_data for file '" << wd.intermediate_points_cash_file_name.string() << "'" << std::endl;
+            std::cout << "problem with save_vector_data for file '" << wd.intermediate_points_cache_file_name.string() << "'" << std::endl;
         }
 
         if (filtered_points.size() > 1000)
@@ -897,10 +892,10 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     int original_points_to_save_counter = 0;
     for (int i = 0; i < worker_data.size(); i++)
     {
-        std::vector<Point3Di> original_points; // = worker_data[i].load_points(worker_data[i].original_points_cash_file_name);
-        if (!load_vector_data(worker_data[i].original_points_cash_file_name.string(), original_points))
+        std::vector<Point3Di> original_points; // = worker_data[i].load_points(worker_data[i].original_points_cache_file_name);
+        if (!load_vector_data(worker_data[i].original_points_cache_file_name.string(), original_points))
         {
-            std::cout << "problem with load_vector_data file '" << worker_data[i].original_points_cash_file_name.string() << "'" << std::endl;
+            std::cout << "problem with load_vector_data file '" << worker_data[i].original_points_cache_file_name.string() << "'" << std::endl;
         }
 
         if (i % 1000 == 0)
@@ -940,16 +935,16 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
         if (counter > 50)
         {
             std::filesystem::path path = params.working_directory_preview;
-            //path /= "cash";
-            std::string fn = "cash_session_chunk_" + std::to_string(original_points_to_save_counter) + ".cash";
+            //path /= "cache";
+            std::string fn = "session_chunk_" + std::to_string(original_points_to_save_counter) + ".cache";
             path /= fn;
-            wd.original_points_to_save_cash_file_name = path;
+            wd.original_points_to_save_cache_file_name = path;
 
-            std::cout << "original_points_to_save_cash_file_name " << path.string() << std::endl;
+            std::cout << "original_points_to_save_cache_file_name " << path.string() << std::endl;
 
-            if (!save_vector_data(wd.original_points_to_save_cash_file_name.string(), original_points_to_save))
+            if (!save_vector_data(wd.original_points_to_save_cache_file_name.string(), original_points_to_save))
             {
-                std::cout << "problem with save_vector_data for file '" << wd.original_points_to_save_cash_file_name.string() << "'" << std::endl;
+                std::cout << "problem with save_vector_data for file '" << wd.original_points_to_save_cache_file_name.string() << "'" << std::endl;
                 std::cout << __FILE__ << " " << __LINE__ << std::endl;
             }
 
@@ -969,16 +964,16 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     if (counter > params.min_counter_concatenated_trajectory_nodes)
     {
         std::filesystem::path path = params.working_directory_preview;
-        //path /= "cash";
-        std::string fn = "cash_session_chunk_" + std::to_string(original_points_to_save_counter) + ".cash";
+        //path /= "cache";
+        std::string fn = "session_chunk_" + std::to_string(original_points_to_save_counter) + ".cache";
         path /= fn;
-        wd.original_points_to_save_cash_file_name = path;
+        wd.original_points_to_save_cache_file_name = path;
 
-        std::cout << "original_points_to_save_cash_file_name " << path.string() << std::endl;
+        std::cout << "original_points_to_save_cache_file_name " << path.string() << std::endl;
 
-        if (!save_vector_data(wd.original_points_to_save_cash_file_name.string(), original_points_to_save))
+        if (!save_vector_data(wd.original_points_to_save_cache_file_name.string(), original_points_to_save))
         {
-            std::cout << "problem with save_vector_data for file '" << wd.original_points_to_save_cash_file_name.string() << "'" << std::endl;
+            std::cout << "problem with save_vector_data for file '" << wd.original_points_to_save_cache_file_name.string() << "'" << std::endl;
             std::cout << __FILE__ << " " << __LINE__ << std::endl;
         }
 
@@ -1016,10 +1011,10 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
         std::vector<unsigned short> intensity;
         std::vector<double> timestamps;
 
-        std::vector<Point3Di> original_points_to_save; // = worker_data[i].load_points(worker_data[i].original_points_cash_file_name);
-        if (!load_vector_data(worker_data_concatenated[i].original_points_to_save_cash_file_name.string(), original_points_to_save))
+        std::vector<Point3Di> original_points_to_save; // = worker_data[i].load_points(worker_data[i].original_points_cache_file_name);
+        if (!load_vector_data(worker_data_concatenated[i].original_points_to_save_cache_file_name.string(), original_points_to_save))
         {
-            std::cout << "problem with load_vector_data file '" << worker_data_concatenated[i].original_points_to_save_cash_file_name.string() << "'" << std::endl;
+            std::cout << "problem with load_vector_data file '" << worker_data_concatenated[i].original_points_to_save_cache_file_name.string() << "'" << std::endl;
             std::cout << __FILE__ << " " << __LINE__ << std::endl;
         }
 

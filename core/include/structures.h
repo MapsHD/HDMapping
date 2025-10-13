@@ -257,10 +257,10 @@ struct GeoPoint {
 struct WorkerData
 {
 	// std::vector<Point3Di> intermediate_points;
-	std::filesystem::path intermediate_points_cash_file_name;
+	std::filesystem::path intermediate_points_cache_file_name;
 	// std::vector<Point3Di> original_points_to_save;
-	std::filesystem::path original_points_cash_file_name;
-	std::filesystem::path original_points_to_save_cash_file_name;
+	std::filesystem::path original_points_cache_file_name;
+	std::filesystem::path original_points_to_save_cache_file_name;
 	std::vector<Eigen::Affine3d> intermediate_trajectory;
 	std::vector<Eigen::Affine3d> intermediate_trajectory_motion_model;
 	std::vector<std::pair<double, double>> intermediate_trajectory_timestamps;

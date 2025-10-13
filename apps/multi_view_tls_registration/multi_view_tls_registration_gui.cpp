@@ -569,15 +569,15 @@ void project_gui()
 
 		ImGui::Text("bucket [m]:");
         ImGui::PushItemWidth(ImGuiNumberWidth);
-        ImGui::InputDouble("X", &tls_registration.bucket_x, 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("X##b", &tls_registration.bucket_x, 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(xText);
         ImGui::SameLine();
-        ImGui::InputDouble("Y", &tls_registration.bucket_y, 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("Y##b", &tls_registration.bucket_y, 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(yText);
         ImGui::SameLine();
-        ImGui::InputDouble("Z", &tls_registration.bucket_z, 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("Z##b", &tls_registration.bucket_z, 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(zText);
 		ImGui::PopItemWidth();
@@ -981,15 +981,15 @@ void project_gui()
 
             ImGui::Text("Origin [m]:");
 			ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputDouble("X", &x_origin, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("X##o", &x_origin, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(xText);
 			ImGui::SameLine();
-            ImGui::InputDouble("Y", &y_origin, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("Y##o", &y_origin, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(yText);
             ImGui::SameLine();
-            ImGui::InputDouble("Z", &z_origin, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("Z##o", &z_origin, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(zText);
 			ImGui::PopItemWidth();
@@ -1253,19 +1253,19 @@ void project_gui()
             ImGui::Separator();
         }
 
-        ImGui::Text("Set offsets to export point cloud in global coordinate system:");
+        ImGui::Text("Set offsets to export point cloud in global coordinate system [m]:");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("each local coordinate of the point += offset");
         ImGui::PushItemWidth(ImGuiNumberWidth);
-        ImGui::InputDouble("X", &session.point_clouds_container.offset.x(), 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("X##f", &session.point_clouds_container.offset.x(), 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(xText);
 		ImGui::SameLine();
-        ImGui::InputDouble("Y", &session.point_clouds_container.offset.y(), 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("Y##f", &session.point_clouds_container.offset.y(), 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(yText);
         ImGui::SameLine();
-        ImGui::InputDouble("Z", &session.point_clouds_container.offset.z(), 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("Z##f", &session.point_clouds_container.offset.z(), 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(zText);
 		ImGui::PopItemWidth();

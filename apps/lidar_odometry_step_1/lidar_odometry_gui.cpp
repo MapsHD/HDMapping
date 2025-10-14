@@ -503,9 +503,9 @@ void lidar_odometry_gui()
             ImGui::Checkbox("save_calibration_validation_file", &params.save_calibration_validation);
             ImGui::InputInt("number of calibration validation points", &params.calibration_validation_points);
             ImGui::Checkbox("use_multithread", &params.useMultithread);
-            ImGui::InputDouble("real_time_threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.1f");
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("optimization timeout");
+            //ImGui::InputDouble("real_time_threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.1f");
+            //if (ImGui::IsItemHovered())
+            //    ImGui::SetTooltip("optimization timeout");
 
 			ImGui::NewLine();
 
@@ -1211,6 +1211,11 @@ void lidar_odometry_basic_gui()
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Apply preselected setings");
             if (isActive4) ImGui::PopStyleColor();
+
+            ImGui::InputDouble("real_time_threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.1f");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("set 0.1 to on-line, 0.2 to 2x online, 0.3 to 3x online (higher value --> better accuracy and precision)");
+
 
             ImGui::Checkbox("full_lidar_odometry_gui", &full_lidar_odometry_gui);
             ImGui::SameLine();

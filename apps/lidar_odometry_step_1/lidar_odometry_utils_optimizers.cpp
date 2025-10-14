@@ -1966,8 +1966,8 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
         for (int i = 0; i < worker_data.size(); i++)
         {
             std::vector<Point3Di> intermediate_points;
-            // = worker_data[i].load_points(worker_data[i].intermediate_points_cash_file_name);
-            load_vector_data(worker_data[i].intermediate_points_cash_file_name.string(), intermediate_points);
+            // = worker_data[i].load_points(worker_data[i].intermediate_points_cache_file_name);
+            load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points);
 
 
 
@@ -2405,9 +2405,9 @@ void Consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     {
         std::vector<Point3Di> intermediate_points;
 
-        if (!load_vector_data(worker_data[i].intermediate_points_cash_file_name.string(), intermediate_points))
+        if (!load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points))
         {
-            std::cout << "problem with load_vector_data file '" << worker_data[i].intermediate_points_cash_file_name.string() << "'" << std::endl;
+            std::cout << "problem with load_vector_data file '" << worker_data[i].intermediate_points_cache_file_name.string() << "'" << std::endl;
         }
 
         for (int j = 0; j < intermediate_points.size(); j++)
@@ -2782,9 +2782,9 @@ void Consistency2(std::vector<WorkerData> &worker_data, LidarOdometryParams &par
     for (int i = 0; i < worker_data.size(); i++)
     {
         std::vector<Point3Di> intermediate_points;
-        if (!load_vector_data(worker_data[i].intermediate_points_cash_file_name.string(), intermediate_points))
+        if (!load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points))
         {
-            std::cout << "problem with load_vector_data for file '" << worker_data[i].intermediate_points_cash_file_name.string() << "'" << std::endl;
+            std::cout << "problem with load_vector_data for file '" << worker_data[i].intermediate_points_cache_file_name.string() << "'" << std::endl;
         }
 
         for (int j = 0; j < intermediate_points.size(); j++)

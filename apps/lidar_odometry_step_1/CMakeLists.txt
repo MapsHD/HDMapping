@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.15.0)
 
 project(lidar_odometry_step_1)
 
-add_executable(
-  lidar_odometry_step_1 
+# Source files
+set(SOURCES
   lidar_odometry_gui.cpp lidar_odometry_utils.h lidar_odometry_utils.cpp
   lidar_odometry_utils_optimizers.cpp
   lidar_odometry.cpp lidar_odometry.h
@@ -11,6 +11,15 @@ add_executable(
   toml.hpp
   toml_io.h
   toml_io.cpp
+)
+
+# Windows: add resource file
+if(WIN32)
+    list(APPEND SOURCES ${REPOSITORY_DIRECTORY}/resources/resource1.rc)
+endif()
+
+add_executable(
+  lidar_odometry_step_1 ${SOURCES}
   )
 
 target_compile_definitions(lidar_odometry_step_1 PRIVATE -DWITH_GUI=1)

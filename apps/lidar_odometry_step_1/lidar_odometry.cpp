@@ -900,7 +900,7 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
 
         if (i % 1000 == 0)
         {
-            printf("processing worker_data [%d] of %d \n", i + 1, (int)worker_data.size());
+            printf("processing worker_data %d/%d \n", i + 1, (int)worker_data.size());
         }
         auto tmp_data = original_points;
         point_sizes_per_chunk.push_back(tmp_data.size());

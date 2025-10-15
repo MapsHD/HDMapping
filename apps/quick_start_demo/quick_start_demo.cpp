@@ -442,7 +442,8 @@ void wheel(int button, int dir, int x, int y)
 
 bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure)
 {
-    #if 0 ToDo
+    #if 0 
+    //ToDo
     if (worker_data.size() != 0)
     {
 
@@ -704,7 +705,8 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
 
 int main(int argc, char *argv[])
 {
-    #if 0 ToDo
+    #if 0 
+    //ToDo
     params.in_out_params_indoor.resolution_X = 0.3;
     params.in_out_params_indoor.resolution_Y = 0.3;
     params.in_out_params_indoor.resolution_Z = 0.3;

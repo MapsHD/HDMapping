@@ -12,6 +12,13 @@ bool TomlIO::SaveParametersToTomlFile(const std::string &filepath, LidarOdometry
         {
             if (attribute == "in_out_params_indoor" || attribute == "in_out_params_outdoor")
                 continue;
+
+            if (attribute == "clear_color")
+            {
+                const ImVec4& c = params.clear_color;
+                cat_tbl.insert(attribute, toml::array{ c.x, c.y, c.z, c.w });
+                continue;
+            }
             
             // Check if it's a motion_model_correction parameter
             auto motion_it = MOTION_MODEL_CORRECTION_POINTERS.find(attribute);
@@ -60,7 +67,7 @@ bool TomlIO::SaveParametersToTomlFile(const std::string &filepath, LidarOdometry
     out << "# Config version: " << params.config_version << std::endl;
     out << "# Created on: " << params.build_date << std::endl;
     out << "# " << std::endl;
-    out << "# This file contains 74 parameters organized in categories." << std::endl;
+    out << "# This file contains parameters organized in categories." << std::endl;
     out << "# Version information is stored in [version_info] section for compatibility checking." << std::endl;
     out << std::endl;
     
@@ -179,6 +186,18 @@ bool TomlIO::LoadParametersFromTomlFile(const std::string &filepath, LidarOdomet
                         else if constexpr (std::is_same_v<MemberType, std::string>) {
                             params.*ptr = attr_it->second.value_or(std::string{});
                         } }, it->second);
+        }
+
+        if (cat_tbl && cat_tbl->contains("clear_color"))
+        {
+            auto arr = cat_tbl->at("clear_color").as_array();
+            if (arr && arr->size() == 4)
+            {
+                params.clear_color.x = static_cast<float>(arr->at(0).as_floating_point()->get());
+                params.clear_color.y = static_cast<float>(arr->at(1).as_floating_point()->get());
+                params.clear_color.z = static_cast<float>(arr->at(2).as_floating_point()->get());
+                params.clear_color.w = static_cast<float>(arr->at(3).as_floating_point()->get());
+            }
         }
     }
     read_grid_params(params.in_out_params_indoor, tbl["in_out_params_indoor"].as_table());

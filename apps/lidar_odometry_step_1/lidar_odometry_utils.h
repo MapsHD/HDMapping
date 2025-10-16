@@ -21,6 +21,7 @@
 #include <python-scripts/constraints/constraint_fixed_parameter_jacobian.h>
 #include <common/include/cauchy.h>
 #include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
+#include <imgui.h>
 
 namespace fs = std::filesystem;
 
@@ -46,7 +47,7 @@ struct LidarOdometryParams
     std::string config_version = "1.0";
     std::string build_date = __DATE__;
     
-    //perfromance
+    //performance
     bool useMultithread = true;
     double real_time_threshold_seconds = 10.0; // for realtime use: threshold_nr_poses * 0.005, where 0.005 is related with IMU frequency
 
@@ -133,6 +134,7 @@ struct LidarOdometryParams
     double total_length_of_calculated_trajectory = 0.0;
     NDTBucketMapType buckets_indoor;
     NDTBucketMapType buckets_outdoor;
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);

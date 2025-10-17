@@ -1,0 +1,4 @@
+#include "resourceV.h"
+
+IDI_ICON1                ICON                     "iconV.ico"
+

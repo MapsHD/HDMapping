@@ -9,7 +9,7 @@ namespace mandeye::fd{
     const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
     const std::vector<std::string> ImageFilter = { "Image files", "*.png *.jpg *.jpeg *.bmp"};
     const std::vector <std::string> LazFilter = { "LAZ files (*.laz)", "*.laz *.las" };
-    const std::vector<std::string> Session_filter = { "session (*.json)", "session.json" };
+    const std::vector<std::string> Session_filter = { "session (*.json)", "*.json" };
     const std::vector<std::string> Resso_filter = { "Resso, (*.reg)", "*.reg" };
     const std::vector<std::string> Dxf_filter = { "dxf (*.dxf)", "*.dxf" };
     const std::vector<std::string> Csv_filter = { "Csv (*.csv)", "*.csv" };

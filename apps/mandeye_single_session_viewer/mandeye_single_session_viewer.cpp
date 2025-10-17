@@ -22,6 +22,16 @@
 
 #include <mutex>
 
+#ifdef _WIN32
+    #include <windows.h>
+    #include <shellapi.h>  // <-- Required for ShellExecuteA
+    #include "../../resources/resourceV.h"
+#endif
+
+bool info_gui = false;
+bool compass_ruler = true;
+static constexpr float ImGuiNumberWidth = 120.0f;
+
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
@@ -48,6 +58,26 @@ int mouse_buttons = 0;
 bool gui_mouse_down{false};
 float mouse_sensitivity = 1.0;
 
+// Target camera state for smooth transitions
+float target_rotate_x = rotate_x;
+float target_rotate_y = rotate_y;
+float target_translate_z = translate_z;
+
+// Transition timing
+bool camera_transition_active = false;
+const float camera_transition_speed = 1.0f; // higher = faster
+
+enum CameraPreset {
+    CAMERA_FRONT,
+    CAMERA_BACK,
+    CAMERA_LEFT,
+    CAMERA_RIGHT,
+    CAMERA_TOP,
+    CAMERA_BOTTOM,
+    CAMERA_ISO,
+    CAMERA_RESET
+};
+
 float m_ortho_projection[] = {1, 0, 0, 0,
                               0, 1, 0, 0,
                               0, 0, 1, 0,
@@ -61,8 +91,6 @@ float m_ortho_gizmo_view[] = {1, 0, 0, 0,
 int index_rendered_points_local = -1;
 float offset_intensity = 0.0;
 bool show_neighbouring_scans = false;
-const std::vector<std::string>
-    Session_filter = {"Session, json", "*.json"};
 
 Session session;
 
@@ -127,6 +155,7 @@ void motion(int x, int y)
             {
                 rotate_x += dy * 0.2f; // * mouse_sensitivity;
                 rotate_y += dx * 0.2f; // * mouse_sensitivity;
+                camera_transition_active = false;
             }
             if (mouse_buttons & 4)
             {
@@ -141,73 +170,282 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
-void project_gui()
+inline void ImGuiHyperlink(const char* url, ImVec4 color = ImVec4(0.2f, 0.4f, 0.8f, 1.0f))
 {
-    if (ImGui::Begin("main gui window"))
+    ImGui::PushStyleColor(ImGuiCol_Text, color);
+    ImGui::TextUnformatted(url);
+    ImGui::PopStyleColor();
+
+    // Get the item's rectangle
+    ImVec2 pos = ImGui::GetItemRectMin();
+    ImVec2 size = ImGui::GetItemRectSize();
+
+    // Change cursor on hover
+    if (ImGui::IsItemHovered())
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+
+    // Draw underline on hover
+    if (ImGui::IsItemHovered())
     {
-        ImGui::ColorEdit3("clear color", (float *)&clear_color);
-        
-        ImGui::InputInt("point_size", &point_size);
-        if (point_size < 1)
-        {
-            point_size = 1;
-        }
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddLine(
+            ImVec2(pos.x, pos.y + size.y),
+            ImVec2(pos.x + size.x, pos.y + size.y),
+            ImColor(color)
+        );
+    }
 
-        if (ImGui::Button("load session"))
-        {
-            std::string input_file_name = "";
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load session file", Session_filter);
-            std::cout << "Session file: '" << input_file_name << "'" << std::endl;
+    // Open URL on click
+    if (ImGui::IsItemClicked())
+    {
+#ifdef _WIN32
+        ShellExecuteA(0, "open", url, 0, 0, SW_SHOWNORMAL);
+#elif __APPLE__
+        std::string cmd = std::string("open ") + url;
+        system(cmd.c_str());
+#else
+        std::string cmd = std::string("xdg-open ") + url;
+        system(cmd.c_str());
+#endif
+    }
+}
 
-            if (input_file_name.size() > 0)
-            {
-                session.load(fs::path(input_file_name).string(), false, 0.0, 0.0, 0.0, false);
-            }
-        }
-     
-        if (session.point_clouds_container.point_clouds.size() > 0)
-        {
-            ImGui::InputFloat("offset_intensity", &offset_intensity, 0.01, 0.1);
-            if (offset_intensity < 0){
-                offset_intensity = 0;
-            }
-            if (offset_intensity > 1){
-                offset_intensity = 1;
-            }
+// Helper function for getting software version from CMake macros
+std::string get_software_version();
 
-            ImGui::Checkbox("show_neighbouring_scans", &show_neighbouring_scans);
-            
-            if (show_neighbouring_scans)
-            {
-                ImGui::ColorEdit3("pc_neigbouring_color", (float *)&pc_neigbouring_color);
-            }
-
-            ImGui::Text("----------- navigate with index_rendered_points_local ---------");
-
-            ImGui::InputInt("index_rendered_points_local", &index_rendered_points_local, 1, 10);
-            if (index_rendered_points_local < 0)
-            {
-                index_rendered_points_local = 0;
-            }
-            if (index_rendered_points_local >= session.point_clouds_container.point_clouds.size() - 1)
-            {
-                index_rendered_points_local = session.point_clouds_container.point_clouds.size() - 1;
-            }
-
-            ImGui::Text(session.point_clouds_container.point_clouds[index_rendered_points_local].file_name.c_str());
-
-            double ts = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps[0] / 1e9;
-                        ImGui::Text((std::string("ts: ") + std::to_string(ts)).c_str());
-        }
+void info_window()
+{
+    if (ImGui::Begin("Info", &info_gui, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("This program is optional step in MANDEYE process.");
+        ImGui::NewLine();
+        ImGui::Text("It analyzes session created in step_1 for problems that need to be addressed further.");
+        ImGui::Text("Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program.");
+        ImGui::NewLine();
+        ImGui::Text("Author: Janusz Bedkowski & contributors");
+        ImGui::NewLine();
+        ImGui::Text("Part of HDMapping software suite");
+        ImGui::Text("Version: %s (%s)", get_software_version(), __DATE__);
+        ImGui::Text("Project page: ");
+        ImGui::SameLine();
+        ImGuiHyperlink("https://github.com/MapsHD/HDMapping");
 
         ImGui::End();
     }
-    return;
+}
+
+void drawMiniCompassWithRuler(
+    const Eigen::Affine3f& viewLocal,
+    float translate_z,
+    ImVec2 compassSize = ImVec2(200, 200))
+{
+    auto drawLabel = [](float x, float y, float z, const char* text, float r, float g, float b)
+        {
+            glColor3f(r, g, b);
+            glRasterPos3f(x, y, z);
+            for (const char* c = text; *c; ++c)
+                glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
+        };
+
+    ImGuiIO& io = ImGui::GetIO();
+
+    glViewport(0, 0, compassSize.x, compassSize.y);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
+
+    // Projection
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(-1.5, 1.5, -1.5, 1.5, -10, 10);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    // Apply rotation
+    Eigen::Affine3f onlyRot = Eigen::Affine3f::Identity();
+    onlyRot.linear() = viewLocal.rotation();
+    glMultMatrixf(onlyRot.matrix().data());
+
+    float miniAxisLength = 1.0f;
+
+    // Snap ruler length to a "nice" round number (1, 2, or 5 × 10^n)
+    float rawUnit = 0.1f * translate_z; // adjust factor to taste
+    float base = pow(10.0f, floor(log10(rawUnit)));
+    float normalized = rawUnit / base;
+    float niceUnit;
+    if (normalized < 2.0f)      niceUnit = 1.0f;
+    else if (normalized < 5.0f) niceUnit = 2.0f;
+    else                        niceUnit = 5.0f;
+    float worldLength = niceUnit * base;
+
+    float scale = miniAxisLength / rawUnit; // convert scroll units to visual units
+    float axisDrawLength = worldLength * scale; // final axis length in mini compass
+
+    // Draw axes
+    glLineWidth(2.0f);
+    glBegin(GL_LINES);
+    glColor3f(1, 0, 0); glVertex3f(0, 0, 0); glVertex3f(axisDrawLength, 0, 0); // X
+    glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, axisDrawLength, 0); // Y
+    glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, axisDrawLength); // Z
+    glEnd();
+
+    // Draw axis labels and end-scale numeric labels
+    Eigen::Vector3f axes[3] = {
+        onlyRot * Eigen::Vector3f(miniAxisLength,0,0),
+        onlyRot * Eigen::Vector3f(0,miniAxisLength,0),
+        onlyRot * Eigen::Vector3f(0,0,miniAxisLength)
+    };
+
+    // Color per axis: X-red, Y-green, Z-blue
+    float colors[3][3] = { {1,0,0},{0,1,0},{0,0,1} };
+
+    for (int i = 0; i < 3; i++)
+    {
+        // Axis label
+        drawLabel(axes[i].x(), axes[i].y(), axes[i].z(), i == 0 ? "X (long.)" : i == 1 ? "Y (lat.)" : "Z (vert.)",
+            colors[i][0], colors[i][1], colors[i][2]);
+    }
+
+    // End scale label
+    char label[24];
+    if (worldLength >= 1000.0f) sprintf(label, "%.0f [km]", worldLength / 1000.0f);
+    else if (worldLength >= 1.0f)    sprintf(label, "%.0f [m]", worldLength);
+    else                             sprintf(label, "%.0f [cm]", worldLength * 100.0f);
+
+    drawLabel(axes[2].x() + 0.2f, axes[2].y() + 0.4f, axes[2].z() - 0.2f, label,
+        colors[2][0], colors[2][1], colors[2][2]);
+
+    // Restore viewport
+    glEnable(GL_DEPTH_TEST);
+    glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+}
+
+void updateCameraTransition(float deltaTime)
+{
+    if (!camera_transition_active)
+        return;
+
+    // Smoothly approach the target using exponential interpolation
+    //const float t = std::min(deltaTime * camera_transition_speed, 1.0f);
+
+    // Ease out curve, slow down effect
+    float t = 1.0f - pow(1.0f - std::min(deltaTime * camera_transition_speed, 1.0f), 3.0f);
+
+    bool doneX = fabs(target_rotate_x - rotate_x) < 0.01f;
+    bool doneY = fabs(target_rotate_y - rotate_y) < 0.01f;
+    bool doneZ = fabs(target_translate_z - translate_z) < 0.01f;
+
+    if (!doneX) rotate_x += (target_rotate_x - rotate_x) * t;
+    if (!doneY) rotate_y += (target_rotate_y - rotate_y) * t;
+    if (!doneZ) translate_z += (target_translate_z - translate_z) * t;
+
+    camera_transition_active = !(doneX && doneY && doneZ);
+}
+
+void setCameraPreset(CameraPreset preset)
+{
+    target_translate_z = translate_z;
+
+    switch (preset)
+    {
+    case CAMERA_FRONT:
+        target_rotate_x = -90.0f;
+        target_rotate_y = +90.0f;
+        break;
+    case CAMERA_BACK:
+        target_rotate_x = -90.0f;
+        target_rotate_y = -90.0f;
+        break;
+    case CAMERA_LEFT:
+        target_rotate_x = -90.0f;
+        target_rotate_y = 180.0f;
+        break;
+    case CAMERA_RIGHT:
+        target_rotate_x = -90.0f;
+        target_rotate_y = 0.0f;
+        break;
+    case CAMERA_TOP:
+        target_rotate_x = 0.0f;
+        target_rotate_y = 90.0f;
+        break;
+    case CAMERA_BOTTOM:
+        target_rotate_x = 180.0f;
+        target_rotate_y = -90.0f;
+        break;
+    case CAMERA_ISO:
+        target_rotate_x = -35.264f;
+        target_rotate_y = 135.0f;
+        break;
+    case CAMERA_RESET:
+        target_rotate_x = 0;
+        target_rotate_y = 0;
+        target_translate_z = -20.0f;
+        break;
+    }
+
+    camera_transition_active = true;
 }
 
 void display()
 {
     ImGuiIO &io = ImGui::GetIO();
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed('F'))
+        setCameraPreset(CAMERA_FRONT);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('B'))
+        setCameraPreset(CAMERA_BACK);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('L'))
+        setCameraPreset(CAMERA_LEFT);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('R'))
+        setCameraPreset(CAMERA_RIGHT);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('T'))
+        setCameraPreset(CAMERA_TOP);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('U'))
+        setCameraPreset(CAMERA_BOTTOM);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('I'))
+        setCameraPreset(CAMERA_ISO);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('Z'))
+        setCameraPreset(CAMERA_RESET); 
+    if (io.KeyCtrl && ImGui::IsKeyPressed('X'))
+        show_axes = !show_axes;
+    if (io.KeyCtrl && ImGui::IsKeyPressed('C'))
+        compass_ruler = !compass_ruler;
+
+    if (session.point_clouds_container.point_clouds.size() > 0)
+    {
+        if (io.KeyCtrl && ImGui::IsKeyPressed('N'))
+            show_neighbouring_scans = !show_neighbouring_scans;
+        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
+            offset_intensity += 0.01;
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
+            offset_intensity -= 0.01;
+        if (offset_intensity < 0) {
+            offset_intensity = 0;
+        }
+        if (offset_intensity > 1) {
+            offset_intensity = 1;
+        }
+
+        if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)
+            || ImGui::IsKeyPressed(ImGuiKey_PageUp, true)
+            || ImGui::IsKeyPressed('+', true)
+            )
+            index_rendered_points_local += 1;
+        if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)
+            || ImGui::IsKeyPressed(ImGuiKey_PageDown, true)
+            || ImGui::IsKeyPressed('-', true)
+            )
+            index_rendered_points_local -= 1;
+
+        if (index_rendered_points_local < 0)
+            index_rendered_points_local = 0;
+        if (index_rendered_points_local >= session.point_clouds_container.point_clouds.size())
+            index_rendered_points_local = session.point_clouds_container.point_clouds.size() - 1;
+    }
+
+    float deltaTime = ImGui::GetIO().DeltaTime;
+    updateCameraTransition(deltaTime);
+
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -254,13 +492,14 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
+    Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
+
     if (!is_ortho)
     {
         reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
 
         Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
         viewTranslation.translate(rotation_center);
-        Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
         viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
         viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
         viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
@@ -333,6 +572,7 @@ void display()
         pose(1, 3) = 0.0;
         pose(2, 3) = 0.0;
 
+        glPointSize(point_size);
         glBegin(GL_POINTS);
         for (int i = 0; i < session.point_clouds_container.point_clouds[index_rendered_points_local].points_local.size(); i++)
         {
@@ -351,25 +591,24 @@ void display()
 
             glColor3f(pc_neigbouring_color.x, pc_neigbouring_color.y, pc_neigbouring_color.z);
 
+            glPointSize(point_size);
             glBegin(GL_POINTS);
             for (int index = index_rendered_points_local - 20; index <= index_rendered_points_local + 20; index +=5){
-                if (index != index_rendered_points_local){
-                    if (index >= 0 && index < session.point_clouds_container.point_clouds.size()){
-                        Eigen::Affine3d pose = session.point_clouds_container.point_clouds[index].m_pose;
-                        Eigen::Affine3d pose_offset = session.point_clouds_container.point_clouds[index_rendered_points_local].m_pose;
+                if (index != index_rendered_points_local && index >= 0 && index < session.point_clouds_container.point_clouds.size()){
+                    Eigen::Affine3d pose = session.point_clouds_container.point_clouds[index].m_pose;
+                    Eigen::Affine3d pose_offset = session.point_clouds_container.point_clouds[index_rendered_points_local].m_pose;
 
-                        pose(0, 3) -= pose_offset(0, 3);
-                        pose(1, 3) -= pose_offset(1, 3);
-                        pose(2, 3) -= pose_offset(2, 3);
+                    pose(0, 3) -= pose_offset(0, 3);
+                    pose(1, 3) -= pose_offset(1, 3);
+                    pose(2, 3) -= pose_offset(2, 3);
 
-                        for (int i = 0; i < session.point_clouds_container.point_clouds[index].points_local.size(); i++)
-                        {
-                            Eigen::Vector3d p(session.point_clouds_container.point_clouds[index].points_local[i].x(),
-                                              session.point_clouds_container.point_clouds[index].points_local[i].y(),
-                                              session.point_clouds_container.point_clouds[index].points_local[i].z());
-                            p = pose * p;
-                            glVertex3f(p.x(), p.y(), p.z());
-                        }
+                    for (int i = 0; i < session.point_clouds_container.point_clouds[index].points_local.size(); i++)
+                    {
+                        Eigen::Vector3d p(session.point_clouds_container.point_clouds[index].points_local[i].x(),
+                                            session.point_clouds_container.point_clouds[index].points_local[i].y(),
+                                            session.point_clouds_container.point_clouds[index].points_local[i].z());
+                        p = pose * p;
+                        glVertex3f(p.x(), p.y(), p.z());
                     }
                 }
             }
@@ -380,7 +619,156 @@ void display()
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
 
-    project_gui();
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::Button("Load session"))
+        {
+            info_gui = false;
+
+            std::string input_file_name = "";
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load session file", mandeye::fd::Session_filter);
+            std::cout << "Session file: '" << input_file_name << "'" << std::endl;
+
+            if (input_file_name.size() > 0)
+            {
+                session.load(fs::path(input_file_name).string(), false, 0.0, 0.0, 0.0, false);
+                index_rendered_points_local = 0;
+            }
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Select session to analyze");
+
+        ImGui::SameLine();
+        ImGui::Dummy(ImVec2(20, 0));
+        ImGui::SameLine();
+
+        if (ImGui::BeginMenu("View"))
+        {
+            if (session.point_clouds_container.point_clouds.size() > 0)
+            {
+                ImGui::PushItemWidth(ImGuiNumberWidth);
+                ImGui::InputFloat("offset_intensity", &offset_intensity, 0.01, 0.1, "%.2f");
+                if (offset_intensity < 0) {
+                    offset_intensity = 0;
+                }
+                if (offset_intensity > 1) {
+                    offset_intensity = 1;
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("keyboard up/down arrows");
+
+                auto tmp = point_size;
+                ImGui::InputInt("points size", &point_size);
+                ImGui::PopItemWidth();
+                if (point_size < 1)
+                    point_size = 1;
+                if (point_size > 10)
+                    point_size = 10;
+
+                if (tmp != point_size)
+                {
+                    for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                    {
+                        session.point_clouds_container.point_clouds[i].point_size = point_size;
+                    }
+                }
+
+                ImGui::MenuItem("show_neighbouring_scans", "Ctrl+N", &show_neighbouring_scans);
+                if (show_neighbouring_scans)
+                {
+                    ImGui::ColorEdit4("pc_neigbouring_color", (float*)&pc_neigbouring_color, ImGuiColorEditFlags_NoInputs);
+                }
+
+                ImGui::Separator();
+            }
+
+            ImGui::MenuItem("show_axes", "Ctrl+X", &show_axes);
+            ImGui::MenuItem("show_compass_ruler", "Ctrl+C", &compass_ruler);
+
+            //ImGui::MenuItem("show_covs", nullptr, &show_covs);
+
+            ImGui::Separator();
+
+            ImGui::ColorEdit4("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
+
+            ImGui::EndMenu();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Scene view relevant parameters");
+ 
+        if (ImGui::BeginMenu("Camera")) {
+            if (ImGui::MenuItem("Front", "Ctrl+F"))
+                setCameraPreset(CAMERA_FRONT);
+            if (ImGui::MenuItem("Back", "Ctrl+B"))
+                setCameraPreset(CAMERA_BACK);
+            if (ImGui::MenuItem("Left", "Ctrl+L"))
+                setCameraPreset(CAMERA_LEFT);
+            if (ImGui::MenuItem("Right", "Ctrl+R"))
+                setCameraPreset(CAMERA_RIGHT);
+            if (ImGui::MenuItem("Top", "Ctrl+T"))
+                setCameraPreset(CAMERA_TOP);
+            if (ImGui::MenuItem("Bottom", "Ctrl+U"))
+                setCameraPreset(CAMERA_BOTTOM);
+            if (ImGui::MenuItem("Isometric", "Ctrl+I"))
+                setCameraPreset(CAMERA_ISO);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Reset", "Ctrl+Z"))
+                setCameraPreset(CAMERA_RESET);
+            ImGui::EndMenu();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Change camera view to fixed positions");
+
+        ImGui::SameLine();
+        ImGui::Dummy(ImVec2(20, 0));
+        ImGui::SameLine();
+
+        if (session.point_clouds_container.point_clouds.size() > 0)
+        {
+            int tempIndex = index_rendered_points_local;
+            ImGui::PushItemWidth(ImGuiNumberWidth);
+            ImGui::InputInt("index_rendered_points_local", &tempIndex, 1, 10);
+            ImGui::PopItemWidth();
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text(session.point_clouds_container.point_clouds[index_rendered_points_local].file_name.c_str());
+                double ts = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps[0] / 1e9;
+                ImGui::Text((std::string("Timestamp: ") + std::to_string(ts)).c_str());
+                ImGui::EndTooltip();
+            }
+
+            if ((tempIndex >= 0) && (tempIndex < session.point_clouds_container.point_clouds.size()))
+            {
+                index_rendered_points_local = tempIndex;
+            }
+        }
+
+        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 2));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
+        if (ImGui::SmallButton("Info"))
+        {
+            info_gui = !info_gui;
+        }
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(3);
+
+
+        ImGui::EndMainMenuBar();
+    }
+
+    if (info_gui)
+    {
+        info_window();
+    }
+
+    if (compass_ruler)
+        drawMiniCompassWithRuler(viewLocal, fabs(translate_z));
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
@@ -395,6 +783,14 @@ bool initGL(int *argc, char **argv)
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
     glutCreateWindow("mandeye single session viewer " HDMAPPING_VERSION_STRING);
+
+    #ifdef _WIN32
+        HWND hwnd = FindWindow(NULL, "mandeye single session viewer " HDMAPPING_VERSION_STRING); // The window title must match exactly
+        HINSTANCE hInstance = GetModuleHandle(NULL);
+        SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+    #endif
+
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -482,6 +878,7 @@ void wheel(int button, int dir, int x, int y)
         else
         {
             translate_z -= 0.05f * translate_z;
+            camera_transition_active = false;
         }
     }
     else
@@ -493,10 +890,50 @@ void wheel(int button, int dir, int x, int y)
         else
         {
             translate_z += 0.05f * translate_z;
+            camera_transition_active = false;
         }
     }
 
     return;
+}
+
+//SpecialKeys handlers needed because of ImGui version <1.89 bug in handling keys
+void specialDown(int key, int x, int y)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    switch (key)
+    {
+    case GLUT_KEY_UP:    io.KeysDown[ImGuiKey_UpArrow] = true; break;
+    case GLUT_KEY_DOWN:  io.KeysDown[ImGuiKey_DownArrow] = true; break;
+    case GLUT_KEY_LEFT:  io.KeysDown[ImGuiKey_LeftArrow] = true; break;
+    case GLUT_KEY_RIGHT: io.KeysDown[ImGuiKey_RightArrow] = true; break;
+    case GLUT_KEY_PAGE_UP:   io.KeysDown[ImGuiKey_PageUp] = true; break;
+    case GLUT_KEY_PAGE_DOWN: io.KeysDown[ImGuiKey_PageDown] = true; break;
+    }
+
+    int mods = glutGetModifiers();
+    io.KeyCtrl = (mods & GLUT_ACTIVE_CTRL) != 0;
+    io.KeyShift = (mods & GLUT_ACTIVE_SHIFT) != 0;
+    io.KeyAlt = (mods & GLUT_ACTIVE_ALT) != 0;
+}
+
+void specialUp(int key, int x, int y)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    switch (key)
+    {
+    case GLUT_KEY_UP:    io.KeysDown[ImGuiKey_UpArrow] = false; break;
+    case GLUT_KEY_DOWN:  io.KeysDown[ImGuiKey_DownArrow] = false; break;
+    case GLUT_KEY_LEFT:  io.KeysDown[ImGuiKey_LeftArrow] = false; break;
+    case GLUT_KEY_RIGHT: io.KeysDown[ImGuiKey_RightArrow] = false; break;
+    case GLUT_KEY_PAGE_UP:   io.KeysDown[ImGuiKey_PageUp] = false; break;
+    case GLUT_KEY_PAGE_DOWN: io.KeysDown[ImGuiKey_PageDown] = false; break;
+    }
+
+    int mods = glutGetModifiers();
+    io.KeyCtrl = (mods & GLUT_ACTIVE_CTRL) != 0;
+    io.KeyShift = (mods & GLUT_ACTIVE_SHIFT) != 0;
+    io.KeyAlt = (mods & GLUT_ACTIVE_ALT) != 0;
 }
 
 int main(int argc, char *argv[])
@@ -506,6 +943,8 @@ int main(int argc, char *argv[])
     glutMouseFunc(mouse);
     glutMotionFunc(motion);
     glutMouseWheelFunc(wheel);
+    glutSpecialFunc(specialDown);
+    glutSpecialUpFunc(specialUp);
     glutMainLoop();
 
     ImGui_ImplOpenGL2_Shutdown();

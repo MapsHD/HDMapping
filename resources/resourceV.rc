@@ -1,4 +1,50 @@
+// Microsoft Visual C++ generated resource script.
+//
 #include "resourceV.h"
+/////////////////////////////////////////////////////////////////////////////
+// English (United States) resources
 
-IDI_ICON1                ICON                     "iconV.ico"
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_ICON1               ICON                    "iconV.ico"
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 0,0,8,8
+ PRODUCTVERSION 0,0,8,8
+ FILEFLAGSMASK 0x3fL
+ FILEOS 0x40004
+ FILETYPE 0x1
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "Mandeye\0"
+            VALUE "FileDescription", "HDMapping Session Viewer\0"
+            VALUE "FileVersion", "0.8.8\0"
+            VALUE "InternalName", "Single session viewer\0"
+            VALUE "LegalCopyright", "(c) 2025 github.com/MapsHD/HDMapping\0"
+            VALUE "OriginalFilename", "mandeye_single_session_viewer.exe\0"
+            VALUE "ProductVersion", "0.8.8\0"
+            VALUE "ProgramID", "github.com/MapsHD/HDMapping\0"
+            VALUE "ProductName", "HDMapping\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 0x04B0
+    END
+END
+/////////////////////////////////////////////////////////////////////////////
 

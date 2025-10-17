@@ -2,11 +2,20 @@ cmake_minimum_required(VERSION 3.15.0)
 
 project(mandeye_raw_data_viewer)
 
-add_executable(
-  mandeye_single_session_viewer
-  mandeye_single_session_viewer.cpp
-  ../lidar_odometry_step_1/lidar_odometry_utils.cpp
+# Source files
+set(SOURCES
+    mandeye_single_session_viewer.cpp
+    ../lidar_odometry_step_1/lidar_odometry_utils.cpp
 )
+
+# Windows: add resource file
+if(WIN32)
+    list(APPEND SOURCES ../../resources/resourceV.rc)
+endif()
+
+add_executable(
+  mandeye_single_session_viewer ${SOURCES}
+  )
 
 target_include_directories(
   mandeye_single_session_viewer

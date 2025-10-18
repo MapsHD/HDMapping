@@ -42,6 +42,7 @@ int mouse_buttons = 0;
 bool gui_mouse_down{false};
 float mouse_sensitivity = 1.0;
 bool move_source_trajectory_with_gizmo = false;
+bool show_correspondences = false;
 
 float m_ortho_projection[] = {1, 0, 0, 0,
                               0, 1, 0, 0,
@@ -471,6 +472,7 @@ void project_gui()
 
         ImGui::Checkbox("show_axes", &show_axes);
         ImGui::Checkbox("is_ortho", &is_ortho);
+        ImGui::Checkbox("show_correspondences", &show_correspondences);
         ImGui::Checkbox("move_source_trajectory_with_gizmo", &move_source_trajectory_with_gizmo);
         // if (ImGui::Button("Load target trajectory (e.g. ground truth trajectory))
         // {
@@ -673,20 +675,40 @@ void project_gui()
         }
         if (ImGui::Button("Calculate ATE (Absolute Trajectory Error)"))
         {
+            //std::cout << std::setprecision(20);
+            //for (const auto &p : Data::trajectory_est)
+            //{
+            //    std::cout << p.first << std::endl;
+            //}
+            //std::cout << " ---------------------------" << std::endl;
+            //for (const auto &p : Data::trajectory_gt)
+            //{
+            //    std::cout << p.first << std::endl;
+            //}
+
             double ATE = 0.0;
             int count = 0;
             for (const auto &p : Data::trajectory_est)
             {
+                //std::cout << p.second.matrix() << std::endl;
+
                 auto it = getInterpolatedPose(Data::trajectory_gt, p.first);
                 if (!it.isZero())
                 {
                     auto tp = Data::trajectory_offset * p.second;
+                    //std::cout << tp.matrix() << " " <<   std::endl;
 
+                    //std::cout << "ATE " << ATE << std::endl;
                     ATE += (tp - it).norm();
                     count++;
                 }
             }
-            std::cout << "ATE: " << ATE / count << std::endl;
+            if (count > 0){
+                std::cout << "ATE: " << ATE / count << std::endl;
+            }else{
+                std::cout << "I cant calculate ATE --> 0 correspondences" << std::endl;
+            }
+                
         }
         // if (ImGui::Button("Calculate RPE (Relative Pose Error)"))
         //{
@@ -824,19 +846,21 @@ void display()
     glEnd();
     glPointSize(1);
 
-    glBegin(GL_LINES);
-    glColor3f(1, 1, 1);
-    for (const auto &p : Data::trajectory_est)
-    {
-        auto it = getInterpolatedPose(Data::trajectory_gt, p.first);
-        if (!it.isZero())
+    if(show_correspondences){
+        glBegin(GL_LINES);
+        glColor3f(1, 1, 1);
+        for (const auto &p : Data::trajectory_est)
         {
-            auto tp = Data::trajectory_offset * p.second;
-            glVertex3f(tp(0, 3), tp(1, 3), tp(2, 3));
-            glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+            auto it = getInterpolatedPose(Data::trajectory_gt, p.first);
+            if (!it.isZero())
+            {
+                auto tp = Data::trajectory_offset * p.second;
+                glVertex3f(tp(0, 3), tp(1, 3), tp(2, 3));
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+            }
         }
+        glEnd();
     }
-    glEnd();
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();

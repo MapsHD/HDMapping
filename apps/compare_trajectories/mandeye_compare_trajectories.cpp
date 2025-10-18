@@ -92,7 +92,6 @@ std::vector<double> parseCSVLineSpace(const std::string &line)
     return values;
 }
 
-
 std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV(const std::string &file_path)
 {
     std::map<double, Eigen::Matrix4d> trajectory;
@@ -125,7 +124,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV(const std::string &fi
     return trajectory;
 }
 
-std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARROT(const std::string& file_path) 
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARROT(const std::string &file_path)
 {
     std::map<double, Eigen::Matrix4d> trajectory;
     std::ifstream file(file_path);
@@ -136,7 +135,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARROT(const std::s
     }
 
     std::string line;
-    std::getline(file, line);  // Skip header line
+    std::getline(file, line); // Skip header line
 
     while (std::getline(file, line))
     {
@@ -156,8 +155,8 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARROT(const std::s
         double r20 = values[10], r21 = values[11], r22 = values[12];
         Eigen::Matrix3d rotationMatrix;
         rotationMatrix << r00, r01, r02,
-                          r10, r11, r12,
-                          r20, r21, r22;
+            r10, r11, r12,
+            r20, r21, r22;
         pose.block<3, 3>(0, 0) = rotationMatrix;
 
         trajectory[timestamp] = pose;
@@ -165,7 +164,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARROT(const std::s
     return trajectory;
 }
 
-std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXROT(const std::string& file_path) 
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXROT(const std::string &file_path)
 {
     std::map<double, Eigen::Matrix4d> trajectory;
     std::ifstream file(file_path);
@@ -176,7 +175,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXROT(const std::st
     }
 
     std::string line;
-    std::getline(file, line);  // Skip header line
+    std::getline(file, line); // Skip header line
 
     while (std::getline(file, line))
     {
@@ -196,8 +195,8 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXROT(const std::st
         double r20 = values[10], r21 = values[11], r22 = values[12];
         Eigen::Matrix3d rotationMatrix;
         rotationMatrix << r00, r01, r02,
-                          r10, r11, r12,
-                          r20, r21, r22;
+            r10, r11, r12,
+            r20, r21, r22;
         pose.block<3, 3>(0, 0) = rotationMatrix;
 
         trajectory[timestamp] = pose;
@@ -205,7 +204,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXROT(const std::st
     return trajectory;
 }
 
-std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXROT(const std::string& file_path) 
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXROT(const std::string &file_path)
 {
     std::map<double, Eigen::Matrix4d> trajectory;
     std::ifstream file(file_path);
@@ -216,7 +215,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXROT(const st
     }
 
     std::string line;
-    std::getline(file, line);  // Skip header line
+    std::getline(file, line); // Skip header line
 
     while (std::getline(file, line))
     {
@@ -237,8 +236,8 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXROT(const st
         double r20 = values[11], r21 = values[12], r22 = values[13];
         Eigen::Matrix3d rotationMatrix;
         rotationMatrix << r00, r01, r02,
-                          r10, r11, r12,
-                          r20, r21, r22;
+            r10, r11, r12,
+            r20, r21, r22;
         pose.block<3, 3>(0, 0) = rotationMatrix;
 
         trajectory[timestamplidar] = pose;
@@ -246,7 +245,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXROT(const st
     return trajectory;
 }
 
-std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARQ(const std::string& file_path) 
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARQ(const std::string &file_path)
 {
     std::map<double, Eigen::Matrix4d> trajectory;
     std::ifstream file(file_path);
@@ -257,7 +256,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARQ(const std::str
     }
 
     std::string line;
-    std::getline(file, line);  // Skip header line
+    std::getline(file, line); // Skip header line
 
     while (std::getline(file, line))
     {
@@ -279,7 +278,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARQ(const std::str
     return trajectory;
 }
 
-std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXQ(const std::string& file_path) 
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXQ(const std::string &file_path)
 {
     std::map<double, Eigen::Matrix4d> trajectory;
     std::ifstream file(file_path);
@@ -290,7 +289,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXQ(const std::stri
     }
 
     std::string line;
-    std::getline(file, line);  // Skip header line
+    std::getline(file, line); // Skip header line
 
     while (std::getline(file, line))
     {
@@ -312,7 +311,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_UNIXQ(const std::stri
     return trajectory;
 }
 
-std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXQ(const std::string& file_path) 
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXQ(const std::string &file_path)
 {
     std::map<double, Eigen::Matrix4d> trajectory;
     std::ifstream file(file_path);
@@ -323,7 +322,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXQ(const std:
     }
 
     std::string line;
-    std::getline(file, line);  // Skip header line
+    std::getline(file, line); // Skip header line
 
     while (std::getline(file, line))
     {
@@ -346,7 +345,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_LIDARUNIXQ(const std:
     return trajectory;
 }
 
-std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_STEP1(const std::string& file_path) 
+std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_STEP1(const std::string &file_path)
 {
     std::map<double, Eigen::Matrix4d> trajectory;
     std::ifstream file(file_path);
@@ -357,7 +356,7 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_STEP1(const std::stri
     }
 
     std::string line;
-    std::getline(file, line);  // Skip header line
+    std::getline(file, line); // Skip header line
 
     while (std::getline(file, line))
     {
@@ -377,10 +376,10 @@ std::map<double, Eigen::Matrix4d> load_trajectory_from_CSV_STEP1(const std::stri
         double r20 = values[10], r21 = values[11], r22 = values[12];
         Eigen::Matrix3d rotationMatrix;
         rotationMatrix << r00, r01, r02,
-                          r10, r11, r12,
-                          r20, r21, r22;
+            r10, r11, r12,
+            r20, r21, r22;
         pose.block<3, 3>(0, 0) = rotationMatrix;
-        
+
         trajectory[timestamp] = pose;
     }
     return trajectory;
@@ -482,87 +481,9 @@ void project_gui()
         //         Data::trajectory_gt = load_trajectory_from_CSV(file_path[0]);
         //     }
         // }
-        if (ImGui::Button("Load source trajectory (timestampLidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(estimated trajectory)"))
-        {
-            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_est = load_trajectory_from_CSV_LIDARROT(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load source trajectory (timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(estimated trajectory)"))
-        {
-            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_est = load_trajectory_from_CSV_UNIXROT(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load source trajectory (timestampLidar,timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(estimated trajectory)"))
-        {
-            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_est = load_trajectory_from_CSV_LIDARUNIXROT(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load source trajectory (timestampLidar,x,y,z,qx,qy,qz,qw(estimated trajectory)"))
-        {
-            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_est = load_trajectory_from_CSV_LIDARQ(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load source trajectory (timestampUnix,x,y,z,qx,qy,qz,qw(estimated trajectory)"))
-        {
-            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_est = load_trajectory_from_CSV_UNIXQ(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load source trajectory (timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw(estimated trajectory)"))
-        {
-            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_est = load_trajectory_from_CSV_LIDARUNIXQ(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load source trajectory timestamp_nanoseconds,pose00,pose01,pose02,pose03,pose10,pose11,pose12,pose13,pose20,pose21,pose22,pose23,timestampUnix_nanoseconds,imuom,imufi,imuka ground truth trajectory"))
-        {
-            auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_est = load_trajectory_from_CSV_STEP1(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load target trajectory (timestampLidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(ground trajectory)"))
-        {
-            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_gt = load_trajectory_from_CSV_LIDARROT(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load target trajectory (timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(ground truth trajectory)"))
-        {
-            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_gt = load_trajectory_from_CSV_UNIXROT(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load target trajectory (timestampLidar,timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(ground truth trajectory)"))
-        {
-            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_gt = load_trajectory_from_CSV_LIDARUNIXROT(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load target trajectory (timestampLidar,x,y,z,qx,qy,qz,qw(ground truth trajectory)"))
+
+        ImGui::Text("--------------------------------");
+        if (ImGui::Button("(Step 1) Load target trajectory (timestampLidar,x,y,z,qx,qy,qz,qw(ground truth trajectory)"))
         {
             auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
             if (!file_path.empty())
@@ -570,145 +491,250 @@ void project_gui()
                 Data::trajectory_gt = load_trajectory_from_CSV_LIDARQ(file_path[0]);
             }
         }
-        if (ImGui::Button("Load target trajectory (timestampUnix,x,y,z,qx,qy,qz,qw(ground truth trajectory)"))
-        {
-            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_gt = load_trajectory_from_CSV_UNIXQ(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load target trajectory (timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw(ground truth trajectory)"))
-        {
-            auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
-            if (!file_path.empty())
-            {
-                Data::trajectory_gt = load_trajectory_from_CSV_LIDARUNIXQ(file_path[0]);
-            }
-        }
-        if (ImGui::Button("Load target trajectory timestamp_nanoseconds,pose00,pose01,pose02,pose03,pose10,pose11,pose12,pose13,pose20,pose21,pose22,pose23,timestampUnix_nanoseconds,imuom,imufi,imuka ground truth trajectory"))
+        if (ImGui::Button("(Step 2) Load source trajectory (timestampLidar,x,y,z,qx,qy,qz,qw(estimated trajectory)"))
         {
             auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
             if (!file_path.empty())
             {
-                Data::trajectory_gt = load_trajectory_from_CSV_STEP1(file_path[0]);
+                Data::trajectory_est = load_trajectory_from_CSV_LIDARQ(file_path[0]);
             }
         }
-        if (ImGui::Button("Align source trajectory to target trajectory (1 iteration of optimization)"))
+        if (ImGui::Button("(Step 3) Calculate ATE (Absolute Trajectory Error)"))
         {
-            Eigen::MatrixXd AtPA(6, 6);
-            AtPA.setZero();
-            Eigen::MatrixXd AtPB(6, 1);
-            AtPB.setZero();
-
-            const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(Eigen::Affine3d(Data::trajectory_offset.matrix()));
-
-            for (const auto &p : Data::trajectory_est)
-            {
-                auto it = getInterpolatedPose(Data::trajectory_gt, p.first);
-                if (!it.isZero())
-                {
-                    Eigen::Vector3d p_s = (Eigen::Affine3d(p.second.matrix())).translation();
-                    Eigen::Vector3d p_t = (Eigen::Affine3d(it.matrix())).translation();
-
-                    Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA_;
-                    point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
-                        AtPA_,
-                        pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                        p_s.x(), p_s.y(), p_s.z(),
-                        1, 0, 0, 0, 1, 0, 0, 0, 1);
-
-                    Eigen::Matrix<double, 6, 1> AtPB_;
-                    point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
-                        AtPB_,
-                        pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                        p_s.x(), p_s.y(), p_s.z(),
-                        1, 0, 0, 0, 1, 0, 0, 0, 1,
-                        p_t.x(), p_t.y(), p_t.z());
-
-                    AtPA.block<6, 6>(0, 0) += AtPA_;
-                    AtPB.block<6, 1>(0, 0) -= AtPB_;
-                }
-            }
-
-            Eigen::SparseMatrix<double> AtPAc(6, 6);
-            Eigen::SparseMatrix<double> AtPBc(6, 1);
-
-            AtPAc = AtPA.sparseView();
-            AtPBc = AtPB.sparseView();
-
-            Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPAc);
-            Eigen::SparseMatrix<double> x = solver.solve(AtPBc);
-            std::vector<double> h_x;
-            for (int k = 0; k < x.outerSize(); ++k)
-            {
-                std::cout << "result pose updates" << std::endl;
-                for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
-                {
-                    h_x.push_back(it.value());
-                    std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
-                }
-            }
-
-            if (h_x.size() == 6)
-            {
-                int counter = 0;
-                TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(Eigen::Affine3d(Data::trajectory_offset.matrix()));
-
-                pose.px += h_x[counter++];
-                pose.py += h_x[counter++];
-                pose.pz += h_x[counter++];
-                pose.om += h_x[counter++];
-                pose.fi += h_x[counter++];
-                pose.ka += h_x[counter++];
-
-                auto m_pose_result = affine_matrix_from_pose_tait_bryan(pose);
-
-                Data::trajectory_offset = m_pose_result.matrix();
-                std::cout << "PairWiseICP::compute SUCCESS" << std::endl;
-                // return true;
-            }
-            else
-            {
-                std::cout << "PairWiseICP::compute FAILED" << std::endl;
-            }
-        }
-        if (ImGui::Button("Calculate ATE (Absolute Trajectory Error)"))
-        {
-            //std::cout << std::setprecision(20);
-            //for (const auto &p : Data::trajectory_est)
+            // std::cout << std::setprecision(20);
+            // for (const auto &p : Data::trajectory_est)
             //{
-            //    std::cout << p.first << std::endl;
-            //}
-            //std::cout << " ---------------------------" << std::endl;
-            //for (const auto &p : Data::trajectory_gt)
+            //     std::cout << p.first << std::endl;
+            // }
+            // std::cout << " ---------------------------" << std::endl;
+            // for (const auto &p : Data::trajectory_gt)
             //{
-            //    std::cout << p.first << std::endl;
-            //}
+            //     std::cout << p.first << std::endl;
+            // }
 
             double ATE = 0.0;
+            double max_ATE = -1000000.0;
+            double min_ATE = 1000000.0;
             int count = 0;
             for (const auto &p : Data::trajectory_est)
             {
-                //std::cout << p.second.matrix() << std::endl;
+                // std::cout << p.second.matrix() << std::endl;
 
                 auto it = getInterpolatedPose(Data::trajectory_gt, p.first);
                 if (!it.isZero())
                 {
                     auto tp = Data::trajectory_offset * p.second;
-                    //std::cout << tp.matrix() << " " <<   std::endl;
+                    // std::cout << tp.matrix() << " " <<   std::endl;
 
-                    //std::cout << "ATE " << ATE << std::endl;
-                    ATE += (tp - it).norm();
+                    // std::cout << "ATE " << ATE << std::endl;
+                    double ate = (tp - it).norm();
+
+                    if (ate > max_ATE){
+                        max_ATE = ate;
+                    }
+                    if (ate < min_ATE)
+                    {
+                        min_ATE = ate;
+                    }
+                    ATE += ate;
                     count++;
                 }
             }
-            if (count > 0){
+            if (count > 0)
+            {
                 std::cout << "ATE: " << ATE / count << std::endl;
-            }else{
+                std::cout << "min_ATE: " << min_ATE << std::endl;
+                std::cout << "max_ATE: " << max_ATE << std::endl;
+            }
+            else
+            {
                 std::cout << "I cant calculate ATE --> 0 correspondences" << std::endl;
             }
-                
+        }
+        ImGui::Text("--------------------------------");
+
+        static bool other_function = false;
+        ImGui::Checkbox("other_function", &other_function);
+
+        if (other_function)
+        {
+            if (ImGui::Button("Load source trajectory (timestampLidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(estimated trajectory)"))
+            {
+                auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_est = load_trajectory_from_CSV_LIDARROT(file_path[0]);
+                }
+            }
+            if (ImGui::Button("Load source trajectory (timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(estimated trajectory)"))
+            {
+                auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_est = load_trajectory_from_CSV_UNIXROT(file_path[0]);
+                }
+            }
+            if (ImGui::Button("Load source trajectory (timestampLidar,timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(estimated trajectory)"))
+            {
+                auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_est = load_trajectory_from_CSV_LIDARUNIXROT(file_path[0]);
+                }
+            }
+
+            if (ImGui::Button("Load source trajectory (timestampUnix,x,y,z,qx,qy,qz,qw(estimated trajectory)"))
+            {
+                auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_est = load_trajectory_from_CSV_UNIXQ(file_path[0]);
+                }
+            }
+            if (ImGui::Button("Load source trajectory (timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw(estimated trajectory)"))
+            {
+                auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_est = load_trajectory_from_CSV_LIDARUNIXQ(file_path[0]);
+                }
+            }
+            if (ImGui::Button("Load source trajectory timestamp_nanoseconds,pose00,pose01,pose02,pose03,pose10,pose11,pose12,pose13,pose20,pose21,pose22,pose23,timestampUnix_nanoseconds,imuom,imufi,imuka ground truth trajectory"))
+            {
+                auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_est = load_trajectory_from_CSV_STEP1(file_path[0]);
+                }
+            }
+            if (ImGui::Button("Load target trajectory (timestampLidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(ground trajectory)"))
+            {
+                auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_gt = load_trajectory_from_CSV_LIDARROT(file_path[0]);
+                }
+            }
+            if (ImGui::Button("Load target trajectory (timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(ground truth trajectory)"))
+            {
+                auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_gt = load_trajectory_from_CSV_UNIXROT(file_path[0]);
+                }
+            }
+            if (ImGui::Button("Load target trajectory (timestampLidar,timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22(ground truth trajectory)"))
+            {
+                auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_gt = load_trajectory_from_CSV_LIDARUNIXROT(file_path[0]);
+                }
+            }
+
+            if (ImGui::Button("Load target trajectory (timestampUnix,x,y,z,qx,qy,qz,qw(ground truth trajectory)"))
+            {
+                auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_gt = load_trajectory_from_CSV_UNIXQ(file_path[0]);
+                }
+            }
+            if (ImGui::Button("Load target trajectory (timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw(ground truth trajectory)"))
+            {
+                auto file_path = pfd::open_file("Select target trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_gt = load_trajectory_from_CSV_LIDARUNIXQ(file_path[0]);
+                }
+            }
+            if (ImGui::Button("Load target trajectory timestamp_nanoseconds,pose00,pose01,pose02,pose03,pose10,pose11,pose12,pose13,pose20,pose21,pose22,pose23,timestampUnix_nanoseconds,imuom,imufi,imuka ground truth trajectory"))
+            {
+                auto file_path = pfd::open_file("Select source trajectory file", fs::current_path().string(), {"CSV Files", "*.csv"}).result();
+                if (!file_path.empty())
+                {
+                    Data::trajectory_gt = load_trajectory_from_CSV_STEP1(file_path[0]);
+                }
+            }
+            if (ImGui::Button("Align source trajectory to target trajectory (1 iteration of optimization)"))
+            {
+                Eigen::MatrixXd AtPA(6, 6);
+                AtPA.setZero();
+                Eigen::MatrixXd AtPB(6, 1);
+                AtPB.setZero();
+
+                const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(Eigen::Affine3d(Data::trajectory_offset.matrix()));
+
+                for (const auto &p : Data::trajectory_est)
+                {
+                    auto it = getInterpolatedPose(Data::trajectory_gt, p.first);
+                    if (!it.isZero())
+                    {
+                        Eigen::Vector3d p_s = (Eigen::Affine3d(p.second.matrix())).translation();
+                        Eigen::Vector3d p_t = (Eigen::Affine3d(it.matrix())).translation();
+
+                        Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA_;
+                        point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
+                            AtPA_,
+                            pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                            p_s.x(), p_s.y(), p_s.z(),
+                            1, 0, 0, 0, 1, 0, 0, 0, 1);
+
+                        Eigen::Matrix<double, 6, 1> AtPB_;
+                        point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
+                            AtPB_,
+                            pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                            p_s.x(), p_s.y(), p_s.z(),
+                            1, 0, 0, 0, 1, 0, 0, 0, 1,
+                            p_t.x(), p_t.y(), p_t.z());
+
+                        AtPA.block<6, 6>(0, 0) += AtPA_;
+                        AtPB.block<6, 1>(0, 0) -= AtPB_;
+                    }
+                }
+
+                Eigen::SparseMatrix<double> AtPAc(6, 6);
+                Eigen::SparseMatrix<double> AtPBc(6, 1);
+
+                AtPAc = AtPA.sparseView();
+                AtPBc = AtPB.sparseView();
+
+                Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPAc);
+                Eigen::SparseMatrix<double> x = solver.solve(AtPBc);
+                std::vector<double> h_x;
+                for (int k = 0; k < x.outerSize(); ++k)
+                {
+                    std::cout << "result pose updates" << std::endl;
+                    for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
+                    {
+                        h_x.push_back(it.value());
+                        std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
+                    }
+                }
+
+                if (h_x.size() == 6)
+                {
+                    int counter = 0;
+                    TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(Eigen::Affine3d(Data::trajectory_offset.matrix()));
+
+                    pose.px += h_x[counter++];
+                    pose.py += h_x[counter++];
+                    pose.pz += h_x[counter++];
+                    pose.om += h_x[counter++];
+                    pose.fi += h_x[counter++];
+                    pose.ka += h_x[counter++];
+
+                    auto m_pose_result = affine_matrix_from_pose_tait_bryan(pose);
+
+                    Data::trajectory_offset = m_pose_result.matrix();
+                    std::cout << "PairWiseICP::compute SUCCESS" << std::endl;
+                    // return true;
+                }
+                else
+                {
+                    std::cout << "PairWiseICP::compute FAILED" << std::endl;
+                }
+            }
         }
         // if (ImGui::Button("Calculate RPE (Relative Pose Error)"))
         //{
@@ -846,7 +872,8 @@ void display()
     glEnd();
     glPointSize(1);
 
-    if(show_correspondences){
+    if (show_correspondences)
+    {
         glBegin(GL_LINES);
         glColor3f(1, 1, 1);
         for (const auto &p : Data::trajectory_est)

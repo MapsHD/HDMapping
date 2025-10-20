@@ -254,6 +254,15 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j
 ```
 
+## WSL2 GUI
+On WSL2 to enable file dialogs in GUI applications you need to install one of the packages used by portable-file-dialogs listed [here](https://github.com/samhocevar/portable-file-dialogs/blob/c12ea8c9a727f5320a2b4570aee863bbede2a204/portable-file-dialogs.h#L539C1-L542C57).
+
+For example on WSL2 Ubuntu-24.04 following package is required to run GUI applications:
+
+``` bash
+sudo apt install zenity
+```
+
 ## Advanced CPU Optimization Options
 
 HDMapping includes automatic CPU optimization that detects your processor and applies the best compilation flags:

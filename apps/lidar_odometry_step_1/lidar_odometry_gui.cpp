@@ -187,29 +187,56 @@ void step1(const std::atomic<bool> &loPause)
     // input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
     input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
 
-    if (!input_folder_name.empty()) {
-        for (const auto& entry : fs::directory_iterator(input_folder_name)) {
-            if (entry.is_regular_file()) {
-                input_file_names.push_back(entry.path().string());
-            }
-        }
-
-        //std::cout << "input_file_names list begin" << std::endl;
-        //std::cout << "----------------------" << std::endl;
-        //for (const auto& fn : input_file_names)
-        //{
-        //    std::cout << "'" << fn << "'" << std::endl;
-        //}
-        //std::cout << "----------------------" << std::endl;
-        //std::cout << "input_file_names list end" << std::endl;
-
-        if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
+    if (fs::exists(input_folder_name))
+    {
+        if (!input_folder_name.empty())
         {
-            working_directory = fs::path(input_file_names[0]).parent_path().string();
-            calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages);
-            compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
-            step_1_done = true;
+            for (const auto &entry : fs::directory_iterator(input_folder_name))
+            {
+                if (entry.is_regular_file())
+                {
+                    input_file_names.push_back(entry.path().string());
+                }
+            }
+            // std::cout << "input_file_names list begin" << std::endl;
+            // std::cout << "----------------------" << std::endl;
+            // for (const auto& fn : input_file_names)
+            //{
+            //     std::cout << "'" << fn << "'" << std::endl;
+            // }
+            // std::cout << "----------------------" << std::endl;
+            // std::cout << "input_file_names list end" << std::endl;
+
+            if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
+            {
+                working_directory = fs::path(input_file_names[0]).parent_path().string();
+                calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages);
+                compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
+                step_1_done = true;
+            }
+        }else{
+            std::string message_info = "Problem with loading data from folder '" + input_folder_name + "' (Pease check if folder exists). Program will close once You click OK!!!";
+            std::cout << message_info << std::endl;
+            [[maybe_unused]]
+            pfd::message message(
+                "Information",
+                message_info.c_str(),
+                pfd::choice::ok, pfd::icon::info);
+            message.result();
+
+            exit(1);
         }
+    }else{
+        std::string message_info = "Problem with loading data from folder '" + input_folder_name + "' Pease check if folder name is composed of ASCII symbols, if not --> please change folder name. Program will close once You click OK!!!";
+        std::cout << message_info << std::endl;
+        [[maybe_unused]]
+        pfd::message message(
+            "Information",
+            message_info.c_str(),
+            pfd::choice::ok, pfd::icon::info);
+        message.result();
+
+        exit(1);
     }
 }
 

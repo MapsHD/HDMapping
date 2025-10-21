@@ -27,28 +27,34 @@ unsigned long long int get_rgd_index(const Eigen::Vector3d p, const Eigen::Vecto
 
 Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &trajectory, double query_time)
 {
+    
+    
     Eigen::Matrix4d ret(Eigen::Matrix4d::Zero());
     auto it_lower = trajectory.lower_bound(query_time);
     auto it_next = it_lower;
 
     if (it_lower == trajectory.begin())
     {
+        //std::cout << "1" << std::endl;
         return ret;
     }
     if (it_lower->first > query_time)
     {
+        //std::cout << "2" << std::endl;
         it_lower = std::prev(it_lower);
     }
     if (it_lower == trajectory.begin())
     {
+        //std::cout << "3" << std::endl;
         return ret;
     }
     if (it_lower == trajectory.end())
     {
+        //std::cout << "4" << std::endl;
         return ret;
     }
-    // std::cout << std::setprecision(10);
-    // std::cout << it_lower->first << " " << query_time << " " << it_next->first << " " << std::next(it_lower)->first << std::endl;
+     //std::cout << std::setprecision(10);
+     //std::cout << it_lower->first << " " << query_time << " " << it_next->first << " " << std::next(it_lower)->first << std::endl;
 
     double t1 = it_lower->first;
     double t2 = it_next->first;
@@ -56,13 +62,17 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &tra
     double difft2 = t2 - query_time;
     if (t1 == t2 && std::fabs(difft1) < 0.1)
     {
+        //std::cout << "5" << std::endl;
         ret = Eigen::Matrix4d::Identity();
         ret.col(3).head<3>() = it_next->second.col(3).head<3>();
         ret.topLeftCorner(3, 3) = it_lower->second.topLeftCorner(3, 3);
         return ret;
     }
-    if (std::fabs(difft1) < 0.15 && std::fabs(difft2) < 0.15)
+
+    //std::cout << std::fabs(difft1) << " " << std::fabs(difft2) << std::endl;
+    //if (std::fabs(difft1) < 0.15 && std::fabs(difft2) < 0.15)
     {
+        //std::cout << "6" << std::endl;
         assert(t2 > t1);
         assert(query_time > t1);
         assert(query_time < t2);

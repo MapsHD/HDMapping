@@ -205,23 +205,9 @@ include(cmake/imgui.cmake)
 include(cmake/imguizmo.cmake)
 include(cmake/implot.cmake)
 
-# Option to build with bundled Eigen
-option(BUILD_WITH_BUNDLED_EIGEN "Build with bundled Eigen" ON)
-if (BUILD_WITH_BUNDLED_EIGEN)
-    set(EIGEN_BUILD_DOC
-            OFF
-            CACHE BOOL "" FORCE)
-    set(EIGEN_BUILD_TESTING
-            OFF
-            CACHE BOOL "" FORCE)
-
-    add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)
-    set(EIGEN3_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)
-    MESSAGE(STATUS "Using bundled Eigen3 : ${EIGEN_INCLUDE_DIR}")
-else()
-    find_package(Eigen3 REQUIRED)
-    MESSAGE(STATUS "Found Eigen3: ${EIGEN3_INCLUDE_DIR}")
-endif()
+add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)
+set(EIGEN3_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)
+MESSAGE(STATUS "Using bundled Eigen3 : ${EIGEN3_INCLUDE_DIR}")
 
 option(BUILD_WITH_BUNDLED_FREEGLUT "Build with bundled FreeGlut" ON)
 if (BUILD_WITH_BUNDLED_FREEGLUT)

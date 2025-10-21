@@ -4,6 +4,8 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
+#include <utils.hpp>
+
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <glm/glm.hpp>
@@ -32,6 +34,13 @@ bool info_gui = false;
 bool compass_ruler = true;
 static constexpr float ImGuiNumberWidth = 120.0f;
 
+std::vector<std::string> infoLines = {
+    "This program is optional step in MANDEYE process.",
+    "",
+    "It analyzes session created in step_1 for problems that need to be addressed further.",
+    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program.",
+};
+
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
@@ -57,26 +66,6 @@ int mouse_old_x, mouse_old_y;
 int mouse_buttons = 0;
 bool gui_mouse_down{false};
 float mouse_sensitivity = 1.0;
-
-// Target camera state for smooth transitions
-float target_rotate_x = rotate_x;
-float target_rotate_y = rotate_y;
-float target_translate_z = translate_z;
-
-// Transition timing
-bool camera_transition_active = false;
-const float camera_transition_speed = 1.0f; // higher = faster
-
-enum CameraPreset {
-    CAMERA_FRONT,
-    CAMERA_BACK,
-    CAMERA_LEFT,
-    CAMERA_RIGHT,
-    CAMERA_TOP,
-    CAMERA_BOTTOM,
-    CAMERA_ISO,
-    CAMERA_RESET
-};
 
 float m_ortho_projection[] = {1, 0, 0, 0,
                               0, 1, 0, 0,
@@ -168,222 +157,6 @@ void motion(int x, int y)
         mouse_old_y = y;
     }
     glutPostRedisplay();
-}
-
-inline void ImGuiHyperlink(const char* url, ImVec4 color = ImVec4(0.2f, 0.4f, 0.8f, 1.0f))
-{
-    ImGui::PushStyleColor(ImGuiCol_Text, color);
-    ImGui::TextUnformatted(url);
-    ImGui::PopStyleColor();
-
-    // Get the item's rectangle
-    ImVec2 pos = ImGui::GetItemRectMin();
-    ImVec2 size = ImGui::GetItemRectSize();
-
-    // Change cursor on hover
-    if (ImGui::IsItemHovered())
-        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-
-    // Draw underline on hover
-    if (ImGui::IsItemHovered())
-    {
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        draw_list->AddLine(
-            ImVec2(pos.x, pos.y + size.y),
-            ImVec2(pos.x + size.x, pos.y + size.y),
-            ImColor(color)
-        );
-    }
-
-    // Open URL on click
-    if (ImGui::IsItemClicked())
-    {
-#ifdef _WIN32
-        ShellExecuteA(0, "open", url, 0, 0, SW_SHOWNORMAL);
-#elif __APPLE__
-        std::string cmd = std::string("open ") + url;
-        system(cmd.c_str());
-#else
-        std::string cmd = std::string("xdg-open ") + url;
-        system(cmd.c_str());
-#endif
-    }
-}
-
-// Helper function for getting software version from CMake macros
-std::string get_software_version();
-
-void info_window()
-{
-    if (ImGui::Begin("Info", &info_gui, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::Text("This program is optional step in MANDEYE process.");
-        ImGui::NewLine();
-        ImGui::Text("It analyzes session created in step_1 for problems that need to be addressed further.");
-        ImGui::Text("Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program.");
-        ImGui::NewLine();
-        ImGui::Text("Author: Janusz Bedkowski & contributors");
-        ImGui::NewLine();
-        ImGui::Text("Part of HDMapping software suite");
-        ImGui::Text("Version: %s (%s)", get_software_version(), __DATE__);
-        ImGui::Text("Project page: ");
-        ImGui::SameLine();
-        ImGuiHyperlink("https://github.com/MapsHD/HDMapping");
-
-        ImGui::End();
-    }
-}
-
-void drawMiniCompassWithRuler(
-    const Eigen::Affine3f& viewLocal,
-    float translate_z,
-    ImVec2 compassSize = ImVec2(200, 200))
-{
-    auto drawLabel = [](float x, float y, float z, const char* text, float r, float g, float b)
-        {
-            glColor3f(r, g, b);
-            glRasterPos3f(x, y, z);
-            for (const char* c = text; *c; ++c)
-                glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
-        };
-
-    ImGuiIO& io = ImGui::GetIO();
-
-    glViewport(0, 0, compassSize.x, compassSize.y);
-    glClear(GL_DEPTH_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
-
-    // Projection
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(-1.5, 1.5, -1.5, 1.5, -10, 10);
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    // Apply rotation
-    Eigen::Affine3f onlyRot = Eigen::Affine3f::Identity();
-    onlyRot.linear() = viewLocal.rotation();
-    glMultMatrixf(onlyRot.matrix().data());
-
-    float miniAxisLength = 1.0f;
-
-    // Snap ruler length to a "nice" round number (1, 2, or 5 × 10^n)
-    float rawUnit = 0.1f * translate_z; // adjust factor to taste
-    float base = pow(10.0f, floor(log10(rawUnit)));
-    float normalized = rawUnit / base;
-    float niceUnit;
-    if (normalized < 2.0f)      niceUnit = 1.0f;
-    else if (normalized < 5.0f) niceUnit = 2.0f;
-    else                        niceUnit = 5.0f;
-    float worldLength = niceUnit * base;
-
-    float scale = miniAxisLength / rawUnit; // convert scroll units to visual units
-    float axisDrawLength = worldLength * scale; // final axis length in mini compass
-
-    // Draw axes
-    glLineWidth(2.0f);
-    glBegin(GL_LINES);
-    glColor3f(1, 0, 0); glVertex3f(0, 0, 0); glVertex3f(axisDrawLength, 0, 0); // X
-    glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, axisDrawLength, 0); // Y
-    glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, axisDrawLength); // Z
-    glEnd();
-
-    // Draw axis labels and end-scale numeric labels
-    Eigen::Vector3f axes[3] = {
-        onlyRot * Eigen::Vector3f(miniAxisLength,0,0),
-        onlyRot * Eigen::Vector3f(0,miniAxisLength,0),
-        onlyRot * Eigen::Vector3f(0,0,miniAxisLength)
-    };
-
-    // Color per axis: X-red, Y-green, Z-blue
-    float colors[3][3] = { {1,0,0},{0,1,0},{0,0,1} };
-
-    for (int i = 0; i < 3; i++)
-    {
-        // Axis label
-        drawLabel(axes[i].x(), axes[i].y(), axes[i].z(), i == 0 ? "X (long.)" : i == 1 ? "Y (lat.)" : "Z (vert.)",
-            colors[i][0], colors[i][1], colors[i][2]);
-    }
-
-    // End scale label
-    char label[24];
-    if (worldLength >= 1000.0f) sprintf(label, "%.0f [km]", worldLength / 1000.0f);
-    else if (worldLength >= 1.0f)    sprintf(label, "%.0f [m]", worldLength);
-    else                             sprintf(label, "%.0f [cm]", worldLength * 100.0f);
-
-    drawLabel(axes[2].x() + 0.2f, axes[2].y() + 0.4f, axes[2].z() - 0.2f, label,
-        colors[2][0], colors[2][1], colors[2][2]);
-
-    // Restore viewport
-    glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-}
-
-void updateCameraTransition(float deltaTime)
-{
-    if (!camera_transition_active)
-        return;
-
-    // Smoothly approach the target using exponential interpolation
-    //const float t = std::min(deltaTime * camera_transition_speed, 1.0f);
-
-    // Ease out curve, slow down effect
-    float t = 1.0f - pow(1.0f - std::min(deltaTime * camera_transition_speed, 1.0f), 3.0f);
-
-    bool doneX = fabs(target_rotate_x - rotate_x) < 0.01f;
-    bool doneY = fabs(target_rotate_y - rotate_y) < 0.01f;
-    bool doneZ = fabs(target_translate_z - translate_z) < 0.01f;
-
-    if (!doneX) rotate_x += (target_rotate_x - rotate_x) * t;
-    if (!doneY) rotate_y += (target_rotate_y - rotate_y) * t;
-    if (!doneZ) translate_z += (target_translate_z - translate_z) * t;
-
-    camera_transition_active = !(doneX && doneY && doneZ);
-}
-
-void setCameraPreset(CameraPreset preset)
-{
-    target_translate_z = translate_z;
-
-    switch (preset)
-    {
-    case CAMERA_FRONT:
-        target_rotate_x = -90.0f;
-        target_rotate_y = +90.0f;
-        break;
-    case CAMERA_BACK:
-        target_rotate_x = -90.0f;
-        target_rotate_y = -90.0f;
-        break;
-    case CAMERA_LEFT:
-        target_rotate_x = -90.0f;
-        target_rotate_y = 180.0f;
-        break;
-    case CAMERA_RIGHT:
-        target_rotate_x = -90.0f;
-        target_rotate_y = 0.0f;
-        break;
-    case CAMERA_TOP:
-        target_rotate_x = 0.0f;
-        target_rotate_y = 90.0f;
-        break;
-    case CAMERA_BOTTOM:
-        target_rotate_x = 180.0f;
-        target_rotate_y = -90.0f;
-        break;
-    case CAMERA_ISO:
-        target_rotate_x = -35.264f;
-        target_rotate_y = 135.0f;
-        break;
-    case CAMERA_RESET:
-        target_rotate_x = 0;
-        target_rotate_y = 0;
-        target_translate_z = -20.0f;
-        break;
-    }
-
-    camera_transition_active = true;
 }
 
 void display()
@@ -726,8 +499,12 @@ void display()
         if (session.point_clouds_container.point_clouds.size() > 0)
         {
             int tempIndex = index_rendered_points_local;
+            ImGui::Text("index_rendered_points_local: ");
+            ImGui::SameLine();
             ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputInt("index_rendered_points_local", &tempIndex, 1, 10);
+            ImGui::SliderInt("##irpls", &tempIndex, 0, static_cast<int>(session.point_clouds_container.point_clouds.size() - 1));
+            ImGui::SameLine();
+            ImGui::InputInt("##irpli", &tempIndex, 1, 10);
             ImGui::PopItemWidth();
             if (ImGui::IsItemHovered())
             {
@@ -762,13 +539,10 @@ void display()
         ImGui::EndMainMenuBar();
     }
 
-    if (info_gui)
-    {
-        info_window();
-    }
+    info_window(infoLines, &info_gui);
 
     if (compass_ruler)
-        drawMiniCompassWithRuler(viewLocal, fabs(translate_z));
+        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), clear_color);
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());

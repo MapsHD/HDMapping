@@ -176,47 +176,50 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         }
 
         std::cout << "loaded from json: " << file_name << std::endl;
-        std::cout << "offset_x: " << point_clouds_container.offset.x() << std::endl;
-        std::cout << "offset_y: " << point_clouds_container.offset.y() << std::endl;
-        std::cout << "offset_z: " << point_clouds_container.offset.z() << std::endl;
+        std::cout << "offset_x: " << point_clouds_container.offset.x()
+                  << ", offset_y: " << point_clouds_container.offset.y()
+                  << ", offset_z: " << point_clouds_container.offset.z()
+                  << " [m]" << std::endl;
         std::cout << "folder_name: '" << folder_name << "'" << std::endl;
         std::cout << "out_folder_name: '" << out_folder_name << "'" << std::endl;
         std::cout << "poses_file_name: '" << poses_file_name << "'" << std::endl;
         std::cout << "initial_poses_file_name: '" << initial_poses_file_name << "'" << std::endl;
         std::cout << "out_poses_file_name: '" << out_poses_file_name << "'" << std::endl;
 
-        std::cout << "------loop closure edges-----" << std::endl;
+        if (!loop_closure_edges.empty()) {
+            std::cout << "------loop closure edges-----" << std::endl;
 
-        for (const auto &edge : loop_closure_edges)
-        {
-            std::cout << "<<<<<<<<<<<<<<<<<<<" << std::endl;
-            std::cout << "index_from: " << edge.index_from << std::endl;
-            std::cout << "index_to: " << edge.index_to << std::endl;
-            std::cout << "is_fixed_fi: " << edge.is_fixed_fi << std::endl;
-            std::cout << "is_fixed_ka: " << edge.is_fixed_ka << std::endl;
-            std::cout << "is_fixed_om: " << edge.is_fixed_om << std::endl;
-            std::cout << "is_fixed_px: " << edge.is_fixed_px << std::endl;
-            std::cout << "is_fixed_py: " << edge.is_fixed_py << std::endl;
-            std::cout << "is_fixed_pz: " << edge.is_fixed_pz << std::endl;
-            std::cout << "relative_pose_tb.fi: " << edge.relative_pose_tb.fi << std::endl;
-            std::cout << "relative_pose_tb.ka: " << edge.relative_pose_tb.ka << std::endl;
-            std::cout << "relative_pose_tb.om: " << edge.relative_pose_tb.om << std::endl;
-            std::cout << "relative_pose_tb.px: " << edge.relative_pose_tb.px << std::endl;
-            std::cout << "relative_pose_tb.py: " << edge.relative_pose_tb.py << std::endl;
-            std::cout << "relative_pose_tb.pz: " << edge.relative_pose_tb.pz << std::endl;
-            std::cout << "relative_pose_tb_weights.fi: " << edge.relative_pose_tb_weights.fi << std::endl;
-            std::cout << "relative_pose_tb_weights.ka: " << edge.relative_pose_tb_weights.ka << std::endl;
-            std::cout << "relative_pose_tb_weights.om: " << edge.relative_pose_tb_weights.om << std::endl;
-            std::cout << "relative_pose_tb_weights.px: " << edge.relative_pose_tb_weights.px << std::endl;
-            std::cout << "relative_pose_tb_weights.py: " << edge.relative_pose_tb_weights.py << std::endl;
-            std::cout << "relative_pose_tb_weights.pz: " << edge.relative_pose_tb_weights.pz << std::endl;
+            for (const auto& edge : loop_closure_edges)
+            {
+                std::cout << "<<<<<<<<<<<<<<<<<<<" << std::endl;
+                std::cout << "index_from: " << edge.index_from << std::endl;
+                std::cout << "index_to: " << edge.index_to << std::endl;
+                std::cout << "is_fixed_fi: " << edge.is_fixed_fi << std::endl;
+                std::cout << "is_fixed_ka: " << edge.is_fixed_ka << std::endl;
+                std::cout << "is_fixed_om: " << edge.is_fixed_om << std::endl;
+                std::cout << "is_fixed_px: " << edge.is_fixed_px << std::endl;
+                std::cout << "is_fixed_py: " << edge.is_fixed_py << std::endl;
+                std::cout << "is_fixed_pz: " << edge.is_fixed_pz << std::endl;
+                std::cout << "relative_pose_tb.fi: " << edge.relative_pose_tb.fi << std::endl;
+                std::cout << "relative_pose_tb.ka: " << edge.relative_pose_tb.ka << std::endl;
+                std::cout << "relative_pose_tb.om: " << edge.relative_pose_tb.om << std::endl;
+                std::cout << "relative_pose_tb.px: " << edge.relative_pose_tb.px << std::endl;
+                std::cout << "relative_pose_tb.py: " << edge.relative_pose_tb.py << std::endl;
+                std::cout << "relative_pose_tb.pz: " << edge.relative_pose_tb.pz << std::endl;
+                std::cout << "relative_pose_tb_weights.fi: " << edge.relative_pose_tb_weights.fi << std::endl;
+                std::cout << "relative_pose_tb_weights.ka: " << edge.relative_pose_tb_weights.ka << std::endl;
+                std::cout << "relative_pose_tb_weights.om: " << edge.relative_pose_tb_weights.om << std::endl;
+                std::cout << "relative_pose_tb_weights.px: " << edge.relative_pose_tb_weights.px << std::endl;
+                std::cout << "relative_pose_tb_weights.py: " << edge.relative_pose_tb_weights.py << std::endl;
+                std::cout << "relative_pose_tb_weights.pz: " << edge.relative_pose_tb_weights.pz << std::endl;
+            }
         }
 
-        std::cout << "------laz file names-----" << std::endl;
-        for (const auto &fn : laz_file_names)
-        {
-            std::cout << "'" << fn << "'" << std::endl;
-        }
+        //std::cout << "------laz file names-----" << std::endl;
+        //for (const auto &fn : laz_file_names)
+        //{
+        //    std::cout << "'" << fn << "'" << std::endl;
+        //}
 #if WITH_GUI == 1
         for (const auto &gcp_json : data["ground_control_points"])
         {
@@ -262,6 +265,8 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             std::cout << "adding cp[" << name << "]" << std::endl;
         };
 #endif
+
+        std::cout << "-----------------------------" << std::endl;
 
         // loading all data
         point_clouds_container.load_whu_tls(laz_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
@@ -326,7 +331,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
     }
     catch (std::exception &e)
     {
-        std::cout << "cant load session: " << e.what() << std::endl;
+        std::cout << "can't load session: " << e.what() << std::endl;
         return false;
     }
 }

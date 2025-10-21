@@ -6,6 +6,7 @@ project(mandeye_raw_data_viewer)
 set(SOURCES
     mandeye_single_session_viewer.cpp
     ../lidar_odometry_step_1/lidar_odometry_utils.cpp
+    "../../core/src/utils.cpp"
 )
 
 # Windows: add resource file

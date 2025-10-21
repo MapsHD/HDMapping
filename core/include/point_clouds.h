@@ -36,7 +36,12 @@ public:
 	std::string poses_file_name;
 	std::string initial_poses_file_name;
 	std::string out_poses_file_name;
-	
+
+	struct PointCloudDimensions {
+		double x_min, x_max, y_min, y_max, z_min, z_max;
+		double length, width, height;
+	};
+
 	bool load(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z);
 	bool update_poses_from_RESSO(const std::string& folder_with_point_clouds, const std::string& poses_file_name);
 	bool update_poses_from_RESSO_inverse(const std::string &folder_with_point_clouds, const std::string &poses_file_name);
@@ -44,9 +49,12 @@ public:
 	bool load_eth(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z);
 	//std::vector<Eigen::Vector3d> load_points(const std::string& point_clouds_file_name);
 #if WITH_GUI == 1
+	void draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_01x01,
+		bool yz_grid_10x10, bool yz_grid_1x1, bool yz_grid_01x01,
+		bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01, PointClouds::PointCloudDimensions dims);
 	void render(const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud, bool xz_intersection, bool yz_intersection, bool xy_intersection,
 				bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_01x01, bool yz_grid_10x10,
-				bool yz_grid_1x1, bool yz_grid_01x01, bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01, double intersection_width);
+				bool yz_grid_1x1, bool yz_grid_01x01, bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01, double intersection_width, PointClouds::PointCloudDimensions dims = {});
 #endif
 	//bool save_poses();
 	bool save_poses(const std::string file_name, bool is_subsession);
@@ -60,7 +68,8 @@ public:
 	
 	bool load_pose_ETH(const std::string& fn, Eigen::Affine3d &m_increment);
 	bool load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset);
-	void print_point_cloud_dimention();
+	PointCloudDimensions compute_point_cloud_dimension() const;
+	void print_point_cloud_dimension();
 	bool load_3DTK_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z);
 };
 

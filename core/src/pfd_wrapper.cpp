@@ -36,27 +36,31 @@ namespace mandeye::fd{
         return files;
     }
 
-    std::string SaveFileDialog(const std::string& title, const std::vector<std::string>&filter, const std::string& defaultExtension)
-    {
-        std::string file;
-        static std::shared_ptr<pfd::save_file> save_file;
-        const auto t = [&]() {
-            file = pfd::save_file(title, internal::lastLocationHint, filter).result();
-        };
-        std::thread th(t);
-        th.join();
+  std::string SaveFileDialog(const std::string& title, const std::vector<std::string>& filter, const std::string& defaultExtension, const std::string& defaultFileName)
+  {
+      std::string file;
+      static std::shared_ptr<pfd::save_file> save_file;
 
-        std::filesystem::path pfile(file);
-        if (!pfile.has_extension())
-        {
-          file+=defaultExtension;
-        }
-        if (pfile.has_parent_path())
-        {
+      // build default path (directory + suggested filename)
+      std::string defaultPath = internal::lastLocationHint;
+      if (!defaultFileName.empty()) {
+          defaultPath = (std::filesystem::path(internal::lastLocationHint) / defaultFileName).string();
+      }
+
+      const auto t = [&]() {
+          file = pfd::save_file(title, defaultPath, filter).result();
+          };
+      std::thread th(t);
+      th.join();
+
+      std::filesystem::path pfile(file);
+      if (!pfile.has_extension())
+          file += defaultExtension;
+      if (pfile.has_parent_path())
           internal::lastLocationHint = pfile.parent_path().string();
-        }
-        return file;
-    }
+      return file;
+  }
+
     std::string SelectFolder(const std::string& title)
     {
       std::string output_folder_name = "";
@@ -69,6 +73,7 @@ namespace mandeye::fd{
       th.join();
       return output_folder_name;
     }
+
     void OutOfMemMessage()
     {
         std::cerr << "Adjust paging / swap memory with tips available here : "

@@ -4,6 +4,8 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
+#include <utils.hpp>
+
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <portable-file-dialogs.h>
@@ -80,6 +82,14 @@ float mouse_sensitivity = 1.0;
 std::string working_directory = "";
 bool initial_transformation_gizmo = false;
 
+std::vector<std::string> infoLines = {
+    "This program is first step in MANDEYE process.",
+    "",
+    "It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.",
+    "",
+    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program."
+};
+
 float m_gizmo[] = {1, 0, 0, 0,
                    0, 1, 0, 0,
                    0, 0, 1, 0,
@@ -93,7 +103,6 @@ bool gizmo_stretch_interval = false;
 Eigen::Affine3d stretch_gizmo_m = Eigen::Affine3d::Identity();
 
 LidarOdometryParams params;
-const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
 std::vector<std::string> csv_files;
 std::vector<std::string> sn_files;
 std::string imuSnToUse;
@@ -1051,68 +1060,6 @@ void lidar_odometry_gui()
     }
 }
 
-inline void ImGuiHyperlink(const char* url, ImVec4 color = ImVec4(0.2f, 0.4f, 0.8f, 1.0f))
-{
-    ImGui::PushStyleColor(ImGuiCol_Text, color);
-    ImGui::TextUnformatted(url);
-    ImGui::PopStyleColor();
-
-    // Get the item's rectangle
-    ImVec2 pos = ImGui::GetItemRectMin();
-    ImVec2 size = ImGui::GetItemRectSize();
-
-    // Change cursor on hover
-    if (ImGui::IsItemHovered())
-        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-
-    // Draw underline on hover
-    if (ImGui::IsItemHovered())
-    {
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        draw_list->AddLine(
-            ImVec2(pos.x, pos.y + size.y),
-            ImVec2(pos.x + size.x, pos.y + size.y),
-            ImColor(color)
-        );
-    }
-
-    // Open URL on click
-    if (ImGui::IsItemClicked())
-    {
-#ifdef _WIN32
-        ShellExecuteA(0, "open", url, 0, 0, SW_SHOWNORMAL);
-#elif __APPLE__
-        std::string cmd = std::string("open ") + url;
-        system(cmd.c_str());
-#else
-        std::string cmd = std::string("xdg-open ") + url;
-        system(cmd.c_str());
-#endif
-    }
-}
-
-void info_window()
-{
-    if (ImGui::Begin("Info", &info_gui, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::Text("This program is first step in MANDEYE process.");
-        ImGui::NewLine();
-        ImGui::Text("It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.");
-        ImGui::Text(("It saves session.json file in " + working_directory + "\\lidar_odometry_result_*").c_str());
-        ImGui::Text("Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program.");
-        ImGui::NewLine();
-        ImGui::Text("Author: Janusz Bedkowski & contributors");
-        ImGui::NewLine();
-        ImGui::Text("Part of HDMapping software suite");
-        ImGui::Text("Version: %s (%s)", params.software_version.c_str(), params.build_date.c_str());
-        ImGui::Text("Project page: ");
-		ImGui::SameLine();
-        ImGuiHyperlink("https://github.com/MapsHD/HDMapping");
-
-        ImGui::End();
-    }
-}
-
 void progress_window()
 {
     ImGui::Begin("Progress");
@@ -1252,13 +1199,10 @@ void wheel(int button, int dir, int x, int y)
     if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
     {
         if (dir > 0)
-        {
             translate_z -= 0.05f * translate_z;
-        }
         else
-        {
             translate_z += 0.05f * translate_z;
-        }
+        camera_transition_active = false;
 
         mouse_sensitivity = fabs(translate_z) / 100;
 
@@ -1292,11 +1236,13 @@ void motion(int x, int y)
         {
             rotate_x += dy * 0.2f;
             rotate_y += dx * 0.2f;
+            camera_transition_active = false;
         }
         if (mouse_buttons & 4)
         {
             translate_x += dx * mouse_sensitivity;
             translate_y -= dy * mouse_sensitivity;
+            camera_transition_active = false;
         }
 
         mouse_old_x = x;
@@ -1305,96 +1251,13 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
-void drawMiniCompassWithRuler(
-    const Eigen::Affine3f& viewLocal,
-    float translate_z,
-    ImVec2 compassSize = ImVec2(200, 200))
-{
-    auto drawLabel = [](float x, float y, float z, const char* text, float r, float g, float b)
-    {
-        glColor3f(r, g, b);
-        glRasterPos3f(x, y, z);
-        for (const char* c = text; *c; ++c)
-            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
-    };
-
-    ImGuiIO& io = ImGui::GetIO();
-
-    glViewport(0, 0, compassSize.x, compassSize.y);
-    glClear(GL_DEPTH_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
-
-    // Projection
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(-1.5, 1.5, -1.5, 1.5, -10, 10);
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    // Apply rotation
-    Eigen::Affine3f onlyRot = Eigen::Affine3f::Identity();
-    onlyRot.linear() = viewLocal.rotation();
-    glMultMatrixf(onlyRot.matrix().data());
-
-    float miniAxisLength = 1.0f;
-
-    // Snap ruler length to a "nice" round number (1, 2, or 5 × 10^n)
-    float rawUnit = 0.1f * translate_z; // adjust factor to taste
-    float base = pow(10.0f, floor(log10(rawUnit)));
-    float normalized = rawUnit / base;
-    float niceUnit;
-    if (normalized < 2.0f)      niceUnit = 1.0f;
-    else if (normalized < 5.0f) niceUnit = 2.0f;
-    else                        niceUnit = 5.0f;
-    float worldLength = niceUnit * base;
-
-    float scale = miniAxisLength / rawUnit; // convert scroll units to visual units
-    float axisDrawLength = worldLength * scale; // final axis length in mini compass
-
-    // Draw axes
-    glLineWidth(2.0f);
-    glBegin(GL_LINES);
-    glColor3f(1, 0, 0); glVertex3f(0, 0, 0); glVertex3f(axisDrawLength, 0, 0); // X
-    glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, axisDrawLength, 0); // Y
-    glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, axisDrawLength); // Z
-    glEnd();
-
-    // Draw axis labels and end-scale numeric labels
-    Eigen::Vector3f axes[3] = {
-        onlyRot * Eigen::Vector3f(miniAxisLength,0,0),
-        onlyRot * Eigen::Vector3f(0,miniAxisLength,0),
-        onlyRot * Eigen::Vector3f(0,0,miniAxisLength)
-    };
-
-    // Color per axis: X-red, Y-green, Z-blue
-    float colors[3][3] = { {1,0,0},{0,1,0},{0,0,1} };
-
-    for (int i = 0; i < 3; i++)
-    {
-        // Axis label
-        drawLabel(axes[i].x(), axes[i].y(), axes[i].z(), i == 0 ? "X (long.)" : i == 1 ? "Y (lat.)" : "Z (vert.)",
-            colors[i][0], colors[i][1], colors[i][2]);
-    }
-
-    // End scale label
-    char label[24];
-    if (worldLength >= 1000.0f) sprintf(label, "%.0f [km]", worldLength / 1000.0f);
-    else if (worldLength >= 1.0f)    sprintf(label, "%.0f [m]", worldLength);
-    else                             sprintf(label, "%.0f [cm]", worldLength * 100.0f);
-
-    drawLabel(axes[2].x() + 0.2f, axes[2].y() + 0.4f, axes[2].z() - 0.2f, label,
-        colors[2][0], colors[2][1], colors[2][2]);
-
-    // Restore viewport
-    glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-}
-
-
 void display()
 {
     ImGuiIO &io = ImGui::GetIO();
+
+    float deltaTime = ImGui::GetIO().DeltaTime;
+    updateCameraTransition(deltaTime);
+
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -1929,8 +1792,28 @@ void display()
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Scene view relevant parameters");
 
-            ImGui::SameLine();
-
+            if (ImGui::BeginMenu("Camera")) {
+                if (ImGui::MenuItem("Front", "Ctrl+F"))
+                    setCameraPreset(CAMERA_FRONT);
+                if (ImGui::MenuItem("Back", "Ctrl+B"))
+                    setCameraPreset(CAMERA_BACK);
+                if (ImGui::MenuItem("Left", "Ctrl+L"))
+                    setCameraPreset(CAMERA_LEFT);
+                if (ImGui::MenuItem("Right", "Ctrl+R"))
+                    setCameraPreset(CAMERA_RIGHT);
+                if (ImGui::MenuItem("Top", "Ctrl+T"))
+                    setCameraPreset(CAMERA_TOP);
+                if (ImGui::MenuItem("Bottom", "Ctrl+U"))
+                    setCameraPreset(CAMERA_BOTTOM);
+                if (ImGui::MenuItem("Isometric", "Ctrl+I"))
+                    setCameraPreset(CAMERA_ISO);
+                ImGui::Separator();
+                if (ImGui::MenuItem("Reset", "Ctrl+Z"))
+                    setCameraPreset(CAMERA_RESET);
+                ImGui::EndMenu();
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Change camera view to fixed positions");
 
             ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
 
@@ -1965,9 +1848,10 @@ void display()
 
     if (info_gui)
     {
-        info_window();
+        infoLines[infoLines.size() - 2] = "It saves session.json file in " + working_directory + "\\lidar_odometry_result_*";
+        info_window(infoLines, &info_gui);
     }
-
+    
     if (initial_transformation_gizmo)
     {
         ImGuiIO &io = ImGui::GetIO();
@@ -2037,7 +1921,7 @@ void display()
     }
 
     if (compass_ruler)
-        drawMiniCompassWithRuler(viewLocal, fabs(translate_z));
+        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), params.clear_color);
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());

@@ -1,6 +1,6 @@
 // Microsoft Visual C++ generated resource script.
 //
-#include "resource1.h"
+#include "resource2.h"
 /////////////////////////////////////////////////////////////////////////////
 // English (United States) resources
 
@@ -11,7 +11,7 @@
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_ICON1               ICON                    "icon1.ico"
+IDI_ICON1               ICON                    "icon2.ico"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -31,11 +31,11 @@ BEGIN
 BLOCK "040904B0"
 BEGIN
 VALUE "CompanyName", "Mandeye\0"
-VALUE "FileDescription", "HDMapping Step 1\0"
+VALUE "FileDescription", "HDMapping Step 2\0"
 VALUE "FileVersion", "0.8.8\0"
-VALUE "InternalName", "Odometry\0"
+VALUE "InternalName", "Multi view TLS registration\0"
 VALUE "LegalCopyright", "(c) 2025 github.com/MapsHD/HDMapping\0"
-VALUE "OriginalFilename", "lidar_odometry_step_1.exe\0"
+VALUE "OriginalFilename", "multi_view_tls_registration_step_2.exe\0"
 VALUE "ProductVersion", "0.8.8\0"
 VALUE "ProgramID", "github.com/MapsHD/HDMapping\0"
 VALUE "ProductName", "HDMapping\0"

@@ -9,6 +9,9 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
+#define ENABLE_ORTHO_SETTINGS
+#include <utils.hpp>
+
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 
@@ -45,6 +48,17 @@
 #include <export_laz.h>
 #include "wgs84_do_puwg92.h"
 #include "WGS84toCartesian.hpp"
+
+#ifdef _WIN32
+#include <windows.h>
+#include "../../resources/resource2.h"
+#endif
+
+#ifdef _WIN32
+bool consWin = true;
+#endif
+bool consImGui = false;
+
 namespace fs = std::filesystem;
 
 static bool show_demo_window = true;
@@ -66,17 +80,42 @@ bool block_z = false;
 bool manual_pose_graph_loop_closure_mode = false;
 
 static constexpr float ImGuiNumberWidth = 120.0f;
+static constexpr const char* omText = "Roll (left/right)";
+static constexpr const char* fiText = "Pitch (up/down)";
+static constexpr const char* kaText = "Yaw (turning left/right)";
 static constexpr const char* xText = "Longitudinal (forward/backward)";
 static constexpr const char* yText = "Lateral (left/right)";
 static constexpr const char* zText = "Vertical (up/down)";
 bool gnssWithOffset = false;
 
+
+std::vector<std::string> infoLines = {
+    "This program is second step in MANDEYE process.",
+    "",
+    "It refines trajectory (e.g with loop closure)",
+    "It refines trajectory with many approaches (e.g. Iterative Closest Point, Normal Distributions Transform)",
+    "It exports session as rigid point cloud to single LAZ file.",
+    "LAZ files are the product of MANDEYE process (open them with Cloud Compare)",
+};
+
+std::string session_file_name = "";
+int session_total_number_of_points = 0;
+PointClouds::PointCloudDimensions session_dims;
+//bool dynamicSubsampling = true;
+//static double lastAdjustTime = 0.0;  // last time we changed subsampling
+//const double cooldownSeconds = 1;  // wait between auto adjustments
+//static float fps_avg = 60.0f;
+
+bool info_gui = false;
+bool compass_ruler = true;
+
 bool is_ndt_gui = false;
 bool is_icp_gui = false;
 bool is_pose_graph_slam = false;
+bool is_lio_segments_gui = false;
 bool is_registration_plane_feature = false;
 bool is_manual_analisys = false;
-int viewer_decmiate_point_cloud = 1000;
+int viewer_decimate_point_cloud = 1000;
 
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
@@ -93,7 +132,6 @@ int index_loop_closure_source = 0;
 int index_loop_closure_target = 0;
 int index_begin = 0;
 int index_end = 0;
-bool save_subsession = false;
 
 float m_gizmo[] = {1, 0, 0, 0,
                    0, 1, 0, 0,
@@ -110,7 +148,7 @@ float m_ortho_projection[] = {1, 0, 0, 0,
                               0, 0, 1, 0,
                               0, 0, 0, 1};
 
-bool manipulate_only_marked_gizmo = true;
+bool manipulate_only_marked_gizmo = false;
 
 Session session;
 bool simple_gui = true;
@@ -191,302 +229,12 @@ void project_gui()
 {
     ImGui::Begin("Single session processing");
 
-    ImGui::Text("This program is second step in MANDEYE process.");
-    ImGui::NewLine();
-    ImGui::Text("It refines trajectory e.g with loop closure.");
-    ImGui::Text("It refines trajectory with many approaches e.g. Iterative Closest Point, Normal Distributions Transform.");
-    ImGui::Text("It exports session as rigid point cloud to single LAZ file).");
-    ImGui::Text("LAZ files are the product of MANDEYE process. Open it with Cloud Compare.");
-    ImGui::NewLine();
     ImGui::Checkbox("simple_gui", &simple_gui);
     ImGui::SameLine();
     ImGui::Checkbox("is ground truth", &session.is_ground_truth);
-
-    const std::vector<std::string>
-        Session_filter = {"Session, json", "*.json"};
-    const std::vector<std::string> Resso_filter = {"Resso, reg", "*.reg"};
-    const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
-
-    if (!session_loaded)
-    {
-        if (ImGui::Button("load session (first step)"))
-        {
-            std::string input_file_name = "";
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load session", mandeye::fd::Session_filter);
-            std::cout << "Session file: '" << input_file_name << "'" << std::endl;
-
-            if (input_file_name.size() > 0)
-            {
-                session.load(fs::path(input_file_name).string(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset);
-                session_loaded = true;
-            }
-        }
-    }
-
-    if (session_loaded)
-    {
-        ImGui::Text(std::string("input session file: '" + session.session_file_name + "'").c_str());
-
-        if (ImGui::Button("save session (last step)"))
-        {
-            const auto output_file_name = mandeye::fd::SaveFileDialog("Save session", Session_filter, ".json");
-            std::cout << "Session file to save: '" << output_file_name << "'" << std::endl;
-
-            if (output_file_name.size() > 0)
-            {
-                if (!save_subsession)
-                {
-                    if (session.point_clouds_container.initial_poses_file_name.empty())
-                    {
-                        std::cout << "Please assign initial_poses_file_name to session" << std::endl;
-                        std::cout << "Session is not saved" << std::endl;
-
-                        [[maybe_unused]] pfd::message message(
-                            "Please assign initial_poses_file_name to session",
-                            "Session is not saved. Please assign initial_poses_file_name to session. "
-                            "Follow guidlines available here : "
-                            "https://github.com/MapsHD/HDMapping/tree/main/doc/, "
-                            "You can do this using button 'update initial poses from RESSO file'",
-                            pfd::choice::ok, pfd::icon::error);
-                        message.result();
-
-                        std::shared_ptr<pfd::save_file> save_file2;
-                        std::string initial_poses_file_name = "";
-                        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file2);
-                        const auto tt = [&]()
-                            {
-                                auto sel = pfd::save_file("initial_poses_file_name", "C:\\", Resso_filter).result();
-                                initial_poses_file_name = sel;
-                                std::cout << "Resso file to save: '" << initial_poses_file_name << "'" << std::endl;
-                            };
-                        std::thread t2(tt);
-                        t2.join();
-
-                        if (initial_poses_file_name.size() > 0)
-                        {
-                            std::cout << "saving initial poses to: " << initial_poses_file_name << std::endl;
-                            session.point_clouds_container.save_poses(fs::path(initial_poses_file_name).string(), save_subsession);
-                        }
-                    }
-
-                    if (session.point_clouds_container.poses_file_name.empty())
-                    {
-                        std::cout << "Please assign poses_file_name to session" << std::endl;
-                        std::cout << "Session is not saved" << std::endl;
-
-                        [[maybe_unused]] pfd::message message(
-                            "Please assign poses_file_name to session",
-                            "Session is not saved. Please assign poses_file_name to session. "
-                            "Follow guidlines available here : "
-                            "https://github.com/MapsHD/HDMapping/tree/main/doc/,"
-                            "You can do this using button 'update poses from RESSO file'",
-                            pfd::choice::ok, pfd::icon::error);
-                        message.result();
-
-                        const auto poses_file_name = mandeye::fd::SaveFileDialog("poses_file_name", Resso_filter);
-                        std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
-                        if (poses_file_name.size() > 0)
-                        {
-                            std::cout << "saving poses to: " << poses_file_name << std::endl;
-                            session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), save_subsession);
-                        }
-                    }
-
-                    session.save(fs::path(output_file_name).string(), session.point_clouds_container.poses_file_name, session.point_clouds_container.initial_poses_file_name, save_subsession);
-                    std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
-                    session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), save_subsession);
-                }
-                else
-                {
-                    // std::string poses_file_name;
-                    // std::string initial_poses_file_name;
-                    const auto initial_poses_file_name = mandeye::fd::SaveFileDialog("initial_poses_file_name", Resso_filter);
-                    const auto poses_file_name = mandeye::fd::SaveFileDialog("poses_file_name", Resso_filter);
-                    std::cout << "Resso file to save: '" << initial_poses_file_name << "'" << std::endl;
-                    std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
-
-                    if (poses_file_name.size() > 0 && initial_poses_file_name.size() > 0)
-                    {
-                        session.save(fs::path(output_file_name).string(), poses_file_name, initial_poses_file_name, save_subsession);
-                        std::cout << "saving initial poses to: " << initial_poses_file_name << std::endl;
-                        session.point_clouds_container.save_poses(fs::path(initial_poses_file_name).string(), save_subsession);
-                        std::cout << "saving poses to: " << poses_file_name << std::endl;
-                        session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), save_subsession);
-                    }
-                }
-            }
-        }
-        ImGui::SameLine();
-        ImGui::Checkbox("save_subsession", &save_subsession);
-
-        if (ImGui::Button("reset view"))
-        {
-            rotate_x = 0.0;
-            rotate_y = 0.0;
-            translate_x = 0.0;
-            translate_y = 0.0;
-            translate_z = -50.0;
-            viewer_decmiate_point_cloud = 1000;
-
-            camera_ortho_xy_view_zoom = 10;
-            camera_ortho_xy_view_shift_x = 0.0;
-            camera_ortho_xy_view_shift_y = 0.0;
-            camera_ortho_xy_view_rotation_angle_deg = 0;
-            camera_mode_ortho_z_center_h = 0.0;
-        }
-    }
-
+   
     ImGui::NewLine();
     
-	ImGui::SetNextItemWidth(ImGuiNumberWidth);
-    ImGui::InputDouble("Intersection width [m]", &session.point_clouds_container.intersection_width, 0.0, 0.0, "%.2f");
-    if (session.point_clouds_container.intersection_width < 0.001)
-    {
-        session.point_clouds_container.intersection_width = 0.001;
-    }
-    if (ImGui::Button("set xz view"))
-    {
-        std::cout << rotate_x << " " << rotate_y << std::endl;
-        rotate_x = -90.0;
-        rotate_y = 180.0;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("set yz view"))
-    {
-        std::cout << rotate_x << " " << rotate_y << std::endl;
-        rotate_x = -90.0;
-        rotate_y = 270.0;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("set xy view"))
-    {
-        std::cout << rotate_x << " " << rotate_y << std::endl;
-        rotate_x = 0.0;
-        rotate_y = 0.0;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("set translation view (x=0,y=0)"))
-    {
-        translate_x = 0;
-        translate_y = 0;
-    }
-
-    ImGui::Checkbox("xz_intersection", &session.point_clouds_container.xz_intersection);
-    if (session.point_clouds_container.xz_intersection)
-    {
-        ImGui::SameLine();
-        ImGui::Checkbox("xz_grid_10x10[m]", &session.point_clouds_container.xz_grid_10x10);
-        ImGui::SameLine();
-        ImGui::Checkbox("xz_grid_1x1[m]", &session.point_clouds_container.xz_grid_1x1);
-        ImGui::SameLine();
-        ImGui::Checkbox("xz_grid_01x01[m]", &session.point_clouds_container.xz_grid_01x01);
-        ImGui::SameLine();
-        if (ImGui::Button("export xz intersection"))
-        {
-            const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-            std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-            if (output_file_name.size() > 0)
-            {
-                save_intersection(session, output_file_name,
-                                  session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
-                                  session.point_clouds_container.intersection_width);
-            }
-        }
-    }
-    ImGui::SameLine();
-
-    ImGui::Checkbox("yz_intersection", &session.point_clouds_container.yz_intersection);
-    if (session.point_clouds_container.yz_intersection)
-    {
-        ImGui::SameLine();
-        ImGui::Checkbox("yz_grid_10x10[m]", &session.point_clouds_container.yz_grid_10x10);
-        ImGui::SameLine();
-        ImGui::Checkbox("yz_grid_1x1[m]", &session.point_clouds_container.yz_grid_1x1);
-        ImGui::SameLine();
-        ImGui::Checkbox("yz_grid_01x01[m]", &session.point_clouds_container.yz_grid_01x01);
-        ImGui::SameLine();
-        if (ImGui::Button("export yz intersection"))
-        {
-            const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-            std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-            if (output_file_name.size() > 0)
-            {
-                save_intersection(session, output_file_name,
-                                  session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
-                                  session.point_clouds_container.intersection_width);
-            }
-        }
-    }
-    ImGui::SameLine();
-
-    ImGui::Checkbox("xy_intersection", &session.point_clouds_container.xy_intersection);
-    if (session.point_clouds_container.xy_intersection)
-    {
-        ImGui::SameLine();
-        ImGui::Checkbox("xy_grid_10x10[m]", &session.point_clouds_container.xy_grid_10x10);
-        ImGui::SameLine();
-        ImGui::Checkbox("xy_grid_1x1[m]", &session.point_clouds_container.xy_grid_1x1);
-        ImGui::SameLine();
-        ImGui::Checkbox("xy_grid_01x01[m]", &session.point_clouds_container.xy_grid_01x01);
-        ImGui::SameLine();
-        if (ImGui::Button("export xy intersection"))
-        {
-            const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-            std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-            if (output_file_name.size() > 0)
-            {
-                save_intersection(session, output_file_name,
-                                  session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
-                                  session.point_clouds_container.intersection_width);
-            }
-        }
-    }
-
-    // session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection);
-
-    ImGui::PushItemWidth(ImGuiNumberWidth);
-    ImGui::InputInt("Points render subsampling", &viewer_decmiate_point_cloud);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("increase for better performance, decrease for rendering more points");
-    if (viewer_decmiate_point_cloud < 1)
-    {
-        viewer_decmiate_point_cloud = 1;
-    }
-    if (!simple_gui)
-    {
-		ImGui::SameLine();
-        ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
-    }
-
-    auto tmp = all_point_size;
-    ImGui::InputInt("all points size", &all_point_size);
-    if (all_point_size < 1)
-        all_point_size = 1;
-    ImGui::PopItemWidth();
-
-    if (tmp != all_point_size)
-    {
-        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-        {
-            session.point_clouds_container.point_clouds[i].point_size = all_point_size;
-        }
-    }
-
-    ImGui::Checkbox("is_ortho", &is_ortho);
-    if (is_ortho)
-    {
-        rotate_x = 0.0;
-        rotate_y = 0.0;
-    }
-    ImGui::SameLine();
-    ImGui::Checkbox("show_axes", &show_axes);
-    ImGui::SameLine();
-
-    ImGui::Checkbox("block_z", &block_z);
-
     ImGui::SliderFloat("mouse_sensitivity", &mouse_sensitivity, 0.01f, 10.0f, "%.1f");
 
     ImGui::NewLine();
@@ -506,46 +254,6 @@ void project_gui()
         rotation_center = Eigen::Vector3f::Zero();
     }
     ImGui::NewLine();
-
-    if (ImGui::Button("generate random colors"))
-    {
-        for (auto& pc : session.point_clouds_container.point_clouds)
-        {
-            pc.show_color = false;
-            pc.render_color[0] = float(rand() % 255) / 255.0f;
-            pc.render_color[1] = float(rand() % 255) / 255.0f;
-            pc.render_color[2] = float(rand() % 255) / 255.0f;
-        }
-    }
-    ImGui::SameLine();
-
-    if (ImGui::Button("generate random color for all"))
-    {
-        float color = float(rand() % 255) / 255.0f;
-        for (auto& pc : session.point_clouds_container.point_clouds)
-        {
-            pc.show_color = false;
-            pc.render_color[0] = color;
-            pc.render_color[1] = color;
-            pc.render_color[2] = color;
-        }
-    }
-
-    ImGui::SameLine();
-    ImGui::Text("Background color:");
-    ImGui::SameLine();
-    if (ImGui::ColorButton("background color", clear_color))
-    {
-        ImGui::OpenPopup("color_picker_popup");
-    }
-
-    // Draw the popup
-    if (ImGui::BeginPopup("color_picker_popup"))
-    {
-        ImGui::Text("Pick a color");
-        ImGui::ColorPicker4("##picker", (float*)&clear_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoSidePreview);
-        ImGui::EndPopup();
-    }
 
     if (ImGui::Button("Set initial pose to Identity and update other poses"))
     {
@@ -611,15 +319,17 @@ void project_gui()
         ImGui::SameLine();
         if (ImGui::Button("save RESSO file"))
         {
-            const auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", Resso_filter);
+            const auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", mandeye::fd::Resso_filter);
             std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
             if (output_file_name.size() > 0)
             {
                 session.point_clouds_container.save_poses(fs::path(output_file_name).string(), false);
             }
         }
+        ImGui::Text("RESSO dataset: ");
+        ImGui::SameLine();
+        ImGuiHyperlink("https://3d.bk.tudelft.nl/liangliang/publications/2019/plade/resso.html");
 
-        ImGui::Text("RESSO dataset: https://3d.bk.tudelft.nl/liangliang/publications/2019/plade/resso.html");
         if (ImGui::Button("load ETH file (pairs.txt)"))
         {
             std::string input_file_name = "";
@@ -639,7 +349,9 @@ void project_gui()
                 }
             }
         }
-        ImGui::Text("ETH dataset: https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
+        ImGui::Text("ETH dataset: ");
+        ImGui::SameLine();
+        ImGuiHyperlink("https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
 
         if (ImGui::Button("load AlignedPointCloud from WHU-TLS (select all *.las or *.laz files in folder 2-AlignedPointCloud)"))
         {
@@ -673,18 +385,20 @@ void project_gui()
                 number_of_point += pc.points_local.size();
             }
 
-            session.point_clouds_container.print_point_cloud_dimention();
+            session.point_clouds_container.print_point_cloud_dimension();
 
             [[maybe_unused]]
             pfd::message message(
                 "Information",
-                "If You can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
+                "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
                 pfd::choice::ok, pfd::icon::info);
             message.result();
         }
         ImGui::SameLine();
         ImGui::Checkbox("calculate_offset for WHU-TLS", &tls_registration.calculate_offset);
-        ImGui::Text("WHU-TLS dataset: http://3s.whu.edu.cn/ybs/en/benchmark.htm");
+        ImGui::Text("WHU-TLS dataset: ");
+        ImGui::SameLine();
+        ImGuiHyperlink("http://3s.whu.edu.cn/ybs/en/benchmark.htm");
 
         if (ImGui::Button("load 3DTK files (select all *.txt files)"))
         {
@@ -713,7 +427,9 @@ void project_gui()
                 }
             }
         }
-        ImGui::Text("3DTK dataset: http://kos.informatik.uni-osnabrueck.de/3Dscans/ 18: the campus of the Jacobs University Bremen");
+        ImGui::Text("3DTK dataset (18: the campus of the Jacobs University Bremen)");
+        ImGui::SameLine();
+        ImGuiHyperlink("http://kos.informatik.uni-osnabrueck.de/3Dscans/");
 
         if (ImGui::Button("update initial poses from RESSO file"))
         {
@@ -789,38 +505,11 @@ void project_gui()
     }
 
     ImGui::Text("-----------------------------------------------------------------------------");
-    if (!simple_gui)
-    {
-        ImGui::NewLine();
-        ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
-        ImGui::Checkbox("Iterative Closest Point", &is_icp_gui);
-        ImGui::Checkbox("Plane Features", &is_registration_plane_feature);
-        ImGui::Checkbox("Pose Graph SLAM", &is_pose_graph_slam);
-        ImGui::Checkbox("Manual Analysis", &is_manual_analisys);
-        ImGui::NewLine();
-    }
-    if (session.point_clouds_container.point_clouds.size() > 0)
-    {
-        //ImGui::Checkbox("Show ground control points gui", &session.ground_control_points.is_imgui);
-        if (ImGui::Button("Ground Control Points GUI"))
-        {
-            session.ground_control_points.is_imgui = true;
-            session.control_points.is_imgui = false;
-        }
-		ImGui::SameLine();
-        //ImGui::Checkbox("Show control points gui", &session.control_points.is_imgui);
-        if (ImGui::Button("Control Points GUI"))
-        {
-            session.ground_control_points.is_imgui = false;
-            session.control_points.is_imgui = true;
-        }
-
-        ImGui::Checkbox("Manual Pose Graph Loop Closure Mode", &manual_pose_graph_loop_closure_mode);
-        ImGui::NewLine();
-    }
 
     if (manual_pose_graph_loop_closure_mode)
     {
+        ImGui::Text("Manual Pose Graph Loop Closure Mode:");
+
         ImGui::InputInt("num_edge_extended_before", &num_edge_extended_before);
         if (num_edge_extended_before < 0)
         {
@@ -849,137 +538,12 @@ void project_gui()
     {
         if (!simple_gui)
         {
-            if (ImGui::Button("show all"))
-            {
-                session.point_clouds_container.show_all();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("hide all"))
-            {
-                session.point_clouds_container.hide_all();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("reset poses"))
-            {
-                reset_poses(session);
-            }
-
-            static double angle_diff = 5.0;
-
-            if (ImGui::Button("set all fuse_inclination_from_IMU"))
-            {
-                for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-                {
-                    double om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
-                    double fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
-
-                    std::cout << "om: " << om << " fi " << fi << std::endl;
-                    if (fabs(om) > angle_diff || fabs(fi) > angle_diff)
-                    {
-                    }
-                    else
-                    {
-                        session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = true;
-                    }
-                }
-            }
-
-            ImGui::SameLine();
-            if (ImGui::Button("unset all fuse_inclination_from_IMU"))
-            {
-                for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-                {
-                    session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = false;
-                }
-            }
-
-            ImGui::SameLine();
-            ImGui::InputDouble("acceptable angle [deg]", &angle_diff);
-
-            ImGui::Checkbox("show_with_initial_pose", &session.point_clouds_container.show_with_initial_pose);
-            ImGui::SameLine();
-            ImGui::Checkbox("manipulate_only_marked_gizmo (false: move also succesive nodes)", &manipulate_only_marked_gizmo);
-
-            int idx_begin = index_begin;
-            int idx_end = index_end;
-            ImGui::NewLine();
-			ImGui::Text("index_show:");
-            ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputInt("from", &index_begin);
-            if (index_begin < 0)
-            {
-                index_begin = 0;
-            }
-            if (index_begin >= session.point_clouds_container.point_clouds.size() - 1)
-            {
-                index_begin = session.point_clouds_container.point_clouds.size() - 1;
-            }
-			ImGui::SameLine();
-            ImGui::InputInt("to", &index_end);
-            if (index_end < 0)
-            {
-                index_end = 0;
-            }
-            if (index_end >= session.point_clouds_container.point_clouds.size() - 1)
-            {
-                index_end = session.point_clouds_container.point_clouds.size() - 1;
-            }
-			ImGui::PopItemWidth();
-
-            if (ImGui::Button("Show selected"))
-            {
-                session.point_clouds_container.show_all_from_range(index_begin, index_end);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Show selected --"))
-            {
-                int step = index_end - index_begin;
-                index_begin -= step;
-                index_end -= step;
-
-                if (index_begin < 0)
-                {
-                    index_begin = 0;
-                }
-                if (index_end < 0)
-                {
-                    index_end = 0;
-                }
-
-                rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
-                rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
-                rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
-                session.point_clouds_container.show_all_from_range(index_begin, index_end);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Show selected ++"))
-            {
-                int step = index_end - index_begin;
-                index_begin += step;
-                index_end += step;
-
-                if (index_begin > session.point_clouds_container.point_clouds.size() - 1)
-                {
-                    index_begin = session.point_clouds_container.point_clouds.size() - 1;
-                }
-                if (index_end > session.point_clouds_container.point_clouds.size() - 1)
-                {
-                    index_end = session.point_clouds_container.point_clouds.size() - 1;
-                }
-
-                rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
-                rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
-                rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
-                session.point_clouds_container.show_all_from_range(index_begin, index_end);
-            }
-
-            ImGui::NewLine();
-
             static double x_origin = 0.0;
             static double y_origin = 0.0;
             static double z_origin = 0.0;
 
-            ImGui::Text("Origin [m]:");
+            ImGui::Text("Origin [m]: ");
+            ImGui::SameLine();
 			ImGui::PushItemWidth(ImGuiNumberWidth);
             ImGui::InputDouble("X##o", &x_origin, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
@@ -993,8 +557,8 @@ void project_gui()
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(zText);
 			ImGui::PopItemWidth();
-
-            if (ImGui::Button("set xyz_origin"))
+            ImGui::SameLine();
+            if (ImGui::Button("Set XYZ origin"))
             {
                 if (session.point_clouds_container.point_clouds.size() != 0)
                 {
@@ -1038,218 +602,7 @@ void project_gui()
                     }
                 }
             }
-            ImGui::NewLine();
-
-            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-            {
-                ImGui::Separator();
-                ImGui::Checkbox(session.point_clouds_container.point_clouds[i].file_name.c_str(), &session.point_clouds_container.point_clouds[i].visible);
-                // ImGui::SameLine();
-                ImGui::Text("--");
-                ImGui::SameLine();
-                ImGui::Checkbox((std::string("gizmo_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
-
-#if 0
-                ImGui::SameLine();
-                ImGui::Checkbox((std::string("fixed_") + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed);
-                ImGui::SameLine();
-                ImGui::PushButtonRepeat(true);
-                float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
-                if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##left").c_str(), ImGuiDir_Left))
-                {
-                    (session.point_clouds_container.point_clouds[i].point_size)--;
-                }
-                ImGui::SameLine(0.0f, spacing);
-                if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##right").c_str(), ImGuiDir_Right))
-                {
-                    (session.point_clouds_container.point_clouds[i].point_size)++;
-                }
-                ImGui::PopButtonRepeat();
-                ImGui::SameLine();
-                ImGui::Text("point size %d", session.point_clouds_container.point_clouds[i].point_size);
-                if (session.point_clouds_container.point_clouds[i].point_size < 1)
-                {
-                    session.point_clouds_container.point_clouds[i].point_size = 1;
-                }
-
-                ImGui::SameLine();
-                if (ImGui::Button(std::string("#" + std::to_string(i) + " save scan(global reference frame)").c_str()))
-                {
-                    const auto output_file_name = mandeye::fd::SaveFileDialog("Choose folder", {});
-                    std::cout << "Scan file to save: '" << output_file_name << "'" << std::endl;
-                    if (output_file_name.size() > 0)
-                    {
-                        session.point_clouds_container.point_clouds[i].save_as_global(output_file_name);
-                    }
-                }
-                ImGui::SameLine();
-                if (ImGui::Button(std::string("#" + std::to_string(i) + " shift points to center").c_str()))
-                {
-                    session.point_clouds_container.point_clouds[i].shift_to_center();
-                }
-#endif
-                if (session.point_clouds_container.point_clouds[i].gizmo)
-                {
-                    for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                    {
-                        if (i != j)
-                        {
-                            session.point_clouds_container.point_clouds[j].gizmo = false;
-                        }
-                    }
-                    m_gizmo[0] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 0);
-                    m_gizmo[1] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 0);
-                    m_gizmo[2] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 0);
-                    m_gizmo[3] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 0);
-                    m_gizmo[4] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 1);
-                    m_gizmo[5] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 1);
-                    m_gizmo[6] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 1);
-                    m_gizmo[7] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 1);
-                    m_gizmo[8] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 2);
-                    m_gizmo[9] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 2);
-                    m_gizmo[10] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 2);
-                    m_gizmo[11] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 2);
-                    m_gizmo[12] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 3);
-                    m_gizmo[13] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 3);
-                    m_gizmo[14] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 3);
-                    m_gizmo[15] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 3);
-                }
-
-                if (session.point_clouds_container.point_clouds[i].visible)
-                {
-                    // ImGui::Text("--");
-                    ImGui::SameLine();
-                    ImGui::Checkbox(std::string(std::to_string(i) + ": show_color").c_str(), &session.point_clouds_container.point_clouds[i].show_color); //
-
-                    if (!session.point_clouds_container.point_clouds[i].show_color)
-                    {
-                        ImGui::SameLine();
-                        ImGui::ColorEdit3(std::string(std::to_string(i) + ": pc_color").c_str(), session.point_clouds_container.point_clouds[i].render_color);
-                    }
-
-#if 0
-                    ImGui::SameLine();
-                    if (ImGui::Button(std::string("#" + std::to_string(i) + "_ICP").c_str()))
-                    {
-                        size_t index_target = i;
-                        PointClouds pcs;
-                        for (size_t k = 0; k < index_target; k++)
-                        {
-                            if (session.point_clouds_container.point_clouds[k].visible)
-                            {
-                                pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[k]);
-                            }
-                        }
-
-                        if (pcs.point_clouds.size() > 0)
-                        {
-                            for (size_t k = 0; k < pcs.point_clouds.size(); k++)
-                            {
-                                pcs.point_clouds[k].fixed = true;
-                            }
-                        }
-                        pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[index_target]);
-                        pcs.point_clouds[pcs.point_clouds.size() - 1].fixed = false;
-
-                        ICP icp;
-                        icp.search_radious = 0.3; // ToDo move to params
-                        for (auto &pc : pcs.point_clouds)
-                        {
-                            pc.rgd_params.resolution_X = icp.search_radious;
-                            pc.rgd_params.resolution_Y = icp.search_radious;
-                            pc.rgd_params.resolution_Z = icp.search_radious;
-
-                            pc.build_rgd();
-                            pc.cout_rgd();
-                            pc.compute_normal_vectors(0.5);
-                        }
-
-                        icp.number_of_threads = std::thread::hardware_concurrency();
-
-                        icp.number_of_iterations = 10;
-                        icp.is_adaptive_robust_kernel = false;
-
-                        icp.is_ballanced_horizontal_vs_vertical = false;
-                        icp.is_fix_first_node = false;
-                        icp.is_gauss_newton = true;
-                        icp.is_levenberg_marguardt = false;
-                        icp.is_cw = false;
-                        icp.is_wc = true;
-                        icp.is_tait_bryan_angles = true;
-                        icp.is_quaternion = false;
-                        icp.is_rodrigues = false;
-                        std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                        icp.optimization_point_to_point_source_to_target(pcs);
-
-                        std::cout << "pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
-
-                        std::vector<Eigen::Affine3d> all_m_poses;
-                        for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                        {
-                            all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
-                        }
-
-                        session.point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
-
-                        std::cout << "pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
-
-                        // like gizmo
-                        if (!manipulate_only_marked_gizmo)
-                        {
-                            std::cout << "update all poses after current pose" << std::endl;
-
-                            Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[index_target].m_pose;
-                            for (int j = index_target + 1; j < session.point_clouds_container.point_clouds.size(); j++)
-                            {
-                                curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                                session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                            }
-                        }
-                    }
-#endif
-                }
-#if 0
-                ImGui::SameLine();
-                if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str()))
-                {
-                    std::cout << session.point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
-                }
-#endif
-
-                // ImGui::SameLine();
-                ImGui::Text("--");
-                ImGui::SameLine();
-                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fuse inclination from IMU").c_str(), &session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_x").c_str(), &session.point_clouds_container.point_clouds[i].fixed_x);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_y").c_str(), &session.point_clouds_container.point_clouds[i].fixed_y);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_z").c_str(), &session.point_clouds_container.point_clouds[i].fixed_z);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_om(X angle)").c_str(), &session.point_clouds_container.point_clouds[i].fixed_om);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_fi(Y angle)").c_str(), &session.point_clouds_container.point_clouds[i].fixed_fi);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(std::string("#" + std::to_string(i) + " fixed_ka(Z angle)").c_str(), &session.point_clouds_container.point_clouds[i].fixed_ka);
-            }
-            ImGui::Separator();
-            int total_number_of_points = 0;
-            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-            {
-                total_number_of_points += session.point_clouds_container.point_clouds[i].points_local.size();
-            }
-            std::string point_size_message = "total number of points: " + std::to_string(total_number_of_points);
-            ImGui::Text(point_size_message.c_str());
-
-            ImGui::Separator();
+            
             ImGui::Separator();
         }
 
@@ -1257,338 +610,18 @@ void project_gui()
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("each local coordinate of the point += offset");
         ImGui::PushItemWidth(ImGuiNumberWidth);
-        ImGui::InputDouble("X##f", &session.point_clouds_container.offset.x(), 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("X##t", &session.point_clouds_container.offset.x(), 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(xText);
 		ImGui::SameLine();
-        ImGui::InputDouble("Y##f", &session.point_clouds_container.offset.y(), 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("Y##t", &session.point_clouds_container.offset.y(), 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(yText);
         ImGui::SameLine();
-        ImGui::InputDouble("Z##f", &session.point_clouds_container.offset.z(), 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("Z##t", &session.point_clouds_container.offset.z(), 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(zText);
 		ImGui::PopItemWidth();
-
-		ImGui::Text("Save all marked scans to laz:");
-        if (ImGui::Button("> as one local scan transformed via inverse pose of first scan"))
-        {
-            const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-            std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-            if (output_file_name.size() > 0)
-            {
-                save_all_to_las(session, output_file_name, true);
-            }
-        }
-
-        if (ImGui::Button("> as one global scan"))
-        {
-            const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-            std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-            if (output_file_name.size() > 0)
-            {
-                save_all_to_las(session, output_file_name, false);
-            }
-        }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("To export in full resolution, close the program and open again, unmark 'simple_gui', unmark 'decimate during load'");
-        if (!simple_gui)
-        {
-
-            if (ImGui::Button("> as separate global scans"))
-            {
-                std::string output_folder_name_separately = "";
-                output_folder_name_separately = mandeye::fd::SelectFolder("Choose folder");
-                save_separately_to_las(session, output_folder_name_separately, ".laz");
-            }
-            if (ImGui::Button("> as separate global scans"))
-            {
-                std::string output_folder_name_separately = "";
-                output_folder_name_separately = mandeye::fd::SelectFolder("Choose folder");
-                save_separately_to_las(session, output_folder_name_separately, ".las");
-            }
-
-            ImGui::Checkbox("is_trajectory_export_downsampling", &tls_registration.is_trajectory_export_downsampling);
-            if (tls_registration.is_trajectory_export_downsampling)
-            {
-                ImGui::InputFloat("curve_consecutive_distance_meters", &tls_registration.curve_consecutive_distance_meters);
-                ImGui::InputFloat("not_curve_consecutive_distance_meters", &tls_registration.not_curve_consecutive_distance_meters);
-            }
-
-            if (ImGui::Button("save all marked trajectories to laz (as one global scan)"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-                if (output_file_name.size() > 0)
-                {
-                    save_trajectories_to_laz(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling);
-                }
-            }
-
-            if (ImGui::Button("save gnss data to laz file"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
-                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    tls_registration.gnss.save_to_laz(output_file_name, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
-                }
-            }
-
-			ImGui::Text("Save scale board for all marked trajectories to laz as one global scan:");
-            if (ImGui::Button("> dec 0.1"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_scale_board_to_laz(session, output_file_name, 0.1);
-                }
-            }
-			ImGui::SameLine();
-            if (ImGui::Button("> dec 1.0"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_scale_board_to_laz(session, output_file_name, 1.0);
-                }
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("> dec 10.0"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_scale_board_to_laz(session, output_file_name, 10.0);
-                }
-            }
-
-			ImGui::Text("Save scale board 10km x 10km to laz:");
-            if (ImGui::Button("> 10m"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_scale_board_to_laz(session, output_file_name, 10.0, 10000.0);
-                }
-            }
-			ImGui::SameLine();
-            if (ImGui::Button("> 100m"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_scale_board_to_laz(session, output_file_name, 100.0, 10000.0);
-                }
-            }
-			ImGui::SameLine();
-            if (ImGui::Button("> 1000m"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-                std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_scale_board_to_laz(session, output_file_name, 1000.0, 10000.0);
-                }
-            }
-
-			ImGui::Text("Save all marked trajectories to:");
-            ImGui::Text("> csv (x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22):");
-			ImGui::SameLine();
-            if (ImGui::Button("timestampLidar"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
-                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, false, false, false);
-                }
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("timestampUnix"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
-                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, true, false, false);
-                }
-            }
-			ImGui::SameLine();
-            if (ImGui::Button("timestampLidar,timestampUnix"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
-                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, true, false, false);
-                }
-            }
-			ImGui::Text("> csv (x,y,z,qx,qy,qz,qw):");
-			ImGui::SameLine();
-            if (ImGui::Button("timestampLidar"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
-                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, false, true, false);
-                }
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("timestampUnix"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
-                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, true, true, false);
-                }
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("timestampLidar,timestampUnix"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::Csv_filter, ".csv");
-                std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, true, true, false);
-                }
-            }
-            if (ImGui::Button("> dxf as polyline"))
-            {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Ouput file name", mandeye::fd::Dxf_filter, ".dxf");
-                std::cout << "dxf file to save: '" << output_file_name << "'" << std::endl;
-
-                if (output_file_name.size() > 0)
-                {
-                    save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, false, false, true);
-                }
-            }
-        } // simple gui
-
-        ImGui::NewLine();
-
-        if (session.point_clouds_container.point_clouds.size() > 0)
-        {
-
-            if (ImGui::Button("load gnss files and convert from wgs84 to puwg92"))
-            {
-                std::vector<std::string> input_file_names;
-                input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", {"GNSS", "*.gnss"}, true);
-
-                if (input_file_names.size() > 0)
-                {
-                    if (!tls_registration.gnss.load(input_file_names, gnssWithOffset))
-                    {
-                        std::cout << "problem with loading gnss files" << std::endl;
-                    }
-                }
-            }
-
-            ImGui::SameLine();
-            ImGui::Checkbox("with offset", &gnssWithOffset);
-
-            ImGui::Checkbox("setWGS84ReferenceFromFirstPose", &tls_registration.gnss.setWGS84ReferenceFromFirstPose);
-
-            if (ImGui::Button("load gnss files and convert from wgs84 to Cartesian using Mercator projection"))
-            {
-                std::vector<std::string> input_file_names;
-                input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", {"GNSS", "*.gnss"}, true);
-
-                if (input_file_names.size() > 0)
-                {
-                    if (!tls_registration.gnss.load_mercator_projection(input_file_names))
-                    {
-                        std::cout << "problem with loading gnss files" << std::endl;
-                    }
-                }
-            }
-
-            if (ImGui::Button("load nmea files and convert from wgs84 to Cartesian using Mercator projection"))
-            {
-                std::vector<std::string> input_file_names;
-                input_file_names = mandeye::fd::OpenFileDialog("Load nmea files", {"NMEA", "*.nmea"}, true);
-
-                if (input_file_names.size() > 0)
-                {
-                    if (!tls_registration.gnss.load_nmea_mercator_projection(input_file_names))
-                    {
-                        std::cout << "problem with loading gnss files" << std::endl;
-                    }
-                }
-            }
-
-            if (ImGui::Button("save metascan points in PUWG92"))
-            {
-
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-                std::vector<Eigen::Vector3d> pointcloud;
-                std::vector<unsigned short> intensity;
-                std::vector<double> timestamps;
-
-                for (auto &p : session.point_clouds_container.point_clouds)
-                {
-                    if (p.visible)
-                    {
-                        for (int i = 0; i < p.points_local.size(); i++)
-                        {
-                            const auto &pp = p.points_local[i];
-                            Eigen::Vector3d vp;
-                            vp = p.m_pose * pp;
-
-                            pointcloud.push_back(vp);
-                            if (i < p.intensities.size())
-                            {
-                                intensity.push_back(p.intensities[i]);
-                            }
-                            else
-                            {
-                                intensity.push_back(0);
-                            }
-                            if (i < p.timestamps.size())
-                            {
-                                timestamps.push_back(p.timestamps[i]);
-                            }
-                        }
-                    }
-                }
-
-                const auto lat = tls_registration.gnss.WGS84ReferenceLatitude;
-                const auto lon = tls_registration.gnss.WGS84ReferenceLongitude;
-                const auto alt = tls_registration.gnss.gnss_poses[0].alt;
-
-                double Xpuwg92 = 0.0;
-                double Ypuwg92 = 0.0;
-                wgs84_do_puwg92(lat, lon, &Xpuwg92, &Ypuwg92);
-                Eigen::Vector3d offset(Ypuwg92, Xpuwg92, alt);
-                exportLaz(output_file_name, pointcloud, intensity, timestamps, offset.x(), offset.y(), offset.z());
-            }
-        }
-        if (tls_registration.gnss.gnss_poses.size() > 0)
-        {
-            ImGui::Checkbox("show GNSS correspondences", &tls_registration.gnss.show_correspondences);
-        }
 
         if (!simple_gui)
         {
@@ -2357,13 +1390,395 @@ void observation_picking_gui()
     ImGui::End();
 }
 
+void lio_segments_gui()
+{
+    ImGui::Begin("LIO segments editor", &is_lio_segments_gui);
+
+    ImGui::Text("index from: ");
+    ImGui::SameLine();
+    ImGui::PushItemWidth(ImGuiNumberWidth);
+    ImGui::SliderInt("##fs", &index_begin, 0, index_end);
+    ImGui::SameLine();
+    ImGui::InputInt("##fi", &index_begin, 1, 5);
+    if (index_begin < 0)
+        index_begin = 0;
+    if (index_begin >= index_end)
+        index_begin = std::min(index_end, static_cast<int>(session.point_clouds_container.point_clouds.size() - 1));
+
+    ImGui::SameLine();
+    ImGui::Text(" to: ");
+    ImGui::SameLine();
+
+    //ImGui::InputInt("to", &index_end);
+    ImGui::SliderInt("##ts", &index_end, index_begin, static_cast<int>(session.point_clouds_container.point_clouds.size() - 1));
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("max %zu", session.point_clouds_container.point_clouds.size() - 1);
+    ImGui::SameLine();
+    ImGui::InputInt("##ti", &index_end, 1, 5);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("max %zu", session.point_clouds_container.point_clouds.size() - 1);    
+    if (index_end < index_begin)
+        index_end = index_begin;
+    if (index_end >= session.point_clouds_container.point_clouds.size() - 1)
+        index_end = session.point_clouds_container.point_clouds.size() - 1;
+    ImGui::PopItemWidth();
+
+    ImGui::Text("Selection: ");
+    ImGui::SameLine();
+    if (ImGui::Button("show"))
+    {
+        session.point_clouds_container.show_all_from_range(index_begin, index_end);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("shift -"))
+    {
+        int step = index_end - index_begin;
+        index_begin -= step;
+        index_end -= step;
+
+        if (index_begin < 0)
+        {
+            index_begin = 0;
+        }
+        if (index_end < 0)
+        {
+            index_end = 0;
+        }
+
+        rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
+        rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
+        rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
+        session.point_clouds_container.show_all_from_range(index_begin, index_end);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("shift +"))
+    {
+        int step = index_end - index_begin;
+        index_begin += step;
+        index_end += step;
+
+        if (index_begin > session.point_clouds_container.point_clouds.size() - 1)
+        {
+            index_begin = session.point_clouds_container.point_clouds.size() - 1;
+        }
+        if (index_end > session.point_clouds_container.point_clouds.size() - 1)
+        {
+            index_end = session.point_clouds_container.point_clouds.size() - 1;
+        }
+
+        rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
+        rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
+        rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
+        session.point_clouds_container.show_all_from_range(index_begin, index_end);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Show all"))
+    {
+        session.point_clouds_container.show_all();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Hide all"))
+    {
+        session.point_clouds_container.hide_all();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset poses"))
+        reset_poses(session);
+
+    ImGui::Checkbox("show_with_initial_pose", &session.point_clouds_container.show_with_initial_pose);
+    ImGui::SameLine();
+    ImGui::Checkbox("manipulate_only_marked_gizmo", &manipulate_only_marked_gizmo);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("false: move also succesive nodes");
+
+    ImGui::Text("Fuse IMU inclination: ");
+    ImGui::SameLine();
+
+    static double angle_diff = 5.0;
+
+    if (ImGui::Button("set all"))
+    {
+        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+        {
+            double om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
+            double fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
+
+            std::cout << "om: " << om << " fi " << fi << std::endl;
+            if (fabs(om) > angle_diff || fabs(fi) > angle_diff)
+            {
+            }
+            else
+            {
+                session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = true;
+            }
+        }
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("unset all"))
+    {
+        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+        {
+            session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = false;
+        }
+    }
+
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGuiNumberWidth);
+    ImGui::InputDouble("acceptable angle [deg]", &angle_diff);
+
+    ImGui::Separator();
+
+    ImGui::BeginChild("LIO segments", ImVec2(0, 0), true);
+    {
+        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+        {
+            if (i > 0)
+                ImGui::Separator();
+            ImGui::SetWindowFontScale(1.25f);
+            ImGui::Checkbox(std::filesystem::path(session.point_clouds_container.point_clouds[i].file_name).filename().string().c_str(), &session.point_clouds_container.point_clouds[i].visible);
+            ImGui::SetWindowFontScale(1.0f);
+            ImGui::SameLine();
+            ImGui::Checkbox(("gizmo##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
+
+    #if 0
+            ImGui::SameLine();
+            ImGui::Checkbox(("fixed##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed);
+            ImGui::SameLine();
+            ImGui::PushButtonRepeat(true);
+            float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
+            if (ImGui::ArrowButton(("left##" + std::to_string(i)).c_str(), ImGuiDir_Left))
+            {
+                (session.point_clouds_container.point_clouds[i].point_size)--;
+            }
+            ImGui::SameLine(0.0f, spacing);
+            if (ImGui::ArrowButton(("right##" + std::to_string(i)).c_str(), ImGuiDir_Right))
+            {
+                (session.point_clouds_container.point_clouds[i].point_size)++;
+            }
+            ImGui::PopButtonRepeat();
+            ImGui::SameLine();
+            ImGui::Text("point size %d", session.point_clouds_container.point_clouds[i].point_size);
+            if (session.point_clouds_container.point_clouds[i].point_size < 1)
+            {
+                session.point_clouds_container.point_clouds[i].point_size = 1;
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button(std::string("#" + std::to_string(i) + " save scan(global reference frame)").c_str()))
+            {
+                const auto output_file_name = mandeye::fd::SaveFileDialog("Choose folder", {});
+                std::cout << "Scan file to save: '" << output_file_name << "'" << std::endl;
+                if (output_file_name.size() > 0)
+                {
+                    session.point_clouds_container.point_clouds[i].save_as_global(output_file_name);
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(std::string("#" + std::to_string(i) + " shift points to center").c_str()))
+            {
+                session.point_clouds_container.point_clouds[i].shift_to_center();
+            }
+    #endif
+            if (session.point_clouds_container.point_clouds[i].gizmo)
+            {
+                for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
+                {
+                    if (i != j)
+                    {
+                        session.point_clouds_container.point_clouds[j].gizmo = false;
+                    }
+                }
+                m_gizmo[0] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 0);
+                m_gizmo[1] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 0);
+                m_gizmo[2] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 0);
+                m_gizmo[3] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 0);
+                m_gizmo[4] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 1);
+                m_gizmo[5] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 1);
+                m_gizmo[6] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 1);
+                m_gizmo[7] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 1);
+                m_gizmo[8] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 2);
+                m_gizmo[9] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 2);
+                m_gizmo[10] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 2);
+                m_gizmo[11] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 2);
+                m_gizmo[12] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 3);
+                m_gizmo[13] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 3);
+                m_gizmo[14] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 3);
+                m_gizmo[15] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 3);
+            }
+
+            if (session.point_clouds_container.point_clouds[i].visible)
+            {
+                ImGui::SameLine();
+                ImGui::ColorEdit3(("pc_color##" + std::to_string(i)).c_str(), session.point_clouds_container.point_clouds[i].render_color, ImGuiColorEditFlags_NoInputs);
+
+    #if 0
+                ImGui::SameLine();
+                if (ImGui::Button(std::string(("ICP##" + std::to_string(i)).c_str())
+                {
+                    size_t index_target = i;
+                    PointClouds pcs;
+                    for (size_t k = 0; k < index_target; k++)
+                    {
+                        if (session.point_clouds_container.point_clouds[k].visible)
+                        {
+                            pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[k]);
+                        }
+                    }
+
+                    if (pcs.point_clouds.size() > 0)
+                    {
+                        for (size_t k = 0; k < pcs.point_clouds.size(); k++)
+                        {
+                            pcs.point_clouds[k].fixed = true;
+                        }
+                    }
+                    pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[index_target]);
+                    pcs.point_clouds[pcs.point_clouds.size() - 1].fixed = false;
+
+                    ICP icp;
+                    icp.search_radious = 0.3; // ToDo move to params
+                    for (auto& pc : pcs.point_clouds)
+                    {
+                        pc.rgd_params.resolution_X = icp.search_radious;
+                        pc.rgd_params.resolution_Y = icp.search_radious;
+                        pc.rgd_params.resolution_Z = icp.search_radious;
+
+                        pc.build_rgd();
+                        pc.cout_rgd();
+                        pc.compute_normal_vectors(0.5);
+                    }
+
+                    icp.number_of_threads = std::thread::hardware_concurrency();
+
+                    icp.number_of_iterations = 10;
+                    icp.is_adaptive_robust_kernel = false;
+
+                    icp.is_ballanced_horizontal_vs_vertical = false;
+                    icp.is_fix_first_node = false;
+                    icp.is_gauss_newton = true;
+                    icp.is_levenberg_marguardt = false;
+                    icp.is_cw = false;
+                    icp.is_wc = true;
+                    icp.is_tait_bryan_angles = true;
+                    icp.is_quaternion = false;
+                    icp.is_rodrigues = false;
+                    std::cout << "optimization_point_to_point_source_to_target" << std::endl;
+
+                    icp.optimization_point_to_point_source_to_target(pcs);
+
+                    std::cout << "pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+
+                    std::vector<Eigen::Affine3d> all_m_poses;
+                    for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
+                    {
+                        all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
+                    }
+
+                    session.point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
+
+                    std::cout << "pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+
+                    // like gizmo
+                    if (!manipulate_only_marked_gizmo)
+                    {
+                        std::cout << "update all poses after current pose" << std::endl;
+
+                        Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[index_target].m_pose;
+                        for (int j = index_target + 1; j < session.point_clouds_container.point_clouds.size(); j++)
+                        {
+                            curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
+                            session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
+                        }
+                    }
+                }
+    #endif
+
+                ImGui::SameLine();
+                ImGui::Checkbox(("fuse IMU inclination##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU);
+
+                ImGui::Text("fixed: ");
+
+                ImGui::SameLine();
+                ImGui::Checkbox(("X##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_x);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(xText);
+
+                ImGui::SameLine();
+                ImGui::Checkbox(("Y##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_y);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(yText);
+
+                ImGui::SameLine();
+                ImGui::Checkbox(("Z##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_z);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(zText);
+
+                ImGui::SameLine();
+                ImGui::Checkbox(("om##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_om);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(omText);
+
+                ImGui::SameLine();
+                ImGui::Checkbox(("fi##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_fi);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(fiText);
+
+                ImGui::SameLine();
+                ImGui::Checkbox(("ka##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_ka);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(kaText);
+
+            }
+    #if 0
+            ImGui::SameLine();
+            if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str()))
+            {
+                std::cout << session.point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
+            }
+    #endif
+        }
+
+    }
+    ImGui::EndChild();
+
+    ImGui::End();
+}
+
 void display()
 {
     ImGuiIO &io = ImGui::GetIO();
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed('F'))
+        setCameraPreset(CAMERA_FRONT);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('B'))
+        setCameraPreset(CAMERA_BACK);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('L'))
+        setCameraPreset(CAMERA_LEFT);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('R'))
+        setCameraPreset(CAMERA_RIGHT);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('T'))
+        setCameraPreset(CAMERA_TOP);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('U'))
+        setCameraPreset(CAMERA_BOTTOM);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('I'))
+        setCameraPreset(CAMERA_ISO);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('Z'))
+        setCameraPreset(CAMERA_RESET);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('X'))
+        show_axes = !show_axes;
+    if (io.KeyCtrl && ImGui::IsKeyPressed('C'))
+        compass_ruler = !compass_ruler;
+
+    float deltaTime = ImGui::GetIO().DeltaTime;
+    updateCameraTransition(deltaTime);
+
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+
+    Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
 
     if (is_ortho)
     {
@@ -2437,7 +1852,6 @@ void display()
 
         viewTranslation.translate(rotation_center);
 
-        Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
         viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
 
         if (!block_z)
@@ -2526,6 +1940,871 @@ void display()
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
 
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (!session_loaded)
+        {
+            if (ImGui::Button("Load session"))
+            {
+                session_file_name = mandeye::fd::OpenFileDialogOneFile("Load session", mandeye::fd::Session_filter);
+                std::cout << "Session file: '" << session_file_name << "'" << std::endl;
+
+                if (session_file_name.size() > 0)
+                    if (session.load(fs::path(session_file_name).string(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset))
+                    {
+                        session_loaded = true;
+                        index_begin = 0;
+                        index_end = session.point_clouds_container.point_clouds.size() - 1;
+
+                        std::string newTitle = "multi_view_tls_registration_step_2 " + std::string(HDMAPPING_VERSION_STRING) + " - " + truncPath(session_file_name);
+                        glutSetWindowTitle(newTitle.c_str());
+
+                        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                        {
+                            session_total_number_of_points += session.point_clouds_container.point_clouds[i].points_local.size();
+                        }
+
+                        session_dims = session.point_clouds_container.compute_point_cloud_dimension();
+                    }
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Select session to analyze");
+
+            ImGui::SameLine();
+            ImGui::Dummy(ImVec2(20, 0));
+            ImGui::SameLine();
+        }
+        else
+        {
+            if (ImGui::BeginMenu("File")) {
+                if (ImGui::MenuItem("Save session"))
+                {
+                    const auto output_file_name = mandeye::fd::SaveFileDialog("Save session", mandeye::fd::Session_filter, ".json", session_file_name);
+                    std::cout << "Session file to save: '" << output_file_name << "'" << std::endl;
+
+                    if (output_file_name.size() > 0)
+                    {
+                        if (session.point_clouds_container.initial_poses_file_name.empty())
+                        {
+                            std::cout << "Please assign initial_poses_file_name to session" << std::endl;
+                            std::cout << "Session is not saved" << std::endl;
+
+                            [[maybe_unused]] pfd::message message(
+                                "Please assign initial_poses_file_name to session",
+                                "Session is not saved. Please assign initial_poses_file_name to session. "
+                                "Follow guidlines available here : "
+                                "https://github.com/MapsHD/HDMapping/tree/main/doc/, "
+                                "You can do this using button 'update initial poses from RESSO file'",
+                                pfd::choice::ok, pfd::icon::error);
+                            message.result();
+
+                            std::shared_ptr<pfd::save_file> save_file2;
+                            std::string initial_poses_file_name = "";
+                            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file2);
+                            const auto tt = [&]()
+                                {
+                                    auto sel = pfd::save_file("initial_poses_file_name", "C:\\", mandeye::fd::Resso_filter).result();
+                                    initial_poses_file_name = sel;
+                                    std::cout << "Resso file to save: '" << initial_poses_file_name << "'" << std::endl;
+                                };
+                            std::thread t2(tt);
+                            t2.join();
+
+                            if (initial_poses_file_name.size() > 0)
+                            {
+                                std::cout << "saving initial poses to: " << initial_poses_file_name << std::endl;
+                                session.point_clouds_container.save_poses(fs::path(initial_poses_file_name).string(), false);
+                            }
+                        }
+
+                        if (session.point_clouds_container.poses_file_name.empty())
+                        {
+                            std::cout << "Please assign poses_file_name to session" << std::endl;
+                            std::cout << "Session is not saved" << std::endl;
+
+                            [[maybe_unused]] pfd::message message(
+                                "Please assign poses_file_name to session",
+                                "Session is not saved. Please assign poses_file_name to session. "
+                                "Follow guidlines available here : "
+                                "https://github.com/MapsHD/HDMapping/tree/main/doc/,"
+                                "You can do this using button 'update poses from RESSO file'",
+                                pfd::choice::ok, pfd::icon::error);
+                            message.result();
+
+                            const auto poses_file_name = mandeye::fd::SaveFileDialog("poses_file_name", mandeye::fd::Resso_filter);
+                            std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
+                            if (poses_file_name.size() > 0)
+                            {
+                                std::cout << "saving poses to: " << poses_file_name << std::endl;
+                                session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), false);
+                            }
+                        }
+
+                        session.save(fs::path(output_file_name).string(), session.point_clouds_container.poses_file_name, session.point_clouds_container.initial_poses_file_name, false);
+                        std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
+                        session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false);
+                    }
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("last step in linear workflow");
+
+                if ((index_begin > 0) || (index_end < static_cast<int>(session.point_clouds_container.point_clouds.size() - 1)))
+                {
+                    if (ImGui::MenuItem("Save subsession"))
+                    {
+                        //creating filename proposal based on current selection
+                        std::filesystem::path path(session_file_name);
+                        // Extract parts
+                        auto dir = path.parent_path();
+                        auto stem = path.stem().string();
+                        auto ext = path.extension().string();
+                        std::string indexpart = " " + std::to_string(index_begin) + "-" + std::to_string(index_end);
+
+                        // Build new name
+                        std::string indexed_file_name = (dir / (stem + indexpart + ext)).string();
+
+                        const auto output_file_name = mandeye::fd::SaveFileDialog("Save subsession", mandeye::fd::Session_filter, ".json", indexed_file_name);
+                        std::cout << "Subsession file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            const auto initial_poses_file_name = (dir / ("lio_initial_poses" + indexpart + ".reg")).string();
+                            const auto poses_file_name = (dir / ("poses" + indexpart + ".reg")).string();
+                            
+                            session.save(fs::path(output_file_name).string(), poses_file_name, initial_poses_file_name, true);
+                            std::cout << "Saving initial poses to: " << initial_poses_file_name << std::endl;
+                            session.point_clouds_container.save_poses(fs::path(initial_poses_file_name).string(), true);
+                            std::cout << "Saving poses to: " << poses_file_name << std::endl;
+                            session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), true);
+                        }
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Save subsession based on selection in Lio segments editor");
+                }
+
+                ImGui::Separator();
+
+                if (ImGui::BeginMenu("Save all marked scans"))
+                {
+                    if (ImGui::MenuItem("Local scan"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_all_to_las(session, output_file_name, true);
+                        }
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("As one local scan transformed via inverse pose of first scan");
+
+                    if (ImGui::MenuItem("Global scan"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_all_to_las(session, output_file_name, false);
+                        }
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("To export in full resolution, close the program and open again, unmark 'simple_gui', unmark 'decimate during load'");
+
+                    if (ImGui::MenuItem("Separate global scans (laz)"))
+                    {
+                        std::string output_folder_name_separately = "";
+                        output_folder_name_separately = mandeye::fd::SelectFolder("Choose folder");
+                        save_separately_to_las(session, output_folder_name_separately, ".laz");
+                    }
+
+                    if (ImGui::MenuItem("Separate global scans (las)"))
+                    {
+                        std::string output_folder_name_separately = "";
+                        output_folder_name_separately = mandeye::fd::SelectFolder("Choose folder");
+                        save_separately_to_las(session, output_folder_name_separately, ".las");
+                    }
+
+                    ImGui::EndMenu();
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Save all marked scans as las/laz files");
+
+                if (ImGui::BeginMenu("Save all marked trajectories"))
+                {
+                    ImGui::MenuItem("is_trajectory_export_downsampling", nullptr, &tls_registration.is_trajectory_export_downsampling);
+                    ImGui::PushItemWidth(ImGuiNumberWidth);
+                    ImGui::InputFloat("curve_consecutive_distance [m]", &tls_registration.curve_consecutive_distance_meters);
+                    ImGui::InputFloat("not_curve_consecutive_distance [m]", &tls_registration.not_curve_consecutive_distance_meters);
+                    ImGui::PopItemWidth();
+
+                    if (ImGui::MenuItem("Save all as las/laz files"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                        if (output_file_name.size() > 0)
+                        {
+                            save_trajectories_to_laz(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling);
+                        }
+                    }
+
+                    ImGui::Separator();
+
+
+                    ImGui::Text("(x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)");
+                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar)"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
+                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, false, false, false);
+                        }
+                    }
+                    if (ImGui::MenuItem("Save all as csv (timestamp Unix)"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
+                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, true, false, false);
+                        }
+                    }
+                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
+                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, true, false, false);
+                        }
+                    }
+
+                    ImGui::Separator();
+                    ImGui::Text("(x,y,z,qx,qy,qz,qw)");
+
+                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar)"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
+                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, false, true, false);
+                        }
+                    }
+                    if (ImGui::MenuItem("Save all as csv (timestamp Unix)"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
+                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, true, true, false);
+                        }
+                    }
+                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
+                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, true, true, false);
+                        }
+                    }
+
+                    ImGui::Separator();
+
+                    if (ImGui::MenuItem("Save all as dxf as polyline"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog("Ouput file name", mandeye::fd::Dxf_filter, ".dxf");
+                        std::cout << "dxf file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, false, false, true);
+                        }
+                    }
+
+                    ImGui::EndMenu();
+                }
+
+                if (ImGui::BeginMenu("Save scale board"))
+                {
+                    ImGui::Text("For all marked trajectories as one global scan to laz");
+
+                    if (ImGui::MenuItem("> dec 0.1"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_scale_board_to_laz(session, output_file_name, 0.1);
+                        }
+                    }
+
+                    if (ImGui::MenuItem("> dec 1.0"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_scale_board_to_laz(session, output_file_name, 1.0);
+                        }
+                    }
+
+                    if (ImGui::MenuItem("> dec 10.0"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_scale_board_to_laz(session, output_file_name, 10.0);
+                        }
+                    }
+
+                    ImGui::Separator();
+                    ImGui::Text("10km x 10km to laz");
+
+                    if (ImGui::MenuItem("> 10m"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_scale_board_to_laz(session, output_file_name, 10.0, 10000.0);
+                        }
+                    }
+
+                    if (ImGui::MenuItem("> 100m"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_scale_board_to_laz(session, output_file_name, 100.0, 10000.0);
+                        }
+                    }
+
+                    if (ImGui::MenuItem("> 1000m"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            save_scale_board_to_laz(session, output_file_name, 1000.0, 10000.0);
+                        }
+                    }
+
+                    ImGui::EndMenu();
+                }
+
+                if (ImGui::BeginMenu("GNSS"))
+                {
+                    ImGui::MenuItem("Load with offset", nullptr, &gnssWithOffset);
+                    
+                    if (ImGui::MenuItem("Load GNSS files and convert WGS84 to PUWG92"))
+                    {
+                        std::vector<std::string> input_file_names;
+                        input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", { "GNSS", "*.gnss" }, true);
+
+                        if (input_file_names.size() > 0)
+                        {
+                            if (!tls_registration.gnss.load(input_file_names, gnssWithOffset))
+                            {
+                                std::cout << "problem with loading gnss files" << std::endl;
+                            }
+                        }
+                    }
+
+                    ImGui::MenuItem("Set WGS84 reference from 1st pose", nullptr, &tls_registration.gnss.setWGS84ReferenceFromFirstPose);
+
+                    ImGui::Text("Load & convert WGS84 to Cartesian by Mercator projection");
+
+                    if (ImGui::MenuItem("Load GNSS"))
+                    {
+                        std::vector<std::string> input_file_names;
+                        input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", { "GNSS", "*.gnss" }, true);
+
+                        if (input_file_names.size() > 0)
+                        {
+                            if (!tls_registration.gnss.load_mercator_projection(input_file_names))
+                            {
+                                std::cout << "problem with loading gnss files" << std::endl;
+                            }
+                        }
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Load structured GNSS dataset and decode it into coordinates");
+
+                    if (ImGui::MenuItem("Load NMEA"))
+                    {
+                        std::vector<std::string> input_file_names;
+                        input_file_names = mandeye::fd::OpenFileDialog("Load nmea files", { "NMEA", "*.nmea" }, true);
+
+                        if (input_file_names.size() > 0)
+                        {
+                            if (!tls_registration.gnss.load_nmea_mercator_projection(input_file_names))
+                            {
+                                std::cout << "problem with loading gnss files" << std::endl;
+                            }
+                        }
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Load raw GNSS serial output and decode it into coordinates");
+
+                    ImGui::Separator();
+
+                    if (ImGui::MenuItem("Save GNSS data to las/laz file"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            tls_registration.gnss.save_to_laz(output_file_name, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
+                        }
+                    }
+
+                    if (ImGui::MenuItem("Save metascan points in PUWG92"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::vector<Eigen::Vector3d> pointcloud;
+                        std::vector<unsigned short> intensity;
+                        std::vector<double> timestamps;
+
+                        for (auto& p : session.point_clouds_container.point_clouds)
+                        {
+                            if (p.visible)
+                            {
+                                for (int i = 0; i < p.points_local.size(); i++)
+                                {
+                                    const auto& pp = p.points_local[i];
+                                    Eigen::Vector3d vp;
+                                    vp = p.m_pose * pp;
+
+                                    pointcloud.push_back(vp);
+                                    if (i < p.intensities.size())
+                                    {
+                                        intensity.push_back(p.intensities[i]);
+                                    }
+                                    else
+                                    {
+                                        intensity.push_back(0);
+                                    }
+                                    if (i < p.timestamps.size())
+                                    {
+                                        timestamps.push_back(p.timestamps[i]);
+                                    }
+                                }
+                            }
+                        }
+
+                        const auto lat = tls_registration.gnss.WGS84ReferenceLatitude;
+                        const auto lon = tls_registration.gnss.WGS84ReferenceLongitude;
+                        const auto alt = tls_registration.gnss.gnss_poses[0].alt;
+
+                        double Xpuwg92 = 0.0;
+                        double Ypuwg92 = 0.0;
+                        wgs84_do_puwg92(lat, lon, &Xpuwg92, &Ypuwg92);
+                        Eigen::Vector3d offset(Ypuwg92, Xpuwg92, alt);
+                        exportLaz(output_file_name, pointcloud, intensity, timestamps, offset.x(), offset.y(), offset.z());
+                    }
+
+                    ImGui::EndMenu();
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("GNSS (GPS, etc.) related open/save commands");
+
+                ImGui::EndMenu();
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Loaded session:");
+                ImGui::Text(std::string(session.session_file_name).c_str());
+                ImGui::Separator();
+                ImGui::Text("Total number of points: %zu", session_total_number_of_points);
+
+                if (ImGui::BeginTable("Dimensions", 4))
+                {
+                    ImGui::TableSetupColumn("Coord [m]");
+                    ImGui::TableSetupColumn("min");
+                    ImGui::TableSetupColumn("max");
+                    ImGui::TableSetupColumn("size");
+                    ImGui::TableHeadersRow();
+
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+
+                    
+                    std::string text = "X";
+                    float centered = ImGui::GetColumnWidth() - ImGui::CalcTextSize(text.c_str()).x;
+                    // Set cursor so text is centered
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+
+                    ImGui::Text("X");
+
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("%.3f", session_dims.x_min);
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::Text("%.3f", session_dims.x_max);
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::Text("%.3f", session_dims.length);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+                    ImGui::Text("Y");
+
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("%.3f", session_dims.y_min);
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::Text("%.3f", session_dims.y_max);
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::Text("%.3f", session_dims.width);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+                    ImGui::Text("Z");
+
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("%.3f", session_dims.z_min);
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::Text("%.3f", session_dims.z_max);
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::Text("%.3f", session_dims.height);
+
+                    ImGui::EndTable();
+                }
+
+                ImGui::EndTooltip();
+            }
+            
+
+            if (ImGui::BeginMenu("Tools"))
+            {
+                ImGui::MenuItem("Normal Distributions Transform", nullptr, &is_ndt_gui);
+                ImGui::MenuItem("Iterative Closest Point", nullptr, &is_icp_gui);
+                ImGui::MenuItem("Plane Features", nullptr, &is_registration_plane_feature);
+                ImGui::MenuItem("Pose Graph SLAM", nullptr, &is_pose_graph_slam);
+                ImGui::MenuItem("Manual Analysis", nullptr, &is_manual_analisys);
+
+
+                ImGui::Separator();
+                if (ImGui::MenuItem("Ground Control Points GUI", nullptr, &session.ground_control_points.is_imgui))
+                {
+                    if (session.ground_control_points.is_imgui)
+                        session.control_points.is_imgui = false;
+                }
+                if (ImGui::MenuItem("Control Points GUI", nullptr, &session.control_points.is_imgui))
+                {
+                    if (session.control_points.is_imgui)
+                        session.ground_control_points.is_imgui = false;
+                }
+
+                ImGui::MenuItem("Manual Pose Graph Loop Closure Mode", nullptr, &manual_pose_graph_loop_closure_mode);
+
+                if (!manual_pose_graph_loop_closure_mode)
+                {
+                    ImGui::Separator();
+                    ImGui::MenuItem("LIO segments editor", nullptr, &is_lio_segments_gui);
+                }
+
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::BeginMenu("Intersections")) {
+                ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                ImGui::InputDouble("Intersection width [m]", &session.point_clouds_container.intersection_width, 0.0, 0.0, "%.2f");
+                if (session.point_clouds_container.intersection_width < 0.001)
+                {
+                    session.point_clouds_container.intersection_width = 0.001;
+                }
+
+                ImGui::Separator();
+
+                ImGui::MenuItem("xz_intersection", nullptr, &session.point_clouds_container.xz_intersection);
+                ImGui::MenuItem("10m grid##xz", nullptr, &session.point_clouds_container.xz_grid_10x10);
+                ImGui::MenuItem("1m grid##xz", nullptr, &session.point_clouds_container.xz_grid_1x1);
+                ImGui::MenuItem("0.1m grid##xz", nullptr, &session.point_clouds_container.xz_grid_01x01);
+                
+                if (ImGui::MenuItem("Export xz intersection", nullptr, false, session.point_clouds_container.xz_intersection))
+                {
+                    const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                    std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                    if (output_file_name.size() > 0)
+                    {
+                        save_intersection(session, output_file_name,
+                            session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
+                            session.point_clouds_container.intersection_width);
+                    }
+                }
+
+                ImGui::Separator();
+
+                ImGui::MenuItem("yz_intersection", nullptr, &session.point_clouds_container.yz_intersection);
+                ImGui::MenuItem("10m grid##yz", nullptr, &session.point_clouds_container.yz_grid_10x10);
+                ImGui::MenuItem("1m grid##yz", nullptr, &session.point_clouds_container.yz_grid_1x1);
+                ImGui::MenuItem("0.1m grid##yz", nullptr, &session.point_clouds_container.yz_grid_01x01);
+                
+                if (ImGui::MenuItem("Export yz intersection", nullptr, false, session.point_clouds_container.yz_intersection))
+                {
+                    const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                    std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                    if (output_file_name.size() > 0)
+                    {
+                        save_intersection(session, output_file_name,
+                            session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
+                            session.point_clouds_container.intersection_width);
+                    }
+                }
+
+                ImGui::Separator();
+
+                ImGui::MenuItem("xy_intersection", nullptr, &session.point_clouds_container.xy_intersection);
+                ImGui::MenuItem("10m grid##xy", nullptr, &session.point_clouds_container.xy_grid_10x10);
+                ImGui::MenuItem("1m grid##xy", nullptr, &session.point_clouds_container.xy_grid_1x1);
+                ImGui::MenuItem("0.1m grid##xy", nullptr, &session.point_clouds_container.xy_grid_01x01);
+
+                if (ImGui::MenuItem("Export xy intersection", nullptr, false, session.point_clouds_container.xy_intersection))
+                {
+                    const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                    std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                    if (output_file_name.size() > 0)
+                    {
+                        save_intersection(session, output_file_name,
+                            session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
+                            session.point_clouds_container.intersection_width);
+                    }
+                }
+
+                ImGui::EndMenu();
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Intersection menu");
+        }
+
+        if (ImGui::BeginMenu("View"))
+        {
+            if (session_loaded)
+            {
+                ImGui::PushItemWidth(ImGuiNumberWidth);
+
+                auto tmp = all_point_size;
+                ImGui::InputInt("points size", &all_point_size);
+                ImGui::PopItemWidth();
+                if (all_point_size < 1)
+                    all_point_size = 1;
+                if (all_point_size > 10)
+                    all_point_size = 10;
+
+                if (tmp != all_point_size)
+                {
+                    for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                    {
+                        session.point_clouds_container.point_clouds[i].point_size = all_point_size;
+                    }
+                }
+
+                if (tls_registration.gnss.gnss_poses.size() > 0)
+                {
+                    ImGui::MenuItem("Show GNSS correspondences", nullptr, &tls_registration.gnss.show_correspondences);
+                }
+
+                ImGui::Separator();
+            }
+
+            ImGui::MenuItem("Orthographic", nullptr, &is_ortho);
+            if (is_ortho)
+            {
+                rotate_x = 0.0;
+                rotate_y = 0.0;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
+            
+            ImGui::MenuItem("Show axes", "Ctrl+X", &show_axes);
+            ImGui::MenuItem("Block Z", nullptr, &block_z);
+
+            ImGui::Separator();
+
+            ImGui::MenuItem("show_compass_ruler", "Ctrl+C", &compass_ruler);
+
+            ImGui::Separator();
+
+            ImGui::ColorEdit4("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
+
+            if (session_loaded)
+            {
+                float color[3] = {
+                    session.point_clouds_container.point_clouds[0].render_color[0],
+                    session.point_clouds_container.point_clouds[0].render_color[1],
+                    session.point_clouds_container.point_clouds[0].render_color[2]
+                };
+
+                if (ImGui::ColorEdit3("Cloud color", (float*)&color, ImGuiColorEditFlags_NoInputs))
+                {
+                    for (auto& pc : session.point_clouds_container.point_clouds)
+                    {
+                        pc.render_color[0] = color[0];
+                        pc.render_color[1] = color[1];
+                        pc.render_color[2] = color[2];
+                        pc.show_color = false;
+                    }
+                }
+
+                if (ImGui::MenuItem("Random segments colors"))
+                {
+                    for (auto& pc : session.point_clouds_container.point_clouds)
+                    {
+                        pc.render_color[0] = float(rand() % 255) / 255.0f;
+                        pc.render_color[1] = float(rand() % 255) / 255.0f;
+                        pc.render_color[2] = float(rand() % 255) / 255.0f;
+                        pc.show_color = false;
+                    }
+                }
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::BeginMenu("Console"))
+            {
+#ifdef _WIN32
+
+                if (ImGui::MenuItem("Use Windows console", nullptr, &consWin))
+                {
+                    if (consWin)
+                    {
+                        AllocConsole();
+                        freopen("CONOUT$", "w", stdout);
+                        freopen("CONOUT$", "w", stderr);
+                        freopen("CONIN$", "r", stdin);
+                    }
+                    else
+                        FreeConsole();
+                }
+                if (ImGui::IsItemHovered())
+                {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("!!! If not used.. !!!");
+                    ImGui::Text("- old console output is lost");
+                    ImGui::Text("- new console output can only be seen in subwindow");
+                    ImGui::Text("- app might run faster");
+                    ImGui::EndTooltip();
+                }
+#endif
+                //ImGui::MenuItem("Subwindow", nullptr, &consImGui);
+                //if (ImGui::IsItemHovered())
+                //    ImGui::SetTooltip("Show/hide console output as GUI window");
+
+                ImGui::EndMenu();
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Control console output");
+
+            ImGui::EndMenu();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Scene view relevant parameters");
+
+        if (ImGui::BeginMenu("Camera"))
+        {
+            if (ImGui::MenuItem("Front (yz view)", "Ctrl+F"))
+                setCameraPreset(CAMERA_FRONT);
+            if (ImGui::MenuItem("Back", "Ctrl+B"))
+                setCameraPreset(CAMERA_BACK);
+            if (ImGui::MenuItem("Left (xz view)", "Ctrl+L"))
+                setCameraPreset(CAMERA_LEFT);
+            if (ImGui::MenuItem("Right", "Ctrl+R"))
+                setCameraPreset(CAMERA_RIGHT);
+            if (ImGui::MenuItem("Top (xy view)", "Ctrl+T"))
+                setCameraPreset(CAMERA_TOP);
+            if (ImGui::MenuItem("Bottom", "Ctrl+U"))
+                setCameraPreset(CAMERA_BOTTOM);
+            if (ImGui::MenuItem("Isometric", "Ctrl+I"))
+                setCameraPreset(CAMERA_ISO);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Reset", "Ctrl+Z"))
+                setCameraPreset(CAMERA_RESET);
+            ImGui::EndMenu();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Change camera view to fixed positions");
+
+        if (session.point_clouds_container.point_clouds.size() > 0)
+        {
+            ImGui::SameLine();
+            ImGui::Dummy(ImVec2(20, 0));
+            ImGui::SameLine();
+
+            ImGui::SetNextItemWidth(ImGuiNumberWidth);
+            ImGui::InputInt("Points render subsampling", &viewer_decimate_point_cloud, 10, 100);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("increase for better performance, decrease for rendering more points");
+            ImGui::SameLine();
+
+            //fps_avg = fps_avg * 0.7f + ImGui::GetIO().Framerate * 0.3f;  // exponential smoothing
+
+            //double now = ImGui::GetTime();  // ImGui’s built-in timer (in seconds)
+
+            //ImGui::Checkbox("dynamic", &dynamicSubsampling);
+            //if (ImGui::IsItemHovered())
+            //    ImGui::SetTooltip("automatically control subsampling vs FPS: increase bellow 10, decrease above 60");
+            //if (dynamicSubsampling && (fps_avg < 15) && (now - lastAdjustTime > cooldownSeconds))
+            //{
+            //    viewer_decimate_point_cloud += 1;
+            //    lastAdjustTime = now;
+            //}
+            //ImGui::SameLine();
+            //ImGui::Text("(avg %.1f)", fps_avg);
+
+            if (viewer_decimate_point_cloud < 1)
+            {
+                viewer_decimate_point_cloud = 1;
+            }
+            ImGui::SameLine();
+            ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
+        }
+
+        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 2));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
+        if (ImGui::SmallButton("Info"))
+        {
+            info_gui = !info_gui;
+        }
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(3);
+
+
+        ImGui::EndMainMenuBar();
+    }
+
+    info_window(infoLines, &info_gui);
+
+    if (compass_ruler)
+        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), clear_color);
+
     if (session.control_points.is_imgui)
     {
         session.control_points.imgui(session.point_clouds_container, rotation_center);
@@ -2556,6 +2835,10 @@ void display()
         if (session.ground_control_points.is_imgui)
         {
             session.ground_control_points.imgui(session.point_clouds_container);
+        }
+        if (is_lio_segments_gui)
+        {
+            lio_segments_gui();
         }
     }
 
@@ -2645,12 +2928,12 @@ void display()
                 }
             }
 
-            session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection,
+            session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection,
                                                   session.point_clouds_container.xy_intersection,
                                                   session.point_clouds_container.xz_grid_10x10, session.point_clouds_container.xz_grid_1x1, session.point_clouds_container.xz_grid_01x01,
                                                   session.point_clouds_container.yz_grid_10x10, session.point_clouds_container.yz_grid_1x1, session.point_clouds_container.yz_grid_01x01,
                                                   session.point_clouds_container.xy_grid_10x10, session.point_clouds_container.xy_grid_1x1, session.point_clouds_container.xy_grid_01x01,
-                                                  session.point_clouds_container.intersection_width);
+                                                  session.point_clouds_container.intersection_width, session_dims);
 
             // std::cout << "session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 << std::endl;
 
@@ -2823,11 +3106,13 @@ void motion(int x, int y)
             {
                 rotate_x += dy * 0.2f; // * mouse_sensitivity;
                 rotate_y += dx * 0.2f; // * mouse_sensitivity;
+                camera_transition_active = false;
             }
             if (mouse_buttons & 4)
             {
                 translate_x += dx * 0.05f * mouse_sensitivity;
                 translate_y -= dy * 0.05f * mouse_sensitivity;
+                camera_transition_active = false;
             }
         }
 
@@ -3029,6 +3314,7 @@ void wheel(int button, int dir, int x, int y)
             else
             {
                 translate_z -= 0.05f * translate_z;
+                camera_transition_active = false;
             }
         }
         else
@@ -3040,6 +3326,7 @@ void wheel(int button, int dir, int x, int y)
             else
             {
                 translate_z += 0.05f * translate_z;
+                camera_transition_active = false;
             }
         }
     }
@@ -3075,6 +3362,14 @@ bool initGL(int *argc, char **argv)
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
     glutCreateWindow("multi_view_tls_registration_step_2 " HDMAPPING_VERSION_STRING);
+
+    #ifdef _WIN32
+        HWND hwnd = FindWindow(NULL, "multi_view_tls_registration_step_2 " HDMAPPING_VERSION_STRING); // The window title must match exactly
+        HINSTANCE hInstance = GetModuleHandle(NULL);
+        SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+    #endif
+
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -3107,6 +3402,7 @@ int main(int argc, char *argv[])
     try
     {
         initGL(&argc, argv);
+
         glutDisplayFunc(display);
         glutMouseFunc(mouse);
         glutMotionFunc(motion);

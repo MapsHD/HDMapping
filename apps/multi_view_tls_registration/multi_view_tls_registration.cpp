@@ -548,7 +548,7 @@ void run_multi_view_tls_registration(
 	{
 		number_of_point += pc.points_local.size();
 	}
-	session.point_clouds_container.print_point_cloud_dimention();
+	session.point_clouds_container.print_point_cloud_dimension();
 
 	if (tls_registration.resso_upd_init.size() > 0)
 	{

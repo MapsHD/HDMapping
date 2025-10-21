@@ -118,7 +118,7 @@ bool PointClouds::load(const std::string &folder_with_point_clouds, const std::s
 
 	std::cout << "all scans, sum_points_before_decimation: " << sum_points_before_decimation << std::endl;
 	std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
-	print_point_cloud_dimention();
+	print_point_cloud_dimension();
 	return true;
 }
 
@@ -441,7 +441,7 @@ bool PointClouds::load_eth(const std::string &folder_with_point_clouds, const st
 {
 	point_clouds.clear();
 
-	std::cout << "Lodaing from file: " << poses_file_name << std::endl;
+	std::cout << "Loading from file: " << poses_file_name << std::endl;
 	std::cout << "ply files are located at: " << folder_with_point_clouds << std::endl;
 
 	std::vector<std::pair<std::string, std::string>> pairs;
@@ -548,23 +548,214 @@ bool PointClouds::load_eth(const std::string &folder_with_point_clouds, const st
 	infile.close();
 	folder_name = folder_with_point_clouds;
 
-	std::cout << "all scans, sum_points_before_decimation: " << sum_points_before_decimation << std::endl;
-	std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
-	print_point_cloud_dimention();
+	std::cout << "sum_points before/after decimation: "
+		<< sum_points_before_decimation << " / "
+		<< sum_points_after_decimation << std::endl;
+	print_point_cloud_dimension();
 	return true;
 }
 
 #if WITH_GUI == 1
+void PointClouds::draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_01x01,
+	bool yz_grid_10x10, bool yz_grid_1x1, bool yz_grid_01x01,
+	bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01, PointClouds::PointCloudDimensions dims)
+{
+	float step;
+	float x_max = std::ceil(dims.x_max / step) * step;
+	float y_max = std::ceil(dims.y_max / step) * step;
+	float z_max = std::ceil(dims.z_max / step) * step;
+
+	if (xz_grid_10x10)
+	{
+		step = 10.0f;
+		glColor3f(0.7, 0.7, 0.7);
+		glBegin(GL_LINES);
+		for (float x = dims.x_min; x <= x_max; x += step)
+		{
+			glVertex3f(x, 0.0f, dims.z_min);
+			glVertex3f(x, 0.0f, z_max);
+		}
+
+		for (float z = dims.z_min; z <= z_max; z += step)
+		{
+			glVertex3f(dims.x_min, 0, z);
+			glVertex3f(x_max, 0, z);
+		}
+		glEnd();
+	}
+
+	if (xz_grid_1x1)
+	{
+		step = 1.0f;
+		glColor3f(0.3, 0.3, 0.3);
+		glBegin(GL_LINES);
+		for (float x = dims.x_min; x <= x_max; x += step)
+		{
+			glVertex3f(x, 0.0f, dims.z_min);
+			glVertex3f(x, 0.0f, z_max);
+		}
+
+		for (float z = dims.z_min; z <= z_max; z += step)
+		{
+			glVertex3f(dims.x_min, 0, z);
+			glVertex3f(x_max, 0, z);
+		}
+		glEnd();
+	}
+
+	if (xz_grid_01x01)
+	{
+		step = 0.1f;
+		glColor3f(0.3, 0.3, 0.3);
+		glBegin(GL_LINES);
+		for (float x = dims.x_min; x <= x_max; x += step)
+		{
+			glVertex3f(x, 0.0f, dims.z_min);
+			glVertex3f(x, 0.0f, z_max);
+		}
+
+		for (float z = dims.z_min; z <= z_max; z += step)
+		{
+			glVertex3f(dims.x_min, 0, z);
+			glVertex3f(x_max, 0, z);
+		}
+		glEnd();
+	}
+
+	if (yz_grid_10x10)
+	{
+		step = 10.0f;
+		glColor3f(0.7, 0.7, 0.7);
+		glBegin(GL_LINES);
+		for (float y = dims.y_min; y <= y_max; y += step)
+		{
+			glVertex3f(0.0f, y, dims.z_min);
+			glVertex3f(0.0f, y, z_max);
+		}
+
+		for (float z = dims.z_min; z <= z_max; z += step)
+		{
+			glVertex3f(0, dims.y_min, z);
+			glVertex3f(0, y_max, z);
+		}
+		glEnd();
+	}
+
+	if (yz_grid_1x1)
+	{
+		step = 1.0f;
+		glColor3f(0.3, 0.3, 0.3);
+		glBegin(GL_LINES);
+		for (float y = dims.y_min; y <= y_max; y += step)
+		{
+			glVertex3f(0.0f, y, dims.z_min);
+			glVertex3f(0.0f, y, z_max);
+		}
+
+		for (float z = dims.z_min; z <= z_max; z += step)
+		{
+			glVertex3f(0, dims.y_min, z);
+			glVertex3f(0, y_max, z);
+		}
+		glEnd();
+	}
+
+	if (yz_grid_01x01)
+	{
+		step = 0.1f;
+		glColor3f(0.3, 0.3, 0.3);
+		glBegin(GL_LINES);
+		for (float y = dims.y_min; y <= y_max; y += step)
+		{
+			glVertex3f(0.0f, y, dims.z_min);
+			glVertex3f(0.0f, y, z_max);
+		}
+
+		for (float z = dims.z_min; z <= z_max; z += step)
+		{
+			glVertex3f(0, dims.y_min, z);
+			glVertex3f(0, y_max, z);
+		}
+		glEnd();
+	}
+
+	if (xy_grid_10x10)
+	{
+		step = 10.0f;
+		glColor3f(0.7, 0.7, 0.7);
+		glBegin(GL_LINES);
+		for (float x = dims.x_min; x <= x_max; x += step)
+		{
+			glVertex3f(x, dims.y_min, 0.0);
+			glVertex3f(x, dims.y_max, 0.0);
+		}
+
+		for (float y = dims.y_min; y <= y_max; y += step)
+		{
+			glVertex3f(dims.x_min, y, 0.0);
+			glVertex3f(x_max, y, 0.0);
+		}
+		glEnd();
+	}
+
+	if (xy_grid_1x1)
+	{
+		step = 1.0f;
+		glColor3f(0.3, 0.3, 0.3);
+		glBegin(GL_LINES);
+		for (float x = dims.x_min; x <= x_max; x += step)
+		{
+			glVertex3f(x, dims.y_min, 0.0);
+			glVertex3f(x, y_max, 0.0);
+		}
+
+		for (float y = dims.y_min; y <= y_max; y += step)
+		{
+			glVertex3f(dims.x_min, y, 0.0);
+			glVertex3f(x_max, y, 0.0);
+		}
+		glEnd();
+	}
+
+	if (xy_grid_01x01)
+	{
+		step = 0.1f;
+		glColor3f(0.3, 0.3, 0.3);
+		glBegin(GL_LINES);
+		for (float x = dims.x_min; x <= x_max; x += step)
+		{
+			glVertex3f(x, dims.y_min, 0.0);
+			glVertex3f(x, y_max, 0.0);
+		}
+
+		for (float y = dims.y_min; y <= y_max; y += step)
+		{
+			glVertex3f(dims.x_min, y, 0.0);
+			glVertex3f(x_max, y, 0.0);
+		}
+		glEnd();
+	}
+}
+
 void PointClouds::render(const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud, bool xz_intersection, bool yz_intersection, bool xy_intersection,
 						 bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_01x01,
 						 bool yz_grid_10x10, bool yz_grid_1x1, bool yz_grid_01x01,
 						 bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01,
-						 double intersection_width)
+						 double intersection_width, PointClouds::PointCloudDimensions dims)
 {
-	for (auto &p : point_clouds)
+	// Draw grids once for the scene
+	if (xz_grid_10x10 || xz_grid_1x1 || xz_grid_01x01 ||
+		yz_grid_10x10 || yz_grid_1x1 || yz_grid_01x01 ||
+		xy_grid_10x10 || xy_grid_1x1 || xy_grid_01x01)
+		draw_grids(xz_grid_10x10, xz_grid_1x1, xz_grid_01x01,
+				   yz_grid_10x10, yz_grid_1x1, yz_grid_01x01,
+				   xy_grid_10x10, xy_grid_1x1, xy_grid_01x01, dims);
+
+	// Render each point cloud (points + trajectories)
+	for (auto& p : point_clouds)
 	{
-		p.render(this->show_with_initial_pose, observation_picking, viewer_decmiate_point_cloud, xz_intersection, yz_intersection, xy_intersection, xz_grid_10x10, xz_grid_1x1, xz_grid_01x01,
-				 yz_grid_10x10, yz_grid_1x1, yz_grid_01x01, xy_grid_10x10, xy_grid_1x1, xy_grid_01x01, intersection_width);
+		p.render(this->show_with_initial_pose, observation_picking, viewer_decmiate_point_cloud,
+			xz_intersection, yz_intersection, xy_intersection, intersection_width);
 	}
 }
 #endif
@@ -592,7 +783,7 @@ bool PointClouds::save_poses(const std::string file_name, bool is_subsession)
 	if (!outfile.good())
 	{
 		std::cout << "can not save file: " << file_name << std::endl;
-		std::cout << "if You can see only '' it means there is no filename assigned to poses, please read manual or contact me januszbedkowski@gmail.com" << std::endl;
+		std::cout << "if you can see only '' it means there is no filename assigned to poses, please read manual or ask for support" << std::endl;
 		std::cout << "To assign filename to poses please use following two buttons in multi_view_tls_registration_step_2" << std::endl;
 		std::cout << "1: update initial poses from RESSO file" << std::endl;
 		std::cout << "2: update poses from RESSO file" << std::endl;
@@ -782,7 +973,6 @@ bool PointClouds::load_pose_ETH(const std::string &fn, Eigen::Affine3d &m_increm
 
 bool load_pc(PointCloud &pc, std::string input_file_name)
 {
-
 	laszip_POINTER laszip_reader;
 	if (laszip_create(&laszip_reader))
 	{
@@ -820,7 +1010,6 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 		point_clouds.push_back(pc);*/
 		return false;
 	}
-	std::cout << "compressed : " << is_compressed << std::endl;
 	laszip_header *header;
 
 	if (laszip_get_header_pointer(laszip_reader, &header))
@@ -884,7 +1073,7 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 
 	laszip_I64 npoints = (header->number_of_point_records ? header->number_of_point_records : header->extended_number_of_point_records);
 
-	fprintf(stderr, "file '%s' contains %I64d points\n", input_file_name.c_str(), npoints);
+	std::cout << (is_compressed ? "" : "un") << "compressed file '" << (std::filesystem::path(input_file_name).filename().string()) << "' contains " << npoints << " points" << std::endl;
 
 	laszip_I64 p_count = 0;
 
@@ -938,7 +1127,8 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 	std::vector<PointCloud> point_clouds_nodata;
 	for (size_t i = 0; i < input_file_names.size(); i++)
 	{
-		std::cout << "loading file: " << input_file_names[i] << " [" << i + 1 << "] of " << input_file_names.size() << std::endl;
+		std::cout << "Loading file " << i + 1 << "/" << input_file_names.size() << " (" << (std::filesystem::path(input_file_names[i]).filename().string()) << "). ";
+
 		PointCloud pc;
 
 		pc.file_name = input_file_names[i];
@@ -949,11 +1139,11 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		std::string trajectory_filename = (fn + ".csv");
 		trj_path /= trajectory_filename;
 
-		std::cout << "trying to load trajectory from file: " << trj_path << std::endl;
+		std::cout << "From trajectory file (" << (std::filesystem::path(trj_path).filename().string()) << ")";
 
 		if (std::filesystem::exists(trj_path))
 		{
-			std::cout << "loading trajectory from file: " << trj_path << std::endl;
+			std::cout << " loading.. ";
 
 			std::vector<PointCloud::LocalTrajectoryNode> local_trajectory;
 			//
@@ -1040,12 +1230,12 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 				}
 			}
 
-			std::cout << "loaded: [" << local_trajectory.size() << "] local trajectory nodes" << std::endl;
+			std::cout << local_trajectory.size() << " local nodes" << std::endl;
 			infile.close();
-			///
+
 			pc.local_trajectory = local_trajectory;
 		}else{
-			std::cout << "trajectory path: " << trj_path << " does not exist" << std::endl; 
+			std::cout << "trajectory path: '" << trj_path.string() << "' does not exist" << std::endl; 
 		}
 
 		point_clouds_nodata.push_back(pc);
@@ -1061,15 +1251,15 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 			{
 				if (is_decimate && pc.points_local.size() > 0)
 				{
-					std::cout << "start downsampling" << std::endl;
+					std::cout << "start downsampling.." << std::endl;
 
 					size_t sum_points_before_decimation = pc.points_local.size();
 					pc.decimate(bucket_x, bucket_y, bucket_z);
 					size_t sum_points_after_decimation = pc.points_local.size();
 
-					std::cout << "downsampling finished" << std::endl;
-					std::cout << "all scans, sum_points_before_decimation: " << sum_points_before_decimation << std::endl;
-					std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
+					std::cout << "downsampling finished. sum_points before/after decimation: "
+						<< sum_points_before_decimation << " / "
+						<< sum_points_after_decimation << std::endl;
 				}
 			}
 			return pc; });
@@ -1096,67 +1286,61 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		}
 	}
 
-	print_point_cloud_dimention();
+	print_point_cloud_dimension();
 	const auto end = std::chrono::system_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end - start;
-	std::cout << "Load time :" << elapsed_seconds.count() << std::endl;
+	std::cout << "Load time: " << std::fixed << std::setprecision(1) << elapsed_seconds.count() << " [s]" << std::endl;
 	return true;
 }
 
-void PointClouds::print_point_cloud_dimention()
+PointClouds::PointCloudDimensions PointClouds::compute_point_cloud_dimension() const
 {
-	std::cout << "------------------------" << std::endl;
-	double x_min = std::numeric_limits<double>::max();
-	double x_max = std::numeric_limits<double>::lowest();
-	double y_min = std::numeric_limits<double>::max();
-	double y_max = std::numeric_limits<double>::lowest();
-	double z_min = std::numeric_limits<double>::max();
-	double z_max = std::numeric_limits<double>::lowest();
+	PointCloudDimensions dim{
+		std::numeric_limits<double>::max(), std::numeric_limits<double>::lowest(),
+		std::numeric_limits<double>::max(), std::numeric_limits<double>::lowest(),
+		std::numeric_limits<double>::max(), std::numeric_limits<double>::lowest(),
+		0, 0, 0
+	};
 
-	for (const auto &pc : this->point_clouds)
+	for (const auto& pc : this->point_clouds)
 	{
-		for (const auto &p : pc.points_local)
+		for (const auto& p : pc.points_local)
 		{
 			auto pt = pc.m_initial_pose * p;
-			if (pt.x() < x_min)
-			{
-				x_min = pt.x();
-			}
-			if (pt.x() > x_max)
-			{
-				x_max = pt.x();
-			}
-			if (pt.y() < y_min)
-			{
-				y_min = pt.y();
-			}
-			if (pt.y() > y_max)
-			{
-				y_max = pt.y();
-			}
-			if (pt.z() < z_min)
-			{
-				z_min = pt.z();
-			}
-			if (pt.z() > z_max)
-			{
-				z_max = pt.z();
-			}
+			dim.x_min = std::min(dim.x_min, pt.x());
+			dim.x_max = std::max(dim.x_max, pt.x());
+			dim.y_min = std::min(dim.y_min, pt.y());
+			dim.y_max = std::max(dim.y_max, pt.y());
+			dim.z_min = std::min(dim.z_min, pt.z());
+			dim.z_max = std::max(dim.z_max, pt.z());
 		}
 	}
 
-	std::cout << "Boundaries" << std::endl;
-	std::cout << "x: " << x_max - x_min << std::endl;
-	std::cout << "y: " << y_max - y_min << std::endl;
-	std::cout << "z: " << z_max - z_min << std::endl;
+	dim.length = dim.x_max - dim.x_min;
+	dim.width = dim.y_max - dim.y_min;
+	dim.height = dim.z_max - dim.z_min;
 
-	std::cout << "--------min max coordinates----------" << std::endl;
-	std::cout << "x_min: " << x_min << std::endl;
-	std::cout << "x_max: " << x_max << std::endl;
-	std::cout << "y_min: " << y_min << std::endl;
-	std::cout << "y_max: " << y_max << std::endl;
-	std::cout << "z_min: " << z_min << std::endl;
-	std::cout << "z_max: " << z_max << std::endl;
+	return dim;
+}
+
+void PointClouds::print_point_cloud_dimension()
+{
+	auto dims = compute_point_cloud_dimension();
+
+	std::cout << "------------------------" << std::endl;
+	
+	std::cout << "Coordinates: min / max / size [m]" << std::endl;
+	std::cout << "X (length): " << std::fixed << std::setprecision(3) << dims.x_min
+		<< " / " << std::fixed << std::setprecision(3) << dims.x_max
+		<< " / " << std::fixed << std::setprecision(3) << dims.length << std::endl;
+	std::cout << "Y (width) : " << std::fixed << std::setprecision(3) << dims.y_min
+		<< " / " << std::fixed << std::setprecision(3) << dims.y_max
+		<< " / " << std::fixed << std::setprecision(3) << dims.width << std::endl;
+	std::cout << "Z (height): " << std::setprecision(3) << dims.z_min
+		<< " / " << std::fixed << std::setprecision(3) << dims.z_max
+		<< " / " << std::fixed << std::setprecision(3) << dims.height << std::endl;
+
+	std::cout << "------------------------" << std::endl;
 }
 
 bool PointClouds::load_3DTK_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z)
@@ -1167,7 +1351,7 @@ bool PointClouds::load_3DTK_tls(std::vector<std::string> input_file_names, bool 
 
 	for (size_t i = 0; i < input_file_names.size(); i++)
 	{
-		std::cout << "loading file: " << input_file_names[i] << " [" << i + 1 << "] of " << input_file_names.size() << std::endl;
+		std::cout << "loading file " << i + 1 << "/" << input_file_names.size() << " (" << (std::filesystem::path(input_file_names[i]).filename().string()) << ")" << std::endl;
 		PointCloud pc;
 		pc.m_pose = Eigen::Affine3d::Identity();
 		pc.m_initial_pose = pc.m_pose;
@@ -1206,7 +1390,7 @@ bool PointClouds::load_3DTK_tls(std::vector<std::string> input_file_names, bool 
 		}
 		else
 		{
-			std::cout << "problem with opening file: " << input_file_names[i] << std::endl;
+			std::cout << "problem opening file: " << input_file_names[i] << std::endl;
 		}
 		pc.file_name = input_file_names[i];
 		point_clouds.push_back(pc);
@@ -1231,7 +1415,7 @@ bool PointClouds::load_3DTK_tls(std::vector<std::string> input_file_names, bool 
 		}
 	}
 
-	std::cout << "start downsampling" << std::endl;
+	std::cout << "start downsampling.." << std::endl;
 	if (is_decimate)
 	{
 		for (int i = 0; i < point_clouds.size(); i++)
@@ -1245,9 +1429,9 @@ bool PointClouds::load_3DTK_tls(std::vector<std::string> input_file_names, bool 
 	{
 		sum_points_after_decimation = sum_points_before_decimation;
 	}
-	std::cout << "downsampling finished" << std::endl;
-	std::cout << "all scans, sum_points_before_decimation: " << sum_points_before_decimation << std::endl;
-	std::cout << "all scans, sum_points_after_decimation: " << sum_points_after_decimation << std::endl;
-	print_point_cloud_dimention();
+	std::cout << "downsampling finished. sum_points before/after decimation: "
+		<< sum_points_before_decimation << " / "
+		<< sum_points_after_decimation << std::endl;
+	print_point_cloud_dimension();
 	return true;
 }

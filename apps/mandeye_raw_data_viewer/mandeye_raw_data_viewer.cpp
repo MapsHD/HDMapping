@@ -113,9 +113,6 @@ double wfi = 1000000.0;
 double wka = 1000000.0;
 // bool is_slerp = false;
 
-const std::vector<std::string>
-    LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
-
 double distance_bucket = 0.5;
 double polar_angle_deg = 5;
 double azimutal_angle_deg = 5;
@@ -652,7 +649,7 @@ void project_gui()
         if (ImGui::Button("save point cloud"))
         {
             std::string output_file_name = "";
-            output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", LAS_LAZ_filter);
+            output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter);
             std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
 
             if (output_file_name.size() > 0)

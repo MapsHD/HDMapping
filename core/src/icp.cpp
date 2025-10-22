@@ -111,7 +111,7 @@ bool ICP::optimize_source_to_target_wc(PointClouds& point_clouds_container, bool
             if (is_adaptive_robust_kernel) {
                 for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
                     if (i != j) {
-                        std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                        std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
                         all_nns.push_back(nns);
                         j_indexes.push_back(j);
                     }
@@ -159,7 +159,7 @@ bool ICP::optimize_source_to_target_wc(PointClouds& point_clouds_container, bool
 
             for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
                 if (i != j) {
-                    std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                    std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
                     TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
 
                     for (size_t k = 0; k < nns.size(); k++) {
@@ -392,7 +392,7 @@ bool ICP::optimize_source_to_target_lie_algebra_left_jacobian(PointClouds& point
             if (is_adaptive_robust_kernel) {
                 for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
                     if (i != j) {
-                        std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                        std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
                         all_nns.push_back(nns);
                         j_indexes.push_back(j);
                     }
@@ -440,7 +440,7 @@ bool ICP::optimize_source_to_target_lie_algebra_left_jacobian(PointClouds& point
 
             for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
                 if (i != j) {
-                    std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                    std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
                     //TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
 
 
@@ -694,7 +694,7 @@ bool ICP::optimize_source_to_target_lie_algebra_right_jacobian(PointClouds& poin
             if (is_adaptive_robust_kernel) {
                 for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
                     if (i != j) {
-                        std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                        std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
                         all_nns.push_back(nns);
                         j_indexes.push_back(j);
                     }
@@ -742,7 +742,7 @@ bool ICP::optimize_source_to_target_lie_algebra_right_jacobian(PointClouds& poin
 
             for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
                 if (i != j) {
-                    std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                    std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
                    
                     for (size_t k = 0; k < nns.size(); k++) {
                         Eigen::Vector3d p_s(point_clouds_container.point_clouds[i].points_local[nns[k].first]);
@@ -973,7 +973,7 @@ bool ICP::compute_uncertainty(PointClouds& point_clouds_container)
     for (int i = 0; i < point_clouds_container.point_clouds.size(); i++) {
         for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
             if (i != j) {
-                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
                 TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
 
                 for (size_t k = 0; k < nns.size(); k++) {

@@ -4,6 +4,14 @@
 
 const std::string out_fn = "Output file name";
 
+static constexpr float ImGuiNumberWidth = 120.0f;
+static constexpr const char* omText = "Roll (left/right)";
+static constexpr const char* fiText = "Pitch (up/down)";
+static constexpr const char* kaText = "Yaw (turning left/right)";
+static constexpr const char* xText = "Longitudinal (forward/backward)";
+static constexpr const char* yText = "Lateral (left/right)";
+static constexpr const char* zText = "Vertical (up/down)";
+
 void drawMiniCompassWithRuler(
     const Eigen::Affine3f& viewLocal,
     float translate_z,

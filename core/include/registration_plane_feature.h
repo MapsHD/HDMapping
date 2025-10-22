@@ -43,7 +43,7 @@ public:
 	std::vector<Job> get_jobs(long long unsigned int size, int num_threads = 8);
 
 	RegistrationPlaneFeature() {
-		search_radious = 0.1;
+		search_radius = 0.1;
 		number_of_threads = 16;
 		number_of_iterations = 6;
 		is_adaptive_robust_kernel = false;
@@ -102,7 +102,7 @@ public:
 	bool optimize_plane_to_plane_source_to_target(PointClouds& point_clouds_container,
 		PoseConvention pose_convention, OptimizationAlgorithm optimization_algorithm, RotationMatrixParametrization rotation_matrix_parametrization);
 
-	float search_radious = 0.1;
+	float search_radius = 0.1;
 	int number_of_threads = 16;
 	int number_of_iterations = 6;
 	bool is_adaptive_robust_kernel = true;

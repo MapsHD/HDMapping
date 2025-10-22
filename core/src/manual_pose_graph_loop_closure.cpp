@@ -24,6 +24,8 @@
 
 #include "export_laz.h"
 
+#include <utils.hpp>
+
 void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                                      int &index_loop_closure_source, int &index_loop_closure_target,
                                      float *m_gizmo, GNSS &gnss, GroundControlPoints &gcps, ControlPoints &cps,
@@ -33,24 +35,21 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
     {
         if (!manipulate_active_edge)
         {
-            ImGui::InputInt("index_loop_closure_source", &index_loop_closure_source);
+            ImGui::Text("Index loop closure:");
+            ImGui::SameLine();
+            ImGui::PushItemWidth(ImGuiNumberWidth);
+            ImGui::InputInt("source", &index_loop_closure_source);
             if (index_loop_closure_source < 0)
-            {
                 index_loop_closure_source = 0;
-            }
             if (index_loop_closure_source >= point_clouds_container.point_clouds.size() - 1)
-            {
                 index_loop_closure_source = point_clouds_container.point_clouds.size() - 1;
-            }
-            ImGui::InputInt("index_loop_closure_target", &index_loop_closure_target);
+            ImGui::SameLine();
+            ImGui::InputInt("target", &index_loop_closure_target);
             if (index_loop_closure_target < 0)
-            {
                 index_loop_closure_target = 0;
-            }
             if (index_loop_closure_target >= point_clouds_container.point_clouds.size() - 1)
-            {
                 index_loop_closure_target = point_clouds_container.point_clouds.size() - 1;
-            }
+            ImGui::PopItemWidth();
 
             if (ImGui::Button("Add edge"))
             {
@@ -60,17 +59,13 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
 
             if (!manipulate_active_edge)
             {
-                if (ImGui::Button("Set initial poses as motion model"))
-                {
-                    set_initial_poses_as_motion_model(point_clouds_container);
-                }
-
+                ImGui::Text("Motion model setting:");
                 ImGui::SameLine();
-
-                if (ImGui::Button("Set current result as motion model"))
-                {
+                if (ImGui::Button("initial poses"))
+                    set_initial_poses_as_motion_model(point_clouds_container);
+                ImGui::SameLine();
+                if (ImGui::Button("current result"))
                     set_current_poses_as_motion_model(point_clouds_container);
-                }
 
                 if (poses_motion_model.size() == point_clouds_container.point_clouds.size())
                 {
@@ -105,6 +100,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
             }
 
             int prev_index_active_edge = index_active_edge;
+            ImGui::SetNextItemWidth(ImGuiNumberWidth);
             ImGui::InputInt("index_active_edge", &index_active_edge);
 
             if (index_active_edge < 0)
@@ -161,40 +157,27 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
             if (!gizmo)
             {
                 if (ImGui::Button("ICP"))
-                {
                     run_icp(point_clouds_container, index_active_edge, search_radious, 10, num_edge_extended_before, num_edge_extended_after);
-                }
                 ImGui::SameLine();
-                ImGui::InputDouble("search_radious", &search_radious);
+                ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                ImGui::InputDouble("search_radius [m]", &search_radious);
                 if (search_radious < 0.01)
-                {
                     search_radious = 0.01;
-                }
 
-                if (ImGui::Button("ICP [2.0]"))
-                {
+                if (ImGui::Button("ICP (2.0)"))
                     run_icp(point_clouds_container, index_active_edge, 2.0, 30, num_edge_extended_before, num_edge_extended_after);
-                }
                 ImGui::SameLine();
-                if (ImGui::Button("ICP [1.0]"))
-                {
+                if (ImGui::Button("ICP (1.0)"))
                     run_icp(point_clouds_container, index_active_edge, 1.0, 30, num_edge_extended_before, num_edge_extended_after);
-                }
                 ImGui::SameLine();
-                if (ImGui::Button("ICP [0.5]"))
-                {
+                if (ImGui::Button("ICP (0.5)"))
                     run_icp(point_clouds_container, index_active_edge, 0.5, 30, num_edge_extended_before, num_edge_extended_after);
-                }
                 ImGui::SameLine();
-                if (ImGui::Button("ICP [0.25]"))
-                {
+                if (ImGui::Button("ICP (0.25)"))
                     run_icp(point_clouds_container, index_active_edge, 0.25, 30, num_edge_extended_before, num_edge_extended_after);
-                }
                 ImGui::SameLine();
-                if (ImGui::Button("ICP [0.1]"))
-                {
+                if (ImGui::Button("ICP (0.1)"))
                     run_icp(point_clouds_container, index_active_edge, 0.1, 30, num_edge_extended_before, num_edge_extended_after);
-                }
 
                 if (ImGui::Button("Save src"))
                 {

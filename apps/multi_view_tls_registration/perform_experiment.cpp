@@ -270,7 +270,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     reset_poses(session);
     double rms = 0.0f;
     std::string result_file = session.working_directory + "/result_win.csv";
-    float search_radious = 0.1f;
+    float search_radius = 0.1f;
     int number_of_threads = 16;
     int number_of_iterations = 6;
     int id_method = 0;
@@ -294,7 +294,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     //--0--
     icp.is_adaptive_robust_kernel = false;
     icp.is_fix_first_node = false;
-    icp.search_radious = search_radious;
+    icp.search_radius = search_radius;
     icp.number_of_threads = number_of_threads;
     icp.number_of_iterations = number_of_iterations;
     icp.is_adaptive_robust_kernel = false;
@@ -838,7 +838,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
 
     //----------------------------------------------------------------------------
 
-    registration_plane_feature.search_radious = search_radious;
+    registration_plane_feature.search_radius = search_radius;
     registration_plane_feature.number_of_threads = number_of_threads;
     registration_plane_feature.number_of_iterations = number_of_iterations;
     registration_plane_feature.is_adaptive_robust_kernel = false;
@@ -1715,7 +1715,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     pose_graph_slam.overlap_threshold = 0.3;
     pose_graph_slam.iterations = 6;
 
-    pose_graph_slam.search_radious = search_radious;
+    pose_graph_slam.search_radius = search_radius;
     pose_graph_slam.number_of_threads = number_of_threads;
     pose_graph_slam.number_of_iterations_pair_wise_matching = number_of_iterations;
 
@@ -1928,7 +1928,7 @@ void perform_experiment_on_linux(Session &session, ObservationPicking &observati
     std::cout << "initial rms: " << initial_rms << std::endl;
     add_initial_rms_to_file(result_file, initial_rms);
 
-    float search_radious = 0.1f;
+    float search_radius = 0.1f;
     int number_of_threads = 16;
     int number_of_iterations = 6;
     int id_method = 0;
@@ -1938,7 +1938,7 @@ void perform_experiment_on_linux(Session &session, ObservationPicking &observati
     pose_graph_slam.overlap_threshold = 0.3;
     pose_graph_slam.iterations = 6;
 
-    pose_graph_slam.search_radious = search_radious;
+    pose_graph_slam.search_radius = search_radius;
     pose_graph_slam.number_of_threads = number_of_threads;
     pose_graph_slam.number_of_iterations_pair_wise_matching = number_of_iterations;
 

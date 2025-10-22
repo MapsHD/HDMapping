@@ -57,14 +57,6 @@ bool step_2_done = false;
 bool step_3_done = false;
 bool calculations_failed = false;
 
-static constexpr float ImGuiNumberWidth = 120.0f;
-static constexpr const char* omText = "Roll (left/right)";
-static constexpr const char* fiText = "Pitch (up/down)";
-static constexpr const char* kaText = "Yaw (turning left/right)";
-static constexpr const char* xText = "Longitudinal (forward/backward)";
-static constexpr const char* yText = "Lateral (left/right)";
-static constexpr const char* zText = "Vertical (up/down)";
-ImVec4 orangeBorder(1.0f, 0.5f, 0.0f, 1.0f);
 int lastPar = 0;
 
 std::vector<WorkerData> worker_data;

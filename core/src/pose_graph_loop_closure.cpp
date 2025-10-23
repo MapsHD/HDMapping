@@ -11,6 +11,8 @@
 #include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 
+#include <python-scripts/point-to-feature-metrics/point_to_plane_tait_bryan_wc_jacobian.h>
+
 void PoseGraphLoopClosure::add_edge(PointClouds &point_clouds_container,
                                     int index_loop_closure_source, int index_loop_closure_target)
 {
@@ -99,12 +101,16 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
         edge.index_from = i - 1;
         edge.index_to = i;
         edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_rel);
-        edge.relative_pose_tb_weights.om = 10000.0;
-        edge.relative_pose_tb_weights.fi = 10000.0;
-        edge.relative_pose_tb_weights.ka = 10000.0;
-        edge.relative_pose_tb_weights.px = 100.0;
-        edge.relative_pose_tb_weights.py = 10000.0;
-        edge.relative_pose_tb_weights.pz = 10000.0;
+        double wom = motion_model_w_om_1_sigma_deg / 180.0 * M_PI;
+        double wfi = motion_model_w_fi_1_sigma_deg / 180.0 * M_PI;
+        double wka = motion_model_w_ka_1_sigma_deg / 180.0 * M_PI;
+
+        edge.relative_pose_tb_weights.om = 1.0 / (wom * wom);
+        edge.relative_pose_tb_weights.fi = 1.0 / (wfi * wfi);
+        edge.relative_pose_tb_weights.ka = 1.0 / (wka * wka);
+        edge.relative_pose_tb_weights.px = 1.0 / (motion_model_w_px_1_sigma_m * motion_model_w_px_1_sigma_m);
+        edge.relative_pose_tb_weights.py = 1.0 / (motion_model_w_py_1_sigma_m * motion_model_w_py_1_sigma_m);
+        edge.relative_pose_tb_weights.pz = 1.0 / (motion_model_w_pz_1_sigma_m * motion_model_w_pz_1_sigma_m);
         all_edges.push_back(edge);
     }
 
@@ -475,6 +481,78 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
 
         for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
         {
+            const auto &pc = point_clouds_container.point_clouds[index_pose];
+            if (!pc.fuse_inclination_from_IMU)
+            {
+                continue;
+            }
+            if (pc.local_trajectory.size() == 0)
+            {
+                continue;
+            }
+
+            TaitBryanPose target_pose;
+            target_pose.om = pc.local_trajectory[0].imu_om_fi_ka.x();
+            target_pose.fi = pc.local_trajectory[0].imu_om_fi_ka.y();
+            target_pose.ka = pc.local_trajectory[0].imu_om_fi_ka.z();
+            target_pose.px = pc.m_pose(0, 3);
+            target_pose.py = pc.m_pose(1, 3);
+            target_pose.pz = pc.m_pose(2, 3);
+
+            Eigen::Affine3d target_mpose = affine_matrix_from_pose_tait_bryan(target_pose);
+
+            double xtg = target_mpose(0, 3);
+            double ytg = target_mpose(1, 3);
+            double ztg = target_mpose(2, 3);
+            double vzx = target_mpose(0, 2);
+            double vzy = target_mpose(1, 2);
+            double vzz = target_mpose(2, 2);
+
+            TaitBryanPose current_pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+
+            Eigen::Matrix<double, 1, 1> delta;
+            point_to_plane_tait_bryan_wc(delta,
+                                         current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                         1, 0, 0, // add 0,1,0
+                                         xtg, ytg, ztg, vzx, vzy, vzz);
+
+            Eigen::Matrix<double, 1, 6> delta_jacobian;
+            point_to_plane_tait_bryan_wc_jacobian(delta_jacobian,
+                                                  current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                                  1, 0, 0,
+                                                  xtg, ytg, ztg, vzx, vzy, vzz);
+
+            int ir = tripletListB.size();
+            int ic = index_pose * 6;
+            tripletListA.emplace_back(ir + 0, ic + 3, -delta_jacobian(0, 3));
+            tripletListA.emplace_back(ir + 0, ic + 4, -delta_jacobian(0, 4));
+
+            tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1) * 10000);
+
+            tripletListB.emplace_back(ir, 0, delta(0, 0));
+
+            ///////////////////////////////
+            point_to_plane_tait_bryan_wc(delta,
+                                         current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                         0, 1, 0, 
+                                         xtg, ytg, ztg, vzx, vzy, vzz);
+
+            point_to_plane_tait_bryan_wc_jacobian(delta_jacobian,
+                                        current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                        0, 1, 0,
+                                        xtg, ytg, ztg, vzx, vzy, vzz);
+
+            ir = tripletListB.size();
+            ic = index_pose * 6;
+            tripletListA.emplace_back(ir + 0, ic + 3, -delta_jacobian(0, 3));
+            tripletListA.emplace_back(ir + 0, ic + 4, -delta_jacobian(0, 4));
+
+            tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1) * 10000);
+
+            tripletListB.emplace_back(ir, 0, delta(0, 0));
+        }
+        /*for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
+        {
 
             const auto &pc = point_clouds_container.point_clouds[index_pose];
             if (!pc.fuse_inclination_from_IMU)
@@ -520,15 +598,20 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
             tripletListA.emplace_back(ir + 1, ic + 3, -delta_jacobian(1, 3));
             tripletListA.emplace_back(ir + 1, ic + 4, -delta_jacobian(1, 4));
 
-            tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1));
-            tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 1));
+            //tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1));
+            //tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 1));
+
+            tripletListP.emplace_back(ir, ir, 10000);
+            tripletListP.emplace_back(ir + 1, ir + 1, 10000);
 
             tripletListB.emplace_back(ir, 0, delta(0, 0));
             tripletListB.emplace_back(ir + 1, 0, delta(1, 0));
 
+            std::cout << "delta(0, 0) " << delta(0, 0) << " delta(1, 0) " << delta(1, 0) << std::endl;
+
             error_imu += sqrt(delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0));
             error_imu_sum++;
-        }
+        }*/
 
         if (error_imu_sum > 0)
         {
@@ -538,7 +621,8 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
 
         for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
         {
-            if (point_clouds_container.point_clouds[index_pose].fixed_x){
+            if (point_clouds_container.point_clouds[index_pose].fixed_x)
+            {
                 int ir = tripletListB.size();
                 int ic = index_pose * 6;
                 tripletListA.emplace_back(ir + 0, ic, 1000000000000);
@@ -651,7 +735,8 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
                 pose.fi += h_x[counter++];
                 pose.ka += h_x[counter++];
 
-                if (!point_clouds_container.point_clouds[i].fixed_x){
+                if (!point_clouds_container.point_clouds[i].fixed_x)
+                {
                     poses[i].px = pose.px;
                 }
                 if (!point_clouds_container.point_clouds[i].fixed_y)

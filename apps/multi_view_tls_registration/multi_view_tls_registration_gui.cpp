@@ -1496,7 +1496,7 @@ void lio_segments_gui()
 
     static double angle_diff = 5.0;
 
-    if (ImGui::Button("set all"))
+    if (ImGui::Button("set those that sattisfy acceptable angle"))
     {
         for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
         {
@@ -1525,7 +1525,19 @@ void lio_segments_gui()
 
     ImGui::SameLine();
     ImGui::SetNextItemWidth(ImGuiNumberWidth);
-    ImGui::InputDouble("acceptable angle [deg]", &angle_diff);
+    ImGui::InputDouble("acceptable angle [deg]: difference to '-gravity', 'Z' blue axis up", &angle_diff);
+
+    ImGui::Separator();
+    ImGui::Text("motion model");
+
+    //session.pose_graph_loop_closure.edges.
+
+    ImGui::InputDouble("motion_model_w_px_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_px_1_sigma_m);
+    ImGui::InputDouble("motion_model_w_py_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_py_1_sigma_m);
+    ImGui::InputDouble("motion_model_w_pz_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_pz_1_sigma_m);
+    ImGui::InputDouble("motion_model_w_om_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_om_1_sigma_deg);
+    ImGui::InputDouble("motion_model_w_fi_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_fi_1_sigma_deg);
+    ImGui::InputDouble("motion_model_w_ka_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_ka_1_sigma_deg);
 
     ImGui::Separator();
 

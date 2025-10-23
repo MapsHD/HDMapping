@@ -26,7 +26,7 @@ public:
 	int iterations = 6;
 	std::vector<Edge> edges;
 
-	float search_radious = 0.1;
+	float search_radius = 0.1;
 	int number_of_threads = 16;
 	int number_of_iterations_pair_wise_matching = 6;
 

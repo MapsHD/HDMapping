@@ -461,7 +461,7 @@ bool RegistrationPlaneFeature::optimize_point_to_plane_source_to_target(PointClo
             if (is_adaptive_robust_kernel) {
                 for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
                     if (i != j) {
-                        std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                        std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
                         all_nns.push_back(nns);
                         j_indexes.push_back(j);
                     }
@@ -509,7 +509,7 @@ bool RegistrationPlaneFeature::optimize_point_to_plane_source_to_target(PointClo
 
             for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
                 if (i != j) {
-                    std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                    std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
 
                     for (size_t k = 0; k < nns.size(); k++) {
                         Eigen::Vector3d p_s(point_clouds_container.point_clouds[i].points_local[nns[k].first]);
@@ -889,7 +889,7 @@ std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> RegistrationPlaneFeatu
     for (int i = 0; i < point_clouds_container.point_clouds.size(); i++) {
         for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
             if (i != j) {
-                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
 
                 for (size_t k = 0; k < nns.size(); k++) {
                     Eigen::Vector3d p_s(point_clouds_container.point_clouds[i].points_local[nns[k].first]);
@@ -976,7 +976,7 @@ std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> RegistrationPlaneFeatu
     for (int i = 0; i < point_clouds_container.point_clouds.size(); i++) {
         for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
             if (i != j) {
-                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
 
                 for (size_t k = 0; k < nns.size(); k++) {
                     Eigen::Vector3d p_s(point_clouds_container.point_clouds[i].points_local[nns[k].first]);
@@ -1064,7 +1064,7 @@ std::vector<Eigen::Matrix<double, 7, 7, Eigen::RowMajor>> RegistrationPlaneFeatu
     for (int i = 0; i < point_clouds_container.point_clouds.size(); i++) {
         for (int j = 0; j < point_clouds_container.point_clouds.size(); j++) {
             if (i != j) {
-                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
 
                 for (size_t k = 0; k < nns.size(); k++) {
                     Eigen::Vector3d p_s(point_clouds_container.point_clouds[i].points_local[nns[k].first]);

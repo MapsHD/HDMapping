@@ -32,7 +32,6 @@
 
 bool info_gui = false;
 bool compass_ruler = true;
-static constexpr float ImGuiNumberWidth = 120.0f;
 
 std::vector<std::string> infoLines = {
     "This program is optional step in MANDEYE process.",

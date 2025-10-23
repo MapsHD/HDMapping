@@ -15,11 +15,11 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
 {
     if (ImGui::Begin("Control Point", &is_imgui))
     {
-        ImGui::Checkbox("draw_uncertainty", &draw_uncertainty);
+        ImGui::Checkbox("Draw uncertainty", &draw_uncertainty);
 
         int prev_index_pose = index_pose;
         ImGui::SetNextItemWidth(ImGuiNumberWidth);
-        ImGui::InputInt("index_pose", &index_pose, 1, 1);
+        ImGui::InputInt("Index pose", &index_pose, 1, 1);
         if (index_pose < 0)
         {
             index_pose = 0;
@@ -73,7 +73,7 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
         {
             ImGui::Text((std::string("CP_") + std::to_string(i) + " [" + cps[i].name + "]").c_str());
             ImGui::SameLine();
-            if (ImGui::Button(std::string("remove: '" + std::to_string(i) + "'").c_str()))
+            if (ImGui::Button(("Remove##" + std::to_string(i)).c_str()))
             {
                 remove_gcp_index = i;
             }
@@ -81,40 +81,38 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
             ImGui::PushItemWidth(ImGuiNumberWidth);
 
             ImGui::InputText("CP name", cps[i].name, IM_ARRAYSIZE(cps[i].name));
-            ImGui::Checkbox("is z_0", &cps[i].is_z_0);
+            ImGui::Checkbox(("is z_0##" + std::to_string(i)).c_str(), &cps[i].is_z_0);
 
             if (!cps[i].is_z_0)
             {
-                ImGui::Text("sigma [m]:");
-                ImGui::InputDouble("X", &cps[i].sigma_x, 0.0, 0.0, "%.3f");
+                ImGui::Text(("sigma [m]:##" + std::to_string(i)).c_str());
+                ImGui::InputDouble(("X##" + std::to_string(i)).c_str(), &cps[i].sigma_x, 0.0, 0.0, "%.3f");
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(xText);
                 ImGui::SameLine();
-                ImGui::InputDouble("X", &cps[i].sigma_y, 0.0, 0.0, "%.3f");
+                ImGui::InputDouble(("Y##" + std::to_string(i)).c_str(), &cps[i].sigma_y, 0.0, 0.0, "%.3f");
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(yText);
                 ImGui::SameLine();
-                ImGui::InputDouble("Z", &cps[i].sigma_z, 0.0, 0.0, "%.3f");
+                ImGui::InputDouble(("Z##" + std::to_string(i)).c_str(), &cps[i].sigma_z, 0.0, 0.0, "%.3f");
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(zText);
 
-                ImGui::Text("target_global [m]:");
-                ImGui::InputDouble("X", &cps[i].x_target_global);
+                ImGui::Text(("target_global [m]:##" + std::to_string(i)).c_str());
+                ImGui::InputDouble(("X##t" + std::to_string(i)).c_str(), &cps[i].x_target_global);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(xText);
                 ImGui::SameLine();
-                ImGui::InputDouble("Y", &cps[i].y_target_global);
+                ImGui::InputDouble(("Y##t" + std::to_string(i)).c_str(), &cps[i].y_target_global);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(yText);
                 ImGui::SameLine();
-                ImGui::InputDouble("Z", &cps[i].z_target_global);
+                ImGui::InputDouble(("Z##t" + std::to_string(i)).c_str(), &cps[i].z_target_global);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(zText);
             }
             else
-            {
-                ImGui::InputDouble("sigma_z", &cps[i].sigma_z);
-            }
+                ImGui::InputDouble(("sigma_z##" + std::to_string(i)).c_str(), &cps[i].sigma_z);
             ImGui::PopItemWidth();
 
             ImGui::NewLine();

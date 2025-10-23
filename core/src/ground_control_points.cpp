@@ -15,9 +15,9 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
 {
     if (ImGui::Begin("Ground Control Point", &is_imgui))
     {
-        ImGui::Checkbox("draw_uncertainty", &draw_uncertainty);
+        ImGui::Checkbox("Draw uncertainty", &draw_uncertainty);
         ImGui::SetNextItemWidth(ImGuiNumberWidth);
-        ImGui::InputDouble("default_lidar_height_above_ground [m]", &default_lidar_height_above_ground, 0.0, 10.0, "%.3f");
+        ImGui::InputDouble("Default lidar height above ground [m]", &default_lidar_height_above_ground, 0.0, 10.0, "%.3f");
 
         ImGui::Text("To show Ground Control Point (GCP) candidate please press 'ctrl'");
         ImGui::Text("To pick trajectory node please press 'ctrl' + 'left/middle mouse'");
@@ -53,43 +53,43 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
         int remove_gcp_index = -1;
         for (int i = 0; i < gpcs.size(); i++)
         {
-            ImGui::Text((std::string("GCP_") + std::to_string(i) + " (" + gpcs[i].name + ")").c_str());
+            ImGui::Text(("GCP_" + std::to_string(i) + " (" + gpcs[i].name + ")").c_str());
             ImGui::SameLine();
-            if (ImGui::Button(std::string("remove: '" + std::to_string(i) + "'").c_str()))
+            if (ImGui::Button(("Remove##" + std::to_string(i)).c_str()))
             {
                 remove_gcp_index = i;
             }
 
             ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputText("GCP name", gpcs[i].name, IM_ARRAYSIZE(gpcs[i].name));
+            ImGui::InputText(("GCP name##" + std::to_string(i)).c_str(), gpcs[i].name, IM_ARRAYSIZE(gpcs[i].name));
 
-			ImGui::Text("sigma [m]:");
-            ImGui::InputDouble("X", &gpcs[i].sigma_x, 0.0, 0.0, "%.3f");
+			ImGui::Text(("sigma [m]:##" + std::to_string(i)).c_str());
+            ImGui::InputDouble(("X##" + std::to_string(i)).c_str(), &gpcs[i].sigma_x, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(xText);
             ImGui::SameLine();
-            ImGui::InputDouble("X", &gpcs[i].sigma_y, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble(("Y##" + std::to_string(i)).c_str(), &gpcs[i].sigma_y, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(yText);
             ImGui::SameLine();
-            ImGui::InputDouble("Z", &gpcs[i].sigma_z, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble(("Z##" + std::to_string(i)).c_str(), &gpcs[i].sigma_z, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(zText);
 
-            ImGui::Text("coordinates [m]:");      
-            ImGui::InputDouble("X", &gpcs[i].x);
+            ImGui::Text(("coordinates [m]:##" + std::to_string(i)).c_str());
+            ImGui::InputDouble(("X##c" + std::to_string(i)).c_str(), &gpcs[i].x);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(xText);
             ImGui::SameLine();
-            ImGui::InputDouble("Y", &gpcs[i].y);
+            ImGui::InputDouble(("Y##c" + std::to_string(i)).c_str(), &gpcs[i].y);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(yText);
             ImGui::SameLine();
-            ImGui::InputDouble("Z", &gpcs[i].z);
+            ImGui::InputDouble(("Z##c" + std::to_string(i)).c_str(), &gpcs[i].z);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(zText);
             
-            ImGui::InputDouble("lidar_height_above_ground [m]", &gpcs[i].lidar_height_above_ground);
+            ImGui::InputDouble(("lidar_height_above_ground [m]##" + std::to_string(i)).c_str(), &gpcs[i].lidar_height_above_ground);
 			ImGui::PopItemWidth();
 
             ImGui::NewLine();

@@ -1120,6 +1120,51 @@ void project_gui()
 
                     std::cout << "Finished saving all trajectories to .laz files." << std::endl;
                 }
+                
+               if (ImGui::Button("save all marked trajectories to TUM txt (timestamp x y z qx qy qz qw)")) {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i) {
+                        const auto &session_path = project_settings.session_file_names[i];
+                        if (i >= sessions.size()) {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+                        Session &session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string txt_path = (dir / (folder_name + "_trajectory_tum.txt")).string();
+
+                        std::cout << "Saving trajectory to TUM TXT: " << txt_path << std::endl;
+                        try {
+                            std::ofstream outfile(txt_path);
+                            if (!outfile.is_open()) {
+                                std::cerr << "Failed to create file: " << txt_path << std::endl;
+                                continue;
+                            }
+
+                            for (const auto &pc : session.point_clouds_container.point_clouds) {
+                                if (!pc.visible) continue;
+                                for (const auto &traj : pc.local_trajectory) {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Quaterniond q(pose.rotation());
+
+                                    double t_s = static_cast<double>(traj.timestamps.first) / 1e9;
+
+                                    outfile << std::fixed 
+                                            << std::setprecision(9) << t_s << " "
+                                            << std::setprecision(10) << pos.x() << " " << pos.y() << " " << pos.z() << " "
+                                            << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << txt_path << std::endl;
+                        } catch (const std::exception &e) {
+                            std::cerr << "Error creating " << txt_path << ": " << e.what() << std::endl;
+                        }
+                    }
+                    std::cout << "Finished saving all trajectories to TUM TXT files." << std::endl;
+                }
 
                 // timestampLidar, x,y,z,r00..r22
                 if (ImGui::Button("save all marked trajectories to csv (timestampLidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))

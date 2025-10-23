@@ -27,7 +27,7 @@ public:
 	std::vector<Job> get_jobs(long long unsigned int size, int num_threads = 8);
 
 	ICP() {
-		search_radious = 0.1;
+		search_radius = 0.1;
 		number_of_threads = std::thread::hardware_concurrency();
 		number_of_iterations = 6;
 		is_adaptive_robust_kernel = false;
@@ -59,7 +59,7 @@ public:
 	std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> compute_covariance_matrices_point_to_point_source_to_target_source_to_target_lie_algebra_right_jacobian(PointClouds& point_clouds_container);
 
 
-	float search_radious;
+	float search_radius;
 	int number_of_threads;
 	int number_of_iterations;
 	bool is_adaptive_robust_kernel;

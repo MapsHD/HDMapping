@@ -658,7 +658,7 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
                             point_clouds_container.point_clouds[j].cout_rgd();
                         }
 
-                        std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                        std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
 
                         if (!precompute_rgd)
                         {
@@ -733,7 +733,7 @@ bool ICP::optimization_point_to_point_source_to_target(PointClouds &point_clouds
                     }
 
                     std::cout << "computing nns start" << std::endl;
-                    std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                    std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
                     std::cout << "computing nns finished nns.size(): " << nns.size() << std::endl;
 
                     if (!precompute_rgd)
@@ -1333,7 +1333,7 @@ std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> ICP::compute_covarianc
         {
             if (i != j)
             {
-                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
 
                 for (size_t k = 0; k < nns.size(); k++)
                 {
@@ -1439,7 +1439,7 @@ std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> ICP::compute_covarianc
         {
             if (i != j)
             {
-                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
 
                 for (size_t k = 0; k < nns.size(); k++)
                 {
@@ -1546,7 +1546,7 @@ std::vector<Eigen::Matrix<double, 7, 7, Eigen::RowMajor>> ICP::compute_covarianc
         {
             if (i != j)
             {
-                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
 
                 for (size_t k = 0; k < nns.size(); k++)
                 {
@@ -1668,7 +1668,7 @@ std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> ICP::compute_covarianc
         {
             if (i != j)
             {
-                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
                 TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
 
                 for (size_t k = 0; k < nns.size(); k++)
@@ -1803,7 +1803,7 @@ std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> ICP::compute_covarianc
         {
             if (i != j)
             {
-                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radious);
+                std::vector<std::pair<int, int>> nns = point_clouds_container.point_clouds[i].nns(point_clouds_container.point_clouds[j], search_radius);
                 TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
 
                 for (size_t k = 0; k < nns.size(); k++)

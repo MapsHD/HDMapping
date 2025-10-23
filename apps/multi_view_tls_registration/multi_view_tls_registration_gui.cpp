@@ -79,15 +79,22 @@ bool is_ortho = false;
 bool block_z = false;
 bool manual_pose_graph_loop_closure_mode = false;
 
-static constexpr float ImGuiNumberWidth = 120.0f;
-static constexpr const char* omText = "Roll (left/right)";
-static constexpr const char* fiText = "Pitch (up/down)";
-static constexpr const char* kaText = "Yaw (turning left/right)";
-static constexpr const char* xText = "Longitudinal (forward/backward)";
-static constexpr const char* yText = "Lateral (left/right)";
-static constexpr const char* zText = "Vertical (up/down)";
 bool gnssWithOffset = false;
 
+//radio button selectors
+static int NDTnomSelection = 0;
+static int NDTpeSelection = 0;
+static int NDT3dSelection = 0;
+static int ICPnomSelection = 0;
+static int ICPpeSelection = 0;
+static int ICP3dSelection = 0;
+static int RPFnomSelection = 0;
+static int RPFpeSelection = 0;
+static int RPF3dSelection = 0;
+static int PGSnomSelection = 0;
+static int PGSpeSelection = 0;
+static int PGS3dSelection = 0;
+static int PGSpwmtSelection = 0;
 
 std::vector<std::string> infoLines = {
     "This program is second step in MANDEYE process.",
@@ -238,7 +245,7 @@ void project_gui()
     ImGui::SliderFloat("mouse_sensitivity", &mouse_sensitivity, 0.01f, 10.0f, "%.1f");
 
     ImGui::NewLine();
-	ImGui::Text("rotation center:");
+	ImGui::Text("rotation center [m]:");
     ImGui::InputFloat3("", rotation_center.data());
     if (ImGui::IsItemHovered())
     {
@@ -290,7 +297,7 @@ void project_gui()
             ImGui::SetTooltip(zText);
 		ImGui::PopItemWidth();
 
-        ImGui::Text("-----------------------------------------------------------------------------");
+        ImGui::Separator();
         // common_data
         // manual_pose_graph_loop_closure_mode
 
@@ -504,25 +511,23 @@ void project_gui()
         ImGui::Text(session.point_clouds_container.poses_file_name.c_str());
     }
 
-    ImGui::Text("-----------------------------------------------------------------------------");
+    ImGui::Separator();
 
     if (manual_pose_graph_loop_closure_mode)
     {
         ImGui::Text("Manual Pose Graph Loop Closure Mode:");
 
-        ImGui::InputInt("num_edge_extended_before", &num_edge_extended_before);
+        ImGui::Text("num_edge_extended:");
+        ImGui::SameLine();
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::InputInt("before", &num_edge_extended_before);
         if (num_edge_extended_before < 0)
-        {
             num_edge_extended_before = 0;
-        }
-
-        ImGui::InputInt("num_edge_extended_after", &num_edge_extended_after);
+        ImGui::SameLine();
+        ImGui::InputInt("after", &num_edge_extended_after);
         if (num_edge_extended_after < 0)
-        {
             num_edge_extended_after = 0;
-        }
-
-        ImGui::Text("--");
+        ImGui::PopItemWidth();
 
         session.pose_graph_loop_closure.Gui(session.point_clouds_container,
                                             index_loop_closure_source,
@@ -652,10 +657,9 @@ void project_gui()
 
 void ndt_gui()
 {
-
     ImGui::Begin("Normal Distributions Transform", &is_ndt_gui);
 
-    ImGui::InputFloat3("bucket_size (x,y,z) [m]", tls_registration.ndt.bucket_size);
+    ImGui::InputFloat3("Bucket size (x,y,z) [m]", tls_registration.ndt.bucket_size);
     if (tls_registration.ndt.bucket_size[0] < 0.01)
         tls_registration.ndt.bucket_size[0] = 0.01f;
     if (tls_registration.ndt.bucket_size[1] < 0.01)
@@ -664,62 +668,48 @@ void ndt_gui()
         tls_registration.ndt.bucket_size[2] = 0.01f;
 
     ImGui::PushItemWidth(ImGuiNumberWidth);
-    ImGui::InputInt("number_of_threads", &tls_registration.ndt.number_of_threads);
+    ImGui::InputInt("Number of threads", &tls_registration.ndt.number_of_threads);
     if (tls_registration.ndt.number_of_threads < 1)
         tls_registration.ndt.number_of_threads = 1;
 
-    ImGui::InputInt("number_of_iterations", &tls_registration.ndt.number_of_iterations);
+    ImGui::InputInt("Number of iterations", &tls_registration.ndt.number_of_iterations);
     if (tls_registration.ndt.number_of_iterations < 1)
         tls_registration.ndt.number_of_iterations = 1;
     ImGui::PopItemWidth();
 
-    ImGui::Checkbox("ndt fix_first_node (add I to first pose in Hessian)", &tls_registration.ndt.is_fix_first_node);
+    ImGui::Checkbox("Fix first node (add I to first pose in Hessian)", &tls_registration.ndt.is_fix_first_node);
 
-    ImGui::Checkbox("ndt Gauss-Newton", &tls_registration.ndt.is_gauss_newton);
-    if (tls_registration.ndt.is_gauss_newton)
-    {
-        tls_registration.ndt.is_levenberg_marguardt = false;
-    }
-
+    ImGui::Text("Nonlinear optimization method:");
     ImGui::SameLine();
-    ImGui::Checkbox("ndt Levenberg-Marguardt", &tls_registration.ndt.is_levenberg_marguardt);
-    if (tls_registration.ndt.is_levenberg_marguardt)
-    {
-        tls_registration.ndt.is_gauss_newton = false;
-    }
-
-    ImGui::Checkbox("ndt poses expressed as camera<-world (cw)", &tls_registration.ndt.is_cw);
-    if (tls_registration.ndt.is_cw)
-    {
-        tls_registration.ndt.is_wc = false;
-    }
+    ImGui::RadioButton("Gauss-Newton", &NDTnomSelection, 0);
     ImGui::SameLine();
-    ImGui::Checkbox("ndt poses expressed as camera->world (wc)", &tls_registration.ndt.is_wc);
-    if (tls_registration.ndt.is_wc)
-    {
-        tls_registration.ndt.is_cw = false;
-    }
+    ImGui::RadioButton("Levenberg-Marguardt", &NDTnomSelection, 1);
 
-    static int ndtSelection; // 0=Tait Bryan, 1=Quaternion, 2=Rodrigues
-    // initialize if none selected
-    if (ndtSelection < 0 || ndtSelection > 2)
-        ndtSelection = 0;
+    tls_registration.ndt.is_gauss_newton = (NDTnomSelection == 0);
+    tls_registration.ndt.is_levenberg_marguardt = (NDTnomSelection == 1);
 
-    ImGui::Text("ndt: ");
- 
+    ImGui::Text("Poses expressed as:");
     ImGui::SameLine();
-    ImGui::RadioButton("Tait-Bryan angles (om fi ka: RxRyRz)", &ndtSelection, 0);
+    ImGui::RadioButton("camera<-world (cw)", &NDTpeSelection, 0);
     ImGui::SameLine();
-    ImGui::RadioButton("Quaternion (q0 q1 q2 q3)", &ndtSelection, 1);
+    ImGui::RadioButton("camera->world (wc)", &NDTpeSelection, 1);
+
+    tls_registration.ndt.is_cw = (NDTpeSelection == 0);
+    tls_registration.ndt.is_wc = (NDTpeSelection == 1);
+
+    ImGui::Text("Parameterizations of 3D rotation:");
+    ImGui::RadioButton("Tait-Bryan angles (om fi ka: RxRyRz)", &NDT3dSelection, 0);
     ImGui::SameLine();
-    ImGui::RadioButton("Rodrigues (sx sy sz)", &ndtSelection, 2);
+    ImGui::RadioButton("Quaternion (q0 q1 q2 q3)", &NDT3dSelection, 1);
+    ImGui::SameLine();
+    ImGui::RadioButton("Rodrigues (sx sy sz)", &NDT3dSelection, 2);
 
-    tls_registration.ndt.is_tait_bryan_angles = (ndtSelection == 0);
-    tls_registration.ndt.is_quaternion = (ndtSelection == 1);
-    tls_registration.ndt.is_rodrigues = (ndtSelection == 2);
+    tls_registration.ndt.is_tait_bryan_angles = (NDT3dSelection == 0);
+    tls_registration.ndt.is_quaternion = (NDT3dSelection == 1);
+    tls_registration.ndt.is_rodrigues = (NDT3dSelection == 2);
 
 
-    if (ImGui::Button("ndt_optimization"))
+    if (ImGui::Button("Optimization"))
     {
         double rms_initial = 0.0;
         double rms_final = 0.0;
@@ -728,8 +718,15 @@ void ndt_gui()
         // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
         tls_registration.ndt.optimize(session.point_clouds_container.point_clouds, false, tls_registration.compute_mean_and_cov_for_bucket);
     }
-
-    if (ImGui::Button("compute mean mahalanobis distance"))
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::BeginTooltip();
+        ImGui::Text("Probabilistic method for point cloud registration (aligning two 3D point sets from LiDAR scans, by estimating the relative pose (translation and rotation) between them)");
+        ImGui::Text("Alternative to Iterative Closest Point (ICP), particularly known for being faster and smoother in optimization because it replaces discrete point-point correspondences with continuous probability density functions.");
+        ImGui::EndTooltip();
+    }
+        
+    if (ImGui::Button("Compute mean Mahalanobis distance"))
     {
         double rms_initial = 0.0;
         double rms_final = 0.0;
@@ -737,10 +734,17 @@ void ndt_gui()
 
         tls_registration.ndt.optimize(session.point_clouds_container.point_clouds, true, tls_registration.compute_mean_and_cov_for_bucket);
     }
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::BeginTooltip();
+        ImGui::Text("Average of all Mahalanobis distances between transformed source points and their corresponding Gaussian cells, where:");
+        ImGui::Text("Mahalanobis distance measures how far a point is from the mean of a multivariate Gaussian distribution, taking into account the covariance (shape and orientation) of that distribution");
+        ImGui::EndTooltip();
+    }
 
-    ImGui::Text("--------------------------------------------------------------------------------------------------------");
+    ImGui::Separator();
 
-    ImGui::Text("ndt_optimization Lie-algebra:");
+    ImGui::Text("NDT optimization Lie algebra:");
     ImGui::SameLine();
     if (ImGui::Button("left Jacobian"))
     {
@@ -754,11 +758,10 @@ void ndt_gui()
         tls_registration.ndt.optimize_lie_algebra_right_jacobian(session.point_clouds_container.point_clouds, tls_registration.compute_mean_and_cov_for_bucket);
     }
 
-    ImGui::Text("--------------------------------------------------------------------------------------------------------");
+    ImGui::Separator();
 
-    ImGui::Checkbox("generalized", &tls_registration.ndt.is_generalized);
-
-    if (tls_registration.ndt.is_generalized)
+    ImGui::Checkbox("Generalized", &tls_registration.ndt.is_generalized);
+    ImGui::BeginDisabled(!tls_registration.ndt.is_generalized);
     {
         ImGui::PushItemWidth(ImGuiNumberWidth);
         ImGui::InputDouble("sigma_r", &tls_registration.ndt.sigma_r, 0.01, 0.01);
@@ -769,51 +772,31 @@ void ndt_gui()
 
         ImGui::Checkbox("compute_mean_and_cov_for_bucket", &tls_registration.compute_mean_and_cov_for_bucket);
     }
+    ImGui::EndDisabled();
 
-    ImGui::Text("Set errors:");
-    ImGui::Text("Zoller+Fröhlich TLS Imager:");
+    ImGui::Text("Set error presets:");
+    ImGui::Text("Zoller+Fröhlich TLS Imager");
     ImGui::SameLine();
-    if (ImGui::Button("5006i"))
-    {
-        tls_registration.set_zoller_frohlich_tls_imager_5006i_errors();
-    }
+    if (ImGui::Button("5006i")) tls_registration.set_zoller_frohlich_tls_imager_5006i_errors();
     ImGui::SameLine();
-    if (ImGui::Button("5010C"))
-    {
-        tls_registration.set_zoller_frohlich_tls_imager_5010c_errors();
-    }
+    if (ImGui::Button("5010C")) tls_registration.set_zoller_frohlich_tls_imager_5010c_errors();
     ImGui::SameLine();
-    if (ImGui::Button("5016"))
-    {
-        tls_registration.set_zoller_frohlich_tls_imager_5016_errors();
-    }
+    if (ImGui::Button("5016")) tls_registration.set_zoller_frohlich_tls_imager_5016_errors();
 
-    ImGui::Text("Leica:");
-    ImGui::SameLine();
-    if (ImGui::Button("ScanStation C5 C10"))
-    {
-        tls_registration.set_leica_scanstation_c5_c10_errors();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Leica HDS6100"))
-    {
-        tls_registration.set_leica_hds6100_errors();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Leica P40"))
-    {
-        tls_registration.set_leica_p40_errors();
-    }
 
-    if (ImGui::Button("Faro Focus3D"))
-    {
-        tls_registration.set_faro_focus3d_errors();
-    }
+    ImGui::Text("Leica");
     ImGui::SameLine();
-    if (ImGui::Button("Riegl VZ400"))
-    {
-        tls_registration.set_riegl_vz400_errors();
-    }
+    if (ImGui::Button("ScanStation C5 C10")) tls_registration.set_leica_scanstation_c5_c10_errors();
+    ImGui::SameLine();
+    if (ImGui::Button("Leica HDS6100")) tls_registration.set_leica_hds6100_errors();
+    ImGui::SameLine();
+    if (ImGui::Button("Leica P40")) tls_registration.set_leica_p40_errors();
+
+    if (ImGui::Button("Faro Focus3D")) tls_registration.set_faro_focus3d_errors();
+    ImGui::SameLine();
+    if (ImGui::Button("Riegl VZ400")) tls_registration.set_riegl_vz400_errors();
+    ImGui::SameLine();
+    if (ImGui::Button("Livox mid360")) tls_registration.set_livox_mid360_errors();
 
     ImGui::End();
 }
@@ -823,76 +806,61 @@ void icp_gui()
     ImGui::Begin("Iterative Closest Point", &is_icp_gui);
 
     ImGui::PushItemWidth(ImGuiNumberWidth);
-    ImGui::InputFloat("icp_search_radious", &tls_registration.icp.search_radious, 0.01f, 0.1f);
-    if (tls_registration.icp.search_radious < 0.01f)
-        tls_registration.icp.search_radious = 0.01f;
-    if (tls_registration.icp.search_radious > 2.0f)
-        tls_registration.icp.search_radious = 2.0f;
+    ImGui::InputFloat("Search radius", &tls_registration.icp.search_radius, 0.01f, 0.1f);
+    if (tls_registration.icp.search_radius < 0.01f)
+        tls_registration.icp.search_radius = 0.01f;
+    if (tls_registration.icp.search_radius > 2.0f)
+        tls_registration.icp.search_radius = 2.0f;
 
-    ImGui::InputInt("icp_number_of_threads", &tls_registration.icp.number_of_threads);
+    ImGui::InputInt("Number of threads", &tls_registration.icp.number_of_threads);
     if (tls_registration.icp.number_of_threads < 1)
         tls_registration.icp.number_of_threads = 1;
 
-    ImGui::InputInt("icp_number_of_iterations", &tls_registration.icp.number_of_iterations);
+    ImGui::InputInt("Number of iterations", &tls_registration.icp.number_of_iterations);
     if (tls_registration.icp.number_of_iterations < 1)
         tls_registration.icp.number_of_iterations = 1;
     ImGui::PopItemWidth();
 
-    ImGui::Checkbox("icp_adaptive_robust_kernel", &tls_registration.icp.is_adaptive_robust_kernel);
+    ImGui::Checkbox("Adaptive robust kernel", &tls_registration.icp.is_adaptive_robust_kernel);
     ImGui::SameLine();
-    ImGui::Checkbox("icp_fix_first_node (add I to first pose in Hessian)", &tls_registration.icp.is_fix_first_node);
+    ImGui::Checkbox("Fix first node (add I to first pose in Hessian)", &tls_registration.icp.is_fix_first_node);
 
-    ImGui::Checkbox("icp Gauss-Newton", &tls_registration.icp.is_gauss_newton);
-    if (tls_registration.icp.is_gauss_newton)
-    {
-        tls_registration.icp.is_levenberg_marguardt = false;
-    }
-
+    ImGui::Text("Nonlinear optimization method:");
     ImGui::SameLine();
-    ImGui::Checkbox("icp Levenberg-Marguardt", &tls_registration.icp.is_levenberg_marguardt);
-    if (tls_registration.icp.is_levenberg_marguardt)
-    {
-        tls_registration.icp.is_gauss_newton = false;
-    }
-
-    ImGui::Text("--------------------------------------------------------------------------------------------------------");
-    ImGui::Checkbox("icp poses expressed as camera<-world (cw)", &tls_registration.icp.is_cw);
-    if (tls_registration.icp.is_cw)
-    {
-        tls_registration.icp.is_wc = false;
-    }
+    ImGui::RadioButton("Gauss-Newton", &ICPnomSelection, 0);
     ImGui::SameLine();
-    ImGui::Checkbox("icp poses expressed as camera->world (wc)", &tls_registration.icp.is_wc);
-    if (tls_registration.icp.is_wc)
-    {
-        tls_registration.icp.is_cw = false;
-    }
+    ImGui::RadioButton("Levenberg-Marguardt", &ICPnomSelection, 1);
 
-    static int icpSelection; // 0=Tait Bryan, 1=Quaternion, 2=Rodrigues
-    // initialize if none selected
-    if (icpSelection < 0 || icpSelection > 2)
-        icpSelection = 0;
+    tls_registration.icp.is_gauss_newton = (ICPnomSelection == 0);
+    tls_registration.icp.is_levenberg_marguardt = (ICPnomSelection == 1);
 
-    ImGui::Text("icp: ");
-
+    ImGui::Text("Poses expressed as:");
     ImGui::SameLine();
-    ImGui::RadioButton("Tait-Bryan angles (om fi ka: RxRyRz)", &icpSelection, 0);
+    ImGui::RadioButton("camera<-world (cw)", &ICPpeSelection, 0);
     ImGui::SameLine();
-    ImGui::RadioButton("Quaternion (q0 q1 q2 q3)", &icpSelection, 1);
+    ImGui::RadioButton("camera->world (wc)", &ICPpeSelection, 1);
+
+    tls_registration.icp.is_cw = (ICPpeSelection == 0);
+    tls_registration.icp.is_wc = (ICPpeSelection == 1);
+
+    ImGui::Text("Parameterizations of 3D rotation:");
+    ImGui::RadioButton("Tait-Bryan angles (om fi ka: RxRyRz)", &ICP3dSelection, 0);
     ImGui::SameLine();
-    ImGui::RadioButton("Rodrigues (sx sy sz)", &icpSelection, 2);
+    ImGui::RadioButton("Quaternion (q0 q1 q2 q3)", &ICP3dSelection, 1);
+    ImGui::SameLine();
+    ImGui::RadioButton("Rodrigues (sx sy sz)", &ICP3dSelection, 2);
 
-    tls_registration.icp.is_tait_bryan_angles = (icpSelection == 0);
-    tls_registration.icp.is_quaternion = (icpSelection == 1);
-    tls_registration.icp.is_rodrigues = (icpSelection == 2);
+    tls_registration.icp.is_tait_bryan_angles = (ICP3dSelection == 0);
+    tls_registration.icp.is_quaternion = (ICP3dSelection == 1);
+    tls_registration.icp.is_rodrigues = (ICP3dSelection == 2);
 
-    if (ImGui::Button("optimization_point_to_point_source_to_target"))
+    if (ImGui::Button("Optimization point to point source to target"))
     {
         tls_registration.icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     }
-    ImGui::Text("--------------------------------------------------------------------------------------------------------");
+    ImGui::Separator();
 
-    ImGui::Text("icp_optimization_source_to_target Lie-algebra:");
+    ImGui::Text("Optimization source to target Lie-algebra:");
     ImGui::SameLine();
     if (ImGui::Button("left Jacobian"))
     {
@@ -903,13 +871,13 @@ void icp_gui()
     {
         tls_registration.icp.optimize_source_to_target_lie_algebra_right_jacobian(session.point_clouds_container);
     }
-    ImGui::Text("--------------------------------------------------------------------------------------------------------");
+    ImGui::Separator();
 
-    if (ImGui::Button("compute rms(optimization_point_to_point_source_to_target)"))
+    if (ImGui::Button("Compute rms (optimization_point_to_point_source_to_target)"))
     {
         double rms = 0.0;
         tls_registration.icp.optimization_point_to_point_source_to_target_compute_rms(session.point_clouds_container, rms);
-        std::cout << "rms(optimization_point_to_point_source_to_target): " << rms << std::endl;
+        std::cout << "rms (optimization_point_to_point_source_to_target): " << rms << std::endl;
     }
 
     ImGui::End();
@@ -919,96 +887,76 @@ void registration_plane_feature_gui()
 {
     ImGui::Begin("Registration Plane Feature", &is_registration_plane_feature);
     ImGui::PushItemWidth(ImGuiNumberWidth);
-    ImGui::InputFloat("plane_feature_search_radious", &tls_registration.registration_plane_feature.search_radious, 0.01, 2.0);
-    if (tls_registration.registration_plane_feature.search_radious < 0.01)
-        tls_registration.registration_plane_feature.search_radious = 0.01;
-    if (tls_registration.registration_plane_feature.search_radious > 2.0)
-        tls_registration.registration_plane_feature.search_radious = 2.0;
+    ImGui::InputFloat("Search radius", &tls_registration.registration_plane_feature.search_radius, 0.01, 2.0);
+    if (tls_registration.registration_plane_feature.search_radius < 0.01)
+        tls_registration.registration_plane_feature.search_radius = 0.01;
+    if (tls_registration.registration_plane_feature.search_radius > 2.0)
+        tls_registration.registration_plane_feature.search_radius = 2.0;
 
-    ImGui::InputInt("plane_feature_number_of_threads", &tls_registration.registration_plane_feature.number_of_threads);
+    ImGui::InputInt("Number of threads", &tls_registration.registration_plane_feature.number_of_threads);
     if (tls_registration.registration_plane_feature.number_of_threads < 1)
         tls_registration.registration_plane_feature.number_of_threads = 1;
 
-    ImGui::InputInt("plane_feature_number_of_iterations", &tls_registration.registration_plane_feature.number_of_iterations);
+    ImGui::InputInt("Number of iterations", &tls_registration.registration_plane_feature.number_of_iterations);
     if (tls_registration.registration_plane_feature.number_of_iterations < 1)
         tls_registration.registration_plane_feature.number_of_iterations = 1;
     ImGui::PopItemWidth();
 
-    ImGui::Checkbox("plane_feature_adaptive_robust_kernel", &tls_registration.registration_plane_feature.is_adaptive_robust_kernel);
+    ImGui::Checkbox("Adaptive robust kernel", &tls_registration.registration_plane_feature.is_adaptive_robust_kernel);
     ImGui::SameLine();
-    ImGui::Checkbox("fix_first_node (add I to first pose in Hessian)", &tls_registration.registration_plane_feature.is_fix_first_node);
+    ImGui::Checkbox("Fix first node (add I to first pose in Hessian)", &tls_registration.registration_plane_feature.is_fix_first_node);
 
-    ImGui::Checkbox("Gauss-Newton", &tls_registration.registration_plane_feature.is_gauss_newton);
-    if (tls_registration.registration_plane_feature.is_gauss_newton)
-    {
-        // registration_plane_feature.is_newton = false;
-        tls_registration.registration_plane_feature.is_levenberg_marguardt = false;
-    }
-
+    ImGui::Text("Nonlinear optimization method:");
     ImGui::SameLine();
-    ImGui::Checkbox("Levenberg-Marguardt", &tls_registration.registration_plane_feature.is_levenberg_marguardt);
-    if (tls_registration.registration_plane_feature.is_levenberg_marguardt)
-    {
-        // registration_plane_feature.is_newton = false;
-        tls_registration.registration_plane_feature.is_gauss_newton = false;
-    }
-
-    ImGui::Checkbox("poses expressed as camera<-world (cw)", &tls_registration.registration_plane_feature.is_cw);
-    if (tls_registration.registration_plane_feature.is_cw)
-    {
-        tls_registration.registration_plane_feature.is_wc = false;
-    }
+    ImGui::RadioButton("Gauss-Newton", &RPFnomSelection, 0);
     ImGui::SameLine();
-    ImGui::Checkbox("poses expressed as camera->world (wc)", &tls_registration.registration_plane_feature.is_wc);
-    if (tls_registration.registration_plane_feature.is_wc)
-    {
-        tls_registration.registration_plane_feature.is_cw = false;
-    }
+    ImGui::RadioButton("Levenberg-Marguardt", &RPFnomSelection, 1);
 
-    static int rpfSelection; // 0=Tait Bryan, 1=Quaternion, 2=Rodrigues
-    // initialize if none selected
-    if (rpfSelection < 0 || rpfSelection > 2)
-        rpfSelection = 0;
+    tls_registration.registration_plane_feature.is_gauss_newton = (RPFnomSelection == 0);
+    tls_registration.registration_plane_feature.is_levenberg_marguardt = (RPFnomSelection == 1);
 
-    ImGui::RadioButton("Tait-Bryan angles (om fi ka: RxRyRz)", &rpfSelection, 0);
+    ImGui::Text("Poses expressed as:");
     ImGui::SameLine();
-    ImGui::RadioButton("Quaternion (q0 q1 q2 q3)", &rpfSelection, 1);
+    ImGui::RadioButton("camera<-world (cw)", &RPFpeSelection, 0);
     ImGui::SameLine();
-    ImGui::RadioButton("Rodrigues (sx sy sz)", &rpfSelection, 2);
+    ImGui::RadioButton("camera->world (wc)", &RPFpeSelection, 1);
 
-    tls_registration.registration_plane_feature.is_tait_bryan_angles = (rpfSelection == 0);
-    tls_registration.registration_plane_feature.is_quaternion = (rpfSelection == 1);
-    tls_registration.registration_plane_feature.is_rodrigues = (rpfSelection == 2);
+    tls_registration.registration_plane_feature.is_cw = (RPFpeSelection == 0);
+    tls_registration.registration_plane_feature.is_wc = (RPFpeSelection == 1);
 
-    ImGui::Text("--------------------------------------------------------------------------------------------");
-    if (ImGui::Button("optimize_point_to_projection_onto_plane_source_to_target"))
-    {
+    ImGui::Text("Parameterizations of 3D rotation:");
+    ImGui::RadioButton("Tait-Bryan angles (om fi ka: RxRyRz)", &RPF3dSelection, 0);
+    ImGui::SameLine();
+    ImGui::RadioButton("Quaternion (q0 q1 q2 q3)", &RPF3dSelection, 1);
+    ImGui::SameLine();
+    ImGui::RadioButton("Rodrigues (sx sy sz)", &RPF3dSelection, 2);
+
+    tls_registration.registration_plane_feature.is_tait_bryan_angles = (RPF3dSelection == 0);
+    tls_registration.registration_plane_feature.is_quaternion = (RPF3dSelection == 1);
+    tls_registration.registration_plane_feature.is_rodrigues = (RPF3dSelection == 2);
+
+    ImGui::Separator();
+    ImGui::Text("Optimize point to projection onto plane source to target:");
+    if (ImGui::Button("Basic Jacobian"))
         tls_registration.registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
-    }
-    // ImGui::Text("--------------------------------------------------------------------------------------------------------");
-    if (ImGui::Button("optimize_point_to_projection_onto_plane_source_to_target(Lie-algebra left Jacobian)"))
-    {
+    ImGui::SameLine();
+    if (ImGui::Button("Lie-algebra left Jacobian"))
         tls_registration.registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(session.point_clouds_container);
-    }
-    if (ImGui::Button("optimize_point_to_projection_onto_plane_source_to_target(Lie-algebra right Jacobian)"))
-    {
+    ImGui::SameLine();
+    if (ImGui::Button("Lie-algebra right Jacobian"))
         tls_registration.registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(session.point_clouds_container);
-    }
 
-    ImGui::Text("--------------------------------------------------------------------------------------------");
+    ImGui::Separator();
 
-    if (ImGui::Button("optimize_point_to_plane_source_to_target (using dot product)"))
-    {
+    ImGui::Text("Optimize source to target:");
+    if (ImGui::Button("point to plane (using dot product)"))
         tls_registration.registration_plane_feature.optimize_point_to_plane_source_to_target(session.point_clouds_container);
-    }
-    if (ImGui::Button("optimize_distance_point_to_plane_source_to_target"))
-    {
+    ImGui::SameLine();
+    if (ImGui::Button("distance point to plane"))
         tls_registration.registration_plane_feature.optimize_distance_point_to_plane_source_to_target(session.point_clouds_container);
-    }
-    if (ImGui::Button("optimize_plane_to_plane_source_to_target"))
-    {
+    ImGui::SameLine();
+    if (ImGui::Button("plane to plane"))
         tls_registration.registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
-    }
 
     ImGui::End();
 }
@@ -1018,19 +966,19 @@ void pose_graph_slam_gui()
     ImGui::Begin("Pose Graph SLAM", &is_pose_graph_slam);
 
     ImGui::PushItemWidth(ImGuiNumberWidth);
-    ImGui::InputFloat("pgslam search_radious", &tls_registration.pose_graph_slam.search_radious, 0.01f, 2.0f);
-    if (tls_registration.pose_graph_slam.search_radious < 0.01f)
-        tls_registration.pose_graph_slam.search_radious = 0.01f;
+    ImGui::InputFloat("Search radious", &tls_registration.pose_graph_slam.search_radius, 0.01f, 2.0f);
+    if (tls_registration.pose_graph_slam.search_radius < 0.01f)
+        tls_registration.pose_graph_slam.search_radius = 0.01f;
 
-    ImGui::InputInt("pgslam number_of_threads", &tls_registration.pose_graph_slam.number_of_threads);
+    ImGui::InputInt("Number of threads", &tls_registration.pose_graph_slam.number_of_threads);
     if (tls_registration.pose_graph_slam.number_of_threads < 1)
         tls_registration.pose_graph_slam.number_of_threads = 1;
 
-    ImGui::InputInt("pgslam number_of_iterations_pair_wise_matching", &tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching);
+    ImGui::InputInt("Number of iterations (pair wise matching)", &tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching);
     if (tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching < 1)
         tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching = 1;
 
-    ImGui::InputFloat("pgslam overlap_threshold", &tls_registration.pose_graph_slam.overlap_threshold, 0.1f, 0.8f);
+    ImGui::InputFloat("Overlap threshold", &tls_registration.pose_graph_slam.overlap_threshold, 0.1f, 0.8f);
     if (tls_registration.pose_graph_slam.overlap_threshold < 0.1f)
         tls_registration.pose_graph_slam.overlap_threshold = 0.1f;
     ImGui::PopItemWidth();
@@ -1038,165 +986,93 @@ void pose_graph_slam_gui()
     // ImGui::Checkbox("pgslam adaptive_robust_kernel", &pose_graph_slam.icp.is_adaptive_robust_kernel);
 
     //--
-    ImGui::Checkbox("pgslam adaptive_robust_kernel", &tls_registration.pose_graph_slam.is_adaptive_robust_kernel);
+    ImGui::Checkbox("Adaptive robust kernel", &tls_registration.pose_graph_slam.is_adaptive_robust_kernel);
     ImGui::SameLine();
-    ImGui::Checkbox("pgslam fix_first_node (add I to first pose in Hessian)", &tls_registration.pose_graph_slam.is_fix_first_node);
+    ImGui::Checkbox("Fix first node (add I to first pose in Hessian)", &tls_registration.pose_graph_slam.is_fix_first_node);
 
-    ImGui::Checkbox("pgslam Gauss-Newton", &tls_registration.pose_graph_slam.is_gauss_newton);
-    if (tls_registration.pose_graph_slam.is_gauss_newton)
-    {
-        tls_registration.pose_graph_slam.is_levenberg_marguardt = false;
-    }
-
+     ImGui::Text("Nonlinear optimization method:");
     ImGui::SameLine();
-    ImGui::Checkbox("pgslam Levenberg-Marguardt", &tls_registration.pose_graph_slam.is_levenberg_marguardt);
-    if (tls_registration.pose_graph_slam.is_levenberg_marguardt)
-    {
-        tls_registration.pose_graph_slam.is_gauss_newton = false;
-    }
-
-    ImGui::Checkbox("pgslam poses expressed as camera<-world (cw)", &tls_registration.pose_graph_slam.is_cw);
-    if (tls_registration.pose_graph_slam.is_cw)
-    {
-        tls_registration.pose_graph_slam.is_wc = false;
-    }
+    ImGui::RadioButton("Gauss-Newton", &PGSnomSelection, 0);
     ImGui::SameLine();
-    ImGui::Checkbox("pgslam poses expressed as camera->world (wc)", &tls_registration.pose_graph_slam.is_wc);
-    if (tls_registration.pose_graph_slam.is_wc)
-    {
-        tls_registration.pose_graph_slam.is_cw = false;
-    }
+    ImGui::RadioButton("Levenberg-Marguardt", &PGSnomSelection, 1);
 
-    static int pgsSelection; // 0=Tait Bryan, 1=Quaternion, 2=Rodrigues
-    // initialize if none selected
-    if (pgsSelection < 0 || pgsSelection > 2)
-        pgsSelection = 0;
+    tls_registration.pose_graph_slam.is_gauss_newton = (PGSnomSelection == 0);
+    tls_registration.pose_graph_slam.is_levenberg_marguardt = (PGSnomSelection == 1);
 
-    ImGui::RadioButton("Tait-Bryan angles (om fi ka: RxRyRz)", &pgsSelection, 0);
+    ImGui::Text("Poses expressed as:");
     ImGui::SameLine();
-    ImGui::RadioButton("Quaternion (q0 q1 q2 q3)", &pgsSelection, 1);
+    ImGui::RadioButton("camera<-world (cw)", &PGSpeSelection, 0);
     ImGui::SameLine();
-    ImGui::RadioButton("Rodrigues (sx sy sz)", &pgsSelection, 2);
+    ImGui::RadioButton("camera->world (wc)", &PGSpeSelection, 1);
 
-    tls_registration.pose_graph_slam.is_tait_bryan_angles = (pgsSelection == 0);
-    tls_registration.pose_graph_slam.is_quaternion = (pgsSelection == 1);
-    tls_registration.pose_graph_slam.is_rodrigues = (pgsSelection == 2);
+    tls_registration.pose_graph_slam.is_cw = (PGSpeSelection == 0);
+    tls_registration.pose_graph_slam.is_wc = (PGSpeSelection == 1);
 
-    ImGui::Text("--------Method for pair wise matching (general)-------------------------------------------------");
-    ImGui::Checkbox("pgslam ndt", &tls_registration.pose_graph_slam.is_ndt);
-    if (tls_registration.pose_graph_slam.is_ndt)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_ndt = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
+    ImGui::Text("Parameterizations of 3D rotation:");
+    ImGui::RadioButton("Tait-Bryan angles (om fi ka: RxRyRz)", &PGS3dSelection, 0);
+    ImGui::SameLine();
+    ImGui::RadioButton("Quaternion (q0 q1 q2 q3)", &PGS3dSelection, 1);
+    ImGui::SameLine();
+    ImGui::RadioButton("Rodrigues (sx sy sz)", &PGS3dSelection, 2);
 
-    ImGui::Checkbox("pgslam optimization_point_to_point_source_to_target", &tls_registration.pose_graph_slam.is_optimization_point_to_point_source_to_target);
-    if (tls_registration.pose_graph_slam.is_optimization_point_to_point_source_to_target)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_optimization_point_to_point_source_to_target = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
+    tls_registration.pose_graph_slam.is_tait_bryan_angles = (PGS3dSelection == 0);
+    tls_registration.pose_graph_slam.is_quaternion = (PGS3dSelection == 1);
+    tls_registration.pose_graph_slam.is_rodrigues = (PGS3dSelection == 2);
 
-    ImGui::Checkbox("pgslam optimize_point_to_projection_onto_plane_source_to_target", &tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target);
-    if (tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
+    ImGui::Separator();
 
-    ImGui::Checkbox("pgslam optimize_point_to_plane_source_to_target", &tls_registration.pose_graph_slam.is_optimize_point_to_plane_source_to_target);
-    if (tls_registration.pose_graph_slam.is_optimize_point_to_plane_source_to_target)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_optimize_point_to_plane_source_to_target = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
+    ImGui::Text("Method for pair wise matching (general):");
+    ImGui::RadioButton("NDT", &PGSpwmtSelection, 0);
+    ImGui::RadioButton("Optimization_point_to_point_source_to_target", &PGSpwmtSelection, 1);
+    ImGui::RadioButton("Optimize_point_to_projection_onto_plane_source_to_target", &PGSpwmtSelection, 2);
+    ImGui::RadioButton("Optimize_point_to_plane_source_to_target", &PGSpwmtSelection, 3);
+    ImGui::RadioButton("Optimize_distance_point_to_plane_source_to_target", &PGSpwmtSelection, 4);
+    ImGui::RadioButton("Optimize_plane_to_plane_source_to_target", &PGSpwmtSelection, 5);
 
-    ImGui::Checkbox("pgslam optimize_distance_point_to_plane_source_to_target", &tls_registration.pose_graph_slam.is_optimize_distance_point_to_plane_source_to_target);
-    if (tls_registration.pose_graph_slam.is_optimize_distance_point_to_plane_source_to_target)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_optimize_distance_point_to_plane_source_to_target = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
+    ImGui::Separator();
 
-    ImGui::Checkbox("pgslam optimize_plane_to_plane_source_to_target", &tls_registration.pose_graph_slam.is_optimize_plane_to_plane_source_to_target);
-    if (tls_registration.pose_graph_slam.is_optimize_plane_to_plane_source_to_target)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_optimize_plane_to_plane_source_to_target = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
-    ImGui::Text("--------Method for pair wise matching (with PCL)------------------------------------------------");
+    ImGui::Text("Method for pair wise matching (with Lie-algebra):");
+    ImGui::RadioButton("Optimize NDT (Lie-algebra left Jacobian)", &PGSpwmtSelection, 6);
+    ImGui::RadioButton("Optimize NDT (Lie-algebra right Jacobian)", &PGSpwmtSelection, 7);
+    ImGui::RadioButton("Optimize point to point source to target (Lie-algebra left Jacobian)", &PGSpwmtSelection, 8);
+    ImGui::RadioButton("Optimize point to point source to target (Lie-algebra right Jacobian)", &PGSpwmtSelection, 9);
+    ImGui::RadioButton("Optimize point to projection onto plane source to target (Lie-algebra left Jacobian)", &PGSpwmtSelection, 10);
+    ImGui::RadioButton("Optimize point to projection onto plane source to target (Lie-algebra right Jacobian)", &PGSpwmtSelection, 11);
+
 #ifdef WITH_PCL
-    ImGui::Checkbox("pgslam optimize with pcl (ndt based pair wise matching)", &tls_registration.pose_graph_slam.is_optimize_pcl_ndt);
-    if (tls_registration.pose_graph_slam.is_optimize_pcl_ndt)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_optimize_pcl_ndt = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
-    }
-    ImGui::Checkbox("pgslam optimize with pcl (icp based pair wise matching)", &tls_registration.pose_graph_slam.is_optimize_pcl_icp);
-    if (tls_registration.pose_graph_slam.is_optimize_pcl_icp)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_optimize_pcl_icp = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
-    }
+    ImGui::Separator();
+    ImGui::Text("Method for pair wise matching (with PCL):");
+    ImGui::RadioButton("Optimize with PCL (NDT based pair wise matching)", &PGSpwmtSelection, 12);
+    ImGui::RadioButton("Optimize with PCL (ICP based pair wise matching)", &PGSpwmtSelection, 13);
 #endif
-    ImGui::Text("------------------------------------------------------------------------------------------------");
-    ImGui::Text("--------Method for pair wise matching (with Lie-algebra)----------------------------------------");
 
-    ImGui::Checkbox("pgslam optimize ndt(Lie-algebra left Jacobian)", &tls_registration.pose_graph_slam.is_ndt_lie_algebra_left_jacobian);
-    if (tls_registration.pose_graph_slam.is_ndt_lie_algebra_left_jacobian)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_ndt_lie_algebra_left_jacobian = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
+    //tls_registration.pose_graph_slam.set_all_to_false();
+    tls_registration.pose_graph_slam.is_ndt = (PGSpwmtSelection == 0);
+    tls_registration.pose_graph_slam.is_optimization_point_to_point_source_to_target = (PGSpwmtSelection == 1);
+    tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target = (PGSpwmtSelection == 2);
+    tls_registration.pose_graph_slam.is_optimize_point_to_plane_source_to_target = (PGSpwmtSelection == 3);
+    tls_registration.pose_graph_slam.is_optimize_distance_point_to_plane_source_to_target = (PGSpwmtSelection == 4);
+    tls_registration.pose_graph_slam.is_optimize_plane_to_plane_source_to_target = (PGSpwmtSelection == 5);
 
-    ImGui::Checkbox("pgslam optimize ndt(Lie-algebra right Jacobian)", &tls_registration.pose_graph_slam.is_ndt_lie_algebra_right_jacobian);
-    if (tls_registration.pose_graph_slam.is_ndt_lie_algebra_right_jacobian)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_ndt_lie_algebra_right_jacobian = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
+    tls_registration.pose_graph_slam.is_ndt_lie_algebra_left_jacobian = (PGSpwmtSelection == 6);
+    tls_registration.pose_graph_slam.is_ndt_lie_algebra_right_jacobian = (PGSpwmtSelection == 7);
+    tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_left_jacobian = (PGSpwmtSelection == 8);
+    tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_right_jacobian = (PGSpwmtSelection == 9);
+    tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian = (PGSpwmtSelection == 10);
+    tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian = (PGSpwmtSelection == 11);
 
-    ImGui::Checkbox("pgslam optimize point to point source to target(Lie-algebra left Jacobian)", &tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_left_jacobian);
-    if (tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_left_jacobian)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_left_jacobian = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
-    ImGui::Checkbox("pgslam optimize point to point source to target(Lie-algebra right Jacobian)", &tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_right_jacobian);
-    if (tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_right_jacobian)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_right_jacobian = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
-    ImGui::Checkbox("pgslam optimize point to projection onto plane source to target(Lie-algebra left Jacobian)", &tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian);
-    if (tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
-    ImGui::Checkbox("pgslam optimize point to projection onto plane source to target(Lie-algebra right Jacobian)", &tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian);
-    if (tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian)
-    {
-        tls_registration.pose_graph_slam.set_all_to_false();
-        tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian = true;
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    }
-    ImGui::Text("------------------------------------------------------------------------------------------------");
+    tls_registration.pose_graph_slam.is_optimize_pcl_ndt = (PGSpwmtSelection == 12);
+    tls_registration.pose_graph_slam.is_optimize_pcl_icp = (PGSpwmtSelection == 13);
 
-    if (ImGui::Button("optimize"))
+    if (PGSpwmtSelection >= 0 && PGSpwmtSelection <= 11)
+        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+    if (PGSpwmtSelection == 6)
+        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
+    if (PGSpwmtSelection == 7)
+        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
+    
+    ImGui::Separator();
+    if (ImGui::Button("Optimize"))
     {
         tls_registration.pose_graph_slam.ndt_bucket_size[0] = tls_registration.ndt.bucket_size[0];
         tls_registration.pose_graph_slam.ndt_bucket_size[1] = tls_registration.ndt.bucket_size[1];
@@ -1208,10 +1084,12 @@ void pose_graph_slam_gui()
         // pose_graph_slam.optimize(point_clouds_container, rms_initial, rms_final, mui);
         // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
     }
-    ImGui::Text("----------with GTSAM----------------------------------------------------------------------------");
+
 #if WITH_GTSAM
-    if (ImGui::Button("optimize with GTSAM"))
+    if (ImGui::Button("Optimize with GTSAM"))
     {
+        ImGui::Separator();
+        ImGui::Text("With GTSAM:");
         tls_registration.pose_graph_slam.ndt_bucket_size[0] = tls_registration.ndt.bucket_size[0];
         tls_registration.pose_graph_slam.ndt_bucket_size[1] = tls_registration.ndt.bucket_size[1];
         tls_registration.pose_graph_slam.ndt_bucket_size[2] = tls_registration.ndt.bucket_size[2];
@@ -1222,17 +1100,16 @@ void pose_graph_slam_gui()
         // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
     }
 #endif
-    ImGui::Text("------------------------------------------------------------------------------------------------");
-    ImGui::Text("----------with MANIF----------------------------------------------------------------------------");
 
 #if WITH_MANIF
-    if (ImGui::Button("optimize with manif (A small header-only library for Lie theory)"))
+    ImGui::Separator();
+    ImGui::Text("With MANIF:");
+    if (ImGui::Button("Optimize with manif (a small header-only library for Lie theory)"))
     {
         tls_registration.pose_graph_slam.optimize_with_manif(session.point_clouds_container);
-        std::cout << "optimize with manif (A small header-only library for Lie theory) DONE" << std::endl;
+        std::cout << "optimize with manif (a small header-only library for Lie theory) DONE" << std::endl;
     }
 #endif
-    ImGui::Text("------------------------------------------------------------------------------------------------");
     ImGui::End();
 }
 
@@ -1242,23 +1119,31 @@ void observation_picking_gui()
 
     ImGui::Begin("Observations", &is_manual_analisys);
 
-    ImGui::Checkbox("observation picking mode", &observation_picking.is_observation_picking_mode);
-    if (observation_picking.is_observation_picking_mode)
+    ImGui::Checkbox("Observation picking mode", &observation_picking.is_observation_picking_mode);
+    ImGui::BeginDisabled(!observation_picking.is_observation_picking_mode);
     {
-        ImGui::Checkbox("grid 10 x 10 [m]", &observation_picking.grid10x10m);
-        ImGui::Checkbox("grid 1 x 1 [m]", &observation_picking.grid1x1m);
-        ImGui::Checkbox("grid 0.1 x 0.1 [m]", &observation_picking.grid01x01m);
-        ImGui::Checkbox("grid 0.01 x 0.01 [m]", &observation_picking.grid001x001m);
-        // ImGui::SliderFloat("picking_plane_height", &observation_picking.picking_plane_height, -20.0f, 20.0f);
-        ImGui::InputFloat("picking_plane_height", &observation_picking.picking_plane_height);
-        // ImGui::SliderFloat("picking_plane_threshold", &observation_picking.picking_plane_threshold, 0.01f, 200.0f);
-        ImGui::InputFloat("picking_plane_threshold", &observation_picking.picking_plane_threshold);
-        // ImGui::SliderFloat("picking_plane_max_xy", &observation_picking.max_xy, 10.0f, 1000.0f);
-        ImGui::InputFloat("picking_plane_max_xy", &observation_picking.max_xy);
-        // ImGui::SliderInt("point_size", &observation_picking.point_size, 1, 10);
-        ImGui::InputInt("point_size", &observation_picking.point_size);
+        ImGui::Text("Grid [m]:");
+        ImGui::Checkbox("10x10", &observation_picking.grid10x10m);
+        ImGui::SameLine();
+        ImGui::Checkbox("1x1", &observation_picking.grid1x1m);
+        ImGui::SameLine();
+        ImGui::Checkbox("0.1x0.1", &observation_picking.grid01x01m);
+        ImGui::SameLine();
+        ImGui::Checkbox("0.01x0.01", &observation_picking.grid001x001m);
 
-        if (ImGui::Button("accept_current_observation"))
+        ImGui::Text("Picking plane:");
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        // ImGui::SliderFloat("picking_plane_height", &observation_picking.picking_plane_height, -20.0f, 20.0f);
+        ImGui::InputFloat("Height [m]", &observation_picking.picking_plane_height);
+        // ImGui::SliderFloat("picking_plane_threshold", &observation_picking.picking_plane_threshold, 0.01f, 200.0f);
+        ImGui::InputFloat("Threshold [m]", &observation_picking.picking_plane_threshold);
+        // ImGui::SliderFloat("picking_plane_max_xy", &observation_picking.max_xy, 10.0f, 1000.0f);
+        ImGui::InputFloat("Max x y [m]", &observation_picking.max_xy);
+        // ImGui::SliderInt("point_size", &observation_picking.point_size, 1, 10);
+        ImGui::InputInt("Point size", &observation_picking.point_size);
+        ImGui::PopItemWidth();
+
+        if (ImGui::Button("Accept current observation"))
         {
             std::vector<Eigen::Affine3d> m_poses;
             for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
@@ -1267,24 +1152,21 @@ void observation_picking_gui()
             }
             observation_picking.accept_current_observation(m_poses);
         }
-
         ImGui::SameLine();
-
-        if (ImGui::Button("clear_current_observation"))
-        {
+        if (ImGui::Button("Clear current observation"))
             observation_picking.current_observation.clear();
-        }
 
-        if (ImGui::Button("reset view"))
+        if (ImGui::Button("Reset view"))
         {
             rotate_x = 0.0;
             rotate_y = 0.0;
         }
     }
+    ImGui::EndDisabled();
 
-    ImGui::Text((std::string("number of observations: ") + std::to_string(observation_picking.observations.size())).c_str());
+    ImGui::Text((std::string("Number of observations: ") + std::to_string(observation_picking.observations.size())).c_str());
 
-    if (ImGui::Button("load observations"))
+    if (ImGui::Button("Load observations"))
     {
         std::string input_file_name = "";
         input_file_name = mandeye::fd::OpenFileDialogOneFile("Load observations", {});
@@ -1314,7 +1196,7 @@ void observation_picking_gui()
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button("save observations"))
+    if (ImGui::Button("Save observations"))
     {
         const auto output_file_name = mandeye::fd::SaveFileDialog("Save observations", {}, ".json");
         std::cout << "json file to save: '" << output_file_name << "'" << std::endl;
@@ -1327,7 +1209,7 @@ void observation_picking_gui()
 
     ImGui::Text((std::string("Loaded observations from file: '") + observations_file_name + std::string("'")).c_str());
 
-    if (ImGui::Button("compute RMS(xy)"))
+    if (ImGui::Button("Compute RMS (xy)"))
     {
         double rms = compute_rms(true, session, observation_picking);
         std::cout << "RMS (initial poses): " << rms << std::endl;
@@ -1335,13 +1217,13 @@ void observation_picking_gui()
         std::cout << "RMS (current poses): " << rms << std::endl;
     }
 
-    ImGui::Text("------------------------------------------------");
-    if (ImGui::Button("add intersection"))
+    ImGui::Separator();
+    if (ImGui::Button("Add intersection"))
     {
         observation_picking.add_intersection(Eigen::Vector3d(0.0, 0.0, 0.0));
     }
 
-    ImGui::SameLine();
+    ImGui::Separator();
 
     int index_intersetion_to_remove = -1;
     for (int i = 0; i < observation_picking.intersections.size(); i++)
@@ -1369,10 +1251,12 @@ void observation_picking_gui()
         }
         observation_picking.intersections = intersections;
     }
-    ImGui::Text("------------------------------------------------");
-    if (observation_picking.intersections.size() > 0)
+
+    ImGui::Separator();
+
+    ImGui::BeginDisabled(observation_picking.intersections.size() <= 0);
     {
-        if (ImGui::Button("export point clouds inside intersections, rms and poses (RESSO format) to folder"))
+        if (ImGui::Button("Export point clouds inside intersections, RMS and poses"))
         {
             std::string output_folder_name = "";
             output_folder_name = mandeye::fd::SelectFolder("Choose folder");
@@ -1383,9 +1267,12 @@ void observation_picking_gui()
                 export_result_to_folder(output_folder_name, observation_picking, session);
             }
         }
-        ImGui::InputFloat("label_dist", &observation_picking.label_dist);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("in RESSO format to folder");
+        ImGui::SetNextItemWidth(ImGuiNumberWidth);
+        ImGui::InputFloat("Label dist", &observation_picking.label_dist);
     }
-    ImGui::Text("------------------------------------------------");
+    ImGui::EndDisabled();
 
     ImGui::End();
 }
@@ -1426,9 +1313,7 @@ void lio_segments_gui()
     ImGui::Text("Selection: ");
     ImGui::SameLine();
     if (ImGui::Button("show"))
-    {
         session.point_clouds_container.show_all_from_range(index_begin, index_end);
-    }
     ImGui::SameLine();
     if (ImGui::Button("shift -"))
     {
@@ -1437,13 +1322,9 @@ void lio_segments_gui()
         index_end -= step;
 
         if (index_begin < 0)
-        {
             index_begin = 0;
-        }
         if (index_end < 0)
-        {
             index_end = 0;
-        }
 
         rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
         rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
@@ -1458,13 +1339,9 @@ void lio_segments_gui()
         index_end += step;
 
         if (index_begin > session.point_clouds_container.point_clouds.size() - 1)
-        {
             index_begin = session.point_clouds_container.point_clouds.size() - 1;
-        }
         if (index_end > session.point_clouds_container.point_clouds.size() - 1)
-        {
             index_end = session.point_clouds_container.point_clouds.size() - 1;
-        }
 
         rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
         rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
@@ -1473,14 +1350,10 @@ void lio_segments_gui()
     }
     ImGui::SameLine();
     if (ImGui::Button("Show all"))
-    {
         session.point_clouds_container.show_all();
-    }
     ImGui::SameLine();
     if (ImGui::Button("Hide all"))
-    {
         session.point_clouds_container.hide_all();
-    }
     ImGui::SameLine();
     if (ImGui::Button("Reset poses"))
         reset_poses(session);
@@ -1508,19 +1381,14 @@ void lio_segments_gui()
             {
             }
             else
-            {
                 session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = true;
-            }
         }
     }
-
     ImGui::SameLine();
     if (ImGui::Button("unset all"))
     {
         for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-        {
             session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = false;
-        }
     }
 
     ImGui::SameLine();
@@ -2060,7 +1928,7 @@ void display()
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("last step in linear workflow");
 
-                if ((index_begin > 0) || (index_end < static_cast<int>(session.point_clouds_container.point_clouds.size() - 1)))
+                ImGui::BeginDisabled(!((index_begin > 0) || (index_end < static_cast<int>(session.point_clouds_container.point_clouds.size() - 1))));
                 {
                     if (ImGui::MenuItem("Save subsession"))
                     {
@@ -2090,9 +1958,8 @@ void display()
                             session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), true);
                         }
                     }
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Save subsession based on selection in Lio segments editor");
                 }
+                ImGui::EndDisabled();
 
                 ImGui::Separator();
 
@@ -2104,9 +1971,7 @@ void display()
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_all_to_las(session, output_file_name, true);
-                        }
                     }
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("As one local scan transformed via inverse pose of first scan");
@@ -2117,9 +1982,7 @@ void display()
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_all_to_las(session, output_file_name, false);
-                        }
                     }
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("To export in full resolution, close the program and open again, unmark 'simple_gui', unmark 'decimate during load'");
@@ -2156,13 +2019,10 @@ void display()
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
                         if (output_file_name.size() > 0)
-                        {
                             save_trajectories_to_laz(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling);
-                        }
                     }
 
                     ImGui::Separator();
-
 
                     ImGui::Text("(x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)");
                     if (ImGui::MenuItem("Save all as csv (timestamp Lidar)"))
@@ -2171,9 +2031,7 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, false, false, false);
-                        }
                     }
                     if (ImGui::MenuItem("Save all as csv (timestamp Unix)"))
                     {
@@ -2181,9 +2039,7 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, true, false, false);
-                        }
                     }
                     if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)"))
                     {
@@ -2191,9 +2047,7 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, true, false, false);
-                        }
                     }
 
                     ImGui::Separator();
@@ -2205,9 +2059,7 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, false, true, false);
-                        }
                     }
                     if (ImGui::MenuItem("Save all as csv (timestamp Unix)"))
                     {
@@ -2215,9 +2067,7 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, true, true, false);
-                        }
                     }
                     if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)"))
                     {
@@ -2225,9 +2075,7 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, true, true, false);
-                        }
                     }
 
                     ImGui::Separator();
@@ -2238,9 +2086,7 @@ void display()
                         std::cout << "dxf file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, false, false, true);
-                        }
                     }
 
                     ImGui::EndMenu();
@@ -2256,9 +2102,7 @@ void display()
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_scale_board_to_laz(session, output_file_name, 0.1);
-                        }
                     }
 
                     if (ImGui::MenuItem("> dec 1.0"))
@@ -2267,9 +2111,7 @@ void display()
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_scale_board_to_laz(session, output_file_name, 1.0);
-                        }
                     }
 
                     if (ImGui::MenuItem("> dec 10.0"))
@@ -2278,9 +2120,7 @@ void display()
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_scale_board_to_laz(session, output_file_name, 10.0);
-                        }
                     }
 
                     ImGui::Separator();
@@ -2292,9 +2132,7 @@ void display()
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_scale_board_to_laz(session, output_file_name, 10.0, 10000.0);
-                        }
                     }
 
                     if (ImGui::MenuItem("> 100m"))
@@ -2303,9 +2141,7 @@ void display()
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_scale_board_to_laz(session, output_file_name, 100.0, 10000.0);
-                        }
                     }
 
                     if (ImGui::MenuItem("> 1000m"))
@@ -2314,9 +2150,7 @@ void display()
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             save_scale_board_to_laz(session, output_file_name, 1000.0, 10000.0);
-                        }
                     }
 
                     ImGui::EndMenu();
@@ -2334,9 +2168,7 @@ void display()
                         if (input_file_names.size() > 0)
                         {
                             if (!tls_registration.gnss.load(input_file_names, gnssWithOffset))
-                            {
                                 std::cout << "problem with loading gnss files" << std::endl;
-                            }
                         }
                     }
 
@@ -2352,9 +2184,7 @@ void display()
                         if (input_file_names.size() > 0)
                         {
                             if (!tls_registration.gnss.load_mercator_projection(input_file_names))
-                            {
                                 std::cout << "problem with loading gnss files" << std::endl;
-                            }
                         }
                     }
                     if (ImGui::IsItemHovered())
@@ -2368,9 +2198,7 @@ void display()
                         if (input_file_names.size() > 0)
                         {
                             if (!tls_registration.gnss.load_nmea_mercator_projection(input_file_names))
-                            {
                                 std::cout << "problem with loading gnss files" << std::endl;
-                            }
                         }
                     }
                     if (ImGui::IsItemHovered())
@@ -2384,9 +2212,7 @@ void display()
                         std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                        {
                             tls_registration.gnss.save_to_laz(output_file_name, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
-                        }
                     }
 
                     if (ImGui::MenuItem("Save metascan points in PUWG92"))
@@ -2408,17 +2234,11 @@ void display()
 
                                     pointcloud.push_back(vp);
                                     if (i < p.intensities.size())
-                                    {
                                         intensity.push_back(p.intensities[i]);
-                                    }
                                     else
-                                    {
                                         intensity.push_back(0);
-                                    }
                                     if (i < p.timestamps.size())
-                                    {
                                         timestamps.push_back(p.timestamps[i]);
-                                    }
                                 }
                             }
                         }
@@ -2529,11 +2349,14 @@ void display()
 
                 ImGui::MenuItem("Manual Pose Graph Loop Closure Mode", nullptr, &manual_pose_graph_loop_closure_mode);
 
-                if (!manual_pose_graph_loop_closure_mode)
+                ImGui::BeginDisabled(manual_pose_graph_loop_closure_mode);
                 {
                     ImGui::Separator();
                     ImGui::MenuItem("LIO segments editor", nullptr, &is_lio_segments_gui);
                 }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Disabled if Manual Pose Graph Loop Closure Mode active");
+                ImGui::EndDisabled();
 
                 ImGui::EndMenu();
             }
@@ -2542,9 +2365,7 @@ void display()
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputDouble("Intersection width [m]", &session.point_clouds_container.intersection_width, 0.0, 0.0, "%.2f");
                 if (session.point_clouds_container.intersection_width < 0.001)
-                {
                     session.point_clouds_container.intersection_width = 0.001;
-                }
 
                 ImGui::Separator();
 
@@ -2614,7 +2435,7 @@ void display()
 
         if (ImGui::BeginMenu("View"))
         {
-            if (session_loaded)
+            ImGui::BeginDisabled(!session_loaded);
             {
                 ImGui::PushItemWidth(ImGuiNumberWidth);
 
@@ -2634,13 +2455,15 @@ void display()
                     }
                 }
 
-                if (tls_registration.gnss.gnss_poses.size() > 0)
+                ImGui::BeginDisabled(tls_registration.gnss.gnss_poses.size() <= 0);
                 {
                     ImGui::MenuItem("Show GNSS correspondences", nullptr, &tls_registration.gnss.show_correspondences);
                 }
+                ImGui::EndDisabled();
 
                 ImGui::Separator();
             }
+            ImGui::EndDisabled();
 
             ImGui::MenuItem("Orthographic", nullptr, &is_ortho);
             if (is_ortho)
@@ -2662,13 +2485,16 @@ void display()
 
             ImGui::ColorEdit4("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
 
-            if (session_loaded)
+            ImGui::BeginDisabled(!session_loaded);
             {
-                float color[3] = {
-                    session.point_clouds_container.point_clouds[0].render_color[0],
-                    session.point_clouds_container.point_clouds[0].render_color[1],
-                    session.point_clouds_container.point_clouds[0].render_color[2]
-                };
+
+                float color[3];
+                if (session_loaded)
+                {
+                    color[0] = session.point_clouds_container.point_clouds[0].render_color[0];
+                    color[1] = session.point_clouds_container.point_clouds[0].render_color[1];
+                    color[2] = session.point_clouds_container.point_clouds[0].render_color[2];
+                }
 
                 if (ImGui::ColorEdit3("Cloud color", (float*)&color, ImGuiColorEditFlags_NoInputs))
                 {
@@ -2692,6 +2518,7 @@ void display()
                     }
                 }
             }
+            ImGui::EndDisabled();
 
             ImGui::Separator();
 
@@ -2759,7 +2586,7 @@ void display()
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Change camera view to fixed positions");
 
-        if (session.point_clouds_container.point_clouds.size() > 0)
+        ImGui::BeginDisabled(session.point_clouds_container.point_clouds.size() <= 0);
         {
             ImGui::SameLine();
             ImGui::Dummy(ImVec2(20, 0));
@@ -2793,6 +2620,7 @@ void display()
             ImGui::SameLine();
             ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
         }
+        ImGui::EndDisabled();
 
         ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
 

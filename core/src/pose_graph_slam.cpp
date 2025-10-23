@@ -1701,7 +1701,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
 			else if (is_optimization_point_to_point_source_to_target) {
 				ICP icp;
 
-				icp.search_radious = search_radious;
+				icp.search_radius = search_radius;
 				icp.number_of_threads = number_of_threads;
 				icp.number_of_iterations = number_of_iterations_pair_wise_matching;
 				icp.is_adaptive_robust_kernel = is_adaptive_robust_kernel;
@@ -1723,7 +1723,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
 			else if (is_optimize_point_to_projection_onto_plane_source_to_target) {
 				RegistrationPlaneFeature registration_plane_feature;
 
-				registration_plane_feature.search_radious = search_radious;
+				registration_plane_feature.search_radius = search_radius;
 				registration_plane_feature.number_of_threads = number_of_threads;
 				registration_plane_feature.number_of_iterations = number_of_iterations_pair_wise_matching;
 				registration_plane_feature.is_adaptive_robust_kernel = is_adaptive_robust_kernel;
@@ -1747,7 +1747,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
 			else if (is_optimize_point_to_projection_onto_plane_source_to_target) {
 				RegistrationPlaneFeature registration_plane_feature;
 
-				registration_plane_feature.search_radious = search_radious;
+				registration_plane_feature.search_radius = search_radius;
 				registration_plane_feature.number_of_threads = number_of_threads;
 				registration_plane_feature.number_of_iterations = number_of_iterations_pair_wise_matching;
 				registration_plane_feature.is_adaptive_robust_kernel = is_adaptive_robust_kernel;
@@ -1771,7 +1771,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
 			else if (is_optimize_point_to_plane_source_to_target) {
 				RegistrationPlaneFeature registration_plane_feature;
 
-				registration_plane_feature.search_radious = search_radious;
+				registration_plane_feature.search_radius = search_radius;
 				registration_plane_feature.number_of_threads = number_of_threads;
 				registration_plane_feature.number_of_iterations = number_of_iterations_pair_wise_matching;
 				registration_plane_feature.is_adaptive_robust_kernel = is_adaptive_robust_kernel;
@@ -1795,7 +1795,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
 			else if (is_optimize_distance_point_to_plane_source_to_target) {
 				RegistrationPlaneFeature registration_plane_feature;
 
-				registration_plane_feature.search_radious = search_radious;
+				registration_plane_feature.search_radius = search_radius;
 				registration_plane_feature.number_of_threads = number_of_threads;
 				registration_plane_feature.number_of_iterations = number_of_iterations_pair_wise_matching;
 				registration_plane_feature.is_adaptive_robust_kernel = is_adaptive_robust_kernel;
@@ -1819,7 +1819,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
 			else if (is_optimize_plane_to_plane_source_to_target) {
 				RegistrationPlaneFeature registration_plane_feature;
 
-				registration_plane_feature.search_radious = search_radious;
+				registration_plane_feature.search_radius = search_radius;
 				registration_plane_feature.number_of_threads = number_of_threads;
 				registration_plane_feature.number_of_iterations = number_of_iterations_pair_wise_matching;
 				registration_plane_feature.is_adaptive_robust_kernel = is_adaptive_robust_kernel;
@@ -1843,7 +1843,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
             else if (is_optimize_point_to_point_source_to_target_lie_algebra_left_jacobian) {
                 ICP icp;
 
-                icp.search_radious = search_radious;
+                icp.search_radius = search_radius;
                 icp.number_of_threads = number_of_threads;
                 icp.number_of_iterations = number_of_iterations_pair_wise_matching;
                 icp.is_adaptive_robust_kernel = is_adaptive_robust_kernel;
@@ -1865,7 +1865,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
             else if (is_optimize_point_to_point_source_to_target_lie_algebra_right_jacobian) {
                 ICP icp;
 
-                icp.search_radious = search_radious;
+                icp.search_radius = search_radius;
                 icp.number_of_threads = number_of_threads;
                 icp.number_of_iterations = number_of_iterations_pair_wise_matching;
                 icp.is_adaptive_robust_kernel = is_adaptive_robust_kernel;
@@ -1887,7 +1887,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
             else if (is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian) {
                 RegistrationPlaneFeature registration_plane_feature;
 
-                registration_plane_feature.search_radious = search_radious;
+                registration_plane_feature.search_radius = search_radius;
                 registration_plane_feature.number_of_threads = number_of_threads;
                 registration_plane_feature.number_of_iterations = number_of_iterations_pair_wise_matching;
                 registration_plane_feature.is_adaptive_robust_kernel = is_adaptive_robust_kernel;
@@ -1911,7 +1911,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
             else if (is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian) {
                 RegistrationPlaneFeature registration_plane_feature;
 
-                registration_plane_feature.search_radious = search_radious;
+                registration_plane_feature.search_radius = search_radius;
                 registration_plane_feature.number_of_threads = number_of_threads;
                 registration_plane_feature.number_of_iterations = number_of_iterations_pair_wise_matching;
                 registration_plane_feature.is_adaptive_robust_kernel = is_adaptive_robust_kernel;
@@ -2116,7 +2116,7 @@ void  PoseGraphSLAM::calculate_edges(std::vector<PointCloud>& point_clouds){
 			icp.setInputSource(input_cloud);
 			icp.setInputTarget(target_cloud);
 			icp.setMaximumIterations (number_of_iterations_pair_wise_matching) ;
-			icp.setMaxCorrespondenceDistance(search_radious) ;
+			icp.setMaxCorrespondenceDistance(search_radius) ;
 
 			pcl::PointCloud<pcl::PointXYZRGBNormal> Final;
 			icp.align(Final);

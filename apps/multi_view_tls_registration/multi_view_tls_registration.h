@@ -72,6 +72,13 @@ struct TLSRegistration
 		ndt.sigma_azimuthal_angle = 8.0 / 3600;
 	}
 
+	void set_livox_mid360_errors()
+	{
+		ndt.sigma_r = 0.02;
+		ndt.sigma_polar_angle = 0.15/ 180.0 * M_PI;
+		ndt.sigma_azimuthal_angle = 0.15 / 180.0 * M_PI;
+	}
+
 	// ICP
 	bool use_icp = false;
 	ICP icp;

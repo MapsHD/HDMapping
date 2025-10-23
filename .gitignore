@@ -64,3 +64,8 @@ cmake-*
 
 # imgui
 imgui.ini
+/resources
+/out/install
+/3rdparty/observation_equations
+/.gitignore
+/.gitignore

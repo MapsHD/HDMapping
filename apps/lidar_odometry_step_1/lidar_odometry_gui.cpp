@@ -4,8 +4,6 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
-#include <utils.hpp>
-
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <portable-file-dialogs.h>
@@ -15,6 +13,8 @@
 #include "lidar_odometry.h"
 #include <registration_plane_feature.h>
 #include <export_laz.h>
+
+#include <utils.hpp>
 
 #include <mutex>
 #include <HDMapping/Version.hpp>
@@ -36,11 +36,19 @@
 
 // #define SAMPLE_PERIOD (1.0 / 200.0)
 
+std::string winTitle = std::string("Step 1 (Lidar odometry) ") + HDMAPPING_VERSION_STRING;
+
+std::vector<std::string> infoLines = {
+    "This program is first step in MANDEYE process.",
+    "",
+    "It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.",
+    "",
+    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program."
+};
+
 namespace fs = std::filesystem;
 
 bool full_lidar_odometry_gui = false;
-bool info_gui = false;
-bool compass_ruler = true;
 bool full_debug_messages = false;
 NDT ndt;
 bool show_reference_buckets = true;
@@ -61,26 +69,8 @@ int lastPar = 0;
 
 std::vector<WorkerData> worker_data;
 
-float rotate_x = 0.0, rotate_y = 0.0;
-Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
-float translate_x, translate_y = 0.0;
-float translate_z = -50.0;
-const unsigned int window_width = 800;
-const unsigned int window_height = 600;
-int mouse_old_x, mouse_old_y;
-bool gui_mouse_down{false};
-int mouse_buttons = 0;
-float mouse_sensitivity = 1.0;
 std::string working_directory = "";
 bool initial_transformation_gizmo = false;
-
-std::vector<std::string> infoLines = {
-    "This program is first step in MANDEYE process.",
-    "",
-    "It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.",
-    "",
-    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program."
-};
 
 float m_gizmo[] = {1, 0, 0, 0,
                    0, 1, 0, 0,
@@ -89,8 +79,8 @@ float m_gizmo[] = {1, 0, 0, 0,
 
 float x_displacement = 0.01;
 
-int index_from_inclusive = -1;
-int index_to_inclusive = -1;
+int index_begin = -1;
+int index_end = -1;
 bool gizmo_stretch_interval = false;
 Eigen::Affine3d stretch_gizmo_m = Eigen::Affine3d::Identity();
 
@@ -183,6 +173,9 @@ void step1(const std::atomic<bool> &loPause)
     {
         if (!input_folder_name.empty())
         {
+            std::string newTitle = winTitle + " - ..\\" + std::filesystem::path(input_folder_name).filename().string();
+            glutSetWindowTitle(newTitle.c_str());
+
             for (const auto &entry : fs::directory_iterator(input_folder_name))
             {
                 if (entry.is_regular_file())
@@ -393,9 +386,6 @@ void lidar_odometry_gui()
         }
 
         // ImGui::Checkbox("show_all_points", &show_all_points);
-        ImGui::InputFloat3("rotation center", rotation_center.data());
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Ctrl + middle mouse button to change rotation center");
 
         if (calculations_failed)
         {
@@ -613,40 +603,40 @@ void lidar_odometry_gui()
 
             ImGui::NewLine();
 
-            ImGui::Text("rigid ICP using spherical coordinates");
+            ImGui::Text("Rigid ICP using spherical coordinates");
             ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputDouble("distance_bucket_rigid_icp [m]", &params.distance_bucket_rigid_sf, 0.0, 0.0, "%.3f");
-            ImGui::InputDouble("polar_angle_rigid_icp [deg]", &params.polar_angle_deg_rigid_sf, 0.0, 0.0, "%.3f");
-            ImGui::InputDouble("azimutal_angle_rigid_icp [deg]", &params.azimutal_angle_deg_rigid_sf, 0.0, 0.0, "%.3f");
-            ImGui::InputInt("number_of_iterations_rigid_icp", &params.robust_and_accurate_lidar_odometry_rigid_sf_iterations);
-            ImGui::InputDouble("max_distance_rgd_rigid_icp [m]", &params.max_distance_lidar_rigid_sf, 0.0, 0.0, "%.2f");
+            ImGui::InputDouble("Distance bucket [m]##ricp", &params.distance_bucket_rigid_sf, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("Polar angle [deg]##ricp", &params.polar_angle_deg_rigid_sf, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("azimutal angle [deg]##ricp", &params.azimutal_angle_deg_rigid_sf, 0.0, 0.0, "%.3f");
+            ImGui::InputInt("Number of iterations##ricp", &params.robust_and_accurate_lidar_odometry_rigid_sf_iterations);
+            ImGui::InputDouble("Max distance [m]##ricp", &params.max_distance_lidar_rigid_sf, 0.0, 0.0, "%.2f");
             ImGui::PopItemWidth();
 
             ImGui::NewLine();
 
-            ImGui::Text("rgd_sf sigmas [m] / [deg]:");
+            ImGui::Text("Rigid spherical feature sigmas [m] / [deg]:");
             ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputDouble("x", &params.rgd_sf_sigma_x_m, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("x##rgdsfs", &params.rgd_sf_sigma_x_m, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(xText);
             ImGui::SameLine();
-            ImGui::InputDouble("om", &params.rgd_sf_sigma_om_deg, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("om##rgdsfs", &params.rgd_sf_sigma_om_deg, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(omText);
 
-            ImGui::InputDouble("y", &params.rgd_sf_sigma_y_m, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("y##rgdsfs", &params.rgd_sf_sigma_y_m, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(yText);
             ImGui::SameLine();
-            ImGui::InputDouble("fi", &params.rgd_sf_sigma_fi_deg, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("fi##rgdsfs", &params.rgd_sf_sigma_fi_deg, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(fiText);
 
-            ImGui::InputDouble("z", &params.rgd_sf_sigma_z_m, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("z##rgdsfs", &params.rgd_sf_sigma_z_m, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(zText);
             ImGui::SameLine();
-            ImGui::InputDouble("ka", &params.rgd_sf_sigma_ka_deg, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("ka##rgdsfs", &params.rgd_sf_sigma_ka_deg, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(kaText);
 
@@ -654,11 +644,11 @@ void lidar_odometry_gui()
 
             ImGui::NewLine();
 
-            if (ImGui::Button("save trajectory to ascii (x y z)"))
+            if (ImGui::Button("Save trajectory to ASCII (x y z)"))
             {
                 std::string output_file_name = "";
                 output_file_name = mandeye::fd::SaveFileDialog("Save trajectory", {}, "");
-                std::cout << "file to save: '" << output_file_name << "'" << std::endl;
+                std::cout << "File to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
@@ -683,13 +673,13 @@ void lidar_odometry_gui()
 
             if (!input_file_names.empty())
             {
-                ImGui::Checkbox("show points", &show_reference_points);
+                ImGui::Checkbox("Show points", &show_reference_points);
                 ImGui::SameLine();
-                ImGui::Checkbox("show buckets", &show_reference_buckets);
+                ImGui::Checkbox("Show buckets", &show_reference_buckets);
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
-                ImGui::InputInt("decimation###ref", &dec_reference_points);
+                ImGui::InputInt("Decimation###ref", &dec_reference_points);
                 
-                if (ImGui::Button("filter reference buckets"))
+                if (ImGui::Button("Filter reference buckets"))
                 {
                     filter_reference_buckets(params);
                 }
@@ -698,8 +688,8 @@ void lidar_odometry_gui()
             if (params.initial_points.size() > 0)
             {
                 ImGui::NewLine();
-                ImGui::Text("manipulate initial transformation:");
-                ImGui::Checkbox("show gizmo", &initial_transformation_gizmo);
+                ImGui::Text("Manipulate initial transformation:");
+                ImGui::Checkbox("Show gizmo", &initial_transformation_gizmo);
                 // gizmo_stretch_interval
                 if (initial_transformation_gizmo)
                 {
@@ -738,7 +728,42 @@ void lidar_odometry_gui()
 
                 ImGui::Text("Scans selection:");
 
-                if (ImGui::Button("select all"))
+                ImGui::Text("index from: ");
+                ImGui::SameLine();
+                ImGui::PushItemWidth(ImGuiNumberWidth);
+                ImGui::SliderInt("##fs", &index_begin, 0, index_end);
+                ImGui::SameLine();
+                ImGui::InputInt("##fi", &index_begin, 1, 5);
+                if (index_begin < 0)
+                    index_begin = 0;
+                if (index_begin >= index_end)
+                    index_begin = std::min(index_end, static_cast<int>(worker_data.size() - 1));
+
+                ImGui::SameLine();
+                ImGui::Text(" to: ");
+                ImGui::SameLine();
+
+                int prev = index_end;
+                ImGui::SliderInt("##ts", &index_end, index_begin, static_cast<int>(worker_data.size() - 1));
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("max %zu", worker_data.size() - 1);
+                ImGui::SameLine();
+                ImGui::InputInt("##ti", &index_end, 1, 5);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("max %zu", worker_data.size() - 1);
+                if (index_end < index_begin)
+                    index_end = index_begin;
+                if (index_end >= worker_data.size() - 1)
+                    index_end = worker_data.size() - 1;
+                if (prev != index_end)
+                {
+                    stretch_gizmo_m = worker_data[index_end].intermediate_trajectory[0];
+                }
+
+                ImGui::PopItemWidth();
+
+                ImGui::Text("Selection: ");
+                 if (ImGui::Button("Select all"))
                 {
                     for (int k = 0; k < worker_data.size(); k++)
                     {
@@ -746,7 +771,7 @@ void lidar_odometry_gui()
                     }
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("unselect"))
+                if (ImGui::Button("Unselect"))
                 {
                     for (int k = 0; k < worker_data.size(); k++)
                     {
@@ -754,135 +779,63 @@ void lidar_odometry_gui()
                     }
                 }
 
-                ImGui::PushItemWidth(ImGuiNumberWidth);
-                ImGui::InputInt("index_from_inclusive", &index_from_inclusive);
-                if (index_from_inclusive < 0)
-                {
-                    index_from_inclusive = 0;
-                }
-                if (index_from_inclusive >= worker_data.size())
-                {
-                    index_from_inclusive = worker_data.size() - 1;
-                }
-                ImGui::SameLine();
-                int prev = index_to_inclusive;
-                ImGui::InputInt("index_to_inclusive", &index_to_inclusive);
-                if (index_to_inclusive < 0)
-                {
-                    index_to_inclusive = 0;
-                }
-                if (index_to_inclusive >= worker_data.size())
-                {
-                    index_to_inclusive = worker_data.size() - 1;
-                }
-                if (prev != index_to_inclusive)
-                {
-                    stretch_gizmo_m = worker_data[index_to_inclusive].intermediate_trajectory[0];
-                }
-                ImGui::PopItemWidth();
-
                 ImGui::Text("Select scans from range:");
                 ImGui::SameLine();
-                if (ImGui::Button("<index_from_inclusive, index_to_inclusive>"))
+                if (ImGui::Button("<from, to>"))
                 {
                     for (int k = 0; k < worker_data.size(); k++)
-                    {
-                        if (k >= index_from_inclusive && k <= index_to_inclusive)
-                        {
-                            worker_data[k].show = true;
-                        }
-                        else
-                        {
-                            worker_data[k].show = false;
-                        }
-                    }
+                        worker_data[k].show = (k >= index_begin && k <= index_end);
                 }
 
-                if (ImGui::Button("<index_from_inclusive - 1, index_to_inclusive - 1>"))
+                if (ImGui::Button("<from - 1, to - 1>"))
                 {
-                    if (index_from_inclusive > 1 && index_to_inclusive > 1)
+                    if (index_begin > 1 && index_end > 1)
                     {
-                        index_from_inclusive--;
-                        index_to_inclusive--;
+                        index_begin--;
+                        index_end--;
 
                         for (int k = 0; k < worker_data.size(); k++)
-                        {
-                            if (k >= index_from_inclusive && k <= index_to_inclusive)
-                            {
-                                worker_data[k].show = true;
-                            }
-                            else
-                            {
-                                worker_data[k].show = false;
-                            }
-                        }
+                            worker_data[k].show = (k >= index_begin && k <= index_end);
                     }
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("<index_from_inclusive + 1, index_to_inclusive + 1>"))
+                if (ImGui::Button("<from + 1, to + 1>"))
                 {
-                    if (index_from_inclusive + 1 < worker_data.size() && index_to_inclusive + 1 < worker_data.size())
+                    if (index_begin + 1 < worker_data.size() && index_end + 1 < worker_data.size())
                     {
-                        index_from_inclusive++;
-                        index_to_inclusive++;
+                        index_begin++;
+                        index_end++;
 
                         for (int k = 0; k < worker_data.size(); k++)
-                        {
-                            if (k >= index_from_inclusive && k <= index_to_inclusive)
-                            {
-                                worker_data[k].show = true;
-                            }
-                            else
-                            {
-                                worker_data[k].show = false;
-                            }
-                        }
+                            worker_data[k].show = (k >= index_begin && k <= index_end);
                     }
                 }
 
-                if (ImGui::Button("<index_from_inclusive - 10, index_to_inclusive - 10>"))
+                if (ImGui::Button("from - 10, to - 10>"))
                 {
-                    if (index_from_inclusive > 10 && index_to_inclusive > 10)
+                    if (index_begin > 10 && index_end > 10)
                     {
-                        index_from_inclusive -= 10;
-                        index_to_inclusive -= 10;
+                        index_begin -= 10;
+                        index_end -= 10;
 
                         for (int k = 0; k < worker_data.size(); k++)
-                        {
-                            if (k >= index_from_inclusive && k <= index_to_inclusive)
-                            {
-                                worker_data[k].show = true;
-                            }
-                            else
-                            {
-                                worker_data[k].show = false;
-                            }
-                        }
+                            worker_data[k].show = (k >= index_begin && k <= index_end);
                     }
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("<index_from_inclusive + 10, index_to_inclusive + 10>"))
+                if (ImGui::Button("<from + 10, to + 10>"))
                 {
-                    if (index_from_inclusive + 10 < worker_data.size() && index_to_inclusive + 10 < worker_data.size())
+                    if (index_begin + 10 < worker_data.size() && index_end + 10 < worker_data.size())
                     {
-                        index_from_inclusive += 10;
-                        index_to_inclusive += 10;
+                        index_begin += 10;
+                        index_end += 10;
 
                         for (int k = 0; k < worker_data.size(); k++)
-                        {
-                            if (k >= index_from_inclusive && k <= index_to_inclusive)
-                            {
-                                worker_data[k].show = true;
-                            }
-                            else
-                            {
-                                worker_data[k].show = false;
-                            }
-                        }
+                            worker_data[k].show = (k >= index_begin && k <= index_end);
                     }
                 }
 
-                if (ImGui::Button("export selected scans"))
+                if (ImGui::Button("Export selected scans"))
                 {
                     auto output_file_name = mandeye::fd::SaveFileDialog("Save las/laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
                     Eigen::Affine3d pose;
@@ -920,7 +873,7 @@ void lidar_odometry_gui()
 
                 ImGui::SameLine();
 
-                if (ImGui::Button("save RESSO file"))
+                if (ImGui::Button("Save RESSO file"))
                 {
                     auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", {}, "");
                     std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
@@ -931,18 +884,18 @@ void lidar_odometry_gui()
                     }
                 }
 
-                if (index_to_inclusive > index_from_inclusive)
+                if (index_end > index_begin)
                 {
-                    ImGui::Text("-------------------------");
-                    ImGui::Checkbox("gizmo_stretch_interval", &gizmo_stretch_interval);
+                    ImGui::Separator();
+                    ImGui::Checkbox("Gizmo_stretch_interval", &gizmo_stretch_interval);
                 }
 
                 // gizmo_stretch_interval
                 if (gizmo_stretch_interval)
                 {
-                    if (index_to_inclusive < worker_data.size())
+                    if (index_end < worker_data.size())
                     {
-                        if (worker_data[index_to_inclusive].intermediate_trajectory.size() > 0)
+                        if (worker_data[index_end].intermediate_trajectory.size() > 0)
                         {
                             m_gizmo[0] = (float)stretch_gizmo_m(0, 0);
                             m_gizmo[1] = (float)stretch_gizmo_m(1, 0);
@@ -965,9 +918,9 @@ void lidar_odometry_gui()
 
                     if (ImGui::Button("Accept_Gizmo (only translation)"))
                     {
-                        if (index_to_inclusive < worker_data.size())
+                        if (index_end < worker_data.size())
                         {
-                            if (worker_data[index_to_inclusive].intermediate_trajectory.size() > 0)
+                            if (worker_data[index_end].intermediate_trajectory.size() > 0)
                             {
                                 Eigen::Affine3d current_gizmo = Eigen::Affine3d::Identity();
                                 current_gizmo(0, 0) = m_gizmo[0];
@@ -987,12 +940,12 @@ void lidar_odometry_gui()
                                 current_gizmo(2, 3) = m_gizmo[14];
                                 current_gizmo(3, 3) = m_gizmo[15];
 
-                                auto first_pose = worker_data[index_from_inclusive].intermediate_trajectory[0];
+                                auto first_pose = worker_data[index_begin].intermediate_trajectory[0];
 
                                 Eigen::Vector3d translation = current_gizmo.translation() - first_pose.translation();
 
                                 float number_all_nodes_inside_interval = 0;
-                                for (int i = index_from_inclusive; i < index_to_inclusive; i++)
+                                for (int i = index_begin; i < index_end; i++)
                                 {
                                     number_all_nodes_inside_interval += (float)worker_data[i].intermediate_trajectory.size();
                                 }
@@ -1012,7 +965,7 @@ void lidar_odometry_gui()
 
                                 Eigen::Affine3d last_m = Eigen::Affine3d::Identity();
 
-                                for (int i = index_from_inclusive; i < index_to_inclusive; i++)
+                                for (int i = index_begin; i < index_end; i++)
                                 {
                                     for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
                                     {
@@ -1030,7 +983,7 @@ void lidar_odometry_gui()
                                     }
                                 }
 
-                                for (int i = index_to_inclusive; i < worker_data.size(); i++)
+                                for (int i = index_end; i < worker_data.size(); i++)
                                 {
                                     for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
                                     {
@@ -1051,11 +1004,11 @@ void lidar_odometry_gui()
                             }
                         }
                     }
-                    ImGui::Text("-------------------------");
+                    ImGui::Separator();
                 }
 
                 ImGui::NewLine();
-                ImGui::Text("show/hide individual scans:");
+                ImGui::Text("Show/hide individual scans:");
 
                 int n_items = (int)worker_data.size();
                 int digits = (n_items > 0) ? (int)std::log10(n_items - 1) + 1 : 1;
@@ -1152,7 +1105,22 @@ void progress_window()
     ImGui::End();
 }
 
-void wheel(int button, int dir, int x, int y);
+void wheel(int button, int dir, int x, int y)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.MouseWheel += dir; // or direction * 1.0f depending on your setup
+
+    if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+    {
+        if (dir > 0)
+            translate_z -= 0.05f * translate_z;
+        else
+            translate_z += 0.05f * translate_z;
+
+        mouse_sensitivity = fabs(translate_z) / 100;
+        camera_transition_active = false;
+    }
+}
 
 void mouse(int glut_button, int state, int x, int y)
 {
@@ -1179,23 +1147,7 @@ void mouse(int glut_button, int state, int x, int y)
     if (!io.WantCaptureMouse)
     {
         if (glut_button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN && io.KeyCtrl)
-        {
-            const auto laser_beam = GetLaserBeam(x, y);
-
-            RegistrationPlaneFeature::Plane pl;
-
-            pl.a = 0;
-            pl.b = 0;
-            pl.c = 1;
-            pl.d = 0;
-            auto old_Totation_center = rotation_center;
-            rotation_center = rayIntersection(laser_beam, pl).cast<float>();
-
-            std::cout << "setting new rotation center to " << rotation_center << std::endl;
-
-            rotate_x = 0.f;
-            rotate_y = 0.f;
-        }
+            setNewRotationCenter(x, y);
 
         if (state == GLUT_DOWN)
         {
@@ -1207,25 +1159,6 @@ void mouse(int glut_button, int state, int x, int y)
         }
         mouse_old_x = x;
         mouse_old_y = y;
-    }
-}
-
-void wheel(int button, int dir, int x, int y)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    io.MouseWheel += dir; // or direction * 1.0f depending on your setup
-
-    if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
-    {
-        if (dir > 0)
-            translate_z -= 0.05f * translate_z;
-        else
-            translate_z += 0.05f * translate_z;
-        camera_transition_active = false;
-
-        mouse_sensitivity = fabs(translate_z) / 100;
-
-        return;
     }
 }
 
@@ -1274,8 +1207,9 @@ void display()
 {
     ImGuiIO &io = ImGui::GetIO();
 
-    float deltaTime = ImGui::GetIO().DeltaTime;
-    updateCameraTransition(deltaTime);
+    view_kbd_shortcuts();
+
+    updateCameraTransition();
 
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
@@ -1459,13 +1393,13 @@ void display()
     //
     if (worker_data.size() > 0)
     {
-        if (index_from_inclusive < worker_data.size())
+        if (index_begin < worker_data.size())
         {
             glColor3f(1, 1, 0);
             glBegin(GL_LINES);
-            if (worker_data[index_from_inclusive].intermediate_trajectory.size() > 0)
+            if (worker_data[index_begin].intermediate_trajectory.size() > 0)
             {
-                auto p = worker_data[index_from_inclusive].intermediate_trajectory[0].translation();
+                auto p = worker_data[index_begin].intermediate_trajectory[0].translation();
                 glVertex3f(p.x() - 1, p.y(), p.z());
                 glVertex3f(p.x() + 1, p.y(), p.z());
 
@@ -1478,13 +1412,13 @@ void display()
             glEnd();
         }
 
-        if (index_to_inclusive < worker_data.size())
+        if (index_end < worker_data.size())
         {
             glColor3f(0, 1, 1);
             glBegin(GL_LINES);
-            if (worker_data[index_to_inclusive].intermediate_trajectory.size() > 0)
+            if (worker_data[index_end].intermediate_trajectory.size() > 0)
             {
-                auto p = worker_data[index_to_inclusive].intermediate_trajectory[0].translation();
+                auto p = worker_data[index_end].intermediate_trajectory[0].translation();
                 glVertex3f(p.x() - 1, p.y(), p.z());
                 glVertex3f(p.x() + 1, p.y(), p.z());
 
@@ -1811,28 +1745,7 @@ void display()
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Scene view relevant parameters");
 
-            if (ImGui::BeginMenu("Camera")) {
-                if (ImGui::MenuItem("Front", "Ctrl+F"))
-                    setCameraPreset(CAMERA_FRONT);
-                if (ImGui::MenuItem("Back", "Ctrl+B"))
-                    setCameraPreset(CAMERA_BACK);
-                if (ImGui::MenuItem("Left", "Ctrl+L"))
-                    setCameraPreset(CAMERA_LEFT);
-                if (ImGui::MenuItem("Right", "Ctrl+R"))
-                    setCameraPreset(CAMERA_RIGHT);
-                if (ImGui::MenuItem("Top", "Ctrl+T"))
-                    setCameraPreset(CAMERA_TOP);
-                if (ImGui::MenuItem("Bottom", "Ctrl+U"))
-                    setCameraPreset(CAMERA_BOTTOM);
-                if (ImGui::MenuItem("Isometric", "Ctrl+I"))
-                    setCameraPreset(CAMERA_ISO);
-                ImGui::Separator();
-                if (ImGui::MenuItem("Reset", "Ctrl+Z"))
-                    setCameraPreset(CAMERA_RESET);
-                ImGui::EndMenu();
-            }
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Change camera view to fixed positions");
+            camMenu();
 
             ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
 
@@ -1954,10 +1867,10 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("lidar_odometry " HDMAPPING_VERSION_STRING);
+    glutCreateWindow(winTitle.c_str());
 
     #ifdef _WIN32
-        HWND hwnd = FindWindow(NULL, "lidar_odometry " HDMAPPING_VERSION_STRING); // The window title must match exactly
+        HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
         HINSTANCE hInstance = GetModuleHandle(NULL);
         SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
         SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
@@ -2072,7 +1985,6 @@ int main(int argc, char *argv[])
         }
         else
         {
-            std::cout << "console usage: " << std::endl;
             std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
 
             params.in_out_params_indoor.resolution_X = 0.1;
@@ -2090,6 +2002,8 @@ int main(int argc, char *argv[])
             glutMouseFunc(mouse);
             glutMotionFunc(motion);
             glutMouseWheelFunc(wheel);
+            glutSpecialFunc(specialDown);
+            glutSpecialUpFunc(specialUp);
             glutMainLoop();
 
             ImGui_ImplOpenGL2_Shutdown();
@@ -2418,37 +2332,6 @@ void alternative_approach()
 }
 #endif
 
-LaserBeam GetLaserBeam(int x, int y)
-{
-    GLint viewport[4];
-    GLdouble modelview[16];
-    GLdouble projection[16];
-    GLfloat winX, winY, winZ;
-    GLdouble posXnear, posYnear, posZnear;
-    GLdouble posXfar, posYfar, posZfar;
-
-    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
-    glGetDoublev(GL_PROJECTION_MATRIX, projection);
-    glGetIntegerv(GL_VIEWPORT, viewport);
-
-    winX = (float)x;
-    winY = (float)viewport[3] - (float)y;
-
-    LaserBeam laser_beam;
-    gluUnProject(winX, winY, 0, modelview, projection, viewport, &posXnear, &posYnear, &posZnear);
-    gluUnProject(winX, winY, -1000, modelview, projection, viewport, &posXfar, &posYfar, &posZfar);
-
-    laser_beam.position.x() = posXnear;
-    laser_beam.position.y() = posYnear;
-    laser_beam.position.z() = posZnear;
-
-    laser_beam.direction.x() = posXfar - posXnear;
-    laser_beam.direction.y() = posYfar - posYnear;
-    laser_beam.direction.z() = posZfar - posZnear;
-
-    return laser_beam;
-}
-
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking)
 {
     const auto laser_beam = GetLaserBeam(x, y);
@@ -2465,33 +2348,4 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observ
     std::cout << "intersection: " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;
 
     return pos;
-}
-
-float distanceToPlane(const RegistrationPlaneFeature::Plane &plane, const Eigen::Vector3d &p)
-{
-    return (plane.a * p.x() + plane.b * p.y() + plane.c * p.z() + plane.d);
-}
-
-Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane)
-{
-    float TOLERANCE = 0.0001;
-    Eigen::Vector3d out_point;
-    out_point.x() = laser_beam.position.x();
-    out_point.y() = laser_beam.position.y();
-    out_point.z() = laser_beam.position.z();
-
-    float a = plane.a * laser_beam.direction.x() + plane.b * laser_beam.direction.y() + plane.c * laser_beam.direction.z();
-
-    if (a > -TOLERANCE && a < TOLERANCE)
-    {
-        return out_point;
-    }
-
-    float distance = distanceToPlane(plane, out_point);
-
-    out_point.x() = laser_beam.position.x() - laser_beam.direction.x() * (distance / a);
-    out_point.y() = laser_beam.position.y() - laser_beam.direction.y() * (distance / a);
-    out_point.z() = laser_beam.position.z() - laser_beam.direction.z() * (distance / a);
-
-    return out_point;
 }

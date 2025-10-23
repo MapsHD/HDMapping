@@ -317,7 +317,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     auto elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
-    std::cout << "final rms: " << rms << std::endl;
+    std::cout << "final RMS: " << rms << std::endl;
 
     append_to_result_file(result_file, "point_to_point", icp, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method, observation_picking, session);

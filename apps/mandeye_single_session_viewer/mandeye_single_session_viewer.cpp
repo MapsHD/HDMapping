@@ -4,12 +4,12 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
-#include <utils.hpp>
-
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+#include <utils.hpp>
 
 #include <Eigen/Eigen>
 
@@ -30,8 +30,7 @@
     #include "../../resources/resourceV.h"
 #endif
 
-bool info_gui = false;
-bool compass_ruler = true;
+std::string winTitle = std::string("Single session viewer ") + HDMAPPING_VERSION_STRING;
 
 std::vector<std::string> infoLines = {
     "This program is optional step in MANDEYE process.",
@@ -43,28 +42,8 @@ std::vector<std::string> infoLines = {
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
-const unsigned int window_width = 800;
-const unsigned int window_height = 600;
-double camera_ortho_xy_view_zoom = 10;
-double camera_ortho_xy_view_shift_x = 0.0;
-double camera_ortho_xy_view_shift_y = 0.0;
-double camera_mode_ortho_z_center_h = 0.0;
-double camera_ortho_xy_view_rotation_angle_deg = 0;
-bool is_ortho = false;
-bool show_axes = true;
-ImVec4 clear_color = ImVec4(0.8f, 0.8f, 0.8f, 1.00f);
 ImVec4 pc_neigbouring_color = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
 ImVec4 pc_color2 = ImVec4(0.0f, 0.0f, 1.0f, 1.0f);
-
-int point_size = 1;
-Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
-float translate_x, translate_y = 0.0;
-float translate_z = -20.0;
-float rotate_x = 0.0, rotate_y = 0.0;
-int mouse_old_x, mouse_old_y;
-int mouse_buttons = 0;
-bool gui_mouse_down{false};
-float mouse_sensitivity = 1.0;
 
 float m_ortho_projection[] = {1, 0, 0, 0,
                               0, 1, 0, 0,
@@ -162,26 +141,7 @@ void display()
 {
     ImGuiIO &io = ImGui::GetIO();
 
-    if (io.KeyCtrl && ImGui::IsKeyPressed('F'))
-        setCameraPreset(CAMERA_FRONT);
-    if (io.KeyCtrl && ImGui::IsKeyPressed('B'))
-        setCameraPreset(CAMERA_BACK);
-    if (io.KeyCtrl && ImGui::IsKeyPressed('L'))
-        setCameraPreset(CAMERA_LEFT);
-    if (io.KeyCtrl && ImGui::IsKeyPressed('R'))
-        setCameraPreset(CAMERA_RIGHT);
-    if (io.KeyCtrl && ImGui::IsKeyPressed('T'))
-        setCameraPreset(CAMERA_TOP);
-    if (io.KeyCtrl && ImGui::IsKeyPressed('U'))
-        setCameraPreset(CAMERA_BOTTOM);
-    if (io.KeyCtrl && ImGui::IsKeyPressed('I'))
-        setCameraPreset(CAMERA_ISO);
-    if (io.KeyCtrl && ImGui::IsKeyPressed('Z'))
-        setCameraPreset(CAMERA_RESET); 
-    if (io.KeyCtrl && ImGui::IsKeyPressed('X'))
-        show_axes = !show_axes;
-    if (io.KeyCtrl && ImGui::IsKeyPressed('C'))
-        compass_ruler = !compass_ruler;
+    view_kbd_shortcuts();
 
     if (session.point_clouds_container.point_clouds.size() > 0)
     {
@@ -215,8 +175,7 @@ void display()
             index_rendered_points_local = session.point_clouds_container.point_clouds.size() - 1;
     }
 
-    float deltaTime = ImGui::GetIO().DeltaTime;
-    updateCameraTransition(deltaTime);
+    updateCameraTransition();
 
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
@@ -397,14 +356,17 @@ void display()
         {
             info_gui = false;
 
-            std::string input_file_name = "";
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load session file", mandeye::fd::Session_filter);
-            std::cout << "Session file: '" << input_file_name << "'" << std::endl;
+            std::string session_file_name = "";
+            session_file_name = mandeye::fd::OpenFileDialogOneFile("Load session file", mandeye::fd::Session_filter);
+            std::cout << "Session file: '" << session_file_name << "'" << std::endl;
 
-            if (input_file_name.size() > 0)
+            if (session_file_name.size() > 0)
             {
-                session.load(fs::path(input_file_name).string(), false, 0.0, 0.0, 0.0, false);
+                session.load(fs::path(session_file_name).string(), false, 0.0, 0.0, 0.0, false);
                 index_rendered_points_local = 0;
+
+                std::string newTitle = winTitle + " - " + truncPath(session_file_name);
+                glutSetWindowTitle(newTitle.c_str());
             }
         }
         if (ImGui::IsItemHovered())
@@ -468,28 +430,7 @@ void display()
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Scene view relevant parameters");
  
-        if (ImGui::BeginMenu("Camera")) {
-            if (ImGui::MenuItem("Front", "Ctrl+F"))
-                setCameraPreset(CAMERA_FRONT);
-            if (ImGui::MenuItem("Back", "Ctrl+B"))
-                setCameraPreset(CAMERA_BACK);
-            if (ImGui::MenuItem("Left", "Ctrl+L"))
-                setCameraPreset(CAMERA_LEFT);
-            if (ImGui::MenuItem("Right", "Ctrl+R"))
-                setCameraPreset(CAMERA_RIGHT);
-            if (ImGui::MenuItem("Top", "Ctrl+T"))
-                setCameraPreset(CAMERA_TOP);
-            if (ImGui::MenuItem("Bottom", "Ctrl+U"))
-                setCameraPreset(CAMERA_BOTTOM);
-            if (ImGui::MenuItem("Isometric", "Ctrl+I"))
-                setCameraPreset(CAMERA_ISO);
-            ImGui::Separator();
-            if (ImGui::MenuItem("Reset", "Ctrl+Z"))
-                setCameraPreset(CAMERA_RESET);
-            ImGui::EndMenu();
-        }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Change camera view to fixed positions");
+        camMenu();
 
         ImGui::SameLine();
         ImGui::Dummy(ImVec2(20, 0));
@@ -555,10 +496,10 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("mandeye single session viewer " HDMAPPING_VERSION_STRING);
+    glutCreateWindow(winTitle.c_str());
 
     #ifdef _WIN32
-        HWND hwnd = FindWindow(NULL, "mandeye single session viewer " HDMAPPING_VERSION_STRING); // The window title must match exactly
+        HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
         HINSTANCE hInstance = GetModuleHandle(NULL);
         SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
         SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
@@ -591,7 +532,38 @@ bool initGL(int *argc, char **argv)
     return true;
 }
 
-void wheel(int button, int dir, int x, int y);
+void wheel(int button, int dir, int x, int y)
+{
+    if (dir > 0)
+    {
+        if (is_ortho)
+        {
+            camera_ortho_xy_view_zoom -= 0.1f * camera_ortho_xy_view_zoom;
+
+            if (camera_ortho_xy_view_zoom < 0.1)
+            {
+                camera_ortho_xy_view_zoom = 0.1;
+            }
+        }
+        else
+        {
+            translate_z -= 0.05f * translate_z;
+            camera_transition_active = false;
+        }
+    }
+    else
+    {
+        if (is_ortho)
+        {
+            camera_ortho_xy_view_zoom += 0.1 * camera_ortho_xy_view_zoom;
+        }
+        else
+        {
+            translate_z += 0.05f * translate_z;
+            camera_transition_active = false;
+        }
+    }
+}
 
 void mouse(int glut_button, int state, int x, int y)
 {
@@ -633,80 +605,6 @@ void mouse(int glut_button, int state, int x, int y)
         mouse_old_x = x;
         mouse_old_y = y;
     }
-}
-
-void wheel(int button, int dir, int x, int y)
-{
-    if (dir > 0)
-    {
-        if (is_ortho)
-        {
-            camera_ortho_xy_view_zoom -= 0.1f * camera_ortho_xy_view_zoom;
-
-            if (camera_ortho_xy_view_zoom < 0.1)
-            {
-                camera_ortho_xy_view_zoom = 0.1;
-            }
-        }
-        else
-        {
-            translate_z -= 0.05f * translate_z;
-            camera_transition_active = false;
-        }
-    }
-    else
-    {
-        if (is_ortho)
-        {
-            camera_ortho_xy_view_zoom += 0.1 * camera_ortho_xy_view_zoom;
-        }
-        else
-        {
-            translate_z += 0.05f * translate_z;
-            camera_transition_active = false;
-        }
-    }
-
-    return;
-}
-
-//SpecialKeys handlers needed because of ImGui version <1.89 bug in handling keys
-void specialDown(int key, int x, int y)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    switch (key)
-    {
-    case GLUT_KEY_UP:    io.KeysDown[ImGuiKey_UpArrow] = true; break;
-    case GLUT_KEY_DOWN:  io.KeysDown[ImGuiKey_DownArrow] = true; break;
-    case GLUT_KEY_LEFT:  io.KeysDown[ImGuiKey_LeftArrow] = true; break;
-    case GLUT_KEY_RIGHT: io.KeysDown[ImGuiKey_RightArrow] = true; break;
-    case GLUT_KEY_PAGE_UP:   io.KeysDown[ImGuiKey_PageUp] = true; break;
-    case GLUT_KEY_PAGE_DOWN: io.KeysDown[ImGuiKey_PageDown] = true; break;
-    }
-
-    int mods = glutGetModifiers();
-    io.KeyCtrl = (mods & GLUT_ACTIVE_CTRL) != 0;
-    io.KeyShift = (mods & GLUT_ACTIVE_SHIFT) != 0;
-    io.KeyAlt = (mods & GLUT_ACTIVE_ALT) != 0;
-}
-
-void specialUp(int key, int x, int y)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    switch (key)
-    {
-    case GLUT_KEY_UP:    io.KeysDown[ImGuiKey_UpArrow] = false; break;
-    case GLUT_KEY_DOWN:  io.KeysDown[ImGuiKey_DownArrow] = false; break;
-    case GLUT_KEY_LEFT:  io.KeysDown[ImGuiKey_LeftArrow] = false; break;
-    case GLUT_KEY_RIGHT: io.KeysDown[ImGuiKey_RightArrow] = false; break;
-    case GLUT_KEY_PAGE_UP:   io.KeysDown[ImGuiKey_PageUp] = false; break;
-    case GLUT_KEY_PAGE_DOWN: io.KeysDown[ImGuiKey_PageDown] = false; break;
-    }
-
-    int mods = glutGetModifiers();
-    io.KeyCtrl = (mods & GLUT_ACTIVE_CTRL) != 0;
-    io.KeyShift = (mods & GLUT_ACTIVE_SHIFT) != 0;
-    io.KeyAlt = (mods & GLUT_ACTIVE_ALT) != 0;
 }
 
 int main(int argc, char *argv[])

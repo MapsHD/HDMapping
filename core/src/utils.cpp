@@ -1,6 +1,4 @@
 #include "utils.hpp"
-//#include <GL/gl.h>
-#include <GL/glew.h>
 #include <GL/glut.h>
 #include <cmath>
 #include <cstdio>
@@ -12,6 +10,44 @@
 //#include <windows.h>
 #include <shellapi.h>
 #endif
+
+
+
+Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
+float rotate_x = 0.0, rotate_y = 0.0;
+float translate_x, translate_y = 0.0;
+float translate_z = -50.0;
+
+int viewer_decimate_point_cloud = 1000;
+
+double camera_ortho_xy_view_zoom = 10;
+double camera_ortho_xy_view_shift_x = 0.0;
+double camera_ortho_xy_view_shift_y = 0.0;
+double camera_ortho_xy_view_rotation_angle_deg = 0;
+double camera_mode_ortho_z_center_h = 0.0;
+
+int mouse_old_x, mouse_old_y;
+bool gui_mouse_down = false;
+int mouse_buttons = 0;
+float mouse_sensitivity = 1.0;
+
+bool is_ortho = false;
+bool show_axes = true;
+ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+int point_size = 1;
+
+bool info_gui = false;
+bool compass_ruler = true;
+
+// Target camera state for smooth transitions
+float new_rotate_x = rotate_x;
+float new_rotate_y = rotate_y;
+float new_translate_x = translate_x;
+float new_translate_y = translate_y;
+float new_translate_z = translate_z;
+
+// Transition timing
+bool camera_transition_active = false;
 
 
 
@@ -93,9 +129,10 @@ void drawMiniCompassWithRuler(
 
     // End scale label
     char label[24];
-    if (worldLength >= 1000.0f) sprintf(label, "%.0f [km]", worldLength / 1000.0f);
+    if (worldLength >= 1000.0f)      sprintf(label, "%.0f [km]", worldLength / 1000.0f);
     else if (worldLength >= 1.0f)    sprintf(label, "%.0f [m]", worldLength);
-    else                             sprintf(label, "%.0f [cm]", worldLength * 100.0f);
+    else if (worldLength >= 0.01f)   sprintf(label, "%.0f [cm]", worldLength * 100.0f);
+    else                             sprintf(label, "<1 [cm]");
 
     //drawLabel(axes[2].x() + 0.2f, axes[2].y() + 0.4f, axes[2].z() - 0.2f, label,
     //    colors[2][0], colors[2][1], colors[2][2]);
@@ -122,18 +159,7 @@ void drawMiniCompassWithRuler(
 
 
 
-// Target camera state for smooth transitions
-float target_rotate_x = rotate_x;
-float target_rotate_y = rotate_y;
-float target_translate_x = translate_x;
-float target_translate_y = translate_y;
-float target_translate_z = translate_z;
-
-// Transition timing
-bool camera_transition_active = false;
-const float camera_transition_speed = 1.0f; // higher = faster
-
-void updateCameraTransition(float deltaTime)
+void updateCameraTransition()
 {
     if (!camera_transition_active)
         return;
@@ -142,19 +168,19 @@ void updateCameraTransition(float deltaTime)
     //const float t = std::min(deltaTime * camera_transition_speed, 1.0f);
 
     // Ease out curve, slow down effect
-    float t = 1.0f - pow(1.0f - std::min(deltaTime * camera_transition_speed, 1.0f), 3.0f);
+    float t = 1.0f - pow(1.0f - std::min(ImGui::GetIO().DeltaTime * camera_transition_speed, 1.0f), 3.0f);
 
-    bool doneXr = fabs(target_rotate_x - rotate_x) < 0.01f;
-    bool doneYr = fabs(target_rotate_y - rotate_y) < 0.01f;
-    bool doneXt = fabs(target_translate_x - translate_x) < 0.01f;
-    bool doneYt = fabs(target_translate_y - translate_y) < 0.01f;
-    bool doneZt = fabs(target_translate_z - translate_z) < 0.01f;
+    bool doneXr = fabs(new_rotate_x - rotate_x) < 0.01f;
+    bool doneYr = fabs(new_rotate_y - rotate_y) < 0.01f;
+    bool doneXt = fabs(new_translate_x - translate_x) < 0.01f;
+    bool doneYt = fabs(new_translate_y - translate_y) < 0.01f;
+    bool doneZt = fabs(new_translate_z - translate_z) < 0.01f;
 
-    if (!doneXr) rotate_x += (target_rotate_x - rotate_x) * t;
-    if (!doneYr) rotate_y += (target_rotate_y - rotate_y) * t;
-    if (!doneXt) translate_x += (target_translate_x - translate_x) * t;
-    if (!doneYt) translate_y += (target_translate_y - translate_y) * t;
-    if (!doneZt) translate_z += (target_translate_z - translate_z) * t;
+    if (!doneXr) rotate_x += (new_rotate_x - rotate_x) * t;
+    if (!doneYr) rotate_y += (new_rotate_y - rotate_y) * t;
+    if (!doneXt) translate_x += (new_translate_x - translate_x) * t;
+    if (!doneYt) translate_y += (new_translate_y - translate_y) * t;
+    if (!doneZt) translate_z += (new_translate_z - translate_z) * t;
 
     camera_transition_active = !(doneXr && doneYr && doneZt);
 }
@@ -163,45 +189,47 @@ void updateCameraTransition(float deltaTime)
 
 void setCameraPreset(CameraPreset preset)
 {
-    target_translate_z = translate_z;
+    new_translate_z = translate_z;
 
     switch (preset)
     {
     case CAMERA_FRONT:
-        target_rotate_x = -90.0f;
-        target_rotate_y = +90.0f;
+        new_rotate_x = -90.0f;
+        new_rotate_y = +90.0f;
         break;
     case CAMERA_BACK:
-        target_rotate_x = -90.0f;
-        target_rotate_y = -90.0f;
+        new_rotate_x = -90.0f;
+        new_rotate_y = -90.0f;
         break;
     case CAMERA_LEFT:
-        target_rotate_x = -90.0f;
-        target_rotate_y = 180.0f;
+        new_rotate_x = -90.0f;
+        new_rotate_y = 180.0f;
         break;
     case CAMERA_RIGHT:
-        target_rotate_x = -90.0f;
-        target_rotate_y = 0.0f;
+        new_rotate_x = -90.0f;
+        new_rotate_y = 0.0f;
         break;
     case CAMERA_TOP:
-        target_rotate_x = 0.0f;
-        target_rotate_y = 90.0f;
+        new_rotate_x = 0.0f;
+        new_rotate_y = 90.0f;
         break;
     case CAMERA_BOTTOM:
-        target_rotate_x = 180.0f;
-        target_rotate_y = -90.0f;
+        new_rotate_x = 180.0f;
+        new_rotate_y = -90.0f;
         break;
     case CAMERA_ISO:
-        target_rotate_x = -35.264f;
-        target_rotate_y = 135.0f;
+        new_rotate_x = -35.264f;
+        new_rotate_y = 135.0f;
         break;
     case CAMERA_RESET:
-        target_rotate_x = 0;
-        target_rotate_y = 0;
-        target_translate_x = 0;
-        target_translate_y = 0;
-        target_translate_z = -50.0f;
-#ifdef ENABLE_ORTHO_SETTINGS
+        new_rotate_x = 0;
+        new_rotate_y = 0;
+        new_translate_x = 0;
+        new_translate_y = 0;
+        new_translate_z = -50.0f;
+
+        rotation_center = Eigen::Vector3f::Zero();
+
         viewer_decimate_point_cloud = 1000;
 
         camera_ortho_xy_view_zoom = 10;
@@ -209,13 +237,37 @@ void setCameraPreset(CameraPreset preset)
         camera_ortho_xy_view_shift_y = 0.0;
         camera_ortho_xy_view_rotation_angle_deg = 0;
         camera_mode_ortho_z_center_h = 0.0;
-#endif
         break;
     }
 
     camera_transition_active = true;
+}
 
-    std::cout << "Camera: " << rotate_x << ", " << rotate_y << ", " << camera_transition_active << std::endl;
+
+void view_kbd_shortcuts()
+{
+    ImGuiIO& io = ImGui::GetIO();
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed('F'))
+        setCameraPreset(CAMERA_FRONT);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('B'))
+        setCameraPreset(CAMERA_BACK);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('L'))
+        setCameraPreset(CAMERA_LEFT);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('R'))
+        setCameraPreset(CAMERA_RIGHT);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('T'))
+        setCameraPreset(CAMERA_TOP);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('U'))
+        setCameraPreset(CAMERA_BOTTOM);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('I'))
+        setCameraPreset(CAMERA_ISO);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('Z'))
+        setCameraPreset(CAMERA_RESET);
+    if (io.KeyCtrl && ImGui::IsKeyPressed('X'))
+        show_axes = !show_axes;
+    if (io.KeyCtrl && ImGui::IsKeyPressed('C'))
+        compass_ruler = !compass_ruler;
 }
 
 
@@ -298,12 +350,217 @@ std::string truncPath(const std::string& fullPath)
     namespace fs = std::filesystem;
     fs::path path(fullPath);
 
-    auto parent = path.parent_path();
+    auto parent = path.parent_path().parent_path().filename().string(); // second to last folder
     auto filename = path.filename().string();
 
-    std::string dir2;
-    if (parent.has_parent_path())
-        dir2 = parent.parent_path().string(); // second to last folder
+    return "..\\" + parent + "\\..\\" + filename;
+}
 
-    return "..\\" + dir2 + "\\..\\" + filename;
+
+
+//SpecialKeys handlers needed because of ImGui version <1.89 bug in handling keys
+void specialDown(int key, int x, int y)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    switch (key)
+    {
+    case GLUT_KEY_UP:    io.KeysDown[ImGuiKey_UpArrow] = true; break;
+    case GLUT_KEY_DOWN:  io.KeysDown[ImGuiKey_DownArrow] = true; break;
+    case GLUT_KEY_LEFT:  io.KeysDown[ImGuiKey_LeftArrow] = true; break;
+    case GLUT_KEY_RIGHT: io.KeysDown[ImGuiKey_RightArrow] = true; break;
+    case GLUT_KEY_PAGE_UP:   io.KeysDown[ImGuiKey_PageUp] = true; break;
+    case GLUT_KEY_PAGE_DOWN: io.KeysDown[ImGuiKey_PageDown] = true; break;
+    }
+
+    int mods = glutGetModifiers();
+    io.KeyCtrl = (mods & GLUT_ACTIVE_CTRL) != 0;
+    io.KeyShift = (mods & GLUT_ACTIVE_SHIFT) != 0;
+    io.KeyAlt = (mods & GLUT_ACTIVE_ALT) != 0;
+}
+
+void specialUp(int key, int x, int y)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    switch (key)
+    {
+    case GLUT_KEY_UP:    io.KeysDown[ImGuiKey_UpArrow] = false; break;
+    case GLUT_KEY_DOWN:  io.KeysDown[ImGuiKey_DownArrow] = false; break;
+    case GLUT_KEY_LEFT:  io.KeysDown[ImGuiKey_LeftArrow] = false; break;
+    case GLUT_KEY_RIGHT: io.KeysDown[ImGuiKey_RightArrow] = false; break;
+    case GLUT_KEY_PAGE_UP:   io.KeysDown[ImGuiKey_PageUp] = false; break;
+    case GLUT_KEY_PAGE_DOWN: io.KeysDown[ImGuiKey_PageDown] = false; break;
+    }
+
+    int mods = glutGetModifiers();
+    io.KeyCtrl = (mods & GLUT_ACTIVE_CTRL) != 0;
+    io.KeyShift = (mods & GLUT_ACTIVE_SHIFT) != 0;
+    io.KeyAlt = (mods & GLUT_ACTIVE_ALT) != 0;
+}
+
+
+
+void camMenu()
+{
+    if (ImGui::BeginMenu("Camera"))
+    {
+        if (ImGui::MenuItem("Front (yz view)", "Ctrl+F"))
+            setCameraPreset(CAMERA_FRONT);
+        if (ImGui::MenuItem("Back", "Ctrl+B"))
+            setCameraPreset(CAMERA_BACK);
+        if (ImGui::MenuItem("Left (xz view)", "Ctrl+L"))
+            setCameraPreset(CAMERA_LEFT);
+        if (ImGui::MenuItem("Right", "Ctrl+R"))
+            setCameraPreset(CAMERA_RIGHT);
+        if (ImGui::MenuItem("Top (xy view)", "Ctrl+T"))
+            setCameraPreset(CAMERA_TOP);
+        if (ImGui::MenuItem("Bottom", "Ctrl+U"))
+            setCameraPreset(CAMERA_BOTTOM);
+        if (ImGui::MenuItem("Isometric", "Ctrl+I"))
+            setCameraPreset(CAMERA_ISO);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Reset", "Ctrl+Z"))
+            setCameraPreset(CAMERA_RESET);
+        ImGui::EndMenu();
+    }
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::BeginTooltip();
+        ImGui::Text("Change camera view to fixed positions");
+        ImGui::Separator();
+        ImGui::Text("Metrics:");
+        if (ImGui::BeginTable("Metrics", 4))
+        {
+            ImGui::TableSetupColumn("Coord");
+            ImGui::TableSetupColumn("rotate");
+            ImGui::TableSetupColumn("translate");
+            ImGui::TableSetupColumn("rot center");
+            ImGui::TableHeadersRow();
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+
+
+            std::string text = "X";
+            float centered = ImGui::GetColumnWidth() - ImGui::CalcTextSize(text.c_str()).x;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+            ImGui::Text("X");
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("%.3f", rotate_x);
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.3f", translate_x);
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.3f", rotation_center.x());
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+            ImGui::Text("Y");
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("%.3f", rotate_y);
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.3f", translate_y);
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.3f", rotation_center.y());
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+            ImGui::Text("Z");
+
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.3f", translate_z);
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.3f", rotation_center.y());
+
+            ImGui::EndTable();
+        }
+
+        ImGui::EndTooltip();
+    }
+}
+
+
+
+float distanceToPlane(const RegistrationPlaneFeature::Plane& plane, const Eigen::Vector3d& p)
+{
+    return (plane.a * p.x() + plane.b * p.y() + plane.c * p.z() + plane.d);
+}
+
+Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane)
+{
+    float TOLERANCE = 0.0001;
+    Eigen::Vector3d out_point;
+    out_point.x() = laser_beam.position.x();
+    out_point.y() = laser_beam.position.y();
+    out_point.z() = laser_beam.position.z();
+
+    float a = plane.a * laser_beam.direction.x() + plane.b * laser_beam.direction.y() + plane.c * laser_beam.direction.z();
+
+    if (a > -TOLERANCE && a < TOLERANCE)
+    {
+        return out_point;
+    }
+
+    float distance = distanceToPlane(plane, out_point);
+
+    out_point.x() = laser_beam.position.x() - laser_beam.direction.x() * (distance / a);
+    out_point.y() = laser_beam.position.y() - laser_beam.direction.y() * (distance / a);
+    out_point.z() = laser_beam.position.z() - laser_beam.direction.z() * (distance / a);
+
+    return out_point;
+}
+
+LaserBeam GetLaserBeam(int x, int y)
+{
+    GLint viewport[4];
+    GLdouble modelview[16];
+    GLdouble projection[16];
+    GLfloat winX, winY, winZ;
+    GLdouble posXnear, posYnear, posZnear;
+    GLdouble posXfar, posYfar, posZfar;
+
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+    winX = (float)x;
+    winY = (float)viewport[3] - (float)y;
+
+    LaserBeam laser_beam;
+    gluUnProject(winX, winY, 0, modelview, projection, viewport, &posXnear, &posYnear, &posZnear);
+    gluUnProject(winX, winY, -1000, modelview, projection, viewport, &posXfar, &posYfar, &posZfar);
+
+    laser_beam.position.x() = posXnear;
+    laser_beam.position.y() = posYnear;
+    laser_beam.position.z() = posZnear;
+
+    laser_beam.direction.x() = posXfar - posXnear;
+    laser_beam.direction.y() = posYfar - posYnear;
+    laser_beam.direction.z() = posZfar - posZnear;
+
+    return laser_beam;
+}
+
+
+
+void setNewRotationCenter(int x, int y)
+{
+    const auto laser_beam = GetLaserBeam(x, y);
+
+    RegistrationPlaneFeature::Plane pl;
+
+    pl.a = 0;
+    pl.b = 0;
+    pl.c = 1;
+    pl.d = 0;
+    auto old_Totation_center = rotation_center;
+    rotation_center = rayIntersection(laser_beam, pl).cast<float>();
+
+    std::cout << "Setting new rotation center to:\n" << rotation_center << std::endl;
+
+    new_rotate_x = 0.f;
+    new_rotate_y = 0.f;
+    camera_transition_active = true;
 }

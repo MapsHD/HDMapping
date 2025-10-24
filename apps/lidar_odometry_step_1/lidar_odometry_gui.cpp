@@ -43,8 +43,7 @@ std::vector<std::string> infoLines = {
     "",
     "It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.",
     "",
-    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program."
-};
+    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program."};
 
 namespace fs = std::filesystem;
 
@@ -118,12 +117,12 @@ std::string formatTime(double seconds)
     }
     if (minutes > 0 || hours > 0)
     {
-		oss << std::setw(2) << std::setfill('0') << minutes << "m ";
+        oss << std::setw(2) << std::setfill('0') << minutes << "m ";
     }
-    
+
     oss << std::setw(2) << std::setfill('0') << secs << "s";
 
-	return oss.str();
+    return oss.str();
 }
 
 // Helper function to format estimated completion time
@@ -169,6 +168,8 @@ void step1(const std::atomic<bool> &loPause)
     // input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
     input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
 
+    std::cout << "Selected folder: '" << input_folder_name << std::endl;
+
     if (fs::exists(input_folder_name))
     {
         if (!input_folder_name.empty())
@@ -199,7 +200,22 @@ void step1(const std::atomic<bool> &loPause)
                 compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
                 step_1_done = true;
             }
-        }else{
+            else
+            {
+                std::string message_info = "Problem with loading data from folder '" + input_folder_name + "' (Pease check if folder exists). Program will close once You click OK!!!";
+                std::cout << message_info << std::endl;
+                [[maybe_unused]]
+                pfd::message message(
+                    "Information",
+                    message_info.c_str(),
+                    pfd::choice::ok, pfd::icon::info);
+                message.result();
+
+                exit(1);
+            }
+        }
+        else
+        {
             std::string message_info = "Problem with loading data from folder '" + input_folder_name + "' (Pease check if folder exists). Program will close once You click OK!!!";
             std::cout << message_info << std::endl;
             [[maybe_unused]]
@@ -211,7 +227,9 @@ void step1(const std::atomic<bool> &loPause)
 
             exit(1);
         }
-    }else{
+    }
+    else
+    {
         std::string message_info = "Problem with loading data from folder '" + input_folder_name + "' Pease check if folder name is composed of ASCII symbols, if not --> please change folder name. Program will close once You click OK!!!";
         std::cout << message_info << std::endl;
         [[maybe_unused]]
@@ -418,11 +436,11 @@ void lidar_odometry_gui()
         ImGui::InputDouble("threshold_output_filter [m]", &params.threshould_output_filter, 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("all local points inside lidar xy_circle radius will be removed during save");
-		ImGui::PopItemWidth();
+        ImGui::PopItemWidth();
 
         if (!simple_gui)
         {
-			ImGui::NewLine();
+            ImGui::NewLine();
             ImGui::Text("NDT bucket size (inner/outer)");
             ImGui::PushItemWidth(ImGuiNumberWidth);
             ImGui::InputDouble("##x", &params.in_out_params_indoor.resolution_X, 0.0, 0.0, "%.3f");
@@ -492,14 +510,14 @@ void lidar_odometry_gui()
             ImGui::Checkbox("save_calibration_validation_file", &params.save_calibration_validation);
             ImGui::InputInt("number of calibration validation points", &params.calibration_validation_points);
 
-			ImGui::NewLine();
+            ImGui::NewLine();
 
             static int fusionConvention; // 0=NWU, 1=ENU, 2=NED
             // initialize if none selected
             if (fusionConvention < 0 || fusionConvention > 2)
                 fusionConvention = 0;
 
-			ImGui::Text("fusion convention: ");
+            ImGui::Text("fusion convention: ");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");
 
@@ -521,7 +539,7 @@ void lidar_odometry_gui()
             params.fusionConventionEnu = (fusionConvention == 1);
             params.fusionConventionNed = (fusionConvention == 2);
 
-			ImGui::NewLine();
+            ImGui::NewLine();
 
             ImGui::Checkbox("use_motion_from_previous_step", &params.use_motion_from_previous_step);
             ImGui::InputDouble("ahrs_gain", &params.ahrs_gain, 0.0, 0.0, "%.3f");
@@ -581,7 +599,7 @@ void lidar_odometry_gui()
                 if (output_file_name.size() > 0)
                 {
                     session.fill_session_from_worker_data(worker_data, false, true, true, params.threshould_output_filter);
-                    //save_all_to_las(session, output_file_name, false);
+                    // save_all_to_las(session, output_file_name, false);
                     save_all_to_las(session, output_file_name, true);
                 }
             }
@@ -591,7 +609,8 @@ void lidar_odometry_gui()
             ImGui::NewLine();
             ImGui::Checkbox("use robust and accurate lidar odometry", &params.use_robust_and_accurate_lidar_odometry);
 
-            if (params.use_robust_and_accurate_lidar_odometry) {
+            if (params.use_robust_and_accurate_lidar_odometry)
+            {
                 ImGui::PushItemWidth(ImGuiNumberWidth);
                 ImGui::InputDouble("distance_bucket [m]", &params.distance_bucket, 0.0, 0.0, "%.3f");
                 ImGui::InputDouble("polar_angle [deg]", &params.polar_angle_deg, 0.0, 0.0, "%.3f");
@@ -678,7 +697,7 @@ void lidar_odometry_gui()
                 ImGui::Checkbox("Show buckets", &show_reference_buckets);
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputInt("Decimation###ref", &dec_reference_points);
-                
+
                 if (ImGui::Button("Filter reference buckets"))
                 {
                     filter_reference_buckets(params);
@@ -763,7 +782,7 @@ void lidar_odometry_gui()
                 ImGui::PopItemWidth();
 
                 ImGui::Text("Selection: ");
-                 if (ImGui::Button("Select all"))
+                if (ImGui::Button("Select all"))
                 {
                     for (int k = 0; k < worker_data.size(); k++)
                     {
@@ -854,20 +873,20 @@ void lidar_odometry_gui()
                     std::cout << "example RESSO file" << std::endl;
                     std::cout << ".................................................." << std::endl;
                     std::cout << "3" << std::endl
-                        << "scan_0.laz" << std::endl
-                        << "0.999775 0.000552479 -0.0212158 -0.0251188" << std::endl
-                        << "0.000834612 0.997864 0.0653156 -0.0381429" << std::endl
-                        << "0.0212066 - 0.0653186 0.997639 -0.000757752" << "0 0 0 1" << std::endl
-                        << "scan_1.laz" << std::endl
-                        << "0.999783 0.00178963 -0.0207603 -0.0309683" << std::endl
-                        << "-0.000467341 0.99798 0.0635239 -0.0517512" << std::endl
-                        << "0.0208321 -0.0635004 0.997764 0.00331449" << std::endl
-                        << "0 0 0 1" << std::endl
-                        << "scan_2.laz" << std::endl
-                        << "0.999783 0.00163449 -0.0207736 -0.0309985" << std::endl
-                        << "-0.000312224 0.997982 0.0634957 -0.0506113" << std::endl
-                        << "0.0208355 -0.0634754 0.997766 0.0028499" << std::endl
-                        << "0 0 0 1" << std::endl;
+                              << "scan_0.laz" << std::endl
+                              << "0.999775 0.000552479 -0.0212158 -0.0251188" << std::endl
+                              << "0.000834612 0.997864 0.0653156 -0.0381429" << std::endl
+                              << "0.0212066 - 0.0653186 0.997639 -0.000757752" << "0 0 0 1" << std::endl
+                              << "scan_1.laz" << std::endl
+                              << "0.999783 0.00178963 -0.0207603 -0.0309683" << std::endl
+                              << "-0.000467341 0.99798 0.0635239 -0.0517512" << std::endl
+                              << "0.0208321 -0.0635004 0.997764 0.00331449" << std::endl
+                              << "0 0 0 1" << std::endl
+                              << "scan_2.laz" << std::endl
+                              << "0.999783 0.00163449 -0.0207736 -0.0309985" << std::endl
+                              << "-0.000312224 0.997982 0.0634957 -0.0506113" << std::endl
+                              << "0.0208355 -0.0634754 0.997766 0.0028499" << std::endl
+                              << "0 0 0 1" << std::endl;
                     std::cout << "................................................." << std::endl;
                 }
 
@@ -1015,8 +1034,8 @@ void lidar_odometry_gui()
 
                 for (int i = 0; i < n_items; i++)
                 {
-                    //std::string text = "[" + std::to_string(i) + "]";
-                    //ImGui::Checkbox(text.c_str(), &worker_data[i].show);
+                    // std::string text = "[" + std::to_string(i) + "]";
+                    // ImGui::Checkbox(text.c_str(), &worker_data[i].show);
                     std::stringstream ss;
                     ss << "[" << std::setw(digits) << std::setfill('0') << i << "]";
 
@@ -1061,17 +1080,17 @@ void progress_window()
         std::string completionTime = formatCompletionTime(estimatedTimeRemaining);
         snprintf(progressText, sizeof(progressText), "Processing: %.1f%%", progress * 100.0f);
         snprintf(timeInfo, sizeof(timeInfo),
-            "Elapsed: %s | Remaining: %s | Estimated finish: ~%s",
-            formatTime(elapsedSeconds).c_str(),
-            formatTime(estimatedTimeRemaining).c_str(),
-            completionTime.c_str());
+                 "Elapsed: %s | Remaining: %s | Estimated finish: ~%s",
+                 formatTime(elapsedSeconds).c_str(),
+                 formatTime(estimatedTimeRemaining).c_str(),
+                 completionTime.c_str());
     }
     else
     {
         snprintf(progressText, sizeof(progressText), "Processing: %.1f%%", progress * 100.0f);
         snprintf(timeInfo, sizeof(timeInfo),
-            "Elapsed: %s | Calculating completion time...",
-            formatTime(elapsedSeconds).c_str());
+                 "Elapsed: %s | Calculating completion time...",
+                 formatTime(elapsedSeconds).c_str());
     }
 
     ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), progressText);
@@ -1107,7 +1126,7 @@ void progress_window()
 
 void wheel(int button, int dir, int x, int y)
 {
-    ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
     io.MouseWheel += dir; // or direction * 1.0f depending on your setup
 
     if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
@@ -1237,7 +1256,7 @@ void display()
     glLoadMatrixf(result.matrix().data());
 
     glBegin(GL_LINES);
-	//X axis - red, Y axis - green, Z axis - blue
+    // X axis - red, Y axis - green, Z axis - blue
     glColor3f(1.0f, 0.0f, 0.0f);
     glVertex3f(0.0f, 0.0f, 0.0f);
     glVertex3f(100, 0.0f, 0.0f);
@@ -1250,7 +1269,6 @@ void display()
     glVertex3f(0.0f, 0.0f, 0.0f);
     glVertex3f(0.0f, 0.0f, 100);
     glEnd();
-
 
     if (show_initial_points)
     {
@@ -1266,13 +1284,13 @@ void display()
 
     if (show_covs)
     {
-        for (const auto& b : params.buckets_indoor)
+        for (const auto &b : params.buckets_indoor)
         {
             draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
         }
     }
 
-#if 0 //ToDo
+#if 0 // ToDo
     for (int i = 0; i < worker_data.size(); i++)
     {
         if (worker_data[i].show)
@@ -1454,7 +1472,8 @@ void display()
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
 
-    if (!loRunning) {
+    if (!loRunning)
+    {
         if (ImGui::BeginMainMenuBar())
         {
             if (ImGui::BeginMenu("Presets"))
@@ -1587,12 +1606,12 @@ void display()
 
             if (ImGui::BeginMenu("Parameters"))
             {
-                ImGui::MenuItem("use_multithread", nullptr, &params.useMultithread);                
+                ImGui::MenuItem("use_multithread", nullptr, &params.useMultithread);
                 ImGui::MenuItem("full_processing_messages", nullptr, &full_debug_messages);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Show more messages during processing in console window");
 
-                ImGui::PushItemWidth(ImGuiNumberWidth/2);
+                ImGui::PushItemWidth(ImGuiNumberWidth / 2);
                 ImGui::InputDouble("time_threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.1f");
                 ImGui::PopItemWidth();
                 if (ImGui::IsItemHovered())
@@ -1620,7 +1639,7 @@ void display()
                             toml_io.LoadParametersFromTomlFile(input_file_names[0], params);
                             std::cout << "Parameters loaded from: " << input_file_names[0] << std::endl;
                         }
-                        catch (const std::exception& e)
+                        catch (const std::exception &e)
                         {
                             std::cerr << "Error loading TOML file: " << e.what() << std::endl;
                         }
@@ -1662,7 +1681,6 @@ void display()
                 ImGui::SetTooltip("Show power user settings window with more parameters");
 
             ImGui::SameLine();
-
 
             ImGui::SameLine();
             ImGui::Dummy(ImVec2(20, 0));
@@ -1710,12 +1728,11 @@ void display()
                                 oss.str(),
                                 pfd::choice::ok, pfd::icon::info);
                             message.result();
-
                         });
 
                     loThread.detach();
                 }
-                else //no data loaded
+                else // no data loaded
                 {
                     loRunning = false;
                 }
@@ -1733,12 +1750,12 @@ void display()
                 ImGui::MenuItem("show_trajectory", nullptr, &show_trajectory);
                 ImGui::MenuItem("show_trajectory_as_axes", nullptr, &show_trajectory_as_axes);
                 ImGui::MenuItem("show_compass_ruler", nullptr, &compass_ruler);
-                
-                //ImGui::MenuItem("show_covs", nullptr, &show_covs);
 
-				ImGui::Separator();
+                // ImGui::MenuItem("show_covs", nullptr, &show_covs);
 
-                ImGui::ColorEdit4("Background color", (float*)&params.clear_color, ImGuiColorEditFlags_NoInputs);
+                ImGui::Separator();
+
+                ImGui::ColorEdit4("Background color", (float *)&params.clear_color, ImGuiColorEditFlags_NoInputs);
 
                 ImGui::EndMenu();
             }
@@ -1761,7 +1778,6 @@ void display()
             ImGui::PopStyleVar(2);
             ImGui::PopStyleColor(3);
 
-
             ImGui::EndMainMenuBar();
         }
     }
@@ -1783,7 +1799,7 @@ void display()
         infoLines[infoLines.size() - 2] = "It saves session.json file in " + working_directory + "\\lidar_odometry_result_*";
         info_window(infoLines, &info_gui);
     }
-    
+
     if (initial_transformation_gizmo)
     {
         ImGuiIO &io = ImGui::GetIO();
@@ -1869,12 +1885,12 @@ bool initGL(int *argc, char **argv)
     glutInitWindowSize(window_width, window_height);
     glutCreateWindow(winTitle.c_str());
 
-    #ifdef _WIN32
-        HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
-        HINSTANCE hInstance = GetModuleHandle(NULL);
-        SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
-        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
-    #endif
+#ifdef _WIN32
+    HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+    SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+    SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+#endif
 
     glutDisplayFunc(display);
     glutMotionFunc(motion);

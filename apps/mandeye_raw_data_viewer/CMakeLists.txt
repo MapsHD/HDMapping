@@ -38,7 +38,8 @@ target_link_libraries(
   ${PLATFORM_LASZIP_LIB}
   ${CORE_LIBRARIES}
   ${GUI_LIBRARIES}
-  ${PLATFORM_MISCELLANEOUS_LIBS})
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  ${OpenCV_LIBS})
 
 if(WIN32)
   add_custom_command(

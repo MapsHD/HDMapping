@@ -266,6 +266,18 @@ add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
 add_subdirectory(core)
 add_subdirectory(core_hd_mapping)
 
+# optional OpenCV modules
+find_package(OpenCV COMPONENTS core imgcodecs highgui calib3d)
+if(OpenCV_FOUND)
+    message(STATUS "OpenCV found: ${OpenCV_VERSION}")
+    include_directories(${OpenCV_INCLUDE_DIRS})
+    add_definitions(-DHAVE_OPENCV)
+    set(OPENCV_LIBRARIES ${OpenCV_LIBS})
+    add_definitions(-DWITH_OPENCV)
+else()
+    message(STATUS "OpenCV not found. Some applications may be disabled.")
+    set(OPENCV_LIBRARIES "")
+endif()
 set(CORE_LIBRARIES core core-hd-mapping)
 set(GUI_LIBRARIES imgui imguizmo implot)
 

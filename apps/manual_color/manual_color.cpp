@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <GL/freeglut.h>
 
@@ -29,6 +28,38 @@
 #include <observation_equations/codes/python-scripts/camera-metrics/fisheye_camera_calibRT_tait_bryan_wc_jacobian.h>
 
 #include <HDMapping/Version.hpp>
+#include <algorithm>
+
+// Simple helper: draw texture fitted into available region while preserving aspect ratio.
+static ImVec2 displayImageFit(ImTextureID tex, float tex_w, float tex_h, bool center = true, bool allow_upscale = true)
+{
+    ImVec2 avail = ImGui::GetContentRegionAvail();
+    float img_w = tex_w;
+    float img_h = tex_h;
+    ImVec2 display_size(img_w, img_h);
+
+    if (img_w > 0.0f && img_h > 0.0f && avail.x > 0.0f && avail.y > 0.0f)
+    {
+        float scale = std::min(avail.x / img_w, avail.y / img_h);
+        if (!allow_upscale)
+            scale = std::min(scale, 1.0f);
+        display_size.x = img_w * scale;
+        display_size.y = img_h * scale;
+
+        if (center)
+        {
+            float offset_x = (avail.x - display_size.x) * 0.5f;
+            float offset_y = (avail.y - display_size.y) * 0.5f;
+            if (offset_x > 0.0f)
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset_x);
+            if (offset_y > 0.0f)
+                ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offset_y);
+        }
+    }
+
+    ImGui::Image(tex, display_size);
+    return display_size;
+}
 
 double fx = 2141.3412300023847;
 double fy = 2141.3412300023847;
@@ -218,7 +249,8 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
         bool visible2;
     };
 
-    auto draw_zoom_pick_point = [my_tex_w, my_tex_h, tint_col, border_col](const ImTextureID &tex, std::vector<ImVec2> &point_picked)
+    // The zoom/pick helper now accepts the displayed image size so UV/pick math is correct when the image is scaled
+    auto draw_zoom_pick_point = [tint_col, border_col](const ImTextureID &tex, std::vector<ImVec2> &point_picked, ImVec2 display_size)
     {
         ImVec2 img_start = ImGui::GetItemRectMin();
         ImGuiIO &io = ImGui::GetIO();
@@ -227,10 +259,10 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
         float region_x = io.MousePos.x - img_start.x - region_sz * 0.5f;
         float region_y = io.MousePos.y - img_start.y - region_sz * 0.5f;
 
-        // add point
+        // add point (normalized using displayed size)
         if (io.MouseClicked[2] && io.KeyShift)
         {
-            ImVec2 picked_point{(io.MousePos.x - img_start.x) / my_tex_w, (io.MousePos.y - img_start.y) / my_tex_h};
+            ImVec2 picked_point{(io.MousePos.x - img_start.x) / display_size.x, (io.MousePos.y - img_start.y) / display_size.y};
             point_picked.push_back(picked_point);
         }
 
@@ -244,20 +276,21 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
         {
             region_x = 0.0f;
         }
-        else if (region_x > my_tex_w - region_sz)
+        else if (region_x > display_size.x - region_sz)
         {
-            region_x = my_tex_w - region_sz;
+            region_x = display_size.x - region_sz;
         }
         if (region_y < 0.0f)
         {
             region_y = 0.0f;
         }
-        else if (region_y > my_tex_h - region_sz)
+        else if (region_y > display_size.y - region_sz)
         {
-            region_y = my_tex_h - region_sz;
+            region_y = display_size.y - region_sz;
         }
-        ImVec2 uv0 = ImVec2((region_x) / my_tex_w, (region_y) / my_tex_h);
-        ImVec2 uv1 = ImVec2((region_x + region_sz) / my_tex_w, (region_y + region_sz) / my_tex_h);
+        // UV coordinates relative to the full texture are computed from the displayed pixel region
+        ImVec2 uv0 = ImVec2((region_x) / display_size.x, (region_y) / display_size.y);
+        ImVec2 uv1 = ImVec2((region_x + region_sz) / display_size.x, (region_y + region_sz) / display_size.y);
         ImGui::Image(tex, ImVec2(region_sz * local_zoom, region_sz * local_zoom), uv0, uv1, tint_col, border_col);
         ImVec2 img_start_loc = ImGui::GetItemRectMin();
         ImVec2 img_sz = {ImGui::GetItemRectMax().x - ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y - ImGui::GetItemRectMin().y};
@@ -269,15 +302,17 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
 
     ImGui::BeginChild((name + "_child1").c_str(), child_size, false, window_flags);
     {
-        ImGui::Image(tex1, ImVec2(my_tex_w, my_tex_h), uv_min, uv_max, tint_col, border_col);
-        const ImVec2 view_port_start = ImGui::GetWindowPos();
-        const ImVec2 view_port_end{view_port_start.x + ImGui::GetWindowWidth(), view_port_start.y + ImGui::GetWindowHeight()};
-        ImVec2 img_start = ImGui::GetItemRectMin();
+        // draw and get display size from helper to keep code simple
+        ImVec2 display_size = displayImageFit(tex1, my_tex_w, my_tex_h);
+         const ImVec2 view_port_start = ImGui::GetWindowPos();
+         const ImVec2 view_port_end{view_port_start.x + ImGui::GetWindowWidth(), view_port_start.y + ImGui::GetWindowHeight()};
+         ImVec2 img_start = ImGui::GetItemRectMin();
         for (int i = 0; i < point_picked.size(); i++)
         {
             const auto &p = point_picked[i];
 
-            ImVec2 center{img_start.x + p.x * my_tex_w, img_start.y + p.y * my_tex_h};
+            // Use displayed size so markers align with the scaled image
+            ImVec2 center{img_start.x + p.x * display_size.x, img_start.y + p.y * display_size.y};
 
             if (center.x > view_port_start.x && center.x < view_port_end.x && center.y > view_port_start.y && center.y < view_port_end.y)
             {
@@ -1325,3 +1360,4 @@ bool initGL(int *argc, char **argv)
 
     return true;
 }
+

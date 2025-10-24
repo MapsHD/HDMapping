@@ -2979,6 +2979,10 @@ void mouse(int glut_button, int state, int x, int y)
                         }
                     }
                 }
+
+                new_translate_x = -rotation_center.x();
+                new_translate_y = -rotation_center.y();
+                camera_transition_active = true;
             }
             else if (session.control_points.is_imgui)
             {
@@ -3009,6 +3013,10 @@ void mouse(int glut_button, int state, int x, int y)
                             session.control_points.index_picked_point = j;
                         }
                     }
+
+                    new_translate_x = -rotation_center.x();
+                    new_translate_y = -rotation_center.y();
+                    camera_transition_active = true;
                 }
             }
             else

@@ -182,7 +182,7 @@ void updateCameraTransition()
     if (!doneYt) translate_y += (new_translate_y - translate_y) * t;
     if (!doneZt) translate_z += (new_translate_z - translate_z) * t;
 
-    camera_transition_active = !(doneXr && doneYr && doneZt);
+    camera_transition_active = !(doneXr && doneYr && doneXt && doneYt && doneZt);
 }
 
 

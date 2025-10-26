@@ -9,6 +9,11 @@ This is open-source software for large-scale 3D mapping using an open-hardware h
 - Info for Windows users: please use the latest release https://github.com/MapsHD/HDMapping/releases 
 - Contact email: januszbedkowski@gmail.com
 
+# MANDEYE is action
+[![MANDEYE-K9](https://img.youtube.com/vi/7a_o7ACH0-M/default.jpg)](https://youtu.be/7a_o7ACH0-M)
+[![MANDEYE-MR (Caver)](https://img.youtube.com/vi/Bu9kDF5y39s/default.jpg)](https://youtu.be/Bu9kDF5y39s)
+[![MANDEYE-MR (Precise Forestry)](https://img.youtube.com/vi/i6Xg_vPuqrY/default.jpg)](https://youtu.be/i6Xg_vPuqrY)
+
 # Compatible community projects
 - Handheld Setup for Recording with Mid360 Lidar and Camera https://github.com/RomanStadlhuber/livo-handheld 
 - Lidar odometry for HDMapping project utilizing KISS-ICP https://github.com/michalpelka/kiss-lidarodometry
@@ -233,9 +238,6 @@ Manual coloring
 
 ------------------------------------------
 
-# MANDEYE is action
-[![MANDEYE-K9](https://img.youtube.com/vi/7a_o7ACH0-M/default.jpg)](https://youtu.be/7a_o7ACH0-M)
-[![MANDEYE-MR (Caver)](https://img.youtube.com/vi/Bu9kDF5y39s/default.jpg)](https://youtu.be/Bu9kDF5y39s)
 
 
 # Building commands

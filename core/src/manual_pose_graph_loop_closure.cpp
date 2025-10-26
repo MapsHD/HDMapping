@@ -35,16 +35,38 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
     {
         if (!manipulate_active_edge)
         {
-            ImGui::Text("Index loop closure:");
+            //suboptimal as distance is computed each frame!
+            double distance = (point_clouds_container.point_clouds[index_loop_closure_target].m_pose.translation()
+                - point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation()).norm();
+			ImGui::Text("Loop closure indexes: (Length of selected edge: %.3f [m])", distance);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Select indexes from going/returning trips to same point that should overlap");
+
+            ImGui::Text("Source: ");
             ImGui::SameLine();
             ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputInt("source", &index_loop_closure_source);
+            ImGui::SliderInt("##lcss", &index_loop_closure_source, 0, point_clouds_container.point_clouds.size() - 1);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("max %zu", point_clouds_container.point_clouds.size() - 1);
+            ImGui::SameLine();
+            ImGui::InputInt("##lcsi", &index_loop_closure_source, 1, 5);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("max %zu", point_clouds_container.point_clouds.size() - 1);
             if (index_loop_closure_source < 0)
                 index_loop_closure_source = 0;
             if (index_loop_closure_source >= point_clouds_container.point_clouds.size() - 1)
                 index_loop_closure_source = point_clouds_container.point_clouds.size() - 1;
+
+            ImGui::Text("Target: ");
             ImGui::SameLine();
-            ImGui::InputInt("target", &index_loop_closure_target);
+
+            ImGui::SliderInt("##lcts", &index_loop_closure_target, 0, point_clouds_container.point_clouds.size() - 1);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("max %zu", point_clouds_container.point_clouds.size() - 1);
+            ImGui::SameLine();
+            ImGui::InputInt("##lcti", &index_loop_closure_target, 1, 5);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("max %zu", point_clouds_container.point_clouds.size() - 1);
             if (index_loop_closure_target < 0)
                 index_loop_closure_target = 0;
             if (index_loop_closure_target >= point_clouds_container.point_clouds.size() - 1)
@@ -56,6 +78,8 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                 add_edge(point_clouds_container, index_loop_closure_source, index_loop_closure_target);
                 index_active_edge = edges.size() - 1;
             }
+            ImGui::SameLine();
+            ImGui::Text("(number of active edges: %zu)", edges.size());
 
             if (!manipulate_active_edge)
             {
@@ -69,10 +93,39 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
 
                 // ImGui::Text("motion model");
 
-                // session.pose_graph_loop_closure.edges.
+                ImGui::Separator();
                 
-                // ImGui::Separator();
+                ImGui::Text("Motion model sigmas [m] / [deg]:");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("position/rotational uncertainties");
 
+                ImGui::PushItemWidth(ImGuiNumberWidth);
+                ImGui::InputDouble("px_1", & motion_model_w_px_1_sigma_m, 0.0, 0.0, "%.4f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(xText);
+                ImGui::SameLine();
+                ImGui::InputDouble("om_1", & motion_model_w_om_1_sigma_deg, 0.0, 0.0, "%.3f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(omText);
+
+                ImGui::InputDouble("py_1", & motion_model_w_py_1_sigma_m, 0.0, 0.0, "%.4f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(yText);
+                ImGui::SameLine();
+                ImGui::InputDouble("fi_1", &motion_model_w_fi_1_sigma_deg, 0.0, 0.0, "%.3f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(fiText);
+
+                ImGui::InputDouble("pz_1", & motion_model_w_pz_1_sigma_m, 0.0, 0.0, "%.4f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(zText);
+                ImGui::SameLine();
+                ImGui::InputDouble("ka_1", &motion_model_w_ka_1_sigma_deg, 0.0, 0.0, "%.3f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(kaText);
+
+                ImGui::PopItemWidth();
+                ImGui::Separator();
 
                 if (poses_motion_model.size() == point_clouds_container.point_clouds.size())
                 {
@@ -99,76 +152,14 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
             }
         }
 
-        std::string number_active_edges = "number_edges: " + std::to_string(edges.size());
-        ImGui::Text(number_active_edges.c_str());
-
-        ImGui::Checkbox("manipulate_active_edge", &manipulate_active_edge);
+		if (edges.size() > 0)
+            ImGui::Checkbox("Manipulate active edge", &manipulate_active_edge);
 
         if (edges.size() > 0 && manipulate_active_edge)
         {
-            // ImGui::SameLine();
-            int remove_edge_index = -1;
-            if (ImGui::Button("remove active edge"))
-            {
-                gizmo = false;
-                remove_edge_index = index_active_edge;
-                // program_params.is_edge_gizmo = false;
-            }
-
-            int prev_index_active_edge = index_active_edge;
-            ImGui::SetNextItemWidth(ImGuiNumberWidth);
-            ImGui::InputInt("index_active_edge", &index_active_edge);
-
-            if (index_active_edge < 0)
-            {
-                index_active_edge = 0;
-            }
-            if (index_active_edge >= (int)edges.size())
-            {
-                index_active_edge = (int)edges.size() - 1;
-            }
-
+            ImGui::SameLine();
             bool prev_gizmo = gizmo;
-            ImGui::Checkbox("gizmo", &gizmo);
-
-            if (prev_gizmo != gizmo)
-            {
-                auto m_to = point_clouds_container.point_clouds[edges[index_active_edge].index_from].m_pose *
-                            affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                m_gizmo[0] = (float)m_to(0, 0);
-                m_gizmo[1] = (float)m_to(1, 0);
-                m_gizmo[2] = (float)m_to(2, 0);
-                m_gizmo[3] = (float)m_to(3, 0);
-                m_gizmo[4] = (float)m_to(0, 1);
-                m_gizmo[5] = (float)m_to(1, 1);
-                m_gizmo[6] = (float)m_to(2, 1);
-                m_gizmo[7] = (float)m_to(3, 1);
-                m_gizmo[8] = (float)m_to(0, 2);
-                m_gizmo[9] = (float)m_to(1, 2);
-                m_gizmo[10] = (float)m_to(2, 2);
-                m_gizmo[11] = (float)m_to(3, 2);
-                m_gizmo[12] = (float)m_to(0, 3);
-                m_gizmo[13] = (float)m_to(1, 3);
-                m_gizmo[14] = (float)m_to(2, 3);
-                m_gizmo[15] = (float)m_to(3, 3);
-            }
-
-            ////////////////////////////////////////
-            if (remove_edge_index != -1)
-            {
-                std::vector<Edge> new_edges;
-                for (int i = 0; i < edges.size(); i++)
-                {
-                    if (remove_edge_index != i)
-                    {
-                        new_edges.push_back(edges[i]);
-                    }
-                }
-                edges = new_edges;
-
-                index_active_edge = remove_edge_index - 1;
-            }
+            ImGui::Checkbox("Gizmo", &gizmo);
 
             if (!gizmo)
             {
@@ -176,7 +167,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     run_icp(point_clouds_container, index_active_edge, search_radious, 10, num_edge_extended_before, num_edge_extended_after);
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
-                ImGui::InputDouble("search_radius [m]", &search_radious);
+                ImGui::InputDouble("Search_radius [m]", &search_radious);
                 if (search_radious < 0.01)
                     search_radious = 0.01;
 
@@ -195,7 +186,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                 if (ImGui::Button("ICP (0.1)"))
                     run_icp(point_clouds_container, index_active_edge, 0.1, 30, num_edge_extended_before, num_edge_extended_after);
 
-                if (ImGui::Button("Save src"))
+                if (ImGui::Button("Save source"))
                 {
                     const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
                     std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
@@ -248,7 +239,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     }
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Save trg (transfromed only by rotation)"))
+                if (ImGui::Button("Save target (transformed only by rotation)"))
                 {
                     const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
                     std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
@@ -294,6 +285,77 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                             timestamps);
                     }
                 }
+            }
+
+            ImGui::Separator();
+
+            int prev_index_active_edge = index_active_edge;
+            ImGui::BeginChild("Edges", ImVec2(0, 0), true);
+            {
+                for (size_t i = 0; i < edges.size(); i++)
+                {
+                    if (i > 0)
+                        ImGui::Separator();
+                    ImGui::SetWindowFontScale(1.25f);
+                    ImGui::RadioButton(("Active edge " + std::to_string(i)).c_str(), &index_active_edge, i);
+                    ImGui::SetWindowFontScale(1.0f);
+
+                    //suboptimal as distance is computed each frame!
+                    double distance = (point_clouds_container.point_clouds[edges[i].index_to].m_pose.translation()
+                        - point_clouds_container.point_clouds[edges[i].index_from].m_pose.translation()).norm();
+
+                    ImGui::SameLine();
+                    ImGui::Text("(length [m]: %.3f)", distance);
+                    ImGui::SameLine();
+                    
+                    if (ImGui::Button(("Remove##" + std::to_string(i)).c_str()))
+                    {
+                        gizmo = false;
+                        
+                        std::vector<Edge> new_edges;
+                        for (int ni = 0; ni < edges.size(); ni++)
+                        {
+                            if (i != ni)
+                                new_edges.push_back(edges[ni]);
+                        }
+                        edges = new_edges;
+
+                        index_active_edge = std::min(index_active_edge, static_cast<int>(edges.size()-1));
+                        manipulate_active_edge = (edges.size() > 0);
+                    }
+
+                    ImGui::BeginDisabled(true);
+                    ImGui::PushItemWidth(ImGuiNumberWidth);
+                    ImGui::InputInt(("Source##" + std::to_string(i)).c_str(), &edges[i].index_from);
+                    ImGui::SameLine();
+                    ImGui::InputInt(("Target##" + std::to_string(i)).c_str(), &edges[i].index_to);
+					ImGui::PopItemWidth();
+					ImGui::EndDisabled();
+                }
+            }
+            ImGui::EndChild();
+
+            if ((prev_gizmo != gizmo) || (prev_index_active_edge != index_active_edge))
+            {
+                auto m_to = point_clouds_container.point_clouds[edges[index_active_edge].index_from].m_pose *
+                    affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                m_gizmo[0] = (float)m_to(0, 0);
+                m_gizmo[1] = (float)m_to(1, 0);
+                m_gizmo[2] = (float)m_to(2, 0);
+                m_gizmo[3] = (float)m_to(3, 0);
+                m_gizmo[4] = (float)m_to(0, 1);
+                m_gizmo[5] = (float)m_to(1, 1);
+                m_gizmo[6] = (float)m_to(2, 1);
+                m_gizmo[7] = (float)m_to(3, 1);
+                m_gizmo[8] = (float)m_to(0, 2);
+                m_gizmo[9] = (float)m_to(1, 2);
+                m_gizmo[10] = (float)m_to(2, 2);
+                m_gizmo[11] = (float)m_to(3, 2);
+                m_gizmo[12] = (float)m_to(0, 3);
+                m_gizmo[13] = (float)m_to(1, 3);
+                m_gizmo[14] = (float)m_to(2, 3);
+                m_gizmo[15] = (float)m_to(3, 3);
             }
         }
     }

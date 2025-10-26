@@ -36,6 +36,7 @@ class ControlPoints{
         //int picking_mode_index_to_node_outer = -1;
         bool draw_uncertainty = false;
         int index_picked_point = -1;
+		bool track_pose_with_camera = true;
 
         int index_pose = 0;
 

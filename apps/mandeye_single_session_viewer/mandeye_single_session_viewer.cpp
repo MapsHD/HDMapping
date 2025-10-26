@@ -128,6 +128,7 @@ void motion(int x, int y)
             {
                 translate_x += dx * 0.05f * mouse_sensitivity;
                 translate_y -= dy * 0.05f * mouse_sensitivity;
+                camera_transition_active = false;
             }
         }
 
@@ -137,11 +138,32 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
+void openSession()
+{
+    info_gui = false;
+
+    std::string session_file_name = "";
+    session_file_name = mandeye::fd::OpenFileDialogOneFile("Open session file", mandeye::fd::Session_filter);
+    std::cout << "Session file: '" << session_file_name << "'" << std::endl;
+
+    if (session_file_name.size() > 0)
+    {
+        session.load(fs::path(session_file_name).string(), false, 0.0, 0.0, 0.0, false);
+        index_rendered_points_local = 0;
+
+        std::string newTitle = winTitle + " - " + truncPath(session_file_name);
+        glutSetWindowTitle(newTitle.c_str());
+    }
+}
+
 void display()
 {
     ImGuiIO &io = ImGui::GetIO();
 
     view_kbd_shortcuts();
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed('O', false))
+        openSession();
 
     if (session.point_clouds_container.point_clouds.size() > 0)
     {
@@ -352,25 +374,10 @@ void display()
 
     if (ImGui::BeginMainMenuBar())
     {
-        if (ImGui::Button("Load session"))
-        {
-            info_gui = false;
-
-            std::string session_file_name = "";
-            session_file_name = mandeye::fd::OpenFileDialogOneFile("Load session file", mandeye::fd::Session_filter);
-            std::cout << "Session file: '" << session_file_name << "'" << std::endl;
-
-            if (session_file_name.size() > 0)
-            {
-                session.load(fs::path(session_file_name).string(), false, 0.0, 0.0, 0.0, false);
-                index_rendered_points_local = 0;
-
-                std::string newTitle = winTitle + " - " + truncPath(session_file_name);
-                glutSetWindowTitle(newTitle.c_str());
-            }
-        }
+        if (ImGui::Button("Open session"))
+			openSession();
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Select session to analyze");
+            ImGui::SetTooltip("Select session to open for analyze (Ctrl+O)");
 
         ImGui::SameLine();
         ImGui::Dummy(ImVec2(20, 0));
@@ -532,43 +539,11 @@ bool initGL(int *argc, char **argv)
     return true;
 }
 
-void wheel(int button, int dir, int x, int y)
-{
-    if (dir > 0)
-    {
-        if (is_ortho)
-        {
-            camera_ortho_xy_view_zoom -= 0.1f * camera_ortho_xy_view_zoom;
-
-            if (camera_ortho_xy_view_zoom < 0.1)
-            {
-                camera_ortho_xy_view_zoom = 0.1;
-            }
-        }
-        else
-        {
-            translate_z -= 0.05f * translate_z;
-            camera_transition_active = false;
-        }
-    }
-    else
-    {
-        if (is_ortho)
-        {
-            camera_ortho_xy_view_zoom += 0.1 * camera_ortho_xy_view_zoom;
-        }
-        else
-        {
-            translate_z += 0.05f * translate_z;
-            camera_transition_active = false;
-        }
-    }
-}
-
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO &io = ImGui::GetIO();
     io.MousePos = ImVec2((float)x, (float)y);
+
     int button = -1;
     if (glut_button == GLUT_LEFT_BUTTON)
         button = 0;

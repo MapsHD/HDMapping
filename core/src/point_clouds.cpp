@@ -561,24 +561,28 @@ void PointClouds::draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_
 	bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01, PointClouds::PointCloudDimensions dims)
 {
 	float step;
-	float x_max = std::ceil(dims.x_max / step) * step;
-	float y_max = std::ceil(dims.y_max / step) * step;
-	float z_max = std::ceil(dims.z_max / step) * step;
 
 	if (xz_grid_10x10)
 	{
 		step = 10.0f;
+		float x_min = std::floor(dims.x_min / step) * step;
+		float y_min = std::floor(dims.y_min / step) * step;
+		float z_min = std::floor(dims.z_min / step) * step;
+		float x_max = std::ceil(dims.x_max / step) * step;
+		float y_max = std::ceil(dims.y_max / step) * step;
+		float z_max = std::ceil(dims.z_max / step) * step;
+
 		glColor3f(0.7, 0.7, 0.7);
 		glBegin(GL_LINES);
-		for (float x = dims.x_min; x <= x_max; x += step)
+		for (float x = x_min; x <= x_max; x += step)
 		{
-			glVertex3f(x, 0.0f, dims.z_min);
+			glVertex3f(x, 0.0f, z_min);
 			glVertex3f(x, 0.0f, z_max);
 		}
 
-		for (float z = dims.z_min; z <= z_max; z += step)
+		for (float z = z_min; z <= z_max; z += step)
 		{
-			glVertex3f(dims.x_min, 0, z);
+			glVertex3f(x_min, 0, z);
 			glVertex3f(x_max, 0, z);
 		}
 		glEnd();
@@ -587,17 +591,23 @@ void PointClouds::draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_
 	if (xz_grid_1x1)
 	{
 		step = 1.0f;
+		float x_min = std::floor(dims.x_min / step) * step;
+		float y_min = std::floor(dims.y_min / step) * step;
+		float z_min = std::floor(dims.z_min / step) * step;
+		float x_max = std::ceil(dims.x_max / step) * step;
+		float y_max = std::ceil(dims.y_max / step) * step;
+		float z_max = std::ceil(dims.z_max / step) * step;
 		glColor3f(0.3, 0.3, 0.3);
 		glBegin(GL_LINES);
-		for (float x = dims.x_min; x <= x_max; x += step)
+		for (float x = x_min; x <= x_max; x += step)
 		{
-			glVertex3f(x, 0.0f, dims.z_min);
+			glVertex3f(x, 0.0f, z_min);
 			glVertex3f(x, 0.0f, z_max);
 		}
 
-		for (float z = dims.z_min; z <= z_max; z += step)
+		for (float z = z_min; z <= z_max; z += step)
 		{
-			glVertex3f(dims.x_min, 0, z);
+			glVertex3f(x_min, 0, z);
 			glVertex3f(x_max, 0, z);
 		}
 		glEnd();
@@ -606,17 +616,23 @@ void PointClouds::draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_
 	if (xz_grid_01x01)
 	{
 		step = 0.1f;
+		float x_min = std::floor(dims.x_min / step) * step;
+		float y_min = std::floor(dims.y_min / step) * step;
+		float z_min = std::floor(dims.z_min / step) * step;
+		float x_max = std::ceil(dims.x_max / step) * step;
+		float y_max = std::ceil(dims.y_max / step) * step;
+		float z_max = std::ceil(dims.z_max / step) * step;
 		glColor3f(0.3, 0.3, 0.3);
 		glBegin(GL_LINES);
-		for (float x = dims.x_min; x <= x_max; x += step)
+		for (float x = x_min; x <= x_max; x += step)
 		{
-			glVertex3f(x, 0.0f, dims.z_min);
+			glVertex3f(x, 0.0f, z_min);
 			glVertex3f(x, 0.0f, z_max);
 		}
 
-		for (float z = dims.z_min; z <= z_max; z += step)
+		for (float z = z_min; z <= z_max; z += step)
 		{
-			glVertex3f(dims.x_min, 0, z);
+			glVertex3f(x_min, 0, z);
 			glVertex3f(x_max, 0, z);
 		}
 		glEnd();
@@ -625,17 +641,23 @@ void PointClouds::draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_
 	if (yz_grid_10x10)
 	{
 		step = 10.0f;
+		float x_min = std::floor(dims.x_min / step) * step;
+		float y_min = std::floor(dims.y_min / step) * step;
+		float z_min = std::floor(dims.z_min / step) * step;
+		float x_max = std::ceil(dims.x_max / step) * step;
+		float y_max = std::ceil(dims.y_max / step) * step;
+		float z_max = std::ceil(dims.z_max / step) * step;
 		glColor3f(0.7, 0.7, 0.7);
 		glBegin(GL_LINES);
-		for (float y = dims.y_min; y <= y_max; y += step)
+		for (float y = y_min; y <= y_max; y += step)
 		{
-			glVertex3f(0.0f, y, dims.z_min);
+			glVertex3f(0.0f, y, z_min);
 			glVertex3f(0.0f, y, z_max);
 		}
 
-		for (float z = dims.z_min; z <= z_max; z += step)
+		for (float z = z_min; z <= z_max; z += step)
 		{
-			glVertex3f(0, dims.y_min, z);
+			glVertex3f(0, y_min, z);
 			glVertex3f(0, y_max, z);
 		}
 		glEnd();
@@ -644,17 +666,23 @@ void PointClouds::draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_
 	if (yz_grid_1x1)
 	{
 		step = 1.0f;
+		float x_min = std::floor(dims.x_min / step) * step;
+		float y_min = std::floor(dims.y_min / step) * step;
+		float z_min = std::floor(dims.z_min / step) * step;
+		float x_max = std::ceil(dims.x_max / step) * step;
+		float y_max = std::ceil(dims.y_max / step) * step;
+		float z_max = std::ceil(dims.z_max / step) * step;
 		glColor3f(0.3, 0.3, 0.3);
 		glBegin(GL_LINES);
-		for (float y = dims.y_min; y <= y_max; y += step)
+		for (float y = y_min; y <= y_max; y += step)
 		{
-			glVertex3f(0.0f, y, dims.z_min);
+			glVertex3f(0.0f, y, z_min);
 			glVertex3f(0.0f, y, z_max);
 		}
 
-		for (float z = dims.z_min; z <= z_max; z += step)
+		for (float z = z_min; z <= z_max; z += step)
 		{
-			glVertex3f(0, dims.y_min, z);
+			glVertex3f(0, y_min, z);
 			glVertex3f(0, y_max, z);
 		}
 		glEnd();
@@ -663,17 +691,23 @@ void PointClouds::draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_
 	if (yz_grid_01x01)
 	{
 		step = 0.1f;
+		float x_min = std::floor(dims.x_min / step) * step;
+		float y_min = std::floor(dims.y_min / step) * step;
+		float z_min = std::floor(dims.z_min / step) * step;
+		float x_max = std::ceil(dims.x_max / step) * step;
+		float y_max = std::ceil(dims.y_max / step) * step;
+		float z_max = std::ceil(dims.z_max / step) * step;
 		glColor3f(0.3, 0.3, 0.3);
 		glBegin(GL_LINES);
-		for (float y = dims.y_min; y <= y_max; y += step)
+		for (float y = y_min; y <= y_max; y += step)
 		{
-			glVertex3f(0.0f, y, dims.z_min);
+			glVertex3f(0.0f, y, z_min);
 			glVertex3f(0.0f, y, z_max);
 		}
 
-		for (float z = dims.z_min; z <= z_max; z += step)
+		for (float z = z_min; z <= z_max; z += step)
 		{
-			glVertex3f(0, dims.y_min, z);
+			glVertex3f(0, y_min, z);
 			glVertex3f(0, y_max, z);
 		}
 		glEnd();
@@ -682,17 +716,23 @@ void PointClouds::draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_
 	if (xy_grid_10x10)
 	{
 		step = 10.0f;
+		float x_min = std::floor(dims.x_min / step) * step;
+		float y_min = std::floor(dims.y_min / step) * step;
+		float z_min = std::floor(dims.z_min / step) * step;
+		float x_max = std::ceil(dims.x_max / step) * step;
+		float y_max = std::ceil(dims.y_max / step) * step;
+		float z_max = std::ceil(dims.z_max / step) * step;
 		glColor3f(0.7, 0.7, 0.7);
 		glBegin(GL_LINES);
-		for (float x = dims.x_min; x <= x_max; x += step)
+		for (float x = x_min; x <= x_max; x += step)
 		{
-			glVertex3f(x, dims.y_min, 0.0);
-			glVertex3f(x, dims.y_max, 0.0);
+			glVertex3f(x, y_min, 0.0);
+			glVertex3f(x, y_max, 0.0);
 		}
 
-		for (float y = dims.y_min; y <= y_max; y += step)
+		for (float y = y_min; y <= y_max; y += step)
 		{
-			glVertex3f(dims.x_min, y, 0.0);
+			glVertex3f(x_min, y, 0.0);
 			glVertex3f(x_max, y, 0.0);
 		}
 		glEnd();
@@ -701,17 +741,23 @@ void PointClouds::draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_
 	if (xy_grid_1x1)
 	{
 		step = 1.0f;
+		float x_min = std::floor(dims.x_min / step) * step;
+		float y_min = std::floor(dims.y_min / step) * step;
+		float z_min = std::floor(dims.z_min / step) * step;
+		float x_max = std::ceil(dims.x_max / step) * step;
+		float y_max = std::ceil(dims.y_max / step) * step;
+		float z_max = std::ceil(dims.z_max / step) * step;
 		glColor3f(0.3, 0.3, 0.3);
 		glBegin(GL_LINES);
-		for (float x = dims.x_min; x <= x_max; x += step)
+		for (float x = x_min; x <= x_max; x += step)
 		{
-			glVertex3f(x, dims.y_min, 0.0);
+			glVertex3f(x, y_min, 0.0);
 			glVertex3f(x, y_max, 0.0);
 		}
 
-		for (float y = dims.y_min; y <= y_max; y += step)
+		for (float y = y_min; y <= y_max; y += step)
 		{
-			glVertex3f(dims.x_min, y, 0.0);
+			glVertex3f(x_min, y, 0.0);
 			glVertex3f(x_max, y, 0.0);
 		}
 		glEnd();
@@ -720,17 +766,23 @@ void PointClouds::draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_
 	if (xy_grid_01x01)
 	{
 		step = 0.1f;
+		float x_min = std::floor(dims.x_min / step) * step;
+		float y_min = std::floor(dims.y_min / step) * step;
+		float z_min = std::floor(dims.z_min / step) * step;
+		float x_max = std::ceil(dims.x_max / step) * step;
+		float y_max = std::ceil(dims.y_max / step) * step;
+		float z_max = std::ceil(dims.z_max / step) * step;
 		glColor3f(0.3, 0.3, 0.3);
 		glBegin(GL_LINES);
-		for (float x = dims.x_min; x <= x_max; x += step)
+		for (float x = x_min; x <= x_max; x += step)
 		{
-			glVertex3f(x, dims.y_min, 0.0);
+			glVertex3f(x, y_min, 0.0);
 			glVertex3f(x, y_max, 0.0);
 		}
 
-		for (float y = dims.y_min; y <= y_max; y += step)
+		for (float y = y_min; y <= y_max; y += step)
 		{
-			glVertex3f(dims.x_min, y, 0.0);
+			glVertex3f(x_min, y, 0.0);
 			glVertex3f(x_max, y, 0.0);
 		}
 		glEnd();

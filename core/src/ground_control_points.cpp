@@ -19,8 +19,8 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
         ImGui::SetNextItemWidth(ImGuiNumberWidth);
         ImGui::InputDouble("Default lidar height above ground [m]", &default_lidar_height_above_ground, 0.0, 10.0, "%.3f");
 
-        ImGui::Text("To show Ground Control Point (GCP) candidate please press 'ctrl'");
-        ImGui::Text("To pick trajectory node please press 'ctrl' + 'left/middle mouse'");
+        ImGui::Text("To show Ground Control Point (GCP) candidate please press 'CTRL'");
+        ImGui::Text("To pick trajectory node please press 'CTRL + left/middle mouse'");
         ImGui::Text("At least 3 GCPs needed!");
 
         if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)

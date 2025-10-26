@@ -16,29 +16,26 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
     if (ImGui::Begin("Control Point", &is_imgui))
     {
         ImGui::Checkbox("Draw uncertainty", &draw_uncertainty);
+        ImGui::SameLine();
+        ImGui::Checkbox("Track pose with camera", &track_pose_with_camera);
 
-        int prev_index_pose = index_pose;
-        ImGui::SetNextItemWidth(ImGuiNumberWidth);
-        ImGui::InputInt("Index pose", &index_pose, 1, 1);
+        ImGui::Text("Pose index: ");
+        ImGui::SameLine();
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::SliderInt("##lcss", &index_pose, 0, point_clouds_container.point_clouds.size() - 1);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("max %zu", point_clouds_container.point_clouds.size() - 1);
+        ImGui::SameLine();
+        ImGui::InputInt("##lcsi", &index_pose, 1, 5);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("max %zu", point_clouds_container.point_clouds.size() - 1);
         if (index_pose < 0)
-        {
             index_pose = 0;
-        }
-
-        if (index_pose > point_clouds_container.point_clouds.size() - 1)
-        {
+        if (index_pose >= point_clouds_container.point_clouds.size() - 1)
             index_pose = point_clouds_container.point_clouds.size() - 1;
-        }
 
-        if (prev_index_pose != index_pose)
-        {
-            rotation_center.x() = point_clouds_container.point_clouds[index_pose].m_pose.translation().x();
-            rotation_center.y() = point_clouds_container.point_clouds[index_pose].m_pose.translation().y();
-            rotation_center.z() = point_clouds_container.point_clouds[index_pose].m_pose.translation().z();
-        }
-
-        ImGui::Text("To show Control Point (CP) candidate please press 'ctrl'");
-        ImGui::Text("To pick point node please press 'ctrl' + 'left/middle mouse'");
+        ImGui::Text("To show Control Point (CP) candidate please press 'CTRL'");
+        ImGui::Text("To pick point node please press 'CTRL + left/middle mouse'");
         ImGui::Text("At least 3 CPs needed!");
 
         if (index_picked_point != -1)

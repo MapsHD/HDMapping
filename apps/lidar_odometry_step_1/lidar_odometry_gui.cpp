@@ -1105,27 +1105,11 @@ void progress_window()
     ImGui::End();
 }
 
-void wheel(int button, int dir, int x, int y)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    io.MouseWheel += dir; // or direction * 1.0f depending on your setup
-
-    if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
-    {
-        if (dir > 0)
-            translate_z -= 0.05f * translate_z;
-        else
-            translate_z += 0.05f * translate_z;
-
-        mouse_sensitivity = fabs(translate_z) / 100;
-        camera_transition_active = false;
-    }
-}
-
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO &io = ImGui::GetIO();
     io.MousePos = ImVec2((float)x, (float)y);
+
     int button = -1;
     if (glut_button == GLUT_LEFT_BUTTON)
         button = 0;
@@ -1137,6 +1121,7 @@ void mouse(int glut_button, int state, int x, int y)
         io.MouseDown[button] = true;
     if (button != -1 && state == GLUT_UP)
         io.MouseDown[button] = false;
+
     static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
     if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
         glutMajorVersion < 3)
@@ -1203,11 +1188,67 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
+void openData()
+{
+    full_lidar_odometry_gui = false;
+    info_gui = false;
+
+    loRunning.store(true);
+    loProgress.store(0.0f);
+    loElapsedSeconds.store(0.0);
+    loEstimatedTimeRemaining.store(0.0);
+    loStartTime = std::chrono::system_clock::now();
+
+    step1(loPause);
+
+    if (step_1_done)
+    {
+        std::thread loThread(
+            []()
+            {
+                std::chrono::time_point<std::chrono::system_clock> start, end;
+                start = std::chrono::system_clock::now();
+
+                step2(loPause);
+
+                end = std::chrono::system_clock::now();
+                std::chrono::duration<double> elapsed_seconds = end - start;
+
+                save_results(false, elapsed_seconds.count());
+
+                loRunning = false;
+
+                std::ostringstream oss;
+                oss << "Data saved to folder:\n'" << working_directory << "\\lidar_odometry_result_*'\n"
+                    << "Calculated trajectory length: "
+                    << std::fixed << std::setprecision(1) << params.total_length_of_calculated_trajectory << "[m]\n"
+                    << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str();
+
+                [[maybe_unused]]
+                pfd::message message(
+                    "Information",
+                    oss.str(),
+                    pfd::choice::ok, pfd::icon::info);
+                message.result();
+
+            });
+
+        loThread.detach();
+    }
+    else //no data loaded
+    {
+        loRunning = false;
+    }
+}
+
 void display()
 {
     ImGuiIO &io = ImGui::GetIO();
 
     view_kbd_shortcuts();
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed('O', false))
+        openData();
 
     updateCameraTransition();
 
@@ -1250,7 +1291,6 @@ void display()
     glVertex3f(0.0f, 0.0f, 0.0f);
     glVertex3f(0.0f, 0.0f, 100);
     glEnd();
-
 
     if (show_initial_points)
     {
@@ -1668,60 +1708,10 @@ void display()
             ImGui::Dummy(ImVec2(20, 0));
             ImGui::SameLine();
 
-            if (ImGui::Button("Load & process MANDEYE data"))
-            {
-                full_lidar_odometry_gui = false;
-                info_gui = false;
-
-                loRunning.store(true);
-                loProgress.store(0.0f);
-                loElapsedSeconds.store(0.0);
-                loEstimatedTimeRemaining.store(0.0);
-                loStartTime = std::chrono::system_clock::now();
-
-                step1(loPause);
-
-                if (step_1_done)
-                {
-                    std::thread loThread(
-                        []()
-                        {
-                            std::chrono::time_point<std::chrono::system_clock> start, end;
-                            start = std::chrono::system_clock::now();
-
-                            step2(loPause);
-
-                            end = std::chrono::system_clock::now();
-                            std::chrono::duration<double> elapsed_seconds = end - start;
-
-                            save_results(false, elapsed_seconds.count());
-
-                            loRunning = false;
-
-                            std::ostringstream oss;
-                            oss << "Data saved to folder:\n'" << working_directory << "\\lidar_odometry_result_*'\n"
-                                << "Calculated trajectory length: "
-                                << std::fixed << std::setprecision(1) << params.total_length_of_calculated_trajectory << "[m]\n"
-                                << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str();
-
-                            [[maybe_unused]]
-                            pfd::message message(
-                                "Information",
-                                oss.str(),
-                                pfd::choice::ok, pfd::icon::info);
-                            message.result();
-
-                        });
-
-                    loThread.detach();
-                }
-                else //no data loaded
-                {
-                    loRunning = false;
-                }
-            }
+            if (ImGui::Button("Load & process scanning"))
+                openData();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Select folder from where to load data and start processing");
+                ImGui::SetTooltip("Select folder from where to load data and start processing (Ctrl+O)");
 
             ImGui::SameLine();
             ImGui::Dummy(ImVec2(20, 0));

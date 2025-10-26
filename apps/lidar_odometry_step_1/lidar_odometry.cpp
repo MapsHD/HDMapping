@@ -38,7 +38,7 @@ bool load_data(std::vector<std::string> &input_file_names, LidarOdometryParams &
             std::string stem = p.filename().stem().string(); // get filename without extension
 
             // skip files starting with "status"
-            if (!stem.starts_with("status"))
+            if (!stem.starts_with("status") && !stem.starts_with("cam0") && !stem.starts_with("cam1"))
             {
                 if (calibrationFile.empty())
                 {

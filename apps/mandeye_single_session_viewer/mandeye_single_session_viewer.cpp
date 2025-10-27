@@ -158,7 +158,7 @@ void openSession()
 
 void display()
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
 
     view_kbd_shortcuts();
 
@@ -180,12 +180,12 @@ void display()
             offset_intensity = 1;
         }
 
-        if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)
+        if ((!io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
             || ImGui::IsKeyPressed(ImGuiKey_PageUp, true)
             || ImGui::IsKeyPressed('+', true)
             )
             index_rendered_points_local += 1;
-        if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)
+        if ((!io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
             || ImGui::IsKeyPressed(ImGuiKey_PageDown, true)
             || ImGui::IsKeyPressed('-', true)
             )

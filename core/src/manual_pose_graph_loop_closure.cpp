@@ -136,15 +136,6 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                     }
                 }
 
-                ImGui::Separator();
-                ImGui::InputDouble("motion_model_px_1_sigma_m", &motion_model_w_px_1_sigma_m);
-                ImGui::InputDouble("motion_model_py_1_sigma_m", &motion_model_w_py_1_sigma_m);
-                ImGui::InputDouble("motion_model_pz_1_sigma_m", &motion_model_w_pz_1_sigma_m);
-                ImGui::InputDouble("motion_model_om_1_sigma_deg", &motion_model_w_om_1_sigma_deg);
-                ImGui::InputDouble("motion_model_fi_1_sigma_deg", &motion_model_w_fi_1_sigma_deg);
-                ImGui::InputDouble("motion_model_ka_1_sigma_deg", &motion_model_w_ka_1_sigma_deg);
-                ImGui::Separator();
-
                 if (ImGui::Button("Fuse trajectory with GNSS (trajectory is rigid)"))
                 {
                     FuseTrajectoryWithGNSS(point_clouds_container, gnss);

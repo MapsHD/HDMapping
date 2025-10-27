@@ -40,14 +40,14 @@ class PoseGraphLoopClosure{
         //edge.relative_pose_tb_weights.py = 10000.0;
         //edge.relative_pose_tb_weights.pz = 10000.0;
 
-        double motion_model_w_px_1_sigma_m = 0.01;
+        double motion_model_w_px_1_sigma_m = 0.1;
         double motion_model_w_py_1_sigma_m = 0.01;
         double motion_model_w_pz_1_sigma_m = 0.01;
 
-        double motion_model_w_om_1_sigma_deg = 0.01;
-        double motion_model_w_fi_1_sigma_deg = 0.01;
-        double motion_model_w_ka_1_sigma_deg = 0.01;
-
+        double motion_model_w_om_1_sigma_deg = 1.0 / 100.0 * 180.0 / M_PI;    //0.01;
+        double motion_model_w_fi_1_sigma_deg = 1.0 / 100.0 * 180.0 / M_PI;
+        double motion_model_w_ka_1_sigma_deg = 1.0 / 100.0 * 180.0 / M_PI;
+        
         PoseGraphLoopClosure(){};
         ~PoseGraphLoopClosure(){};
 

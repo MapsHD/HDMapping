@@ -2,7 +2,20 @@ cmake_minimum_required(VERSION 3.15.0)
 
 project(multi_session_registration_step_3)
 
-add_executable(multi_session_registration_step_3 multi_session_registration.cpp)
+# Source files
+set(SOURCES
+    multi_session_registration.cpp
+    "../../core/src/utils.cpp"
+)
+
+# Windows: add resource file
+if(WIN32)
+    list(APPEND SOURCES ${REPOSITORY_DIRECTORY}/resources/resource3.rc)
+endif()
+
+add_executable(
+  multi_session_registration_step_3 ${SOURCES}
+  )
 
 target_compile_definitions(multi_session_registration_step_3 PRIVATE -DWITH_GUI=1)
 

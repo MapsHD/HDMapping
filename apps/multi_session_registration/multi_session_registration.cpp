@@ -26,6 +26,8 @@
 #include <portable-file-dialogs.h>
 #include <pfd_wrapper.hpp>
 
+#include <utils.hpp>
+
 #include <icp.h>
 
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
@@ -46,11 +48,22 @@
 
 #include <export_laz.h>
 
-double camera_ortho_xy_view_zoom = 10;
-double camera_ortho_xy_view_shift_x = 0.0;
-double camera_ortho_xy_view_shift_y = 0.0;
-double camera_ortho_xy_view_rotation_angle_deg = 0;
-double camera_mode_ortho_z_center_h = 0.0;
+#ifdef _WIN32
+#include <windows.h>
+#include "../../resources/resource3.h"
+#endif
+
+
+
+std::string winTitle = std::string("Step 3 (Multi session registration) ") + HDMAPPING_VERSION_STRING;
+
+std::vector<std::string> infoLines = {
+    "This program is third/final step in MANDEYE process",
+    "",
+    "First step: create project by adding sessions (result of 'multi_view_tls_registration_step_2' program)",
+    "Last step: save project",
+    "To produce map use 'multi_view_tls_registration_step_2' export functionality"
+};
 
 float m_ortho_projection[] = {1, 0, 0, 0,
                               0, 1, 0, 0,
@@ -65,28 +78,13 @@ float m_gizmo[] = {1, 0, 0, 0,
                    0, 0, 1, 0,
                    0, 0, 0, 1};
 
-static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
-float rotate_x = 0.0, rotate_y = 0.0;
-float translate_x, translate_y = 0.0;
-float translate_z = -50.0;
-const unsigned int window_width = 800;
-const unsigned int window_height = 600;
-int mouse_old_x, mouse_old_y;
-int mouse_buttons = 0;
-bool show_axes = false;
-bool is_ortho = false;
 bool block_z = false;
-int viewer_decmiate_point_cloud = 1000;
-bool gui_mouse_down{false};
-float mouse_sensitivity = 1.0;
+
 bool is_decimate = true;
 double bucket_x = 0.1;
 double bucket_y = 0.1;
 double bucket_z = 0.1;
-int all_point_size = 1;
 bool calculate_offset = false;
-bool manual_pose_graph_loop_closure_mode = false;
 ObservationPicking observation_picking;
 int index_loop_closure_source = -1;
 int index_loop_closure_target = -1;
@@ -97,7 +95,10 @@ bool loaded_sessions = false;
 bool optimized = false;
 bool gizmo_all_sessions = false;
 bool is_ndt_gui = false;
+bool is_loop_closure_gui = false;
 NDT ndt;
+
+int number_visible_sessions = 0;
 
 double time_stamp_offset = 0.0;
 
@@ -144,12 +145,37 @@ bool save_results(std::vector<Session> &sessions);
 LaserBeam GetLaserBeam(int x, int y);
 Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
 
+
+
+void reshape(int w, int h)
+{
+    glViewport(0, 0, (GLsizei)w, (GLsizei)h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    if (!is_ortho)
+    {
+        gluPerspective(60.0, (GLfloat)w / (GLfloat)h, 0.01, 10000.0);
+    }
+    else
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+
+        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+        // glOrtho(-translate_z, translate_z, -translate_z * (float)h / float(w), translate_z * float(h) / float(w), -10000, 10000);
+    }
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+}
+
 void ndt_gui()
 {
     static bool compute_mean_and_cov_for_bucket = false;
-    if (ImGui::Begin("Normal Distributions Transform"))
+    if (ImGui::Begin("Normal Distributions Transform", &is_ndt_gui, ImGuiWindowFlags_AlwaysAutoResize))
     {
-        ImGui::InputFloat3("bucket_size (x[m],y[m],z[m])", ndt.bucket_size);
+        ImGui::InputFloat3("Bucket size [m] (x, y,z)", ndt.bucket_size);
         if (ndt.bucket_size[0] < 0.01)
             ndt.bucket_size[0] = 0.01f;
         if (ndt.bucket_size[1] < 0.01)
@@ -157,15 +183,17 @@ void ndt_gui()
         if (ndt.bucket_size[2] < 0.01)
             ndt.bucket_size[2] = 0.01f;
 
-        ImGui::InputInt("number_of_threads", &ndt.number_of_threads);
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::InputInt("Number of threads", &ndt.number_of_threads);
         if (ndt.number_of_threads < 1)
             ndt.number_of_threads = 1;
-
-        ImGui::InputInt("number_of_iterations", &ndt.number_of_iterations);
+        ImGui::SameLine();
+        ImGui::InputInt("Number of iterations", &ndt.number_of_iterations);
         if (ndt.number_of_iterations < 1)
             ndt.number_of_iterations = 1;
+		ImGui::PopItemWidth();
 
-        if (ImGui::Button("ndt_optimization"))
+        if (ImGui::Button("NDT optimization"))
         {
             for (auto &s : sessions)
             {
@@ -182,13 +210,12 @@ void ndt_gui()
         ImGui::End();
     }
 
+
+
+
+
+
 #if 0
-    
-
-    
-
-    
-
     ImGui::Checkbox("ndt fix_first_node (add I to first pose in Hessian)", &ndt.is_fix_first_node);
 
     ImGui::Checkbox("ndt Gauss-Newton", &ndt.is_gauss_newton);
@@ -238,8 +265,6 @@ void ndt_gui()
         ndt.is_tait_bryan_angles = false;
         ndt.is_quaternion = false;
     }
-
-    
 
     if (ImGui::Button("compute mean mahalanobis distance"))
     {
@@ -329,6 +354,1104 @@ void ndt_gui()
         ndt.sigma_azimuthal_angle = 8.0 / 3600;
     }
 #endif
+}
+
+void loop_closure_gui()
+{
+    if (ImGui::Begin("Normal Distributions Transform", &is_loop_closure_gui, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("Manual Pose Graph Loop Closure Mode");
+
+        if (!manipulate_active_edge)
+        {
+            ImGui::InputInt("index_loop_closure_source", &index_loop_closure_source);
+            if (index_loop_closure_source < 0)
+                index_loop_closure_source = 0;
+            if (index_loop_closure_source >= sessions[first_session_index].point_clouds_container.point_clouds.size() - 1)
+                index_loop_closure_source = sessions[first_session_index].point_clouds_container.point_clouds.size() - 1;
+            ImGui::InputInt("index_loop_closure_target", &index_loop_closure_target);
+            if (index_loop_closure_target < 0)
+                index_loop_closure_target = 0;
+            if (index_loop_closure_target >= sessions[second_session_index].point_clouds_container.point_clouds.size() - 1)
+                index_loop_closure_target = sessions[second_session_index].point_clouds_container.point_clouds.size() - 1;
+        }
+        if (ImGui::Button("Add edge"))
+        {
+            Edge edge;
+            edge.index_from = index_loop_closure_source;
+            edge.index_to = index_loop_closure_target;
+            edge.index_session_from = first_session_index;
+            edge.index_session_to = second_session_index;
+
+            edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(
+                sessions[first_session_index].point_clouds_container.point_clouds[index_loop_closure_source].m_pose.inverse() *
+                sessions[second_session_index].point_clouds_container.point_clouds[index_loop_closure_target].m_pose);
+
+            edge.relative_pose_tb_weights.px = 1000000.0;
+            edge.relative_pose_tb_weights.py = 1000000.0;
+            edge.relative_pose_tb_weights.pz = 1000000.0;
+            edge.relative_pose_tb_weights.om = 1000000.0;
+            edge.relative_pose_tb_weights.fi = 1000000.0;
+            edge.relative_pose_tb_weights.ka = 1000000.0;
+
+            edges.push_back(edge);
+
+            index_active_edge = edges.size() - 1;
+        }
+
+        std::string number_active_edges = "number_edges: " + std::to_string(edges.size());
+        ImGui::Text(number_active_edges.c_str());
+        if (edges.size() > 0)
+        {
+            ImGui::Checkbox("manipulate_active_edge", &manipulate_active_edge);
+            if (manipulate_active_edge)
+            {
+                int remove_edge_index = -1;
+                if (ImGui::Button("remove active edge"))
+                {
+                    edge_gizmo = false;
+                    remove_edge_index = index_active_edge;
+                }
+
+                int prev_index_active_edge = index_active_edge;
+
+                if (!edge_gizmo)
+                {
+                    bool is_gizmo = false;
+
+                    for (const auto& s : sessions)
+                    {
+                        if (s.is_gizmo)
+                            is_gizmo = true;
+                    }
+
+                    if (!is_gizmo)
+                    {
+                        ImGui::InputInt("index_active_edge", &index_active_edge);
+
+                        if (index_active_edge < 0)
+                            index_active_edge = 0;
+                        if (index_active_edge >= (int)edges.size())
+                            index_active_edge = (int)edges.size() - 1;
+                    }
+                }
+
+                std::string txt = "index_session_from: " + std::to_string(edges[index_active_edge].index_session_from);
+                ImGui::Text(txt.c_str());
+                txt = "index_session_to: " + std::to_string(edges[index_active_edge].index_session_to);
+                ImGui::Text(txt.c_str());
+                txt = "index_from: " + std::to_string(edges[index_active_edge].index_from);
+                ImGui::Text(txt.c_str());
+                txt = "index_to: " + std::to_string(edges[index_active_edge].index_to);
+                ImGui::Text(txt.c_str());
+
+                if (remove_edge_index != -1)
+                {
+                    std::vector<Edge> new_edges;
+                    for (int i = 0; i < edges.size(); i++)
+                    {
+                        if (remove_edge_index != i)
+                            new_edges.push_back(edges[i]);
+                    }
+                    edges = new_edges;
+
+                    index_active_edge = remove_edge_index - 1;
+                    manipulate_active_edge = false;
+                }
+
+                bool prev_gizmo = edge_gizmo;
+                ImGui::Checkbox("gizmo", &edge_gizmo);
+
+                if (prev_gizmo != edge_gizmo)
+                {
+                    auto m_to = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].m_pose *
+                        affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                    m_gizmo[0] = (float)m_to(0, 0);
+                    m_gizmo[1] = (float)m_to(1, 0);
+                    m_gizmo[2] = (float)m_to(2, 0);
+                    m_gizmo[3] = (float)m_to(3, 0);
+                    m_gizmo[4] = (float)m_to(0, 1);
+                    m_gizmo[5] = (float)m_to(1, 1);
+                    m_gizmo[6] = (float)m_to(2, 1);
+                    m_gizmo[7] = (float)m_to(3, 1);
+                    m_gizmo[8] = (float)m_to(0, 2);
+                    m_gizmo[9] = (float)m_to(1, 2);
+                    m_gizmo[10] = (float)m_to(2, 2);
+                    m_gizmo[11] = (float)m_to(3, 2);
+                    m_gizmo[12] = (float)m_to(0, 3);
+                    m_gizmo[13] = (float)m_to(1, 3);
+                    m_gizmo[14] = (float)m_to(2, 3);
+                    m_gizmo[15] = (float)m_to(3, 3);
+                }
+                if (!edge_gizmo)
+                {
+                    if (ImGui::Button("ICP"))
+                    {
+                        std::cout << "Iterative Closest Point" << std::endl;
+                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                        {
+                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                        }
+                        else
+                        {
+                            bool is_with_ground_truth = false;
+                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                            {
+                                is_with_ground_truth = true;
+                            }
+
+                            if (is_with_ground_truth)
+                            {
+                                int index_session_from = -1;
+                                int index_session_to = -1;
+                                int index_from = -1;
+                                int index_to = -1;
+
+                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_from;
+                                    index_session_to = edges[index_active_edge].index_session_to;
+                                    index_from = edges[index_active_edge].index_from;
+                                    index_to = edges[index_active_edge].index_to;
+                                }
+                                else
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_to;
+                                    index_session_to = edges[index_active_edge].index_session_from;
+                                    index_from = edges[index_active_edge].index_to;
+                                    index_to = edges[index_active_edge].index_from;
+                                }
+
+                                double x_min = 1000000000000.0;
+                                double y_min = 1000000000000.0;
+                                double z_min = 1000000000000.0;
+                                double x_max = -1000000000000.0;
+                                double y_max = -1000000000000.0;
+                                double z_max = -1000000000000.0;
+
+                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                for (const auto& p : points_to.points_local)
+                                {
+                                    auto pg = points_to.m_pose * p;
+                                    if (pg.x() < x_min)
+                                        x_min = pg.x();
+                                    if (pg.y() < y_min)
+                                        y_min = pg.y();
+                                    if (pg.z() < z_min)
+                                        z_min = pg.z();
+
+                                    if (pg.x() > x_max)
+                                        x_max = pg.x();
+                                    if (pg.y() > y_max)
+                                        y_max = pg.y();
+                                    if (pg.z() > z_max)
+                                        z_max = pg.z();
+                                }
+                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                std::vector<Eigen::Vector3d> ground_truth;
+                                for (const auto& p : points_from.points_local)
+                                {
+                                    auto pg = points_from.m_pose * p;
+                                    if (pg.x() > x_min && pg.x() < x_max)
+                                    {
+                                        if (pg.y() > y_min && pg.y() < y_max)
+                                        {
+                                            if (pg.z() > z_min && pg.z() < z_max)
+                                                ground_truth.push_back(p);
+                                        }
+                                    }
+                                }
+
+                                int number_of_iterations = 10;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, search_radious, number_of_iterations, m_pose))
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+
+                                /*PointClouds pcs;
+                                pcs.point_clouds.push_back(sessions[index_session_from].point_clouds_container.point_clouds[index_from]);
+                                pcs.point_clouds.push_back(sessions[index_session_to].point_clouds_container.point_clouds[index_to]);
+                                pcs.point_clouds[0].points_local = ground_truth;
+                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
+                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+
+                                ICP icp;
+                                icp.search_radious = (float)search_radious;
+
+                                for (auto &pc : pcs.point_clouds)
+                                {
+                                    pc.rgd_params.resolution_X = icp.search_radious;
+                                    pc.rgd_params.resolution_Y = icp.search_radious;
+                                    pc.rgd_params.resolution_Z = icp.search_radious;
+                                    pc.build_rgd();
+                                    pc.cout_rgd();
+                                    pc.compute_normal_vectors(0.5);
+                                }
+
+                                icp.number_of_threads = std::thread::hardware_concurrency();
+                                icp.number_of_iterations = 10;
+                                icp.is_adaptive_robust_kernel = false;
+
+                                icp.is_ballanced_horizontal_vs_vertical = false;
+                                icp.is_fix_first_node = true;
+                                icp.is_gauss_newton = true;
+                                icp.is_levenberg_marguardt = false;
+                                icp.is_cw = false;
+                                icp.is_wc = true;
+                                icp.is_tait_bryan_angles = true;
+                                icp.is_quaternion = false;
+                                icp.is_rodrigues = false;
+                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
+
+                                icp.optimization_point_to_point_source_to_target(pcs);
+
+                                edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
+                                */
+                            }
+                            else
+                            {
+                                /*PointClouds pcs;
+                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from]);
+                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to]);
+                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
+                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                                ICP icp;
+                                icp.search_radious = (float)search_radious;
+
+                                for (auto &pc : pcs.point_clouds)
+                                {
+                                    pc.rgd_params.resolution_X = icp.search_radious;
+                                    pc.rgd_params.resolution_Y = icp.search_radious;
+                                    pc.rgd_params.resolution_Z = icp.search_radious;
+                                    pc.build_rgd();
+                                    pc.cout_rgd();
+                                    pc.compute_normal_vectors(0.5);
+                                }
+
+                                icp.number_of_threads = std::thread::hardware_concurrency();
+                                icp.number_of_iterations = 10;
+                                icp.is_adaptive_robust_kernel = false;
+
+                                icp.is_ballanced_horizontal_vs_vertical = false;
+                                icp.is_fix_first_node = true;
+                                icp.is_gauss_newton = true;
+                                icp.is_levenberg_marguardt = false;
+                                icp.is_cw = false;
+                                icp.is_wc = true;
+                                icp.is_tait_bryan_angles = true;
+                                icp.is_quaternion = false;
+                                icp.is_rodrigues = false;
+                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
+
+                                icp.optimization_point_to_point_source_to_target(pcs);
+
+                                edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
+                                */
+                                int number_of_iterations = 10;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, search_radious, number_of_iterations, m_pose))
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                            }
+                        }
+                    }
+                    ImGui::SameLine();
+                    ImGui::InputDouble("search_radious", &search_radious);
+                    if (search_radious < 0.01)
+                        search_radious = 0.01;
+
+                    /*if (ImGui::Button("ICP"))
+                    {
+                        std::cout << "Iterative Closest Point" << std::endl;
+                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                        {
+                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                        }
+                        else
+                        {
+                            bool is_with_ground_truth = false;
+                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                            {
+                                is_with_ground_truth = true;
+                            }
+
+                            if (is_with_ground_truth)
+                            {
+                                int index_session_from = -1;
+                                int index_session_to = -1;
+                                int index_from = -1;
+                                int index_to = -1;
+
+                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_from;
+                                    index_session_to = edges[index_active_edge].index_session_to;
+                                    index_from = edges[index_active_edge].index_from;
+                                    index_to = edges[index_active_edge].index_to;
+                                }
+                                else
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_to;
+                                    index_session_to = edges[index_active_edge].index_session_from;
+                                    index_from = edges[index_active_edge].index_to;
+                                    index_to = edges[index_active_edge].index_from;
+                                }
+
+                                double x_min = 1000000000000.0;
+                                double y_min = 1000000000000.0;
+                                double z_min = 1000000000000.0;
+                                double x_max = -1000000000000.0;
+                                double y_max = -1000000000000.0;
+                                double z_max = -1000000000000.0;
+
+                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                for (const auto &p : points_to.points_local)
+                                {
+                                    auto pg = points_to.m_pose * p;
+                                    if (pg.x() < x_min)
+                                    {
+                                        x_min = pg.x();
+                                    }
+                                    if (pg.y() < y_min)
+                                    {
+                                        y_min = pg.y();
+                                    }
+                                    if (pg.z() < z_min)
+                                    {
+                                        z_min = pg.z();
+                                    }
+                                    if (pg.x() > x_max)
+                                    {
+                                        x_max = pg.x();
+                                    }
+                                    if (pg.y() > y_max)
+                                    {
+                                        y_max = pg.y();
+                                    }
+                                    if (pg.z() > z_max)
+                                    {
+                                        z_max = pg.z();
+                                    }
+                                }
+                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                std::vector<Eigen::Vector3d> ground_truth;
+                                for (const auto &p : points_from.points_local)
+                                {
+                                    auto pg = points_from.m_pose * p;
+                                    if (pg.x() > x_min && pg.x() < x_max)
+                                    {
+                                        if (pg.y() > y_min && pg.y() < y_max)
+                                        {
+                                            if (pg.z() > z_min && pg.z() < z_max)
+                                            {
+                                                ground_truth.push_back(p);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                PointClouds pcs;
+                                pcs.point_clouds.push_back(sessions[index_session_from].point_clouds_container.point_clouds[index_from]);
+                                pcs.point_clouds.push_back(sessions[index_session_to].point_clouds_container.point_clouds[index_to]);
+                                pcs.point_clouds[0].points_local = ground_truth;
+                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
+                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                                ICP icp;
+                                icp.search_radious = (float)search_radious;
+
+                                for (auto &pc : pcs.point_clouds)
+                                {
+                                    pc.rgd_params.resolution_X = icp.search_radious;
+                                    pc.rgd_params.resolution_Y = icp.search_radious;
+                                    pc.rgd_params.resolution_Z = icp.search_radious;
+                                    pc.build_rgd();
+                                    pc.cout_rgd();
+                                    pc.compute_normal_vectors(0.5);
+                                }
+
+                                icp.number_of_threads = std::thread::hardware_concurrency();
+                                icp.number_of_iterations = 10;
+                                icp.is_adaptive_robust_kernel = false;
+
+                                icp.is_ballanced_horizontal_vs_vertical = false;
+                                icp.is_fix_first_node = true;
+                                icp.is_gauss_newton = true;
+                                icp.is_levenberg_marguardt = false;
+                                icp.is_cw = false;
+                                icp.is_wc = true;
+                                icp.is_tait_bryan_angles = true;
+                                icp.is_quaternion = false;
+                                icp.is_rodrigues = false;
+                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
+
+                                icp.optimization_point_to_point_source_to_target(pcs);
+
+                                edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
+                            }
+                            else
+                            {
+                                PointClouds pcs;
+                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from]);
+                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to]);
+                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
+                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                                ICP icp;
+                                icp.search_radious = (float)search_radious;
+
+                                for (auto &pc : pcs.point_clouds)
+                                {
+                                    pc.rgd_params.resolution_X = icp.search_radious;
+                                    pc.rgd_params.resolution_Y = icp.search_radious;
+                                    pc.rgd_params.resolution_Z = icp.search_radious;
+                                    pc.build_rgd();
+                                    pc.cout_rgd();
+                                    pc.compute_normal_vectors(0.5);
+                                }
+
+                                icp.number_of_threads = std::thread::hardware_concurrency();
+                                icp.number_of_iterations = 10;
+                                icp.is_adaptive_robust_kernel = false;
+
+                                icp.is_ballanced_horizontal_vs_vertical = false;
+                                icp.is_fix_first_node = true;
+                                icp.is_gauss_newton = true;
+                                icp.is_levenberg_marguardt = false;
+                                icp.is_cw = false;
+                                icp.is_wc = true;
+                                icp.is_tait_bryan_angles = true;
+                                icp.is_quaternion = false;
+                                icp.is_rodrigues = false;
+                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
+
+                                icp.optimization_point_to_point_source_to_target(pcs);
+
+                                edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
+                            }
+                        }
+                    }
+                    ImGui::SameLine();
+                    ImGui::InputDouble("search_radious", &search_radious);
+                    if (search_radious < 0.01)
+                    {
+                        search_radious = 0.01;
+                    }*/
+
+                    /////////////////////////////////
+                    if (ImGui::Button("ICP [search radious 2m]"))
+                    {
+                        float sr = 2.0;
+                        std::cout << "Iterative Closest Point" << std::endl;
+                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                        {
+                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                        }
+                        else
+                        {
+                            bool is_with_ground_truth = false;
+                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                            {
+                                is_with_ground_truth = true;
+                            }
+
+                            if (is_with_ground_truth)
+                            {
+                                int index_session_from = -1;
+                                int index_session_to = -1;
+                                int index_from = -1;
+                                int index_to = -1;
+
+                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_from;
+                                    index_session_to = edges[index_active_edge].index_session_to;
+                                    index_from = edges[index_active_edge].index_from;
+                                    index_to = edges[index_active_edge].index_to;
+                                }
+                                else
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_to;
+                                    index_session_to = edges[index_active_edge].index_session_from;
+                                    index_from = edges[index_active_edge].index_to;
+                                    index_to = edges[index_active_edge].index_from;
+                                }
+
+                                double x_min = 1000000000000.0;
+                                double y_min = 1000000000000.0;
+                                double z_min = 1000000000000.0;
+                                double x_max = -1000000000000.0;
+                                double y_max = -1000000000000.0;
+                                double z_max = -1000000000000.0;
+
+                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                for (const auto& p : points_to.points_local)
+                                {
+                                    auto pg = points_to.m_pose * p;
+                                    if (pg.x() < x_min)
+                                        x_min = pg.x();
+                                    if (pg.y() < y_min)
+                                        y_min = pg.y();
+                                    if (pg.z() < z_min)
+                                        z_min = pg.z();
+
+                                    if (pg.x() > x_max)
+                                        x_max = pg.x();
+                                    if (pg.y() > y_max)
+                                        y_max = pg.y();
+                                    if (pg.z() > z_max)
+                                        z_max = pg.z();
+                                }
+                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                std::vector<Eigen::Vector3d> ground_truth;
+                                for (const auto& p : points_from.points_local)
+                                {
+                                    auto pg = points_from.m_pose * p;
+                                    if (pg.x() > x_min && pg.x() < x_max)
+                                    {
+                                        if (pg.y() > y_min && pg.y() < y_max)
+                                        {
+                                            if (pg.z() > z_min && pg.z() < z_max)
+                                                ground_truth.push_back(p);
+                                        }
+                                    }
+                                }
+
+                                int number_of_iterations = 30;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                            }
+                            else
+                            {
+
+                                int number_of_iterations = 30;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                            }
+                        }
+                    }
+
+                    ImGui::SameLine();
+                    if (ImGui::Button("ICP [search radious 1m]"))
+                    {
+                        float sr = 1.0;
+                        std::cout << "Iterative Closest Point" << std::endl;
+                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                        {
+                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                        }
+                        else
+                        {
+                            bool is_with_ground_truth = false;
+                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                            {
+                                is_with_ground_truth = true;
+                            }
+
+                            if (is_with_ground_truth)
+                            {
+                                int index_session_from = -1;
+                                int index_session_to = -1;
+                                int index_from = -1;
+                                int index_to = -1;
+
+                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_from;
+                                    index_session_to = edges[index_active_edge].index_session_to;
+                                    index_from = edges[index_active_edge].index_from;
+                                    index_to = edges[index_active_edge].index_to;
+                                }
+                                else
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_to;
+                                    index_session_to = edges[index_active_edge].index_session_from;
+                                    index_from = edges[index_active_edge].index_to;
+                                    index_to = edges[index_active_edge].index_from;
+                                }
+
+                                double x_min = 1000000000000.0;
+                                double y_min = 1000000000000.0;
+                                double z_min = 1000000000000.0;
+                                double x_max = -1000000000000.0;
+                                double y_max = -1000000000000.0;
+                                double z_max = -1000000000000.0;
+
+                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                for (const auto& p : points_to.points_local)
+                                {
+                                    auto pg = points_to.m_pose * p;
+                                    if (pg.x() < x_min)
+                                        x_min = pg.x();
+                                    if (pg.y() < y_min)
+                                        y_min = pg.y();
+                                    if (pg.z() < z_min)
+                                        z_min = pg.z();
+
+                                    if (pg.x() > x_max)
+                                        x_max = pg.x();
+                                    if (pg.y() > y_max)
+                                        y_max = pg.y();
+                                    if (pg.z() > z_max)
+                                        z_max = pg.z();
+                                }
+                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                std::vector<Eigen::Vector3d> ground_truth;
+                                for (const auto& p : points_from.points_local)
+                                {
+                                    auto pg = points_from.m_pose * p;
+                                    if (pg.x() > x_min && pg.x() < x_max)
+                                    {
+                                        if (pg.y() > y_min && pg.y() < y_max)
+                                        {
+                                            if (pg.z() > z_min && pg.z() < z_max)
+                                                ground_truth.push_back(p);
+                                        }
+                                    }
+                                }
+
+                                int number_of_iterations = 30;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                            }
+                            else
+                            {
+
+                                int number_of_iterations = 30;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                            }
+                        }
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("ICP [search radious 0.5m]"))
+                    {
+                        float sr = 0.5;
+                        std::cout << "Iterative Closest Point" << std::endl;
+                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                        {
+                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                        }
+                        else
+                        {
+                            bool is_with_ground_truth = false;
+                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                            {
+                                is_with_ground_truth = true;
+                            }
+
+                            if (is_with_ground_truth)
+                            {
+                                int index_session_from = -1;
+                                int index_session_to = -1;
+                                int index_from = -1;
+                                int index_to = -1;
+
+                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_from;
+                                    index_session_to = edges[index_active_edge].index_session_to;
+                                    index_from = edges[index_active_edge].index_from;
+                                    index_to = edges[index_active_edge].index_to;
+                                }
+                                else
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_to;
+                                    index_session_to = edges[index_active_edge].index_session_from;
+                                    index_from = edges[index_active_edge].index_to;
+                                    index_to = edges[index_active_edge].index_from;
+                                }
+
+                                double x_min = 1000000000000.0;
+                                double y_min = 1000000000000.0;
+                                double z_min = 1000000000000.0;
+                                double x_max = -1000000000000.0;
+                                double y_max = -1000000000000.0;
+                                double z_max = -1000000000000.0;
+
+                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                for (const auto& p : points_to.points_local)
+                                {
+                                    auto pg = points_to.m_pose * p;
+                                    if (pg.x() < x_min)
+                                        x_min = pg.x();
+                                    if (pg.y() < y_min)
+                                        y_min = pg.y();
+                                    if (pg.z() < z_min)
+                                        z_min = pg.z();
+
+                                    if (pg.x() > x_max)
+                                        x_max = pg.x();
+                                    if (pg.y() > y_max)
+                                        y_max = pg.y();
+                                    if (pg.z() > z_max)
+                                        z_max = pg.z();
+                                }
+                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                std::vector<Eigen::Vector3d> ground_truth;
+                                for (const auto& p : points_from.points_local)
+                                {
+                                    auto pg = points_from.m_pose * p;
+                                    if (pg.x() > x_min && pg.x() < x_max)
+                                    {
+                                        if (pg.y() > y_min && pg.y() < y_max)
+                                        {
+                                            if (pg.z() > z_min && pg.z() < z_max)
+                                                ground_truth.push_back(p);
+                                        }
+                                    }
+                                }
+
+                                int number_of_iterations = 30;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                {
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                }
+                            }
+                            else
+                            {
+
+                                int number_of_iterations = 30;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                {
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                }
+                            }
+                        }
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("ICP [search radious 0.25m]"))
+                    {
+                        float sr = 0.25;
+                        std::cout << "Iterative Closest Point" << std::endl;
+                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                        {
+                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                        }
+                        else
+                        {
+                            bool is_with_ground_truth = false;
+                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                            {
+                                is_with_ground_truth = true;
+                            }
+
+                            if (is_with_ground_truth)
+                            {
+                                int index_session_from = -1;
+                                int index_session_to = -1;
+                                int index_from = -1;
+                                int index_to = -1;
+
+                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_from;
+                                    index_session_to = edges[index_active_edge].index_session_to;
+                                    index_from = edges[index_active_edge].index_from;
+                                    index_to = edges[index_active_edge].index_to;
+                                }
+                                else
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_to;
+                                    index_session_to = edges[index_active_edge].index_session_from;
+                                    index_from = edges[index_active_edge].index_to;
+                                    index_to = edges[index_active_edge].index_from;
+                                }
+
+                                double x_min = 1000000000000.0;
+                                double y_min = 1000000000000.0;
+                                double z_min = 1000000000000.0;
+                                double x_max = -1000000000000.0;
+                                double y_max = -1000000000000.0;
+                                double z_max = -1000000000000.0;
+
+                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                for (const auto& p : points_to.points_local)
+                                {
+                                    auto pg = points_to.m_pose * p;
+                                    if (pg.x() < x_min)
+                                        x_min = pg.x();
+                                    if (pg.y() < y_min)
+                                        y_min = pg.y();
+                                    if (pg.z() < z_min)
+                                        z_min = pg.z();
+
+                                    if (pg.x() > x_max)
+                                        x_max = pg.x();
+                                    if (pg.y() > y_max)
+                                        y_max = pg.y();
+                                    if (pg.z() > z_max)
+                                        z_max = pg.z();
+                                }
+                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                std::vector<Eigen::Vector3d> ground_truth;
+                                for (const auto& p : points_from.points_local)
+                                {
+                                    auto pg = points_from.m_pose * p;
+                                    if (pg.x() > x_min && pg.x() < x_max)
+                                    {
+                                        if (pg.y() > y_min && pg.y() < y_max)
+                                        {
+                                            if (pg.z() > z_min && pg.z() < z_max)
+                                                ground_truth.push_back(p);
+                                        }
+                                    }
+                                }
+
+                                int number_of_iterations = 30;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                {
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                }
+                            }
+                            else
+                            {
+
+                                int number_of_iterations = 30;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                {
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                }
+                            }
+                        }
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("ICP [search radious 0.1m]"))
+                    {
+                        float sr = 0.1;
+                        std::cout << "Iterative Closest Point" << std::endl;
+                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
+                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                        {
+                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
+                        }
+                        else
+                        {
+                            bool is_with_ground_truth = false;
+                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
+                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
+                            {
+                                is_with_ground_truth = true;
+                            }
+
+                            if (is_with_ground_truth)
+                            {
+                                int index_session_from = -1;
+                                int index_session_to = -1;
+                                int index_from = -1;
+                                int index_to = -1;
+
+                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_from;
+                                    index_session_to = edges[index_active_edge].index_session_to;
+                                    index_from = edges[index_active_edge].index_from;
+                                    index_to = edges[index_active_edge].index_to;
+                                }
+                                else
+                                {
+                                    index_session_from = edges[index_active_edge].index_session_to;
+                                    index_session_to = edges[index_active_edge].index_session_from;
+                                    index_from = edges[index_active_edge].index_to;
+                                    index_to = edges[index_active_edge].index_from;
+                                }
+
+                                double x_min = 1000000000000.0;
+                                double y_min = 1000000000000.0;
+                                double z_min = 1000000000000.0;
+                                double x_max = -1000000000000.0;
+                                double y_max = -1000000000000.0;
+                                double z_max = -1000000000000.0;
+
+                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+
+                                for (const auto& p : points_to.points_local)
+                                {
+                                    auto pg = points_to.m_pose * p;
+                                    if (pg.x() < x_min)
+                                        x_min = pg.x();
+                                    if (pg.y() < y_min)
+                                        y_min = pg.y();
+                                    if (pg.z() < z_min)
+                                        z_min = pg.z();
+
+                                    if (pg.x() > x_max)
+                                        x_max = pg.x();
+                                    if (pg.y() > y_max)
+                                        y_max = pg.y();
+                                    if (pg.z() > z_max)
+                                        z_max = pg.z();
+                                }
+                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                std::vector<Eigen::Vector3d> ground_truth;
+                                for (const auto& p : points_from.points_local)
+                                {
+                                    auto pg = points_from.m_pose * p;
+                                    if (pg.x() > x_min && pg.x() < x_max)
+                                    {
+                                        if (pg.y() > y_min && pg.y() < y_max)
+                                        {
+                                            if (pg.z() > z_min && pg.z() < z_max)
+                                                ground_truth.push_back(p);
+                                        }
+                                    }
+                                }
+
+                                int number_of_iterations = 30;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                {
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                }
+                            }
+                            else
+                            {
+
+                                int number_of_iterations = 30;
+                                PairWiseICP icp;
+                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                                {
+                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                                }
+                            }
+                        }
+                    }
+#if 0
+                    if (ImGui::Button("Save src"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                        if (output_file_name.size() > 0)
+                        {
+                            std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                            std::vector<Eigen::Vector3d> pointcloud;
+                            std::vector<unsigned short> intensity;
+                            std::vector<double> timestamps;
+
+                            for (int i = 0; i < source.size(); i++)
+                            {
+                                pointcloud.push_back(source[i]);
+                                intensity.push_back(0);
+                                timestamps.push_back(0.0);
+                            }
+
+                            exportLaz(
+                                output_file_name[0],
+                                pointcloud,
+                                intensity,
+                                timestamps);
+                        }
+
+                        /*int number_of_iterations = 30;
+                        PairWiseICP icp;
+                        auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                        std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
+                        std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
+
+                        if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+                        {
+                            edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+                        }*/
+                        //save
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Save trg (transfromed only by rotation)"))
+                    {
+                    }
+#endif
+                    //////////////////////////////////
+                }
+            }
+        }
+
+        ImGui::End();
+    }
 }
 
 bool load_project_settings(const std::string &file_name, ProjectSettings &_project_settings)
@@ -570,39 +1693,29 @@ void save_trajectories(
                             double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
 
                             if (angle_deg > 10.0)
-                            {
                                 is_curve = true;
-                            }
                         }
                     }
                     double tol = not_curve_consecutive_distance_meters;
 
                     if (is_curve)
-                    {
                         tol = curve_consecutive_distance_meters;
-                    }
 
                     if (!is_trajectory_export_downsampling || (is_trajectory_export_downsampling && consecutive_distance >= tol))
                     {
                         if (is_trajectory_export_downsampling)
-                        {
                             consecutive_distance = 0;
-                        }
                         if (save_to_dxf)
-                        {
                             polylinePoints.push_back(pose.translation());
-                        }
                         else
                         {
                             outfile << std::setprecision(20);
+
                             if (write_lidar_timestamp)
-                            {
                                 outfile << p.local_trajectory[i].timestamps.first << ",";
-                            }
                             if (write_unix_timestamp)
-                            {
                                 outfile << p.local_trajectory[i].timestamps.second << ",";
-                            }
+
                             outfile << pose(0, 3) << "," << pose(1, 3) << "," << pose(2, 3) << ",";
                             if (use_quaternions)
                             {
@@ -610,22 +1723,16 @@ void save_trajectories(
                                 outfile << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << std::endl;
                             }
                             else
-                            {
                                 outfile << pose(0, 0) << "," << pose(0, 1) << "," << pose(0, 2) << "," << pose(1, 0) << "," << pose(1, 1) << "," << pose(1, 2) << "," << pose(2, 0) << "," << pose(2, 1) << "," << pose(2, 2) << std::endl;
-                            }
                         }
                     }
                 }
             }
         }
         if (!save_to_dxf)
-        {
             outfile.close();
-        }
         else
-        {
             createDXFPolyline(output_file_name, polylinePoints);
-        }
     }
 }
 
@@ -705,86 +1812,35 @@ void update_timestamp_offset()
 
 void project_gui()
 {
-    const std::vector<std::string> Session_filter = {"Session, json", "*.json"};
-    const std::vector<std::string> Project_filter = {"Project, json", "*.json"};
-
-    if (ImGui::Begin("multi_session_registration_step_3"))
-    {
-        ImGui::Text("This program is third step in MANDEYE process.");
-        ImGui::Text("To change centre of rotation press 'ctrl + middle mouse button'");
-        ImGui::Text("It refines sessions with loop closure.");
-        ImGui::Text("First step: create project by adding sessions: result of 'multi_view_tls_registration_step_2' program.");
-        ImGui::Text("Last step: save project.");
-        ImGui::Text("To produce map use 'multi_view_tls_registration_step_2' export functionality.");
-
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        ImGui::ColorEdit3("clear color", (float *)&clear_color); // Edit 3 floats representing a color
-
-        if (ImGui::Button("reset view"))
-        {
-            rotate_x = 0.0;
-            rotate_y = 0.0;
-            translate_x = 0.0;
-            translate_y = 0.0;
-            translate_z = -50.0;
-            viewer_decmiate_point_cloud = 1000;
-
-            camera_ortho_xy_view_zoom = 10;
-            camera_ortho_xy_view_shift_x = 0.0;
-            camera_ortho_xy_view_shift_y = 0.0;
-            camera_ortho_xy_view_rotation_angle_deg = 0;
-            camera_mode_ortho_z_center_h = 0.0;
-        }
-
-        ImGui::InputInt("'Points render subsampling': increase for better performance, decrease for rendering more points", &viewer_decmiate_point_cloud);
-        if (viewer_decmiate_point_cloud < 1)
-        {
-            viewer_decmiate_point_cloud = 1;
-        }
-
-        auto tmp = all_point_size;
-        ImGui::InputInt("all points size", &all_point_size);
-        if (all_point_size < 1)
-            all_point_size = 1;
-
-        if (tmp != all_point_size)
-        {
-            for (auto &session : sessions)
-            {
-                for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-                {
-                    session.point_clouds_container.point_clouds[i].point_size = all_point_size;
-                }
-            }
-        }
-
-        ImGui::Checkbox("is_ortho", &is_ortho);
-        if (is_ortho)
-        {
-            rotate_x = 0.0;
-            rotate_y = 0.0;
-        }
+    if (ImGui::Begin("Multi session processing"))
+    {   
+        ImGui::Checkbox("Decimate during load", &is_decimate);
         ImGui::SameLine();
-        ImGui::Checkbox("show_axes", &show_axes);
+        ImGui::Text("Bucket [m]:");
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::InputDouble("X##b", &bucket_x, 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(xText);
         ImGui::SameLine();
+        ImGui::InputDouble("Y##b", &bucket_y, 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(yText);
+        ImGui::SameLine();
+        ImGui::InputDouble("Z##b", &bucket_z, 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(zText);
+        ImGui::PopItemWidth();
 
-        ImGui::Checkbox("block_z", &block_z);
-
-        ImGui::SliderFloat("mouse_sensitivity", &mouse_sensitivity, 0.01f, 25.0f);
-        ImGui::InputFloat3("rotation center", rotation_center.data());
-        ImGui::Checkbox("decimate during load", &is_decimate);
-        ImGui::InputDouble("bucket_x", &bucket_x);
-        ImGui::InputDouble("bucket_y", &bucket_y);
-        ImGui::InputDouble("bucket_z", &bucket_z);
-
-        //  ImGui::Text("---------------------------------------------");
         ImGui::NewLine();
 
-        ImGui::Text("-------BENCHMARK SETTINGS BEGIN----------------");
+        ImGui::Separator();
 
-        ImGui::InputDouble("time_stamp_offset", &time_stamp_offset, 100000000000.0, 1000000000000.0);
+        ImGui::Text("Benchmark settings:");
 
-        if (ImGui::Button("set to origin"))
+		ImGui::SetNextItemWidth(ImGuiNumberWidth*2);
+        ImGui::InputDouble("Timestamp offset ", &time_stamp_offset, 100000000000.0, 1000000000000.0);
+        ImGui::SameLine();
+        if (ImGui::Button("Set to origin"))
         {
 
             for (auto &session : sessions)
@@ -817,186 +1873,89 @@ void project_gui()
                     auto inv = (m1 * m2).inverse();
 
                     for (int index = 0; index < session.point_clouds_container.point_clouds.size(); index++)
-                    {
                         session.point_clouds_container.point_clouds[index].m_pose = inv * session.point_clouds_container.point_clouds[index].m_pose;
-                    }
                 }
             }
         }
 
-        ImGui::Text("-------BENCHMARK SETTINGS END----------------");
+        ImGui::Separator();
 
         ImGui::NewLine();
 
-        ImGui::Text("-------PROJECT SETTINGS BEGIN----------------");
-        if (ImGui::Button("add session to project"))
-        {
-            std::string input_file_name = "";
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Add session", mandeye::fd::Session_filter);
-            std::cout << "SESSION file: '" << input_file_name << "'" << std::endl;
+        ImGui::Separator();
 
-            if (input_file_name.size() > 0)
-            {
-                project_settings.session_file_names.push_back(input_file_name);
-                loaded_sessions = false;
-                time_stamp_offset = 0.0;
-            }
-        }
-
-        ImGui::SameLine();
-
-        if (ImGui::Button("remove selected sessions from project"))
-        {
-            ImGui::OpenPopup("Remove Sessions");
-        }
-
-        if (ImGui::BeginPopupModal("Remove Sessions", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-        {
-            static std::vector<bool> session_marked_for_removal;
-            if (session_marked_for_removal.size() != project_settings.session_file_names.size())
-                session_marked_for_removal.resize(project_settings.session_file_names.size(), false);
-
-            ImGui::Text("Select sessions to remove:");
-            ImGui::Separator();
-
-            for (int i = 0; i < project_settings.session_file_names.size(); i++)
-            {
-                bool checked = session_marked_for_removal[i];
-                if (ImGui::Checkbox(project_settings.session_file_names[i].c_str(), &checked))
-                    session_marked_for_removal[i] = checked;
-            }
-
-            ImGui::Separator();
-
-            if (ImGui::Button("Remove"))
-            {
-                for (int i = project_settings.session_file_names.size() - 1; i >= 0; i--)
-                {
-                    if (session_marked_for_removal[i])
-                    {
-                        std::cout << "Removing session: " << project_settings.session_file_names[i] << std::endl;
-                        project_settings.session_file_names.erase(project_settings.session_file_names.begin() + i);
-                        if (loaded_sessions && i < sessions.size())
-                            sessions.erase(sessions.begin() + i);
-                    }
-                }
-
-                session_marked_for_removal.clear();
-
-                if (!sessions.empty())
-                {
-                    update_timestamp_offset();
-                }
-                else
-                {
-                    loaded_sessions = false;
-                    time_stamp_offset = 0.0;
-                }
-
-                ImGui::CloseCurrentPopup();
-            }
-
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel"))
-            {
-                session_marked_for_removal.clear();
-                ImGui::CloseCurrentPopup();
-            }
-
-            ImGui::EndPopup();
-        }
-
-        if (ImGui::Button("load project"))
-        {
-            std::string input_file_name = "";
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load project", Project_filter);
-            std::cout << "Project file: '" << input_file_name << "'" << std::endl;
-
-            if (input_file_name.size() > 0)
-            {
-                load_project_settings(fs::path(input_file_name).string(), project_settings);
-                loaded_sessions = false;
-                time_stamp_offset = 0.0;
-            }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("save project"))
-        {
-            std::string output_file_name = "";
-            output_file_name = mandeye::fd::SaveFileDialog("Save project file", Project_filter, ".json");
-
-            if (output_file_name.size() > 0)
-            {
-                save_project_settings(fs::path(output_file_name).string(), project_settings);
-            }
-        }
-
-        ImGui::Text("-----------session_file_names begin----------");
-        ImGui::Checkbox("gizmo_all_sessions", &gizmo_all_sessions);
+        ImGui::Text("Session file names:");
 
         int index_gizmo = -1;
 
         for (int i = 0; i < project_settings.session_file_names.size(); i++)
         {
-            ImGui::Text(project_settings.session_file_names[i].c_str());
+            ImGui::Text(truncPath(project_settings.session_file_names[i]).c_str());
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(project_settings.session_file_names[i].c_str());
 
             if (project_settings.session_file_names.size() == sessions.size())
             {
+                ImGui::SameLine();
+                ImGui::Checkbox(("Visible##" + std::to_string(i)).c_str(), &sessions[i].visible);
+
+                ImGui::BeginDisabled(!sessions[i].visible);
+                {
+                    ImGui::BeginDisabled(sessions[i].is_ground_truth);
+                    {
+                        ImGui::SameLine();
+                        if (ImGui::Checkbox(("Gizmo##" + std::to_string(i)).c_str(), &sessions[i].is_gizmo))
+                        {
+                            if (sessions[i].is_gizmo)
+                            {
+                                for (int ii = 0; ii < sessions.size(); ii++)
+									if (i != ii)
+                                        sessions[ii].is_gizmo = false;
+                                index_gizmo = i;
+                            }
+                            else
+                                index_gizmo = -1;
+                        }
+                    }
+                    ImGui::EndDisabled();
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox(("Show RGB##" + std::to_string(i)).c_str(), &sessions[i].show_rgb);
+
+                    if (!sessions[i].show_rgb)
+                    {
+                        ImGui::SameLine();
+                        ImGui::ColorEdit3(("Color##" + std::to_string(i)).c_str(), (float*)&sessions[i].render_color, ImGuiColorEditFlags_NoInputs);
+                        for (auto& pc : sessions[i].point_clouds_container.point_clouds)
+                        {
+                            pc.render_color[0] = sessions[i].render_color[0];
+                            pc.render_color[1] = sessions[i].render_color[1];
+                            pc.render_color[2] = sessions[i].render_color[2];
+                            pc.show_color = sessions[i].show_rgb;
+                        }
+                    }
+                    else
+                    {
+                        for (auto& pc : sessions[i].point_clouds_container.point_clouds)
+                            pc.show_color = sessions[i].show_rgb;
+                    }
+                }
+                ImGui::EndDisabled();
+                         
                 if (sessions[i].is_ground_truth)
                 {
                     ImGui::SameLine();
-                    ImGui::Text(" [ground_truth] ");
-                }
-                ImGui::SameLine();
-                ImGui::Checkbox(("visible[" + std::to_string(i) + "]").c_str(), &sessions[i].visible);
-                if (!sessions[i].is_ground_truth && sessions[i].visible)
-                {
-                    ImGui::SameLine();
-                    ImGui::Checkbox(("gizmo[" + std::to_string(i) + "]").c_str(), &sessions[i].is_gizmo);
-                }
-
-                if (sessions[i].is_gizmo)
-                {
-                    for (int ii = 0; ii < sessions.size(); ii++)
-                    {
-                        sessions[ii].is_gizmo = false;
-                    }
-                    // std::cout << i << std::endl;
-                    index_gizmo = i;
-                }
-                ImGui::SameLine();
-                ImGui::Checkbox(("show_rgb[" + std::to_string(i) + "]").c_str(), &sessions[i].show_rgb);
-
-                if (!sessions[i].show_rgb)
-                {
-                    // ImGui::SameLine();
-                    ImGui::ColorEdit3(("color[" + std::to_string(i) + "]").c_str(), (float *)&sessions[i].render_color);
-                    for (auto &pc : sessions[i].point_clouds_container.point_clouds)
-                    {
-                        pc.render_color[0] = sessions[i].render_color[0];
-                        pc.render_color[1] = sessions[i].render_color[1];
-                        pc.render_color[2] = sessions[i].render_color[2];
-                        pc.show_color = sessions[i].show_rgb;
-                    }
-                }
-                else
-                {
-                    for (auto &pc : sessions[i].point_clouds_container.point_clouds)
-                    {
-                        pc.show_color = sessions[i].show_rgb;
-                    }
+                    ImGui::Text(" [ground_truth]");
                 }
             }
         }
         if (project_settings.session_file_names.size() == sessions.size())
         {
-            for (int i = 0; i < sessions.size(); i++)
-            {
-                sessions[i].is_gizmo = false;
-            }
+            //for (int i = 0; i < sessions.size(); i++)
+            //    sessions[i].is_gizmo = false;
             if (index_gizmo != -1 && index_gizmo < sessions.size())
             {
-                sessions[index_gizmo].is_gizmo = true;
+                //sessions[index_gizmo].is_gizmo = true;
                 m_gizmo[0] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 0);
                 m_gizmo[1] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 0);
                 m_gizmo[2] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 0);
@@ -1016,542 +1975,23 @@ void project_gui()
             }
         }
 
-        ImGui::Text("-----------session_file_names end------------");
+        ImGui::BeginDisabled((project_settings.session_file_names.size() < 2) || (index_gizmo == -1));
+        {
+            ImGui::Checkbox("Gizmo all sessions", &gizmo_all_sessions);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Gizmo will move all sessions");
+        }
+		ImGui::EndDisabled();
 
-        ImGui::Text("-------PROJECT SETTINGS END------------------");
+        ImGui::Separator();
 
         ImGui::NewLine();
 
         if (project_settings.session_file_names.size() > 0)
         {
-            if (!loaded_sessions)
-            {
-                if (ImGui::Button("load sessions"))
-                {
-                    sessions.clear();
-                    for (const auto &ps : project_settings.session_file_names)
-                    {
-                        Session session;
-                        session.load(fs::path(ps).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
-                        sessions.push_back(session);
-                    }
-                    loaded_sessions = true;
-
-                    // reorder
-                    std::vector<Session> sessions_reorder;
-                    std::vector<std::string> session_file_names_reordered;
-
-                    std::map<int, int> map_reorder;
-                    // project_settings.session_file_names.
-                    int new_index = 0;
-                    for (int i = 0; i < sessions.size(); i++)
-                    {
-                        if (sessions[i].is_ground_truth)
-                        {
-                            sessions_reorder.push_back(sessions[i]);
-                            session_file_names_reordered.push_back(project_settings.session_file_names[i]);
-                            map_reorder[i] = new_index++;
-                        }
-                    }
-                    for (int i = 0; i < sessions.size(); i++)
-                    {
-                        if (!sessions[i].is_ground_truth)
-                        {
-                            sessions_reorder.push_back(sessions[i]);
-                            session_file_names_reordered.push_back(project_settings.session_file_names[i]);
-                            map_reorder[i] = new_index++;
-                        }
-                    }
-                    sessions = sessions_reorder;
-                    project_settings.session_file_names = session_file_names_reordered;
-
-                    for (auto &e : edges)
-                    {
-                        e.index_session_from = map_reorder[e.index_session_from];
-                        e.index_session_to = map_reorder[e.index_session_to];
-                    }
-
-                    std::cout << "sessions reordered, ground truth should be in front" << std::endl;
-                    for (const auto &s : sessions)
-                    {
-                        std::cout << "session: '" << s.session_file_name << "' ground truth [" << int(s.is_ground_truth) << "]" << std::endl;
-                    }
-
-                    // update time_stamp_offset
-                    std::cout << "update time_stamp_offset" << std::endl;
-                    for (const auto &s : sessions)
-                    {
-                        if (s.point_clouds_container.point_clouds.size() > 0)
-                        {
-                            if (s.point_clouds_container.point_clouds[0].local_trajectory.size() > 0)
-                            {
-                                if (s.point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first > time_stamp_offset)
-                                {
-                                    time_stamp_offset = s.point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (loaded_sessions)
-            {
-                ImGui::Text("-------TRAJECTORY EXPORT SECTION BEGIN------------------");
-
-                if (ImGui::Button("save all marked trajectories to laz (as one global scan)"))
-                {
-                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
-                    {
-                        const auto &session_path = project_settings.session_file_names[i];
-
-                        if (i >= sessions.size())
-                        {
-                            std::cerr << "No loaded session for: " << session_path << std::endl;
-                            continue;
-                        }
-
-                        Session &session = sessions[i];
-
-                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
-                        std::string folder_name = dir.filename().string();
-                        std::string laz_path = (dir / (folder_name + "_trajectory_laz.laz")).string();
-
-                        std::cout << "Saving trajectory to LAZ: " << laz_path << std::endl;
-
-                        save_trajectories_to_laz(session,
-                                                 laz_path,
-                                                 0.0f,
-                                                 0.0f,
-                                                 false);
-                    }
-
-                    std::cout << "Finished saving all trajectories to .laz files." << std::endl;
-                }
-                
-               if (ImGui::Button("save all marked trajectories to TUM txt (timestamp x y z qx qy qz qw)")) {
-                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i) {
-                        const auto &session_path = project_settings.session_file_names[i];
-                        if (i >= sessions.size()) {
-                            std::cerr << "No loaded session for: " << session_path << std::endl;
-                            continue;
-                        }
-                        Session &session = sessions[i];
-                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
-                        std::string folder_name = dir.filename().string();
-                        std::string txt_path = (dir / (folder_name + "_trajectory_tum.txt")).string();
-
-                        std::cout << "Saving trajectory to TUM TXT: " << txt_path << std::endl;
-                        try {
-                            std::ofstream outfile(txt_path);
-                            if (!outfile.is_open()) {
-                                std::cerr << "Failed to create file: " << txt_path << std::endl;
-                                continue;
-                            }
-
-                            for (const auto &pc : session.point_clouds_container.point_clouds) {
-                                if (!pc.visible) continue;
-                                for (const auto &traj : pc.local_trajectory) {
-                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
-                                    Eigen::Vector3d pos = pose.translation();
-                                    Eigen::Quaterniond q(pose.rotation());
-
-                                    double t_s = static_cast<double>(traj.timestamps.first) / 1e9;
-
-                                    outfile << std::fixed 
-                                            << std::setprecision(9) << t_s << " "
-                                            << std::setprecision(10) << pos.x() << " " << pos.y() << " " << pos.z() << " "
-                                            << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
-                                }
-                            }
-
-                            outfile.close();
-                            std::cout << "Saved: " << txt_path << std::endl;
-                        } catch (const std::exception &e) {
-                            std::cerr << "Error creating " << txt_path << ": " << e.what() << std::endl;
-                        }
-                    }
-                    std::cout << "Finished saving all trajectories to TUM TXT files." << std::endl;
-                }
-
-                // timestampLidar, x,y,z,r00..r22
-                if (ImGui::Button("save all marked trajectories to csv (timestampLidar,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
-                {
-                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
-                    {
-                        const auto &session_path = project_settings.session_file_names[i];
-
-                        if (i >= sessions.size())
-                        {
-                            std::cerr << "No loaded session for: " << session_path << std::endl;
-                            continue;
-                        }
-
-                        Session &session = sessions[i];
-                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
-                        std::string folder_name = dir.filename().string();
-                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidar_r.csv")).string();
-
-                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
-
-                        try
-                        {
-                            std::ofstream outfile(csv_path);
-                            if (!outfile.is_open())
-                            {
-                                std::cerr << "Failed to create file: " << csv_path << std::endl;
-                                continue;
-                            }
-
-                            outfile << "timestampLidar,x,y,z,"
-                                    << "r00,r01,r02,"
-                                    << "r10,r11,r12,"
-                                    << "r20,r21,r22\n";
-
-                            for (const auto &pc : session.point_clouds_container.point_clouds)
-                            {
-                                if (!pc.visible)
-                                    continue;
-
-                                for (const auto &traj : pc.local_trajectory)
-                                {
-                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
-                                    Eigen::Vector3d pos = pose.translation();
-                                    Eigen::Matrix3d rot = pose.rotation();
-
-                                    outfile << std::fixed << std::setprecision(0)
-                                            << traj.timestamps.first << ","
-                                            << std::setprecision(10)
-                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                            << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
-                                            << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
-                                            << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
-                                }
-                            }
-
-                            outfile.close();
-                            std::cout << "Saved: " << csv_path << std::endl;
-                        }
-                        catch (const std::exception &e)
-                        {
-                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
-                        }
-                    }
-
-                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
-                }
-
-                // timestampUnix, x,y,z,r00..r22
-                if (ImGui::Button("save all marked trajectories to csv (timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
-                {
-                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
-                    {
-                        const auto &session_path = project_settings.session_file_names[i];
-                        if (i >= sessions.size())
-                        {
-                            std::cerr << "No loaded session for: " << session_path << std::endl;
-                            continue;
-                        }
-
-                        Session &session = sessions[i];
-                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
-                        std::string folder_name = dir.filename().string();
-                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampUnix_r.csv")).string();
-
-                        try
-                        {
-                            std::ofstream outfile(csv_path);
-                            if (!outfile.is_open())
-                            {
-                                std::cerr << "Failed to create file: " << csv_path << std::endl;
-                                continue;
-                            }
-
-                            outfile << "timestampUnix,x,y,z,"
-                                    << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
-
-                            for (const auto &pc : session.point_clouds_container.point_clouds)
-                            {
-                                if (!pc.visible)
-                                    continue;
-                                for (const auto &traj : pc.local_trajectory)
-                                {
-                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
-                                    Eigen::Vector3d pos = pose.translation();
-                                    Eigen::Matrix3d rot = pose.rotation();
-                                    outfile << std::fixed << std::setprecision(0)
-                                            << traj.timestamps.second << "," // Unix timestamp
-                                            << std::setprecision(10)
-                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                            << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
-                                            << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
-                                            << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
-                                }
-                            }
-
-                            outfile.close();
-                            std::cout << "Saved: " << csv_path << std::endl;
-                        }
-                        catch (const std::exception &e)
-                        {
-                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
-                        }
-                    }
-                }
-
-                // timestampLidar, timestampUnix, x,y,z,r00..r22
-                if (ImGui::Button("save all marked trajectories to csv (timestampLidar,timestampUnix,x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)"))
-                {
-                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
-                    {
-                        const auto &session_path = project_settings.session_file_names[i];
-                        if (i >= sessions.size())
-                        {
-                            std::cerr << "No loaded session for: " << session_path << std::endl;
-                            continue;
-                        }
-
-                        Session &session = sessions[i];
-                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
-                        std::string folder_name = dir.filename().string();
-                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidarUnix_r.csv")).string();
-
-                        try
-                        {
-                            std::ofstream outfile(csv_path);
-                            if (!outfile.is_open())
-                            {
-                                std::cerr << "Failed to create file: " << csv_path << std::endl;
-                                continue;
-                            }
-
-                            outfile << "timestampLidar,timestampUnix,x,y,z,"
-                                    << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
-
-                            for (const auto &pc : session.point_clouds_container.point_clouds)
-                            {
-                                if (!pc.visible)
-                                    continue;
-                                for (const auto &traj : pc.local_trajectory)
-                                {
-                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
-                                    Eigen::Vector3d pos = pose.translation();
-                                    Eigen::Matrix3d rot = pose.rotation();
-                                    outfile << std::fixed << std::setprecision(0)
-                                            << traj.timestamps.first << ","  // Lidar timestamp
-                                            << traj.timestamps.second << "," // Unix timestamp
-                                            << std::setprecision(10)
-                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                            << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
-                                            << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
-                                            << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
-                                }
-                            }
-
-                            outfile.close();
-                            std::cout << "Saved: " << csv_path << std::endl;
-                        }
-                        catch (const std::exception &e)
-                        {
-                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
-                        }
-                    }
-                }
-
-                // timestampLidar, x,y,z,qx,qy,qz,qw
-                if (ImGui::Button("save all marked trajectories to csv (timestampLidar,x,y,z,qx,qy,qz,qw)"))
-                {
-                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
-                    {
-                        const auto &session_path = project_settings.session_file_names[i];
-
-                        if (i >= sessions.size())
-                        {
-                            std::cerr << "No loaded session for: " << session_path << std::endl;
-                            continue;
-                        }
-
-                        Session &session = sessions[i];
-                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
-                        std::string folder_name = dir.filename().string();
-                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidar_q.csv")).string();
-
-                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
-
-                        try
-                        {
-                            std::ofstream outfile(csv_path);
-                            if (!outfile.is_open())
-                            {
-                                std::cerr << "Failed to create file: " << csv_path << std::endl;
-                                continue;
-                            }
-
-                            outfile << "timestampLidar,x,y,z,qx,qy,qz,qw\n";
-
-                            for (const auto &pc : session.point_clouds_container.point_clouds)
-                            {
-                                if (!pc.visible)
-                                    continue;
-
-                                for (const auto &traj : pc.local_trajectory)
-                                {
-                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
-                                    Eigen::Vector3d pos = pose.translation();
-                                    Eigen::Quaterniond q(pose.rotation());
-
-                                    outfile << std::fixed << std::setprecision(0)
-                                            << traj.timestamps.first << "," // Lidar timestamp
-                                            << std::setprecision(10)
-                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                            << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
-                                }
-                            }
-
-                            outfile.close();
-                            std::cout << "Saved: " << csv_path << std::endl;
-                        }
-                        catch (const std::exception &e)
-                        {
-                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
-                        }
-                    }
-
-                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
-                }
-
-                // timestampUnix, x,y,z,qx,qy,qz,qw
-                if (ImGui::Button("save all marked trajectories to csv (timestampUnix,x,y,z,qx,qy,qz,qw)"))
-                {
-                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
-                    {
-                        const auto &session_path = project_settings.session_file_names[i];
-
-                        if (i >= sessions.size())
-                        {
-                            std::cerr << "No loaded session for: " << session_path << std::endl;
-                            continue;
-                        }
-
-                        Session &session = sessions[i];
-                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
-                        std::string folder_name = dir.filename().string();
-                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampUnix_q.csv")).string();
-
-                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
-
-                        try
-                        {
-                            std::ofstream outfile(csv_path);
-                            if (!outfile.is_open())
-                            {
-                                std::cerr << "Failed to create file: " << csv_path << std::endl;
-                                continue;
-                            }
-
-                            outfile << "timestampUnix,x,y,z,qx,qy,qz,qw\n";
-
-                            for (const auto &pc : session.point_clouds_container.point_clouds)
-                            {
-                                if (!pc.visible)
-                                    continue;
-
-                                for (const auto &traj : pc.local_trajectory)
-                                {
-                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
-                                    Eigen::Vector3d pos = pose.translation();
-                                    Eigen::Quaterniond q(pose.rotation());
-
-                                    outfile << std::fixed << std::setprecision(0)
-                                            << traj.timestamps.second << "," // Unix timestamp
-                                            << std::setprecision(10)
-                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                            << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
-                                }
-                            }
-
-                            outfile.close();
-                            std::cout << "Saved: " << csv_path << std::endl;
-                        }
-                        catch (const std::exception &e)
-                        {
-                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
-                        }
-                    }
-
-                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
-                }
-
-                // timestampLidar, timestampUnix, x,y,z,qx,qy,qz,qw
-                if (ImGui::Button("save all marked trajectories to csv (timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw)"))
-                {
-                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
-                    {
-                        const auto &session_path = project_settings.session_file_names[i];
-
-                        if (i >= sessions.size())
-                        {
-                            std::cerr << "No loaded session for: " << session_path << std::endl;
-                            continue;
-                        }
-
-                        Session &session = sessions[i];
-                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
-                        std::string folder_name = dir.filename().string();
-                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidarUnix_q.csv")).string();
-
-                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
-
-                        try
-                        {
-                            std::ofstream outfile(csv_path);
-                            if (!outfile.is_open())
-                            {
-                                std::cerr << "Failed to create file: " << csv_path << std::endl;
-                                continue;
-                            }
-
-                            outfile << "timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw\n";
-
-                            for (const auto &pc : session.point_clouds_container.point_clouds)
-                            {
-                                if (!pc.visible)
-                                    continue;
-
-                                for (const auto &traj : pc.local_trajectory)
-                                {
-                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
-                                    Eigen::Vector3d pos = pose.translation();
-                                    Eigen::Quaterniond q(pose.rotation());
-
-                                    outfile << std::fixed << std::setprecision(0)
-                                            << traj.timestamps.first << ","  // Lidar timestamp
-                                            << traj.timestamps.second << "," // Unix timestamp
-                                            << std::setprecision(10)
-                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                            << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
-                                }
-                            }
-
-                            outfile.close();
-                            std::cout << "Saved: " << csv_path << std::endl;
-                        }
-                        catch (const std::exception &e)
-                        {
-                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
-                        }
-                    }
-
-                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
-                }
-
-                ImGui::Text("-------TRAJECTORY EXPORT SECTION END------------------");
-                ImGui::NewLine();
-            }
-
             if (project_settings.session_file_names.size() == sessions.size())
             {
-                int number_visible_sessions = 0;
+                number_visible_sessions = 0;
 
                 bool first_session_index_found = false;
                 for (int index = 0; index < sessions.size(); index++)
@@ -1572,14 +2012,13 @@ void project_gui()
                     }
                 }
 
-                if (!manual_pose_graph_loop_closure_mode)
+                if (!is_loop_closure_gui)
                 {
                     static int nr_iter = 100;
-                    ImGui::InputInt("number of iterations", &nr_iter);
+                    ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                    ImGui::InputInt("Number of iterations", &nr_iter);
                     if (nr_iter < 1)
-                    {
                         nr_iter = 1;
-                    }
 
                     std::string bn = "Optimize (number of iterations: " + std::to_string(nr_iter) + ")";
 
@@ -1597,1243 +2036,221 @@ void project_gui()
                     //{
                     ImGui::SameLine();
                     if (ImGui::Button("Revert"))
-                    {
                         revert(sessions);
-                    }
                     ImGui::SameLine();
                     if (ImGui::Button("Save results"))
-                    {
                         save_results(sessions);
-                    }
                     //}
                 }
 
-                if (number_visible_sessions == 1 || number_visible_sessions == 2)
-                {
-                    // bool prev_manual_pose_graph_loop_closure_mode = manual_pose_graph_loop_closure_mode;
-                    ImGui::Checkbox("Manual Pose Graph Loop Closure Mode", &manual_pose_graph_loop_closure_mode);
-
-                    if (manual_pose_graph_loop_closure_mode)
-                    {
-                        if (!manipulate_active_edge)
-                        {
-                            ImGui::InputInt("index_loop_closure_source", &index_loop_closure_source);
-                            if (index_loop_closure_source < 0)
-                            {
-                                index_loop_closure_source = 0;
-                            }
-                            if (index_loop_closure_source >= sessions[first_session_index].point_clouds_container.point_clouds.size() - 1)
-                            {
-                                index_loop_closure_source = sessions[first_session_index].point_clouds_container.point_clouds.size() - 1;
-                            }
-                            ImGui::InputInt("index_loop_closure_target", &index_loop_closure_target);
-                            if (index_loop_closure_target < 0)
-                            {
-                                index_loop_closure_target = 0;
-                            }
-                            if (index_loop_closure_target >= sessions[second_session_index].point_clouds_container.point_clouds.size() - 1)
-                            {
-                                index_loop_closure_target = sessions[second_session_index].point_clouds_container.point_clouds.size() - 1;
-                            }
-                        }
-                        if (ImGui::Button("Add edge"))
-                        {
-                            Edge edge;
-                            edge.index_from = index_loop_closure_source;
-                            edge.index_to = index_loop_closure_target;
-                            edge.index_session_from = first_session_index;
-                            edge.index_session_to = second_session_index;
-
-                            edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(
-                                sessions[first_session_index].point_clouds_container.point_clouds[index_loop_closure_source].m_pose.inverse() *
-                                sessions[second_session_index].point_clouds_container.point_clouds[index_loop_closure_target].m_pose);
-
-                            edge.relative_pose_tb_weights.px = 1000000.0;
-                            edge.relative_pose_tb_weights.py = 1000000.0;
-                            edge.relative_pose_tb_weights.pz = 1000000.0;
-                            edge.relative_pose_tb_weights.om = 1000000.0;
-                            edge.relative_pose_tb_weights.fi = 1000000.0;
-                            edge.relative_pose_tb_weights.ka = 1000000.0;
-
-                            edges.push_back(edge);
-
-                            index_active_edge = edges.size() - 1;
-                        }
-
-                        std::string number_active_edges = "number_edges: " + std::to_string(edges.size());
-                        ImGui::Text(number_active_edges.c_str());
-                        if (edges.size() > 0)
-                        {
-                            ImGui::Checkbox("manipulate_active_edge", &manipulate_active_edge);
-                            if (manipulate_active_edge)
-                            {
-                                int remove_edge_index = -1;
-                                if (ImGui::Button("remove active edge"))
-                                {
-                                    edge_gizmo = false;
-                                    remove_edge_index = index_active_edge;
-                                }
-
-                                int prev_index_active_edge = index_active_edge;
-
-                                if (!edge_gizmo)
-                                {
-                                    bool is_gizmo = false;
-
-                                    for (const auto &s : sessions)
-                                    {
-                                        if (s.is_gizmo)
-                                        {
-                                            is_gizmo = true;
-                                        }
-                                    }
-
-                                    if (!is_gizmo)
-                                    {
-                                        ImGui::InputInt("index_active_edge", &index_active_edge);
-
-                                        if (index_active_edge < 0)
-                                        {
-                                            index_active_edge = 0;
-                                        }
-                                        if (index_active_edge >= (int)edges.size())
-                                        {
-                                            index_active_edge = (int)edges.size() - 1;
-                                        }
-                                    }
-                                }
-
-                                std::string txt = "index_session_from: " + std::to_string(edges[index_active_edge].index_session_from);
-                                ImGui::Text(txt.c_str());
-                                txt = "index_session_to: " + std::to_string(edges[index_active_edge].index_session_to);
-                                ImGui::Text(txt.c_str());
-                                txt = "index_from: " + std::to_string(edges[index_active_edge].index_from);
-                                ImGui::Text(txt.c_str());
-                                txt = "index_to: " + std::to_string(edges[index_active_edge].index_to);
-                                ImGui::Text(txt.c_str());
-
-                                if (remove_edge_index != -1)
-                                {
-                                    std::vector<Edge> new_edges;
-                                    for (int i = 0; i < edges.size(); i++)
-                                    {
-                                        if (remove_edge_index != i)
-                                        {
-                                            new_edges.push_back(edges[i]);
-                                        }
-                                    }
-                                    edges = new_edges;
-
-                                    index_active_edge = remove_edge_index - 1;
-                                    manipulate_active_edge = false;
-                                }
-
-                                bool prev_gizmo = edge_gizmo;
-                                ImGui::Checkbox("gizmo", &edge_gizmo);
-
-                                if (prev_gizmo != edge_gizmo)
-                                {
-                                    auto m_to = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].m_pose *
-                                                affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                    m_gizmo[0] = (float)m_to(0, 0);
-                                    m_gizmo[1] = (float)m_to(1, 0);
-                                    m_gizmo[2] = (float)m_to(2, 0);
-                                    m_gizmo[3] = (float)m_to(3, 0);
-                                    m_gizmo[4] = (float)m_to(0, 1);
-                                    m_gizmo[5] = (float)m_to(1, 1);
-                                    m_gizmo[6] = (float)m_to(2, 1);
-                                    m_gizmo[7] = (float)m_to(3, 1);
-                                    m_gizmo[8] = (float)m_to(0, 2);
-                                    m_gizmo[9] = (float)m_to(1, 2);
-                                    m_gizmo[10] = (float)m_to(2, 2);
-                                    m_gizmo[11] = (float)m_to(3, 2);
-                                    m_gizmo[12] = (float)m_to(0, 3);
-                                    m_gizmo[13] = (float)m_to(1, 3);
-                                    m_gizmo[14] = (float)m_to(2, 3);
-                                    m_gizmo[15] = (float)m_to(3, 3);
-                                }
-                                if (!edge_gizmo)
-                                {
-                                    if (ImGui::Button("ICP"))
-                                    {
-                                        std::cout << "Iterative Closest Point" << std::endl;
-                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                        {
-                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                                        }
-                                        else
-                                        {
-                                            bool is_with_ground_truth = false;
-                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                            {
-                                                is_with_ground_truth = true;
-                                            }
-
-                                            if (is_with_ground_truth)
-                                            {
-                                                int index_session_from = -1;
-                                                int index_session_to = -1;
-                                                int index_from = -1;
-                                                int index_to = -1;
-
-                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_from;
-                                                    index_session_to = edges[index_active_edge].index_session_to;
-                                                    index_from = edges[index_active_edge].index_from;
-                                                    index_to = edges[index_active_edge].index_to;
-                                                }
-                                                else
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_to;
-                                                    index_session_to = edges[index_active_edge].index_session_from;
-                                                    index_from = edges[index_active_edge].index_to;
-                                                    index_to = edges[index_active_edge].index_from;
-                                                }
-
-                                                double x_min = 1000000000000.0;
-                                                double y_min = 1000000000000.0;
-                                                double z_min = 1000000000000.0;
-                                                double x_max = -1000000000000.0;
-                                                double y_max = -1000000000000.0;
-                                                double z_max = -1000000000000.0;
-
-                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                                for (const auto &p : points_to.points_local)
-                                                {
-                                                    auto pg = points_to.m_pose * p;
-                                                    if (pg.x() < x_min)
-                                                    {
-                                                        x_min = pg.x();
-                                                    }
-                                                    if (pg.y() < y_min)
-                                                    {
-                                                        y_min = pg.y();
-                                                    }
-                                                    if (pg.z() < z_min)
-                                                    {
-                                                        z_min = pg.z();
-                                                    }
-                                                    if (pg.x() > x_max)
-                                                    {
-                                                        x_max = pg.x();
-                                                    }
-                                                    if (pg.y() > y_max)
-                                                    {
-                                                        y_max = pg.y();
-                                                    }
-                                                    if (pg.z() > z_max)
-                                                    {
-                                                        z_max = pg.z();
-                                                    }
-                                                }
-                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                                std::vector<Eigen::Vector3d> ground_truth;
-                                                for (const auto &p : points_from.points_local)
-                                                {
-                                                    auto pg = points_from.m_pose * p;
-                                                    if (pg.x() > x_min && pg.x() < x_max)
-                                                    {
-                                                        if (pg.y() > y_min && pg.y() < y_max)
-                                                        {
-                                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                            {
-                                                                ground_truth.push_back(p);
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                int number_of_iterations = 10;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, search_radious, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                                /*PointClouds pcs;
-                                                pcs.point_clouds.push_back(sessions[index_session_from].point_clouds_container.point_clouds[index_from]);
-                                                pcs.point_clouds.push_back(sessions[index_session_to].point_clouds_container.point_clouds[index_to]);
-                                                pcs.point_clouds[0].points_local = ground_truth;
-                                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
-                                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-
-                                                ICP icp;
-                                                icp.search_radious = (float)search_radious;
-
-                                                for (auto &pc : pcs.point_clouds)
-                                                {
-                                                    pc.rgd_params.resolution_X = icp.search_radious;
-                                                    pc.rgd_params.resolution_Y = icp.search_radious;
-                                                    pc.rgd_params.resolution_Z = icp.search_radious;
-                                                    pc.build_rgd();
-                                                    pc.cout_rgd();
-                                                    pc.compute_normal_vectors(0.5);
-                                                }
-
-                                                icp.number_of_threads = std::thread::hardware_concurrency();
-                                                icp.number_of_iterations = 10;
-                                                icp.is_adaptive_robust_kernel = false;
-
-                                                icp.is_ballanced_horizontal_vs_vertical = false;
-                                                icp.is_fix_first_node = true;
-                                                icp.is_gauss_newton = true;
-                                                icp.is_levenberg_marguardt = false;
-                                                icp.is_cw = false;
-                                                icp.is_wc = true;
-                                                icp.is_tait_bryan_angles = true;
-                                                icp.is_quaternion = false;
-                                                icp.is_rodrigues = false;
-                                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                                                icp.optimization_point_to_point_source_to_target(pcs);
-
-                                                edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
-                                                */
-                                            }
-                                            else
-                                            {
-                                                /*PointClouds pcs;
-                                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from]);
-                                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to]);
-                                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
-                                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                                                ICP icp;
-                                                icp.search_radious = (float)search_radious;
-
-                                                for (auto &pc : pcs.point_clouds)
-                                                {
-                                                    pc.rgd_params.resolution_X = icp.search_radious;
-                                                    pc.rgd_params.resolution_Y = icp.search_radious;
-                                                    pc.rgd_params.resolution_Z = icp.search_radious;
-                                                    pc.build_rgd();
-                                                    pc.cout_rgd();
-                                                    pc.compute_normal_vectors(0.5);
-                                                }
-
-                                                icp.number_of_threads = std::thread::hardware_concurrency();
-                                                icp.number_of_iterations = 10;
-                                                icp.is_adaptive_robust_kernel = false;
-
-                                                icp.is_ballanced_horizontal_vs_vertical = false;
-                                                icp.is_fix_first_node = true;
-                                                icp.is_gauss_newton = true;
-                                                icp.is_levenberg_marguardt = false;
-                                                icp.is_cw = false;
-                                                icp.is_wc = true;
-                                                icp.is_tait_bryan_angles = true;
-                                                icp.is_quaternion = false;
-                                                icp.is_rodrigues = false;
-                                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                                                icp.optimization_point_to_point_source_to_target(pcs);
-
-                                                edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
-                                                */
-                                                int number_of_iterations = 10;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, search_radious, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    ImGui::SameLine();
-                                    ImGui::InputDouble("search_radious", &search_radious);
-                                    if (search_radious < 0.01)
-                                    {
-                                        search_radious = 0.01;
-                                    }
-                                    /*if (ImGui::Button("ICP"))
-                                    {
-                                        std::cout << "Iterative Closest Point" << std::endl;
-                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                        {
-                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                                        }
-                                        else
-                                        {
-                                            bool is_with_ground_truth = false;
-                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                            {
-                                                is_with_ground_truth = true;
-                                            }
-
-                                            if (is_with_ground_truth)
-                                            {
-                                                int index_session_from = -1;
-                                                int index_session_to = -1;
-                                                int index_from = -1;
-                                                int index_to = -1;
-
-                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_from;
-                                                    index_session_to = edges[index_active_edge].index_session_to;
-                                                    index_from = edges[index_active_edge].index_from;
-                                                    index_to = edges[index_active_edge].index_to;
-                                                }
-                                                else
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_to;
-                                                    index_session_to = edges[index_active_edge].index_session_from;
-                                                    index_from = edges[index_active_edge].index_to;
-                                                    index_to = edges[index_active_edge].index_from;
-                                                }
-
-                                                double x_min = 1000000000000.0;
-                                                double y_min = 1000000000000.0;
-                                                double z_min = 1000000000000.0;
-                                                double x_max = -1000000000000.0;
-                                                double y_max = -1000000000000.0;
-                                                double z_max = -1000000000000.0;
-
-                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                                for (const auto &p : points_to.points_local)
-                                                {
-                                                    auto pg = points_to.m_pose * p;
-                                                    if (pg.x() < x_min)
-                                                    {
-                                                        x_min = pg.x();
-                                                    }
-                                                    if (pg.y() < y_min)
-                                                    {
-                                                        y_min = pg.y();
-                                                    }
-                                                    if (pg.z() < z_min)
-                                                    {
-                                                        z_min = pg.z();
-                                                    }
-                                                    if (pg.x() > x_max)
-                                                    {
-                                                        x_max = pg.x();
-                                                    }
-                                                    if (pg.y() > y_max)
-                                                    {
-                                                        y_max = pg.y();
-                                                    }
-                                                    if (pg.z() > z_max)
-                                                    {
-                                                        z_max = pg.z();
-                                                    }
-                                                }
-                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                                std::vector<Eigen::Vector3d> ground_truth;
-                                                for (const auto &p : points_from.points_local)
-                                                {
-                                                    auto pg = points_from.m_pose * p;
-                                                    if (pg.x() > x_min && pg.x() < x_max)
-                                                    {
-                                                        if (pg.y() > y_min && pg.y() < y_max)
-                                                        {
-                                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                            {
-                                                                ground_truth.push_back(p);
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                PointClouds pcs;
-                                                pcs.point_clouds.push_back(sessions[index_session_from].point_clouds_container.point_clouds[index_from]);
-                                                pcs.point_clouds.push_back(sessions[index_session_to].point_clouds_container.point_clouds[index_to]);
-                                                pcs.point_clouds[0].points_local = ground_truth;
-                                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
-                                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                                                ICP icp;
-                                                icp.search_radious = (float)search_radious;
-
-                                                for (auto &pc : pcs.point_clouds)
-                                                {
-                                                    pc.rgd_params.resolution_X = icp.search_radious;
-                                                    pc.rgd_params.resolution_Y = icp.search_radious;
-                                                    pc.rgd_params.resolution_Z = icp.search_radious;
-                                                    pc.build_rgd();
-                                                    pc.cout_rgd();
-                                                    pc.compute_normal_vectors(0.5);
-                                                }
-
-                                                icp.number_of_threads = std::thread::hardware_concurrency();
-                                                icp.number_of_iterations = 10;
-                                                icp.is_adaptive_robust_kernel = false;
-
-                                                icp.is_ballanced_horizontal_vs_vertical = false;
-                                                icp.is_fix_first_node = true;
-                                                icp.is_gauss_newton = true;
-                                                icp.is_levenberg_marguardt = false;
-                                                icp.is_cw = false;
-                                                icp.is_wc = true;
-                                                icp.is_tait_bryan_angles = true;
-                                                icp.is_quaternion = false;
-                                                icp.is_rodrigues = false;
-                                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                                                icp.optimization_point_to_point_source_to_target(pcs);
-
-                                                edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
-                                            }
-                                            else
-                                            {
-                                                PointClouds pcs;
-                                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from]);
-                                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to]);
-                                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
-                                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                                                ICP icp;
-                                                icp.search_radious = (float)search_radious;
-
-                                                for (auto &pc : pcs.point_clouds)
-                                                {
-                                                    pc.rgd_params.resolution_X = icp.search_radious;
-                                                    pc.rgd_params.resolution_Y = icp.search_radious;
-                                                    pc.rgd_params.resolution_Z = icp.search_radious;
-                                                    pc.build_rgd();
-                                                    pc.cout_rgd();
-                                                    pc.compute_normal_vectors(0.5);
-                                                }
-
-                                                icp.number_of_threads = std::thread::hardware_concurrency();
-                                                icp.number_of_iterations = 10;
-                                                icp.is_adaptive_robust_kernel = false;
-
-                                                icp.is_ballanced_horizontal_vs_vertical = false;
-                                                icp.is_fix_first_node = true;
-                                                icp.is_gauss_newton = true;
-                                                icp.is_levenberg_marguardt = false;
-                                                icp.is_cw = false;
-                                                icp.is_wc = true;
-                                                icp.is_tait_bryan_angles = true;
-                                                icp.is_quaternion = false;
-                                                icp.is_rodrigues = false;
-                                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                                                icp.optimization_point_to_point_source_to_target(pcs);
-
-                                                edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
-                                            }
-                                        }
-                                    }
-                                    ImGui::SameLine();
-                                    ImGui::InputDouble("search_radious", &search_radious);
-                                    if (search_radious < 0.01)
-                                    {
-                                        search_radious = 0.01;
-                                    }*/
-
-                                    /////////////////////////////////
-                                    if (ImGui::Button("ICP [search radious 2m]"))
-                                    {
-                                        float sr = 2.0;
-                                        std::cout << "Iterative Closest Point" << std::endl;
-                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                        {
-                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                                        }
-                                        else
-                                        {
-                                            bool is_with_ground_truth = false;
-                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                            {
-                                                is_with_ground_truth = true;
-                                            }
-
-                                            if (is_with_ground_truth)
-                                            {
-                                                int index_session_from = -1;
-                                                int index_session_to = -1;
-                                                int index_from = -1;
-                                                int index_to = -1;
-
-                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_from;
-                                                    index_session_to = edges[index_active_edge].index_session_to;
-                                                    index_from = edges[index_active_edge].index_from;
-                                                    index_to = edges[index_active_edge].index_to;
-                                                }
-                                                else
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_to;
-                                                    index_session_to = edges[index_active_edge].index_session_from;
-                                                    index_from = edges[index_active_edge].index_to;
-                                                    index_to = edges[index_active_edge].index_from;
-                                                }
-
-                                                double x_min = 1000000000000.0;
-                                                double y_min = 1000000000000.0;
-                                                double z_min = 1000000000000.0;
-                                                double x_max = -1000000000000.0;
-                                                double y_max = -1000000000000.0;
-                                                double z_max = -1000000000000.0;
-
-                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                                for (const auto &p : points_to.points_local)
-                                                {
-                                                    auto pg = points_to.m_pose * p;
-                                                    if (pg.x() < x_min)
-                                                    {
-                                                        x_min = pg.x();
-                                                    }
-                                                    if (pg.y() < y_min)
-                                                    {
-                                                        y_min = pg.y();
-                                                    }
-                                                    if (pg.z() < z_min)
-                                                    {
-                                                        z_min = pg.z();
-                                                    }
-                                                    if (pg.x() > x_max)
-                                                    {
-                                                        x_max = pg.x();
-                                                    }
-                                                    if (pg.y() > y_max)
-                                                    {
-                                                        y_max = pg.y();
-                                                    }
-                                                    if (pg.z() > z_max)
-                                                    {
-                                                        z_max = pg.z();
-                                                    }
-                                                }
-                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                                std::vector<Eigen::Vector3d> ground_truth;
-                                                for (const auto &p : points_from.points_local)
-                                                {
-                                                    auto pg = points_from.m_pose * p;
-                                                    if (pg.x() > x_min && pg.x() < x_max)
-                                                    {
-                                                        if (pg.y() > y_min && pg.y() < y_max)
-                                                        {
-                                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                            {
-                                                                ground_truth.push_back(p);
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                int number_of_iterations = 30;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                            }
-                                            else
-                                            {
-
-                                                int number_of_iterations = 30;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    ImGui::SameLine();
-                                    if (ImGui::Button("ICP [search radious 1m]"))
-                                    {
-                                        float sr = 1.0;
-                                        std::cout << "Iterative Closest Point" << std::endl;
-                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                        {
-                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                                        }
-                                        else
-                                        {
-                                            bool is_with_ground_truth = false;
-                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                            {
-                                                is_with_ground_truth = true;
-                                            }
-
-                                            if (is_with_ground_truth)
-                                            {
-                                                int index_session_from = -1;
-                                                int index_session_to = -1;
-                                                int index_from = -1;
-                                                int index_to = -1;
-
-                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_from;
-                                                    index_session_to = edges[index_active_edge].index_session_to;
-                                                    index_from = edges[index_active_edge].index_from;
-                                                    index_to = edges[index_active_edge].index_to;
-                                                }
-                                                else
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_to;
-                                                    index_session_to = edges[index_active_edge].index_session_from;
-                                                    index_from = edges[index_active_edge].index_to;
-                                                    index_to = edges[index_active_edge].index_from;
-                                                }
-
-                                                double x_min = 1000000000000.0;
-                                                double y_min = 1000000000000.0;
-                                                double z_min = 1000000000000.0;
-                                                double x_max = -1000000000000.0;
-                                                double y_max = -1000000000000.0;
-                                                double z_max = -1000000000000.0;
-
-                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                                for (const auto &p : points_to.points_local)
-                                                {
-                                                    auto pg = points_to.m_pose * p;
-                                                    if (pg.x() < x_min)
-                                                    {
-                                                        x_min = pg.x();
-                                                    }
-                                                    if (pg.y() < y_min)
-                                                    {
-                                                        y_min = pg.y();
-                                                    }
-                                                    if (pg.z() < z_min)
-                                                    {
-                                                        z_min = pg.z();
-                                                    }
-                                                    if (pg.x() > x_max)
-                                                    {
-                                                        x_max = pg.x();
-                                                    }
-                                                    if (pg.y() > y_max)
-                                                    {
-                                                        y_max = pg.y();
-                                                    }
-                                                    if (pg.z() > z_max)
-                                                    {
-                                                        z_max = pg.z();
-                                                    }
-                                                }
-                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                                std::vector<Eigen::Vector3d> ground_truth;
-                                                for (const auto &p : points_from.points_local)
-                                                {
-                                                    auto pg = points_from.m_pose * p;
-                                                    if (pg.x() > x_min && pg.x() < x_max)
-                                                    {
-                                                        if (pg.y() > y_min && pg.y() < y_max)
-                                                        {
-                                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                            {
-                                                                ground_truth.push_back(p);
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                int number_of_iterations = 30;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                            }
-                                            else
-                                            {
-
-                                                int number_of_iterations = 30;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    ImGui::SameLine();
-                                    if (ImGui::Button("ICP [search radious 0.5m]"))
-                                    {
-                                        float sr = 0.5;
-                                        std::cout << "Iterative Closest Point" << std::endl;
-                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                        {
-                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                                        }
-                                        else
-                                        {
-                                            bool is_with_ground_truth = false;
-                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                            {
-                                                is_with_ground_truth = true;
-                                            }
-
-                                            if (is_with_ground_truth)
-                                            {
-                                                int index_session_from = -1;
-                                                int index_session_to = -1;
-                                                int index_from = -1;
-                                                int index_to = -1;
-
-                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_from;
-                                                    index_session_to = edges[index_active_edge].index_session_to;
-                                                    index_from = edges[index_active_edge].index_from;
-                                                    index_to = edges[index_active_edge].index_to;
-                                                }
-                                                else
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_to;
-                                                    index_session_to = edges[index_active_edge].index_session_from;
-                                                    index_from = edges[index_active_edge].index_to;
-                                                    index_to = edges[index_active_edge].index_from;
-                                                }
-
-                                                double x_min = 1000000000000.0;
-                                                double y_min = 1000000000000.0;
-                                                double z_min = 1000000000000.0;
-                                                double x_max = -1000000000000.0;
-                                                double y_max = -1000000000000.0;
-                                                double z_max = -1000000000000.0;
-
-                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                                for (const auto &p : points_to.points_local)
-                                                {
-                                                    auto pg = points_to.m_pose * p;
-                                                    if (pg.x() < x_min)
-                                                    {
-                                                        x_min = pg.x();
-                                                    }
-                                                    if (pg.y() < y_min)
-                                                    {
-                                                        y_min = pg.y();
-                                                    }
-                                                    if (pg.z() < z_min)
-                                                    {
-                                                        z_min = pg.z();
-                                                    }
-                                                    if (pg.x() > x_max)
-                                                    {
-                                                        x_max = pg.x();
-                                                    }
-                                                    if (pg.y() > y_max)
-                                                    {
-                                                        y_max = pg.y();
-                                                    }
-                                                    if (pg.z() > z_max)
-                                                    {
-                                                        z_max = pg.z();
-                                                    }
-                                                }
-                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                                std::vector<Eigen::Vector3d> ground_truth;
-                                                for (const auto &p : points_from.points_local)
-                                                {
-                                                    auto pg = points_from.m_pose * p;
-                                                    if (pg.x() > x_min && pg.x() < x_max)
-                                                    {
-                                                        if (pg.y() > y_min && pg.y() < y_max)
-                                                        {
-                                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                            {
-                                                                ground_truth.push_back(p);
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                int number_of_iterations = 30;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                            }
-                                            else
-                                            {
-
-                                                int number_of_iterations = 30;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    ImGui::SameLine();
-                                    if (ImGui::Button("ICP [search radious 0.25m]"))
-                                    {
-                                        float sr = 0.25;
-                                        std::cout << "Iterative Closest Point" << std::endl;
-                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                        {
-                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                                        }
-                                        else
-                                        {
-                                            bool is_with_ground_truth = false;
-                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                            {
-                                                is_with_ground_truth = true;
-                                            }
-
-                                            if (is_with_ground_truth)
-                                            {
-                                                int index_session_from = -1;
-                                                int index_session_to = -1;
-                                                int index_from = -1;
-                                                int index_to = -1;
-
-                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_from;
-                                                    index_session_to = edges[index_active_edge].index_session_to;
-                                                    index_from = edges[index_active_edge].index_from;
-                                                    index_to = edges[index_active_edge].index_to;
-                                                }
-                                                else
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_to;
-                                                    index_session_to = edges[index_active_edge].index_session_from;
-                                                    index_from = edges[index_active_edge].index_to;
-                                                    index_to = edges[index_active_edge].index_from;
-                                                }
-
-                                                double x_min = 1000000000000.0;
-                                                double y_min = 1000000000000.0;
-                                                double z_min = 1000000000000.0;
-                                                double x_max = -1000000000000.0;
-                                                double y_max = -1000000000000.0;
-                                                double z_max = -1000000000000.0;
-
-                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                                for (const auto &p : points_to.points_local)
-                                                {
-                                                    auto pg = points_to.m_pose * p;
-                                                    if (pg.x() < x_min)
-                                                    {
-                                                        x_min = pg.x();
-                                                    }
-                                                    if (pg.y() < y_min)
-                                                    {
-                                                        y_min = pg.y();
-                                                    }
-                                                    if (pg.z() < z_min)
-                                                    {
-                                                        z_min = pg.z();
-                                                    }
-                                                    if (pg.x() > x_max)
-                                                    {
-                                                        x_max = pg.x();
-                                                    }
-                                                    if (pg.y() > y_max)
-                                                    {
-                                                        y_max = pg.y();
-                                                    }
-                                                    if (pg.z() > z_max)
-                                                    {
-                                                        z_max = pg.z();
-                                                    }
-                                                }
-                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                                std::vector<Eigen::Vector3d> ground_truth;
-                                                for (const auto &p : points_from.points_local)
-                                                {
-                                                    auto pg = points_from.m_pose * p;
-                                                    if (pg.x() > x_min && pg.x() < x_max)
-                                                    {
-                                                        if (pg.y() > y_min && pg.y() < y_max)
-                                                        {
-                                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                            {
-                                                                ground_truth.push_back(p);
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                int number_of_iterations = 30;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                            }
-                                            else
-                                            {
-
-                                                int number_of_iterations = 30;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    ImGui::SameLine();
-                                    if (ImGui::Button("ICP [search radious 0.1m]"))
-                                    {
-                                        float sr = 0.1;
-                                        std::cout << "Iterative Closest Point" << std::endl;
-                                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                        {
-                                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                                        }
-                                        else
-                                        {
-                                            bool is_with_ground_truth = false;
-                                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                                            {
-                                                is_with_ground_truth = true;
-                                            }
-
-                                            if (is_with_ground_truth)
-                                            {
-                                                int index_session_from = -1;
-                                                int index_session_to = -1;
-                                                int index_from = -1;
-                                                int index_to = -1;
-
-                                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_from;
-                                                    index_session_to = edges[index_active_edge].index_session_to;
-                                                    index_from = edges[index_active_edge].index_from;
-                                                    index_to = edges[index_active_edge].index_to;
-                                                }
-                                                else
-                                                {
-                                                    index_session_from = edges[index_active_edge].index_session_to;
-                                                    index_session_to = edges[index_active_edge].index_session_from;
-                                                    index_from = edges[index_active_edge].index_to;
-                                                    index_to = edges[index_active_edge].index_from;
-                                                }
-
-                                                double x_min = 1000000000000.0;
-                                                double y_min = 1000000000000.0;
-                                                double z_min = 1000000000000.0;
-                                                double x_max = -1000000000000.0;
-                                                double y_max = -1000000000000.0;
-                                                double z_max = -1000000000000.0;
-
-                                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                                for (const auto &p : points_to.points_local)
-                                                {
-                                                    auto pg = points_to.m_pose * p;
-                                                    if (pg.x() < x_min)
-                                                    {
-                                                        x_min = pg.x();
-                                                    }
-                                                    if (pg.y() < y_min)
-                                                    {
-                                                        y_min = pg.y();
-                                                    }
-                                                    if (pg.z() < z_min)
-                                                    {
-                                                        z_min = pg.z();
-                                                    }
-                                                    if (pg.x() > x_max)
-                                                    {
-                                                        x_max = pg.x();
-                                                    }
-                                                    if (pg.y() > y_max)
-                                                    {
-                                                        y_max = pg.y();
-                                                    }
-                                                    if (pg.z() > z_max)
-                                                    {
-                                                        z_max = pg.z();
-                                                    }
-                                                }
-                                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                                std::vector<Eigen::Vector3d> ground_truth;
-                                                for (const auto &p : points_from.points_local)
-                                                {
-                                                    auto pg = points_from.m_pose * p;
-                                                    if (pg.x() > x_min && pg.x() < x_max)
-                                                    {
-                                                        if (pg.y() > y_min && pg.y() < y_max)
-                                                        {
-                                                            if (pg.z() > z_min && pg.z() < z_max)
-                                                            {
-                                                                ground_truth.push_back(p);
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                int number_of_iterations = 30;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                            }
-                                            else
-                                            {
-
-                                                int number_of_iterations = 30;
-                                                PairWiseICP icp;
-                                                auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                                std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                                std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                                if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                                {
-                                                    edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                                }
-                                            }
-                                        }
-                                    }
-#if 0
-                                    if (ImGui::Button("Save src"))
-                                    {
-                                        const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
-                                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
-
-                                        if (output_file_name.size() > 0)
-                                        {
-                                            std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                            std::vector<Eigen::Vector3d> pointcloud;
-                                            std::vector<unsigned short> intensity;
-                                            std::vector<double> timestamps;
-
-                                            for (int i = 0; i < source.size(); i++)
-                                            {
-                                                pointcloud.push_back(source[i]);
-                                                intensity.push_back(0);
-                                                timestamps.push_back(0.0);
-                                            }
-
-                                            exportLaz(
-                                                output_file_name[0],
-                                                pointcloud,
-                                                intensity,
-                                                timestamps);
-                                        }
-
-                                        /*int number_of_iterations = 30;
-                                        PairWiseICP icp;
-                                        auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                                        std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
-                                        std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
-
-                                        if (icp.compute(source, target, sr, number_of_iterations, m_pose))
-                                        {
-                                            edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-                                        }*/
-                                        //save
-                                    }
-                                    ImGui::SameLine();
-                                    if (ImGui::Button("Save trg (transfromed only by rotation)"))
-                                    {
-                                    }
-#endif
-                                    //////////////////////////////////
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // if (!manual_pose_graph_loop_closure_mode && prev_manual_pose_graph_loop_closure_mode)
+                // if (!is_loop_closure_gui && prev_is_loop_closure_gui)
                 //{
                 //     exit(1);
                 // }
             }
         }
-        if (!manual_pose_graph_loop_closure_mode)
-        {
-            ImGui::Checkbox("Normal Distributions transform", &is_ndt_gui);
-        }
+
         ImGui::End();
     }
 }
 
-void reshape(int w, int h);
+void openProject()
+{
+    std::string input_file_name = "";
+    input_file_name = mandeye::fd::OpenFileDialogOneFile("Load project", mandeye::fd::Project_filter);
+    std::cout << "Project file: '" << input_file_name << "'" << std::endl;
+
+    if (input_file_name.size() > 0)
+    {
+        load_project_settings(fs::path(input_file_name).string(), project_settings);
+
+        std::string newTitle = winTitle + " - " + truncPath(input_file_name);
+        glutSetWindowTitle(newTitle.c_str());
+
+        loaded_sessions = false;
+        time_stamp_offset = 0.0;
+    }
+}
+
+void saveProject()
+{
+    std::string output_file_name = "";
+    output_file_name = mandeye::fd::SaveFileDialog("Save project file", mandeye::fd::Project_filter, ".json");
+
+    if (output_file_name.size() > 0)
+        if (save_project_settings(fs::path(output_file_name).string(), project_settings))
+        {
+            std::string newTitle = winTitle + " - " + truncPath(output_file_name);
+            glutSetWindowTitle(newTitle.c_str());
+        }
+}
+
+void addSession()
+{
+    std::string input_file_name = "";
+    input_file_name = mandeye::fd::OpenFileDialogOneFile("Add session", mandeye::fd::Session_filter);
+    std::cout << "SESSION file: '" << input_file_name << "'" << std::endl;
+
+    if (input_file_name.size() > 0)
+    {
+        project_settings.session_file_names.push_back(input_file_name);
+        loaded_sessions = false;
+        time_stamp_offset = 0.0;
+    }
+}
+
+void removeSession()
+{
+    ImGui::OpenPopup("Remove Sessions");
+
+    if (ImGui::BeginPopupModal("Remove Sessions", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        static std::vector<bool> session_marked_for_removal;
+        if (session_marked_for_removal.size() != project_settings.session_file_names.size())
+            session_marked_for_removal.resize(project_settings.session_file_names.size(), false);
+
+        ImGui::Text("Select sessions to remove:");
+        ImGui::Separator();
+
+        for (int i = 0; i < project_settings.session_file_names.size(); i++)
+        {
+            bool checked = session_marked_for_removal[i];
+            if (ImGui::Checkbox(project_settings.session_file_names[i].c_str(), &checked))
+                session_marked_for_removal[i] = checked;
+        }
+
+        ImGui::Separator();
+
+        if (ImGui::Button("Remove"))
+        {
+            for (int i = project_settings.session_file_names.size() - 1; i >= 0; i--)
+            {
+                if (session_marked_for_removal[i])
+                {
+                    std::cout << "Removing session: " << project_settings.session_file_names[i] << std::endl;
+                    project_settings.session_file_names.erase(project_settings.session_file_names.begin() + i);
+                    if (loaded_sessions && i < sessions.size())
+                        sessions.erase(sessions.begin() + i);
+                }
+            }
+
+            session_marked_for_removal.clear();
+
+            if (!sessions.empty())
+                update_timestamp_offset();
+            else
+            {
+                loaded_sessions = false;
+                time_stamp_offset = 0.0;
+            }
+
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            session_marked_for_removal.clear();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+}
+
+void loadSessions()
+{
+    sessions.clear();
+    for (const auto& ps : project_settings.session_file_names)
+    {
+        Session session;
+        session.load(fs::path(ps).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
+        sessions.push_back(session);
+    }
+    loaded_sessions = true;
+
+    // reorder
+    std::vector<Session> sessions_reorder;
+    std::vector<std::string> session_file_names_reordered;
+
+    std::map<int, int> map_reorder;
+    // project_settings.session_file_names.
+    int new_index = 0;
+    for (int i = 0; i < sessions.size(); i++)
+    {
+        if (sessions[i].is_ground_truth)
+        {
+            sessions_reorder.push_back(sessions[i]);
+            session_file_names_reordered.push_back(project_settings.session_file_names[i]);
+            map_reorder[i] = new_index++;
+        }
+    }
+    for (int i = 0; i < sessions.size(); i++)
+    {
+        if (!sessions[i].is_ground_truth)
+        {
+            sessions_reorder.push_back(sessions[i]);
+            session_file_names_reordered.push_back(project_settings.session_file_names[i]);
+            map_reorder[i] = new_index++;
+        }
+    }
+    sessions = sessions_reorder;
+    project_settings.session_file_names = session_file_names_reordered;
+
+    for (auto& e : edges)
+    {
+        e.index_session_from = map_reorder[e.index_session_from];
+        e.index_session_to = map_reorder[e.index_session_to];
+    }
+
+    std::cout << "sessions reordered, ground truth should be in front" << std::endl;
+    for (const auto& s : sessions)
+    {
+        std::cout << "session: '" << s.session_file_name << "' ground truth [" << int(s.is_ground_truth) << "]" << std::endl;
+    }
+
+    // update time_stamp_offset
+    std::cout << "update time_stamp_offset" << std::endl;
+    for (const auto& s : sessions)
+    {
+        if (s.point_clouds_container.point_clouds.size() > 0)
+        {
+            if (s.point_clouds_container.point_clouds[0].local_trajectory.size() > 0)
+            {
+                if (s.point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first > time_stamp_offset)
+                {
+                    time_stamp_offset = s.point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first;
+                }
+            }
+        }
+    }
+}
 
 void display()
 {
     ImGuiIO &io = ImGui::GetIO();
+
+    view_kbd_shortcuts();
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed('A', false))
+        addSession();
+    if (io.KeyCtrl && ImGui::IsKeyPressed('L', false))
+        loadSessions();
+    if (io.KeyCtrl && ImGui::IsKeyPressed('O', false))
+        openProject();
+    if (io.KeyCtrl && ImGui::IsKeyPressed('R', false))
+        removeSession();
+    if (io.KeyCtrl && ImGui::IsKeyPressed('S', false))
+        saveProject();
+
+    updateCameraTransition();
+
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+
+    Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
 
     if (is_ortho)
     {
@@ -2882,7 +2299,7 @@ void display()
         glTranslatef(translate_x, translate_y, translate_z);
 
         // janusz
-        if (manual_pose_graph_loop_closure_mode)
+        if (is_loop_closure_gui)
         {
             // sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, viewer_decmiate_point_cloud, false, false, false, false, false, false, false, false, false, false, false, false, 100000);
             // sessions[second_session_index].point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, viewer_decmiate_point_cloud, false, false, false, false, false, false, false, false, false, false, false, false, 100000);
@@ -2994,7 +2411,7 @@ void display()
         glEnd();
     }
 
-    if (manual_pose_graph_loop_closure_mode)
+    if (is_loop_closure_gui)
     {
         if (manipulate_active_edge)
         {
@@ -3006,15 +2423,15 @@ void display()
                 Eigen::Affine3d m_src = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
                 Eigen::Affine3d m_trg = m_src * affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).render(m_src, viewer_decmiate_point_cloud);
-                sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_trg).render(m_trg, viewer_decmiate_point_cloud);
+                sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).render(m_src, viewer_decimate_point_cloud);
+                sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_trg).render(m_trg, viewer_decimate_point_cloud);
             }
         }
         else
         {
             ObservationPicking observation_picking;
-            sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, viewer_decmiate_point_cloud, false, false, false, 100000);
-            sessions[second_session_index].point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, viewer_decmiate_point_cloud, false, false, false, 100000);
+            sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, viewer_decimate_point_cloud, false, false, false, 100000);
+            sessions[second_session_index].point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, viewer_decimate_point_cloud, false, false, false, 100000);
         }
 
         // sessions[first_session_index].point_clouds_container.render();
@@ -3113,7 +2530,7 @@ void display()
         {
             if (session.visible)
             {
-                session.point_clouds_container.render(observation_picking, viewer_decmiate_point_cloud, false, false, false, false, false, false, false, false, false, false, false, false, 10000);
+                session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, false, false, false, false, false, false, false, false, false, false, false, false, 10000);
                 session.ground_control_points.render(session.point_clouds_container);
 
                 ////
@@ -3162,7 +2579,7 @@ void display()
         }
     }
 
-    /*if (manual_pose_graph_loop_closure_mode)
+    /*if (is_loop_closure_gui)
     {
         session.manual_pose_graph_loop_closure.Render(session.point_clouds_container, index_loop_closure_source, index_loop_closure_target);
     }
@@ -3228,6 +2645,604 @@ void display()
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
 
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("Open project", "Ctrl+O"))
+                openProject();
+            if (ImGui::MenuItem("Save project", "Ctrl+S", nullptr, sessions.size() > 0))
+                saveProject();
+
+			ImGui::Separator();
+
+            if (ImGui::MenuItem("Add session", "Ctrl+A"))
+                addSession();
+            if (ImGui::MenuItem("Remove session(s)", "Ctrl+R", nullptr, sessions.size() > 0))
+                removeSession();
+
+            if (ImGui::MenuItem("Load sessions", "Ctrl+L", nullptr, (project_settings.session_file_names.size() > 0) && !loaded_sessions))
+                loadSessions();
+
+            ImGui::Separator();
+
+            if (ImGui::BeginMenu("Save all marked trajectories", loaded_sessions))
+            {
+                if (ImGui::MenuItem("Save all as las/laz files"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto& session_path = project_settings.session_file_names[i];
+
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session& session = sessions[i];
+
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string laz_path = (dir / (folder_name + "_trajectory_laz.laz")).string();
+
+                        std::cout << "Saving trajectory to LAZ: " << laz_path << std::endl;
+
+                        save_trajectories_to_laz(session,
+                            laz_path,
+                            0.0f,
+                            0.0f,
+                            false);
+                    }
+
+                    std::cout << "Finished saving all trajectories to .laz files." << std::endl;
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("As one global scan");
+
+                ImGui::Separator();
+
+                ImGui::Text("(x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)");
+                if (ImGui::MenuItem("Save all as csv (timestamp Lidar)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto& session_path = project_settings.session_file_names[i];
+
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session& session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidar_r.csv")).string();
+
+                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampLidar,x,y,z,"
+                                << "r00,r01,r02,"
+                                << "r10,r11,r12,"
+                                << "r20,r21,r22\n";
+
+                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible)
+                                    continue;
+
+                                for (const auto& traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Matrix3d rot = pose.rotation();
+
+                                    outfile << std::fixed << std::setprecision(0)
+                                        << traj.timestamps.first << ","
+                                        << std::setprecision(10)
+                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                        << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
+                                        << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
+                                        << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception& e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+
+                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
+                }
+                if (ImGui::MenuItem("Save all as csv (timestamp Unix)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto& session_path = project_settings.session_file_names[i];
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session& session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampUnix_r.csv")).string();
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampUnix,x,y,z," << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
+
+                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible)
+                                    continue;
+                                for (const auto& traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Matrix3d rot = pose.rotation();
+                                    outfile << std::fixed << std::setprecision(0)
+                                        << traj.timestamps.second << "," // Unix timestamp
+                                        << std::setprecision(10)
+                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                        << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
+                                        << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
+                                        << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception& e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+                }
+                if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto& session_path = project_settings.session_file_names[i];
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session& session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidarUnix_r.csv")).string();
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampLidar,timestampUnix,x,y,z,"
+                                << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
+
+                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible)
+                                    continue;
+                                for (const auto& traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Matrix3d rot = pose.rotation();
+                                    outfile << std::fixed << std::setprecision(0)
+                                        << traj.timestamps.first << ","  // Lidar timestamp
+                                        << traj.timestamps.second << "," // Unix timestamp
+                                        << std::setprecision(10)
+                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                        << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
+                                        << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
+                                        << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception& e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+                }
+
+                ImGui::Separator();
+                ImGui::Text("(x,y,z,qx,qy,qz,qw)");
+
+                if (ImGui::MenuItem("Save all as csv (timestamp Lidar)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto& session_path = project_settings.session_file_names[i];
+
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session& session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidar_q.csv")).string();
+
+                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampLidar,x,y,z,qx,qy,qz,qw\n";
+
+                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible)
+                                    continue;
+
+                                for (const auto& traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Quaterniond q(pose.rotation());
+
+                                    outfile << std::fixed << std::setprecision(0)
+                                        << traj.timestamps.first << "," // Lidar timestamp
+                                        << std::setprecision(10)
+                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                        << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception& e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+
+                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
+                }
+                if (ImGui::MenuItem("Save all as csv (timestamp Unix)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto& session_path = project_settings.session_file_names[i];
+
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session& session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampUnix_q.csv")).string();
+
+                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampUnix,x,y,z,qx,qy,qz,qw\n";
+
+                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible)
+                                    continue;
+
+                                for (const auto& traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Quaterniond q(pose.rotation());
+
+                                    outfile << std::fixed << std::setprecision(0)
+                                        << traj.timestamps.second << "," // Unix timestamp
+                                        << std::setprecision(10)
+                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                        << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception& e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+
+                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
+                }
+                if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto& session_path = project_settings.session_file_names[i];
+
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session& session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidarUnix_q.csv")).string();
+
+                        std::cout << "Saving trajectory to CSV: " << csv_path << std::endl;
+
+                        try
+                        {
+                            std::ofstream outfile(csv_path);
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: " << csv_path << std::endl;
+                                continue;
+                            }
+
+                            outfile << "timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw\n";
+
+                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible)
+                                    continue;
+
+                                for (const auto& traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Quaterniond q(pose.rotation());
+
+                                    outfile << std::fixed << std::setprecision(0)
+                                        << traj.timestamps.first << ","  // Lidar timestamp
+                                        << traj.timestamps.second << "," // Unix timestamp
+                                        << std::setprecision(10)
+                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                        << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << csv_path << std::endl;
+                        }
+                        catch (const std::exception& e)
+                        {
+                            std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
+                        }
+                    }
+
+                    std::cout << "Finished saving all trajectories to CSV files." << std::endl;
+                }
+                if (ImGui::MenuItem("Save all as TUM TXT"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i) {
+                        const auto& session_path = project_settings.session_file_names[i];
+                        if (i >= sessions.size()) {
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
+                            continue;
+                        }
+                        Session& session = sessions[i];
+                        std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
+                        std::string folder_name = dir.filename().string();
+                        std::string txt_path = (dir / (folder_name + "_trajectory_tum.txt")).string();
+
+                        std::cout << "Saving trajectory to TUM TXT: " << txt_path << std::endl;
+                        try {
+                            std::ofstream outfile(txt_path);
+                            if (!outfile.is_open()) {
+                                std::cerr << "Failed to create file: " << txt_path << std::endl;
+                                continue;
+                            }
+
+                            for (const auto& pc : session.point_clouds_container.point_clouds) {
+                                if (!pc.visible) continue;
+                                for (const auto& traj : pc.local_trajectory) {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+                                    Eigen::Vector3d pos = pose.translation();
+                                    Eigen::Quaterniond q(pose.rotation());
+
+                                    double t_s = static_cast<double>(traj.timestamps.first) / 1e9;
+
+                                    outfile << std::fixed
+                                        << std::setprecision(9) << t_s << " "
+                                        << std::setprecision(10) << pos.x() << " " << pos.y() << " " << pos.z() << " "
+                                        << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
+                                }
+                            }
+
+                            outfile.close();
+                            std::cout << "Saved: " << txt_path << std::endl;
+                        }
+                        catch (const std::exception& e) {
+                            std::cerr << "Error creating " << txt_path << ": " << e.what() << std::endl;
+                        }
+                    }
+                    std::cout << "Finished saving all trajectories to TUM TXT files." << std::endl;
+                }
+
+                ImGui::EndMenu();
+            }
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Tools"))
+        {
+            ImGui::MenuItem("Normal Distributions Transform", nullptr, &is_ndt_gui, !is_loop_closure_gui && loaded_sessions);
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Point cloud alignment (registration) algorithm");
+                ImGui::Text("Probabilistic alternative to ICP that models one cloud (the target)\nas a set of Gaussian distributions rather than raw points");
+                ImGui::Text("Robust for rough initial poses but can converge to a local optimum\nif the initial misalignment is very large");
+                ImGui::Text("Known for being faster and smoother in optimization because\nit replaces discrete point-point correspondences with continuous probability density functions.");
+                ImGui::EndTooltip();
+            }
+ 
+            //bool prev_is_loop_closure_gui 
+            ImGui::MenuItem("Manual Loop Closure", "Ctrl+L", &is_loop_closure_gui, (number_visible_sessions == 1 || number_visible_sessions == 2));
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Manually connect overlapping scan sections");
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("View"))
+        {
+            if (sessions.size() > 0)
+            {
+                auto tmp = point_size;
+                ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                ImGui::InputInt("points size", &point_size);
+                if (point_size < 1)
+                    point_size = 1;
+                if (point_size > 10)
+                    point_size = 10;
+
+                if (tmp != point_size)
+                {
+                    for (auto& session : sessions)
+                    {
+                        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                            session.point_clouds_container.point_clouds[i].point_size = point_size;
+                    }
+                }
+
+                ImGui::Separator();
+            }
+
+            ImGui::MenuItem("Orthographic", nullptr, &is_ortho);
+            if (is_ortho)
+            {
+                new_rotation_center = rotation_center;
+                new_rotate_x = 0.0;
+                new_rotate_y = 0.0;
+                new_translate_x = translate_x;
+                new_translate_y = translate_y;
+                new_translate_z = translate_z;
+                camera_transition_active = true;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
+
+            ImGui::MenuItem("Show axes", nullptr, &show_axes);
+            ImGui::MenuItem("Block Z", nullptr, &block_z);
+            ImGui::Separator();
+            ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
+
+            //ImGui::MenuItem("show_covs", nullptr, &show_covs);
+
+            ImGui::Separator();
+
+            ImGui::ColorEdit4("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
+
+            ImGui::EndMenu();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Scene view relevant parameters");
+
+        camMenu();
+
+        ImGui::BeginDisabled(sessions.size() <= 0);
+        {
+            ImGui::SameLine();
+            ImGui::Dummy(ImVec2(20, 0));
+            ImGui::SameLine();
+
+            ImGui::SetNextItemWidth(ImGuiNumberWidth);
+            ImGui::InputInt("Points render subsampling", &viewer_decimate_point_cloud, 10, 100);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("increase for better performance, decrease for rendering more points");
+            ImGui::SameLine();
+
+            if (viewer_decimate_point_cloud < 1)
+            {
+                viewer_decimate_point_cloud = 1;
+            }
+            ImGui::SameLine();
+            ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
+        }
+        ImGui::EndDisabled();
+
+        ImGui::SameLine();
+        ImGui::Dummy(ImVec2(20, 0));
+        ImGui::SameLine();
+
+        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 2));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
+        if (ImGui::SmallButton("Info"))
+        {
+            info_gui = !info_gui;
+        }
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(3);
+
+
+        ImGui::EndMainMenuBar();
+    }
+
+    info_window(infoLines, &info_gui);
+
+    if (compass_ruler)
+        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), clear_color);
+
     // my_display_code();
     /*if (is_ndt_gui)
         ndt_gui();
@@ -3239,16 +3254,17 @@ void display()
         registration_plane_feature_gui();
     if (is_manual_analisys)
         observation_picking_gui();*/
-    // if (manual_pose_graph_loop_closure_mode)
+    // if (is_loop_closure_gui)
     //{
     //     manual_pose_graph_loop_closure.Gui();
     // }
     project_gui();
 
-    if (!manual_pose_graph_loop_closure_mode)
+    if (!is_loop_closure_gui)
     {
         Eigen::Affine3d prev_pose_manipulated = Eigen::Affine3d::Identity();
         Eigen::Affine3d prev_pose_after_gismo = Eigen::Affine3d::Identity();
+
         for (size_t i = 0; i < sessions.size(); i++)
         {
             // gizmo_all_sessions;
@@ -3256,15 +3272,12 @@ void display()
             {
                 if (sessions[i].point_clouds_container.point_clouds.size() > 0)
                 {
-                    //std::cout << "1" <<  std::endl;
                     prev_pose_manipulated = sessions[i].point_clouds_container.point_clouds[0].m_pose;
                     std::vector<Eigen::Affine3d> all_m_poses;
                     for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
                     {
                         all_m_poses.push_back(sessions[i].point_clouds_container.point_clouds[j].m_pose);
                     }
-
-                    //std::cout << "2" << std::endl;
 
                     //if (all_m_poses.size() > 1)
                     //{
@@ -3283,35 +3296,15 @@ void display()
                             GLfloat modelview[16];
                             glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-                            ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                            ImGuizmo::Manipulate(modelview, projection, ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
                         }
                         else
-                        {
                             ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
-                        }
 
-                        //std::cout << "4" << std::endl;
-
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(0, 0) = m_gizmo[0];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(1, 0) = m_gizmo[1];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(2, 0) = m_gizmo[2];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(3, 0) = m_gizmo[3];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(0, 1) = m_gizmo[4];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(1, 1) = m_gizmo[5];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(2, 1) = m_gizmo[6];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(3, 1) = m_gizmo[7];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(0, 2) = m_gizmo[8];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(1, 2) = m_gizmo[9];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(2, 2) = m_gizmo[10];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(3, 2) = m_gizmo[11];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(0, 3) = m_gizmo[12];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(1, 3) = m_gizmo[13];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(2, 3) = m_gizmo[14];
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose(3, 3) = m_gizmo[15];
+                        sessions[i].point_clouds_container.point_clouds[0].m_pose =
+                            Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>();
                         prev_pose_after_gismo = sessions[i].point_clouds_container.point_clouds[0].m_pose;
                         sessions[i].point_clouds_container.point_clouds[0].pose = pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[0].m_pose);
-
-                        //std::cout << "5" << std::endl;
 
                         sessions[i].point_clouds_container.point_clouds[0].gui_translation[0] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.px;
                         sessions[i].point_clouds_container.point_clouds[0].gui_translation[1] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.py;
@@ -3322,7 +3315,6 @@ void display()
                         sessions[i].point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * 180.0 / M_PI);
 
                         ImGui::End();
-                        //std::cout << "6" << std::endl;
 
                         Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
                         for (int j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
@@ -3339,8 +3331,6 @@ void display()
                             sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
                             sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
                         }
-
-                        //std::cout << "7" << std::endl;
                     //}
                 }
             }
@@ -3354,9 +3344,7 @@ void display()
                 {
                     std::vector<Eigen::Affine3d> all_m_poses;
                     for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
-                    {
                         all_m_poses.push_back(sessions[i].point_clouds_container.point_clouds[j].m_pose);
-                    }
 
                     Eigen::Affine3d m_rel_org = prev_pose_manipulated.inverse() * sessions[i].point_clouds_container.point_clouds[0].m_pose;
 
@@ -3418,22 +3406,7 @@ void display()
 
             Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
 
-            m_g(0, 0) = m_gizmo[0];
-            m_g(1, 0) = m_gizmo[1];
-            m_g(2, 0) = m_gizmo[2];
-            m_g(3, 0) = m_gizmo[3];
-            m_g(0, 1) = m_gizmo[4];
-            m_g(1, 1) = m_gizmo[5];
-            m_g(2, 1) = m_gizmo[6];
-            m_g(3, 1) = m_gizmo[7];
-            m_g(0, 2) = m_gizmo[8];
-            m_g(1, 2) = m_gizmo[9];
-            m_g(2, 2) = m_gizmo[10];
-            m_g(3, 2) = m_gizmo[11];
-            m_g(0, 3) = m_gizmo[12];
-            m_g(1, 3) = m_gizmo[13];
-            m_g(2, 3) = m_gizmo[14];
-            m_g(3, 3) = m_gizmo[15];
+            m_g.matrix() = Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>();
 
             const int &index_src = edges[index_active_edge].index_from;
 
@@ -3445,10 +3418,12 @@ void display()
     }
 
     if (is_ndt_gui)
-    {
         ndt_gui();
-    }
-    /*if (!manual_pose_graph_loop_closure_mode)
+
+    if (is_loop_closure_gui)
+		loop_closure_gui();
+
+    /*if (!is_loop_closure_gui)
     {
         for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
         {
@@ -3699,11 +3674,13 @@ void motion(int x, int y)
             {
                 rotate_x += dy * 0.2f; // * mouse_sensitivity;
                 rotate_y += dx * 0.2f; // * mouse_sensitivity;
+                camera_transition_active = false;
             }
             if (mouse_buttons & 4)
             {
                 translate_x += dx * 0.05f * mouse_sensitivity;
                 translate_y -= dy * 0.05f * mouse_sensitivity;
+                camera_transition_active = false;
             }
         }
 
@@ -3712,7 +3689,6 @@ void motion(int x, int y)
     }
     glutPostRedisplay();
 }
-void wheel(int button, int dir, int x, int y);
 
 void mouse(int glut_button, int state, int x, int y)
 {
@@ -3791,68 +3767,20 @@ void mouse(int glut_button, int state, int x, int y)
     }
 }
 
-void wheel(int button, int dir, int x, int y)
-{
-    if (dir > 0)
-    {
-        if (is_ortho)
-        {
-            camera_ortho_xy_view_zoom -= 0.1f * camera_ortho_xy_view_zoom;
-
-            if (camera_ortho_xy_view_zoom < 0.1)
-            {
-                camera_ortho_xy_view_zoom = 0.1;
-            }
-        }
-        else
-        {
-            translate_z -= 0.05f * translate_z;
-        }
-    }
-    else
-    {
-        if (is_ortho)
-        {
-            camera_ortho_xy_view_zoom += 0.1 * camera_ortho_xy_view_zoom;
-        }
-        else
-        {
-            translate_z += 0.05f * translate_z;
-        }
-    }
-
-    return;
-}
-
-void reshape(int w, int h)
-{
-    glViewport(0, 0, (GLsizei)w, (GLsizei)h);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    if (!is_ortho)
-    {
-        gluPerspective(60.0, (GLfloat)w / (GLfloat)h, 0.01, 10000.0);
-    }
-    else
-    {
-        ImGuiIO &io = ImGui::GetIO();
-        float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
-        // glOrtho(-translate_z, translate_z, -translate_z * (float)h / float(w), translate_z * float(h) / float(w), -10000, 10000);
-    }
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-}
-
 bool initGL(int *argc, char **argv)
 {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("multi_session_registration_step_3 " HDMAPPING_VERSION_STRING);
+    glutCreateWindow(winTitle.c_str());
+
+#ifdef _WIN32
+    HWND hwnd = FindWindow(NULL, winTitle.c_str());
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+    SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+    SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+#endif
+
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -3889,6 +3817,8 @@ int main(int argc, char *argv[])
         glutMouseFunc(mouse);
         glutMotionFunc(motion);
         glutMouseWheelFunc(wheel);
+        glutSpecialFunc(specialDown);
+        glutSpecialUpFunc(specialUp);
         glutMainLoop();
 
         ImGui_ImplOpenGL2_Shutdown();
@@ -3914,9 +3844,7 @@ bool optimize(std::vector<Session> &sessions)
     {
         // std::cout << session.point_clouds_container.point_clouds.size() << std::endl;
         for (auto &pc : session.point_clouds_container.point_clouds)
-        {
             pc.m_pose_temp = pc.m_pose;
-        }
     }
 
     std::vector<int> sums;
@@ -4537,34 +4465,20 @@ bool optimize(std::vector<Session> &sessions)
                 pose.ka += h_x[counter++] * 0.1;
 
                 if (!vfixed_x[i])
-                {
                     poses[i].px = pose.px;
-                }
                 if (!vfixed_y[i])
-                {
                     poses[i].py = pose.py;
-                }
                 if (!vfixed_z[i])
-                {
                     poses[i].pz = pose.pz;
-                }
                 if (!vfixed_om[i])
-                {
                     poses[i].om = pose.om;
-                }
                 if (!vfixed_fi[i])
-                {
                     poses[i].fi = pose.fi;
-                }
                 if (!vfixed_ka[i])
-                {
                     poses[i].ka = pose.ka;
-                }
 
                 // if (i == 0 && is_fix_first_node)
-                //{
                 //     poses[i] = pose;
-                // }
             }
             // std::cout << "optimizing with tait bryan finished" << std::endl;
         }
@@ -4581,13 +4495,9 @@ bool optimize(std::vector<Session> &sessions)
             for (size_t i = 0; i < m_poses.size(); i++)
             {
                 if (is_wc)
-                {
                     m_poses[i] = affine_matrix_from_pose_tait_bryan(poses[i]);
-                }
                 else if (is_cw)
-                {
                     m_poses[i] = affine_matrix_from_pose_tait_bryan(poses[i]).inverse();
-                }
             }
         }
 
@@ -4599,9 +4509,7 @@ bool optimize(std::vector<Session> &sessions)
                 if (i > 0)
                 {
                     if (index_trajectory[i - 1] != index_trajectory[i])
-                    {
                         index = 0;
-                    }
                 }
                 if (!sessions[index_trajectory[i]].is_ground_truth)
                 {
@@ -4626,9 +4534,7 @@ bool revert(std::vector<Session> &sessions)
     for (auto &session : sessions)
     {
         for (auto &pc : session.point_clouds_container.point_clouds)
-        {
             pc.m_pose = pc.m_pose_temp;
-        }
     }
     return true;
 }
@@ -4644,37 +4550,6 @@ bool save_results(std::vector<Session> &sessions)
         }
     }
     return true;
-}
-
-LaserBeam GetLaserBeam(int x, int y)
-{
-    GLint viewport[4];
-    GLdouble modelview[16];
-    GLdouble projection[16];
-    GLfloat winX, winY, winZ;
-    GLdouble posXnear, posYnear, posZnear;
-    GLdouble posXfar, posYfar, posZfar;
-
-    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
-    glGetDoublev(GL_PROJECTION_MATRIX, projection);
-    glGetIntegerv(GL_VIEWPORT, viewport);
-
-    winX = (float)x;
-    winY = (float)viewport[3] - (float)y;
-
-    LaserBeam laser_beam;
-    gluUnProject(winX, winY, 0, modelview, projection, viewport, &posXnear, &posYnear, &posZnear);
-    gluUnProject(winX, winY, -1000, modelview, projection, viewport, &posXfar, &posYfar, &posZfar);
-
-    laser_beam.position.x() = posXnear;
-    laser_beam.position.y() = posYnear;
-    laser_beam.position.z() = posZnear;
-
-    laser_beam.direction.x() = posXfar - posXnear;
-    laser_beam.direction.y() = posYfar - posYnear;
-    laser_beam.direction.z() = posZfar - posZnear;
-
-    return laser_beam;
 }
 
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking)
@@ -4693,33 +4568,4 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observ
     std::cout << "intersection: " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;
 
     return pos;
-}
-
-float distanceToPlane(const RegistrationPlaneFeature::Plane &plane, const Eigen::Vector3d &p)
-{
-    return (plane.a * p.x() + plane.b * p.y() + plane.c * p.z() + plane.d);
-}
-
-Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane)
-{
-    float TOLERANCE = 0.0001;
-    Eigen::Vector3d out_point;
-    out_point.x() = laser_beam.position.x();
-    out_point.y() = laser_beam.position.y();
-    out_point.z() = laser_beam.position.z();
-
-    float a = plane.a * laser_beam.direction.x() + plane.b * laser_beam.direction.y() + plane.c * laser_beam.direction.z();
-
-    if (a > -TOLERANCE && a < TOLERANCE)
-    {
-        return out_point;
-    }
-
-    float distance = distanceToPlane(plane, out_point);
-
-    out_point.x() = laser_beam.position.x() - laser_beam.direction.x() * (distance / a);
-    out_point.y() = laser_beam.position.y() - laser_beam.direction.y() * (distance / a);
-    out_point.z() = laser_beam.position.z() - laser_beam.direction.z() * (distance / a);
-
-    return out_point;
 }

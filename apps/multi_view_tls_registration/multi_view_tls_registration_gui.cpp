@@ -53,6 +53,8 @@
 #include "../../resources/resource2.h"
 #endif
 
+
+
 #ifdef _WIN32
 bool consWin = true;
 #endif
@@ -61,11 +63,11 @@ bool consImGui = false;
 std::string winTitle = std::string("Step 2 (Multi view TSL registration) ") + HDMAPPING_VERSION_STRING;
 
 std::vector<std::string> infoLines = {
-    "This program is second step in MANDEYE process.",
+    "This program is second step in MANDEYE process",
     "",
     "It refines trajectory (e.g with loop closure)",
     "It refines trajectory with many approaches (e.g. Iterative Closest Point, Normal Distributions Transform)",
-    "It exports session as rigid point cloud to single LAZ file.",
+    "It exports session as rigid point cloud to single LAZ file",
     "LAZ files are the product of MANDEYE process (open them with Cloud Compare)",
 };
 
@@ -2130,6 +2132,8 @@ void display()
                         if (output_file_name.size() > 0)
                             save_trajectories_to_laz(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling);
                     }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("As one global scan");
 
                     ImGui::Separator();
 
@@ -2551,11 +2555,9 @@ void display()
         {
             ImGui::BeginDisabled(!session_loaded);
             {
-                ImGui::PushItemWidth(ImGuiNumberWidth);
-
                 auto tmp = point_size;
+                ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputInt("points size", &point_size);
-                ImGui::PopItemWidth();
                 if (point_size < 1)
                     point_size = 1;
                 if (point_size > 10)
@@ -2593,12 +2595,12 @@ void display()
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
             
-            ImGui::MenuItem("Show axes", "Ctrl+X", &show_axes);
+            ImGui::MenuItem("Show axes", nullptr, &show_axes);
             ImGui::MenuItem("Block Z", nullptr, &block_z);
 
             ImGui::Separator();
 
-            ImGui::MenuItem("Show compass ruler", "Ctrl+C", &compass_ruler);
+            ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
             ImGui::Separator();
 
@@ -3278,7 +3280,7 @@ bool initGL(int *argc, char **argv)
     glutCreateWindow(winTitle.c_str());
 
     #ifdef _WIN32
-        HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
+        HWND hwnd = FindWindow(NULL, winTitle.c_str());
         HINSTANCE hInstance = GetModuleHandle(NULL);
         SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
         SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));

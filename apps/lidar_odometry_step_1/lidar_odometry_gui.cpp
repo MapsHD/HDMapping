@@ -1738,10 +1738,10 @@ void display()
 
             if (ImGui::BeginMenu("View"))
             {
-                ImGui::MenuItem("show_initial_points", nullptr, &show_initial_points);
-                ImGui::MenuItem("show_trajectory", nullptr, &show_trajectory);
-                ImGui::MenuItem("show_trajectory_as_axes", nullptr, &show_trajectory_as_axes);
-                ImGui::MenuItem("show_compass_ruler", nullptr, &compass_ruler);
+                ImGui::MenuItem("Show initial points", nullptr, &show_initial_points);
+                ImGui::MenuItem("Show trajectory", nullptr, &show_trajectory);
+                ImGui::MenuItem("Show trajectory as axes", nullptr, &show_trajectory_as_axes);
+                ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
                 // ImGui::MenuItem("show_covs", nullptr, &show_covs);
 

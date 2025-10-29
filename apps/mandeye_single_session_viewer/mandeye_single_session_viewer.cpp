@@ -33,10 +33,10 @@
 std::string winTitle = std::string("Single session viewer ") + HDMAPPING_VERSION_STRING;
 
 std::vector<std::string> infoLines = {
-    "This program is optional step in MANDEYE process.",
+    "This program is optional step in MANDEYE process",
     "",
-    "It analyzes session created in step_1 for problems that need to be addressed further.",
-    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program.",
+    "It analyzes session created in step_1 for problems that need to be addressed further",
+    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program",
 };
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
@@ -388,7 +388,7 @@ void display()
             if (session.point_clouds_container.point_clouds.size() > 0)
             {
                 ImGui::PushItemWidth(ImGuiNumberWidth);
-                ImGui::InputFloat("offset_intensity", &offset_intensity, 0.01, 0.1, "%.2f");
+                ImGui::InputFloat("Offset intensity", &offset_intensity, 0.01, 0.1, "%.2f");
                 if (offset_intensity < 0) {
                     offset_intensity = 0;
                 }
@@ -399,7 +399,7 @@ void display()
                     ImGui::SetTooltip("keyboard up/down arrows");
 
                 auto tmp = point_size;
-                ImGui::InputInt("points size", &point_size);
+                ImGui::InputInt("Points size", &point_size);
                 ImGui::PopItemWidth();
                 if (point_size < 1)
                     point_size = 1;
@@ -414,17 +414,21 @@ void display()
                     }
                 }
 
-                ImGui::MenuItem("show_neighbouring_scans", "Ctrl+N", &show_neighbouring_scans);
-                if (show_neighbouring_scans)
+                ImGui::MenuItem("Show neighbouring scans", "Ctrl+N", &show_neighbouring_scans);
+                ImGui::BeginDisabled(!show_neighbouring_scans);
                 {
-                    ImGui::ColorEdit4("pc_neigbouring_color", (float*)&pc_neigbouring_color, ImGuiColorEditFlags_NoInputs);
+                    ImGui::ColorEdit4("Neigbouring color", (float*)&pc_neigbouring_color, ImGuiColorEditFlags_NoInputs);
                 }
+                ImGui::EndDisabled();
 
                 ImGui::Separator();
             }
 
-            ImGui::MenuItem("show_axes", "Ctrl+X", &show_axes);
-            ImGui::MenuItem("show_compass_ruler", "Ctrl+C", &compass_ruler);
+            ImGui::MenuItem("Show axes", nullptr, &show_axes);
+
+            ImGui::Separator();
+
+            ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
             //ImGui::MenuItem("show_covs", nullptr, &show_covs);
 

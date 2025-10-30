@@ -223,6 +223,10 @@ void project_gui()
     ImGui::SameLine();
     ImGui::Checkbox("Is ground truth", &session.is_ground_truth);
 
+    std::string wd = "working directory: '" + session.working_directory + "'";
+
+    ImGui::Text(wd.c_str());
+
     ImGui::NewLine();
 
     if (ImGui::Button("Set initial pose to Identity and update other poses"))

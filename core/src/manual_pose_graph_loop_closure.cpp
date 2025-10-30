@@ -91,6 +91,14 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                 if (ImGui::Button("current result"))
                     set_current_poses_as_motion_model(point_clouds_container);
 
+                if (poses_motion_model.size() == point_clouds_container.point_clouds.size())
+                {
+                    ImGui::SameLine();
+                    if (ImGui::Button("Compute Pose Graph SLAM"))
+                    {
+                        graph_slam(point_clouds_container, gnss, gcps, cps);
+                    }
+                }
                 // ImGui::Text("motion model");
 
                 ImGui::Separator();
@@ -127,14 +135,7 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                 ImGui::PopItemWidth();
                 ImGui::Separator();
 
-                if (poses_motion_model.size() == point_clouds_container.point_clouds.size())
-                {
-                    ImGui::SameLine();
-                    if (ImGui::Button("Compute Pose Graph SLAM"))
-                    {
-                        graph_slam(point_clouds_container, gnss, gcps, cps);
-                    }
-                }
+                
 
                 if (ImGui::Button("Fuse trajectory with GNSS (trajectory is rigid)"))
                 {

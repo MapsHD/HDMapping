@@ -264,7 +264,7 @@ cmake --version
 - Run the installer and follow the instructions
 - Ensure CMake is added to your system PATH
 
-## Quick Start (Recommended)
+## Quick Start (Ubuntu)
 ```bash
 git clone https://github.com/MapsHD/HDMapping.git
 cd HDMapping
@@ -276,6 +276,19 @@ cd build
 # Auto-optimized build (detects your CPU automatically)
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j
+```
+
+## Quick Start (Windows)
+```bash
+git clone https://github.com/MapsHD/HDMapping.git
+cd HDMapping
+mkdir build
+git submodule init
+git submodule update --recursive
+
+# Auto-optimized build (detects your CPU automatically)
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build ./build --config Release
 ```
 
 ## WSL2 GUI

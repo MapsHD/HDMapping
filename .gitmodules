@@ -34,3 +34,6 @@
 [submodule "3rdparty/implot"]
 	path = 3rdparty/implot
 	url = https://github.com/epezent/implot.git
+[submodule "3rdparty/oneTBB"]
+	path = 3rdparty/oneTBB
+	url = https://github.com/oneapi-src/oneTBB.git

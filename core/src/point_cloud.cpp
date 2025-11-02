@@ -1589,6 +1589,54 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 					glEnd();
 				}
 			}
+
+			if (show_IMU)
+			{
+				TaitBryanPose tb;
+				tb.px = this->m_pose(0, 3);
+				tb.py = this->m_pose(1, 3);
+				tb.pz = this->m_pose(2, 3);
+				tb.om = this->local_trajectory[0].imu_om_fi_ka.x();
+				tb.fi = this->local_trajectory[0].imu_om_fi_ka.y();
+				tb.ka = this->local_trajectory[0].imu_om_fi_ka.z();
+
+				Eigen::Affine3d m = affine_matrix_from_pose_tait_bryan(tb);
+
+				glBegin(GL_LINES);
+				glColor3f(1.0f, 0.0f, 0.0f);
+				glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+				glVertex3f(m(0, 3) + m(0, 0), m(1, 3) + m(1, 0), m(2, 3) + m(2, 0));
+
+				glColor3f(0.0f, 1.0f, 0.0f);
+				glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+				glVertex3f(m(0, 3) + m(0, 1), m(1, 3) + m(1, 1), m(2, 3) + m(2, 1));
+
+				glColor3f(0.0f, 0.0f, 1.0f);
+				glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+				glVertex3f(m(0, 3) + m(0, 2), m(1, 3) + m(1, 2), m(2, 3) + m(2, 2));
+				glEnd();
+			}
+
+			if (show_pose)
+			{
+				Eigen::Affine3d m = this->m_pose;
+
+				glLineWidth(2);
+				glBegin(GL_LINES);
+				glColor3f(1.0f, 0.0f, 0.0f);
+				glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+				glVertex3f(m(0, 3) + m(0, 0), m(1, 3) + m(1, 0), m(2, 3) + m(2, 0));
+
+				glColor3f(0.0f, 1.0f, 0.0f);
+				glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+				glVertex3f(m(0, 3) + m(0, 1), m(1, 3) + m(1, 1), m(2, 3) + m(2, 1));
+
+				glColor3f(0.0f, 0.0f, 1.0f);
+				glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+				glVertex3f(m(0, 3) + m(0, 2), m(1, 3) + m(1, 2), m(2, 3) + m(2, 2));
+				glEnd();
+				glLineWidth(1);
+			}
 		}
 	}
 }

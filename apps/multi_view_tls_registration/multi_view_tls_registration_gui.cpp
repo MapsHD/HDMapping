@@ -1638,6 +1638,40 @@ void lio_segments_gui()
 
                 ImGui::SameLine();
                 ImGui::Checkbox(("fuse IMU inclination##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU);
+                
+                ImGui::SameLine();
+                ImGui::Checkbox(("show IMU##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].show_IMU);
+
+                ImGui::SameLine();
+                ImGui::Checkbox(("show pose##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].show_pose);
+
+                /*ImGui::SameLine();
+                if (ImGui::Button(("set IMU inclination##" + std::to_string(i)).c_str()))
+                {
+                    //session.point_clouds_container.point_clouds[i].m_initial_pose
+                    //session.point_clouds_container.point_clouds[i].m_pose
+                    //session.point_clouds_container.point_clouds[i].m_pose_temp
+
+                    TaitBryanPose target_pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
+
+                    target_pose.om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x();
+                    target_pose.fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y();
+
+                    Eigen::Affine3d m_pose = affine_matrix_from_pose_tait_bryan(target_pose);
+
+                    session.point_clouds_container.point_clouds[i].m_initial_pose = m_pose;
+                    session.point_clouds_container.point_clouds[i].m_pose = m_pose;
+                    session.point_clouds_container.point_clouds[i].m_pose_temp = m_pose;
+
+                    //session.point_clouds_container.point_clouds[i].m_pose = m_pose;
+                    //session.point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
+                    //session.point_clouds_container.point_clouds[i].gui_translation[0] = session.point_clouds_container.point_clouds[i].pose.px;
+                    //session.point_clouds_container.point_clouds[i].gui_translation[1] = session.point_clouds_container.point_clouds[i].pose.py;
+                    //session.point_clouds_container.point_clouds[i].gui_translation[2] = session.point_clouds_container.point_clouds[i].pose.pz;
+                    //session.point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(session.point_clouds_container.point_clouds[i].pose.om);
+                    //session.point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(session.point_clouds_container.point_clouds[i].pose.fi);
+                    //session.point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(session.point_clouds_container.point_clouds[i].pose.ka);
+                }*/
 
                 ImGui::Text("fixed: ");
 

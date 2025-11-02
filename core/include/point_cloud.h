@@ -98,6 +98,9 @@ public:
 	bool show_color = true;
 	bool fuse_inclination_from_IMU = false;
 
+	bool show_IMU = false;
+	bool show_pose = false;
+
 	TaitBryanPose pose;
 	float gui_translation[3];
 	float gui_rotation[3];

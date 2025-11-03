@@ -84,14 +84,24 @@ void wheel(int button, int dir, int x, int y)
                 }
             }
             else
-                translate_z -= 0.05f * translate_z;
+            {
+                if (io.KeyShift)
+                    translate_z += 5.0f;
+                else
+                    translate_z += 1.0f;
+            }
         }
         else
         {
             if (is_ortho)
                 camera_ortho_xy_view_zoom += 0.1 * camera_ortho_xy_view_zoom;
             else
-                translate_z += 0.05f * translate_z;
+            {
+                if (io.KeyShift)
+                    translate_z -= 5.0f;
+				else
+                    translate_z -= 1.0f;
+            }
         }
 
         mouse_sensitivity = fabs(translate_z) / 100; //1 for translate_z 50 (default zoom)

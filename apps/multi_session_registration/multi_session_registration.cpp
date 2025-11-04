@@ -96,6 +96,7 @@ bool optimized = false;
 bool gizmo_all_sessions = false;
 bool is_ndt_gui = false;
 bool is_loop_closure_gui = false;
+bool open_remove = false;
 NDT ndt;
 
 int number_visible_sessions = 0;
@@ -2077,12 +2078,12 @@ void saveProject()
     std::string output_file_name = "";
     output_file_name = mandeye::fd::SaveFileDialog("Save project file", mandeye::fd::Project_filter, ".json");
 
-    if (output_file_name.size() > 0)
-        if (save_project_settings(fs::path(output_file_name).string(), project_settings))
-        {
-            std::string newTitle = winTitle + " - " + truncPath(output_file_name);
-            glutSetWindowTitle(newTitle.c_str());
-        }
+if (output_file_name.size() > 0)
+if (save_project_settings(fs::path(output_file_name).string(), project_settings))
+{
+    std::string newTitle = winTitle + " - " + truncPath(output_file_name);
+    glutSetWindowTitle(newTitle.c_str());
+}
 }
 
 void addSession()
@@ -2096,65 +2097,6 @@ void addSession()
         project_settings.session_file_names.push_back(input_file_name);
         loaded_sessions = false;
         time_stamp_offset = 0.0;
-    }
-}
-
-void removeSession()
-{
-    ImGui::OpenPopup("Remove Sessions");
-
-    if (ImGui::BeginPopupModal("Remove Sessions", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        static std::vector<bool> session_marked_for_removal;
-        if (session_marked_for_removal.size() != project_settings.session_file_names.size())
-            session_marked_for_removal.resize(project_settings.session_file_names.size(), false);
-
-        ImGui::Text("Select sessions to remove:");
-        ImGui::Separator();
-
-        for (int i = 0; i < project_settings.session_file_names.size(); i++)
-        {
-            bool checked = session_marked_for_removal[i];
-            if (ImGui::Checkbox(project_settings.session_file_names[i].c_str(), &checked))
-                session_marked_for_removal[i] = checked;
-        }
-
-        ImGui::Separator();
-
-        if (ImGui::Button("Remove"))
-        {
-            for (int i = project_settings.session_file_names.size() - 1; i >= 0; i--)
-            {
-                if (session_marked_for_removal[i])
-                {
-                    std::cout << "Removing session: " << project_settings.session_file_names[i] << std::endl;
-                    project_settings.session_file_names.erase(project_settings.session_file_names.begin() + i);
-                    if (loaded_sessions && i < sessions.size())
-                        sessions.erase(sessions.begin() + i);
-                }
-            }
-
-            session_marked_for_removal.clear();
-
-            if (!sessions.empty())
-                update_timestamp_offset();
-            else
-            {
-                loaded_sessions = false;
-                time_stamp_offset = 0.0;
-            }
-
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel"))
-        {
-            session_marked_for_removal.clear();
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
     }
 }
 
@@ -2228,20 +2170,24 @@ void loadSessions()
 
 void display()
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
 
     view_kbd_shortcuts();
 
     if (io.KeyCtrl && ImGui::IsKeyPressed('A', false))
         addSession();
-    if (io.KeyCtrl && ImGui::IsKeyPressed('L', false))
-        loadSessions();
+    if ((project_settings.session_file_names.size() > 0) && !loaded_sessions)
+        if (io.KeyCtrl && ImGui::IsKeyPressed('L', false))
+            loadSessions();
     if (io.KeyCtrl && ImGui::IsKeyPressed('O', false))
         openProject();
-    if (io.KeyCtrl && ImGui::IsKeyPressed('R', false))
-        removeSession();
-    if (io.KeyCtrl && ImGui::IsKeyPressed('S', false))
-        saveProject();
+    if (sessions.size() > 0)
+    {
+        if (io.KeyCtrl && ImGui::IsKeyPressed('R', false))
+            open_remove = true;
+        if (io.KeyCtrl && ImGui::IsKeyPressed('S', false))
+            saveProject();
+    }
 
     updateCameraTransition();
 
@@ -2659,7 +2605,7 @@ void display()
             if (ImGui::MenuItem("Add session", "Ctrl+A"))
                 addSession();
             if (ImGui::MenuItem("Remove session(s)", "Ctrl+R", nullptr, sessions.size() > 0))
-                removeSession();
+                open_remove = true;
 
             if (ImGui::MenuItem("Load sessions", "Ctrl+L", nullptr, (project_settings.session_file_names.size() > 0) && !loaded_sessions))
                 loadSessions();
@@ -3238,6 +3184,66 @@ void display()
         ImGui::EndMainMenuBar();
     }
 
+    if (open_remove)
+    {
+        ImGui::OpenPopup("Remove Sessions");
+        open_remove = false;
+	}
+
+    if (ImGui::BeginPopupModal("Remove Sessions", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        static std::vector<bool> session_marked_for_removal;
+        if (session_marked_for_removal.size() != project_settings.session_file_names.size())
+            session_marked_for_removal.resize(project_settings.session_file_names.size(), false);
+
+        ImGui::Text("Select sessions to remove:");
+        ImGui::Separator();
+
+        for (int i = 0; i < project_settings.session_file_names.size(); i++)
+        {
+            bool checked = session_marked_for_removal[i];
+            if (ImGui::Checkbox(project_settings.session_file_names[i].c_str(), &checked))
+                session_marked_for_removal[i] = checked;
+        }
+
+        ImGui::Separator();
+
+        if (ImGui::Button("Remove"))
+        {
+            for (int i = project_settings.session_file_names.size() - 1; i >= 0; i--)
+            {
+                if (session_marked_for_removal[i])
+                {
+                    std::cout << "Removing session: " << project_settings.session_file_names[i] << std::endl;
+                    project_settings.session_file_names.erase(project_settings.session_file_names.begin() + i);
+                    if (loaded_sessions && i < sessions.size())
+                        sessions.erase(sessions.begin() + i);
+                }
+            }
+
+            session_marked_for_removal.clear();
+
+            if (!sessions.empty())
+                update_timestamp_offset();
+            else
+            {
+                loaded_sessions = false;
+                time_stamp_offset = 0.0;
+            }
+
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            session_marked_for_removal.clear();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
     info_window(infoLines, &info_gui);
 
     if (compass_ruler)
@@ -3780,6 +3786,17 @@ bool initGL(int *argc, char **argv)
     SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
     SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
 #endif
+
+    // Query versions info
+    //const GLubyte* renderer = glGetString(GL_RENDERER);
+    //const GLubyte* version = glGetString(GL_VERSION);
+    //const GLubyte* glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
+
+    //std::cout << "Renderer: " << renderer << std::endl;
+    //std::cout << "OpenGL version supported: " << version << std::endl;
+    //std::cout << "GLSL version: " << glslVersion << std::endl;
+
+    //std::cout << "ImGui version: " << ImGui::GetVersion() << std::endl;
 
     glutDisplayFunc(display);
     glutMotionFunc(motion);

@@ -9,6 +9,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <utils.hpp>
+
 #include <Eigen/Eigen>
 
 #include <transformations.h>
@@ -24,31 +26,25 @@
 
 #include <pair_wise_iterative_closest_point.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <shellapi.h>  // <-- Required for ShellExecuteA
+#include "../../resources/resourceA.h"
+#endif
+
+std::string winTitle = std::string("MR calibration ") + HDMAPPING_VERSION_STRING;
+
+std::vector<std::string> infoLines = {
+    "This program is optional step in MANDEYE process",
+    "",
+    "Used for MR (Mission Recorder) hardware using two LiDAR units"
+};
+
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
-const unsigned int window_width = 800;
-const unsigned int window_height = 600;
-double camera_ortho_xy_view_zoom = 10;
-double camera_ortho_xy_view_shift_x = 0.0;
-double camera_ortho_xy_view_shift_y = 0.0;
-double camera_mode_ortho_z_center_h = 0.0;
-double camera_ortho_xy_view_rotation_angle_deg = 0;
-bool is_ortho = false;
-bool show_axes = true;
-ImVec4 clear_color = ImVec4(0.8f, 0.8f, 0.8f, 1.00f);
 ImVec4 pc_color = ImVec4(1.0f, 0.0f, 0.0f, 1.00f);
 ImVec4 pc_color2 = ImVec4(0.0f, 0.0f, 1.0f, 1.00f);
-
-int point_size = 1;
-Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
-float translate_x, translate_y = 0.0;
-float translate_z = -50.0;
-float rotate_x = 0.0, rotate_y = 0.0;
-int mouse_old_x, mouse_old_y;
-int mouse_buttons = 0;
-bool gui_mouse_down{false};
-float mouse_sensitivity = 1.0;
 
 float m_ortho_projection[] = {1, 0, 0, 0,
                               0, 1, 0, 0,
@@ -80,9 +76,6 @@ std::vector<std::string> all_file_names;
 LidarOdometryParams params;
 int threshold_initial_points = 10000;
 std::vector<WorkerData> worker_data;
-const std::vector<std::string> json_filter = {"Calibration file (*.json)", "*.json", "All files", "*"};
-const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.laz)", "*.laz", "LASzip file (*.las)", "*.las", "All files", "*"};
-const std::vector<std::string> sn_filter = {"sn file (*.sn)", "*.sn", "All files", "*"};
 std::unordered_map<std::string, Eigen::Affine3d> calibration;
 std::vector<Point3Di> point_cloud;
 
@@ -96,7 +89,7 @@ struct Checked
 std::vector<Checked> calibrated_lidar;
 std::vector<Checked> imu_lidar;
 
-double search_radious = 0.1;
+double search_radius = 0.1;
 
 bool show_grid = true;
 bool manual_calibration = false;
@@ -162,11 +155,13 @@ void motion(int x, int y)
             {
                 rotate_x += dy * 0.2f; // * mouse_sensitivity;
                 rotate_y += dx * 0.2f; // * mouse_sensitivity;
+                camera_transition_active = false;
             }
             if (mouse_buttons & 4)
             {
                 translate_x += dx * 0.05f * mouse_sensitivity;
                 translate_y -= dy * 0.05f * mouse_sensitivity;
+                camera_transition_active = false;
             }
         }
 
@@ -192,7 +187,7 @@ std::vector<Point3Di> load_pc(const std::string &lazFile, bool ommit_points_with
         fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", lazFile.c_str());
         std::abort();
     }
-    std::cout << "compressed : " << is_compressed << std::endl;
+    std::cout << "Compressed : " << is_compressed << std::endl;
     laszip_header *header;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
@@ -200,7 +195,7 @@ std::vector<Point3Di> load_pc(const std::string &lazFile, bool ommit_points_with
         fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
         std::abort();
     }
-    fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
+    fprintf(stderr, "File '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
     laszip_point *point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
@@ -211,7 +206,7 @@ std::vector<Point3Di> load_pc(const std::string &lazFile, bool ommit_points_with
     int counter_ts0 = 0;
     int counter_filtered_points = 0;
 
-    std::cout << "header->number_of_point_records:  " << header->number_of_point_records << std::endl;
+    std::cout << "Header -> number_of_point_records:  " << header->number_of_point_records << std::endl;
 
     for (laszip_U32 j = 0; j < header->number_of_point_records; j++)
     {
@@ -291,36 +286,21 @@ std::vector<Point3Di> load_pc(const std::string &lazFile, bool ommit_points_with
             }
         }
     }
-    std::cout << "number points with ts == 0: " << counter_ts0 << std::endl;
-    std::cout << "counter_filtered_points: " << counter_filtered_points << std::endl;
-    std::cout << "total number points: " << points.size() << std::endl;
+    std::cout << "Number points with timestamp == 0: " << counter_ts0 << std::endl;
+    std::cout << "Counter filtered points: " << counter_filtered_points << std::endl;
+    std::cout << "Total number of points: " << points.size() << std::endl;
     laszip_close_reader(laszip_reader);
     return points;
 }
 
 void project_gui()
 {
-    if (ImGui::Begin("main gui window"))
+    if (ImGui::Begin("Settings"))
     {
-        ImGui::ColorEdit3("clear color", (float *)&clear_color);
-
-        if (idToSn.size() == 2)
-        {
-            ImGui::ColorEdit3(idToSn.at(0).c_str(), (float *)&pc_color);
-            ImGui::ColorEdit3(idToSn.at(1).c_str(), (float *)&pc_color2);
-        }
-        else
-        {
-            ImGui::ColorEdit3("pc_color_lidar_1", (float *)&pc_color);
-            ImGui::ColorEdit3("pc_color_lidar_2", (float *)&pc_color2);
-        }
-
-        ImGui::Checkbox("show_grid", &show_grid);
-        ImGui::Checkbox("show_axes", &show_axes);
 
         if (calibrated_lidar.size() == 2)
         {
-            ImGui::Text(".......... Check calibrated lidar ..............");
+            ImGui::Text("Select calibrated LiDAR:");
 
             int chosen_lidar = -1;
             for (int i = 0; i < calibrated_lidar.size(); i++)
@@ -359,8 +339,8 @@ void project_gui()
                 calibrated_lidar[chosen_lidar].check = true;
             }
 
-            ImGui::Text("------------------------------------------------");
-            ImGui::Checkbox("manual_calibration", &manual_calibration);
+			ImGui::Separator();
+            ImGui::Checkbox("Manual calibration", &manual_calibration);
 
             if (manual_calibration)
             {
@@ -382,12 +362,26 @@ void project_gui()
 
                     auto tmp = tb_pose;
 
+                    ImGui::PushItemWidth(ImGuiNumberWidth);
                     ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_x [m] (offset in X-red axis)").c_str(), &tb_pose.px, 0.01, 0.1);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(xText);
                     ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_y [m] (offset in Y-green axis)").c_str(), &tb_pose.py, 0.01, 0.1);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(yText);
                     ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_z [m] (offset in Z-blue axis)").c_str(), &tb_pose.pz, 0.01, 0.1);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(zText);
                     ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_om [deg] (angle around X-red axis)").c_str(), &tb_pose.om, 0.1, 1.0);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(omText);
                     ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_fi [deg] (angle around Y-green axis)").c_str(), &tb_pose.fi, 0.1, 1.0);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(fiText);
                     ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_ka [deg] (angle around Z-blue axis)").c_str(), &tb_pose.ka, 0.1, 1.0);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(kaText);
+                    ImGui::PopItemWidth();
 
                     if (tmp.px != tb_pose.px || tmp.py != tb_pose.py || tmp.pz != tb_pose.pz ||
                         tmp.om != tb_pose.om || tmp.fi != tb_pose.fi || tmp.ka != tb_pose.ka)
@@ -403,51 +397,26 @@ void project_gui()
 
                 // calibrations.at(0) = m0;
             }
-            ImGui::Text("................................................");
+            ImGui::NewLine();
         }
 
         if (idToSn.size() == 0)
         {
             if (ImGui::Button("Load 'LiDAR serial number to index' file (lidar****.sn) (step 1)"))
             {
-              const auto input_file_name = mandeye::fd::OpenFileDialogOneFile("Calibration files", {});
+              const auto input_file_name = mandeye::fd::OpenFileDialogOneFile("Calibration files", mandeye::fd::sn_filter);
               idToSn = MLvxCalib::GetIdToSnMapping(input_file_name);
             }
         }
 
         if (idToSn.size() == 2 && calibrations.size() == 0)
         {
-            if (ImGui::Button("Load last known calibration (*.json) (step 2)"))
-            {
-                const auto input_file_name = mandeye::fd::OpenFileDialogOneFile("Calibration files", {});
-                if (input_file_name.size() > 0)
-                {
-                    std::cout << "loading file: " << input_file_name << std::endl;
-
-                    calibration = MLvxCalib::GetCalibrationFromFile(input_file_name);
-                    imuSnToUse = MLvxCalib::GetImuSnToUse(input_file_name);
-
-                    calibrations = MLvxCalib::CombineIntoCalibration(idToSn, calibration);
-
-                    if (!calibration.empty())
-                    {
-                        std::cout << "Loaded calibration for: \n";
-                        for (const auto &[sn, _] : calibration)
-                        {
-                            std::cout << " -> " << sn << std::endl;
-                        }
-                        std::cout << "imuSnToUse: " << imuSnToUse << std::endl;
-                    }
-                }
-            }
-
-            //ImGui::SameLine();
-            ImGui::Text("If You dont have any calibration file --> ");
+            ImGui::Text("If you don't have any calibration file --> ");
             ImGui::SameLine();
             if (ImGui::Button("Create calibration from scratch and save as 'calibration.json' (optional before step 2)"))
             {
                 std::string output_file_name = "";
-                output_file_name = mandeye::fd::SaveFileDialog("Save *.json file", json_filter, ".json");
+                output_file_name = mandeye::fd::SaveFileDialog("Save *.json file", mandeye::fd::json_filter, ".json");
 
                 if (output_file_name.size() > 0)
                 {
@@ -486,6 +455,30 @@ void project_gui()
                     fs.close();
                 }
             }
+
+            if (ImGui::Button("Load last known calibration (*.json) (step 2)"))
+            {
+                const auto input_file_name = mandeye::fd::OpenFileDialogOneFile("Calibration files", mandeye::fd::json_filter);
+                if (input_file_name.size() > 0)
+                {
+                    std::cout << "loading file: " << input_file_name << std::endl;
+
+                    calibration = MLvxCalib::GetCalibrationFromFile(input_file_name);
+                    imuSnToUse = MLvxCalib::GetImuSnToUse(input_file_name);
+
+                    calibrations = MLvxCalib::CombineIntoCalibration(idToSn, calibration);
+
+                    if (!calibration.empty())
+                    {
+                        std::cout << "Loaded calibration for: \n";
+                        for (const auto &[sn, _] : calibration)
+                        {
+                            std::cout << " -> " << sn << std::endl;
+                        }
+                        std::cout << "imuSnToUse: " << imuSnToUse << std::endl;
+                    }
+                }
+            }
         }
 
         if (calibrations.size() > 0 && point_cloud.size() == 0)
@@ -520,7 +513,7 @@ void project_gui()
 
         if (point_cloud.size() > 0)
         {
-            std::string calibrated_lidar_name = "calibrate[";
+            std::string calibrated_lidar_name = "Calibrate [";
 
             for (int i = 0; i < calibrated_lidar.size(); i++)
             {
@@ -555,17 +548,17 @@ void project_gui()
                     }
                 }
 
-                std::cout << "decimation: " << params.decimation << std::endl;
-                std::cout << "point cloud size before" << std::endl;
-                std::cout << "lidar0.size(): " << lidar0.size() << std::endl;
-                std::cout << "lidar1.size(): " << lidar1.size() << std::endl;
+                std::cout << "Decimation: " << params.decimation << std::endl;
+                std::cout << "Point cloud size before" << std::endl;
+                std::cout << "LiDAR0 size: " << lidar0.size() << std::endl;
+                std::cout << "LidDAR1 size: " << lidar1.size() << std::endl;
 
                 lidar0 = decimate(lidar0, params.decimation, params.decimation, params.decimation);
                 lidar1 = decimate(lidar1, params.decimation, params.decimation, params.decimation);
 
-                std::cout << "point cloud size after" << std::endl;
-                std::cout << "lidar0.size(): " << lidar0.size() << std::endl;
-                std::cout << "lidar1.size(): " << lidar1.size() << std::endl;
+                std::cout << "Point cloud size after" << std::endl;
+                std::cout << "LiDAR0 size: " << lidar0.size() << std::endl;
+                std::cout << "LiDAR1 size: " << lidar1.size() << std::endl;
 
                 std::vector<Eigen::Vector3d> pc0;
                 std::vector<Eigen::Vector3d> pc1;
@@ -582,7 +575,7 @@ void project_gui()
                         pc1.emplace_back(pp.x(), pp.y(), pp.z());
                     }
 
-                    if (icp.compute(pc0, pc1, search_radious, number_of_iterations, m0))
+                    if (icp.compute(pc0, pc1, search_radius, number_of_iterations, m0))
                     {
                         calibrations.at(0) = m0;
                     }
@@ -598,7 +591,7 @@ void project_gui()
                     {
                         pc1.emplace_back(t.point.x(), t.point.y(), t.point.z());
                     }
-                    if (icp.compute(pc1, pc0, search_radious, number_of_iterations, m1))
+                    if (icp.compute(pc1, pc0, search_radius, number_of_iterations, m1))
                     {
                         calibrations.at(1) = m1;
                     }
@@ -607,27 +600,25 @@ void project_gui()
 
             ImGui::SameLine();
 
-            ImGui::InputDouble("search_radious: ", &search_radious);
-            if (search_radious < 0.02)
+            ImGui::SetNextItemWidth(ImGuiNumberWidth);
+            ImGui::InputDouble("Search radius:", &search_radius);
+            if (search_radius < 0.02)
             {
-                search_radious = 0.02;
+                search_radius = 0.02;
             }
 
-            /**/
-
-            //
-            ImGui::Text("=========================================================================");
+            ImGui::Separator();
 
             if (imu_lidar.size() == 2)
             {
-                ImGui::Text(".......... Check imu for lidar odometry in calibration file (horizontal LiDAR preferable) ..........");
+                ImGui::Text("Select IMU for LiDAR odometry in calibration file (LiDAR in horizontal orientation!):");
 
                 int chosen_imu = -1;
                 for (int i = 0; i < imu_lidar.size(); i++)
                 {
                     std::string name = idToSn.at(i);
                     bool before = imu_lidar[i].check;
-                    ImGui::Checkbox(std::string(name + "_imu").c_str(), &imu_lidar[i].check);
+                    ImGui::Checkbox(std::string(name + "##imu").c_str(), &imu_lidar[i].check);
                     bool after = imu_lidar[i].check;
 
                     if (!before && after)
@@ -663,12 +654,12 @@ void project_gui()
             if (ImGui::Button("Save result calibration as 'calibration.json' (step 5)"))
             {
                 std::string output_file_name = "";
-                output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", json_filter, ".json");
-                std::cout << "las or laz file toj save: '" << output_file_name << "'" << std::endl;
+                output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::json_filter, ".json");
+                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
 
                 if (output_file_name.size() > 0)
                 {
-                    std::cout << "output_file_name: " << output_file_name << std::endl;
+                    std::cout << "Output file name: " << output_file_name << std::endl;
                     nlohmann::json j;
 
                     j["calibration"][idToSn.at(0)]["order"] = "ROW";
@@ -724,9 +715,8 @@ void project_gui()
                     fs.close();
                 }
             }
-            ImGui::SameLine();
-            ImGui::Text(" imprtant notice! 'lidar_odometry_step_1.exe' program requires file name 'calibration.json' in folder with data");
-            ImGui::Text("=========================================================================");
+            ImGui::NewLine();
+            ImGui::Text("Important notice! 'lidar_odometry_step_1.exe' program requires file name 'calibration.json' in folder with data");
         }
         ImGui::End();
     }
@@ -736,6 +726,14 @@ void project_gui()
 void display()
 {
     ImGuiIO &io = ImGui::GetIO();
+
+    view_kbd_shortcuts();
+
+    if (ImGui::IsKeyPressed('G', false))
+        show_grid = !show_grid;
+
+    updateCameraTransition();
+
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -780,6 +778,8 @@ void display()
     glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
+
+    Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
 
     if (!is_ortho)
     {
@@ -958,6 +958,59 @@ void display()
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
 
+    if (ImGui::BeginMainMenuBar())
+    {
+
+        if (ImGui::BeginMenu("View"))
+        {
+            ImGui::MenuItem("Show grid", "key G", &show_grid);
+            ImGui::MenuItem("Show axes", "key X", &show_axes);
+            ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
+
+            ImGui::Separator();
+
+            ImGui::ColorEdit3("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
+            if (idToSn.size() == 2)
+            {
+                ImGui::ColorEdit3(idToSn.at(0).c_str(), (float*)&pc_color, ImGuiColorEditFlags_NoInputs);
+                ImGui::ColorEdit3(idToSn.at(1).c_str(), (float*)&pc_color2, ImGuiColorEditFlags_NoInputs);
+            }
+            else
+            {
+                ImGui::ColorEdit3("Cloud 1 color", (float*)&pc_color, ImGuiColorEditFlags_NoInputs);
+                ImGui::ColorEdit3("Cloud 2 color", (float*)&pc_color2, ImGuiColorEditFlags_NoInputs);
+            }
+
+            ImGui::EndMenu();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Scene view relevant parameters");
+
+        camMenu();
+
+        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 2));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
+        if (ImGui::SmallButton("Info"))
+        {
+            info_gui = !info_gui;
+        }
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(3);
+
+
+        ImGui::EndMainMenuBar();
+    }
+
+    info_window(infoLines, &info_gui);
+
+    if (compass_ruler)
+        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), clear_color);
+
     project_gui();
 
     ImGui::Render();
@@ -972,7 +1025,15 @@ bool initGL(int *argc, char **argv)
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
     glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("mandeye_mission_recorder_calibration " HDMAPPING_VERSION_STRING);
+    glutCreateWindow(winTitle.c_str());
+
+    #ifdef _WIN32
+        HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
+        HINSTANCE hInstance = GetModuleHandle(NULL);
+        SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+    #endif
+
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
@@ -999,8 +1060,6 @@ bool initGL(int *argc, char **argv)
     ImGui_ImplOpenGL2_Init();
     return true;
 }
-
-void wheel(int button, int dir, int x, int y);
 
 void mouse(int glut_button, int state, int x, int y)
 {
@@ -1044,39 +1103,6 @@ void mouse(int glut_button, int state, int x, int y)
     }
 }
 
-void wheel(int button, int dir, int x, int y)
-{
-    if (dir > 0)
-    {
-        if (is_ortho)
-        {
-            camera_ortho_xy_view_zoom -= 0.1f * camera_ortho_xy_view_zoom;
-
-            if (camera_ortho_xy_view_zoom < 0.1)
-            {
-                camera_ortho_xy_view_zoom = 0.1;
-            }
-        }
-        else
-        {
-            translate_z -= 0.05f * translate_z;
-        }
-    }
-    else
-    {
-        if (is_ortho)
-        {
-            camera_ortho_xy_view_zoom += 0.1 * camera_ortho_xy_view_zoom;
-        }
-        else
-        {
-            translate_z += 0.05f * translate_z;
-        }
-    }
-
-    return;
-}
-
 int main(int argc, char *argv[])
 {
     params.decimation = 0.03;
@@ -1086,6 +1112,8 @@ int main(int argc, char *argv[])
     glutMouseFunc(mouse);
     glutMotionFunc(motion);
     glutMouseWheelFunc(wheel);
+    glutSpecialFunc(specialDown);
+    glutSpecialUpFunc(specialUp);
 
     glutMainLoop();
 

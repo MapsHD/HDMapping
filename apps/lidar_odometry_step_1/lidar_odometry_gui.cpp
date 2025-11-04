@@ -549,17 +549,17 @@ void lidar_odometry_gui()
         ImGui::NewLine();
         if (!step_1_done)
         {
-            if (ImGui::Button("load data (step 1)"))
+            if (ImGui::Button("Load data"))
             {
                 step1(loPause);
-                std::cout << "step_1_done please click 'compute_all (step 2)' to continue calculations" << std::endl;
+                std::cout << "Load data done please click 'Compute all' to continue calculations" << std::endl;
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Select all imu *.csv and lidar *.laz files produced by MANDEYE saved in 'continousScanning_*' folder");
         }
         if (step_1_done && !step_2_done)
         {
-            if (ImGui::Button("compute_all (step 2)"))
+            if (ImGui::Button("Compute all"))
             {
                 step2(loPause);
             }
@@ -576,13 +576,13 @@ void lidar_odometry_gui()
                 run_consistency(worker_data, params);
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Press optionally before pressing 'Save result (step 3)");
+                ImGui::SetTooltip("Press optionally before pressing 'Save result");
             ImGui::SameLine();
-            ImGui::Checkbox("use multiple Gaussians for each bucket", &params.use_mutliple_gaussian);
+            ImGui::Checkbox("Use multiple Gaussians for each bucket", &params.use_mutliple_gaussian);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Multiple Gaussians suppose to work better in floor plan indoor scenarios (multiple neighbouring rooms)");
 
-            if (ImGui::Button("Save result (step 3)"))
+            if (ImGui::Button("Save result"))
             {
                 save_results(true, 0.0);
             }
@@ -592,7 +592,7 @@ void lidar_odometry_gui()
         if (step_1_done && step_2_done)
         {
 
-            if (ImGui::Button("save all point clouds to single las/laz file"))
+            if (ImGui::Button("Save all point clouds to single las/laz file"))
             {
                 const auto output_file_name = mandeye::fd::SaveFileDialog("Save las/laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
 
@@ -607,16 +607,16 @@ void lidar_odometry_gui()
         if (!simple_gui)
         {
             ImGui::NewLine();
-            ImGui::Checkbox("use robust and accurate lidar odometry", &params.use_robust_and_accurate_lidar_odometry);
+            ImGui::Checkbox("Use robust and accurate lidar odometry", &params.use_robust_and_accurate_lidar_odometry);
 
             if (params.use_robust_and_accurate_lidar_odometry)
             {
                 ImGui::PushItemWidth(ImGuiNumberWidth);
-                ImGui::InputDouble("distance_bucket [m]", &params.distance_bucket, 0.0, 0.0, "%.3f");
-                ImGui::InputDouble("polar_angle [deg]", &params.polar_angle_deg, 0.0, 0.0, "%.3f");
-                ImGui::InputDouble("azimutal_angle [deg]", &params.azimutal_angle_deg, 0.0, 0.0, "%.3f");
-                ImGui::InputInt("number of iterations", &params.robust_and_accurate_lidar_odometry_iterations);
-                // ImGui::InputDouble("max distance lidar", &params.max_distance_lidar);
+                ImGui::InputDouble("Distance bucket [m]", &params.distance_bucket, 0.0, 0.0, "%.3f");
+                ImGui::InputDouble("Polar angle [deg]", &params.polar_angle_deg, 0.0, 0.0, "%.3f");
+                ImGui::InputDouble("Azimutal angle [deg]", &params.azimutal_angle_deg, 0.0, 0.0, "%.3f");
+                ImGui::InputInt("Number of iterations", &params.robust_and_accurate_lidar_odometry_iterations);
+                // ImGui::InputDouble("Max distance lidar", &params.max_distance_lidar);
                 ImGui::PopItemWidth();
             }
 
@@ -935,7 +935,7 @@ void lidar_odometry_gui()
                         }
                     }
 
-                    if (ImGui::Button("Accept_Gizmo (only translation)"))
+                    if (ImGui::Button("Accept Gizmo (only translation)"))
                     {
                         if (index_end < worker_data.size())
                         {
@@ -1749,7 +1749,7 @@ void display()
 
                 ImGui::Separator();
 
-                ImGui::ColorEdit4("Background color", (float *)&params.clear_color, ImGuiColorEditFlags_NoInputs);
+                ImGui::ColorEdit3("Background color", (float *)&params.clear_color, ImGuiColorEditFlags_NoInputs);
 
                 ImGui::EndMenu();
             }

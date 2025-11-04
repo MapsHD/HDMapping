@@ -977,7 +977,7 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
         counter++;
         if (counter > 50)
         {
-            std::filesystem::path path = params.working_directory_preview;
+            std::filesystem::path path = params.working_directory_cache;
             // path /= "cache";
             std::string fn = "session_chunk_" + std::to_string(original_points_to_save_counter) + ".cache";
             path /= fn;
@@ -1006,7 +1006,7 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
 
     if (counter > params.min_counter_concatenated_trajectory_nodes)
     {
-        std::filesystem::path path = params.working_directory_preview;
+        std::filesystem::path path = params.working_directory_cache;
         // path /= "cache";
         std::string fn = "session_chunk_" + std::to_string(original_points_to_save_counter) + ".cache";
         path /= fn;

@@ -18,7 +18,7 @@ using Imu = std::vector<std::tuple<std::pair<double, double>, FusionVector, Fusi
 
 bool load_data(std::vector<std::string>& input_file_names, LidarOdometryParams& params, std::vector<std::vector<Point3Di>>& pointsPerFile, Imu& imu_data, bool debugMsg);
 void calculate_trajectory(
-    Trajectory& trajectory, Imu& imu_data, bool fusionConventionNwu, bool fusionConventionEnu, bool fusionConventionNed, double ahrs_gain, bool debugMsg);
+    Trajectory &trajectory, Imu &imu_data, bool fusionConventionNwu, bool fusionConventionEnu, bool fusionConventionNed, double ahrs_gain, bool debugMsg, bool use_removie_imu_bias_from_first_stationary_scan);
 bool compute_step_1(
     std::vector<std::vector<Point3Di>> &pointsPerFile, LidarOdometryParams &params,
     Trajectory &trajectory, std::vector<WorkerData> &worker_data, const std::atomic<bool> &pause);

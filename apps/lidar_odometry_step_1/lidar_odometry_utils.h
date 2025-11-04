@@ -135,6 +135,8 @@ struct LidarOdometryParams
     NDTBucketMapType buckets_indoor;
     NDTBucketMapType buckets_outdoor;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    bool use_removie_imu_bias_from_first_stationary_scan = false;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);

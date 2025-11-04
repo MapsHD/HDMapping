@@ -196,7 +196,7 @@ void step1(const std::atomic<bool> &loPause)
             if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
             {
                 working_directory = fs::path(input_file_names[0]).parent_path().string();
-                calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages);
+                calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages, params.use_removie_imu_bias_from_first_stationary_scan);
                 compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
                 step_1_done = true;
             }
@@ -1647,6 +1647,8 @@ void display()
 
             if (ImGui::BeginMenu("Parameters"))
             {
+
+                ImGui::MenuItem("use_removie_imu_bias_from_first_stationary_scan", nullptr, &params.use_removie_imu_bias_from_first_stationary_scan);
                 ImGui::MenuItem("use_multithread", nullptr, &params.useMultithread);
                 ImGui::MenuItem("full_processing_messages", nullptr, &full_debug_messages);
                 if (ImGui::IsItemHovered())
@@ -1934,7 +1936,7 @@ void step1(const std::string &folder,
     if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
-        calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages);
+        calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages, params.use_removie_imu_bias_from_first_stationary_scan);
         compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
         std::cout << "step_1_done" << std::endl;
     }

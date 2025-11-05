@@ -1224,8 +1224,7 @@ void optimize_rigid_sf(
             return {AtPA, AtPB, c};
         };
 
-    std:
-        vector<Blocks> blocks(indexes.size());
+        std::vector<Blocks> blocks(indexes.size());
 
         if (useMultithread) // ToDo fix for this case
         {

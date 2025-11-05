@@ -48,6 +48,7 @@ ToDo
 - https://github.com/StephLin/LIO-SEGMOT (2023)
 - https://github.com/BrenYi/Light-LOAM (2024)
 - https://github.com/ZikangYuan/sr_lio (2024)
+- https://github.com/Ji1Xingyu/lio_gvm (2024)
 - https://github.com/MapsHD/rko_lio (2025)
 - https://github.com/PRBonn/kiss-slam (2025)
 - https://github.com/93won/lidar_odometry?tab=readme-ov-file (2025)

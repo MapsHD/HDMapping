@@ -36,7 +36,7 @@ std::vector<std::string> infoLines = {
     "This program is optional step in MANDEYE process",
     "",
     "It analyzes session created in step_1 for problems that need to be addressed further",
-    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program",
+    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program"
 };
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
@@ -400,6 +400,8 @@ void display()
 
                 auto tmp = point_size;
                 ImGui::InputInt("Points size", &point_size);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("keyboard 1-9 keys");
                 ImGui::PopItemWidth();
                 if (point_size < 1)
                     point_size = 1;
@@ -417,14 +419,14 @@ void display()
                 ImGui::MenuItem("Show neighbouring scans", "Ctrl+N", &show_neighbouring_scans);
                 ImGui::BeginDisabled(!show_neighbouring_scans);
                 {
-                    ImGui::ColorEdit4("Neigbouring color", (float*)&pc_neigbouring_color, ImGuiColorEditFlags_NoInputs);
+                    ImGui::ColorEdit3("Neigbouring color", (float*)&pc_neigbouring_color, ImGuiColorEditFlags_NoInputs);
                 }
                 ImGui::EndDisabled();
 
                 ImGui::Separator();
             }
 
-            ImGui::MenuItem("Show axes", nullptr, &show_axes);
+            ImGui::MenuItem("Show axes", "key X", &show_axes);
 
             ImGui::Separator();
 
@@ -434,7 +436,7 @@ void display()
 
             ImGui::Separator();
 
-            ImGui::ColorEdit4("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit3("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
 
             ImGui::EndMenu();
         }

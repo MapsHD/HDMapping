@@ -2,11 +2,21 @@ cmake_minimum_required(VERSION 4.0.0)
 
 project(mandeye_mission_recorder_calibration)
 
-add_executable(
-  mandeye_mission_recorder_calibration
+# Source files
+set(SOURCES
   mandeye_mission_recorder_calibration.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils_optimizers.cpp
+    "../../core/src/utils.cpp"
+)
+
+# Windows: add resource file
+if(WIN32)
+    list(APPEND SOURCES ../../resources/resourceA.rc)
+endif()
+
+add_executable(
+  mandeye_mission_recorder_calibration ${SOURCES}
 )
 
 target_include_directories(

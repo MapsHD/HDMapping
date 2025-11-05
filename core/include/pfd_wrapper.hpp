@@ -6,9 +6,9 @@ namespace mandeye::fd{
     {
         static  std::string lastLocationHint = ".";//"C:\\";
     }
-    const std::vector<std::string> LAS_LAZ_filter = {"LAS file (*.las)", "*.las", "LASzip file (*.laz)", "*.laz", "All files", "*"};
-    const std::vector<std::string> ImageFilter = { "Image files", "*.png *.jpg *.jpeg *.bmp"};
+    const std::vector<std::string> LAS_LAZ_filter = {"LASzip file (*.laz)", "*.laz", "LAS file (*.las)", "*.las", "All files", "*"};
     const std::vector <std::string> LazFilter = { "LAZ files (*.laz)", "*.laz *.las" };
+    const std::vector<std::string> ImageFilter = { "Image files", "*.png *.jpg *.jpeg *.bmp"};
     const std::vector<std::string> Session_filter = { "Session (*.json)", "*.json" };
     const std::vector<std::string> Project_filter = { "Project, json", "*.json" };
     const std::vector<std::string> Resso_filter = { "Resso (*.reg)", "*.reg" };
@@ -16,6 +16,8 @@ namespace mandeye::fd{
     const std::vector<std::string> Csv_filter = { "Csv (*.csv)", "*.csv" };
     const std::vector<std::string> Toml_filter = {"Toml (*.toml)", "*.toml"};
     const std::vector<std::string> All_Filter = {"All files", "*.png *.jpg *.jpeg *.bmp *.las *.laz *.json *.dxf *.csv *.sn"};
+    const std::vector<std::string> json_filter = { "Calibration file (*.json)", "*.json", "All files", "*" };
+    const std::vector<std::string> sn_filter = { "sn file (*.sn)", "*.sn", "All files", "*" };
 
     std::string OpenFileDialogOneFile(const std::string& title, const std::vector<std::string>&filter);
     std::vector<std::string> OpenFileDialog(const std::string& title, const std::vector<std::string>&filter, bool multiselect);

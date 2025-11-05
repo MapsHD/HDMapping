@@ -361,6 +361,8 @@ void view_kbd_shortcuts()
 {
     ImGuiIO& io = ImGui::GetIO();
 
+    if (io.WantCaptureKeyboard) return;
+
     //translate camera
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
     {
@@ -410,10 +412,13 @@ void view_kbd_shortcuts()
     //only checking for single key press (no modifiers) from this point
     if (io.KeyCtrl || io.KeyShift) return;
 
-    if (ImGui::IsKeyPressed('F'))
-        setCameraPreset(CAMERA_FRONT);
+
     if (ImGui::IsKeyPressed('B'))
         setCameraPreset(CAMERA_BACK);
+    if (ImGui::IsKeyPressed('F'))
+        setCameraPreset(CAMERA_FRONT);
+    if (ImGui::IsKeyPressed('I'))
+        setCameraPreset(CAMERA_ISO);
     if (ImGui::IsKeyPressed('L'))
         setCameraPreset(CAMERA_LEFT);
     if (ImGui::IsKeyPressed('R'))
@@ -422,14 +427,36 @@ void view_kbd_shortcuts()
         setCameraPreset(CAMERA_TOP);
     if (ImGui::IsKeyPressed('U'))
         setCameraPreset(CAMERA_BOTTOM);
-    if (ImGui::IsKeyPressed('I'))
-        setCameraPreset(CAMERA_ISO);
     if (ImGui::IsKeyPressed('Z'))
         setCameraPreset(CAMERA_RESET);
-    if (ImGui::IsKeyPressed('X'))
-        show_axes = !show_axes;
+
     if (ImGui::IsKeyPressed('C'))
         compass_ruler = !compass_ruler;
+    if (ImGui::IsKeyPressed('O'))
+        is_ortho = !is_ortho;
+    if (ImGui::IsKeyPressed('X'))
+        show_axes = !show_axes;
+
+
+    if (ImGui::IsKeyPressed('1'))
+		point_size = 1;
+	if (ImGui::IsKeyPressed('2'))
+		point_size = 2;
+	if (ImGui::IsKeyPressed('3'))
+		point_size = 3;
+	if (ImGui::IsKeyPressed('4'))
+		point_size = 4;
+	if (ImGui::IsKeyPressed('5'))
+		point_size = 5;
+    if (ImGui::IsKeyPressed('6'))
+		point_size = 6;
+	if (ImGui::IsKeyPressed('7'))
+		point_size = 7;
+	if (ImGui::IsKeyPressed('8'))
+		point_size = 8;
+	if (ImGui::IsKeyPressed('9'))
+		point_size = 9;
+
 }
 
 

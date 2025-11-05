@@ -359,10 +359,8 @@ void ndt_gui()
 
 void loop_closure_gui()
 {
-    if (ImGui::Begin("Normal Distributions Transform", &is_loop_closure_gui, ImGuiWindowFlags_AlwaysAutoResize))
+    if (ImGui::Begin("Manual Pose Graph Loop Closure Mode", &is_loop_closure_gui, ImGuiWindowFlags_AlwaysAutoResize))
     {
-        ImGui::Text("Manual Pose Graph Loop Closure Mode");
-
         if (!manipulate_active_edge)
         {
             ImGui::InputInt("index_loop_closure_source", &index_loop_closure_source);
@@ -3092,6 +3090,8 @@ void display()
                 auto tmp = point_size;
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputInt("points size", &point_size);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("keyboard 1-9 keys");
                 if (point_size < 1)
                     point_size = 1;
                 if (point_size > 10)
@@ -3109,7 +3109,7 @@ void display()
                 ImGui::Separator();
             }
 
-            ImGui::MenuItem("Orthographic", nullptr, &is_ortho);
+            ImGui::MenuItem("Orthographic", "key O", &is_ortho);
             if (is_ortho)
             {
                 new_rotation_center = rotation_center;
@@ -3123,7 +3123,7 @@ void display()
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
 
-            ImGui::MenuItem("Show axes", nullptr, &show_axes);
+            ImGui::MenuItem("Show axes", "key X", &show_axes);
             ImGui::MenuItem("Block Z", nullptr, &block_z);
             ImGui::Separator();
             ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
@@ -3132,7 +3132,7 @@ void display()
 
             ImGui::Separator();
 
-            ImGui::ColorEdit4("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit3("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
 
             ImGui::EndMenu();
         }

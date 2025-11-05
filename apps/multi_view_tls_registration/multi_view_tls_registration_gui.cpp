@@ -2596,6 +2596,8 @@ void display()
                 auto tmp = point_size;
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputInt("points size", &point_size);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("keyboard 1-9 keys");
                 if (point_size < 1)
                     point_size = 1;
                 if (point_size > 10)
@@ -2633,7 +2635,7 @@ void display()
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
             
-            ImGui::MenuItem("Show axes", nullptr, &show_axes);
+            ImGui::MenuItem("Show axes", "key X", &show_axes);
             ImGui::MenuItem("Block Z", nullptr, &block_z);
 
             ImGui::Separator();
@@ -2642,7 +2644,7 @@ void display()
 
             ImGui::Separator();
 
-            ImGui::ColorEdit4("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit3("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
 
             ImGui::BeginDisabled(!session_loaded);
             {

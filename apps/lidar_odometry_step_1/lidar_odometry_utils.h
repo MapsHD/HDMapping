@@ -75,7 +75,7 @@ struct LidarOdometryParams
     int threshold_nr_poses = 20;
 
     //lidar odometry debug info
-    bool save_calibration_validation = true;
+    bool save_calibration_validation = false;
     int calibration_validation_points = 1000000;
 
     //consistency
@@ -233,7 +233,7 @@ bool load_point_sizes(const std::filesystem::path &path, std::vector<int> &vecto
 bool load_index_poses(const std::filesystem::path &path, std::vector<std::vector<int>> &index_poses_out);
 bool load_worker_data_from_results(const fs::path &session_file, std::vector<WorkerData> &worker_data_out);
 
-//! This namespace contains functions for loading calibration file (.json and .sn).
+//! This namespace contains functions for loading calibration file (.json/.mjc and .sn).
 //!
 //! Calibration file is a json file with the following format:
 //!{```json
@@ -280,7 +280,7 @@ namespace MLvxCalib
 {
 
     //! Parse the calibration file and return a map from sensor id to serial number.
-    //! Sensor id is the id is id of the point in laz file.
+    //! Sensor id is the id of the point in laz file.
     //! Serial number is the serial number of the Livox.
     //! @param filename calibration file
     //! @return map of serial number, where key is sensor id.

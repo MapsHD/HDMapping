@@ -2074,14 +2074,14 @@ void openProject()
 void saveProject()
 {
     std::string output_file_name = "";
-    output_file_name = mandeye::fd::SaveFileDialog("Save project file", mandeye::fd::Project_filter, ".json");
+    output_file_name = mandeye::fd::SaveFileDialog("Save project file", mandeye::fd::Project_filter, ".mjp", "project");
 
-if (output_file_name.size() > 0)
-if (save_project_settings(fs::path(output_file_name).string(), project_settings))
-{
-    std::string newTitle = winTitle + " - " + truncPath(output_file_name);
-    glutSetWindowTitle(newTitle.c_str());
-}
+    if (output_file_name.size() > 0)
+        if (save_project_settings(fs::path(output_file_name).string(), project_settings))
+        {
+            std::string newTitle = winTitle + " - " + truncPath(output_file_name);
+            glutSetWindowTitle(newTitle.c_str());
+        }
 }
 
 void addSession()

@@ -82,6 +82,11 @@ std::vector<Point3Di> point_cloud;
 std::unordered_map<int, std::string> idToSn;
 std::unordered_map<int, Eigen::Affine3d> calibrations;
 
+std::string calibration_file_name;
+
+int chosen_lidar = -1;
+int chosen_imu = -1;
+
 struct Checked
 {
     bool check;
@@ -297,134 +302,40 @@ void project_gui()
 {
     if (ImGui::Begin("Settings"))
     {
-
-        if (calibrated_lidar.size() == 2)
-        {
-            ImGui::Text("Select calibrated LiDAR:");
-
-            int chosen_lidar = -1;
-            for (int i = 0; i < calibrated_lidar.size(); i++)
-            {
-                std::string name = idToSn.at(i);
-                bool before = calibrated_lidar[i].check;
-                ImGui::Checkbox(name.c_str(), &calibrated_lidar[i].check);
-                bool after = calibrated_lidar[i].check;
-
-                if (!before && after)
-                {
-                    chosen_lidar = i;
-                }
-            }
-
-            bool is_all_false = true;
-            for (int i = 0; i < calibrated_lidar.size(); i++)
-            {
-                if (calibrated_lidar[i].check)
-                {
-                    is_all_false = false;
-                }
-            }
-
-            if (is_all_false)
-            {
-                chosen_lidar = 0;
-            }
-
-            if (chosen_lidar != -1)
-            {
-                for (int i = 0; i < calibrated_lidar.size(); i++)
-                {
-                    calibrated_lidar[i].check = false;
-                }
-                calibrated_lidar[chosen_lidar].check = true;
-            }
-
-			ImGui::Separator();
-            ImGui::Checkbox("Manual calibration", &manual_calibration);
-
-            if (manual_calibration)
-            {
-                int index_calibrated_lidar = -1;
-                for (int i = 0; i < calibrated_lidar.size(); i++)
-                {
-                    if (calibrated_lidar[i].check)
-                    {
-                        index_calibrated_lidar = i;
-                    }
-                }
-
-                if (index_calibrated_lidar != -1)
-                {
-                    TaitBryanPose tb_pose = pose_tait_bryan_from_affine_matrix(calibrations.at(index_calibrated_lidar));
-                    tb_pose.om = tb_pose.om * 180.0 / M_PI;
-                    tb_pose.fi = tb_pose.fi * 180.0 / M_PI;
-                    tb_pose.ka = tb_pose.ka * 180.0 / M_PI;
-
-                    auto tmp = tb_pose;
-
-                    ImGui::PushItemWidth(ImGuiNumberWidth);
-                    ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_x [m] (offset in X-red axis)").c_str(), &tb_pose.px, 0.01, 0.1);
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip(xText);
-                    ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_y [m] (offset in Y-green axis)").c_str(), &tb_pose.py, 0.01, 0.1);
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip(yText);
-                    ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_z [m] (offset in Z-blue axis)").c_str(), &tb_pose.pz, 0.01, 0.1);
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip(zText);
-                    ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_om [deg] (angle around X-red axis)").c_str(), &tb_pose.om, 0.1, 1.0);
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip(omText);
-                    ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_fi [deg] (angle around Y-green axis)").c_str(), &tb_pose.fi, 0.1, 1.0);
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip(fiText);
-                    ImGui::InputDouble(std::string(idToSn.at(index_calibrated_lidar) + "_ka [deg] (angle around Z-blue axis)").c_str(), &tb_pose.ka, 0.1, 1.0);
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip(kaText);
-                    ImGui::PopItemWidth();
-
-                    if (tmp.px != tb_pose.px || tmp.py != tb_pose.py || tmp.pz != tb_pose.pz ||
-                        tmp.om != tb_pose.om || tmp.fi != tb_pose.fi || tmp.ka != tb_pose.ka)
-                    {
-                        tb_pose.om = tb_pose.om * M_PI / 180.0;
-                        tb_pose.fi = tb_pose.fi * M_PI / 180.0;
-                        tb_pose.ka = tb_pose.ka * M_PI / 180.0;
-
-                        Eigen::Affine3d m_pose = affine_matrix_from_pose_tait_bryan(tb_pose);
-                        calibrations.at(index_calibrated_lidar) = m_pose;
-                    }
-                }
-
-                // calibrations.at(0) = m0;
-            }
-            ImGui::NewLine();
-        }
-
-        if (idToSn.size() == 0)
+        if (idToSn.size() < 2)
         {
             if (ImGui::Button("Load 'LiDAR serial number to index' file (lidar****.sn) (step 1)"))
             {
-              const auto input_file_name = mandeye::fd::OpenFileDialogOneFile("Calibration files", mandeye::fd::sn_filter);
-              idToSn = MLvxCalib::GetIdToSnMapping(input_file_name);
+                const auto input_file_name = mandeye::fd::OpenFileDialogOneFile("Serial number file", mandeye::fd::sn_filter);
+                idToSn = MLvxCalib::GetIdToSnMapping(input_file_name);
             }
-        }
 
-        if (idToSn.size() == 2 && calibrations.size() == 0)
+            if (idToSn.size() == 1)
+				ImGui::Text("No need for calibration when only 1 LiDAR available (Load other file or quit)");
+        }
+        else if (point_cloud.size() == 0)
+        {
+            ImGui::Text("Loaded LiDAR serial numbers:");
+            for (const auto &[id, sn] : idToSn)
+                ImGui::Text(" - ID: %d --> SN: %s", id, sn.c_str());
+			ImGui::Separator();
+		}
+
+        if (idToSn.size() > 1 && calibrations.size() == 0)
         {
             ImGui::Text("If you don't have any calibration file --> ");
             ImGui::SameLine();
-            if (ImGui::Button("Create calibration from scratch and save as 'calibration.json' (optional before step 2)"))
+            if (ImGui::Button("Create new calibration (optional before step 2)"))
             {
-                std::string output_file_name = "";
-                output_file_name = mandeye::fd::SaveFileDialog("Save *.json file", mandeye::fd::json_filter, ".json");
+                const auto input_file_name = mandeye::fd::SaveFileDialog("Save calibration file", mandeye::fd::Calibration_filter, ".mjc", "calibration");
 
-                if (output_file_name.size() > 0)
+                if (input_file_name.size() > 0)
                 {
                     std::string l1 = idToSn.at(0);
                     std::string l2 = idToSn.at(1);
 
                     std::cout
-                        << "output_file_name: " << output_file_name << std::endl;
+                        << "output_file_name: " << input_file_name << std::endl;
                     nlohmann::json j;
 
                     j["calibration"][l1.c_str()]["identity"] = "true";
@@ -448,7 +359,7 @@ void project_gui()
                     j["calibration"][l2.c_str()]["data"][15] = 1;
                     j["imuToUse"] = l1.c_str();
 
-                    std::ofstream fs(output_file_name);
+                    std::ofstream fs(input_file_name);
                     if (!fs.good())
                         return;
                     fs << j.dump(2);
@@ -456,34 +367,37 @@ void project_gui()
                 }
             }
 
-            if (ImGui::Button("Load last known calibration (*.json) (step 2)"))
+            if (ImGui::Button("Load last known calibration (step 2)"))
             {
-                const auto input_file_name = mandeye::fd::OpenFileDialogOneFile("Calibration files", mandeye::fd::json_filter);
-                if (input_file_name.size() > 0)
+                calibration_file_name = mandeye::fd::OpenFileDialogOneFile("Calibration files", mandeye::fd::Calibration_filter);
+                if (calibration_file_name.size() > 0)
                 {
-                    std::cout << "loading file: " << input_file_name << std::endl;
+                    std::cout << "loading file: " << calibration_file_name << std::endl;
 
-                    calibration = MLvxCalib::GetCalibrationFromFile(input_file_name);
-                    imuSnToUse = MLvxCalib::GetImuSnToUse(input_file_name);
+                    calibration = MLvxCalib::GetCalibrationFromFile(calibration_file_name);
+                    imuSnToUse = MLvxCalib::GetImuSnToUse(calibration_file_name);
 
                     calibrations = MLvxCalib::CombineIntoCalibration(idToSn, calibration);
+                }
 
-                    if (!calibration.empty())
+                if (!calibration.empty())
+                {
+                    std::cout << "Loaded calibration for: \n";
+                    for (const auto& [sn, _] : calibration)
                     {
-                        std::cout << "Loaded calibration for: \n";
-                        for (const auto &[sn, _] : calibration)
-                        {
-                            std::cout << " -> " << sn << std::endl;
-                        }
-                        std::cout << "imuSnToUse: " << imuSnToUse << std::endl;
+                        std::cout << " -> " << sn << std::endl;
                     }
+                    std::cout << "imuSnToUse: " << imuSnToUse << std::endl;
                 }
             }
         }
 
         if (calibrations.size() > 0 && point_cloud.size() == 0)
         {
-            if (ImGui::Button("Load pointcloud (lidar****.laz) (step 3)"))
+            ImGui::Text("Using calibration file: %s", calibration_file_name.c_str());
+            ImGui::Separator();
+
+            if (ImGui::Button("Load point clouds of static scan (lidar****.laz) (step 3)"))
             {
                 std::vector<std::string> input_file_names;
                 input_file_names = mandeye::fd::OpenFileDialog("Point cloud files", mandeye::fd::LAS_LAZ_filter, true);
@@ -501,14 +415,102 @@ void project_gui()
                     }
                 }
 
-                Checked check;
-                check.check = true;
-                calibrated_lidar.push_back(check);
-                imu_lidar.push_back(check);
-                check.check = false;
-                calibrated_lidar.push_back(check);
-                imu_lidar.push_back(check);
+                // Initialize imu_lidar according to imuSnToUse
+                imu_lidar.clear();
+                for (const auto& [id, sn] : idToSn)
+                {
+                    Checked imu;
+                    imu.check = (sn == imuSnToUse);
+                    imu_lidar.push_back(imu);
+
+                    if (imu.check)
+                        chosen_imu = id;
+                }
+
+                calibrated_lidar.clear();
+                // Initialize calibrated_lidar according to calibrations data
+                for (const auto& [id, affine] : calibrations)
+                {
+                    Checked calib;
+                    // If affine is close to identity -> not calibrated; otherwise -> calibrated
+                    Eigen::Matrix4d m = affine.matrix();
+                    calib.check = !(m.isApprox(Eigen::Matrix4d::Identity(), 1e-6));
+                    calibrated_lidar.push_back(calib);
+
+                    if (calib.check)
+                        chosen_lidar = id;
+                }
             }
+        }
+
+        if (calibrated_lidar.size() > 1)
+        {
+            ImGui::Text("Select calibrated LiDAR:");
+
+            for (int i = 0; i < calibrated_lidar.size(); i++)
+            {
+                std::string name = idToSn.at(i);
+                ImGui::RadioButton(name.c_str(), &chosen_lidar, i);
+            }
+
+            if (chosen_lidar != -1)
+            {
+                for (int i = 0; i < calibrated_lidar.size(); i++)
+                    calibrated_lidar[i].check = (i == chosen_lidar);
+            }
+
+            ImGui::Separator();
+            ImGui::Checkbox("Manual calibration", &manual_calibration);
+
+            ImGui::BeginDisabled(!manual_calibration);
+            {
+                if (chosen_lidar != -1)
+                {
+                    TaitBryanPose tb_pose = pose_tait_bryan_from_affine_matrix(calibrations.at(chosen_lidar));
+                    tb_pose.om = tb_pose.om * 180.0 / M_PI;
+                    tb_pose.fi = tb_pose.fi * 180.0 / M_PI;
+                    tb_pose.ka = tb_pose.ka * 180.0 / M_PI;
+
+                    auto tmp = tb_pose;
+
+                    ImGui::PushItemWidth(ImGuiNumberWidth);
+                    ImGui::InputDouble("x [m] (offset in X-red axis)", &tb_pose.px, 0.01, 0.1);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(xText);
+                    ImGui::InputDouble("y [m] (offset in Y-green axis)", &tb_pose.py, 0.01, 0.1);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(yText);
+                    ImGui::InputDouble("z [m] (offset in Z-blue axis)", &tb_pose.pz, 0.01, 0.1);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(zText);
+                    ImGui::InputDouble("om [deg] (angle around X-red axis)", &tb_pose.om, 0.1, 1.0);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(omText);
+                    ImGui::InputDouble("fi [deg] (angle around Y-green axis)", &tb_pose.fi, 0.1, 1.0);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(fiText);
+                    ImGui::InputDouble("ka [deg] (angle around Z-blue axis)", &tb_pose.ka, 0.1, 1.0);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(kaText);
+                    ImGui::PopItemWidth();
+
+                    if (tmp.px != tb_pose.px || tmp.py != tb_pose.py || tmp.pz != tb_pose.pz ||
+                        tmp.om != tb_pose.om || tmp.fi != tb_pose.fi || tmp.ka != tb_pose.ka)
+                    {
+                        tb_pose.om = tb_pose.om * M_PI / 180.0;
+                        tb_pose.fi = tb_pose.fi * M_PI / 180.0;
+                        tb_pose.ka = tb_pose.ka * M_PI / 180.0;
+
+                        Eigen::Affine3d m_pose = affine_matrix_from_pose_tait_bryan(tb_pose);
+                        calibrations.at(chosen_lidar) = m_pose;
+                    }
+                }
+
+                // calibrations.at(0) = m0;
+            }
+            ImGui::EndDisabled();
+
+            ImGui::NewLine();
         }
 
         if (point_cloud.size() > 0)
@@ -518,9 +520,7 @@ void project_gui()
             for (int i = 0; i < calibrated_lidar.size(); i++)
             {
                 if (calibrated_lidar[i].check)
-                {
                     calibrated_lidar_name += idToSn.at(i);
-                }
             }
 
             calibrated_lidar_name += "] (step 4)";
@@ -539,13 +539,9 @@ void project_gui()
                 for (const auto &p : point_cloud)
                 {
                     if (p.lidarid == 0)
-                    {
                         lidar0.emplace_back(p);
-                    }
                     else
-                    {
                         lidar1.emplace_back(p);
-                    }
                 }
 
                 std::cout << "Decimation: " << params.decimation << std::endl;
@@ -566,9 +562,7 @@ void project_gui()
                 if (calibrated_lidar[0].check)
                 {
                     for (const auto &s : lidar0)
-                    {
                         pc0.emplace_back(s.point.x(), s.point.y(), s.point.z());
-                    }
                     for (const auto &t : lidar1)
                     {
                         auto pp = m1 * t.point;
@@ -576,9 +570,7 @@ void project_gui()
                     }
 
                     if (icp.compute(pc0, pc1, search_radius, number_of_iterations, m0))
-                    {
                         calibrations.at(0) = m0;
-                    }
                 }
                 else
                 {
@@ -588,13 +580,9 @@ void project_gui()
                         pc0.emplace_back(pp.x(), pp.y(), pp.z());
                     }
                     for (const auto &t : lidar1)
-                    {
                         pc1.emplace_back(t.point.x(), t.point.y(), t.point.z());
-                    }
                     if (icp.compute(pc1, pc0, search_radius, number_of_iterations, m1))
-                    {
                         calibrations.at(1) = m1;
-                    }
                 }
             }
 
@@ -609,57 +597,30 @@ void project_gui()
 
             ImGui::Separator();
 
-            if (imu_lidar.size() == 2)
+            if (imu_lidar.size() > 1)
             {
-                ImGui::Text("Select IMU for LiDAR odometry in calibration file (LiDAR in horizontal orientation!):");
+                ImGui::Text("Select IMU for LiDAR odometry (LiDAR in horizontal orientation!):");
 
-                int chosen_imu = -1;
                 for (int i = 0; i < imu_lidar.size(); i++)
                 {
                     std::string name = idToSn.at(i);
-                    bool before = imu_lidar[i].check;
-                    ImGui::Checkbox(std::string(name + "##imu").c_str(), &imu_lidar[i].check);
-                    bool after = imu_lidar[i].check;
-
-                    if (!before && after)
-                    {
-                        chosen_imu = i;
-                    }
-                }
-
-                bool is_all_imu_false = true;
-                for (int i = 0; i < imu_lidar.size(); i++)
-                {
-                    if (imu_lidar[i].check)
-                    {
-                        is_all_imu_false = false;
-                    }
-                }
-
-                if (is_all_imu_false)
-                {
-                    chosen_imu = 0;
+					ImGui::RadioButton(std::string(name + "##imu").c_str(), &chosen_imu, i);
                 }
 
                 if (chosen_imu != -1)
                 {
                     for (int i = 0; i < imu_lidar.size(); i++)
-                    {
-                        imu_lidar[i].check = false;
-                    }
-                    imu_lidar[chosen_imu].check = true;
+                        imu_lidar[i].check = (i == chosen_imu);
                 }
             }
 
-            if (ImGui::Button("Save result calibration as 'calibration.json' (step 5)"))
+            if (ImGui::Button("Save resulted calibration file (step 5)"))
             {
-                std::string output_file_name = "";
-                output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::json_filter, ".json");
-                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                const auto new_calibration_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::Calibration_filter, ".mjc", calibration_file_name);
 
-                if (output_file_name.size() > 0)
+                if (new_calibration_file_name.size() > 0)
                 {
-                    std::cout << "Output file name: " << output_file_name << std::endl;
+                    std::cout << "Output file name: " << new_calibration_file_name << std::endl;
                     nlohmann::json j;
 
                     j["calibration"][idToSn.at(0)]["order"] = "ROW";
@@ -701,14 +662,11 @@ void project_gui()
                     j["calibration"][idToSn.at(1)]["data"][15] = 1;
 
                     if (imu_lidar[0].check)
-                    {
                         j["imuToUse"] = idToSn.at(0);
-                    }
                     else
-                    {
                         j["imuToUse"] = idToSn.at(1);
-                    }
-                    std::ofstream fs(output_file_name);
+
+                    std::ofstream fs(new_calibration_file_name);
                     if (!fs.good())
                         return;
                     fs << j.dump(2);
@@ -716,8 +674,9 @@ void project_gui()
                 }
             }
             ImGui::NewLine();
-            ImGui::Text("Important notice! 'lidar_odometry_step_1.exe' program requires file name 'calibration.json' in folder with data");
+            ImGui::Text("Important notice! 'lidar_odometry_step_1.exe' program requires a calibration file in folder with data");
         }
+
         ImGui::End();
     }
     return;
@@ -875,9 +834,7 @@ void display()
         for (int i = 0; i < calibrated_lidar.size(); i++)
         {
             if (calibrated_lidar[i].check)
-            {
                 index_calibrated_lidar = i;
-            }
         }
 
         glBegin(GL_POINTS);
@@ -888,24 +845,16 @@ void display()
             if (p.lidarid == 0)
             {
                 if (p.lidarid != index_calibrated_lidar)
-                {
                     glColor3f(0.5, 0.5, 0.5);
-                }
                 else
-                {
                     glColor3f(pc_color.x, pc_color.y, pc_color.z);
-                }
             }
             else
             {
                 if (p.lidarid != index_calibrated_lidar)
-                {
                     glColor3f(0.5, 0.5, 0.5);
-                }
                 else
-                {
                     glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
-                }
             }
 
             auto pp = cal * p.point;
@@ -922,13 +871,9 @@ void display()
             Eigen::Affine3d cal = calibrations.empty() ? Eigen::Affine3d::Identity() : calibrations.at(p.lidarid);
 
             if (p.lidarid == 0)
-            {
                 glColor3f(pc_color.x, pc_color.y, pc_color.z);
-            }
             else
-            {
                 glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
-            }
 
             auto pp = cal * p.point;
 
@@ -1078,11 +1023,8 @@ void mouse(int glut_button, int state, int x, int y)
         io.MouseDown[button] = false;
 
     static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
-    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
-        glutMajorVersion < 3)
-    {
+    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) && glutMajorVersion < 3)
         wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
-    }
 
     if (!io.WantCaptureMouse)
     {
@@ -1091,13 +1033,10 @@ void mouse(int glut_button, int state, int x, int y)
         }
 
         if (state == GLUT_DOWN)
-        {
             mouse_buttons |= 1 << glut_button;
-        }
         else if (state == GLUT_UP)
-        {
             mouse_buttons = 0;
-        }
+
         mouse_old_x = x;
         mouse_old_y = y;
     }

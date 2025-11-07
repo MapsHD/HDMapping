@@ -1,323 +1,331 @@
 #include "lidar_odometry.h"
+#include "tbb/tbb.h"
 #include <mutex>
 
 namespace fs = std::filesystem;
 
-bool load_data(std::vector<std::string> &input_file_names, LidarOdometryParams &params, std::vector<std::vector<Point3Di>> &pointsPerFile, Imu &imu_data, bool debugMsg)
+bool load_data(std::vector<std::string> &input_file_names,
+    LidarOdometryParams &params,
+    std::vector<std::vector<Point3Di>> &pointsPerFile,
+    Imu &imu_data,
+    bool debugMsg)
 {
     std::sort(std::begin(input_file_names), std::end(input_file_names));
-    std::vector<std::string> csv_files;
-    std::vector<std::string> laz_files;
-    std::string sn_file;
-    std::string calibrationFile; // will hold the single JSON file
 
-    std::cout << "Loading data.." << std::endl;
-    std::cout << "--------------" << std::endl;
+    std::vector<std::string> csv_files, laz_files;
+    std::string sn_file;
+    std::string calibrationFile;
+
+    std::cout << "Loading data..\n--------------\n";
+
 
     std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
-                  {
-        if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
         {
-            laz_files.push_back(fileName);
-        }
-        if (fileName.ends_with(".csv"))
-        {
-            csv_files.push_back(fileName);
-        }
-        if (fileName.ends_with(".sn"))
-        {
-            if (sn_file.empty())
-            {
-                sn_file = fileName;
-                std::cout << "Only using first SN file found" << std::endl;
-            }
-        }
-        if (fileName.ends_with(".json"))
-        {
-            fs::path p(fileName);
-            std::string stem = p.filename().stem().string(); // get filename without extension
+            if (fileName.ends_with(".csv"))
+                csv_files.push_back(fileName);
 
-            // skip files starting with "status"
-            if (!stem.starts_with("status") && !stem.starts_with("cam0") && !stem.starts_with("cam1"))
+            if (fileName.ends_with(".json"))
+            {
+                std::string stem = fs::path(fileName).filename().stem().string(); // get filename without extension
+
+                // skip files not related to calibration
+                if (!stem.starts_with("status") && !stem.starts_with("cam0") && !stem.starts_with("cam1"))
+                {
+                    if (calibrationFile.empty())
+                        calibrationFile = fileName;
+                    else
+                        std::cout << "Unexpected JSON file found (" << fileName << "). Ignored.." << std::endl;
+                }
+            }
+
+            if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
+                laz_files.push_back(fileName);
+
+            if (fileName.ends_with(".mjc"))
             {
                 if (calibrationFile.empty())
-                {
                     calibrationFile = fileName;
+                else
+                    std::cout << "Unexpected calibration file found (" << fileName << "). Ignored.." << std::endl;
+            }
+
+            if (fileName.ends_with(".sn"))
+            {
+                if (sn_file.empty())
+                {
+                    sn_file = fileName;
+                    std::cout << "Only using first SN file found" << std::endl;
+                }
+            }
+        });
+
+            for (int i = 0; i < laz_files.size(); i++)
+            {
+                fs::path lf(laz_files[i]);
+                std::string lfs = lf.filename().stem().string().substr(lf.filename().stem().string().size() - 4);
+
+                bool found = false;
+                for (int j = 0; j < csv_files.size(); j++)
+                {
+                    fs::path cf(csv_files[j]);
+                    std::string cfs = cf.filename().stem().string().substr(cf.filename().stem().string().size() - 4);
+                    if (lfs.compare(cfs) == 0)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found)
+                {
+                    std::cout << "\n!!! there is no CSV file for: " << laz_files[i] << " !!! \n\n";
+
+                    if (i < (laz_files.size() - 1))
+                    {
+                        std::cout << "!!! can't continue with missmatched middle file pairs.. !!!\n"
+                            << std::endl;
+                        return false;
+                    }
+                }
+            }
+
+            for (int i = 0; i < csv_files.size(); i++)
+            {
+                fs::path lf(csv_files[i]);
+                std::string lfs = lf.filename().stem().string().substr(lf.filename().stem().string().size() - 4);
+
+                bool found = false;
+                for (int j = 0; j < laz_files.size(); j++)
+                {
+                    fs::path cf(laz_files[j]);
+                    std::string cfs = cf.filename().stem().string().substr(cf.filename().stem().string().size() - 4);
+                    if (lfs.compare(cfs) == 0)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found)
+                {
+                    std::cout << "\n!!! there is no LAZ file for: " << csv_files[i] << " !!! \n\n";
+
+                    if (i < (csv_files.size() - 1))
+                    {
+                        std::cout << "!!! can't continue with missmatched middle file pairs.. !!!\n"
+                            << std::endl;
+                        return false;
+                    }
+                }
+            }
+            std::string working_directory = "";
+            std::string imuSnToUse;
+            std::size_t minSize = std::min(laz_files.size(), csv_files.size());
+
+            if (input_file_names.size() > 2)
+            {
+                working_directory = fs::path(input_file_names[0]).parent_path().string();
+
+                if (laz_files.size() != csv_files.size())
+                {
+                    std::cout << "!!! file number issue. continuing but ignoring missmatched last file pair.. !!!\n"
+                        << std::endl;
+                }
+
+                // check if folder exists!
+                if (!fs::exists(working_directory))
+                {
+                    std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
+
+                    std::string message_info = "folder '" + working_directory + "' does not exist --> PLEASE REMOVE e.g. POLISH LETTERS from path. !!!PROGRAM WILL SHUT DOWN AFTER THIS MESSAGE!!!";
+                    return false;
+                }
+
+                const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
+                imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
+
+                if (!preloadedCalibration.empty())
+                {
+                    std::cout << "Loaded calibration for: \n";
+                    for (const auto &[sn, _] : preloadedCalibration)
+                    {
+                        std::cout << " -> " << sn << "\n";
+                    }
+                    std::cout << std::endl;
                 }
                 else
                 {
-                    std::cout << "Multiple JSON files found! Using first found as calibration.." << std::endl;
+                    std::cout << "There is no calibration file in folder!" << std::endl;
+                    std::cout << "IGNORE THIS MESSAGE IF YOU ONLY HAVE 1 LiDAR" << std::endl;
+
+                    // example file for 2x LiDAR":
+                    /*
+                    {
+                        "calibration" : {
+                            "47MDL9T0020193" : {
+                                "identity" : "true"
+                            },
+                            "47MDL9S0020300" :
+                                {
+                                    "order" : "ROW",
+                                    "inverted" : "TRUE",
+                                    "data" : [
+                                        0.999824, 0.00466397, -0.0181595, -0.00425984,
+                                        -0.0181478, -0.00254457, -0.999832, -0.151599,
+                                        -0.0047094, 0.999986, -0.00245948, -0.146408,
+                                        0, 0, 0, 1
+                                    ]
+                                }
+                        },
+                                        "imuToUse" : "47MDL9T0020193"
+                    }*/
                 }
-            }
-        } });
 
-    for (int i = 0; i < laz_files.size(); i++)
-    {
-        fs::path lf(laz_files[i]);
-        std::string lfs = lf.filename().stem().string().substr(lf.filename().stem().string().size() - 4);
+                fs::path wdp = fs::path(input_file_names[0]).parent_path();
+                wdp /= "preview";
+                if (!fs::exists(wdp))
+                {
+                    std::cout << "creating folder: '" << wdp << "'" << std::endl;
+                    fs::create_directory(wdp);
+                }
 
-        bool found = false;
-        for (int j = 0; j < csv_files.size(); j++)
-        {
-            fs::path cf(csv_files[j]);
-            std::string cfs = cf.filename().stem().string().substr(cf.filename().stem().string().size() - 4);
-            if (lfs.compare(cfs) == 0)
-            {
-                found = true;
-                break;
-            }
-        }
+                params.working_directory_preview = wdp.string();
 
-        if (!found)
-        {
-            std::cout << "\n!!! there is no CSV file for: " << laz_files[i] << " !!! \n\n";
+                fs::path wdp2 = fs::path(input_file_names[0]).parent_path();
+                wdp2 /= "cache";
+                if (!fs::exists(wdp2))
+                {
+                    std::cout << "creating folder: '" << wdp2 << "'" << std::endl;
+                    fs::create_directory(wdp2);
+                }
+                params.working_directory_cache = wdp2.string();
 
-            if (i < (laz_files.size() - 1))
-            {
-                std::cout << "!!! can't continue with missmatched middle file pairs.. !!!\n"
-                          << std::endl;
-                return false;
-            }
-        }
-    }
+                // for (size_t i = 0; i < input_file_names.size(); i++)
+                //{
+                //     std::cout << input_file_names[i] << std::endl;
+                // }
 
-    for (int i = 0; i < csv_files.size(); i++)
-    {
-        fs::path lf(csv_files[i]);
-        std::string lfs = lf.filename().stem().string().substr(lf.filename().stem().string().size() - 4);
+                const auto idToSn = MLvxCalib::GetIdToSnMapping(sn_file);
+                // GetId of Imu to use
+                int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
 
-        bool found = false;
-        for (int j = 0; j < laz_files.size(); j++)
-        {
-            fs::path cf(laz_files[j]);
-            std::string cfs = cf.filename().stem().string().substr(cf.filename().stem().string().size() - 4);
-            if (lfs.compare(cfs) == 0)
-            {
-                found = true;
-                break;
-            }
-        }
+                std::cout << "loading IMU data from 'imu****.csv' using ID " << imuNumberToUse
+                    << " from reference '" << sn_file << "' ..\n"
+                    << std::endl;
 
-        if (!found)
-        {
-            std::cout << "\n!!! there is no LAZ file for: " << csv_files[i] << " !!! \n\n";
+                for (size_t fileNo = 0; fileNo < minSize; fileNo++)
+                {
+                    const std::string &imufn = csv_files.at(fileNo);
+                    auto imu = load_imu(imufn.c_str(), imuNumberToUse);
+                    imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
 
-            if (i < (csv_files.size() - 1))
-            {
-                std::cout << "!!! can't continue with missmatched middle file pairs.. !!!\n"
-                          << std::endl;
-                return false;
-            }
-        }
-    }
-    std::string working_directory = "";
-    std::string imuSnToUse;
-    std::size_t minSize = std::min(laz_files.size(), csv_files.size());
+                    bool hasError = false;
 
-    if (input_file_names.size() > 2)
-    {
-        working_directory = fs::path(input_file_names[0]).parent_path().string();
-
-        if (laz_files.size() != csv_files.size())
-        {
-            std::cout << "!!! file number issue. continuing but ignoring missmatched last file pair.. !!!\n"
-                      << std::endl;
-        }
-
-        // check if folder exists!
-        if (!fs::exists(working_directory))
-        {
-            std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
-
-            std::string message_info = "folder '" + working_directory + "' does not exist --> PLEASE REMOVE e.g. POLISH LETTERS from path. !!!PROGRAM WILL SHUT DOWN AFTER THIS MESSAGE!!!";
-            return false;
-        }
-
-        const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
-        imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
-
-        if (!preloadedCalibration.empty())
-        {
-            std::cout << "Loaded calibration for: \n";
-            for (const auto &[sn, _] : preloadedCalibration)
-            {
-                std::cout << " -> " << sn << "\n";
-            }
-            std::cout << std::endl;
-        }
-        else
-        {
-            std::cout << "There is no calibration.json file in folder (check comment in source code) file: " << __FILE__ << " line: " << __LINE__ << std::endl;
-            std::cout << "IGNORE THIS MESSAGE IF YOU HAVE ONLY 1 LIDAR" << std::endl;
-
-            // example file for 2x livox";
-            /*
-            {
-                "calibration" : {
-                    "47MDL9T0020193" : {
-                        "identity" : "true"
-                    },
-                    "47MDL9S0020300" :
+                    if (!preloadedCalibration.empty())
+                    {
+                        for (const auto &[id, sn] : idToSn)
                         {
-                            "order" : "ROW",
-                            "inverted" : "TRUE",
-                            "data" : [
-                                0.999824, 0.00466397, -0.0181595, -0.00425984,
-                                -0.0181478, -0.00254457, -0.999832, -0.151599,
-                                -0.0047094, 0.999986, -0.00245948, -0.146408,
-                                0, 0, 0, 1
-                            ]
+                            if (preloadedCalibration.find(sn) == preloadedCalibration.end())
+                            {
+                                std::cerr << "WRONG CALIBRATION FILE! THE SERIAL NUMBER SHOULD BE " << sn << "!!!\n";
+                                hasError = true;
+                            }
                         }
-                },
-                                "imuToUse" : "47MDL9T0020193"
-            }*/
-        }
 
-        fs::path wdp = fs::path(input_file_names[0]).parent_path();
-        wdp /= "preview";
-        if (!fs::exists(wdp))
-        {
-            std::cout << "creating folder: '" << wdp << "'" << std::endl;
-            fs::create_directory(wdp);
-        }
+                        if (!hasError && preloadedCalibration.find(imuSnToUse) == preloadedCalibration.end())
+                        {
+                            std::cerr << "MISSING CALIBRATION FOR imuSnToUse: " << imuSnToUse << "!!!\n";
+                            std::cerr << "Available serial numbers in calibration file are:\n";
+                            for (const auto &[snKey, _] : preloadedCalibration)
+                            {
+                                std::cerr << "  - " << snKey << "\n";
+                            }
+                            hasError = true;
+                        }
 
-        params.working_directory_preview = wdp.string();
-
-        fs::path wdp2 = fs::path(input_file_names[0]).parent_path();
-        wdp2 /= "cache";
-        if (!fs::exists(wdp2))
-        {
-            std::cout << "creating folder: '" << wdp2 << "'" << std::endl;
-            fs::create_directory(wdp2);
-        }
-        params.working_directory_cache = wdp2.string();
-
-        // for (size_t i = 0; i < input_file_names.size(); i++)
-        //{
-        //     std::cout << input_file_names[i] << std::endl;
-        // }
-
-        const auto idToSn = MLvxCalib::GetIdToSnMapping(sn_file);
-        // GetId of Imu to use
-        int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
-
-        std::cout << "loading imu data from 'imu****.csv' using id " << imuNumberToUse
-                  << " from reference '" << sn_file << "' ..\n"
-                  << std::endl;
-
-        for (size_t fileNo = 0; fileNo < minSize; fileNo++)
-        {
-            const std::string &imufn = csv_files.at(fileNo);
-            auto imu = load_imu(imufn.c_str(), imuNumberToUse);
-            imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
-
-            bool hasError = false;
-
-            if (!preloadedCalibration.empty())
-            {
-                for (const auto &[id, sn] : idToSn)
-                {
-                    if (preloadedCalibration.find(sn) == preloadedCalibration.end())
-                    {
-                        std::cerr << "WRONG CALIBRATION FILE! THE SERIAL NUMBER SHOULD BE " << sn << "!!!\n";
-                        hasError = true;
+                        if (hasError)
+                        {
+                            std::cerr << "Press ENTER to exit...\n";
+                            std::cin.get();
+                            std::exit(EXIT_FAILURE);
+                        }
                     }
                 }
 
-                if (!hasError && preloadedCalibration.find(imuSnToUse) == preloadedCalibration.end())
-                {
-                    std::cerr << "MISSING CALIBRATION FOR imuSnToUse: " << imuSnToUse << "!!!\n";
-                    std::cerr << "Available serial numbers in calibration file are:\n";
-                    for (const auto &[snKey, _] : preloadedCalibration)
+                std::sort(imu_data.begin(), imu_data.end(),
+                    [](const std::tuple<std::pair<double, double>, FusionVector, FusionVector> &a, const std::tuple<std::pair<double, double>, FusionVector, FusionVector> &b)
                     {
-                        std::cerr << "  - " << snKey << "\n";
-                    }
-                    hasError = true;
+                        return std::get<0>(a).first < std::get<0>(b).first;
+                    });
+
+                std::cout << "loading points..\n";
+                pointsPerFile.resize(minSize);
+                std::mutex mtx;
+
+                std::cout << "total   - filter = kept\n";
+                std::cout << "-----------------------" << std::endl;
+
+                std::transform(std::execution::par_unseq, std::begin(laz_files), std::begin(laz_files) + minSize, std::begin(pointsPerFile), [&](const std::string &fn)
+                    {
+                        auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
+                        auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy_inner, params.filter_threshold_xy_outer, calibration);
+
+                        std::sort(data.begin(), data.end(), [](const Point3Di &a, const Point3Di &b)
+                            { return a.timestamp < b.timestamp; });
+
+                        if ((fn == laz_files.front()) && (params.save_calibration_validation))
+                        {
+                            fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
+                            std::ofstream testPointcloud{calibrationValidtationFile.c_str()};
+                            int row_index = 0;
+                            for (const auto &p : data)
+                            {
+                                if (row_index++ >= params.calibration_validation_points)
+                                {
+                                    break;
+                                }
+                                testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int)p.lidarid << "\n";
+                            }
+                        }
+
+                        std::unique_lock lck(mtx);
+
+                        if (debugMsg)
+                        {
+                            for (const auto &[id, calib] : calibration)
+                            {
+                                std::cout << " id : " << id << std::endl;
+                                std::cout << calib.matrix() << std::endl;
+                            }
+                        }
+
+                        return data;
+                        // std::cout << fn << std::endl;
+                        //
+                    });
+
+                if (pointsPerFile.size() > 0)
+                {
+                    pointsPerFile[0].clear();
                 }
 
-                if (hasError)
+                int number_of_points = 0;
+                for (const auto &pp : pointsPerFile)
                 {
-                    std::cerr << "Press ENTER to exit...\n";
-                    std::cin.get();
-                    std::exit(EXIT_FAILURE);
+                    number_of_points += pp.size();
                 }
+                std::cout << "TOTAL: " << number_of_points << std::endl;
+
+                std::cout << "..loading finished\n"
+                    << std::endl;
+
+                return true;
             }
-        }
-
-        std::sort(imu_data.begin(), imu_data.end(),
-                  [](const std::tuple<std::pair<double, double>, FusionVector, FusionVector> &a, const std::tuple<std::pair<double, double>, FusionVector, FusionVector> &b)
-                  {
-                      return std::get<0>(a).first < std::get<0>(b).first;
-                  });
-
-        std::cout << "loading points..\n";
-        pointsPerFile.resize(minSize);
-        std::mutex mtx;
-
-        std::cout << "total   - filter = kept\n";
-        std::cout << "-----------------------" << std::endl;
-
-        std::transform(std::execution::par_unseq, std::begin(laz_files), std::begin(laz_files) + minSize, std::begin(pointsPerFile), [&](const std::string &fn)
-                       {
-                           auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
-                           auto data = load_point_cloud(fn.c_str(), true, params.filter_threshold_xy_inner, params.filter_threshold_xy_outer, calibration);
-
-                           std::sort(data.begin(), data.end(), [](const Point3Di &a, const Point3Di &b)
-                                     { return a.timestamp < b.timestamp; });
-
-                           if ((fn == laz_files.front()) && (params.save_calibration_validation))
-                           {
-                               fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
-                               std::ofstream testPointcloud{calibrationValidtationFile.c_str()};
-                               int row_index = 0;
-                               for (const auto &p : data)
-                               {
-                                   if (row_index++ >= params.calibration_validation_points)
-                                   {
-                                       break;
-                                   }
-                                   testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int)p.lidarid << "\n";
-                               }
-                           }
-
-                           std::unique_lock lck(mtx);
-
-                           if (debugMsg)
-                           {
-                               for (const auto &[id, calib] : calibration)
-                               {
-                                   std::cout << " id : " << id << std::endl;
-                                   std::cout << calib.matrix() << std::endl;
-                               }
-                           }
-
-                           return data;
-                           // std::cout << fn << std::endl;
-                           //
-                       });
-
-        if (pointsPerFile.size() > 0)
-        {
-            pointsPerFile[0].clear();
-        }
-
-        int number_of_points = 0;
-        for (const auto &pp : pointsPerFile)
-        {
-            number_of_points += pp.size();
-        }
-        std::cout << "TOTAL: " << number_of_points << std::endl;
-
-        std::cout << "..loading finished\n"
-                  << std::endl;
-
-        return true;
-    }
-    else
-    {
-        std::cout << "Not enought files to continue: " << input_file_names.size() << std::endl;
-        return false;
-    }
+            else
+            {
+                std::cout << "Not enought files to continue: " << input_file_names.size() << std::endl;
+                return false;
+            }
 }
 
 void calculate_trajectory(
@@ -327,17 +335,11 @@ void calculate_trajectory(
     FusionAhrsInitialise(&ahrs);
 
     if (fusionConventionNwu)
-    {
         ahrs.settings.convention = FusionConventionNwu;
-    }
-    if (fusionConventionEnu)
-    {
+    else if (fusionConventionEnu)
         ahrs.settings.convention = FusionConventionEnu;
-    }
-    if (fusionConventionNed)
-    {
+    else if (fusionConventionNed)
         ahrs.settings.convention = FusionConventionNed;
-    }
     ahrs.settings.gain = ahrs_gain;
     int counter = 1;
 
@@ -466,7 +468,7 @@ void calculate_trajectory(
 }
 
 bool compute_step_1(
-    std::vector<std::vector<Point3Di>> &pointsPerFile, LidarOdometryParams &params, Trajectory &trajectory, std::vector<WorkerData> &worker_data, const std::atomic<bool> &pause)
+    std::vector<std::vector<Point3Di>> &pointsPerFile, LidarOdometryParams &params, Trajectory &trajectory, std::vector<WorkerData> &worker_data, const std::atomic<bool>& pause)
 {
     int number_of_initial_points = 0;
     double timestamp_begin = 0.0;
@@ -575,8 +577,8 @@ bool compute_step_1(
 
             double ts_begin = wd.intermediate_trajectory_timestamps[0].first;
             double ts_step = (wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first -
-                              wd.intermediate_trajectory_timestamps[0].first) /
-                             points.size();
+                wd.intermediate_trajectory_timestamps[0].first) /
+                points.size();
 
             // std::cout << "ts_begin " << ts_begin << std::endl;
             // std::cout << "ts_step " << ts_step << std::endl;
@@ -593,8 +595,8 @@ bool compute_step_1(
         {
             Point3Di &p = points[k];
             auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp,
-                                          [](std::pair<double, double> lhs, double rhs) -> bool
-                                          { return lhs.first < rhs; });
+                [](std::pair<double, double> lhs, double rhs) -> bool
+                { return lhs.first < rhs; });
             // p.index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower);
 
             int index_pose = std::distance(wd.intermediate_trajectory_timestamps.begin(), lower) - 1;
@@ -1113,10 +1115,10 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
         //
     }
     fs::path path(outwd);
-    path /= "lio_initial_poses.reg";
+    path /= "session_ini_poses.mri";
     save_poses(path.string(), m_poses, file_names);
     fs::path path2(outwd);
-    path2 /= "poses.reg";
+    path2 /= "session_poses.mrp";
     save_poses(path2.string(), m_poses, file_names);
 
     fs::path index_poses_path = outwd / "index_poses.json";
@@ -1133,7 +1135,7 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     }
 
     fs::path path3(outwd);
-    path3 /= "session.json";
+    path3 /= "session.mjs";
 
     // save session file
     std::cout << "saving file: '" << path3 << "'" << std::endl;

@@ -1858,7 +1858,7 @@ void saveSubsession()
     // Build new name
     std::string indexed_file_name = (dir / (stem + indexpart + ext)).string();
 
-    const auto output_file_name = mandeye::fd::SaveFileDialog("Save subsession", mandeye::fd::Session_filter, ".json", indexed_file_name);
+    const auto output_file_name = mandeye::fd::SaveFileDialog("Save subsession", mandeye::fd::Session_filter, ".mjs", indexed_file_name);
 
     if (output_file_name.size() > 0)
     {

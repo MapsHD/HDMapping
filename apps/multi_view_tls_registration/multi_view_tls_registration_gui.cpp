@@ -1852,7 +1852,7 @@ void saveSubsession()
     // Extract parts
     const auto dir = path.parent_path();
     const auto stem = path.stem().string();
-    const auto ext = path.extension().string();
+    const auto ext = ".mjs"; // path.extension().string();
     const std::string indexpart = " " + std::to_string(inx_begin) + "-" + std::to_string(inx_end);
 
     // Build new name
@@ -1860,7 +1860,11 @@ void saveSubsession()
 
     const auto output_file_name = mandeye::fd::SaveFileDialog("Save subsession", mandeye::fd::Session_filter, ".mjs", indexed_file_name);
 
-    if (output_file_name.size() > 0)
+    std::filesystem::path pfn(output_file_name);
+
+    const auto fn = pfn.filename().string();
+
+    if (fn.size() > 4)
     {
         std::cout << "Subsession file to save: '" << output_file_name << "'" << std::endl;
 
@@ -1877,6 +1881,8 @@ void saveSubsession()
         catch (const fs::filesystem_error& e) {
             std::cerr << "Error copying poses file: " << e.what() << '\n';
         }
+    }else{
+        std::cout << "saving canceled" << std::endl;
     }
 }
 

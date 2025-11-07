@@ -9,8 +9,14 @@ namespace mandeye::fd{
     const std::vector<std::string> LAS_LAZ_filter = {"LASzip file (*.laz)", "*.laz", "LAS file (*.las)", "*.las", "All files", "*"};
     const std::vector <std::string> LazFilter = { "LAZ files (*.laz)", "*.laz *.las" };
     const std::vector<std::string> ImageFilter = { "Image files", "*.png *.jpg *.jpeg *.bmp"};
-    const std::vector<std::string> Session_filter = { "Session (*.json)", "*.json" };
-    const std::vector<std::string> Project_filter = { "Project, json", "*.json" };
+
+    const std::vector<std::string> Calibration_filter = { "Mandeye JSON Calibration (*.mjc)", "*.mjc", "Generic JSON (*.json)", "*.json" };
+    const std::vector<std::string> Session_filter = { "Mandeye JSON Session (*.mjs)", "*.mjs", "Generic JSON (*.json)", "*.json" };
+    const std::vector<std::string> Project_filter = { "Mandeye JSON Project (*.mjp)", "*.mjp", "Generic JSON (*.json)", "*.json" };
+
+    const std::vector<std::string> IniPoses_filter = { "Mandeye REG Initial poses (*.mri)", "*.mri", "Generic REG initial poses (*.reg)", "*.reg" };
+    const std::vector<std::string> Poses_filter = { "Mandeye REG Poses (*.mrp)", "*.mrp", "Generic REG poses (*.reg)", "*.reg" };
+
     const std::vector<std::string> Resso_filter = { "Resso (*.reg)", "*.reg" };
     const std::vector<std::string> Dxf_filter = { "dxf (*.dxf)", "*.dxf" };
     const std::vector<std::string> Csv_filter = { "Csv (*.csv)", "*.csv" };

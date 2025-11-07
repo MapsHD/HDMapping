@@ -476,13 +476,13 @@ void run_multi_view_tls_registration(
 		std::cout << "Provided input path does not exist." << std::endl;
 		return;
 	}
-	if (has_extension(input_file_name, ".json"))
+	if (has_extension(input_file_name, ".json") || has_extension(input_file_name, ".mjs"))
 	{
 		std::cout << "Session file: '" << input_file_name << "'" << std::endl;
 		session.working_directory = fs::path(input_file_name).parent_path().string();
 		session.load(fs::path(input_file_name).string(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset);
 	}
-	else if (has_extension(input_file_name, ".reg"))
+	else if (has_extension(input_file_name, ".reg") || has_extension(input_file_name, ".mjp"))
 	{
 		std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
 		session.working_directory = fs::path(input_file_name).parent_path().string();
@@ -693,19 +693,20 @@ void run_multi_view_tls_registration(
 	{
 		if (session.point_clouds_container.initial_poses_file_name.empty() && tls_registration.save_initial_poses)
 		{
-			std::string initial_poses_file_name = (outwd / "initial_poses.reg").string();
+			std::string initial_poses_file_name = (outwd / "session_step2_ini_poses.mri").string();
 			std::cout << "saving initial poses to: " << initial_poses_file_name << std::endl;
 			session.point_clouds_container.save_poses(initial_poses_file_name, false);
 		}
 
 		if (session.point_clouds_container.poses_file_name.empty() && tls_registration.save_poses)
 		{
-			std::string poses_file_name = (outwd / "poses.reg").string();
+			std::string poses_file_name = (outwd / "session_step2_poses.mrp").string();
 			std::cout << "saving poses to: " << poses_file_name << std::endl;
 			session.point_clouds_container.save_poses(poses_file_name, false);
 		}
+
 		session.save(
-			(outwd / "session_step_2.json").string(), session.point_clouds_container.poses_file_name,
+			(outwd / "session_step2.mjs").string(), session.point_clouds_container.poses_file_name,
 			session.point_clouds_container.initial_poses_file_name, false);
 		std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
 		session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false);

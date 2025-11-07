@@ -1724,10 +1724,11 @@ void lio_segments_gui()
 void openSession()
 {
     session_file_name = mandeye::fd::OpenFileDialogOneFile("Open session", mandeye::fd::Session_filter);
-    std::cout << "Session file: '" << session_file_name << "'" << std::endl;
 
     if (session_file_name.size() > 0)
     {
+        std::cout << "Session file: '" << session_file_name << "'" << std::endl;
+
         if (session.load(fs::path(session_file_name).string(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset))
         {
             session_loaded = true;
@@ -1749,11 +1750,23 @@ void openSession()
 
 void saveSession()
 {
-    const auto output_file_name = mandeye::fd::SaveFileDialog("Save session", mandeye::fd::Session_filter, ".json", session_file_name);
-    std::cout << "Session file to save: '" << output_file_name << "'" << std::endl;
+    const auto output_file_name = mandeye::fd::SaveFileDialog("Save session as", mandeye::fd::Session_filter, ".json", session_file_name);
 
     if (output_file_name.size() > 0)
     {
+        std::cout << "Session file to save: '" << output_file_name << "'" << std::endl;
+
+        //creating filename proposal based on current selection
+        std::filesystem::path path(output_file_name);
+        // Extract parts
+        const auto dir = path.parent_path();
+        const auto stem = path.stem().string();
+        const auto ext = path.extension().string();
+
+        // Build new name
+        std::string initial_poses_file_name = (dir / (stem + "_ini_poses.mri")).string();
+        std::string poses_file_name = (dir / (stem + "_poses.mrp")).string();
+
         if (session.point_clouds_container.initial_poses_file_name.empty())
         {
             std::cout << "Please assign initial_poses_file_name to session" << std::endl;
@@ -1768,22 +1781,13 @@ void saveSession()
                 pfd::choice::ok, pfd::icon::error);
             message.result();
 
-            std::shared_ptr<pfd::save_file> save_file2;
-            std::string initial_poses_file_name = "";
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)save_file2);
-            const auto tt = [&]()
-                {
-                    auto sel = pfd::save_file("initial_poses_file_name", "C:\\", mandeye::fd::Resso_filter).result();
-                    initial_poses_file_name = sel;
-                    std::cout << "Resso file to save: '" << initial_poses_file_name << "'" << std::endl;
-                };
-            std::thread t2(tt);
-            t2.join();
+            initial_poses_file_name = mandeye::fd::SaveFileDialog("Initial poses file name", mandeye::fd::IniPoses_filter, initial_poses_file_name);
+            std::cout << "Resso file to save: '" << initial_poses_file_name << "'" << std::endl;
 
             if (initial_poses_file_name.size() > 0)
             {
                 std::cout << "saving initial poses to: " << initial_poses_file_name << std::endl;
-                session.point_clouds_container.save_poses(fs::path(initial_poses_file_name).string(), false);
+                session.point_clouds_container.save_poses(initial_poses_file_name, false);
             }
         }
 
@@ -1801,18 +1805,25 @@ void saveSession()
                 pfd::choice::ok, pfd::icon::error);
             message.result();
 
-            const auto poses_file_name = mandeye::fd::SaveFileDialog("poses_file_name", mandeye::fd::Resso_filter);
+            poses_file_name = mandeye::fd::SaveFileDialog("Poses file name", mandeye::fd::Poses_filter, poses_file_name);
             std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
             if (poses_file_name.size() > 0)
             {
                 std::cout << "saving poses to: " << poses_file_name << std::endl;
-                session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), false);
+                session.point_clouds_container.save_poses(poses_file_name, false);
             }
         }
 
-        session.save(fs::path(output_file_name).string(), session.point_clouds_container.poses_file_name, session.point_clouds_container.initial_poses_file_name, false);
-        std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
-        session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false);
+        session.save(output_file_name, poses_file_name, initial_poses_file_name, false);
+        std::cout << "saving result to: " << poses_file_name << std::endl;
+        session.point_clouds_container.save_poses(poses_file_name, false);
+
+        try {
+            fs::copy_file(poses_file_name, initial_poses_file_name, fs::copy_options::overwrite_existing);
+        }
+        catch (const fs::filesystem_error& e) {
+            std::cerr << "Error copying poses file: " << e.what() << '\n';
+        }
     }
 }
 
@@ -1821,27 +1832,33 @@ void saveSubsession()
     //creating filename proposal based on current selection
     std::filesystem::path path(session_file_name);
     // Extract parts
-    auto dir = path.parent_path();
-    auto stem = path.stem().string();
-    auto ext = path.extension().string();
-    std::string indexpart = " " + std::to_string(index_begin) + "-" + std::to_string(index_end);
+    const auto dir = path.parent_path();
+    const auto stem = path.stem().string();
+    const auto ext = path.extension().string();
+    const std::string indexpart = " " + std::to_string(index_begin) + "-" + std::to_string(index_end);
 
     // Build new name
     std::string indexed_file_name = (dir / (stem + indexpart + ext)).string();
 
     const auto output_file_name = mandeye::fd::SaveFileDialog("Save subsession", mandeye::fd::Session_filter, ".json", indexed_file_name);
-    std::cout << "Subsession file to save: '" << output_file_name << "'" << std::endl;
 
     if (output_file_name.size() > 0)
     {
-        const auto initial_poses_file_name = (dir / ("lio_initial_poses" + indexpart + ".reg")).string();
-        const auto poses_file_name = (dir / ("poses" + indexpart + ".reg")).string();
+        std::cout << "Subsession file to save: '" << output_file_name << "'" << std::endl;
+
+        const auto initial_poses_file_name = (dir / (stem + "_ini_poses" + indexpart + ".mri")).string();
+        const auto poses_file_name = (dir / (stem + "_poses" + indexpart + ".mrp")).string();
 
         session.save(fs::path(output_file_name).string(), poses_file_name, initial_poses_file_name, true);
-        std::cout << "Saving initial poses to: " << initial_poses_file_name << std::endl;
-        session.point_clouds_container.save_poses(fs::path(initial_poses_file_name).string(), true);
         std::cout << "Saving poses to: " << poses_file_name << std::endl;
         session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), true);
+
+        try {
+            fs::copy_file(poses_file_name, initial_poses_file_name, fs::copy_options::overwrite_existing);
+        }
+        catch (const fs::filesystem_error& e) {
+            std::cerr << "Error copying poses file: " << e.what() << '\n';
+        }
     }
 }
 
@@ -2098,7 +2115,7 @@ void display()
         else
         {
             if (ImGui::BeginMenu("File")) {
-                if (ImGui::MenuItem("Save session", "Ctrl+S"))
+                if (ImGui::MenuItem("Save session as", "Ctrl+S"))
                     saveSession();
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("last step in linear workflow");

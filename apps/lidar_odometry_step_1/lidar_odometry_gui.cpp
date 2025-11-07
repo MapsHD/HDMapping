@@ -164,8 +164,6 @@ void step1(const std::atomic<bool> &loPause)
 {
     std::string input_folder_name;
     std::vector<std::string> input_file_names;
-    // input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
-    // input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
     input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
 
     std::cout << "Selected folder: '" << input_folder_name << std::endl;
@@ -178,20 +176,8 @@ void step1(const std::atomic<bool> &loPause)
             glutSetWindowTitle(newTitle.c_str());
 
             for (const auto &entry : fs::directory_iterator(input_folder_name))
-            {
                 if (entry.is_regular_file())
-                {
                     input_file_names.push_back(entry.path().string());
-                }
-            }
-            // std::cout << "input_file_names list begin" << std::endl;
-            // std::cout << "----------------------" << std::endl;
-            // for (const auto& fn : input_file_names)
-            //{
-            //     std::cout << "'" << fn << "'" << std::endl;
-            // }
-            // std::cout << "----------------------" << std::endl;
-            // std::cout << "input_file_names list end" << std::endl;
 
             if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
             {
@@ -394,7 +380,8 @@ void lidar_odometry_gui()
 
         if (!simple_gui)
         {
-            ImGui::InputInt("THRESHOLD_NR_POSES", &params.threshold_nr_poses);
+			ImGui::SetNextItemWidth(ImGuiNumberWidth);
+            ImGui::InputInt("Threshold nr poses", &params.threshold_nr_poses);
             if (params.threshold_nr_poses < 1)
             {
                 params.threshold_nr_poses = 1;
@@ -413,7 +400,7 @@ void lidar_odometry_gui()
         }
 
         ImGui::PushItemWidth(ImGuiNumberWidth);
-        ImGui::InputDouble("filter_threshold_xy_inner [m]", &params.filter_threshold_xy_inner, 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("Filter threshold XY inner [m]", &params.filter_threshold_xy_inner, 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
         {
             ImGui::BeginTooltip();
@@ -423,7 +410,7 @@ void lidar_odometry_gui()
             ImGui::Text("e.g.: 0.1[m] for Livox Mid-360");
             ImGui::EndTooltip();
         }
-        ImGui::InputDouble("filter_threshold_xy_outer [m]", &params.filter_threshold_xy_outer, 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("Filter threshold XY outer [m]", &params.filter_threshold_xy_outer, 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
         {
             ImGui::BeginTooltip();
@@ -433,7 +420,7 @@ void lidar_odometry_gui()
             ImGui::Text("e.g.: 70[m] @ 80%% reflectivity for Livox Mid-360");
             ImGui::EndTooltip();
         }
-        ImGui::InputDouble("threshold_output_filter [m]", &params.threshould_output_filter, 0.0, 0.0, "%.3f");
+        ImGui::InputDouble("Threshold output filter [m]", &params.threshould_output_filter, 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("all local points inside lidar xy_circle radius will be removed during save");
         ImGui::PopItemWidth();
@@ -493,22 +480,17 @@ void lidar_odometry_gui()
 
             ImGui::NewLine();
 
-            // ImGui::InputDouble("filter_threshold_xy (all local points inside lidar xy_circle radius[m] will be removed during load)", &params.filter_threshold_xy);
-            // ImGui::InputDouble("threshould_output_filter (all local points inside lidar xy_circle radius[m] will be removed during save)", &threshould_output_filter);
-
-            ImGui::InputDouble("decimation", &params.decimation, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("Decimation", &params.decimation, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("larger value of decimation better performance, but worse accuracy");
+                ImGui::SetTooltip("Larger value of decimation better performance, but worse accuracy");
 
-            ImGui::InputDouble("max distance of processed points [m]", &params.max_distance_lidar, 0.0, 0.0, "%.2f");
+            ImGui::InputDouble("Max distance of processed points [m]", &params.max_distance_lidar, 0.0, 0.0, "%.2f");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("local LiDAR coordinates");
+                ImGui::SetTooltip("Local LiDAR coordinates");
 
-            ImGui::InputInt("number iterations", &params.nr_iter);
-            ImGui::InputDouble("sliding window trajectory length threshold [m]", &params.sliding_window_trajectory_length_threshold, 0.0, 0.0, "%.2f");
-            ImGui::InputInt("threshold initial points", &params.threshold_initial_points);
-            ImGui::Checkbox("save_calibration_validation_file", &params.save_calibration_validation);
-            ImGui::InputInt("number of calibration validation points", &params.calibration_validation_points);
+            ImGui::InputInt("Number of iterations", &params.nr_iter);
+            ImGui::InputDouble("Sliding window trajectory length threshold [m]", &params.sliding_window_trajectory_length_threshold, 0.0, 0.0, "%.2f");
+            ImGui::InputInt("Threshold initial points", &params.threshold_initial_points);
 
             ImGui::NewLine();
 
@@ -517,9 +499,9 @@ void lidar_odometry_gui()
             if (fusionConvention < 0 || fusionConvention > 2)
                 fusionConvention = 0;
 
-            ImGui::Text("fusion convention: ");
+            ImGui::Text("Fusion convention: ");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");
+                ImGui::SetTooltip("Coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");
 
             ImGui::SameLine();
             ImGui::RadioButton("NWU", &fusionConvention, 0);
@@ -541,8 +523,16 @@ void lidar_odometry_gui()
 
             ImGui::NewLine();
 
-            ImGui::Checkbox("use_motion_from_previous_step", &params.use_motion_from_previous_step);
-            ImGui::InputDouble("ahrs_gain", &params.ahrs_gain, 0.0, 0.0, "%.3f");
+            ImGui::Checkbox("Use motion from previous step", &params.use_motion_from_previous_step);
+            ImGui::InputDouble("AHRS gain", &params.ahrs_gain, 0.0, 0.0, "%.3f");
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Attitude and Heading Reference System gain:");
+                ImGui::Text("How strongly the accelerometer/magnetometer corrections influence the orientation estimate versus gyroscope integration");
+                ImGui::Text("Larger value means faster response to changes in orientation, but more noise");
+                ImGui::EndTooltip();
+            }
 
             ImGui::PopItemWidth();
         }
@@ -551,41 +541,49 @@ void lidar_odometry_gui()
         {
             if (ImGui::Button("Load data"))
             {
+                loStartTime = std::chrono::system_clock::now();
+                
                 step1(loPause);
                 std::cout << "Load data done please click 'Compute all' to continue calculations" << std::endl;
+
+                std::chrono::duration<double> elapsed = std::chrono::system_clock::now() - loStartTime;
+                double elapsedSeconds = elapsed.count();
+
+                std::cout << "Elapsed time: " << formatTime(elapsedSeconds).c_str() << std::endl;
+
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Select all imu *.csv and lidar *.laz files produced by MANDEYE saved in 'continousScanning_*' folder");
+                ImGui::SetTooltip("Select all IMU *.csv and LiDAR *.laz files produced by MANDEYE saved in 'continousScanning_*' folder");
         }
         if (step_1_done && !step_2_done)
         {
             if (ImGui::Button("Compute all"))
-            {
                 step2(loPause);
-            }
+
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Press this button for automatic lidar odometry calculation -> it will produce trajectory");
+                ImGui::SetTooltip("Press this button for automatic LiDAR odometry calculation -> it will produce trajectory");
         }
 
         if (step_1_done && step_2_done)
         {
-            ImGui::Text("'Point cloud consistency and trajectory smoothness' makes trajectory smooth, point cloud will be more consistent");
-
             if (ImGui::Button("Point cloud consistency and trajectory smoothness"))
-            {
                 run_consistency(worker_data, params);
-            }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Press optionally before pressing 'Save result");
+            {
+                ImGui::BeginTooltip();
+				ImGui::Text("This process makes trajectory smooth, point cloud will be more consistent");
+                ImGui::SetTooltip("Press optionally before pressing 'Save result'");
+                ImGui::EndTooltip();
+            }
+                
             ImGui::SameLine();
             ImGui::Checkbox("Use multiple Gaussians for each bucket", &params.use_mutliple_gaussian);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Multiple Gaussians suppose to work better in floor plan indoor scenarios (multiple neighbouring rooms)");
 
             if (ImGui::Button("Save result"))
-            {
                 save_results(true, 0.0);
-            }
+
             ImGui::SameLine();
             ImGui::Text("Press this button for saving resulting trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program");
         }
@@ -1648,24 +1646,36 @@ void display()
             if (ImGui::BeginMenu("Parameters"))
             {
 
-                ImGui::MenuItem("use_removie_imu_bias_from_first_stationary_scan", nullptr, &params.use_removie_imu_bias_from_first_stationary_scan);
-                ImGui::MenuItem("use_multithread", nullptr, &params.useMultithread);
-                ImGui::MenuItem("full_processing_messages", nullptr, &full_debug_messages);
+                ImGui::MenuItem("Remove IMU bias from first stationary scan", nullptr, &params.use_removie_imu_bias_from_first_stationary_scan);
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Show more messages during processing in console window");
+					ImGui::SetTooltip("IMU bias will be removed given there's a stationary period at the start of the recording");
 
+                ImGui::MenuItem("Multithread", nullptr, &params.useMultithread);
                 ImGui::PushItemWidth(ImGuiNumberWidth / 2);
-                ImGui::InputDouble("time_threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.1f");
+                ImGui::InputDouble("Time threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.1f");
                 ImGui::PopItemWidth();
                 if (ImGui::IsItemHovered())
                 {
                     ImGui::BeginTooltip();
-                    ImGui::Text("optimization timeout");
+                    ImGui::Text("Optimization timeout");
                     ImGui::Text("smaller value gives faster calculations, less precise results");
                     ImGui::Text("e.g.: 0.1 [s] will make processing time aprox equal to scan time");
                     ImGui::Text("0.3 [s] will make processing time aprox equal to 3x scan time");
                     ImGui::EndTooltip();
                 }
+
+                ImGui::Separator();
+
+				ImGui::Text("Debug:");
+
+                ImGui::MenuItem("Full processing messages", nullptr, &full_debug_messages);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Show more messages during processing in console window");
+                ImGui::MenuItem("Save calibration validation file", nullptr, &params.save_calibration_validation);
+                if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Save calibrated points from first laz file in 'calibrationValidation.asc' file");
+				ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                ImGui::InputInt("Number of calibration validation points", &params.calibration_validation_points);
 
                 ImGui::Separator();
 
@@ -1790,7 +1800,7 @@ void display()
 
     if (info_gui)
     {
-        infoLines[infoLines.size() - 2] = "It saves session.json file in " + working_directory + "\\lidar_odometry_result_*";
+        infoLines[infoLines.size() - 2] = "It saves session file in " + working_directory + "\\lidar_odometry_result_*";
         info_window(infoLines, &info_gui);
     }
 

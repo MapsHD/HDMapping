@@ -1374,7 +1374,7 @@ void lio_segments_gui()
 
     ImGui::Text("Selection: ");
     ImGui::SameLine();
-    if (ImGui::Button("show"))
+    if (ImGui::Button("show <index from, index to>"))
         session.point_clouds_container.show_all_from_range(index_begin, index_end);
     ImGui::SameLine();
     if (ImGui::Button("shift -"))
@@ -1829,13 +1829,31 @@ void saveSession()
 
 void saveSubsession()
 {
-    //creating filename proposal based on current selection
+    int inx_begin = 0;
+    int inx_end = 0;
+
+    for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++){
+        if (session.point_clouds_container.point_clouds[i].visible){
+            inx_begin = i;
+            break;
+        }
+    }
+
+    for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+    {
+        if (session.point_clouds_container.point_clouds[i].visible)
+        {
+            inx_end = i;
+        }
+    }
+
+    // creating filename proposal based on current selection
     std::filesystem::path path(session_file_name);
     // Extract parts
     const auto dir = path.parent_path();
     const auto stem = path.stem().string();
     const auto ext = path.extension().string();
-    const std::string indexpart = " " + std::to_string(index_begin) + "-" + std::to_string(index_end);
+    const std::string indexpart = " " + std::to_string(inx_begin) + "-" + std::to_string(inx_end);
 
     // Build new name
     std::string indexed_file_name = (dir / (stem + indexpart + ext)).string();
@@ -2120,12 +2138,12 @@ void display()
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("last step in linear workflow");
 
-                ImGui::BeginDisabled(!((index_begin > 0) || (index_end < static_cast<int>(session.point_clouds_container.point_clouds.size() - 1))));
-                {
+                //ImGui::BeginDisabled(!((index_begin > 0) || (index_end < static_cast<int>(session.point_clouds_container.point_clouds.size() - 1))));
+                //{
                     if (ImGui::MenuItem("Save subsession", "Ctrl+Shift+S"))
                         saveSubsession();
-                }
-                ImGui::EndDisabled();
+                //}
+                //ImGui::EndDisabled();
 
                 ImGui::Separator();
 

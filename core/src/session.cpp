@@ -22,8 +22,7 @@ std::string pathUpdater(std::string path, std::string newPath)
 bool Session::load(const std::string &file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
 {
     this->session_file_name = file_name;
-    std::cout
-        << "loading file: '" << file_name << "'" << std::endl;
+    std::cout << "Loading file: '" << file_name << "'" << std::endl;
     // point_clouds_container.point_clouds.clear();
 
     std::string folder_name;
@@ -175,16 +174,16 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             laz_file_names.push_back(fn);
         }
 
-        std::cout << "loaded from json: " << file_name << std::endl;
-        std::cout << "offset_x: " << point_clouds_container.offset.x()
+        std::cout << "Loaded: "
+                  << "offset_x: " << point_clouds_container.offset.x()
                   << ", offset_y: " << point_clouds_container.offset.y()
                   << ", offset_z: " << point_clouds_container.offset.z()
-                  << " [m]" << std::endl;
-        std::cout << "folder_name: '" << folder_name << "'" << std::endl;
-        std::cout << "out_folder_name: '" << out_folder_name << "'" << std::endl;
-        std::cout << "poses_file_name: '" << poses_file_name << "'" << std::endl;
-        std::cout << "initial_poses_file_name: '" << initial_poses_file_name << "'" << std::endl;
-        std::cout << "out_poses_file_name: '" << out_poses_file_name << "'" << std::endl;
+                  << " [m]\n";
+        std::cout << "Folder_name: '" << folder_name << "'\n";
+        std::cout << "Out_folder_name: '" << out_folder_name << "'\n";
+        std::cout << "Initial_poses_file_name: '" << initial_poses_file_name << "'\n";
+        std::cout << "Poses_file_name: '" << poses_file_name << "'\n";
+        std::cout << "Out_poses_file_name: '" << out_poses_file_name << "'\n";
 
         if (!loop_closure_edges.empty()) {
             std::cout << "------loop closure edges-----" << std::endl;

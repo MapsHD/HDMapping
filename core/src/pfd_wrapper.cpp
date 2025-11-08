@@ -53,6 +53,9 @@ namespace mandeye::fd{
       std::thread th(t);
       th.join();
 
+      if (file.empty())
+		  return file;
+
       std::filesystem::path pfile(file);
       if (!pfile.has_extension())
           file += defaultExtension;

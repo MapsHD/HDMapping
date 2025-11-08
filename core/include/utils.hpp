@@ -71,6 +71,12 @@ extern float new_translate_z;
 // Transition timing
 extern bool camera_transition_active;
 
+struct ShortcutEntry {
+    std::string type;
+    std::string shortcut;
+    std::string description;
+};
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 std::string truncPath(const std::string& fullPath);
@@ -93,7 +99,7 @@ void ImGuiHyperlink(const char* url, ImVec4 color = ImVec4(0.2f, 0.4f, 0.8f, 1.0
 
 
 
-void info_window(const std::vector<std::string>& infoLines, bool* open = nullptr);
+void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts, bool* open);
 
 
 

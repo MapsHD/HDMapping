@@ -45,6 +45,9 @@ std::vector<std::string> infoLines = {
     "",
     "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program."};
 
+//App specific shortcuts (using empty dummy until needed)
+std::vector<ShortcutEntry> appShortcuts(77, { "", "", "" });
+
 namespace fs = std::filesystem;
 
 bool full_lidar_odometry_gui = false;
@@ -1801,7 +1804,7 @@ void display()
     if (info_gui)
     {
         infoLines[infoLines.size() - 2] = "It saves session file in " + working_directory + "\\lidar_odometry_result_*";
-        info_window(infoLines, &info_gui);
+        info_window(infoLines, appShortcuts, &info_gui);
     }
 
     if (initial_transformation_gizmo)

@@ -71,6 +71,87 @@ std::vector<std::string> infoLines = {
     "LAZ files are the product of MANDEYE process (open them with Cloud Compare)",
 };
 
+//App specific shortcuts (Type and Shortcut are just for easy reference)
+static const std::vector<ShortcutEntry> appShortcuts = {
+    {"Normal keys", "A", ""},
+    {"", "Ctrl+A", "point cloud Alignment"},
+    {"", "B", ""},
+    {"", "Ctrl+B", ""},
+    {"", "C", ""},
+    {"", "Ctrl+C", "Control points"},
+    {"", "D", ""},
+    {"", "Ctrl+D", ""},
+    {"", "E", ""},
+    {"", "Ctrl+E", "lio segments Editor"},
+    {"", "F", ""},
+    {"", "Ctrl+F", ""},
+    {"", "G", ""},
+    {"", "Ctrl+G", "Ground control points"},
+    {"", "H", ""},
+    {"", "Ctrl+H", ""},
+    {"", "I", ""},
+    {"", "Ctrl+I", ""},
+    {"", "J", ""},
+    {"", "Ctrl+K", ""},
+    {"", "K", ""},
+    {"", "Ctrl+K", ""},
+    {"", "L", ""},
+    {"", "Ctrl+L", "manual Loop closure"},
+    {"", "M", ""},
+    {"", "Ctrl+M", ""},
+    {"", "N", ""},
+    {"", "Ctrl+N", ""},
+    {"", "O", ""},
+    {"", "Ctrl+O", ""},
+    {"", "P", ""},
+    {"", "Ctrl+P", "Pose graph slam"},
+    {"", "Q", ""},
+    {"", "Ctrl+Q", ""},
+    {"", "R", ""},
+    {"", "Ctrl+R", "Random cloud colors"},
+    {"", "S", ""},
+    {"", "Ctrl+S", "Save session"},
+    {"", "Ctrl+Shift+S", "Save subsession"},
+    {"", "T", ""},
+    {"", "Ctrl+T", ""},
+    {"", "U", ""},
+    {"", "Ctrl+U", ""},
+    {"", "V", ""},
+    {"", "Ctrl+V", ""},
+    {"", "W", ""},
+    {"", "Ctrl+W", ""},
+    {"", "X", ""},
+    {"", "Ctrl+X", ""},
+    {"", "Y", ""},
+    {"", "Ctrl+Y", ""},
+    {"", "Z", ""},
+    {"", "Ctrl+Z", ""},
+    {"", "1-9", ""},
+    {"Special keys", "Up arrow", ""},
+    {"", "Shift + up arrow", ""},
+    {"", "Ctrl + up arrow", ""},
+    {"", "Down arrow", ""},
+    {"", "Shift + down arrow", ""},
+    {"", "Ctrl + down arrow", ""},
+    {"", "Left arrow", ""},
+    {"", "Shift + left arrow", ""},
+    {"", "Ctrl + left arrow", ""},
+    {"", "Right arrow", ""},
+    {"", "Shift + right arrow", ""},
+    {"", "Ctrl + right arrow", ""},
+    {"", "Pg down", ""},
+    {"", "Pg up", ""},
+    {"", "- key", ""},
+    {"", "+ key", ""},
+    {"Mouse related", "Left click + drag", ""},
+    {"", "Right click + drag", "n"},
+    {"", "Scroll", ""},
+    {"", "Shift + scroll", ""},
+    {"", "Ctrl + left click", ""},
+    {"", "Ctrl + right click", ""},
+    {"", "Ctrl + middle click", ""}
+};
+
 namespace fs = std::filesystem;
 
 static bool show_demo_window = true;
@@ -1848,11 +1929,11 @@ void saveSubsession()
     }
 
     // creating filename proposal based on current selection
-    std::filesystem::path path(session_file_name);
+    fs::path path(session_file_name);
     // Extract parts
-    const auto dir = path.parent_path();
-    const auto stem = path.stem().string();
-    const auto ext = ".mjs"; // path.extension().string();
+    fs::path dir = path.parent_path();
+    std::string stem = path.stem().string();
+	const auto ext = ".mjs"; //forcing new extension even if original session was .json
     const std::string indexpart = " " + std::to_string(inx_begin) + "-" + std::to_string(inx_end);
 
     // Build new name
@@ -1860,16 +1941,16 @@ void saveSubsession()
 
     const auto output_file_name = mandeye::fd::SaveFileDialog("Save subsession", mandeye::fd::Session_filter, ".mjs", indexed_file_name);
 
-    std::filesystem::path pfn(output_file_name);
-
-    const auto fn = pfn.filename().string();
-
-    if (fn.size() > 4)
+    if (output_file_name.size() > 0)
     {
         std::cout << "Subsession file to save: '" << output_file_name << "'" << std::endl;
 
-        const auto initial_poses_file_name = (dir / (stem + "_ini_poses" + indexpart + ".mri")).string();
-        const auto poses_file_name = (dir / (stem + "_poses" + indexpart + ".mrp")).string();
+        path = fs::path(output_file_name);
+        dir = path.parent_path();
+        stem = path.stem().string();
+
+        const auto initial_poses_file_name = (dir / (stem + "_ini_poses" + ".mri")).string();
+        const auto poses_file_name = (dir / (stem + "_poses" + ".mrp")).string();
 
         session.save(fs::path(output_file_name).string(), poses_file_name, initial_poses_file_name, true);
         std::cout << "Saving poses to: " << poses_file_name << std::endl;
@@ -2142,12 +2223,14 @@ void display()
                 if (ImGui::MenuItem("Save session as", "Ctrl+S"))
                     saveSession();
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("last step in linear workflow");
+                    ImGui::SetTooltip("Save changes of full session with posibility to change filename");
 
                 //ImGui::BeginDisabled(!((index_begin > 0) || (index_end < static_cast<int>(session.point_clouds_container.point_clouds.size() - 1))));
                 //{
                     if (ImGui::MenuItem("Save subsession", "Ctrl+Shift+S"))
                         saveSubsession();
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Save session according to selections from 'LIO segments editor' window");
                 //}
                 //ImGui::EndDisabled();
 
@@ -2871,7 +2954,7 @@ void display()
     if (session.ground_control_points.is_imgui)
         session.ground_control_points.imgui(session.point_clouds_container);
 
-    info_window(infoLines, &info_gui);
+    info_window(infoLines, appShortcuts, &info_gui);
 
     if (compass_ruler)
         drawMiniCompassWithRuler(viewLocal, fabs(translate_z), clear_color);

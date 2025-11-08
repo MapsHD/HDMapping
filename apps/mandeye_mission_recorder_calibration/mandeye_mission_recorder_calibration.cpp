@@ -40,6 +40,9 @@ std::vector<std::string> infoLines = {
     "Used for MR (Mission Recorder) hardware using two LiDAR units"
 };
 
+//App specific shortcuts (using empty dummy until needed)
+std::vector<ShortcutEntry> appShortcuts(77, { "", "", "" });
+
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
@@ -951,7 +954,7 @@ void display()
         ImGui::EndMainMenuBar();
     }
 
-    info_window(infoLines, &info_gui);
+    info_window(infoLines, appShortcuts, &info_gui);
 
     if (compass_ruler)
         drawMiniCompassWithRuler(viewLocal, fabs(translate_z), clear_color);

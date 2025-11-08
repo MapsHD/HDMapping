@@ -36,7 +36,88 @@ std::vector<std::string> infoLines = {
     "This program is optional step in MANDEYE process",
     "",
     "It analyzes session created in step_1 for problems that need to be addressed further",
-    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program"
+    "Next step will be to load session file with 'multi_view_tls_registration_step_2' app"
+};
+
+//App specific shortcuts (Type and Shortcut are just for easy reference)
+static const std::vector<ShortcutEntry> appShortcuts = {
+    {"Normal keys", "A", ""},
+    {"", "Ctrl+A", ""},
+    {"", "B", ""},
+    {"", "Ctrl+B", ""},
+    {"", "C", ""},
+    {"", "Ctrl+C", ""},
+    {"", "D", ""},
+    {"", "Ctrl+D", ""},
+    {"", "E", ""},
+    {"", "Ctrl+E", ""},
+    {"", "F", ""},
+    {"", "Ctrl+F", ""},
+    {"", "G", ""},
+    {"", "Ctrl+G", ""},
+    {"", "H", ""},
+    {"", "Ctrl+H", ""},
+    {"", "I", ""},
+    {"", "Ctrl+I", ""},
+    {"", "J", ""},
+    {"", "Ctrl+K", ""},
+    {"", "K", ""},
+    {"", "Ctrl+K", ""},
+    {"", "L", ""},
+    {"", "Ctrl+L", ""},
+    {"", "M", ""},
+    {"", "Ctrl+M", ""},
+    {"", "N", ""},
+    {"", "Ctrl+N", "show Neightbouring scans"},
+    {"", "O", ""},
+    {"", "Ctrl+O", ""},
+    {"", "P", ""},
+    {"", "Ctrl+P", ""},
+    {"", "Q", ""},
+    {"", "Ctrl+Q", ""},
+    {"", "R", ""},
+    {"", "Ctrl+R", ""},
+    {"", "S", ""},
+    {"", "Ctrl+S", ""},
+    {"", "Ctrl+Shift+S", ""},
+    {"", "T", ""},
+    {"", "Ctrl+T", ""},
+    {"", "U", ""},
+    {"", "Ctrl+U", ""},
+    {"", "V", ""},
+    {"", "Ctrl+V", ""},
+    {"", "W", ""},
+    {"", "Ctrl+W", ""},
+    {"", "X", ""},
+    {"", "Ctrl+X", ""},
+    {"", "Y", ""},
+    {"", "Ctrl+Y", ""},
+    {"", "Z", ""},
+    {"", "Ctrl+Z", ""},
+    {"", "1-9", ""},
+    {"Special keys", "Up arrow", "Intensity offset +"},
+    {"", "Shift + up arrow", ""},
+    {"", "Ctrl + up arrow", ""},
+    {"", "Down arrow", "Intensity offset -"},
+    {"", "Shift + down arrow", ""},
+    {"", "Ctrl + down arrow", ""},
+    {"", "Left arrow", "Point cloud index -"},
+    {"", "Shift + left arrow", ""},
+    {"", "Ctrl + left arrow", ""},
+    {"", "Right arrow", "Point cloud index +"},
+    {"", "Shift + right arrow", ""},
+    {"", "Ctrl + right arrow", ""},
+    {"", "Pg down", "Point cloud index -"},
+    {"", "Pg up", "Point cloud index +"},
+    {"", "- key", "Point cloud index -"},
+    {"", "+ key", "Point cloud index +"},
+    {"Mouse related", "Left click + drag", ""},
+    {"", "Right click + drag", "n"},
+    {"", "Scroll", ""},
+    {"", "Shift + scroll", ""},
+    {"", "Ctrl + left click", ""},
+    {"", "Ctrl + right click", ""},
+    {"", "Ctrl + middle click", ""}
 };
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
@@ -144,7 +225,6 @@ void openSession()
 
     std::string session_file_name = "";
     session_file_name = mandeye::fd::OpenFileDialogOneFile("Open session file", mandeye::fd::Session_filter);
-    std::cout << "Session file: '" << session_file_name << "'" << std::endl;
 
     if (session_file_name.size() > 0)
     {
@@ -492,7 +572,7 @@ void display()
         ImGui::EndMainMenuBar();
     }
 
-    info_window(infoLines, &info_gui);
+    info_window(infoLines, appShortcuts, &info_gui);
 
     if (compass_ruler)
         drawMiniCompassWithRuler(viewLocal, fabs(translate_z), clear_color);

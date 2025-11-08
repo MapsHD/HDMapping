@@ -50,6 +50,96 @@ float new_translate_z = translate_z;
 // Transition timing
 bool camera_transition_active = false;
 
+bool scroll_hint_enabled = true;
+bool scroll_hint_active = false;
+int scroll_hint_count = 0;
+float scroll_hint_accu = 0.0f;
+double scroll_hint_lastT = 0.0;
+
+bool show_about = false;
+
+//General shortcuts applicable to any app
+static const std::vector<ShortcutEntry> shortcuts = {
+    {"Normal keys", "A", ""},
+    {"", "Ctrl+A", ""},
+    {"", "B", "camera Back"},
+    {"", "Ctrl+B", ""},
+    {"", "C", "Compass/ruler"},
+    {"", "Ctrl+C", ""},
+    {"", "D", ""},
+    {"", "Ctrl+D", ""},
+    {"", "E", ""},
+    {"", "Ctrl+E", ""},
+    {"", "F", "camera Front"},
+    {"", "Ctrl+F", ""},
+    {"", "G", ""},
+    {"", "Ctrl+G", ""},
+    {"", "H", ""},
+    {"", "Ctrl+H", ""},
+    {"", "I", "camera Isometric"},
+    {"", "Ctrl+I", ""},
+    {"", "J", ""},
+    {"", "Ctrl+J", ""},
+    {"", "K", ""},
+    {"", "Ctrl+K", ""},
+    {"", "L", "camera Left"},
+    {"", "Ctrl+L", ""},
+    {"", "M", ""},
+    {"", "Ctrl+M", ""},
+    {"", "N", ""},
+    {"", "Ctrl+N", ""},
+    {"", "O", ""},
+    {"", "Ctrl+O", "Open/load session/data"},
+    {"", "P", ""},
+    {"", "Ctrl+P", ""},
+    {"", "Q", ""},
+    {"", "Ctrl+Q", ""},
+    {"", "R", "camera Right"},
+    {"", "Ctrl+R", ""},
+    {"", "S", ""},
+    {"", "Ctrl+S", ""},
+    {"", "Ctrl+Shift+S", ""},
+    {"", "T", "camera Top"},
+    {"", "Ctrl+T", ""},
+    {"", "U", "camera bottom (Under)"},
+    {"", "Ctrl+U", ""},
+    {"", "V", ""},
+    {"", "Ctrl+V", ""},
+    {"", "W", ""},
+    {"", "Ctrl+W", ""},
+    {"", "X", "show aXes"},
+    {"", "Ctrl+X", ""},
+    {"", "Y", ""},
+    {"", "Ctrl+Y", ""},
+    {"", "Z", "camera reset"},
+    {"", "Ctrl+Z", ""},
+    {"", "1-9", "point size"},
+    {"Special keys", "Up arrow", ""},
+    {"", "Shift + up arrow", "camera translate Up"},
+    {"", "Ctrl + up arrow", ""},
+    {"", "Down arrow", ""},
+    {"", "Shift + down arrow", "camera translate Down"},
+    {"", "Ctrl + down arrow", ""},
+    {"", "Left arrow", ""},
+    {"", "Shift + left arrow", "camera translate Left"},
+    {"", "Ctrl + left arrow", ""},
+    {"", "Right arrow", ""},
+    {"", "Shift + right arrow", "camera translate Right"},
+    {"", "Ctrl + right arrow", ""},
+    {"", "Pg down", ""},
+    {"", "Pg up", ""},
+    {"", "- key", ""},
+    {"", "+ key", ""},
+    {"Mouse related", "Left click + drag", "camera rotate"},
+    {"", "Right click + drag", "camera pan"},
+    {"", "Scroll", "camera zoom"},
+    {"", "Shift + scroll", "camera 5x zoom"},
+    {"", "Ctrl + left click", ""},
+    {"", "Ctrl + right click", "change center of rotation"},
+    {"", "Ctrl + middle click", "change center of rotation (if no CP GUI active)"}
+};
+
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 std::string truncPath(const std::string& fullPath)
@@ -106,6 +196,31 @@ void wheel(int button, int dir, int x, int y)
 
         mouse_sensitivity = fabs(translate_z) / 100; //1 for translate_z 50 (default zoom)
         camera_transition_active = false;
+
+        if (scroll_hint_enabled)
+        {
+            if (!scroll_hint_active)
+            {
+                scroll_hint_accu += fabs(dir);
+
+                if (scroll_hint_accu > 30.0f)  // tweak threshold
+                {
+                    scroll_hint_accu = 0.0f;
+                    scroll_hint_active = true;
+                    scroll_hint_count++;
+                }
+            }
+            
+			if (scroll_hint_active)
+                scroll_hint_lastT = ImGui::GetTime();
+                
+            //Reset and disable hint if Shift is pressed while scrolling
+            if (io.KeyShift || scroll_hint_count > 3)
+            {
+                scroll_hint_active = false;
+                scroll_hint_enabled = false;
+            }
+		}
     }
 }
 
@@ -260,6 +375,7 @@ void setCameraPreset(CameraPreset preset)
         camera_mode_ortho_z_center_h = 0.0;
 
         viewer_decimate_point_cloud = 1000;
+        triggered = false;
         break;
     }
 
@@ -354,6 +470,20 @@ void camMenu()
         ImGui::Text("Mouse sensitivity: %.4f", mouse_sensitivity);
 
         ImGui::EndTooltip();
+    }
+
+    if (scroll_hint_active)
+    {
+        ImVec2 mousePos = ImGui::GetMousePos();
+        ImGui::SetNextWindowPos(ImVec2(mousePos.x + 20, mousePos.y - 40));
+        ImGui::SetNextWindowBgAlpha(0.7f);
+        ImGui::BeginTooltip();
+        ImGui::Text("Tip: To accelerate hold Shift + scroll");
+        ImGui::EndTooltip();
+
+        // Reset accumulated scroll if user stops scrolling
+        if (ImGui::GetTime() - scroll_hint_lastT > 1)
+            scroll_hint_active = false;
     }
 }
 
@@ -503,12 +633,66 @@ void ImGuiHyperlink(const char* url, ImVec4 color)
 
 
 
-void info_window(const std::vector<std::string>& infoLines, bool* open)
+void ShowShortcutsTable(const std::vector<ShortcutEntry> appShortcuts)
+{
+    if (ImGui::BeginTable("ShortcutsTable", 2,
+        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY, ImVec2(-FLT_MIN, 200)))
+    {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthFixed, 120);
+        ImGui::TableSetupColumn("Description");
+        ImGui::TableHeadersRow();
+
+        std::string lastType;
+
+        for (size_t i = 0; i < shortcuts.size(); ++i)
+        {
+            const auto& s = shortcuts[i];
+
+            // Insert a "fake" type row when type changes
+            if (!s.type.empty() && s.type != lastType)
+            {
+                lastType = s.type;
+                ImGui::TableNextRow();
+
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32(70, 70, 140, 255));
+
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "%s", lastType.c_str());
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextUnformatted("");
+            }
+
+            auto description = s.description;
+
+            if (description.empty())
+                description = appShortcuts[i].description;
+
+            if (!description.empty())
+            {
+                // Normal row
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextUnformatted(s.shortcut.c_str());
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextUnformatted(description.c_str());
+            }
+
+        }
+
+        ImGui::EndTable();
+    }
+}
+
+
+
+void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts, bool* open)
 {
     if (!open || !*open) return;
 
     if (ImGui::Begin("Info", open, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
     {
+        bool firstLine = true;
         for (const auto& line : infoLines)
         {
             if (line.empty())
@@ -517,6 +701,15 @@ void info_window(const std::vector<std::string>& infoLines, bool* open)
                 ImGuiHyperlink(line.c_str());
             else
                 ImGui::Text(line.c_str());
+
+            if (firstLine)
+            {
+                ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("ImGui").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
+                if (ImGui::Button("ImGui"))
+                    show_about = true;
+                
+                firstLine = false;
+            }
         }
 
         ImGui::NewLine();
@@ -527,6 +720,15 @@ void info_window(const std::vector<std::string>& infoLines, bool* open)
         ImGui::Text("Project page: ");
         ImGui::SameLine();
         ImGuiHyperlink("https://github.com/MapsHD/HDMapping");
+
+        ImGui::NewLine();
+		ImGui::Separator();
+        ImGui::NewLine();
+
+        ShowShortcutsTable(appShortcuts);
+
+        if (show_about)
+            ImGui::ShowAboutWindow(&show_about);
 
         ImGui::End();
     }

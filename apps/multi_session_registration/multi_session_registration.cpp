@@ -2723,7 +2723,7 @@ void project_gui()
         ImGui::Text("Benchmark settings:");
 
         ImGui::SetNextItemWidth(ImGuiNumberWidth * 2);
-        ImGui::InputDouble("Timestamp offset ", &time_stamp_offset, 100000000000.0, 1000000000000.0);
+        ImGui::InputDouble("Timestamp offset ", &time_stamp_offset, 100000000.0, 1000000000.0);
         ImGui::SameLine();
         if (ImGui::Button("Set to origin"))
         {
@@ -3245,14 +3245,14 @@ void display()
 
                     auto v1 = (m1 * m2).translation();
 
-                    glVertex3f(v1.x() - 0.1, v1.y(), v1.z());
-                    glVertex3f(v1.x() + 0.1, v1.y(), v1.z());
+                    glVertex3f(v1.x() - 1.0, v1.y(), v1.z());
+                    glVertex3f(v1.x() + 1.0, v1.y(), v1.z());
 
-                    glVertex3f(v1.x(), v1.y() - 0.1, v1.z());
-                    glVertex3f(v1.x(), v1.y() + 0.1, v1.z());
+                    glVertex3f(v1.x(), v1.y() - 1.0, v1.z());
+                    glVertex3f(v1.x(), v1.y() + 1.0, v1.z());
 
-                    glVertex3f(v1.x(), v1.y(), v1.z() - 0.1);
-                    glVertex3f(v1.x(), v1.y(), v1.z() + 0.1);
+                    glVertex3f(v1.x(), v1.y(), v1.z() - 1.0);
+                    glVertex3f(v1.x(), v1.y(), v1.z() + 1.0);
 
                     glEnd();
                 }

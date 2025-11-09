@@ -1719,6 +1719,12 @@ void display()
                     }
                 }
 
+                ImGui::Text("----------- ablation study -----------");
+                ImGui::Checkbox("use_planarity", &params.ablation_study_use_planarity);
+                ImGui::Checkbox("use_norm", &params.ablation_study_use_norm);
+                ImGui::Checkbox("use_hierarchical_rgd", &params.ablation_study_use_hierarchical_rgd);
+                ImGui::Checkbox("use_view_point_and_normal_vectors", &params.ablation_study_use_view_point_and_normal_vectors);
+               
                 ImGui::EndMenu();
             }
             if (ImGui::IsItemHovered())

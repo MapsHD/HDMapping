@@ -539,7 +539,11 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
                                         params.lidar_odometry_motion_model_fix_origin_z_1_sigma_m,
                                         params.lidar_odometry_motion_model_fix_origin_om_1_sigma_deg,
                                         params.lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg,
-                                        params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
+                                        params.lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg,
+                                        params.ablation_study_use_planarity,
+                                        params.ablation_study_use_norm,
+                                        params.ablation_study_use_hierarchical_rgd,
+                                        params.ablation_study_use_view_point_and_normal_vectors);
             }
 
             end1 = std::chrono::system_clock::now();

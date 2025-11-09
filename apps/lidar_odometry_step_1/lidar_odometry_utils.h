@@ -137,6 +137,12 @@ struct LidarOdometryParams
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     bool use_removie_imu_bias_from_first_stationary_scan = false;
+
+    //ablation study
+    bool ablation_study_use_planarity = true;
+    bool ablation_study_use_norm = true;
+    bool ablation_study_use_hierarchical_rgd = true;
+    bool ablation_study_use_view_point_and_normal_vectors = true;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);
@@ -197,7 +203,11 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points, std::ve
                              double lidar_odometry_motion_model_fix_origin_z_1_sigma_m,
                              double lidar_odometry_motion_model_fix_origin_om_1_sigma_deg,
                              double lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg,
-                             double lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
+                             double lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg,
+                             bool ablation_study_use_planarity,
+                             bool ablation_study_use_norm,
+                             bool ablation_study_use_hierarchical_rgd,
+                             bool ablation_study_use_view_point_and_normal_vectors);
 
 void optimize_sf(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,
                  std::vector<Eigen::Affine3d> &intermediate_trajectory_motion_model,

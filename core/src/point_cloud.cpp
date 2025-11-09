@@ -1416,7 +1416,7 @@ void PointCloud::shift_to_center()
 }
 
 #if WITH_GUI == 1
-void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud, bool xz_intersection, bool yz_intersection,
+void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decimate_point_cloud, bool xz_intersection, bool yz_intersection,
 						bool xy_intersection, double intersection_width)
 {
 	// std::cout << (int)xz_grid_10x10 << std::endl;
@@ -1433,7 +1433,7 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 		// std::cout << this->colors.size() << " " << this->points_local.size() << std::endl;
 
 		glBegin(GL_POINTS);
-		for (int i = 0; i < this->points_local.size(); i += viewer_decmiate_point_cloud)
+		for (int i = 0; i < this->points_local.size(); i += viewer_decimate_point_cloud)
 		{
 			const auto &p = this->points_local[i];
 			Eigen::Vector3d vp;
@@ -1641,7 +1641,7 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 	}
 }
 
-void PointCloud::render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud)
+void PointCloud::render(Eigen::Affine3d pose, int viewer_decimate_point_cloud)
 {
 	if (this->visible)
 	{
@@ -1649,7 +1649,7 @@ void PointCloud::render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud)
 		glPointSize(point_size);
 		glBegin(GL_POINTS);
 
-		for (int i = 0; i < this->points_local.size(); i += viewer_decmiate_point_cloud)
+		for (int i = 0; i < this->points_local.size(); i += viewer_decimate_point_cloud)
 		{
 			const auto &p = this->points_local[i];
 			Eigen::Vector3d vp;

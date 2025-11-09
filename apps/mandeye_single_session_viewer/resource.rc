@@ -1,6 +1,6 @@
 // Microsoft Visual C++ generated resource script.
 //
-#include "resourceA.h"
+#include "resource.h"
 /////////////////////////////////////////////////////////////////////////////
 // English (United States) resources
 
@@ -11,7 +11,7 @@
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_ICON1               ICON                    "iconA.ico"
+IDI_ICON1               ICON                    "icon.ico"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -31,11 +31,11 @@ BEGIN
         BLOCK "040904B0"
         BEGIN
             VALUE "CompanyName", "Mandeye\0"
-            VALUE "FileDescription", "HDMapping MR Calibration\0"
+            VALUE "FileDescription", "HDMapping Session Viewer\0"
             VALUE "FileVersion", "0.8.9\0"
-            VALUE "InternalName", "Mission Recorder Calibration\0"
+            VALUE "InternalName", "Single session viewer\0"
             VALUE "LegalCopyright", "(c) 2025 github.com/MapsHD/HDMapping\0"
-            VALUE "OriginalFilename", "mandeye_mission_recorder_calibration.exe\0"
+            VALUE "OriginalFilename", "mandeye_single_session_viewer.exe\0"
             VALUE "ProductVersion", "0.8.9\0"
             VALUE "ProgramID", "github.com/MapsHD/HDMapping\0"
             VALUE "ProductName", "HDMapping\0"

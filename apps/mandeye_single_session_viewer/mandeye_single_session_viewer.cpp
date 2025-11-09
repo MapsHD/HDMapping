@@ -27,8 +27,10 @@
 #ifdef _WIN32
     #include <windows.h>
     #include <shellapi.h>  // <-- Required for ShellExecuteA
-    #include "../../resources/resourceV.h"
+    #include "resource.h"
 #endif
+
+///////////////////////////////////////////////////////////////////////////////////
 
 std::string winTitle = std::string("Single session viewer ") + HDMAPPING_VERSION_STRING;
 
@@ -142,82 +144,7 @@ bool show_neighbouring_scans = false;
 
 Session session;
 
-void reshape(int w, int h)
-{
-    glViewport(0, 0, (GLsizei)w, (GLsizei)h);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    if (!is_ortho)
-    {
-        gluPerspective(60.0, (GLfloat)w / (GLfloat)h, 0.01, 10000.0);
-    }
-    else
-    {
-        ImGuiIO &io = ImGui::GetIO();
-        float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
-        // glOrtho(-translate_z, translate_z, -translate_z * (float)h / float(w), translate_z * float(h) / float(w), -10000, 10000);
-    }
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-}
-
-void motion(int x, int y)
-{
-    ImGuiIO &io = ImGui::GetIO();
-    io.MousePos = ImVec2((float)x, (float)y);
-
-    if (!io.WantCaptureMouse)
-    {
-        float dx, dy;
-        dx = (float)(x - mouse_old_x);
-        dy = (float)(y - mouse_old_y);
-
-        if (is_ortho)
-        {
-            if (mouse_buttons & 1)
-            {
-                float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-                Eigen::Vector3d v(dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
-                                  dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio), 0);
-                TaitBryanPose pose_tb;
-                pose_tb.px = 0.0;
-                pose_tb.py = 0.0;
-                pose_tb.pz = 0.0;
-                pose_tb.om = 0.0;
-                pose_tb.fi = 0.0;
-                pose_tb.ka = camera_ortho_xy_view_rotation_angle_deg * M_PI / 180.0;
-                auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
-                Eigen::Vector3d v_t = m * v;
-                camera_ortho_xy_view_shift_x += v_t.x();
-                camera_ortho_xy_view_shift_y += v_t.y();
-            }
-        }
-        else
-        {
-            gui_mouse_down = mouse_buttons > 0;
-            if (mouse_buttons & 1)
-            {
-                rotate_x += dy * 0.2f; // * mouse_sensitivity;
-                rotate_y += dx * 0.2f; // * mouse_sensitivity;
-                camera_transition_active = false;
-            }
-            if (mouse_buttons & 4)
-            {
-                translate_x += dx * 0.05f * mouse_sensitivity;
-                translate_y -= dy * 0.05f * mouse_sensitivity;
-                camera_transition_active = false;
-            }
-        }
-
-        mouse_old_x = x;
-        mouse_old_y = y;
-    }
-    glutPostRedisplay();
-}
+///////////////////////////////////////////////////////////////////////////////////
 
 void openSession()
 {
@@ -353,41 +280,7 @@ void display()
         glLoadIdentity();
     }
 
-    if (ImGui::GetIO().KeyCtrl)
-    {
-        glBegin(GL_LINES);
-        glColor3f(1.f, 1.f, 1.f);
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x() + 1.f, rotation_center.y(), rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x() - 1.f, rotation_center.y(), rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y() - 1.f, rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y() + 1.f, rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() - 1.f);
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() + 1.f);
-        glEnd();
-    }
-
-    if (show_axes)
-    {
-        glBegin(GL_LINES);
-        glColor3f(1.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(1, 0.0f, 0.0f);
-
-        glColor3f(0.0f, 1.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 1, 0.0f);
-
-        glColor3f(0.0f, 0.0f, 1.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 1);
-        glEnd();
-    }
+    showAxes();
 
     if (index_rendered_points_local >= 0 && index_rendered_points_local < session.point_clouds_container.point_clouds[index_rendered_points_local].points_local.size())
     {
@@ -395,9 +288,7 @@ void display()
         for (int i = 0; i < session.point_clouds_container.point_clouds[index_rendered_points_local].intensities.size(); i++)
         {
             if (session.point_clouds_container.point_clouds[index_rendered_points_local].intensities[i] > max_intensity)
-            {
                 max_intensity = session.point_clouds_container.point_clouds[index_rendered_points_local].intensities[i];
-            }
         }
 
         Eigen::Affine3d pose = session.point_clouds_container.point_clouds[index_rendered_points_local].m_pose;
@@ -543,15 +434,14 @@ void display()
             {
                 ImGui::BeginTooltip();
                 ImGui::Text(session.point_clouds_container.point_clouds[index_rendered_points_local].file_name.c_str());
-                double ts = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps[0] / 1e9;
-                ImGui::Text((std::string("Timestamp: ") + std::to_string(ts)).c_str());
+                double ts = (session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps[0]
+                           - session.point_clouds_container.point_clouds[0].timestamps[0]) / 1e9;
+                ImGui::Text("Delta 1st points timestamp [s]: %.6f", ts);
                 ImGui::EndTooltip();
             }
 
             if ((tempIndex >= 0) && (tempIndex < session.point_clouds_container.point_clouds.size()))
-            {
                 index_rendered_points_local = tempIndex;
-            }
         }
 
         ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
@@ -584,47 +474,6 @@ void display()
     glutPostRedisplay();
 }
 
-bool initGL(int *argc, char **argv)
-{
-    glutInit(argc, argv);
-    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
-    glutInitWindowSize(window_width, window_height);
-    glutCreateWindow(winTitle.c_str());
-
-    #ifdef _WIN32
-        HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
-        HINSTANCE hInstance = GetModuleHandle(NULL);
-        SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
-        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
-    #endif
-
-    glutDisplayFunc(display);
-    glutMotionFunc(motion);
-
-    // default initialization
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glEnable(GL_DEPTH_TEST);
-
-    // viewport
-    glViewport(0, 0, window_width, window_height);
-
-    // projection
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01, 10000.0);
-    glutReshapeFunc(reshape);
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-
-    ImGui::StyleColorsDark();
-    ImGui_ImplGLUT_Init();
-    ImGui_ImplGLUT_InstallFuncs();
-    ImGui_ImplOpenGL2_Init();
-    return true;
-}
-
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -643,26 +492,19 @@ void mouse(int glut_button, int state, int x, int y)
         io.MouseDown[button] = false;
 
     static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
-    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
-        glutMajorVersion < 3)
-    {
+    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) && glutMajorVersion < 3)
         wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
-    }
 
     if (!io.WantCaptureMouse)
     {
-        if (glut_button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN && io.KeyCtrl)
-        {
-        }
+        if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_RIGHT_BUTTON) && state == GLUT_DOWN && io.KeyCtrl)
+            setNewRotationCenter(x, y);
 
         if (state == GLUT_DOWN)
-        {
             mouse_buttons |= 1 << glut_button;
-        }
         else if (state == GLUT_UP)
-        {
             mouse_buttons = 0;
-        }
+
         mouse_old_x = x;
         mouse_old_y = y;
     }
@@ -670,18 +512,29 @@ void mouse(int glut_button, int state, int x, int y)
 
 int main(int argc, char *argv[])
 {
-    initGL(&argc, argv);
-    glutDisplayFunc(display);
-    glutMouseFunc(mouse);
-    glutMotionFunc(motion);
-    glutMouseWheelFunc(wheel);
-    glutSpecialFunc(specialDown);
-    glutSpecialUpFunc(specialUp);
-    glutMainLoop();
+    try
+    {
+        initGL(&argc, argv, winTitle, display, mouse);
 
-    ImGui_ImplOpenGL2_Shutdown();
-    ImGui_ImplGLUT_Shutdown();
+        glutMainLoop();
 
-    ImGui::DestroyContext();
+        ImGui_ImplOpenGL2_Shutdown();
+        ImGui_ImplGLUT_Shutdown();
+        ImGui::DestroyContext();
+    }
+    catch (const std::bad_alloc& e)
+    {
+        std::cerr << "System is out of memory : " << e.what() << std::endl;
+        mandeye::fd::OutOfMemMessage();
+    }
+    catch (const std::exception& e)
+    {
+        std::cout << e.what();
+    }
+    catch (...)
+    {
+        std::cerr << "Unknown fatal error occurred." << std::endl;
+    }
+
     return 0;
 }

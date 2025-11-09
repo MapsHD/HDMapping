@@ -1,5 +1,8 @@
 #include "utils.hpp"
-#include <GL/glut.h>
+#include <imgui_impl_glut.h>
+#include <imgui_impl_opengl2.h>
+//#include <GL/glut.h>
+#include <GL/freeglut.h>
 #include <cmath>
 #include <cstdio>
 #include <iostream>
@@ -7,7 +10,7 @@
 #include <filesystem>
 
 #ifdef _WIN32
-//#include <windows.h>
+#include <windows.h>
 #include <shellapi.h>
 #endif
 
@@ -16,7 +19,6 @@
 int viewer_decimate_point_cloud = 1000;
 
 int mouse_old_x, mouse_old_y;
-bool gui_mouse_down = false;
 int mouse_buttons = 0;
 float mouse_sensitivity = 1.0;
 
@@ -224,6 +226,84 @@ void wheel(int button, int dir, int x, int y)
     }
 }
 
+void reshape(int w, int h)
+{
+    glViewport(0, 0, (GLsizei)w, (GLsizei)h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    if (!is_ortho)
+    {
+        gluPerspective(60.0, (GLfloat)w / (GLfloat)h, 0.01, 10000.0);
+    }
+    else
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+
+        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+        // glOrtho(-translate_z, translate_z, -translate_z * (float)h / float(w), translate_z * float(h) / float(w), -10000, 10000);
+    }
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+}
+
+void motion(int x, int y)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.MousePos = ImVec2((float)x, (float)y);
+
+    if (!io.WantCaptureMouse)
+    {
+        float dx, dy;
+        dx = (float)(x - mouse_old_x);
+        dy = (float)(y - mouse_old_y);
+
+        if (is_ortho)
+        {
+            if (mouse_buttons & 1)
+            {
+                float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+                Eigen::Vector3d v(dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
+                    dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio), 0);
+                TaitBryanPose pose_tb;
+                pose_tb.px = 0.0;
+                pose_tb.py = 0.0;
+                pose_tb.pz = 0.0;
+                pose_tb.om = 0.0;
+                pose_tb.fi = 0.0;
+                pose_tb.ka = camera_ortho_xy_view_rotation_angle_deg * M_PI / 180.0;
+                auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
+                Eigen::Vector3d v_t = m * v;
+                camera_ortho_xy_view_shift_x += v_t.x();
+                camera_ortho_xy_view_shift_y += v_t.y();
+            }
+        }
+        else
+        {
+            if (mouse_buttons & 1) //left button
+            {
+                rotate_x += dy * 0.2f; // * mouse_sensitivity;
+                rotate_y += dx * 0.2f; // * mouse_sensitivity;
+                breakCameraTransition();
+                //camera_transition_active = false;
+            }
+            if (mouse_buttons & 4) //right button
+            {
+                translate_x += dx * 0.1f * mouse_sensitivity;
+                translate_y -= dy * 0.1f * mouse_sensitivity;
+                breakCameraTransition();
+                //camera_transition_active = false;
+            }
+        }
+
+        mouse_old_x = x;
+        mouse_old_y = y;
+    }
+    glutPostRedisplay();
+}
+
 //SpecialKeys handlers needed because of ImGui version <1.89 bug in handling keys
 void specialDown(int key, int x, int y)
 {
@@ -263,7 +343,97 @@ void specialUp(int key, int x, int y)
     io.KeyAlt = (mods & GLUT_ACTIVE_ALT) != 0;
 }
 
+bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)(), void (*mouse)(int, int, int, int))
+{
+    glutInit(argc, argv);
+    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
+    glutInitWindowSize(window_width, window_height);
+    if (glutCreateWindow(winTitle.c_str()) <= 0)
+        return false; // window creation failed
 
+#ifdef _WIN32
+    HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
+    if (!hwnd)
+		return false; //couldn't find window handle
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+    SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+    SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
+#endif
+
+    while (glGetError() != GL_NO_ERROR) {} // Clear any existing GL errors from platform or driver init
+
+    // default initialization
+    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glEnable(GL_DEPTH_TEST);
+
+    // viewport
+    glViewport(0, 0, window_width, window_height);
+
+    // projection
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01, 10000.0);
+    glutReshapeFunc(reshape);
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    (void)io;
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+
+    ImGui::StyleColorsDark();
+    ImGui_ImplGLUT_Init();
+    ImGui_ImplGLUT_InstallFuncs();
+    ImGui_ImplOpenGL2_Init();
+
+    glutDisplayFunc(display);
+    glutMouseFunc(mouse);
+    glutMotionFunc(motion);
+    glutMouseWheelFunc(wheel);
+    glutSpecialFunc(specialDown);
+    glutSpecialUpFunc(specialUp);
+
+    return (glGetError() == GL_NO_ERROR);
+}
+
+
+
+void showAxes()
+{
+    if (show_axes || ImGui::GetIO().KeyCtrl) //rotation center axes
+    {
+        glBegin(GL_LINES);
+        glColor3f(1.f, 1.f, 1.f);
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x() + 1.f, rotation_center.y(), rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x() - 1.f, rotation_center.y(), rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y() - 1.f, rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y() + 1.f, rotation_center.z());
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() - 1.f);
+        glVertex3fv(rotation_center.data());
+        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() + 1.f);
+        glEnd();
+    }
+
+    if (show_axes || ImGui::GetIO().KeyCtrl) //origin axes
+    {
+        glBegin(GL_LINES);
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glVertex3f(0.0f, 0.0f, 0.0f);
+        glVertex3f(100, 0.0f, 0.0f);
+
+        glColor3f(0.0f, 1.0f, 0.0f);
+        glVertex3f(0.0f, 0.0f, 0.0f);
+        glVertex3f(0.0f, 100, 0.0f);
+
+        glColor3f(0.0f, 0.0f, 1.0f);
+        glVertex3f(0.0f, 0.0f, 0.0f);
+        glVertex3f(0.0f, 0.0f, 100);
+        glEnd();
+    }
+}
 
 void updateCameraTransition()
 {
@@ -274,7 +444,7 @@ void updateCameraTransition()
     //const float t = std::min(deltaTime * camera_transition_speed, 1.0f);
 
     // Ease out curve, slow down effect
-    float t = 1.0f - pow(1.0f - std::min(ImGui::GetIO().DeltaTime * camera_transition_speed, 1.0f), 3.0f);
+    float t = 1.0f - powf(1.0f - std::min(ImGui::GetIO().DeltaTime * camera_transition_speed, 1.0f), 3.0f);
 
     bool doneXrc = fabs(new_rotation_center.x() - rotation_center.x()) < 0.01f;
     bool doneYrc = fabs(new_rotation_center.y() - rotation_center.y()) < 0.01f;

@@ -1897,6 +1897,13 @@ void display()
     glutPostRedisplay();
 }
 
+void on_exit(){
+    // remove cache
+    std::cout << "remove cache: '" << params.working_directory_cache << "' START" << std::endl;
+    std::filesystem::remove_all(params.working_directory_cache);
+    std::cout << "remove cache: '" << params.working_directory_cache << "' FINISHED" << std::endl;
+}
+
 bool initGL(int *argc, char **argv)
 {
     glutInit(argc, argv);
@@ -1914,6 +1921,8 @@ bool initGL(int *argc, char **argv)
     glutDisplayFunc(display);
     glutMotionFunc(motion);
 
+    
+    glutCloseFunc(on_exit);
     // default initialization
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glEnable(GL_DEPTH_TEST);

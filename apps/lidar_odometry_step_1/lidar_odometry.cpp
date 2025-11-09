@@ -707,224 +707,6 @@ void run_consistency(std::vector<WorkerData> &worker_data, LidarOdometryParams &
 
 void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, fs::path outwd, double elapsed_time_s)
 {
-#if 0
-    std::filesystem::create_directory(outwd);
-    // concatenate data
-    std::vector<WorkerData> worker_data_concatenated;
-    WorkerData wd;
-    int counter = 0;
-    int pose_offset = 0;
-    std::vector<int> point_sizes_per_chunk;
-    for (int i = 0; i < worker_data.size(); i++)
-    {
-        if (i % 500 == 0)
-        {
-            printf("\rprocessing worker_data: %d/%d", i + 1, (int)worker_data.size());
-        }
-        auto tmp_data = worker_data[i].original_points;
-        point_sizes_per_chunk.push_back(tmp_data.size());
-        /*// filter data
-        std::vector<Point3Di> filtered_local_point_cloud;
-        for (auto &t : tmp_data)
-        {
-            auto pp = worker_data[i].intermediate_trajectory[t.index_pose].inverse() * t.point;
-            if(pp.norm() > threshould_output_filter){
-                filtered_local_point_cloud.push_back(t);
-            }
-        }
-        tmp_data = filtered_local_point_cloud;*/
-        for (auto &t : tmp_data)
-        {
-            t.index_pose += pose_offset;
-        }
-
-        wd.intermediate_trajectory.insert(std::end(wd.intermediate_trajectory),
-                                          std::begin(worker_data[i].intermediate_trajectory), std::end(worker_data[i].intermediate_trajectory));
-
-        wd.intermediate_trajectory_timestamps.insert(std::end(wd.intermediate_trajectory_timestamps),
-                                                     std::begin(worker_data[i].intermediate_trajectory_timestamps), std::end(worker_data[i].intermediate_trajectory_timestamps));
-
-        wd.original_points.insert(std::end(wd.original_points),
-                                  std::begin(tmp_data), std::end(tmp_data));
-
-        wd.imu_om_fi_ka.insert(std::end(wd.imu_om_fi_ka), std::begin(worker_data[i].imu_om_fi_ka), std::end(worker_data[i].imu_om_fi_ka));
-        pose_offset += worker_data[i].intermediate_trajectory.size();
-
-        counter++;
-        if (counter > 50)
-        {
-            worker_data_concatenated.push_back(wd);
-            wd.intermediate_trajectory.clear();
-            wd.intermediate_trajectory_timestamps.clear();
-            wd.original_points.clear();
-            wd.imu_om_fi_ka.clear();
-
-            counter = 0;
-            pose_offset = 0;
-        }
-    }
-
-    printf("\rprocessing worker_data: %d (done)\n", (int)worker_data.size());
-
-    if (counter > params.min_counter_concatenated_trajectory_nodes)
-    {
-        worker_data_concatenated.push_back(wd);
-    }
-
-    fs::path point_sizes_path = outwd / "point_sizes_per_chunk.json";
-    nlohmann::json j_point_sizes = point_sizes_per_chunk;
-    std::ofstream out_point_sizes(point_sizes_path);
-    if (!out_point_sizes)
-    {
-        std::cerr << "Failed to open " << point_sizes_path << " for writing point sizes per chunk.\n";
-    }
-    else
-    {
-        out_point_sizes << j_point_sizes.dump(2);
-        out_point_sizes.close();
-    }
-
-    std::vector<Eigen::Affine3d> m_poses;
-    std::vector<std::string> file_names;
-    std::vector<std::vector<int>> index_poses;
-    for (int i = 0; i < worker_data_concatenated.size(); i++)
-    {
-        std::cout << "------------------------" << std::endl;
-        fs::path path(outwd);
-        std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
-        path /= filename;
-        //std::cout << "saving to: " << path << std::endl;
-        std::vector<int> index_poses_i;
-
-        std::vector<Eigen::Vector3d> global_pointcloud;
-        std::vector<unsigned short> intensity; 
-        std::vector<double> timestamps;
-        points_to_vector(
-            worker_data_concatenated[i].original_points, worker_data_concatenated[i].intermediate_trajectory,
-            params.threshould_output_filter, &index_poses_i, global_pointcloud, intensity, timestamps, true
-        );
-        exportLaz(path.string(), global_pointcloud, intensity, timestamps);
-        index_poses.push_back(index_poses_i);
-        m_poses.push_back(worker_data_concatenated[i].intermediate_trajectory[0]);
-        file_names.push_back(filename);
-
-        // save trajectory
-        std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
-        fs::path pathtrj(outwd);
-        pathtrj /= trajectory_filename;
-        std::cout << "writing " << pathtrj << std::endl;
-
-        ///
-        std::ofstream outfile;
-        outfile.open(pathtrj);
-        if (!outfile.good())
-        {
-            std::cout << "can not save file: " << pathtrj << std::endl;
-            return;
-        }
-
-        outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 timestampUnix_nanoseconds om_rad fi_rad ka_rad" << std::endl;
-        for (int j = 0; j < worker_data_concatenated[i].intermediate_trajectory.size(); j++)
-        {
-            auto pose = worker_data_concatenated[i].intermediate_trajectory[0].inverse() * worker_data_concatenated[i].intermediate_trajectory[j];
-
-            outfile
-                << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].first * 1e9 << " " << std::setprecision(10)
-                << pose(0, 0) << " "
-                << pose(0, 1) << " "
-                << pose(0, 2) << " "
-                << pose(0, 3) << " "
-                << pose(1, 0) << " "
-                << pose(1, 1) << " "
-                << pose(1, 2) << " "
-                << pose(1, 3) << " "
-                << pose(2, 0) << " "
-                << pose(2, 1) << " "
-                << pose(2, 2) << " "
-                << pose(2, 3) << " "
-                << std::setprecision(20) << worker_data_concatenated[i].intermediate_trajectory_timestamps[j].second * 1e9 << " "
-                << worker_data_concatenated[i].imu_om_fi_ka[j].x() << " "
-                << worker_data_concatenated[i].imu_om_fi_ka[j].y() << " "
-                << worker_data_concatenated[i].imu_om_fi_ka[j].z() << " "
-                << std::endl;
-        }
-        outfile.close();
-        //
-    }
-    fs::path path(outwd);
-    path /= "lio_initial_poses.reg";
-    save_poses(path.string(), m_poses, file_names);
-    fs::path path2(outwd);
-    path2 /= "poses.reg";
-    save_poses(path2.string(), m_poses, file_names);
-
-    fs::path index_poses_path = outwd / "index_poses.json";
-    nlohmann::json j_index_poses = index_poses;
-    std::ofstream out_index(index_poses_path);
-    if (!out_index)
-    {
-        std::cerr << "Failed to open " << index_poses_path << " for writing index poses.\n";
-    }
-    else
-    {
-        out_index << j_index_poses.dump(2);
-        out_index.close();
-    }
-
-    std::cout << "\nfinalizing..\n";
-
-    fs::path path3(outwd);
-    path3 /= "session.json";
-
-    // save session file
-    std::cout << "saving file: '" << path3 << "'" << std::endl;
-
-    nlohmann::json jj;
-    nlohmann::json j;
-
-    j["offset_x"] = 0.0;
-    j["offset_y"] = 0.0;
-    j["offset_z"] = 0.0;
-    j["folder_name"] = outwd;
-    j["out_folder_name"] = outwd;
-    j["poses_file_name"] = path2.string();
-    j["initial_poses_file_name"] = path.string();
-    j["out_poses_file_name"] = path2.string();
-    j["lidar_odometry_version"] = HDMAPPING_VERSION_STRING;
-    j["length of trajectory[m]"] = params.total_length_of_calculated_trajectory;
-    j["elapsed time seconds"] = elapsed_time_s;
-    j["index_poses_path"] = index_poses_path.string();
-    j["point_sizes_path"] = point_sizes_path.string();
-    j["decimation"] = params.decimation;
-    j["threshold_nr_poses"] = params.threshold_nr_poses;
-
-    jj["Session Settings"] = j;
-
-    nlohmann::json jlaz_file_names;
-    for (int i = 0; i < worker_data_concatenated.size(); i++)
-    {
-        fs::path path(outwd);
-        std::string filename = ("scan_lio_" + std::to_string(i) + ".laz");
-        path /= filename;
-        std::cout << "adding file: " << path << std::endl;
-
-        nlohmann::json jfn{
-            {"file_name", path.string()}};
-        jlaz_file_names.push_back(jfn);
-    }
-    jj["laz_file_names"] = jlaz_file_names;
-
-    std::ofstream fs(path3.string());
-    fs << jj.dump(2);
-    fs.close();
-    
-    // Save parameters to TOML file (loadable parameters only)
-    save_parameters_toml(params, outwd, elapsed_time_s);
-    
-    // Save processing results and complex data to JSON file
-    save_processing_results_json(params, outwd, elapsed_time_s);
-#endif
-
     std::filesystem::create_directory(outwd);
     // concatenate data
     std::vector<WorkerData> worker_data_concatenated;
@@ -1184,6 +966,12 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
 
     // Save processing results and complex data to JSON file
     save_processing_results_json(params, outwd, elapsed_time_s);
+
+
+    //remove cache
+    //std::cout << "remove cache: '" << params.working_directory_cache << "' START" << std::endl;
+    //std::filesystem::remove_all(params.working_directory_cache);
+    //std::cout << "remove cache: '" << params.working_directory_cache << "' FINISHED" << std::endl;
 }
 
 void filter_reference_buckets(LidarOdometryParams &params)
@@ -1286,8 +1074,12 @@ std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryP
     if (!compute_step_2(worker_data, params, ts_failure, loProgress, pause, true))
     {
         std::cout << "Calculation failed at step 2 of lidar odometry, exiting." << std::endl;
+
         return worker_data;
     }
+
+   
+
     return worker_data;
 }
 

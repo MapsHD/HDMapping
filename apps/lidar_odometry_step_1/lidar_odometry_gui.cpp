@@ -1656,6 +1656,12 @@ void display()
                 ImGui::MenuItem("Multithread", nullptr, &params.useMultithread);
                 ImGui::PushItemWidth(ImGuiNumberWidth / 2);
                 ImGui::InputDouble("Time threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.1f");
+
+                ImGui::SameLine();
+                if(ImGui::Button("Set real time performance (for IMU 200Hz, 20 nodes in optimization window)")){
+                    params.real_time_threshold_seconds = 0.1;
+                }
+
                 ImGui::PopItemWidth();
                 if (ImGui::IsItemHovered())
                 {

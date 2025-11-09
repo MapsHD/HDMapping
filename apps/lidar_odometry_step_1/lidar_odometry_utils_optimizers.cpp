@@ -1540,7 +1540,6 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
             }
             auto &this_bucket = bucket_it->second;
 
-            // if(buckets[index_of_bucket].number_of_points >= 5){
             const Eigen::Matrix3d &infm = this_bucket.cov.inverse();
             const double threshold = 100000.0;
 

@@ -1906,10 +1906,13 @@ void saveSession()
             std::cerr << "Error copying poses file: " << e.what() << '\n';
         }
     }
+
+    return;
 }
 
 void saveSubsession()
 {
+    std::cout << "saveSubsession: 1 " << std::endl;
     int inx_begin = 0;
     int inx_end = 0;
 
@@ -1920,6 +1923,7 @@ void saveSubsession()
         }
     }
 
+    std::cout << "saveSubsession: 2 " << std::endl;
     for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
     {
         if (session.point_clouds_container.point_clouds[i].visible)
@@ -1928,6 +1932,7 @@ void saveSubsession()
         }
     }
 
+    std::cout << "saveSubsession: 3 " << std::endl;
     // creating filename proposal based on current selection
     fs::path path(session_file_name);
     // Extract parts
@@ -1939,8 +1944,10 @@ void saveSubsession()
     // Build new name
     std::string indexed_file_name = (dir / (stem + indexpart + ext)).string();
 
+    std::cout << "saveSubsession: 4 " << std::endl;
     const auto output_file_name = mandeye::fd::SaveFileDialog("Save subsession", mandeye::fd::Session_filter, ".mjs", indexed_file_name);
 
+    std::cout << "saveSubsession: 5 " << std::endl;
     if (output_file_name.size() > 0)
     {
         std::cout << "Subsession file to save: '" << output_file_name << "'" << std::endl;
@@ -1957,6 +1964,7 @@ void saveSubsession()
         session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), true);
 
         try {
+            std::cout << "saveSubsession: 6 " << std::endl;
             fs::copy_file(poses_file_name, initial_poses_file_name, fs::copy_options::overwrite_existing);
         }
         catch (const fs::filesystem_error& e) {
@@ -1965,6 +1973,10 @@ void saveSubsession()
     }else{
         std::cout << "saving canceled" << std::endl;
     }
+
+    std::cout << "saveSubsession: 7 " << std::endl;
+
+    return;
 }
 
 void display()

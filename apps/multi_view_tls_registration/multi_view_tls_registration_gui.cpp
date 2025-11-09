@@ -1831,7 +1831,10 @@ void openSession()
 
 void saveSession()
 {
+    std::cout << "saveSession: 1 " << std::endl;
     const auto output_file_name = mandeye::fd::SaveFileDialog("Save session as", mandeye::fd::Session_filter, ".json", session_file_name);
+
+    std::cout << "saveSession: 2 '" << output_file_name << "'" <<  std::endl;
 
     if (output_file_name.size() > 0)
     {
@@ -1906,6 +1909,8 @@ void saveSession()
             std::cerr << "Error copying poses file: " << e.what() << '\n';
         }
     }
+
+    std::cout << "saveSession: 3 " << std::endl;
 
     return;
 }

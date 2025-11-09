@@ -2192,9 +2192,11 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             std::chrono::time_point<std::chrono::system_clock> start, end;
             start = std::chrono::system_clock::now();
 
+            int iter_end = 0;
+            
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
-
+                iter_end = iter;
                 delta = 100000.0;
                 optimize_lidar_odometry(intermediate_points, worker_data[i].intermediate_trajectory, worker_data[i].intermediate_trajectory_motion_model,
                                         params.in_out_params_indoor, params.buckets_indoor,
@@ -2220,7 +2222,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                                         params.ablation_study_use_view_point_and_normal_vectors);
                 if (delta < 1e-12)
                 {
-                    std::cout << "finished at iteration " << iter + 1 << "/" << params.nr_iter;
+                    //std::cout << "finished at iteration " << iter + 1 << "/" << params.nr_iter;
                     break;
                 }
 
@@ -2246,6 +2248,9 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             end1 = std::chrono::system_clock::now();
 
             std::chrono::duration<double> elapsed_seconds1 = end1 - start1;
+            
+            std::cout << "finished at iteration " << iter_end + 1 << "/" << params.nr_iter;
+
             std::cout << " optimizing worker_data " << i + 1 << "/" << worker_data.size()
                       << " with acc_distance " << fixed << std::setprecision(2) << acc_distance << "[m] in "
                       << fixed << std::setprecision(2) << elapsed_seconds1.count()

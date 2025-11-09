@@ -62,14 +62,8 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         initial_poses_file_name = pathUpdater(project_settings_json["initial_poses_file_name"], directory);
         std::cout << "!!" << initial_poses_file_name << std::endl;
         out_poses_file_name = pathUpdater(project_settings_json["out_poses_file_name"], directory);
-        if (project_settings_json.contains("ground_truth"))
-        {
-            is_ground_truth = project_settings_json["ground_truth"];
-        }
-        else
-        {
-            is_ground_truth = false;
-        }
+
+        is_ground_truth = project_settings_json.value("ground_truth", false);
 
         for (const auto &edge_json : data["loop_closure_edges"])
         {
@@ -99,79 +93,16 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
 
         for (const auto &fn_json : data["laz_file_names"])
         {
-            std::string fn = pathUpdater(fn_json["file_name"], directory);
-        
-            if (fn_json.contains("fixed_x")){
-                bool fixed_x = fn_json["fixed_x"];
-                vfixed_x.push_back(fixed_x);
-            }else{
-                vfixed_x.push_back(false);
-            }
-                
-            if (fn_json.contains("fixed_y")){
-                bool fixed_y = fn_json["fixed_y"];
-                vfixed_y.push_back(fixed_y);
-            }else{
-                vfixed_y.push_back(false);
-            }
-
-            if (fn_json.contains("fixed_z"))
-            {
-                bool fixed_z = fn_json["fixed_z"];
-                vfixed_z.push_back(fixed_z);
-            }
-            else
-            {
-                vfixed_z.push_back(false);
-            }
-
-            if (fn_json.contains("fixed_om"))
-            {
-                bool fixed_om = fn_json["fixed_om"];
-                vfixed_om.push_back(fixed_om);
-            }
-            else
-            {
-                vfixed_om.push_back(false);
-            }
-
-            if (fn_json.contains("fixed_fi"))
-            {
-                bool fixed_fi = fn_json["fixed_fi"];
-                vfixed_fi.push_back(fixed_fi);
-            }
-            else
-            {
-                vfixed_fi.push_back(false);
-            }
-
-            if (fn_json.contains("fixed_ka"))
-            {
-                bool fixed_ka = fn_json["fixed_ka"];
-                vfixed_ka.push_back(fixed_ka);
-            }
-            else
-            {
-                vfixed_ka.push_back(false);
-            }
-
-            if (fn_json.contains("fuse_inclination_from_IMU"))
-            {
-                bool fuse_inclination_from_IMU = fn_json["fuse_inclination_from_IMU"];
-                vfuse_inclination_from_IMU.push_back(fuse_inclination_from_IMU);
-            }
-            else
-            {
-                vfuse_inclination_from_IMU.push_back(false);
-            }
-
-            //bool fixed_y = fn_json["fixed_y"];
-           // bool fixed_z = fn_json["fixed_z"];
-           // bool fixed_om = fn_json["fixed_om"];
-           // bool fixed_fi = fn_json["fixed_fi"];
-            //bool fixed_ka = fn_json["fixed_ka"];
-
+            const std::string fn = pathUpdater(fn_json["file_name"], directory);
             laz_file_names.push_back(fn);
+        
+            vfixed_x.push_back(fn_json.value("fixed_x", false));
+            vfixed_y.push_back(fn_json.value("fixed_y", false));
+            vfixed_z.push_back(fn_json.value("fixed_z", false));
+            vfixed_om.push_back(fn_json.value("fixed_om", false));
+            vfixed_fi.push_back(fn_json.value("fixed_fi", false));
+            vfixed_ka.push_back(fn_json.value("fixed_ka", false));
+            vfuse_inclination_from_IMU.push_back(fn_json.value("fuse_inclination_from_IMU", false));
         }
 
         std::cout << "Loaded: "
@@ -186,31 +117,31 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         std::cout << "Out_poses_file_name: '" << out_poses_file_name << "'\n";
 
         if (!loop_closure_edges.empty()) {
-            std::cout << "------loop closure edges-----" << std::endl;
+            std::cout << "Loop closure edges:" << std::endl;
 
             for (const auto& edge : loop_closure_edges)
             {
                 std::cout << "<<<<<<<<<<<<<<<<<<<" << std::endl;
-                std::cout << "index_from: " << edge.index_from << std::endl;
-                std::cout << "index_to: " << edge.index_to << std::endl;
-                std::cout << "is_fixed_fi: " << edge.is_fixed_fi << std::endl;
-                std::cout << "is_fixed_ka: " << edge.is_fixed_ka << std::endl;
-                std::cout << "is_fixed_om: " << edge.is_fixed_om << std::endl;
-                std::cout << "is_fixed_px: " << edge.is_fixed_px << std::endl;
-                std::cout << "is_fixed_py: " << edge.is_fixed_py << std::endl;
-                std::cout << "is_fixed_pz: " << edge.is_fixed_pz << std::endl;
-                std::cout << "relative_pose_tb.fi: " << edge.relative_pose_tb.fi << std::endl;
-                std::cout << "relative_pose_tb.ka: " << edge.relative_pose_tb.ka << std::endl;
-                std::cout << "relative_pose_tb.om: " << edge.relative_pose_tb.om << std::endl;
-                std::cout << "relative_pose_tb.px: " << edge.relative_pose_tb.px << std::endl;
-                std::cout << "relative_pose_tb.py: " << edge.relative_pose_tb.py << std::endl;
-                std::cout << "relative_pose_tb.pz: " << edge.relative_pose_tb.pz << std::endl;
-                std::cout << "relative_pose_tb_weights.fi: " << edge.relative_pose_tb_weights.fi << std::endl;
-                std::cout << "relative_pose_tb_weights.ka: " << edge.relative_pose_tb_weights.ka << std::endl;
-                std::cout << "relative_pose_tb_weights.om: " << edge.relative_pose_tb_weights.om << std::endl;
-                std::cout << "relative_pose_tb_weights.px: " << edge.relative_pose_tb_weights.px << std::endl;
-                std::cout << "relative_pose_tb_weights.py: " << edge.relative_pose_tb_weights.py << std::endl;
-                std::cout << "relative_pose_tb_weights.pz: " << edge.relative_pose_tb_weights.pz << std::endl;
+                std::cout << "index_from: " << edge.index_from
+                          << ", index_to: " << edge.index_to << std::endl;
+                std::cout << "is_fixed fi: " << edge.is_fixed_fi
+                          << ", ka: " << edge.is_fixed_ka
+                          << ", om: " << edge.is_fixed_om << std::endl;
+                std::cout << "is_fixed px: " << edge.is_fixed_px
+                          << ", py: " << edge.is_fixed_py
+                          << ", pz: " << edge.is_fixed_pz << std::endl;
+                std::cout << "relative_pose_tb fi: " << edge.relative_pose_tb.fi
+                          << ", ka: " << edge.relative_pose_tb.ka
+                          << ", om: " << edge.relative_pose_tb.om << std::endl;
+                std::cout << "relative_pose_tb px: " << edge.relative_pose_tb.px
+                          << ", py: " << edge.relative_pose_tb.py
+                          << ", pz: " << edge.relative_pose_tb.pz << std::endl;
+                std::cout << "relative_pose_tb_weights fi: " << edge.relative_pose_tb_weights.fi
+                          << ", ka: " << edge.relative_pose_tb_weights.ka
+                          << ", om: " << edge.relative_pose_tb_weights.om << std::endl;
+                std::cout << "relative_pose_tb_weights px: " << edge.relative_pose_tb_weights.px
+                          << ", py: " << edge.relative_pose_tb_weights.py
+                          << ", pz: " << edge.relative_pose_tb_weights.pz << std::endl;
             }
         }
 
@@ -328,7 +259,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
 
         return true;
     }
-    catch (std::exception &e)
+    catch (const std::exception &e)
     {
         std::cout << "can't load session: " << e.what() << std::endl;
         return false;

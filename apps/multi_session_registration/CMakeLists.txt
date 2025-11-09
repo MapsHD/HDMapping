@@ -10,7 +10,7 @@ set(SOURCES
 
 # Windows: add resource file
 if(WIN32)
-    list(APPEND SOURCES ${REPOSITORY_DIRECTORY}/resources/resource3.rc)
+    list(APPEND SOURCES "resource.rc")
 endif()
 
 add_executable(

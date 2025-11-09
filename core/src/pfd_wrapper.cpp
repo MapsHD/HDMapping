@@ -18,12 +18,8 @@ namespace mandeye::fd{
     {
         std::vector<std::string> files;
         static std::shared_ptr<pfd::open_file> open_file;
-        const auto t = [&]() {
-            files = pfd::open_file(title, internal::lastLocationHint, filter, multiselect).result();
-
-        };
-        std::thread th(t);
-        th.join();
+        
+        files = pfd::open_file(title, internal::lastLocationHint, filter, multiselect).result();
 
         if (!files.empty())
         {
@@ -38,55 +34,37 @@ namespace mandeye::fd{
 
   std::string SaveFileDialog(const std::string& title, const std::vector<std::string>& filter, const std::string& defaultExtension, const std::string& defaultFileName)
   {
-      std::cout << "SaveFileDialog 1" << std::endl;
-      
       std::string file;
       static std::shared_ptr<pfd::save_file> save_file;
 
-      std::cout << "SaveFileDialog 2" << std::endl;
       // build default path (directory + suggested filename)
       std::string defaultPath = internal::lastLocationHint;
       if (!defaultFileName.empty()) {
           defaultPath = (std::filesystem::path(internal::lastLocationHint) / defaultFileName).string();
       }
 
-      std::cout << "SaveFileDialog 3" << std::endl;
-
-      //const auto t = [&]() {
-          file = pfd::save_file(title, defaultPath, filter).result();
-      //    };
-      //std::thread th(t);
-      //th.join();
-
-      std::cout << "SaveFileDialog 4" << std::endl;
+      file = pfd::save_file(title, defaultPath, filter).result();
 
       if (file.empty())
 		  return file;
-
-      std::cout << "SaveFileDialog 5" << std::endl;
 
       std::filesystem::path pfile(file);
       if (!pfile.has_extension())
           file += defaultExtension;
 
-      std::cout << "SaveFileDialog 6" << std::endl;
       if (pfile.has_parent_path())
           internal::lastLocationHint = pfile.parent_path().string();
 
-      std::cout << "SaveFileDialog 7" << std::endl;
       return file;
   }
 
     std::string SelectFolder(const std::string& title)
     {
       std::string output_folder_name = "";
-      const auto t = [&]()
-      {
-        output_folder_name = pfd::select_folder(title, internal::lastLocationHint).result();
-        std::cout << "folder: '" << output_folder_name << "'" << std::endl;
-      };
-      std::thread th(t);
-      th.join();
+
+      output_folder_name = pfd::select_folder(title, internal::lastLocationHint).result();
+      std::cout << "folder: '" << output_folder_name << "'" << std::endl;
+
       return output_folder_name;
     }
 

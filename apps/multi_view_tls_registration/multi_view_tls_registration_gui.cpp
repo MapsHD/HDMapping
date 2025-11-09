@@ -50,10 +50,10 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include "../../resources/resource2.h"
+#include "resource.h"
 #endif
 
-
+///////////////////////////////////////////////////////////////////////////////////
 
 #ifdef _WIN32
 bool consWin = true;
@@ -228,6 +228,8 @@ bool session_loaded = false;
 int num_edge_extended_before = 0;
 int num_edge_extended_after = 0;
 
+ImVec4 orangeBorder(1.0f, 0.5f, 0.0f, 1.0f);
+
 void export_result_to_folder(std::string output_folder_name, ObservationPicking &observation_picking, Session &session);
 void reshape(int w, int h);
 
@@ -250,11 +252,10 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
 void perform_experiment_on_linux(Session &session, ObservationPicking &observation_picking, ICP &icp, NDT &ndt,
                                  RegistrationPlaneFeature &registration_plane_feature, PoseGraphSLAM &pose_graph_slam);
 
-LaserBeam GetLaserBeam(int x, int y);
-Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
-Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking);
 double compute_rms(bool initial, Session &session, ObservationPicking &observation_picking);
 void reset_poses(Session &session);
+
+///////////////////////////////////////////////////////////////////////////////////
 
 void my_display_code()
 {
@@ -295,385 +296,6 @@ void my_display_code()
         ImGui::End();
     }
 }
-
-void project_gui()
-{
-    ImGui::Begin("Single session processing");
-
-    ImGui::Checkbox("Simple_gui", &simple_gui);
-    ImGui::SameLine();
-    ImGui::Checkbox("Is ground truth", &session.is_ground_truth);
-
-    std::string wd = "working directory: '" + session.working_directory + "'";
-
-    ImGui::Text(wd.c_str());
-
-    ImGui::NewLine();
-
-    if (ImGui::Button("Set initial pose to Identity and update other poses"))
-    {
-        initial_pose_to_identity(session);
-    }
-
-    if (!simple_gui)
-    {
-		ImGui::NewLine();
-        
-        ImGui::Text("Offset [m] x: %.10f y: %.10f z: %.10f", session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
-        ImGui::SameLine();
-        if (ImGui::Button("Print offset to console"))
-            std::cout << "Offset: " << std::setprecision(10) << session.point_clouds_container.offset << std::endl;
-
-        ImGui::Checkbox("Decimate during load", &tls_registration.is_decimate);
-
-		ImGui::Text("Bucket [m]:");
-        ImGui::PushItemWidth(ImGuiNumberWidth);
-        ImGui::InputDouble("X##b", &tls_registration.bucket_x, 0.0, 0.0, "%.3f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(xText);
-        ImGui::SameLine();
-        ImGui::InputDouble("Y##b", &tls_registration.bucket_y, 0.0, 0.0, "%.3f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(yText);
-        ImGui::SameLine();
-        ImGui::InputDouble("Z##b", &tls_registration.bucket_z, 0.0, 0.0, "%.3f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(zText);
-		ImGui::PopItemWidth();
-
-        ImGui::Separator();
-        // common_data
-        // manual_pose_graph_loop_closure_mode
-
-        if (ImGui::Button("Load RESSO file (transformation_GroundTruth.reg)"))
-        {
-            std::string input_file_name = "";
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO", mandeye::fd::Resso_filter);
-            std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
-
-            if (input_file_name.size() > 0)
-            {
-
-                session.working_directory = fs::path(input_file_name).parent_path().string();
-
-                if (!session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z))
-                {
-                    std::cout << "check input files" << std::endl;
-                    return;
-                }
-                else
-                {
-                    std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                }
-            }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Save RESSO file"))
-        {
-            const auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", mandeye::fd::Resso_filter);
-            std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
-            if (output_file_name.size() > 0)
-            {
-                session.point_clouds_container.save_poses(fs::path(output_file_name).string(), false);
-            }
-        }
-        ImGui::Text("RESSO dataset: ");
-        ImGui::SameLine();
-        ImGuiHyperlink("https://3d.bk.tudelft.nl/liangliang/publications/2019/plade/resso.html");
-
-        if (ImGui::Button("Load ETH file (pairs.txt)"))
-        {
-            std::string input_file_name = "";
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load ETH file", {});
-            if (input_file_name.size() > 0)
-            {
-                session.working_directory = fs::path(input_file_name).parent_path().string();
-
-                if (!session.point_clouds_container.load_eth(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z))
-                {
-                    std::cout << "check input files" << std::endl;
-                    return;
-                }
-                else
-                {
-                    std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                }
-            }
-        }
-        ImGui::Text("ETH dataset: ");
-        ImGui::SameLine();
-        ImGuiHyperlink("https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
-
-        if (ImGui::Button("load AlignedPointCloud from WHU-TLS (select all *.las or *.laz files in folder 2-AlignedPointCloud)"))
-        {
-            session.point_clouds_container.point_clouds.clear();
-            std::vector<std::string> input_file_names;
-            input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
-            if (input_file_names.size() > 0)
-            {
-                session.working_directory = fs::path(input_file_names[0]).parent_path().string();
-
-                std::cout << "Las/Laz files:" << std::endl;
-                for (size_t i = 0; i < input_file_names.size(); i++)
-                {
-                    std::cout << input_file_names[i] << std::endl;
-                }
-
-                if (!session.point_clouds_container.load_whu_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset))
-                {
-                    std::cout << "Check input files laz/las" << std::endl;
-                    // return;
-                }
-                else
-                {
-                    std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                }
-            }
-
-            int number_of_point = 0;
-            for (const auto &pc : session.point_clouds_container.point_clouds)
-            {
-                number_of_point += pc.points_local.size();
-            }
-
-            session.point_clouds_container.print_point_cloud_dimension();
-
-            [[maybe_unused]]
-            pfd::message message(
-                "Information",
-                "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
-                pfd::choice::ok, pfd::icon::info);
-            message.result();
-        }
-        ImGui::SameLine();
-        ImGui::Checkbox("Calculate_offset for WHU-TLS", &tls_registration.calculate_offset);
-        ImGui::Text("WHU-TLS dataset: ");
-        ImGui::SameLine();
-        ImGuiHyperlink("http://3s.whu.edu.cn/ybs/en/benchmark.htm");
-
-        if (ImGui::Button("load 3DTK files (select all *.txt files)"))
-        {
-            session.point_clouds_container.point_clouds.clear();
-            std::vector<std::string> input_file_names;
-            input_file_names = mandeye::fd::OpenFileDialog("Load txt files", {}, true);
-
-            if (input_file_names.size() > 0)
-            {
-                session.working_directory = fs::path(input_file_names[0]).parent_path().string();
-
-                std::cout << "TXT files:" << std::endl;
-                for (size_t i = 0; i < input_file_names.size(); i++)
-                {
-                    std::cout << input_file_names[i] << std::endl;
-                }
-
-                if (!session.point_clouds_container.load_3DTK_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z))
-                {
-                    std::cout << "Check input files" << std::endl;
-                    return;
-                }
-                else
-                {
-                    std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                }
-            }
-        }
-        ImGui::Text("3DTK dataset (18: the campus of the Jacobs University Bremen)");
-        ImGui::SameLine();
-        ImGuiHyperlink("http://kos.informatik.uni-osnabrueck.de/3Dscans/");
-
-        if (ImGui::Button("Update initial poses from RESSO file"))
-        {
-            std::string input_file_name;
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
-            if (input_file_name.size() > 0)
-            {
-
-                session.working_directory = fs::path(input_file_name).parent_path().string();
-
-                if (!session.point_clouds_container.update_initial_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
-                {
-
-                    std::cout << "Check input files" << std::endl;
-                    return;
-                }
-                else
-                {
-                    session.point_clouds_container.initial_poses_file_name = input_file_name;
-                    std::cout << "Updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                }
-            }
-        }
-        ImGui::SameLine();
-        ImGui::Text(session.point_clouds_container.initial_poses_file_name.c_str());
-
-        if (ImGui::Button("Update poses from RESSO file"))
-        {
-            std::string input_file_name;
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
-
-            if (input_file_name.size() > 0)
-            {
-                session.working_directory = fs::path(input_file_name).parent_path().string();
-
-                if (!session.point_clouds_container.update_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
-                {
-                    std::cout << "Check input files" << std::endl;
-                    return;
-                }
-                else
-                {
-                    std::cout << "Updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                    session.point_clouds_container.poses_file_name = input_file_name;
-                }
-            }
-        }
-        ImGui::SameLine();
-
-        if (ImGui::Button("Update poses from RESSO file (inverse)"))
-        {
-            std::string input_file_name;
-            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
-
-            if (input_file_name.size() > 0)
-            {
-                session.working_directory = fs::path(input_file_name).parent_path().string();
-
-                if (!session.point_clouds_container.update_poses_from_RESSO_inverse(session.working_directory.c_str(), input_file_name.c_str()))
-                {
-                    std::cout << "Check input files" << std::endl;
-                    return;
-                }
-                else
-                {
-                    std::cout << "Updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                    session.point_clouds_container.poses_file_name = input_file_name;
-                }
-            }
-        }
-        ImGui::SameLine();
-        ImGui::Text(session.point_clouds_container.poses_file_name.c_str());
-    }
-
-    ImGui::Separator();
-
-    if (!is_loop_closure_gui)
-    {
-        if (!simple_gui)
-        {
-            static double x_origin = 0.0;
-            static double y_origin = 0.0;
-            static double z_origin = 0.0;
-
-            ImGui::Text("Origin [m]: ");
-            ImGui::SameLine();
-			ImGui::PushItemWidth(ImGuiNumberWidth);
-            ImGui::InputDouble("X##o", &x_origin, 0.0, 0.0, "%.3f");
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(xText);
-			ImGui::SameLine();
-            ImGui::InputDouble("Y##o", &y_origin, 0.0, 0.0, "%.3f");
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(yText);
-            ImGui::SameLine();
-            ImGui::InputDouble("Z##o", &z_origin, 0.0, 0.0, "%.3f");
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(zText);
-			ImGui::PopItemWidth();
-            ImGui::SameLine();
-            if (ImGui::Button("Set XYZ origin"))
-            {
-                if (session.point_clouds_container.point_clouds.size() != 0)
-                {
-                    std::vector<Eigen::Affine3d> all_m_poses2;
-                    for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                    {
-                        all_m_poses2.push_back(session.point_clouds_container.point_clouds[j].m_pose);
-                    }
-
-                    session.point_clouds_container.point_clouds[0].m_pose(0, 3) = x_origin;
-                    session.point_clouds_container.point_clouds[0].m_pose(1, 3) = y_origin;
-                    session.point_clouds_container.point_clouds[0].m_pose(2, 3) = z_origin;
-
-                    session.point_clouds_container.point_clouds[0].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[0].m_pose);
-
-                    session.point_clouds_container.point_clouds[0].gui_translation[0] = (float)session.point_clouds_container.point_clouds[0].pose.px;
-                    session.point_clouds_container.point_clouds[0].gui_translation[1] = (float)session.point_clouds_container.point_clouds[0].pose.py;
-                    session.point_clouds_container.point_clouds[0].gui_translation[2] = (float)session.point_clouds_container.point_clouds[0].pose.pz;
-
-                    session.point_clouds_container.point_clouds[0].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[0].pose.om * 180.0 / M_PI);
-                    session.point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[0].pose.fi * 180.0 / M_PI);
-                    session.point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[0].pose.ka * 180.0 / M_PI);
-
-                    Eigen::Affine3d curr_m_pose2 = session.point_clouds_container.point_clouds[0].m_pose;
-                    for (int j = 1; j < session.point_clouds_container.point_clouds.size(); j++)
-                    {
-                        curr_m_pose2 = curr_m_pose2 * (all_m_poses2[j - 1].inverse() * all_m_poses2[j]);
-
-                        // std::cout << curr_m_pose2.matrix() << std::endl;
-                        session.point_clouds_container.point_clouds[j]
-                            .m_pose = curr_m_pose2;
-                        session.point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
-
-                        session.point_clouds_container.point_clouds[j].gui_translation[0] = (float)session.point_clouds_container.point_clouds[j].pose.px;
-                        session.point_clouds_container.point_clouds[j].gui_translation[1] = (float)session.point_clouds_container.point_clouds[j].pose.py;
-                        session.point_clouds_container.point_clouds[j].gui_translation[2] = (float)session.point_clouds_container.point_clouds[j].pose.pz;
-
-                        session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
-                        session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
-                        session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
-                    }
-                }
-            }
-            
-            ImGui::Separator();
-        }
-
-        ImGui::Text("Set offsets to export point cloud in global coordinate system [m]:");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("each local coordinate of the point += offset");
-        ImGui::PushItemWidth(ImGuiNumberWidth);
-        ImGui::InputDouble("X##t", &session.point_clouds_container.offset.x(), 0.0, 0.0, "%.3f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(xText);
-		ImGui::SameLine();
-        ImGui::InputDouble("Y##t", &session.point_clouds_container.offset.y(), 0.0, 0.0, "%.3f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(yText);
-        ImGui::SameLine();
-        ImGui::InputDouble("Z##t", &session.point_clouds_container.offset.z(), 0.0, 0.0, "%.3f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(zText);
-		ImGui::PopItemWidth();
-
-        if (!simple_gui)
-        {
-            ImGui::NewLine();
-            ImGui::NewLine();
-            ImGui::NewLine();
-            ImGui::Separator();
-            ImGui::NewLine();
-            ImGui::NewLine();
-            ImGui::NewLine();
-			ImGui::Text("Perform experiment on:");
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Experiments to compare methods and approaches for multi-view TLS registration");
-			ImGui::SameLine();
-            if (ImGui::Button("WINDOWS"))
-            {
-                perform_experiment_on_windows(session, observation_picking, tls_registration.icp, tls_registration.ndt, tls_registration.registration_plane_feature, tls_registration.pose_graph_slam);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("LINUX"))
-            {
-                perform_experiment_on_linux(session, observation_picking, tls_registration.icp, tls_registration.ndt, tls_registration.registration_plane_feature, tls_registration.pose_graph_slam);
-            }
-        }
-    }
-    ImGui::End();
-}
-
-ImVec4 orangeBorder(1.0f, 0.5f, 0.0f, 1.0f);
 
 void ndt_gui()
 {
@@ -1819,10 +1441,8 @@ void openSession()
             std::string newTitle = winTitle + " - " + truncPath(session_file_name);
             glutSetWindowTitle(newTitle.c_str());
 
-            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-            {
-                session_total_number_of_points += session.point_clouds_container.point_clouds[i].points_local.size();
-            }
+            for (const auto& pc : session.point_clouds_container.point_clouds)
+                session_total_number_of_points += pc.points_local.size();
 
             session_dims = session.point_clouds_container.compute_point_cloud_dimension();
         }
@@ -1831,10 +1451,7 @@ void openSession()
 
 void saveSession()
 {
-    std::cout << "saveSession: 1 " << std::endl;
-    const auto output_file_name = mandeye::fd::SaveFileDialog("Save session as", mandeye::fd::Session_filter, ".json", session_file_name);
-
-    std::cout << "saveSession: 2 '" << output_file_name << "'" <<  std::endl;
+    const auto output_file_name = mandeye::fd::SaveFileDialog("Save session as", mandeye::fd::Session_filter, ".mjs", session_file_name);
 
     if (output_file_name.size() > 0)
     {
@@ -1909,15 +1526,10 @@ void saveSession()
             std::cerr << "Error copying poses file: " << e.what() << '\n';
         }
     }
-
-    std::cout << "saveSession: 3 " << std::endl;
-
-    return;
 }
 
 void saveSubsession()
 {
-    std::cout << "saveSubsession: 1 " << std::endl;
     int inx_begin = 0;
     int inx_end = 0;
 
@@ -1928,7 +1540,6 @@ void saveSubsession()
         }
     }
 
-    std::cout << "saveSubsession: 2 " << std::endl;
     for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
     {
         if (session.point_clouds_container.point_clouds[i].visible)
@@ -1937,7 +1548,6 @@ void saveSubsession()
         }
     }
 
-    std::cout << "saveSubsession: 3 " << std::endl;
     // creating filename proposal based on current selection
     fs::path path(session_file_name);
     // Extract parts
@@ -1949,10 +1559,8 @@ void saveSubsession()
     // Build new name
     std::string indexed_file_name = (dir / (stem + indexpart + ext)).string();
 
-    std::cout << "saveSubsession: 4 " << std::endl;
     const auto output_file_name = mandeye::fd::SaveFileDialog("Save subsession", mandeye::fd::Session_filter, ".mjs", indexed_file_name);
 
-    std::cout << "saveSubsession: 5 " << std::endl;
     if (output_file_name.size() > 0)
     {
         std::cout << "Subsession file to save: '" << output_file_name << "'" << std::endl;
@@ -1969,7 +1577,6 @@ void saveSubsession()
         session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), true);
 
         try {
-            std::cout << "saveSubsession: 6 " << std::endl;
             fs::copy_file(poses_file_name, initial_poses_file_name, fs::copy_options::overwrite_existing);
         }
         catch (const fs::filesystem_error& e) {
@@ -1978,24 +1585,434 @@ void saveSubsession()
     }else{
         std::cout << "saving canceled" << std::endl;
     }
+}
 
-    std::cout << "saveSubsession: 7 " << std::endl;
+double distance_point_to_line(const Eigen::Vector3d &point, const LaserBeam &line)
+{
+    Eigen::Vector3d AP = point - line.position;
 
-    return;
+    double dist = (AP.cross(line.direction)).norm();
+    return dist;
+}
+
+void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking)
+{
+    const auto laser_beam = GetLaserBeam(x, y);
+    double min_distance = std::numeric_limits<double>::max();
+    int index_i = -1;
+    int index_j = -1;
+
+    for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+    {
+        for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+        {
+            const auto& p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+            Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
+
+            double dist = distance_point_to_line(vp, laser_beam);
+
+            if (dist < min_distance)
+            {
+                min_distance = dist;
+                index_i = i;
+                index_j = j;
+
+                new_rotation_center.x() = vp.x();
+                new_rotation_center.y() = vp.y();
+                new_rotation_center.z() = vp.z();
+
+                if (gcpPicking)
+                {
+                    session.ground_control_points.picking_mode_index_to_node_inner = index_i;
+                    session.ground_control_points.picking_mode_index_to_node_outer = index_j;
+                }
+
+                // if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
+            }
+        }
+    }
+
+    new_rotate_x = rotate_x;
+    new_rotate_y = rotate_y;
+    new_translate_x = -new_rotation_center.x();
+    new_translate_y = -new_rotation_center.y();
+    new_translate_z = translate_z;
+    camera_transition_active = true;
+}
+
+void project_gui()
+{
+    ImGui::Begin("Single session processing");
+
+    ImGui::Checkbox("Simple_gui", &simple_gui);
+    ImGui::SameLine();
+    ImGui::Checkbox("Is ground truth", &session.is_ground_truth);
+
+    std::string wd = "working directory: '" + session.working_directory + "'";
+
+    ImGui::Text(wd.c_str());
+
+    ImGui::NewLine();
+
+    if (ImGui::Button("Set initial pose to Identity and update other poses"))
+    {
+        initial_pose_to_identity(session);
+    }
+
+    if (!simple_gui)
+    {
+        ImGui::NewLine();
+
+        ImGui::Text("Offset [m] x: %.10f y: %.10f z: %.10f", session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
+        ImGui::SameLine();
+        if (ImGui::Button("Print offset to console"))
+            std::cout << "Offset: " << std::setprecision(10) << session.point_clouds_container.offset << std::endl;
+
+        ImGui::Checkbox("Decimate during load", &tls_registration.is_decimate);
+
+        ImGui::Text("Bucket [m]:");
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::InputDouble("X##b", &tls_registration.bucket_x, 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(xText);
+        ImGui::SameLine();
+        ImGui::InputDouble("Y##b", &tls_registration.bucket_y, 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(yText);
+        ImGui::SameLine();
+        ImGui::InputDouble("Z##b", &tls_registration.bucket_z, 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(zText);
+        ImGui::PopItemWidth();
+
+        ImGui::Separator();
+        // common_data
+        // manual_pose_graph_loop_closure_mode
+
+        if (ImGui::Button("Load RESSO file (transformation_GroundTruth.reg)"))
+        {
+            std::string input_file_name = "";
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO", mandeye::fd::Resso_filter);
+            std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
+
+            if (input_file_name.size() > 0)
+            {
+
+                session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                if (!session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z))
+                {
+                    std::cout << "check input files" << std::endl;
+                    return;
+                }
+                else
+                    std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save RESSO file"))
+        {
+            const auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", mandeye::fd::Resso_filter);
+            std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
+            if (output_file_name.size() > 0)
+                session.point_clouds_container.save_poses(fs::path(output_file_name).string(), false);
+        }
+        ImGui::Text("RESSO dataset: ");
+        ImGui::SameLine();
+        ImGuiHyperlink("https://3d.bk.tudelft.nl/liangliang/publications/2019/plade/resso.html");
+
+        if (ImGui::Button("Load ETH file (pairs.txt)"))
+        {
+            std::string input_file_name = "";
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load ETH file", {});
+            if (input_file_name.size() > 0)
+            {
+                session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                if (!session.point_clouds_container.load_eth(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z))
+                {
+                    std::cout << "check input files" << std::endl;
+                    return;
+                }
+                else
+                    std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+            }
+        }
+        ImGui::Text("ETH dataset: ");
+        ImGui::SameLine();
+        ImGuiHyperlink("https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
+
+        if (ImGui::Button("Load AlignedPointCloud from WHU-TLS (select all *.las or *.laz files in folder 2-AlignedPointCloud)"))
+        {
+            session.point_clouds_container.point_clouds.clear();
+            std::vector<std::string> input_file_names;
+            input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
+            if (input_file_names.size() > 0)
+            {
+                session.working_directory = fs::path(input_file_names[0]).parent_path().string();
+
+                std::cout << "Las/Laz files:" << std::endl;
+                for (size_t i = 0; i < input_file_names.size(); i++)
+                    std::cout << input_file_names[i] << std::endl;
+
+                if (!session.point_clouds_container.load_whu_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset))
+                {
+                    std::cout << "Check input files laz/las" << std::endl;
+                    // return;
+                }
+                else
+                    std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+            }
+
+            session.point_clouds_container.print_point_cloud_dimension();
+
+            [[maybe_unused]]
+            pfd::message message(
+                "Information",
+                "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
+                pfd::choice::ok, pfd::icon::info);
+            message.result();
+        }
+        ImGui::SameLine();
+        ImGui::Checkbox("Calculate_offset for WHU-TLS", &tls_registration.calculate_offset);
+        ImGui::Text("WHU-TLS dataset: ");
+        ImGui::SameLine();
+        ImGuiHyperlink("http://3s.whu.edu.cn/ybs/en/benchmark.htm");
+
+        if (ImGui::Button("Load 3DTK files (select all *.txt files)"))
+        {
+            session.point_clouds_container.point_clouds.clear();
+            std::vector<std::string> input_file_names;
+            input_file_names = mandeye::fd::OpenFileDialog("Load txt files", {}, true);
+
+            if (input_file_names.size() > 0)
+            {
+                session.working_directory = fs::path(input_file_names[0]).parent_path().string();
+
+                std::cout << "TXT files:" << std::endl;
+                for (size_t i = 0; i < input_file_names.size(); i++)
+                {
+                    std::cout << input_file_names[i] << std::endl;
+                }
+
+                if (!session.point_clouds_container.load_3DTK_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z))
+                {
+                    std::cout << "Check input files" << std::endl;
+                    return;
+                }
+                else
+                {
+                    std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                }
+            }
+        }
+        ImGui::Text("3DTK dataset (18: the campus of the Jacobs University Bremen)");
+        ImGui::SameLine();
+        ImGuiHyperlink("http://kos.informatik.uni-osnabrueck.de/3Dscans/");
+
+        if (ImGui::Button("Update initial poses from RESSO file"))
+        {
+            std::string input_file_name;
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
+            if (input_file_name.size() > 0)
+            {
+
+                session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                if (!session.point_clouds_container.update_initial_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
+                {
+
+                    std::cout << "Check input files" << std::endl;
+                    return;
+                }
+                else
+                {
+                    session.point_clouds_container.initial_poses_file_name = input_file_name;
+                    std::cout << "Updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                }
+            }
+        }
+        ImGui::SameLine();
+        ImGui::Text(session.point_clouds_container.initial_poses_file_name.c_str());
+
+        if (ImGui::Button("Update poses from RESSO file"))
+        {
+            std::string input_file_name;
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
+
+            if (input_file_name.size() > 0)
+            {
+                session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                if (!session.point_clouds_container.update_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
+                {
+                    std::cout << "Check input files" << std::endl;
+                    return;
+                }
+                else
+                {
+                    std::cout << "Updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                    session.point_clouds_container.poses_file_name = input_file_name;
+                }
+            }
+        }
+        ImGui::SameLine();
+
+        if (ImGui::Button("Update poses from RESSO file (inverse)"))
+        {
+            std::string input_file_name;
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
+
+            if (input_file_name.size() > 0)
+            {
+                session.working_directory = fs::path(input_file_name).parent_path().string();
+
+                if (!session.point_clouds_container.update_poses_from_RESSO_inverse(session.working_directory.c_str(), input_file_name.c_str()))
+                {
+                    std::cout << "Check input files" << std::endl;
+                    return;
+                }
+                else
+                {
+                    std::cout << "Updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                    session.point_clouds_container.poses_file_name = input_file_name;
+                }
+            }
+        }
+        ImGui::SameLine();
+        ImGui::Text(session.point_clouds_container.poses_file_name.c_str());
+    }
+
+    ImGui::Separator();
+
+    if (!is_loop_closure_gui)
+    {
+        if (!simple_gui)
+        {
+            static double x_origin = 0.0;
+            static double y_origin = 0.0;
+            static double z_origin = 0.0;
+
+            ImGui::Text("Origin [m]: ");
+            ImGui::SameLine();
+            ImGui::PushItemWidth(ImGuiNumberWidth);
+            ImGui::InputDouble("X##o", &x_origin, 0.0, 0.0, "%.3f");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(xText);
+            ImGui::SameLine();
+            ImGui::InputDouble("Y##o", &y_origin, 0.0, 0.0, "%.3f");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(yText);
+            ImGui::SameLine();
+            ImGui::InputDouble("Z##o", &z_origin, 0.0, 0.0, "%.3f");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(zText);
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            if (ImGui::Button("Set XYZ origin"))
+            {
+                if (session.point_clouds_container.point_clouds.size() != 0)
+                {
+                    std::vector<Eigen::Affine3d> all_m_poses2;
+                    for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
+                    {
+                        all_m_poses2.push_back(session.point_clouds_container.point_clouds[j].m_pose);
+                    }
+
+                    session.point_clouds_container.point_clouds[0].m_pose(0, 3) = x_origin;
+                    session.point_clouds_container.point_clouds[0].m_pose(1, 3) = y_origin;
+                    session.point_clouds_container.point_clouds[0].m_pose(2, 3) = z_origin;
+
+                    session.point_clouds_container.point_clouds[0].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[0].m_pose);
+
+                    session.point_clouds_container.point_clouds[0].gui_translation[0] = (float)session.point_clouds_container.point_clouds[0].pose.px;
+                    session.point_clouds_container.point_clouds[0].gui_translation[1] = (float)session.point_clouds_container.point_clouds[0].pose.py;
+                    session.point_clouds_container.point_clouds[0].gui_translation[2] = (float)session.point_clouds_container.point_clouds[0].pose.pz;
+
+                    session.point_clouds_container.point_clouds[0].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[0].pose.om * 180.0 / M_PI);
+                    session.point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[0].pose.fi * 180.0 / M_PI);
+                    session.point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[0].pose.ka * 180.0 / M_PI);
+
+                    Eigen::Affine3d curr_m_pose2 = session.point_clouds_container.point_clouds[0].m_pose;
+                    for (int j = 1; j < session.point_clouds_container.point_clouds.size(); j++)
+                    {
+                        curr_m_pose2 = curr_m_pose2 * (all_m_poses2[j - 1].inverse() * all_m_poses2[j]);
+
+                        // std::cout << curr_m_pose2.matrix() << std::endl;
+                        session.point_clouds_container.point_clouds[j]
+                            .m_pose = curr_m_pose2;
+                        session.point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
+
+                        session.point_clouds_container.point_clouds[j].gui_translation[0] = (float)session.point_clouds_container.point_clouds[j].pose.px;
+                        session.point_clouds_container.point_clouds[j].gui_translation[1] = (float)session.point_clouds_container.point_clouds[j].pose.py;
+                        session.point_clouds_container.point_clouds[j].gui_translation[2] = (float)session.point_clouds_container.point_clouds[j].pose.pz;
+
+                        session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                    }
+                }
+            }
+
+            ImGui::Separator();
+        }
+
+        ImGui::Text("Set offsets to export point cloud in global coordinate system [m]:");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("each local coordinate of the point += offset");
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::InputDouble("X##t", &session.point_clouds_container.offset.x(), 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(xText);
+        ImGui::SameLine();
+        ImGui::InputDouble("Y##t", &session.point_clouds_container.offset.y(), 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(yText);
+        ImGui::SameLine();
+        ImGui::InputDouble("Z##t", &session.point_clouds_container.offset.z(), 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(zText);
+        ImGui::PopItemWidth();
+
+        if (!simple_gui)
+        {
+            ImGui::NewLine();
+            ImGui::NewLine();
+            ImGui::NewLine();
+            ImGui::Separator();
+            ImGui::NewLine();
+            ImGui::NewLine();
+            ImGui::NewLine();
+            ImGui::Text("Perform experiment on:");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Experiments to compare methods and approaches for multi-view TLS registration");
+            ImGui::SameLine();
+            if (ImGui::Button("WINDOWS"))
+            {
+                perform_experiment_on_windows(session, observation_picking, tls_registration.icp, tls_registration.ndt, tls_registration.registration_plane_feature, tls_registration.pose_graph_slam);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("LINUX"))
+            {
+                perform_experiment_on_linux(session, observation_picking, tls_registration.icp, tls_registration.ndt, tls_registration.registration_plane_feature, tls_registration.pose_graph_slam);
+            }
+        }
+    }
+    ImGui::End();
 }
 
 void display()
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
 
     view_kbd_shortcuts();
 
     if (io.KeyCtrl && ImGui::IsKeyPressed('A'))
-		is_pca_gui = !is_pca_gui;
+        is_pca_gui = !is_pca_gui;
     if (io.KeyCtrl && ImGui::IsKeyPressed('C'))
     {
         if (session.control_points.is_imgui)
-			session.control_points.is_imgui = false;
+            session.control_points.is_imgui = false;
         else if (!session.ground_control_points.is_imgui)
             session.control_points.is_imgui = true;
     }
@@ -2056,12 +2073,12 @@ void display()
     if (is_ortho)
     {
         glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio, -100000, 100000);
 
         glm::mat4 proj = glm::orthoLH_ZO<float>(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                                                -camera_ortho_xy_view_zoom / ratio,
-                                                camera_ortho_xy_view_zoom / ratio, -100, 100);
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio, -100, 100);
 
         std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
 
@@ -2081,11 +2098,11 @@ void display()
         Eigen::Vector3d v_t = m * v;
 
         gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
-                  v_center_t.x(), v_center_t.y(), v_center_t.z(),
-                  v_t.x(), v_t.y(), v_t.z());
+            v_center_t.x(), v_center_t.y(), v_center_t.z(),
+            v_t.x(), v_t.y(), v_t.z());
         glm::mat4 lookat = glm::lookAt(glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
-                                       glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
-                                       glm::vec3(v_t.x(), v_t.y(), v_t.z()));
+            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
+            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
     }
 
@@ -2134,7 +2151,7 @@ void display()
                     camera_transition_active = true;
                 }
 
-				new_loop_closure_index = false;
+                new_loop_closure_index = false;
             }
         }
 
@@ -2170,41 +2187,7 @@ void display()
         glLoadIdentity();
     }
 
-    if (show_axes || ImGui::GetIO().KeyCtrl)
-    {
-        glBegin(GL_LINES);
-        glColor3f(1.f, 1.f, 1.f);
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x() + 1.f, rotation_center.y(), rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x() - 1.f, rotation_center.y(), rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y() - 1.f, rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y() + 1.f, rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() - 1.f);
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() + 1.f);
-        glEnd();
-    }
-
-    if (show_axes || ImGui::GetIO().KeyCtrl)
-    {
-        glBegin(GL_LINES);
-        glColor3f(1.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(100, 0.0f, 0.0f);
-
-        glColor3f(0.0f, 1.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 100, 0.0f);
-
-        glColor3f(0.0f, 0.0f, 1.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 100);
-        glEnd();
-    }
+    showAxes();
 
     if (session.control_points.is_imgui)
         session.control_points.render(session.point_clouds_container);
@@ -2226,7 +2209,7 @@ void display()
         if (!session_loaded)
         {
             if (ImGui::Button("Load session"))
-				openSession();
+                openSession();
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Select session to open (Ctrl+O)");
 
@@ -2244,10 +2227,10 @@ void display()
 
                 //ImGui::BeginDisabled(!((index_begin > 0) || (index_end < static_cast<int>(session.point_clouds_container.point_clouds.size() - 1))));
                 //{
-                    if (ImGui::MenuItem("Save subsession", "Ctrl+Shift+S"))
-                        saveSubsession();
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Save session according to selections from 'LIO segments editor' window");
+                if (ImGui::MenuItem("Save subsession", "Ctrl+Shift+S"))
+                    saveSubsession();
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Save session according to selections from 'LIO segments editor' window");
                 //}
                 //ImGui::EndDisabled();
 
@@ -2451,7 +2434,7 @@ void display()
                 if (ImGui::BeginMenu("GNSS"))
                 {
                     ImGui::MenuItem("Load with offset", nullptr, &gnssWithOffset);
-                    
+
                     if (ImGui::MenuItem("Load GNSS files and convert WGS84 to PUWG92"))
                     {
                         std::vector<std::string> input_file_names;
@@ -2631,25 +2614,25 @@ void display()
                     ImGui::Text("- Registration Plane Feature");
                     ImGui::EndTooltip();
                 }
-				ImGui::Separator();
+                ImGui::Separator();
                 ImGui::MenuItem("Pose Graph SLAM", "Ctrl+P", &is_pose_graph_slam);
                 ImGui::MenuItem("Manual Analysis", nullptr, &is_manual_analisys);
 
 
                 ImGui::Separator();
-                
-                if (ImGui::MenuItem("Control Points", "Ctrl+C", &session.control_points.is_imgui, !session.ground_control_points.is_imgui))
+
+                ImGui::MenuItem("Control Points", "Ctrl+C", &session.control_points.is_imgui, !session.ground_control_points.is_imgui);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Known reference points used to align or verify the scan");
 
-                if (ImGui::MenuItem("Ground Control Points", "Ctrl+G", &session.ground_control_points.is_imgui, !session.control_points.is_imgui))
+                ImGui::MenuItem("Ground Control Points", "Ctrl+G", &session.ground_control_points.is_imgui, !session.control_points.is_imgui);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Accurate real-world points used to georeference the scan");
 
                 ImGui::MenuItem("Manual Loop Closure", "Ctrl+L", &is_loop_closure_gui, !is_lio_segments_gui);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Manually connect overlapping scan sections");
-                
+
                 ImGui::Separator();
                 ImGui::MenuItem("LIO segments editor", "Ctrl+E", &is_lio_segments_gui, !is_loop_closure_gui);
                 if (ImGui::IsItemHovered())
@@ -2670,7 +2653,7 @@ void display()
                 ImGui::MenuItem("10m grid##xz", nullptr, &session.point_clouds_container.xz_grid_10x10);
                 ImGui::MenuItem("1m grid##xz", nullptr, &session.point_clouds_container.xz_grid_1x1);
                 ImGui::MenuItem("0.1m grid##xz", nullptr, &session.point_clouds_container.xz_grid_01x01);
-                
+
                 if (ImGui::MenuItem("Export xz intersection", nullptr, false, session.point_clouds_container.xz_intersection))
                 {
                     const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
@@ -2690,7 +2673,7 @@ void display()
                 ImGui::MenuItem("10m grid##yz", nullptr, &session.point_clouds_container.yz_grid_10x10);
                 ImGui::MenuItem("1m grid##yz", nullptr, &session.point_clouds_container.yz_grid_1x1);
                 ImGui::MenuItem("0.1m grid##yz", nullptr, &session.point_clouds_container.yz_grid_01x01);
-                
+
                 if (ImGui::MenuItem("Export yz intersection", nullptr, false, session.point_clouds_container.yz_intersection))
                 {
                     const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
@@ -2747,9 +2730,7 @@ void display()
                 if (tmp != point_size)
                 {
                     for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-                    {
                         session.point_clouds_container.point_clouds[i].point_size = point_size;
-                    }
                 }
 
                 ImGui::BeginDisabled(tls_registration.gnss.gnss_poses.size() <= 0);
@@ -2765,7 +2746,7 @@ void display()
             ImGui::MenuItem("Orthographic", nullptr, &is_ortho);
             if (is_ortho)
             {
-				new_rotation_center = rotation_center;
+                new_rotation_center = rotation_center;
                 new_rotate_x = 0.0;
                 new_rotate_y = 0.0;
                 new_translate_x = translate_x;
@@ -2775,7 +2756,7 @@ void display()
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
-            
+
             ImGui::MenuItem("Show axes", "key X", &show_axes);
             ImGui::MenuItem("Block Z", nullptr, &block_z);
 
@@ -2946,7 +2927,7 @@ void display()
 
     if (prev_index_pose != session.control_points.index_pose)
     {
-		session.control_points.index_picked_point = -1; // reset picked point when pose changes
+        session.control_points.index_picked_point = -1; // reset picked point when pose changes
 
         new_rotation_center.x() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().x();
         new_rotation_center.y() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().y();
@@ -2962,7 +2943,7 @@ void display()
         else
         {
             new_translate_x = translate_x;
-			new_translate_y = translate_y;
+            new_translate_y = translate_y;
         }
         new_translate_z = translate_z;
         camera_transition_active = true;
@@ -3200,110 +3181,22 @@ void display()
     glutPostRedisplay();
 }
 
-void motion(int x, int y)
-{
-    ImGuiIO &io = ImGui::GetIO();
-    io.MousePos = ImVec2((float)x, (float)y);
-
-    if (!io.WantCaptureMouse)
-    {
-        float dx, dy;
-        dx = (float)(x - mouse_old_x);
-        dy = (float)(y - mouse_old_y);
-
-        if (is_ortho)
-        {
-            if (mouse_buttons & 1)
-            {
-                float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-                Eigen::Vector3d v(dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
-                                  dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio), 0);
-                TaitBryanPose pose_tb;
-                pose_tb.px = 0.0;
-                pose_tb.py = 0.0;
-                pose_tb.pz = 0.0;
-                pose_tb.om = 0.0;
-                pose_tb.fi = 0.0;
-                pose_tb.ka = camera_ortho_xy_view_rotation_angle_deg * M_PI / 180.0;
-                auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
-                Eigen::Vector3d v_t = m * v;
-                camera_ortho_xy_view_shift_x += v_t.x();
-                camera_ortho_xy_view_shift_y += v_t.y();
-            }
-        }
-        else
-        {
-            if (mouse_buttons & 1) //left button
-            {
-                rotate_x += dy * 0.2f; // * mouse_sensitivity;
-                rotate_y += dx * 0.2f; // * mouse_sensitivity;
-                breakCameraTransition();
-            }
-            if (mouse_buttons & 4) //right button
-            {
-                translate_x += dx * 0.1f * mouse_sensitivity;
-                translate_y -= dy * 0.1f * mouse_sensitivity;
-                breakCameraTransition();
-            }
-        }
-
-        mouse_old_x = x;
-        mouse_old_y = y;
-    }
-    glutPostRedisplay();
-}
-
-double distance_point_to_line(const Eigen::Vector3d &point, const LaserBeam &line)
-{
-    Eigen::Vector3d AP = point - line.position;
-
-    double dist = (AP.cross(line.direction)).norm();
-    return dist;
-}
-
-void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking)
+Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observation_picking)
 {
     const auto laser_beam = GetLaserBeam(x, y);
-    double min_distance = std::numeric_limits<double>::max();
-    int index_i = -1;
-    int index_j = -1;
 
-    for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-    {
-        for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
-        {
-            const auto& p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
-            Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
+    RegistrationPlaneFeature::Plane pl;
 
-            double dist = distance_point_to_line(vp, laser_beam);
+    pl.a = 0;
+    pl.b = 0;
+    pl.c = 1;
+    pl.d = -observation_picking.picking_plane_height;
 
-            if (dist < min_distance)
-            {
-                min_distance = dist;
-                index_i = i;
-                index_j = j;
+    Eigen::Vector3d pos = rayIntersection(laser_beam, pl);
 
-                new_rotation_center.x() = vp.x();
-                new_rotation_center.y() = vp.y();
-                new_rotation_center.z() = vp.z();
+    std::cout << "intersection: " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;
 
-                if (gcpPicking)
-                {
-                    session.ground_control_points.picking_mode_index_to_node_inner = index_i;
-                    session.ground_control_points.picking_mode_index_to_node_outer = index_j;
-                }
-
-                // if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
-            }
-        }
-    }
-
-    new_rotate_x = rotate_x;
-    new_rotate_y = rotate_y;
-    new_translate_x = -new_rotation_center.x();
-    new_translate_y = -new_rotation_center.y();
-    new_translate_z = translate_z;
-    camera_transition_active = true;
+    return pos;
 }
 
 void mouse(int glut_button, int state, int x, int y)
@@ -3324,11 +3217,8 @@ void mouse(int glut_button, int state, int x, int y)
         io.MouseDown[button] = false;
 
     static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
-    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
-        glutMajorVersion < 3)
-    {
+    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) && glutMajorVersion < 3)
         wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
-    }
 
     if (!io.WantCaptureMouse)
     {
@@ -3401,7 +3291,6 @@ void mouse(int glut_button, int state, int x, int y)
         {
             mouse_buttons |= 1 << glut_button;
 
-            //-
             if (observation_picking.is_observation_picking_mode)
             {
                 Eigen::Vector3d p = GLWidgetGetOGLPos(x, y, observation_picking);
@@ -3416,129 +3305,43 @@ void mouse(int glut_button, int state, int x, int y)
                     }
                 }
                 if (number_active_pcs == 1)
-                {
                     observation_picking.add_picked_to_current_observation(index_picked, p);
-                }
             }
         }
         else if (state == GLUT_UP)
-        {
             mouse_buttons = 0;
-        }
+
         mouse_old_x = x;
         mouse_old_y = y;
     }
-}
-
-void reshape(int w, int h)
-{
-    glViewport(0, 0, (GLsizei)w, (GLsizei)h);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    if (!is_ortho)
-    {
-        gluPerspective(60.0, (GLfloat)w / (GLfloat)h, 0.01, 10000.0);
-    }
-    else
-    {
-        ImGuiIO &io = ImGui::GetIO();
-        float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
-        // glOrtho(-translate_z, translate_z, -translate_z * (float)h / float(w), translate_z * float(h) / float(w), -10000, 10000);
-    }
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-}
-
-bool initGL(int *argc, char **argv)
-{
-    glutInit(argc, argv);
-    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
-    glutInitWindowSize(window_width, window_height);
-    glutCreateWindow(winTitle.c_str());
-
-    #ifdef _WIN32
-        HWND hwnd = FindWindow(NULL, winTitle.c_str());
-        HINSTANCE hInstance = GetModuleHandle(NULL);
-        SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
-        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
-    #endif
-
-    glutDisplayFunc(display);
-    glutMotionFunc(motion);
-
-    // default initialization
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glEnable(GL_DEPTH_TEST);
-
-    // viewport
-    glViewport(0, 0, window_width, window_height);
-
-    // projection
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01, 10000.0);
-    glutReshapeFunc(reshape);
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-
-    ImGui::StyleColorsDark();
-    ImGui_ImplGLUT_Init();
-    ImGui_ImplGLUT_InstallFuncs();
-    ImGui_ImplOpenGL2_Init();
-    return true;
 }
 
 int main(int argc, char *argv[])
 {
     try
     {
-        initGL(&argc, argv);
+        initGL(&argc, argv, winTitle, display, mouse);
 
-        glutDisplayFunc(display);
-        glutMouseFunc(mouse);
-        glutMotionFunc(motion);
-        glutMouseWheelFunc(wheel);
-        glutSpecialFunc(specialDown);
-        glutSpecialUpFunc(specialUp);
+
         glutMainLoop();
 
         ImGui_ImplOpenGL2_Shutdown();
         ImGui_ImplGLUT_Shutdown();
-
         ImGui::DestroyContext();
     }
-    catch (const std::bad_alloc e)
+    catch (const std::bad_alloc& e)
     {
         std::cerr << "System is out of memory : " << e.what() << std::endl;
         mandeye::fd::OutOfMemMessage();
     }
-    catch (const std::exception e)
+    catch (const std::exception& e)
     {
         std::cout << e.what();
     }
+    catch (...)
+    {
+        std::cerr << "Unknown fatal error occurred." << std::endl;
+    }
+
     return 0;
-}
-
-Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking)
-{
-    const auto laser_beam = GetLaserBeam(x, y);
-
-    RegistrationPlaneFeature::Plane pl;
-
-    pl.a = 0;
-    pl.b = 0;
-    pl.c = 1;
-    pl.d = -observation_picking.picking_plane_height;
-
-    Eigen::Vector3d pos = rayIntersection(laser_beam, pl);
-
-    std::cout << "intersection: " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;
-
-    return pos;
 }

@@ -1177,11 +1177,14 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 {
 	const auto start = std::chrono::system_clock::now();
 	std::vector<PointCloud> point_clouds_nodata;
+
+	point_clouds_nodata.resize(input_file_names.size()); // pre-allocate
+
 	for (size_t i = 0; i < input_file_names.size(); i++)
 	{
 		std::cout << "Loading file " << i + 1 << "/" << input_file_names.size() << " (" << (std::filesystem::path(input_file_names[i]).filename().string()) << "). ";
 
-		PointCloud pc;
+		auto& pc = point_clouds_nodata[i];  // reference directly to vector slot
 
 		pc.file_name = input_file_names[i];
 		auto trj_path = std::filesystem::path(input_file_names[i]).parent_path();
@@ -1289,8 +1292,6 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		}else{
 			std::cout << "trajectory path: '" << trj_path.string() << "' does not exist" << std::endl; 
 		}
-
-		point_clouds_nodata.push_back(pc);
 	}
 
 	//// load actual pointclouds

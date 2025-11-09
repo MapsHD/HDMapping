@@ -27,8 +27,10 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include "../../resources/resource1.h"
+#include "resource.h"
 #endif
+
+///////////////////////////////////////////////////////////////////////////////////
 
 // This is LiDAR odometry (step 1)
 // This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system https://github.com/JanuszBedkowski/mandeye_controller
@@ -101,6 +103,8 @@ std::atomic<bool> loPause{false};
 std::chrono::time_point<std::chrono::system_clock> loStartTime;
 std::atomic<double> loElapsedSeconds{0.0};
 std::atomic<double> loEstimatedTimeRemaining{0.0};
+
+///////////////////////////////////////////////////////////////////////////////////
 
 // Helper function to format time in human-readable format
 std::string formatTime(double seconds)
@@ -1054,7 +1058,7 @@ void lidar_odometry_gui()
 
 void progress_window()
 {
-    ImGui::Begin("Progress");
+    ImGui::Begin("Progress", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
     // Calculate elapsed time and ETA
     auto currentTime = std::chrono::system_clock::now();
@@ -1097,6 +1101,8 @@ void progress_window()
     ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), progressText);
     ImGui::Text("%s", timeInfo);
 
+    ImGui::NewLine();
+
     if (!loPause)
     {
         if (ImGui::Button("Pause"))
@@ -1120,92 +1126,8 @@ void progress_window()
     }
     ImGui::SameLine();
     ImGui::Text("Also check console for progress..");
-    ImGui::NewLine();
 
     ImGui::End();
-}
-
-void mouse(int glut_button, int state, int x, int y)
-{
-    ImGuiIO &io = ImGui::GetIO();
-    io.MousePos = ImVec2((float)x, (float)y);
-
-    int button = -1;
-    if (glut_button == GLUT_LEFT_BUTTON)
-        button = 0;
-    if (glut_button == GLUT_RIGHT_BUTTON)
-        button = 1;
-    if (glut_button == GLUT_MIDDLE_BUTTON)
-        button = 2;
-    if (button != -1 && state == GLUT_DOWN)
-        io.MouseDown[button] = true;
-    if (button != -1 && state == GLUT_UP)
-        io.MouseDown[button] = false;
-
-    static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
-    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
-        glutMajorVersion < 3)
-    {
-        wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
-    }
-
-    if (!io.WantCaptureMouse)
-    {
-        if (glut_button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN && io.KeyCtrl)
-            setNewRotationCenter(x, y);
-
-        if (state == GLUT_DOWN)
-        {
-            mouse_buttons |= 1 << glut_button;
-        }
-        else if (state == GLUT_UP)
-        {
-            mouse_buttons = 0;
-        }
-        mouse_old_x = x;
-        mouse_old_y = y;
-    }
-}
-
-void reshape(int w, int h)
-{
-    glViewport(0, 0, (GLsizei)w, (GLsizei)h);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(60.0, (GLfloat)w / (GLfloat)h, 0.01, 10000.0);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-}
-
-void motion(int x, int y)
-{
-    ImGuiIO &io = ImGui::GetIO();
-    io.MousePos = ImVec2((float)x, (float)y);
-
-    if (!io.WantCaptureMouse)
-    {
-        float dx, dy;
-        dx = (float)(x - mouse_old_x);
-        dy = (float)(y - mouse_old_y);
-
-        gui_mouse_down = mouse_buttons > 0;
-        if (mouse_buttons & 1)
-        {
-            rotate_x += dy * 0.2f;
-            rotate_y += dx * 0.2f;
-            camera_transition_active = false;
-        }
-        if (mouse_buttons & 4)
-        {
-            translate_x += dx * mouse_sensitivity;
-            translate_y -= dy * mouse_sensitivity;
-            camera_transition_active = false;
-        }
-
-        mouse_old_x = x;
-        mouse_old_y = y;
-    }
-    glutPostRedisplay();
 }
 
 void openData()
@@ -1261,6 +1183,48 @@ void openData()
     }
 }
 
+void step1(const std::string &folder,
+           LidarOdometryParams &params,
+           std::vector<std::vector<Point3Di>> &pointsPerFile,
+           Imu &imu_data,
+           std::string &working_directory,
+           Trajectory &trajectory,
+           std::vector<WorkerData> &worker_data,
+           const std::atomic<bool> &loPause)
+{
+    std::vector<std::string> input_file_names;
+
+    for (const auto &entry : fs::directory_iterator(folder))
+    {
+        if (!entry.is_directory())
+        {
+            std::cout << entry.path() << std::endl;
+            input_file_names.push_back(entry.path().string());
+        }
+    }
+
+    if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
+    {
+        working_directory = fs::path(input_file_names[0]).parent_path().string();
+        calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages, params.use_removie_imu_bias_from_first_stationary_scan);
+        compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
+        std::cout << "step_1_done" << std::endl;
+    }
+}
+
+void step2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, const std::atomic<bool> &loPause)
+{
+    double ts_failure = 0.0;
+    std::atomic<float> loProgress;
+    compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages);
+}
+
+void save_results(bool info, double elapsed_seconds, std::string &working_directory,
+                  std::vector<WorkerData> &worker_data, LidarOdometryParams &params, fs::path outwd)
+{
+    save_result(worker_data, params, outwd, elapsed_seconds);
+}
+
 void display()
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -1297,20 +1261,7 @@ void display()
     glMatrixMode(GL_MODELVIEW);
     glLoadMatrixf(result.matrix().data());
 
-    glBegin(GL_LINES);
-    // X axis - red, Y axis - green, Z axis - blue
-    glColor3f(1.0f, 0.0f, 0.0f);
-    glVertex3f(0.0f, 0.0f, 0.0f);
-    glVertex3f(100, 0.0f, 0.0f);
-
-    glColor3f(0.0f, 1.0f, 0.0f);
-    glVertex3f(0.0f, 0.0f, 0.0f);
-    glVertex3f(0.0f, 100, 0.0f);
-
-    glColor3f(0.0f, 0.0f, 1.0f);
-    glVertex3f(0.0f, 0.0f, 0.0f);
-    glVertex3f(0.0f, 0.0f, 100);
-    glEnd();
+    showAxes();
 
     if (show_initial_points)
     {
@@ -1379,7 +1330,6 @@ void display()
 
     if (show_trajectory_as_axes)
     {
-        glColor3f(0, 1, 0);
         // glBegin(GL_LINE_STRIP);
         glBegin(GL_LINES);
         for (const auto &wd : worker_data)
@@ -1490,25 +1440,6 @@ void display()
             }
             glEnd();
         }
-    }
-
-    if (ImGui::GetIO().KeyCtrl)
-    {
-        glBegin(GL_LINES);
-        glColor3f(1.f, 1.f, 1.f);
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x() + 1.f, rotation_center.y(), rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x() - 1.f, rotation_center.y(), rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y() - 1.f, rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y() + 1.f, rotation_center.z());
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() - 1.f);
-        glVertex3fv(rotation_center.data());
-        glVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() + 1.f);
-        glEnd();
     }
 
     ImGui_ImplOpenGL2_NewFrame();
@@ -1651,18 +1582,11 @@ void display()
 
                 ImGui::MenuItem("Remove IMU bias from first stationary scan", nullptr, &params.use_removie_imu_bias_from_first_stationary_scan);
                 if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("IMU bias will be removed given there's a stationary period at the start of the recording");
+                    ImGui::SetTooltip("IMU bias will be removed given there's a stationary period at the start of the recording");
 
                 ImGui::MenuItem("Multithread", nullptr, &params.useMultithread);
-                ImGui::PushItemWidth(ImGuiNumberWidth / 2);
+                ImGui::SetNextItemWidth(ImGuiNumberWidth / 2);
                 ImGui::InputDouble("Time threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.1f");
-
-                ImGui::SameLine();
-                if(ImGui::Button("Set real time performance (for IMU 200Hz, 20 nodes in optimization window)")){
-                    params.real_time_threshold_seconds = 0.1;
-                }
-
-                ImGui::PopItemWidth();
                 if (ImGui::IsItemHovered())
                 {
                     ImGui::BeginTooltip();
@@ -1672,19 +1596,31 @@ void display()
                     ImGui::Text("0.3 [s] will make processing time aprox equal to 3x scan time");
                     ImGui::EndTooltip();
                 }
+                
+                if(ImGui::MenuItem("Set real time performance"))
+                    params.real_time_threshold_seconds = 0.1;
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("For IMU 200Hz, 20 nodes in optimization window");
 
                 ImGui::Separator();
 
-				ImGui::Text("Debug:");
+                ImGui::Text("Debug:");
 
                 ImGui::MenuItem("Full processing messages", nullptr, &full_debug_messages);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Show more messages during processing in console window");
                 ImGui::MenuItem("Save calibration validation file", nullptr, &params.save_calibration_validation);
                 if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("Save calibrated points from first laz file in 'calibrationValidation.asc' file");
-				ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                    ImGui::SetTooltip("Save calibrated points from first laz file in 'calibrationValidation.asc' file");
+                ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputInt("Number of calibration validation points", &params.calibration_validation_points);
+
+                ImGui::Separator();
+                ImGui::Text("Ablation study:");
+                ImGui::MenuItem("Use planarity", nullptr, &params.ablation_study_use_planarity);
+                ImGui::MenuItem("Use norm", nullptr, &params.ablation_study_use_norm);
+                ImGui::MenuItem("Use hierarchical RGD", nullptr, &params.ablation_study_use_hierarchical_rgd);
+                ImGui::MenuItem("Use view point and normal vectors", nullptr, &params.ablation_study_use_view_point_and_normal_vectors);
 
                 ImGui::Separator();
 
@@ -1724,12 +1660,6 @@ void display()
                             std::cerr << "Failed to save parameters." << std::endl;
                     }
                 }
-
-                ImGui::Text("----------- ablation study -----------");
-                ImGui::Checkbox("use_planarity", &params.ablation_study_use_planarity);
-                ImGui::Checkbox("use_norm", &params.ablation_study_use_norm);
-                ImGui::Checkbox("use_hierarchical_rgd", &params.ablation_study_use_hierarchical_rgd);
-                ImGui::Checkbox("use_view_point_and_normal_vectors", &params.ablation_study_use_view_point_and_normal_vectors);
                
                 ImGui::EndMenu();
             }
@@ -1904,96 +1834,47 @@ void on_exit(){
     std::cout << "remove cache: '" << params.working_directory_cache << "' FINISHED" << std::endl;
 }
 
-bool initGL(int *argc, char **argv)
+void mouse(int glut_button, int state, int x, int y)
 {
-    glutInit(argc, argv);
-    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
-    glutInitWindowSize(window_width, window_height);
-    glutCreateWindow(winTitle.c_str());
+    ImGuiIO& io = ImGui::GetIO();
+    io.MousePos = ImVec2((float)x, (float)y);
 
-#ifdef _WIN32
-    HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
-    HINSTANCE hInstance = GetModuleHandle(NULL);
-    SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
-    SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
-#endif
+    int button = -1;
+    if (glut_button == GLUT_LEFT_BUTTON)
+        button = 0;
+    if (glut_button == GLUT_RIGHT_BUTTON)
+        button = 1;
+    if (glut_button == GLUT_MIDDLE_BUTTON)
+        button = 2;
+    if (button != -1 && state == GLUT_DOWN)
+        io.MouseDown[button] = true;
+    if (button != -1 && state == GLUT_UP)
+        io.MouseDown[button] = false;
 
-    glutDisplayFunc(display);
-    glutMotionFunc(motion);
+    static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
+    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) && glutMajorVersion < 3)
+        wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
 
-    
-    glutCloseFunc(on_exit);
-    // default initialization
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glEnable(GL_DEPTH_TEST);
-
-    // viewport
-    glViewport(0, 0, window_width, window_height);
-
-    // projection
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01, 10000.0);
-    glutReshapeFunc(reshape);
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-
-    ImGui::StyleColorsDark();
-    ImGui_ImplGLUT_Init();
-    ImGui_ImplGLUT_InstallFuncs();
-    ImGui_ImplOpenGL2_Init();
-    return true;
-}
-
-void step1(const std::string &folder,
-           LidarOdometryParams &params,
-           std::vector<std::vector<Point3Di>> &pointsPerFile,
-           Imu &imu_data,
-           std::string &working_directory,
-           Trajectory &trajectory,
-           std::vector<WorkerData> &worker_data,
-           const std::atomic<bool> &loPause)
-{
-    std::vector<std::string> input_file_names;
-
-    for (const auto &entry : fs::directory_iterator(folder))
+    if (!io.WantCaptureMouse)
     {
-        if (!entry.is_directory())
-        {
-            std::cout << entry.path() << std::endl;
-            input_file_names.push_back(entry.path().string());
-        }
+        if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_RIGHT_BUTTON) && state == GLUT_DOWN && io.KeyCtrl)
+            setNewRotationCenter(x, y);
+
+        if (state == GLUT_DOWN)
+            mouse_buttons |= 1 << glut_button;
+        else if (state == GLUT_UP)
+            mouse_buttons = 0;
+        
+        mouse_old_x = x;
+        mouse_old_y = y;
     }
-
-    if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
-    {
-        working_directory = fs::path(input_file_names[0]).parent_path().string();
-        calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages, params.use_removie_imu_bias_from_first_stationary_scan);
-        compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
-        std::cout << "step_1_done" << std::endl;
-    }
-}
-
-void step2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, const std::atomic<bool> &loPause)
-{
-    double ts_failure = 0.0;
-    std::atomic<float> loProgress;
-    compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages);
-}
-
-void save_results(bool info, double elapsed_seconds, std::string &working_directory,
-                  std::vector<WorkerData> &worker_data, LidarOdometryParams &params, fs::path outwd)
-{
-    save_result(worker_data, params, outwd, elapsed_seconds);
 }
 
 int main(int argc, char *argv[])
 {
     try
     {
-        if (argc == 4)
+		if (argc == 4) //runnning from command line
         {
             // Load parameters from file using original TomlIO class
             TomlIO toml_io;
@@ -2027,7 +1908,7 @@ int main(int argc, char *argv[])
 
             save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);
         }
-        else
+        else //full GUI mode
         {
             std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
 
@@ -2041,30 +1922,30 @@ int main(int argc, char *argv[])
             params.in_out_params_outdoor.resolution_Z = 0.3;
             params.in_out_params_outdoor.bounding_box_extension = 20.0;
 
-            initGL(&argc, argv);
-            glutDisplayFunc(display);
-            glutMouseFunc(mouse);
-            glutMotionFunc(motion);
-            glutMouseWheelFunc(wheel);
-            glutSpecialFunc(specialDown);
-            glutSpecialUpFunc(specialUp);
+            initGL(&argc, argv, winTitle, display, mouse);
+            glutCloseFunc(on_exit);
+
             glutMainLoop();
 
             ImGui_ImplOpenGL2_Shutdown();
             ImGui_ImplGLUT_Shutdown();
-
             ImGui::DestroyContext();
         }
     }
-    catch (const std::bad_alloc e)
+    catch (const std::bad_alloc& e)
     {
         std::cerr << "System is out of memory : " << e.what() << std::endl;
         mandeye::fd::OutOfMemMessage();
     }
-    catch (const std::exception e)
+    catch (const std::exception& e)
     {
         std::cout << e.what();
     }
+    catch (...)
+    {
+        std::cerr << "Unknown fatal error occurred." << std::endl;
+    }
+
     return 0;
 }
 

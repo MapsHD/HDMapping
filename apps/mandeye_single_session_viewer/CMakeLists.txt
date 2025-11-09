@@ -11,7 +11,7 @@ set(SOURCES
 
 # Windows: add resource file
 if(WIN32)
-    list(APPEND SOURCES ../../resources/resourceV.rc)
+    list(APPEND SOURCES resource.rc)
 endif()
 
 add_executable(

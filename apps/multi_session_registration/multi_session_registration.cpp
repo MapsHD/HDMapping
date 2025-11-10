@@ -53,8 +53,6 @@
 #include "resource.h"
 #endif
 
-
-
 std::string winTitle = std::string("Step 3 (Multi session registration) ") + HDMAPPING_VERSION_STRING;
 
 std::vector<std::string> infoLines = {
@@ -62,10 +60,9 @@ std::vector<std::string> infoLines = {
     "",
     "First step: create project by adding sessions (result of 'multi_view_tls_registration_step_2' program)",
     "Last step: save project",
-    "To produce map use 'multi_view_tls_registration_step_2' export functionality"
-};
+    "To produce map use 'multi_view_tls_registration_step_2' export functionality"};
 
-//App specific shortcuts (Type and Shortcut are just for easy reference)
+// App specific shortcuts (Type and Shortcut are just for easy reference)
 static const std::vector<ShortcutEntry> appShortcuts = {
     {"Normal keys", "A", ""},
     {"", "Ctrl+A", ""},
@@ -143,8 +140,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Shift + scroll", ""},
     {"", "Ctrl + left click", ""},
     {"", "Ctrl + right click", ""},
-    {"", "Ctrl + middle click", ""}
-};
+    {"", "Ctrl + middle click", ""}};
 
 float m_ortho_projection[] = {1, 0, 0, 0,
                               0, 1, 0, 0,
@@ -238,7 +234,7 @@ void ndt_gui()
         ImGui::InputInt("Number of iterations", &ndt.number_of_iterations);
         if (ndt.number_of_iterations < 1)
             ndt.number_of_iterations = 1;
-		ImGui::PopItemWidth();
+        ImGui::PopItemWidth();
 
         if (ImGui::Button("NDT optimization"))
         {
@@ -459,7 +455,7 @@ void loop_closure_gui()
                 {
                     bool is_gizmo = false;
 
-                    for (const auto& s : sessions)
+                    for (const auto &s : sessions)
                     {
                         if (s.is_gizmo)
                             is_gizmo = true;
@@ -505,7 +501,7 @@ void loop_closure_gui()
                 if (prev_gizmo != edge_gizmo)
                 {
                     auto m_to = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].m_pose *
-                        affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                                affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
                     m_gizmo[0] = (float)m_to(0, 0);
                     m_gizmo[1] = (float)m_to(1, 0);
@@ -572,9 +568,9 @@ void loop_closure_gui()
                                 double y_max = -1000000000000.0;
                                 double z_max = -1000000000000.0;
 
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
 
-                                for (const auto& p : points_to.points_local)
+                                for (const auto &p : points_to.points_local)
                                 {
                                     auto pg = points_to.m_pose * p;
                                     if (pg.x() < x_min)
@@ -591,9 +587,9 @@ void loop_closure_gui()
                                     if (pg.z() > z_max)
                                         z_max = pg.z();
                                 }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
                                 std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
+                                for (const auto &p : points_from.points_local)
                                 {
                                     auto pg = points_from.m_pose * p;
                                     if (pg.x() > x_min && pg.x() < x_max)
@@ -940,9 +936,9 @@ void loop_closure_gui()
                                 double y_max = -1000000000000.0;
                                 double z_max = -1000000000000.0;
 
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
 
-                                for (const auto& p : points_to.points_local)
+                                for (const auto &p : points_to.points_local)
                                 {
                                     auto pg = points_to.m_pose * p;
                                     if (pg.x() < x_min)
@@ -959,9 +955,9 @@ void loop_closure_gui()
                                     if (pg.z() > z_max)
                                         z_max = pg.z();
                                 }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
                                 std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
+                                for (const auto &p : points_from.points_local)
                                 {
                                     auto pg = points_from.m_pose * p;
                                     if (pg.x() > x_min && pg.x() < x_max)
@@ -1048,9 +1044,9 @@ void loop_closure_gui()
                                 double y_max = -1000000000000.0;
                                 double z_max = -1000000000000.0;
 
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
 
-                                for (const auto& p : points_to.points_local)
+                                for (const auto &p : points_to.points_local)
                                 {
                                     auto pg = points_to.m_pose * p;
                                     if (pg.x() < x_min)
@@ -1067,9 +1063,9 @@ void loop_closure_gui()
                                     if (pg.z() > z_max)
                                         z_max = pg.z();
                                 }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
                                 std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
+                                for (const auto &p : points_from.points_local)
                                 {
                                     auto pg = points_from.m_pose * p;
                                     if (pg.x() > x_min && pg.x() < x_max)
@@ -1155,9 +1151,9 @@ void loop_closure_gui()
                                 double y_max = -1000000000000.0;
                                 double z_max = -1000000000000.0;
 
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
 
-                                for (const auto& p : points_to.points_local)
+                                for (const auto &p : points_to.points_local)
                                 {
                                     auto pg = points_to.m_pose * p;
                                     if (pg.x() < x_min)
@@ -1174,9 +1170,9 @@ void loop_closure_gui()
                                     if (pg.z() > z_max)
                                         z_max = pg.z();
                                 }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
                                 std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
+                                for (const auto &p : points_from.points_local)
                                 {
                                     auto pg = points_from.m_pose * p;
                                     if (pg.x() > x_min && pg.x() < x_max)
@@ -1266,9 +1262,9 @@ void loop_closure_gui()
                                 double y_max = -1000000000000.0;
                                 double z_max = -1000000000000.0;
 
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
 
-                                for (const auto& p : points_to.points_local)
+                                for (const auto &p : points_to.points_local)
                                 {
                                     auto pg = points_to.m_pose * p;
                                     if (pg.x() < x_min)
@@ -1285,9 +1281,9 @@ void loop_closure_gui()
                                     if (pg.z() > z_max)
                                         z_max = pg.z();
                                 }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
                                 std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
+                                for (const auto &p : points_from.points_local)
                                 {
                                     auto pg = points_from.m_pose * p;
                                     if (pg.x() > x_min && pg.x() < x_max)
@@ -1377,9 +1373,9 @@ void loop_closure_gui()
                                 double y_max = -1000000000000.0;
                                 double z_max = -1000000000000.0;
 
-                                auto& points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
+                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
 
-                                for (const auto& p : points_to.points_local)
+                                for (const auto &p : points_to.points_local)
                                 {
                                     auto pg = points_to.m_pose * p;
                                     if (pg.x() < x_min)
@@ -1396,9 +1392,9 @@ void loop_closure_gui()
                                     if (pg.z() > z_max)
                                         z_max = pg.z();
                                 }
-                                auto& points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
+                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
                                 std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto& p : points_from.points_local)
+                                for (const auto &p : points_from.points_local)
                                 {
                                     auto pg = points_from.m_pose * p;
                                     if (pg.x() > x_min && pg.x() < x_max)
@@ -1850,12 +1846,12 @@ void update_timestamp_offset()
     std::cout << "new time_stamp_offset = " << time_stamp_offset << std::endl;
 }
 
-bool optimize(std::vector<Session>& sessions)
+bool optimize(std::vector<Session> &sessions)
 {
-    for (auto& session : sessions)
+    for (auto &session : sessions)
     {
         // std::cout << session.point_clouds_container.point_clouds.size() << std::endl;
-        for (auto& pc : session.point_clouds_container.point_clouds)
+        for (auto &pc : session.point_clouds_container.point_clouds)
             pc.m_pose_temp = pc.m_pose;
     }
 
@@ -2017,18 +2013,18 @@ bool optimize(std::vector<Session>& sessions)
                     normalize_angle(all_edges[i].relative_pose_tb.fi),
                     normalize_angle(all_edges[i].relative_pose_tb.ka));
                 relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(jacobian,
-                    poses[all_edges[i].index_from].px,
-                    poses[all_edges[i].index_from].py,
-                    poses[all_edges[i].index_from].pz,
-                    normalize_angle(poses[all_edges[i].index_from].om),
-                    normalize_angle(poses[all_edges[i].index_from].fi),
-                    normalize_angle(poses[all_edges[i].index_from].ka),
-                    poses[all_edges[i].index_to].px,
-                    poses[all_edges[i].index_to].py,
-                    poses[all_edges[i].index_to].pz,
-                    normalize_angle(poses[all_edges[i].index_to].om),
-                    normalize_angle(poses[all_edges[i].index_to].fi),
-                    normalize_angle(poses[all_edges[i].index_to].ka));
+                                                                  poses[all_edges[i].index_from].px,
+                                                                  poses[all_edges[i].index_from].py,
+                                                                  poses[all_edges[i].index_from].pz,
+                                                                  normalize_angle(poses[all_edges[i].index_from].om),
+                                                                  normalize_angle(poses[all_edges[i].index_from].fi),
+                                                                  normalize_angle(poses[all_edges[i].index_from].ka),
+                                                                  poses[all_edges[i].index_to].px,
+                                                                  poses[all_edges[i].index_to].py,
+                                                                  poses[all_edges[i].index_to].pz,
+                                                                  normalize_angle(poses[all_edges[i].index_to].om),
+                                                                  normalize_angle(poses[all_edges[i].index_to].fi),
+                                                                  normalize_angle(poses[all_edges[i].index_to].ka));
             }
             else if (is_cw)
             {
@@ -2053,18 +2049,18 @@ bool optimize(std::vector<Session>& sessions)
                     normalize_angle(all_edges[i].relative_pose_tb.fi),
                     normalize_angle(all_edges[i].relative_pose_tb.ka));
                 relative_pose_obs_eq_tait_bryan_cw_case1_jacobian(jacobian,
-                    poses[all_edges[i].index_from].px,
-                    poses[all_edges[i].index_from].py,
-                    poses[all_edges[i].index_from].pz,
-                    normalize_angle(poses[all_edges[i].index_from].om),
-                    normalize_angle(poses[all_edges[i].index_from].fi),
-                    normalize_angle(poses[all_edges[i].index_from].ka),
-                    poses[all_edges[i].index_to].px,
-                    poses[all_edges[i].index_to].py,
-                    poses[all_edges[i].index_to].pz,
-                    normalize_angle(poses[all_edges[i].index_to].om),
-                    normalize_angle(poses[all_edges[i].index_to].fi),
-                    normalize_angle(poses[all_edges[i].index_to].ka));
+                                                                  poses[all_edges[i].index_from].px,
+                                                                  poses[all_edges[i].index_from].py,
+                                                                  poses[all_edges[i].index_from].pz,
+                                                                  normalize_angle(poses[all_edges[i].index_from].om),
+                                                                  normalize_angle(poses[all_edges[i].index_from].fi),
+                                                                  normalize_angle(poses[all_edges[i].index_from].ka),
+                                                                  poses[all_edges[i].index_to].px,
+                                                                  poses[all_edges[i].index_to].py,
+                                                                  poses[all_edges[i].index_to].pz,
+                                                                  normalize_angle(poses[all_edges[i].index_to].om),
+                                                                  normalize_angle(poses[all_edges[i].index_to].fi),
+                                                                  normalize_angle(poses[all_edges[i].index_to].ka));
             }
 
             int ir = tripletListB.size();
@@ -2303,15 +2299,15 @@ bool optimize(std::vector<Session>& sessions)
                 TaitBryanPose pose_s;
                 pose_s = pose_tait_bryan_from_affine_matrix(sessions[j].point_clouds_container.point_clouds[sessions[j].ground_control_points.gpcs[jj].index_to_node_inner].m_pose);
                 point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                    p_s.x(), p_s.y(), p_s.z());
+                                                                       p_s.x(), p_s.y(), p_s.z());
 
                 double delta_x;
                 double delta_y;
                 double delta_z;
                 Eigen::Vector3d p_t(sessions[j].ground_control_points.gpcs[jj].x, sessions[j].ground_control_points.gpcs[jj].y, sessions[j].ground_control_points.gpcs[jj].z + sessions[j].ground_control_points.gpcs[jj].lidar_height_above_ground);
                 point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                    pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                    p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+                                                              pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
+                                                              p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
 
                 int ir = tripletListB.size();
                 int ic = sessions[j].ground_control_points.gpcs[jj].index_to_node_inner * 6 + sums[j] * 6;
@@ -2541,19 +2537,19 @@ bool optimize(std::vector<Session>& sessions)
     return true;
 }
 
-bool revert(std::vector<Session>& sessions)
+bool revert(std::vector<Session> &sessions)
 {
-    for (auto& session : sessions)
+    for (auto &session : sessions)
     {
-        for (auto& pc : session.point_clouds_container.point_clouds)
+        for (auto &pc : session.point_clouds_container.point_clouds)
             pc.m_pose = pc.m_pose_temp;
     }
     return true;
 }
 
-bool save_results(std::vector<Session>& sessions)
+bool save_results(std::vector<Session> &sessions)
 {
-    for (auto& session : sessions)
+    for (auto &session : sessions)
     {
         if (!session.is_ground_truth)
         {
@@ -2564,7 +2560,7 @@ bool save_results(std::vector<Session>& sessions)
     return true;
 }
 
-Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observation_picking)
+Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking)
 {
     const auto laser_beam = GetLaserBeam(x, y);
 
@@ -2630,7 +2626,7 @@ void addSession()
 void loadSessions()
 {
     sessions.clear();
-    for (const auto& ps : project_settings.session_file_names)
+    for (const auto &ps : project_settings.session_file_names)
     {
         Session session;
         session.load(fs::path(ps).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
@@ -2666,21 +2662,21 @@ void loadSessions()
     sessions = sessions_reorder;
     project_settings.session_file_names = session_file_names_reordered;
 
-    for (auto& e : edges)
+    for (auto &e : edges)
     {
         e.index_session_from = map_reorder[e.index_session_from];
         e.index_session_to = map_reorder[e.index_session_to];
     }
 
     std::cout << "sessions reordered, ground truth should be in front" << std::endl;
-    for (const auto& s : sessions)
+    for (const auto &s : sessions)
     {
         std::cout << "session: '" << s.session_file_name << "' ground truth [" << int(s.is_ground_truth) << "]" << std::endl;
     }
 
     // update time_stamp_offset
     std::cout << "update time_stamp_offset" << std::endl;
-    for (const auto& s : sessions)
+    for (const auto &s : sessions)
     {
         if (s.point_clouds_container.point_clouds.size() > 0)
         {
@@ -2723,12 +2719,17 @@ void project_gui()
         ImGui::Text("Benchmark settings:");
 
         ImGui::SetNextItemWidth(ImGuiNumberWidth * 2);
-        ImGui::InputDouble("Timestamp offset ", &time_stamp_offset, 100000000.0, 1000000000.0);
+
+        static double fast_plus = 100000000.0;
+        static double fast_plus_plus = 1000000000.0;
+
+        ImGui::InputDouble("increment ", &fast_plus);
+        ImGui::InputDouble("faset increment ", &fast_plus_plus);
+        ImGui::InputDouble("Timestamp offset ", &time_stamp_offset, fast_plus, fast_plus_plus);
         ImGui::SameLine();
         if (ImGui::Button("Set to origin"))
         {
-
-            for (auto& session : sessions)
+            for (auto &session : sessions)
             {
                 int index_point_clouds = -1;
                 int index_local_trajectory = -1;
@@ -2810,8 +2811,8 @@ void project_gui()
                     if (!sessions[i].show_rgb)
                     {
                         ImGui::SameLine();
-                        ImGui::ColorEdit3(("Color##" + std::to_string(i)).c_str(), (float*)&sessions[i].render_color, ImGuiColorEditFlags_NoInputs);
-                        for (auto& pc : sessions[i].point_clouds_container.point_clouds)
+                        ImGui::ColorEdit3(("Color##" + std::to_string(i)).c_str(), (float *)&sessions[i].render_color, ImGuiColorEditFlags_NoInputs);
+                        for (auto &pc : sessions[i].point_clouds_container.point_clouds)
                         {
                             pc.render_color[0] = sessions[i].render_color[0];
                             pc.render_color[1] = sessions[i].render_color[1];
@@ -2821,7 +2822,7 @@ void project_gui()
                     }
                     else
                     {
-                        for (auto& pc : sessions[i].point_clouds_container.point_clouds)
+                        for (auto &pc : sessions[i].point_clouds_container.point_clouds)
                             pc.show_color = sessions[i].show_rgb;
                     }
                 }
@@ -2832,15 +2833,37 @@ void project_gui()
                     ImGui::SameLine();
                     ImGui::Text(" [ground_truth]");
                 }
+
+                //
+                if (sessions[i].point_clouds_container.point_clouds.size() > 0)
+                {
+                    if (sessions[i].point_clouds_container.point_clouds[0].local_trajectory.size() > 0)
+                    {
+                        if (sessions[i].point_clouds_container.point_clouds[sessions[i].point_clouds_container.point_clouds.size() - 1].local_trajectory.size() > 0)
+                        {
+                            ImGui::SameLine();
+
+                            std::string ts_begin = std::to_string(sessions[i].point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first);
+
+                            int index_last = sessions[i].point_clouds_container.point_clouds.size() - 1;
+                            int index_last2 = sessions[i].point_clouds_container.point_clouds[index_last].local_trajectory.size() - 1;
+
+                            std::string ts_end = std::to_string(sessions[i].point_clouds_container.point_clouds[index_last].local_trajectory[index_last2].timestamps.first);
+
+                            ImGui::Text(("timestamp range: <" + ts_begin + "," + ts_end + ">").c_str());
+                        }
+                    }
+                }
+                //
             }
         }
         if (project_settings.session_file_names.size() == sessions.size())
         {
-            //for (int i = 0; i < sessions.size(); i++)
-            //    sessions[i].is_gizmo = false;
+            // for (int i = 0; i < sessions.size(); i++)
+            //     sessions[i].is_gizmo = false;
             if (index_gizmo != -1 && index_gizmo < sessions.size())
             {
-                //sessions[index_gizmo].is_gizmo = true;
+                // sessions[index_gizmo].is_gizmo = true;
                 m_gizmo[0] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 0);
                 m_gizmo[1] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 0);
                 m_gizmo[2] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 0);
@@ -2941,7 +2964,7 @@ void project_gui()
 
 void display()
 {
-    ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
 
     view_kbd_shortcuts();
 
@@ -3335,7 +3358,7 @@ void display()
             if (ImGui::MenuItem("Save project", "Ctrl+S", nullptr, sessions.size() > 0))
                 saveProject();
 
-			ImGui::Separator();
+            ImGui::Separator();
 
             if (ImGui::MenuItem("Add session", "Ctrl+A"))
                 addSession();
@@ -3353,7 +3376,7 @@ void display()
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
-                        const auto& session_path = project_settings.session_file_names[i];
+                        const auto &session_path = project_settings.session_file_names[i];
 
                         if (i >= sessions.size())
                         {
@@ -3361,7 +3384,7 @@ void display()
                             continue;
                         }
 
-                        Session& session = sessions[i];
+                        Session &session = sessions[i];
 
                         std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
                         std::string folder_name = dir.filename().string();
@@ -3370,10 +3393,10 @@ void display()
                         std::cout << "Saving trajectory to LAZ: " << laz_path << std::endl;
 
                         save_trajectories_to_laz(session,
-                            laz_path,
-                            0.0f,
-                            0.0f,
-                            false);
+                                                 laz_path,
+                                                 0.0f,
+                                                 0.0f,
+                                                 false);
                     }
 
                     std::cout << "Finished saving all trajectories to .laz files." << std::endl;
@@ -3388,7 +3411,7 @@ void display()
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
-                        const auto& session_path = project_settings.session_file_names[i];
+                        const auto &session_path = project_settings.session_file_names[i];
 
                         if (i >= sessions.size())
                         {
@@ -3396,7 +3419,7 @@ void display()
                             continue;
                         }
 
-                        Session& session = sessions[i];
+                        Session &session = sessions[i];
                         std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
                         std::string folder_name = dir.filename().string();
                         std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidar_r.csv")).string();
@@ -3413,35 +3436,35 @@ void display()
                             }
 
                             outfile << "timestampLidar,x,y,z,"
-                                << "r00,r01,r02,"
-                                << "r10,r11,r12,"
-                                << "r20,r21,r22\n";
+                                    << "r00,r01,r02,"
+                                    << "r10,r11,r12,"
+                                    << "r20,r21,r22\n";
 
-                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
                             {
                                 if (!pc.visible)
                                     continue;
 
-                                for (const auto& traj : pc.local_trajectory)
+                                for (const auto &traj : pc.local_trajectory)
                                 {
                                     Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
                                     Eigen::Vector3d pos = pose.translation();
                                     Eigen::Matrix3d rot = pose.rotation();
 
                                     outfile << std::fixed << std::setprecision(0)
-                                        << traj.timestamps.first << ","
-                                        << std::setprecision(10)
-                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                        << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
-                                        << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
-                                        << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
+                                            << traj.timestamps.first << ","
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
+                                            << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
+                                            << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
                                 }
                             }
 
                             outfile.close();
                             std::cout << "Saved: " << csv_path << std::endl;
                         }
-                        catch (const std::exception& e)
+                        catch (const std::exception &e)
                         {
                             std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
                         }
@@ -3453,14 +3476,14 @@ void display()
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
-                        const auto& session_path = project_settings.session_file_names[i];
+                        const auto &session_path = project_settings.session_file_names[i];
                         if (i >= sessions.size())
                         {
                             std::cerr << "No loaded session for: " << session_path << std::endl;
                             continue;
                         }
 
-                        Session& session = sessions[i];
+                        Session &session = sessions[i];
                         std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
                         std::string folder_name = dir.filename().string();
                         std::string csv_path = (dir / (folder_name + "_trajectory_timestampUnix_r.csv")).string();
@@ -3476,29 +3499,29 @@ void display()
 
                             outfile << "timestampUnix,x,y,z," << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
 
-                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
                             {
                                 if (!pc.visible)
                                     continue;
-                                for (const auto& traj : pc.local_trajectory)
+                                for (const auto &traj : pc.local_trajectory)
                                 {
                                     Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
                                     Eigen::Vector3d pos = pose.translation();
                                     Eigen::Matrix3d rot = pose.rotation();
                                     outfile << std::fixed << std::setprecision(0)
-                                        << traj.timestamps.second << "," // Unix timestamp
-                                        << std::setprecision(10)
-                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                        << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
-                                        << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
-                                        << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
+                                            << traj.timestamps.second << "," // Unix timestamp
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
+                                            << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
+                                            << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
                                 }
                             }
 
                             outfile.close();
                             std::cout << "Saved: " << csv_path << std::endl;
                         }
-                        catch (const std::exception& e)
+                        catch (const std::exception &e)
                         {
                             std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
                         }
@@ -3508,14 +3531,14 @@ void display()
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
-                        const auto& session_path = project_settings.session_file_names[i];
+                        const auto &session_path = project_settings.session_file_names[i];
                         if (i >= sessions.size())
                         {
                             std::cerr << "No loaded session for: " << session_path << std::endl;
                             continue;
                         }
 
-                        Session& session = sessions[i];
+                        Session &session = sessions[i];
                         std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
                         std::string folder_name = dir.filename().string();
                         std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidarUnix_r.csv")).string();
@@ -3530,32 +3553,32 @@ void display()
                             }
 
                             outfile << "timestampLidar,timestampUnix,x,y,z,"
-                                << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
+                                    << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
 
-                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
                             {
                                 if (!pc.visible)
                                     continue;
-                                for (const auto& traj : pc.local_trajectory)
+                                for (const auto &traj : pc.local_trajectory)
                                 {
                                     Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
                                     Eigen::Vector3d pos = pose.translation();
                                     Eigen::Matrix3d rot = pose.rotation();
                                     outfile << std::fixed << std::setprecision(0)
-                                        << traj.timestamps.first << ","  // Lidar timestamp
-                                        << traj.timestamps.second << "," // Unix timestamp
-                                        << std::setprecision(10)
-                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                        << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
-                                        << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
-                                        << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
+                                            << traj.timestamps.first << ","  // Lidar timestamp
+                                            << traj.timestamps.second << "," // Unix timestamp
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << rot(0, 0) << "," << rot(0, 1) << "," << rot(0, 2) << ","
+                                            << rot(1, 0) << "," << rot(1, 1) << "," << rot(1, 2) << ","
+                                            << rot(2, 0) << "," << rot(2, 1) << "," << rot(2, 2) << "\n";
                                 }
                             }
 
                             outfile.close();
                             std::cout << "Saved: " << csv_path << std::endl;
                         }
-                        catch (const std::exception& e)
+                        catch (const std::exception &e)
                         {
                             std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
                         }
@@ -3569,7 +3592,7 @@ void display()
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
-                        const auto& session_path = project_settings.session_file_names[i];
+                        const auto &session_path = project_settings.session_file_names[i];
 
                         if (i >= sessions.size())
                         {
@@ -3577,7 +3600,7 @@ void display()
                             continue;
                         }
 
-                        Session& session = sessions[i];
+                        Session &session = sessions[i];
                         std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
                         std::string folder_name = dir.filename().string();
                         std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidar_q.csv")).string();
@@ -3595,29 +3618,29 @@ void display()
 
                             outfile << "timestampLidar,x,y,z,qx,qy,qz,qw\n";
 
-                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
                             {
                                 if (!pc.visible)
                                     continue;
 
-                                for (const auto& traj : pc.local_trajectory)
+                                for (const auto &traj : pc.local_trajectory)
                                 {
                                     Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
                                     Eigen::Vector3d pos = pose.translation();
                                     Eigen::Quaterniond q(pose.rotation());
 
                                     outfile << std::fixed << std::setprecision(0)
-                                        << traj.timestamps.first << "," // Lidar timestamp
-                                        << std::setprecision(10)
-                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                        << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
+                                            << traj.timestamps.first << "," // Lidar timestamp
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
                                 }
                             }
 
                             outfile.close();
                             std::cout << "Saved: " << csv_path << std::endl;
                         }
-                        catch (const std::exception& e)
+                        catch (const std::exception &e)
                         {
                             std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
                         }
@@ -3629,7 +3652,7 @@ void display()
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
-                        const auto& session_path = project_settings.session_file_names[i];
+                        const auto &session_path = project_settings.session_file_names[i];
 
                         if (i >= sessions.size())
                         {
@@ -3637,7 +3660,7 @@ void display()
                             continue;
                         }
 
-                        Session& session = sessions[i];
+                        Session &session = sessions[i];
                         std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
                         std::string folder_name = dir.filename().string();
                         std::string csv_path = (dir / (folder_name + "_trajectory_timestampUnix_q.csv")).string();
@@ -3655,29 +3678,29 @@ void display()
 
                             outfile << "timestampUnix,x,y,z,qx,qy,qz,qw\n";
 
-                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
                             {
                                 if (!pc.visible)
                                     continue;
 
-                                for (const auto& traj : pc.local_trajectory)
+                                for (const auto &traj : pc.local_trajectory)
                                 {
                                     Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
                                     Eigen::Vector3d pos = pose.translation();
                                     Eigen::Quaterniond q(pose.rotation());
 
                                     outfile << std::fixed << std::setprecision(0)
-                                        << traj.timestamps.second << "," // Unix timestamp
-                                        << std::setprecision(10)
-                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                        << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
+                                            << traj.timestamps.second << "," // Unix timestamp
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
                                 }
                             }
 
                             outfile.close();
                             std::cout << "Saved: " << csv_path << std::endl;
                         }
-                        catch (const std::exception& e)
+                        catch (const std::exception &e)
                         {
                             std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
                         }
@@ -3689,7 +3712,7 @@ void display()
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
-                        const auto& session_path = project_settings.session_file_names[i];
+                        const auto &session_path = project_settings.session_file_names[i];
 
                         if (i >= sessions.size())
                         {
@@ -3697,7 +3720,7 @@ void display()
                             continue;
                         }
 
-                        Session& session = sessions[i];
+                        Session &session = sessions[i];
                         std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
                         std::string folder_name = dir.filename().string();
                         std::string csv_path = (dir / (folder_name + "_trajectory_timestampLidarUnix_q.csv")).string();
@@ -3715,30 +3738,30 @@ void display()
 
                             outfile << "timestampLidar,timestampUnix,x,y,z,qx,qy,qz,qw\n";
 
-                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
                             {
                                 if (!pc.visible)
                                     continue;
 
-                                for (const auto& traj : pc.local_trajectory)
+                                for (const auto &traj : pc.local_trajectory)
                                 {
                                     Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
                                     Eigen::Vector3d pos = pose.translation();
                                     Eigen::Quaterniond q(pose.rotation());
 
                                     outfile << std::fixed << std::setprecision(0)
-                                        << traj.timestamps.first << ","  // Lidar timestamp
-                                        << traj.timestamps.second << "," // Unix timestamp
-                                        << std::setprecision(10)
-                                        << pos.x() << "," << pos.y() << "," << pos.z() << ","
-                                        << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
+                                            << traj.timestamps.first << ","  // Lidar timestamp
+                                            << traj.timestamps.second << "," // Unix timestamp
+                                            << std::setprecision(10)
+                                            << pos.x() << "," << pos.y() << "," << pos.z() << ","
+                                            << q.x() << "," << q.y() << "," << q.z() << "," << q.w() << "\n";
                                 }
                             }
 
                             outfile.close();
                             std::cout << "Saved: " << csv_path << std::endl;
                         }
-                        catch (const std::exception& e)
+                        catch (const std::exception &e)
                         {
                             std::cerr << "Error creating " << csv_path << ": " << e.what() << std::endl;
                         }
@@ -3748,28 +3771,35 @@ void display()
                 }
                 if (ImGui::MenuItem("Save all as TUM TXT"))
                 {
-                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i) {
-                        const auto& session_path = project_settings.session_file_names[i];
-                        if (i >= sessions.size()) {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto &session_path = project_settings.session_file_names[i];
+                        if (i >= sessions.size())
+                        {
                             std::cerr << "No loaded session for: " << session_path << std::endl;
                             continue;
                         }
-                        Session& session = sessions[i];
+                        Session &session = sessions[i];
                         std::filesystem::path dir = std::filesystem::path(session_path).parent_path();
                         std::string folder_name = dir.filename().string();
                         std::string txt_path = (dir / (folder_name + "_trajectory_tum.txt")).string();
 
                         std::cout << "Saving trajectory to TUM TXT: " << txt_path << std::endl;
-                        try {
+                        try
+                        {
                             std::ofstream outfile(txt_path);
-                            if (!outfile.is_open()) {
+                            if (!outfile.is_open())
+                            {
                                 std::cerr << "Failed to create file: " << txt_path << std::endl;
                                 continue;
                             }
 
-                            for (const auto& pc : session.point_clouds_container.point_clouds) {
-                                if (!pc.visible) continue;
-                                for (const auto& traj : pc.local_trajectory) {
+                            for (const auto &pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible)
+                                    continue;
+                                for (const auto &traj : pc.local_trajectory)
+                                {
                                     Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
                                     Eigen::Vector3d pos = pose.translation();
                                     Eigen::Quaterniond q(pose.rotation());
@@ -3777,16 +3807,17 @@ void display()
                                     double t_s = static_cast<double>(traj.timestamps.first) / 1e9;
 
                                     outfile << std::fixed
-                                        << std::setprecision(9) << t_s << " "
-                                        << std::setprecision(10) << pos.x() << " " << pos.y() << " " << pos.z() << " "
-                                        << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
+                                            << std::setprecision(9) << t_s << " "
+                                            << std::setprecision(10) << pos.x() << " " << pos.y() << " " << pos.z() << " "
+                                            << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
                                 }
                             }
 
                             outfile.close();
                             std::cout << "Saved: " << txt_path << std::endl;
                         }
-                        catch (const std::exception& e) {
+                        catch (const std::exception &e)
+                        {
                             std::cerr << "Error creating " << txt_path << ": " << e.what() << std::endl;
                         }
                     }
@@ -3811,8 +3842,8 @@ void display()
                 ImGui::Text("Known for being faster and smoother in optimization because\nit replaces discrete point-point correspondences with continuous probability density functions.");
                 ImGui::EndTooltip();
             }
- 
-            //bool prev_is_loop_closure_gui 
+
+            // bool prev_is_loop_closure_gui
             ImGui::MenuItem("Manual Loop Closure", "Ctrl+L", &is_loop_closure_gui, (number_visible_sessions == 1 || number_visible_sessions == 2));
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Manually connect overlapping scan sections");
@@ -3836,7 +3867,7 @@ void display()
 
                 if (tmp != point_size)
                 {
-                    for (auto& session : sessions)
+                    for (auto &session : sessions)
                     {
                         for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
                             session.point_clouds_container.point_clouds[i].point_size = point_size;
@@ -3865,11 +3896,11 @@ void display()
             ImGui::Separator();
             ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
-            //ImGui::MenuItem("show_covs", nullptr, &show_covs);
+            // ImGui::MenuItem("show_covs", nullptr, &show_covs);
 
             ImGui::Separator();
 
-            ImGui::ColorEdit3("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit3("Background color", (float *)&clear_color, ImGuiColorEditFlags_NoInputs);
 
             ImGui::EndMenu();
         }
@@ -3917,7 +3948,6 @@ void display()
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(3);
 
-
         ImGui::EndMainMenuBar();
     }
 
@@ -3925,7 +3955,7 @@ void display()
     {
         ImGui::OpenPopup("Remove Sessions");
         open_remove = false;
-	}
+    }
 
     if (ImGui::BeginPopupModal("Remove Sessions", NULL, ImGuiWindowFlags_AlwaysAutoResize))
     {
@@ -4022,58 +4052,58 @@ void display()
                         all_m_poses.push_back(sessions[i].point_clouds_container.point_clouds[j].m_pose);
                     }
 
-                    //if (all_m_poses.size() > 1)
+                    // if (all_m_poses.size() > 1)
                     //{
-                        ImGuiIO &io = ImGui::GetIO();
-                        // ImGuizmo -----------------------------------------------
-                        ImGuizmo::BeginFrame();
-                        ImGuizmo::Enable(true);
-                        ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+                    ImGuiIO &io = ImGui::GetIO();
+                    // ImGuizmo -----------------------------------------------
+                    ImGuizmo::BeginFrame();
+                    ImGuizmo::Enable(true);
+                    ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-                        //std::cout << "3" << std::endl;
-                        if (!is_ortho)
-                        {
-                            GLfloat projection[16];
-                            glGetFloatv(GL_PROJECTION_MATRIX, projection);
+                    // std::cout << "3" << std::endl;
+                    if (!is_ortho)
+                    {
+                        GLfloat projection[16];
+                        glGetFloatv(GL_PROJECTION_MATRIX, projection);
 
-                            GLfloat modelview[16];
-                            glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+                        GLfloat modelview[16];
+                        glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-                            ImGuizmo::Manipulate(modelview, projection, ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
-                        }
-                        else
-                            ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                        ImGuizmo::Manipulate(modelview, projection, ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                    }
+                    else
+                        ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
 
-                        sessions[i].point_clouds_container.point_clouds[0].m_pose =
-                            Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>();
-                        prev_pose_after_gismo = sessions[i].point_clouds_container.point_clouds[0].m_pose;
-                        sessions[i].point_clouds_container.point_clouds[0].pose = pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[0].m_pose);
+                    sessions[i].point_clouds_container.point_clouds[0].m_pose =
+                        Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>();
+                    prev_pose_after_gismo = sessions[i].point_clouds_container.point_clouds[0].m_pose;
+                    sessions[i].point_clouds_container.point_clouds[0].pose = pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[0].m_pose);
 
-                        sessions[i].point_clouds_container.point_clouds[0].gui_translation[0] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.px;
-                        sessions[i].point_clouds_container.point_clouds[0].gui_translation[1] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.py;
-                        sessions[i].point_clouds_container.point_clouds[0].gui_translation[2] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.pz;
+                    sessions[i].point_clouds_container.point_clouds[0].gui_translation[0] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.px;
+                    sessions[i].point_clouds_container.point_clouds[0].gui_translation[1] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.py;
+                    sessions[i].point_clouds_container.point_clouds[0].gui_translation[2] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.pz;
 
-                        sessions[i].point_clouds_container.point_clouds[0].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.om * 180.0 / M_PI);
-                        sessions[i].point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * 180.0 / M_PI);
-                        sessions[i].point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * 180.0 / M_PI);
+                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.om * 180.0 / M_PI);
+                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * 180.0 / M_PI);
+                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * 180.0 / M_PI);
 
-                        ImGui::End();
+                    ImGui::End();
 
-                        Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
-                        for (int j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
-                        {
-                            curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                            sessions[i].point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                            sessions[i].point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[j].m_pose);
+                    Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
+                    for (int j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+                    {
+                        curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
+                        sessions[i].point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
+                        sessions[i].point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(sessions[i].point_clouds_container.point_clouds[j].m_pose);
 
-                            sessions[i].point_clouds_container.point_clouds[j].gui_translation[0] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.px;
-                            sessions[i].point_clouds_container.point_clouds[j].gui_translation[1] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.py;
-                            sessions[i].point_clouds_container.point_clouds[j].gui_translation[2] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.pz;
+                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[0] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.px;
+                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[1] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.py;
+                        sessions[i].point_clouds_container.point_clouds[j].gui_translation[2] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.pz;
 
-                            sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
-                            sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
-                            sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
-                        }
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                    }
                     //}
                 }
             }
@@ -4164,7 +4194,7 @@ void display()
         ndt_gui();
 
     if (is_loop_closure_gui)
-		loop_closure_gui();
+        loop_closure_gui();
 
     /*if (!is_loop_closure_gui)
     {
@@ -4448,12 +4478,12 @@ int main(int argc, char *argv[])
         ImGui_ImplGLUT_Shutdown();
         ImGui::DestroyContext();
     }
-    catch (const std::bad_alloc& e)
+    catch (const std::bad_alloc &e)
     {
         std::cerr << "System is out of memory : " << e.what() << std::endl;
         mandeye::fd::OutOfMemMessage();
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cout << e.what();
     }

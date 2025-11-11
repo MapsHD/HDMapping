@@ -1023,7 +1023,7 @@ bool PointClouds::load_pose_ETH(const std::string &fn, Eigen::Affine3d &m_increm
 	return true;
 }
 
-bool load_pc(PointCloud &pc, std::string input_file_name)
+bool PointClouds::load_pc(PointCloud &pc, std::string input_file_name)
 {
 	laszip_POINTER laszip_reader;
 	if (laszip_create(&laszip_reader))

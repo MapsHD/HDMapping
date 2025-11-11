@@ -71,6 +71,8 @@ public:
 	PointCloudDimensions compute_point_cloud_dimension() const;
 	void print_point_cloud_dimension();
 	bool load_3DTK_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z);
+
+	bool load_pc(PointCloud &pc, std::string input_file_name);
 };
 
 double get_mean_uncertainty_xyz_impact6x6(std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>& uncertainty_before, std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>& uncertainty_after);

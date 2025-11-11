@@ -349,7 +349,7 @@ set(GUI_LIBRARIES imgui imguizmo implot)
 add_subdirectory(apps/hd_mapper)
 add_subdirectory(apps/lidar_odometry_step_1)    
 add_subdirectory(apps/manual_color)
-add_subdirectory(apps/matrix_mul)
+add_subdirectory(apps/console_tools)
 add_subdirectory(apps/multi_session_registration)
 add_subdirectory(apps/multi_view_tls_registration)
 add_subdirectory(apps/split_multi_livox)
@@ -362,7 +362,7 @@ add_subdirectory(apps/mandeye_single_session_viewer)
 add_subdirectory(apps/livox_mid_360_intrinsic_calibration)
 add_subdirectory(apps/single_session_manual_coloring)
 add_subdirectory(apps/concatenate_multi_livox)
-
+ 
 # CPack configuration
 set(CPACK_PACKAGE_NAME "hd_mapping")
 set(CPACK_PACKAGE_VERSION "${HDMAPPING_VERSION_MAJOR}.${HDMAPPING_VERSION_MINOR}.${HDMAPPING_VERSION_PATCH}")

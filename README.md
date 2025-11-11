@@ -342,7 +342,7 @@ This approach allows smooth build on Windows platform and guarantee predictable 
 If you want to build Debian package, you can depends on system-provided libraries:
 Before build install 3rd party libraries:
 ```
-sudo apt-get install freeglut3-dev libeigen3-dev liblaszip-dev
+sudo apt-get install freeglut3-dev libeigen3-dev liblaszip-dev libopencv-dev
 ```
 Next build Debian package:
 ```

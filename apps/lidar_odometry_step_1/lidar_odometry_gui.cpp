@@ -4,6 +4,7 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
+#define GLEW_STATIC
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <portable-file-dialogs.h>
@@ -104,6 +105,12 @@ std::chrono::time_point<std::chrono::system_clock> loStartTime;
 std::atomic<double> loElapsedSeconds{0.0};
 std::atomic<double> loEstimatedTimeRemaining{0.0};
 
+#if _WIN32
+#define DEFAULT_PATH "C:\\"
+#else
+#define DEFAULT_PATH "~"
+#endif
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 // Helper function to format time in human-readable format
@@ -156,16 +163,331 @@ std::string formatCompletionTime(double remainingSeconds)
     return std::string(timeStr);
 }
 
-// void alternative_approach();
-LaserBeam GetLaserBeam(int x, int y);
-Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane);
-void draw_ellipse(const Eigen::Matrix3d &covar, const Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd = 3);
+std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, int point_count_threshold, std::vector<Point3Di> prev_points)
+{
+    std::vector<std::vector<Point3Di>> res_points;
+    std::vector<Point3Di> points = load_point_cloud(laz_file, false, 0, 10000, {});
 
-#if _WIN32
-#define DEFAULT_PATH "C:\\"
-#else
-#define DEFAULT_PATH "~"
+    std::vector<Point3Di> tmp_points = prev_points;
+    int counter = tmp_points.size();
+    for (int i = 0; i < points.size(); i++)
+    {
+        counter++;
+        tmp_points.push_back(points[i]);
+        if (counter > point_count_threshold)
+        {
+            res_points.push_back(tmp_points);
+            tmp_points.clear();
+            counter = 0;
+        }
+    }
+
+    if (tmp_points.size() > 0)
+    {
+        res_points.push_back(tmp_points);
+    }
+    return res_points;
+}
+
+int get_index(set<int> s, int k)
+{
+    int index = 0;
+    for (auto u : s)
+    {
+        if (u == k)
+        {
+            return index;
+        }
+        index++;
+    }
+    return -1;
+}
+
+void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timestamps, std::vector<Eigen::Affine3d> poses, std::string fn1, std::string fn2)
+{
+    for (int i = 0; i < points.size(); i++)
+    {
+        auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), points[i].timestamp);
+        points[i].index_pose = std::distance(timestamps.begin(), lower);
+        // std::cout << "points[i].timestamp " << points[i].timestamp << " timestamps " << timestamps[points[i].index_pose] << std::endl;
+    }
+
+    std::set<int> indexes;
+
+    for (int i = 0; i < points.size(); i++)
+    {
+        indexes.insert(points[i].index_pose);
+    }
+    // build trajectory
+    std::vector<Eigen::Affine3d> trajectory;
+    std::vector<double> ts;
+
+    for (auto& s : indexes)
+    {
+        trajectory.push_back(poses[s]);
+        ts.push_back(timestamps[s]);
+    }
+
+    std::cout << "trajectory.size() " << trajectory.size() << std::endl;
+    // Sleep(2000);
+
+    std::vector<Point3Di> points_reindexed = points;
+    for (int i = 0; i < points_reindexed.size(); i++)
+    {
+        points_reindexed[i].index_pose = get_index(indexes, points[i].index_pose);
+    }
+    ///
+    std::vector<Eigen::Affine3d> best_trajectory = trajectory;
+    unsigned long long min_buckets = ULLONG_MAX;
+
+    for (double x = 0.0; x < 0.2; x += 0.0005)
+    {
+        std::vector<Eigen::Affine3d> trajectory_stretched;
+
+        Eigen::Affine3d m_x_offset = Eigen::Affine3d::Identity();
+        m_x_offset(0, 3) = x;
+
+        Eigen::Affine3d m = trajectory[0];
+        trajectory_stretched.push_back(m);
+        for (int i = 1; i < trajectory.size(); i++)
+        {
+            Eigen::Affine3d m_update = trajectory[i - 1].inverse() * trajectory[i] * (m_x_offset);
+            m = m * m_update;
+            trajectory_stretched.push_back(m);
+        }
+
+        NDT::GridParameters rgd_params;
+        rgd_params.resolution_X = 0.3;
+        rgd_params.resolution_Y = 0.3;
+        rgd_params.resolution_Z = 0.3;
+        NDTBucketMapType my_buckets;
+
+        std::vector<Point3Di> points_global = points_reindexed;
+
+        std::vector<Point3Di> points_global2;
+
+        for (auto& p : points_global)
+        {
+            if (p.point.z() > 0)
+            {
+                p.point = trajectory_stretched[p.index_pose] * p.point;
+                points_global2.push_back(p);
+                // if (p.point.norm() > 6 && p.point.norm() < 15)
+                //{
+                // points_global.push_back(p);
+                // }
+            }
+        }
+        update_rgd(rgd_params, my_buckets, points_global2, trajectory_stretched[0].translation());
+
+        std::cout << "number of buckets [" << x << "]: " << my_buckets.size() << std::endl;
+        if (my_buckets.size() < min_buckets)
+        {
+            min_buckets = my_buckets.size();
+            best_trajectory = trajectory_stretched;
+        }
+    }
+
+    std::map<double, Eigen::Matrix4d> trajectory_for_interpolation;
+    for (int i = 0; i < best_trajectory.size(); i++)
+    {
+        trajectory_for_interpolation[ts[i]] = best_trajectory[i].matrix();
+    }
+
+    std::vector<Eigen::Vector3d> pointcloud_global;
+    std::vector<unsigned short> intensity;
+    std::vector<double> timestamps_;
+    for (const auto& p : points_reindexed)
+    {
+        Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, p.timestamp);
+        Eigen::Affine3d b;
+        b.matrix() = pose;
+        Eigen::Vector3d vec = b * p.point;
+        pointcloud_global.push_back(vec);
+        intensity.push_back(p.intensity);
+        timestamps_.push_back(p.timestamp);
+    }
+
+    std::cout << "saving file: " << fn1 << std::endl;
+    exportLaz(fn1, pointcloud_global, intensity, timestamps_);
+
+    pointcloud_global.clear();
+    for (const auto& p : points_reindexed)
+    {
+        Eigen::Vector3d vec = trajectory[p.index_pose] * p.point;
+        pointcloud_global.push_back(vec);
+    }
+    exportLaz(fn2, pointcloud_global, intensity, timestamps_);
+}
+
+#if 0
+void alternative_approach()
+{
+    int point_count_threshold = 10000;
+
+    std::cout << "aternative_approach" << std::endl;
+
+    std::vector<std::string> input_file_names;
+    input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
+    std::sort(std::begin(input_file_names), std::end(input_file_names));
+
+    std::vector<std::string> csv_files;
+    std::vector<std::string> laz_files;
+    std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string& fileName)
+        {
+            if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
+            {
+                laz_files.push_back(fileName);
+            }
+            if (fileName.ends_with(".csv"))
+            {
+                csv_files.push_back(fileName);
+            } });
+
+            std::cout << "imu files: " << std::endl;
+            for (const auto& fn : csv_files)
+            {
+                std::cout << fn << std::endl;
+            }
+
+            std::cout << "loading imu" << std::endl;
+            std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
+
+            std::for_each(std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string& fn)
+                {
+                    auto imu = load_imu(fn.c_str(), 0);
+                    std::cout << fn << std::endl;
+                    imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu)); });
+
+            FusionAhrs ahrs;
+            FusionAhrsInitialise(&ahrs);
+
+            if (params.fusionConventionNwu)
+            {
+                ahrs.settings.convention = FusionConventionNwu;
+            }
+            if (params.fusionConventionEnu)
+            {
+                ahrs.settings.convention = FusionConventionEnu;
+            }
+            if (params.fusionConventionNed)
+            {
+                ahrs.settings.convention = FusionConventionNed;
+            }
+
+            std::map<double, Eigen::Matrix4d> trajectory;
+
+            int counter = 1;
+            static bool first = true;
+            static double last_ts;
+
+            for (const auto& [timestamp_pair, gyr, acc] : imu_data)
+            {
+                const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI) };
+                const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
+
+                //FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
+                if (first)
+                {
+                    FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
+                    first = false;
+                }
+                else
+                {
+                    double curr_ts = timestamp_pair.first;
+                    double ts_diff = curr_ts - last_ts;
+                    if (ts_diff < 0.01)
+                    {
+                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+                    }
+                    else
+                    {
+                        std::cout << "IMU TS jump!!!" << std::endl;
+                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
+                    }
+                }
+                last_ts = timestamp_pair.first;
+
+                FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
+
+                Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
+                Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
+                t.rotate(d);
+
+                trajectory[timestamp_pair.first] = t.matrix();
+                const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+                counter++;
+                if (counter % 100 == 0)
+                {
+                    printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+                }
+            }
+
+            ///////////////////////////////////////////////////////////////////////////////
+            std::cout << "point cloud file names" << std::endl;
+            for (const auto& fn : laz_files)
+            {
+                std::cout << fn << std::endl;
+            }
+
+            std::vector<Point3Di> prev_points;
+            std::vector<std::vector<Point3Di>> all_points;
+            std::vector<std::vector<Point3Di>> tmp_points = get_batches_of_points(laz_files[0], point_count_threshold, prev_points);
+
+            for (size_t i = 0; i < tmp_points.size() - 1; i++)
+            {
+                all_points.push_back(tmp_points[i]);
+            }
+
+            for (int i = 1; i < laz_files.size(); i++)
+            {
+                prev_points = tmp_points[tmp_points.size() - 1];
+                tmp_points = get_batches_of_points(laz_files[i], point_count_threshold, prev_points);
+                for (size_t j = 0; j < tmp_points.size() - 1; j++)
+                {
+                    all_points.push_back(tmp_points[j]);
+                }
+            }
+
+            //////////
+            std::vector<double> timestamps;
+            std::vector<Eigen::Affine3d> poses;
+            for (const auto& t : trajectory)
+            {
+                timestamps.push_back(t.first);
+                Eigen::Affine3d m;
+                m.matrix() = t.second;
+                poses.push_back(m);
+            }
+
+            for (int i = 0; i < all_points.size(); i++)
+            {
+                std::cout << all_points[i].size() << std::endl;
+                std::string fn1 = "C:/data/tmp/" + std::to_string(i) + "_best.laz";
+                std::string fn2 = "C:/data/tmp/" + std::to_string(i) + "_original.laz";
+
+                find_best_stretch(all_points[i], timestamps, poses, fn1, fn2);
+            }
+}
 #endif
+
+Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observation_picking)
+{
+    const auto laser_beam = GetLaserBeam(x, y);
+
+    RegistrationPlaneFeature::Plane pl;
+
+    pl.a = 0;
+    pl.b = 0;
+    pl.c = 1;
+    pl.d = -observation_picking.picking_plane_height;
+
+    Eigen::Vector3d pos = rayIntersection(laser_beam, pl);
+
+    std::cout << "intersection: " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;
+
+    return pos;
+}
 
 void step1(const std::atomic<bool> &loPause)
 {
@@ -1266,6 +1588,7 @@ void display()
     if (show_initial_points)
     {
         glColor3d(0.0, 1.0, 0.0);
+        glPointSize(point_size);
         glBegin(GL_POINTS);
         for (const auto &p : params.initial_points)
         {
@@ -1616,11 +1939,15 @@ void display()
                 ImGui::InputInt("Number of calibration validation points", &params.calibration_validation_points);
 
                 ImGui::Separator();
-                ImGui::Text("Ablation study:");
-                ImGui::MenuItem("Use planarity", nullptr, &params.ablation_study_use_planarity);
-                ImGui::MenuItem("Use norm", nullptr, &params.ablation_study_use_norm);
-                ImGui::MenuItem("Use hierarchical RGD", nullptr, &params.ablation_study_use_hierarchical_rgd);
-                ImGui::MenuItem("Use view point and normal vectors", nullptr, &params.ablation_study_use_view_point_and_normal_vectors);
+                if (ImGui::BeginMenu("Ablation study"))
+                {
+                    ImGui::MenuItem("Use planarity", nullptr, &params.ablation_study_use_planarity);
+                    ImGui::MenuItem("Use norm", nullptr, &params.ablation_study_use_norm);
+                    ImGui::MenuItem("Use hierarchical RGD", nullptr, &params.ablation_study_use_hierarchical_rgd);
+                    ImGui::MenuItem("Use view point and normal vectors", nullptr, &params.ablation_study_use_view_point_and_normal_vectors);
+
+                    ImGui::EndMenu();
+                }
 
                 ImGui::Separator();
 
@@ -1695,6 +2022,26 @@ void display()
 
             if (ImGui::BeginMenu("View"))
             {
+                ImGui::BeginDisabled(!(session.point_clouds_container.point_clouds.size() > 0));
+                {
+                    auto tmp = point_size;
+                    ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                    ImGui::InputInt("Points size", &point_size);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("keyboard 1-9 keys");
+                    if (point_size < 1)
+                        point_size = 1;
+                    else if (point_size > 10)
+                        point_size = 10;
+
+                    if (tmp != point_size)
+                        for (auto& point_cloud : session.point_clouds_container.point_clouds)
+                            point_cloud.point_size = point_size;
+
+                    ImGui::Separator();
+                }
+                ImGui::EndDisabled();
+
                 ImGui::MenuItem("Show initial points", nullptr, &show_initial_points);
                 ImGui::MenuItem("Show trajectory", nullptr, &show_trajectory);
                 ImGui::MenuItem("Show trajectory as axes", nullptr, &show_trajectory_as_axes);
@@ -1703,6 +2050,8 @@ void display()
                 // ImGui::MenuItem("show_covs", nullptr, &show_covs);
 
                 ImGui::Separator();
+
+                ImGui::Text("Colors:");
 
                 ImGui::ColorEdit3("Background color", (float *)&params.clear_color, ImGuiColorEditFlags_NoInputs);
 
@@ -1739,9 +2088,7 @@ void display()
     }
 
     if (loRunning)
-    {
         progress_window();
-    }
 
     if (info_gui)
     {
@@ -1947,330 +2294,4 @@ int main(int argc, char *argv[])
     }
 
     return 0;
-}
-
-std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, int point_count_threshold, std::vector<Point3Di> prev_points)
-{
-    std::vector<std::vector<Point3Di>> res_points;
-    std::vector<Point3Di> points = load_point_cloud(laz_file, false, 0, 10000, {});
-
-    std::vector<Point3Di> tmp_points = prev_points;
-    int counter = tmp_points.size();
-    for (int i = 0; i < points.size(); i++)
-    {
-        counter++;
-        tmp_points.push_back(points[i]);
-        if (counter > point_count_threshold)
-        {
-            res_points.push_back(tmp_points);
-            tmp_points.clear();
-            counter = 0;
-        }
-    }
-
-    if (tmp_points.size() > 0)
-    {
-        res_points.push_back(tmp_points);
-    }
-    return res_points;
-}
-
-int get_index(set<int> s, int k)
-{
-    int index = 0;
-    for (auto u : s)
-    {
-        if (u == k)
-        {
-            return index;
-        }
-        index++;
-    }
-    return -1;
-}
-
-void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timestamps, std::vector<Eigen::Affine3d> poses, std::string fn1, std::string fn2)
-{
-    for (int i = 0; i < points.size(); i++)
-    {
-        auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), points[i].timestamp);
-        points[i].index_pose = std::distance(timestamps.begin(), lower);
-        // std::cout << "points[i].timestamp " << points[i].timestamp << " timestamps " << timestamps[points[i].index_pose] << std::endl;
-    }
-
-    std::set<int> indexes;
-
-    for (int i = 0; i < points.size(); i++)
-    {
-        indexes.insert(points[i].index_pose);
-    }
-    // build trajectory
-    std::vector<Eigen::Affine3d> trajectory;
-    std::vector<double> ts;
-
-    for (auto &s : indexes)
-    {
-        trajectory.push_back(poses[s]);
-        ts.push_back(timestamps[s]);
-    }
-
-    std::cout << "trajectory.size() " << trajectory.size() << std::endl;
-    // Sleep(2000);
-
-    std::vector<Point3Di> points_reindexed = points;
-    for (int i = 0; i < points_reindexed.size(); i++)
-    {
-        points_reindexed[i].index_pose = get_index(indexes, points[i].index_pose);
-    }
-    ///
-    std::vector<Eigen::Affine3d> best_trajectory = trajectory;
-    unsigned long long min_buckets = ULLONG_MAX;
-
-    for (double x = 0.0; x < 0.2; x += 0.0005)
-    {
-        std::vector<Eigen::Affine3d> trajectory_stretched;
-
-        Eigen::Affine3d m_x_offset = Eigen::Affine3d::Identity();
-        m_x_offset(0, 3) = x;
-
-        Eigen::Affine3d m = trajectory[0];
-        trajectory_stretched.push_back(m);
-        for (int i = 1; i < trajectory.size(); i++)
-        {
-            Eigen::Affine3d m_update = trajectory[i - 1].inverse() * trajectory[i] * (m_x_offset);
-            m = m * m_update;
-            trajectory_stretched.push_back(m);
-        }
-
-        NDT::GridParameters rgd_params;
-        rgd_params.resolution_X = 0.3;
-        rgd_params.resolution_Y = 0.3;
-        rgd_params.resolution_Z = 0.3;
-        NDTBucketMapType my_buckets;
-
-        std::vector<Point3Di> points_global = points_reindexed;
-
-        std::vector<Point3Di> points_global2;
-
-        for (auto &p : points_global)
-        {
-            if (p.point.z() > 0)
-            {
-                p.point = trajectory_stretched[p.index_pose] * p.point;
-                points_global2.push_back(p);
-                // if (p.point.norm() > 6 && p.point.norm() < 15)
-                //{
-                // points_global.push_back(p);
-                // }
-            }
-        }
-        update_rgd(rgd_params, my_buckets, points_global2, trajectory_stretched[0].translation());
-
-        std::cout << "number of buckets [" << x << "]: " << my_buckets.size() << std::endl;
-        if (my_buckets.size() < min_buckets)
-        {
-            min_buckets = my_buckets.size();
-            best_trajectory = trajectory_stretched;
-        }
-    }
-
-    std::map<double, Eigen::Matrix4d> trajectory_for_interpolation;
-    for (int i = 0; i < best_trajectory.size(); i++)
-    {
-        trajectory_for_interpolation[ts[i]] = best_trajectory[i].matrix();
-    }
-
-    std::vector<Eigen::Vector3d> pointcloud_global;
-    std::vector<unsigned short> intensity;
-    std::vector<double> timestamps_;
-    for (const auto &p : points_reindexed)
-    {
-        Eigen::Matrix4d pose = getInterpolatedPose(trajectory_for_interpolation, p.timestamp);
-        Eigen::Affine3d b;
-        b.matrix() = pose;
-        Eigen::Vector3d vec = b * p.point;
-        pointcloud_global.push_back(vec);
-        intensity.push_back(p.intensity);
-        timestamps_.push_back(p.timestamp);
-    }
-
-    std::cout << "saving file: " << fn1 << std::endl;
-    exportLaz(fn1, pointcloud_global, intensity, timestamps_);
-
-    pointcloud_global.clear();
-    for (const auto &p : points_reindexed)
-    {
-        Eigen::Vector3d vec = trajectory[p.index_pose] * p.point;
-        pointcloud_global.push_back(vec);
-    }
-    exportLaz(fn2, pointcloud_global, intensity, timestamps_);
-}
-
-#if 0
-void alternative_approach()
-{
-    int point_count_threshold = 10000;
-
-    std::cout << "aternative_approach" << std::endl;
-
-    std::vector<std::string> input_file_names;
-    input_file_names = mandeye::fd::OpenFileDialog("Load las files",{}, true);
-    std::sort(std::begin(input_file_names), std::end(input_file_names));
-
-    std::vector<std::string> csv_files;
-    std::vector<std::string> laz_files;
-    std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string &fileName)
-                  {
-                    if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
-                    {
-                        laz_files.push_back(fileName);
-                    }
-                    if (fileName.ends_with(".csv"))
-                    {
-                        csv_files.push_back(fileName);
-                    } });
-
-    std::cout << "imu files: " << std::endl;
-    for (const auto &fn : csv_files)
-    {
-        std::cout << fn << std::endl;
-    }
-
-    std::cout << "loading imu" << std::endl;
-    std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
-
-    std::for_each(std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string &fn)
-                  {
-                    auto imu = load_imu(fn.c_str(), 0);
-                    std::cout << fn << std::endl;
-                    imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu)); });
-
-    FusionAhrs ahrs;
-    FusionAhrsInitialise(&ahrs);
-
-    if (params.fusionConventionNwu)
-    {
-        ahrs.settings.convention = FusionConventionNwu;
-    }
-    if (params.fusionConventionEnu)
-    {
-        ahrs.settings.convention = FusionConventionEnu;
-    }
-    if (params.fusionConventionNed)
-    {
-        ahrs.settings.convention = FusionConventionNed;
-    }
-
-    std::map<double, Eigen::Matrix4d> trajectory;
-
-    int counter = 1;
-    static bool first = true;
-    static double last_ts;
-
-    for (const auto &[timestamp_pair, gyr, acc] : imu_data)
-    {
-        const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
-        const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
-
-        //FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-        if (first)
-        {
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
-            first = false;
-        }
-        else
-        {
-            double curr_ts = timestamp_pair.first;
-            double ts_diff = curr_ts - last_ts;
-            if (ts_diff < 0.01)
-            {
-                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
-            }
-            else
-            {
-                std::cout << "IMU TS jump!!!" << std::endl;
-                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0/200.0);
-            }
-        }
-        last_ts = timestamp_pair.first;
-
-        FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-        Eigen::Quaterniond d{quat.element.w, quat.element.x, quat.element.y, quat.element.z};
-        Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
-        t.rotate(d);
-
-        trajectory[timestamp_pair.first] = t.matrix();
-        const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
-        counter++;
-        if (counter % 100 == 0)
-        {
-            printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
-        }
-    }
-
-    ///////////////////////////////////////////////////////////////////////////////
-    std::cout << "point cloud file names" << std::endl;
-    for (const auto &fn : laz_files)
-    {
-        std::cout << fn << std::endl;
-    }
-
-    std::vector<Point3Di> prev_points;
-    std::vector<std::vector<Point3Di>> all_points;
-    std::vector<std::vector<Point3Di>> tmp_points = get_batches_of_points(laz_files[0], point_count_threshold, prev_points);
-
-    for (size_t i = 0; i < tmp_points.size() - 1; i++)
-    {
-        all_points.push_back(tmp_points[i]);
-    }
-
-    for (int i = 1; i < laz_files.size(); i++)
-    {
-        prev_points = tmp_points[tmp_points.size() - 1];
-        tmp_points = get_batches_of_points(laz_files[i], point_count_threshold, prev_points);
-        for (size_t j = 0; j < tmp_points.size() - 1; j++)
-        {
-            all_points.push_back(tmp_points[j]);
-        }
-    }
-
-    //////////
-    std::vector<double> timestamps;
-    std::vector<Eigen::Affine3d> poses;
-    for (const auto &t : trajectory)
-    {
-        timestamps.push_back(t.first);
-        Eigen::Affine3d m;
-        m.matrix() = t.second;
-        poses.push_back(m);
-    }
-
-    for (int i = 0; i < all_points.size(); i++)
-    {
-        std::cout << all_points[i].size() << std::endl;
-        std::string fn1 = "C:/data/tmp/" + std::to_string(i) + "_best.laz";
-        std::string fn2 = "C:/data/tmp/" + std::to_string(i) + "_original.laz";
-
-        find_best_stretch(all_points[i], timestamps, poses, fn1, fn2);
-    }
-}
-#endif
-
-Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observation_picking)
-{
-    const auto laser_beam = GetLaserBeam(x, y);
-
-    RegistrationPlaneFeature::Plane pl;
-
-    pl.a = 0;
-    pl.b = 0;
-    pl.c = 1;
-    pl.d = -observation_picking.picking_plane_height;
-
-    Eigen::Vector3d pos = rayIntersection(laser_beam, pl);
-
-    std::cout << "intersection: " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;
-
-    return pos;
 }

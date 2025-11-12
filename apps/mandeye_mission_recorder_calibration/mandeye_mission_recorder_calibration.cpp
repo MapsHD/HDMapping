@@ -4,6 +4,7 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
+#define GLEW_STATIC
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <glm/glm.hpp>
@@ -336,10 +337,8 @@ void project_gui()
                     input_file_names = mandeye::fd::OpenFileDialog("Point cloud files", mandeye::fd::LAS_LAZ_filter, true);
 
                     if (input_file_names.size() > 0)
-                    {
                         for (int i = 0; i < input_file_names.size(); i++)
                             load_pc(input_file_names[i].c_str(), point_cloud, true, filter_threshold_xy);
-                    }
 
                     // Initialize imu_lidar according to imuSnToUse
                     imu_lidar.clear();
@@ -677,7 +676,7 @@ void display()
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
     }
 
-    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
@@ -744,6 +743,7 @@ void display()
                 index_calibrated_lidar = i;
         }
 
+        glPointSize(point_size);
         glBegin(GL_POINTS);
         for (const auto &p : point_cloud)
         {
@@ -772,6 +772,7 @@ void display()
     }
     else
     {
+        glPointSize(point_size);
         glBegin(GL_POINTS);
         for (const auto &p : point_cloud)
         {
@@ -815,13 +816,30 @@ void display()
 
         if (ImGui::BeginMenu("View"))
         {
+            ImGui::BeginDisabled(!(point_cloud.size() > 0));
+            {
+                ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                ImGui::InputInt("Points size", &point_size);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("keyboard 1-9 keys");
+                if (point_size < 1)
+                    point_size = 1;
+                else if (point_size > 10)
+                    point_size = 10;
+
+                ImGui::Separator();
+            }
+            ImGui::EndDisabled();
+
             ImGui::MenuItem("Show grid", "key G", &show_grid);
+
             ImGui::MenuItem("Show axes", "key X", &show_axes);
             ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
             ImGui::Separator();
+            ImGui::Text("Colors:");
 
-            ImGui::ColorEdit3("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit3("Background color", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
             if (idToSn.size() == 2)
             {
                 ImGui::ColorEdit3(idToSn.at(0).c_str(), (float*)&pc_color, ImGuiColorEditFlags_NoInputs);
@@ -861,7 +879,7 @@ void display()
     info_window(infoLines, appShortcuts, &info_gui);
 
     if (compass_ruler)
-        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), clear_color);
+        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), bg_color);
 
     project_gui();
 

@@ -5,20 +5,6 @@
 
 namespace fs = std::filesystem;
 
-std::string pathUpdater(std::string path, std::string newPath)
-{
-    fs::path p(path);
-    fs::path newpath(newPath);
-    if (is_directory(p))
-    {
-        return p.string();
-    }
-
-    // get filename
-    fs::path filename = p.filename();
-    return (newpath / filename).string();
-}
-
 bool Session::load(const std::string &file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
 {
     this->session_file_name = file_name;
@@ -44,6 +30,14 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
     // Get a loaded file directory
     std::string directory = fs::path(file_name).parent_path().string();
 
+	// Local pathUpdater lambda (keep directories unchanged, update files to be in session directory)
+    auto getNewPath = [&](const std::string& path) -> std::string {
+        fs::path p(path);
+        if (is_directory(p))
+            return p.string();
+        return (fs::path(directory) / p.filename()).string();
+        };
+
     try
     {
         std::ifstream fs(file_name);
@@ -52,16 +46,16 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         nlohmann::json data = nlohmann::json::parse(fs);
         fs.close();
 
-        auto project_settings_json = data["Session Settings"];
-        point_clouds_container.offset.x() = project_settings_json["offset_x"];
-        point_clouds_container.offset.y() = project_settings_json["offset_y"];
-        point_clouds_container.offset.z() = project_settings_json["offset_z"];
-        folder_name = pathUpdater(project_settings_json["folder_name"], directory);
-        out_folder_name = pathUpdater(project_settings_json["out_folder_name"], directory);
-        poses_file_name = pathUpdater(project_settings_json["poses_file_name"], directory);
-        initial_poses_file_name = pathUpdater(project_settings_json["initial_poses_file_name"], directory);
+        const auto& project_settings_json = data["Session Settings"];
+        point_clouds_container.offset.x() = project_settings_json.value("offset_x", 0.0);
+        point_clouds_container.offset.y() = project_settings_json.value("offset_y", 0.0);
+        point_clouds_container.offset.z() = project_settings_json.value("offset_z", 0.0);
+        folder_name = getNewPath(project_settings_json.value("folder_name",""));
+        out_folder_name = getNewPath(project_settings_json.value("out_folder_name", ""));
+        poses_file_name = getNewPath(project_settings_json.value("poses_file_name", ""));
+        initial_poses_file_name = getNewPath(project_settings_json.value("initial_poses_file_name", ""));
         std::cout << "!!" << initial_poses_file_name << std::endl;
-        out_poses_file_name = pathUpdater(project_settings_json["out_poses_file_name"], directory);
+        out_poses_file_name = getNewPath(project_settings_json.value("out_poses_file_name", ""));
 
         is_ground_truth = project_settings_json.value("ground_truth", false);
 
@@ -70,30 +64,30 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             PoseGraphLoopClosure::Edge edge;
             edge.index_from = edge_json["index_from"];
             edge.index_to = edge_json["index_to"];
-            edge.is_fixed_fi = edge_json["is_fixed_fi"];
-            edge.is_fixed_ka = edge_json["is_fixed_ka"];
-            edge.is_fixed_om = edge_json["is_fixed_om"];
-            edge.is_fixed_px = edge_json["is_fixed_px"];
-            edge.is_fixed_py = edge_json["is_fixed_py"];
-            edge.is_fixed_pz = edge_json["is_fixed_pz"];
-            edge.relative_pose_tb.fi = edge_json["fi"];
-            edge.relative_pose_tb.ka = edge_json["ka"];
-            edge.relative_pose_tb.om = edge_json["om"];
-            edge.relative_pose_tb.px = edge_json["px"];
-            edge.relative_pose_tb.py = edge_json["py"];
-            edge.relative_pose_tb.pz = edge_json["pz"];
-            edge.relative_pose_tb_weights.fi = edge_json["w_fi"];
-            edge.relative_pose_tb_weights.ka = edge_json["w_ka"];
-            edge.relative_pose_tb_weights.om = edge_json["w_om"];
-            edge.relative_pose_tb_weights.px = edge_json["w_px"];
-            edge.relative_pose_tb_weights.py = edge_json["w_py"];
-            edge.relative_pose_tb_weights.pz = edge_json["w_pz"];
+            edge.is_fixed_fi = edge_json.value("is_fixed_fi", false);
+            edge.is_fixed_ka = edge_json.value("is_fixed_ka", false);
+            edge.is_fixed_om = edge_json.value("is_fixed_om", false);
+            edge.is_fixed_px = edge_json.value("is_fixed_px", false);
+            edge.is_fixed_py = edge_json.value("is_fixed_py", false);
+            edge.is_fixed_pz = edge_json.value("is_fixed_pz", false);
+            edge.relative_pose_tb.fi = edge_json.value("fi", 0.0);
+            edge.relative_pose_tb.ka = edge_json.value("ka", 0.0);
+            edge.relative_pose_tb.om = edge_json.value("om", 0.0);
+            edge.relative_pose_tb.px = edge_json.value("px", 0.0);
+            edge.relative_pose_tb.py = edge_json.value("py", 0.0);
+            edge.relative_pose_tb.pz = edge_json.value("pz", 0.0);
+            edge.relative_pose_tb_weights.fi = edge_json.value("w_fi", 0.0);
+            edge.relative_pose_tb_weights.ka = edge_json.value("w_ka", 0.0);
+            edge.relative_pose_tb_weights.om = edge_json.value("w_om", 0.0);
+            edge.relative_pose_tb_weights.px = edge_json.value("w_px", 0.0);
+            edge.relative_pose_tb_weights.py = edge_json.value("w_py", 0.0);
+            edge.relative_pose_tb_weights.pz = edge_json.value("w_pz", 0.0);
             loop_closure_edges.push_back(edge);
         }
 
         for (const auto &fn_json : data["laz_file_names"])
         {
-            const std::string fn = pathUpdater(fn_json["file_name"], directory);
+            const std::string fn = getNewPath(fn_json["file_name"]);
             laz_file_names.push_back(fn);
         
             vfixed_x.push_back(fn_json.value("fixed_x", false));
@@ -154,42 +148,38 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         for (const auto &gcp_json : data["ground_control_points"])
         {
             GroundControlPoint gcp;
-            // gcp.name = gcp_json["name"];
-            std::string name = gcp_json["name"];
+            std::string name = gcp_json.value("name", "");
             strcpy(gcp.name, name.c_str());
-            gcp.x = gcp_json["x"];
-            gcp.y = gcp_json["y"];
-            gcp.z = gcp_json["z"];
-            gcp.sigma_x = gcp_json["sigma_x"];
-            gcp.sigma_y = gcp_json["sigma_y"];
-            gcp.sigma_z = gcp_json["sigma_z"];
-            gcp.lidar_height_above_ground = gcp_json["lidar_height_above_ground"];
+            gcp.x = gcp_json.value("x", 0.0);
+            gcp.y = gcp_json.value("y", 0.0);
+            gcp.z = gcp_json.value("z", 0.0);
+            gcp.sigma_x = gcp_json.value("sigma_x", 0.0);
+            gcp.sigma_y = gcp_json.value("sigma_y", 0.0);
+            gcp.sigma_z = gcp_json.value("sigma_z", 0.0);
+            gcp.lidar_height_above_ground = gcp_json.value("lidar_height_above_ground", 0.0);
             gcp.index_to_node_inner = gcp_json["index_to_node_inner"];
             gcp.index_to_node_outer = gcp_json["index_to_node_outer"];
             ground_control_points.gpcs.push_back(gcp);
 
             std::cout << "adding gcp[" << name << "]" << std::endl;
         };
-#endif
 
-#if WITH_GUI == 1
         for (const auto &cp_json : data["control_points"])
         {
             ControlPoint cp;
-            // cp.name = cp_json["name"];
-            std::string name = cp_json["name"];
+            std::string name = cp_json.value("name", "");
             strcpy(cp.name, name.c_str());
-            cp.x_source_local = cp_json["x_source_local"];
-            cp.y_source_local = cp_json["y_source_local"];
-            cp.z_source_local = cp_json["z_source_local"];
-            cp.x_target_global = cp_json["x_target_global"];
-            cp.y_target_global = cp_json["y_target_global"];
-            cp.z_target_global = cp_json["z_target_global"];
-            cp.sigma_x = cp_json["sigma_x"];
-            cp.sigma_y = cp_json["sigma_y"];
-            cp.sigma_z = cp_json["sigma_z"];
+            cp.x_source_local = cp_json.value("x_source_local", 0.0);
+            cp.y_source_local = cp_json.value("y_source_local", 0.0);
+            cp.z_source_local = cp_json.value("z_source_local", 0.0);
+            cp.x_target_global = cp_json.value("x_target_global", 0.0);
+            cp.y_target_global = cp_json.value("y_target_global", 0.0);
+            cp.z_target_global = cp_json.value("z_target_global", 0.0);
+            cp.sigma_x = cp_json.value("sigma_x", 0.0);
+            cp.sigma_y = cp_json.value("sigma_y", 0.0);
+            cp.sigma_z = cp_json.value("sigma_z", 0.0);
             cp.index_to_pose = cp_json["index_to_pose"];
-            cp.is_z_0 = cp_json["is_z_0"];
+            cp.is_z_0 = cp_json.value("is_z_0", false);
             control_points.cps.push_back(cp);
 
             std::cout << "adding cp[" << name << "]" << std::endl;

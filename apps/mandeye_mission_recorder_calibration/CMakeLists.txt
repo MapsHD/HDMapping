@@ -41,6 +41,7 @@ target_include_directories(
 target_link_libraries(
   mandeye_mission_recorder_calibration
   PRIVATE Fusion
+  PRIVATE ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
   ${FREEGLUT_LIBRARY}
   ${OPENGL_gl_LIBRARY}
   OpenGL::GLU

@@ -6,6 +6,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////////
 
+const float DEG_TO_RAD = 3.141592653589793238462643383279502884 / 180.0f;
+
 const std::string out_fn = "Output file name";
 
 constexpr float ImGuiNumberWidth = 120.0f;
@@ -43,7 +45,7 @@ extern float mouse_sensitivity;
 
 extern bool is_ortho;
 extern bool show_axes;
-extern ImVec4 clear_color;
+extern ImVec4 bg_color;
 extern int point_size;
 
 extern bool info_gui;

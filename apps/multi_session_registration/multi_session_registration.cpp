@@ -13,6 +13,7 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
+#define GLEW_STATIC
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <glm/glm.hpp>
@@ -2718,14 +2719,16 @@ void project_gui()
 
         ImGui::Text("Benchmark settings:");
 
-        ImGui::SetNextItemWidth(ImGuiNumberWidth * 2);
+        ImGui::PushItemWidth(ImGuiNumberWidth * 2);
 
         static double fast_plus = 100000000.0;
         static double fast_plus_plus = 1000000000.0;
 
-        ImGui::InputDouble("increment ", &fast_plus);
-        ImGui::InputDouble("faset increment ", &fast_plus_plus);
-        ImGui::InputDouble("Timestamp offset ", &time_stamp_offset, fast_plus, fast_plus_plus);
+        ImGui::InputDouble("Increment", &fast_plus);
+        ImGui::InputDouble("Fast increment", &fast_plus_plus);
+		ImGui::PopItemWidth();
+        ImGui::SetNextItemWidth(ImGuiNumberWidth);
+        ImGui::InputDouble("Timestamp offset", &time_stamp_offset, fast_plus, fast_plus_plus);
         ImGui::SameLine();
         if (ImGui::Button("Set to origin"))
         {
@@ -2763,10 +2766,6 @@ void project_gui()
                 }
             }
         }
-
-        ImGui::Separator();
-
-        ImGui::NewLine();
 
         ImGui::Separator();
 
@@ -2850,7 +2849,7 @@ void project_gui()
 
                             std::string ts_end = std::to_string(sessions[i].point_clouds_container.point_clouds[index_last].local_trajectory[index_last2].timestamps.first);
 
-                            ImGui::Text(("timestamp range: <" + ts_begin + "," + ts_end + ">").c_str());
+                            ImGui::Text(("Timestamp range: <" + ts_begin + ", " + ts_end + ">").c_str());
                         }
                     }
                 }
@@ -3029,7 +3028,7 @@ void display()
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
     }
 
-    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
@@ -3823,12 +3822,10 @@ void display()
                     }
                     std::cout << "Finished saving all trajectories to TUM TXT files." << std::endl;
                 }
-
-                ImGui::EndMenu();
             }
-
-            ImGui::EndMenu();
+            ImGui::EndMenu();  
         }
+        ImGui::EndMenu();
 
         if (ImGui::BeginMenu("Tools"))
         {
@@ -3847,32 +3844,27 @@ void display()
             ImGui::MenuItem("Manual Loop Closure", "Ctrl+L", &is_loop_closure_gui, (number_visible_sessions == 1 || number_visible_sessions == 2));
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Manually connect overlapping scan sections");
-
-            ImGui::EndMenu();
         }
+        ImGui::EndMenu();
 
         if (ImGui::BeginMenu("View"))
         {
-            if (sessions.size() > 0)
+            ImGui::BeginDisabled(!(sessions.size() > 0));
             {
                 auto tmp = point_size;
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
-                ImGui::InputInt("points size", &point_size);
+                ImGui::InputInt("Points size", &point_size);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("keyboard 1-9 keys");
                 if (point_size < 1)
                     point_size = 1;
-                if (point_size > 10)
+                else if (point_size > 10)
                     point_size = 10;
 
                 if (tmp != point_size)
-                {
                     for (auto &session : sessions)
-                    {
-                        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-                            session.point_clouds_container.point_clouds[i].point_size = point_size;
-                    }
-                }
+                        for (auto& point_cloud : session.point_clouds_container.point_clouds)
+                            point_cloud.point_size = point_size;
 
                 ImGui::Separator();
             }
@@ -3892,18 +3884,19 @@ void display()
                 ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
 
             ImGui::MenuItem("Show axes", "key X", &show_axes);
-            ImGui::MenuItem("Block Z", nullptr, &block_z);
-            ImGui::Separator();
             ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
+
+            ImGui::MenuItem("Block Z", nullptr, &block_z);
 
             // ImGui::MenuItem("show_covs", nullptr, &show_covs);
 
             ImGui::Separator();
 
-            ImGui::ColorEdit3("Background color", (float *)&clear_color, ImGuiColorEditFlags_NoInputs);
+            ImGui::Text("Colors:");
 
-            ImGui::EndMenu();
+            ImGui::ColorEdit3("Background color", (float *)&bg_color, ImGuiColorEditFlags_NoInputs);
         }
+        ImGui::EndMenu();
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Scene view relevant parameters");
 
@@ -4014,7 +4007,7 @@ void display()
     info_window(infoLines, appShortcuts, &info_gui);
 
     if (compass_ruler)
-        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), clear_color);
+        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), bg_color);
 
     // my_display_code();
     /*if (is_ndt_gui)

@@ -20,19 +20,9 @@ add_executable(
 
 target_compile_definitions(multi_view_tls_registration_step_2 PRIVATE -DWITH_GUI=1)
 
-target_link_libraries(
-  multi_view_tls_registration_step_2
-  PRIVATE ${FREEGLUT_LIBRARY}
-          ${OPENGL_gl_LIBRARY}
-          OpenGL::GLU
-          ${PLATFORM_LASZIP_LIB}
-          ${PLATFORM_MISCELLANEOUS_LIBS}
-          ${CORE_LIBRARIES}
-          ${GUI_LIBRARIES})
-
 target_include_directories(
-  multi_view_tls_registration_step_2
-  PRIVATE include
+          multi_view_tls_registration_step_2
+          PRIVATE include
           ${REPOSITORY_DIRECTORY}/core/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
           ${EIGEN3_INCLUDE_DIR}
@@ -44,6 +34,17 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
           ${LASZIP_INCLUDE_DIR}/LASzip/include)
+
+  target_link_libraries(
+          multi_view_tls_registration_step_2
+          PRIVATE ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
+          PRIVATE ${FREEGLUT_LIBRARY}
+          ${OPENGL_gl_LIBRARY}
+          OpenGL::GLU
+          ${PLATFORM_LASZIP_LIB}
+          ${PLATFORM_MISCELLANEOUS_LIBS}
+          ${CORE_LIBRARIES}
+          ${GUI_LIBRARIES})
 
 if(WIN32)
   add_custom_command(

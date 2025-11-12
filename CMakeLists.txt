@@ -254,6 +254,8 @@ add_definitions(-D_USE_MATH_DEFINES)
 
 get_filename_component(REPOSITORY_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} ABSOLUTE)
 set(EXTERNAL_LIBRARIES_DIRECTORY ${REPOSITORY_DIRECTORY}/3rdparty)
+set(EXTERNAL_LIBRARIES_DIRECTORY_BINARY ${REPOSITORY_DIRECTORY}/3rdpartyBinary)
+
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -298,6 +300,9 @@ else()
     MESSAGE(STATUS "LASzip include dir: ${LASZIP_INCLUDE_DIR}, LASzip library: ${LASZIP_LIBRARY}")
 endif ()
 
+# Download or Search for OpenCV
+add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY_BINARY}/OpenCV)
+
 # Option to build with bundled oneTBB
 option(BUILD_WITH_BUNDLED_ONETBB "Build with bundled oneTBB" ON)
 if (BUILD_WITH_BUNDLED_ONETBB)
@@ -337,6 +342,7 @@ if(PYBIND)
 else()
     message(STATUS "PYBIND is disabled.")
 endif()
+
 
 add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
 

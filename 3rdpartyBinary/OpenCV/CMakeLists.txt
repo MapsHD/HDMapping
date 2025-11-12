@@ -22,10 +22,10 @@ if (WIN32)
         message(STATUS "Downloading OpenCV...")
         file(DOWNLOAD ${OPENCV_DOWNLOAD_EXE_URL} ${OPENCV_DOWNLOAD_EXE} SHOW_PROGRESS)
         # Verify SHA256 checksum
-        # file(SHA256 ${OPENCV_DOWNLOAD_EXE} OPENCV_COMPUTED_SHA256)
-        # if(NOT OPENCV_COMPUTED_SHA256 STREQUAL OPENCV_DOWNLOAD_EXE_SHA256)
-        #     message(FATAL_ERROR "SHA256 checksum mismatch for downloaded OpenCV executable.")
-        # endif()
+        file(SHA256 ${OPENCV_DOWNLOAD_EXE} OPENCV_COMPUTED_SHA256)
+        if(NOT OPENCV_COMPUTED_SHA256 STREQUAL OPENCV_DOWNLOAD_EXE_SHA256)
+            message(FATAL_ERROR "SHA256 checksum mismatch for downloaded OpenCV executable.")
+        endif()
     endif()
 
     # Extract OpenCV exe

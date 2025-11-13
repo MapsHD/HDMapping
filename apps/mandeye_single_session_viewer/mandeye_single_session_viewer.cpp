@@ -4,8 +4,11 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
+#ifdef _WIN32
 #define GLEW_STATIC
 #include <GL/glew.h>
+#endif
+
 #include <GL/freeglut.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -153,382 +156,389 @@ Session session;
 
 //VBO/VAO/SSBO proof of concept implementation through glew. openGL 4.6 required
 ///////////////////////////////////////////////////////////////////////////////////
+#ifdef _WIN32
+    //in order to test have to be enabled from View menu before loading session so buffers are created
+    //should be tested with smaller sessions since session is "doubled" with gl_Points vector
+    bool gl_useVBOs = false;
 
-//in order to test have to be enabled from View menu before loading session so buffers are created
-//should be tested with smaller sessions since session is "doubled" with gl_Points vector
-bool gl_useVBOs = false;
+    // vertex shader
+    const char* pointsVertSource = R"glsl(
+    #version 460 core
 
-// vertex shader
-const char* pointsVertSource = R"glsl(
-#version 460 core
+    //SSBOs
+    layout(std430, binding = 0) buffer VertexCloudIndex {
+        int cloudIndex[];  // cloud index per vertex
+    };
 
-//SSBOs
-layout(std430, binding = 0) buffer VertexCloudIndex {
-    int cloudIndex[];  // cloud index per vertex
-};
+    //order matters for std430 layout
+    struct Cloud {
+        int colorScheme;   // 0=solid,1=intensity gradient, etc.
+        vec3 fixedColor;   // fixed color
+        mat4 pose;         // cloud transformation
+    };
 
-//order matters for std430 layout
-struct Cloud {
-    int colorScheme;   // 0=solid,1=intensity gradient, etc.
-    vec3 fixedColor;   // fixed color
-    mat4 pose;         // cloud transformation
-};
+    layout(std430, binding = 1) buffer CloudsBuffer {
+        Cloud clouds[];
+    };
 
-layout(std430, binding = 1) buffer CloudsBuffer {
-    Cloud clouds[];
-};
+    //vertex inputs
+    layout(location = 0) in vec3 aPos;        // vertex position
+    layout(location = 1) in float aIntensity; // per-point intensity
 
-//vertex inputs
-layout(location = 0) in vec3 aPos;        // vertex position
-layout(location = 1) in float aIntensity; // per-point intensity
+    //uniforms
+    uniform mat4 uMVP;                        // model-view-projection matrix
+    uniform float uPointSize;                 // point size from GUI
+    uniform int uUsePose;                   // whether to use cloud pose
 
-//uniforms
-uniform mat4 uMVP;                        // model-view-projection matrix
-uniform float uPointSize;                 // point size from GUI
-uniform int uUsePose;                   // whether to use cloud pose
+    out float vIntensity;                     // pass intensity to fragment shader
+    flat out int vColorScheme;                     // pass cloud color scheme to fragment shader
+    out vec3 vFixedColor;                     // pass fixed color / computed color to fragment shader
 
-out float vIntensity;                     // pass intensity to fragment shader
-flat out int vColorScheme;                     // pass cloud color scheme to fragment shader
-out vec3 vFixedColor;                     // pass fixed color / computed color to fragment shader
-
-void main()
-{
-    int idx = cloudIndex[gl_VertexID];       // get cloud index
-    Cloud c = clouds[idx];                   // fetch attributes
-
-    mat4 finalPose = (uUsePose == 0) ?  mat4(1.0) : c.pose;  // identity if not using pose
-    gl_Position = uMVP * finalPose * vec4(aPos, 1.0);
-
-    gl_PointSize = uPointSize;
-    vIntensity = aIntensity;
-    vColorScheme = c.colorScheme;
-    vFixedColor = c.fixedColor;
-    //vFixedColor = vec3(float(idx % 10) / 10.0, float((idx/10) % 10) / 10.0, 0.0);
-}
-)glsl";
-
-// fragment shader
-const char* pointsFragSource = R"glsl(
-#version 460 core
-
-in float vIntensity;
-flat in int vColorScheme;
-in vec3 vFixedColor;
-out vec4 FragColor;
-
-uniform float uIntensityScale; // optional multiplier or normalization
-
-void main()
-{
-    float norm = clamp(vIntensity * uIntensityScale, 0.0, 1.0);
-    vec3 endColor;
-
-    if (vColorScheme == 0)
-        endColor = vFixedColor;                 // solid color
-    else if (vColorScheme == 1)
-        endColor = vec3(norm, 0.0, 1.0 - norm); // blue–red gradient by intensity
-    else
-        endColor = vec3(0.5);                   // default gray
-
-    FragColor = vec4(endColor, 1.0);
-}
-)glsl";
-
-///////////////////////////////////////////////////////////////////////////////////
-
-struct gl_point {
-    Eigen::Vector3f pos;
-    float intensity;
-};
-
-std::vector<gl_point> gl_Points;
-/*= {
-    {{0.0f, 0.0f, 1.0f}, 1.0f},
-    {{0.5f, 0.0f, 1.0f}, 0.7f},
-    {{0.0f, 0.5f, 1.0f}, 0.5f},
-    {{0.0f, 0.0f, 2.0f}, 0.2f},
-};*/
-
-struct gl_cloud {
-    GLint offset;     
-    GLsizei count;    
-    bool visible;     // show/hide
-};
-
-// Add to clouds vector
-std::vector<gl_cloud> gl_clouds;
-/*= { {
-    0,                                //offset
-    static_cast<GLsizei>(gl_Points.size()), //count
-    true,                             //visible
-    Eigen::Matrix4f::Identity(),      //pose
-    1,                                //colorScheme
-    Eigen::Vector3f(1.0f, 0.0f, 0.0f) //color = red, for example
-} };*/
-
-// CPU-side vectors for SSBO data
-struct gl_cloudSSBO {
-    int colorScheme;        // 4 bytes
-    float padding0[3];      // pad to vec4 alignment (std430 requires vec3 as 16 bytes)
-    float fixedColor[3];    // 12 bytes for vec3
-    float padding1;         // pad to 16 bytes
-    float pose[16];         // mat4 = 16 floats (16*4 = 64 bytes)
-};
-
-std::vector<int> gl_cloudIndexSSBO;      // size = gl_Points.size()
-std::vector<gl_cloudSSBO> gl_cloudsSSBO;        // Cloud is your struct from GLSL
-
-Eigen::Matrix4f gl_mvp; //Model-View-Projection matrix
-
-// Uniform locations
-GLuint VAO, VBO = 0;
-
-GLuint gl_uPointSize = 0;
-GLuint gl_uMVP = 0;
-GLuint gl_shaderProgram = 0;
-GLuint gl_uIntensityScale = 0;
-GLuint gl_uUsePose = 0;
-
-GLuint gl_ssboCloudIndex, gl_ssboClouds = 0;
-
-//gl_*** functions related to glew/openGL VBO/VAO
-GLuint gl_compileShader(GLenum type, const char* source)
-{
-    GLuint shader = glCreateShader(type);
-    glShaderSource(shader, 1, &source, nullptr);
-    glCompileShader(shader);
-
-    // check compilation
-    GLint success;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (!success)
+    void main()
     {
-        char infoLog[512];
-        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
-        std::cerr << "openGL shader compilation failed: " << infoLog << std::endl;
+        int idx = cloudIndex[gl_VertexID];       // get cloud index
+        Cloud c = clouds[idx];                   // fetch attributes
+
+        mat4 finalPose = (uUsePose == 0) ?  mat4(1.0) : c.pose;  // identity if not using pose
+        gl_Position = uMVP * finalPose * vec4(aPos, 1.0);
+
+        gl_PointSize = uPointSize;
+        vIntensity = aIntensity;
+        vColorScheme = c.colorScheme;
+        vFixedColor = c.fixedColor;
+        //vFixedColor = vec3(float(idx % 10) / 10.0, float((idx/10) % 10) / 10.0, 0.0);
     }
-    return shader;
-}
+    )glsl";
 
-GLuint gl_createShaderProgram(const char* vertSource, const char* fragSource)
-{
-    GLuint vertexShader = gl_compileShader(GL_VERTEX_SHADER, vertSource);
-    GLuint fragmentShader = gl_compileShader(GL_FRAGMENT_SHADER, fragSource);
+    // fragment shader
+    const char* pointsFragSource = R"glsl(
+    #version 460 core
 
-    GLuint program = glCreateProgram();
-    glAttachShader(program, vertexShader);
-    glAttachShader(program, fragmentShader);
-    glLinkProgram(program);
+    in float vIntensity;
+    flat in int vColorScheme;
+    in vec3 vFixedColor;
+    out vec4 FragColor;
 
-    // check linking
-    GLint success;
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (!success)
+    uniform float uIntensityScale; // optional multiplier or normalization
+
+    void main()
     {
-        char infoLog[512];
-        glGetProgramInfoLog(program, 512, nullptr, infoLog);
-        std::cerr << "openGL program linking failed: " << infoLog << std::endl;
+        float norm = clamp(vIntensity * uIntensityScale, 0.0, 1.0);
+        vec3 endColor;
+
+        if (vColorScheme == 0)
+            endColor = vFixedColor;                 // solid color
+        else if (vColorScheme == 1)
+            endColor = vec3(norm, 0.0, 1.0 - norm); // blue–red gradient by intensity
+        else
+            endColor = vec3(0.5);                   // default gray
+
+        FragColor = vec4(endColor, 1.0);
     }
+    )glsl";
 
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+    ///////////////////////////////////////////////////////////////////////////////////
 
-    return program;
-}
+    struct gl_point {
+        Eigen::Vector3f pos;
+        float intensity;
+    };
 
-void gl_loadPointCloudBuffer(const std::vector<gl_point>& points, GLuint& VAO, GLuint& VBO)
-{
-    // Create VAO + VBO
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
+    std::vector<gl_point> gl_Points;
+    /*= {
+        {{0.0f, 0.0f, 1.0f}, 1.0f},
+        {{0.5f, 0.0f, 1.0f}, 0.7f},
+        {{0.0f, 0.5f, 1.0f}, 0.5f},
+        {{0.0f, 0.0f, 2.0f}, 0.2f},
+    };*/
 
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(gl_point), points.data(), GL_STATIC_DRAW);
+    struct gl_cloud {
+        GLint offset;     
+        GLsizei count;    
+        bool visible;     // show/hide
+    };
 
-    // --- Attribute 0: position ---
-    // layout(location = 0) in vec3 aPos;
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(
-        0,                                    // attribute index
-        3,                                    // vec3
-        GL_FLOAT,
-        GL_FALSE,
-        sizeof(gl_point),                     // stride = full struct
-        (void*)offsetof(gl_point, pos)        // offset of position field
-    );
+    // Add to clouds vector
+    std::vector<gl_cloud> gl_clouds;
+    /*= { {
+        0,                                //offset
+        static_cast<GLsizei>(gl_Points.size()), //count
+        true,                             //visible
+        Eigen::Matrix4f::Identity(),      //pose
+        1,                                //colorScheme
+        Eigen::Vector3f(1.0f, 0.0f, 0.0f) //color = red, for example
+    } };*/
 
-    // --- Attribute 1: intensity ---
-    // layout(location = 1) in float aIntensity;
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(
-        1,
-        1,
-        GL_FLOAT,
-        GL_FALSE,
-        sizeof(gl_point),
-        (void*)offsetof(gl_point, intensity)
-    );
+    // CPU-side vectors for SSBO data
+    struct gl_cloudSSBO {
+        int colorScheme;        // 4 bytes
+        float padding0[3];      // pad to vec4 alignment (std430 requires vec3 as 16 bytes)
+        float fixedColor[3];    // 12 bytes for vec3
+        float padding1;         // pad to 16 bytes
+        float pose[16];         // mat4 = 16 floats (16*4 = 64 bytes)
+    };
 
-    // Unbind
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
+    std::vector<int> gl_cloudIndexSSBO;      // size = gl_Points.size()
+    std::vector<gl_cloudSSBO> gl_cloudsSSBO;        // Cloud is your struct from GLSL
 
-void gl_updateSSBOs() {
-    // Vertex -> Cloud index
-    if (gl_ssboCloudIndex == 0)
+    Eigen::Matrix4f gl_mvp; //Model-View-Projection matrix
+
+    // Uniform locations
+    GLuint VAO, VBO = 0;
+
+    GLuint gl_uPointSize = 0;
+    GLuint gl_uMVP = 0;
+    GLuint gl_shaderProgram = 0;
+    GLuint gl_uIntensityScale = 0;
+    GLuint gl_uUsePose = 0;
+
+    GLuint gl_ssboCloudIndex, gl_ssboClouds = 0;
+
+    //gl_*** functions related to glew/openGL VBO/VAO
+    GLuint gl_compileShader(GLenum type, const char* source)
     {
-        glGenBuffers(1, &gl_ssboCloudIndex);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboCloudIndex);
-        glBufferData(GL_SHADER_STORAGE_BUFFER,
-            gl_cloudIndexSSBO.size() * sizeof(int),
-            gl_cloudIndexSSBO.data(),
-            GL_DYNAMIC_DRAW);
-    }
-    else
-    {
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboCloudIndex);
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER,
-            0,
-            gl_cloudIndexSSBO.size() * sizeof(int),
-            gl_cloudIndexSSBO.data());
-	}
+        GLuint shader = glCreateShader(type);
+        glShaderSource(shader, 1, &source, nullptr);
+        glCompileShader(shader);
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gl_ssboCloudIndex);
-
-    // Cloud attributes
-    if (gl_ssboClouds == 0)
-    {
-        glGenBuffers(1, &gl_ssboClouds);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboClouds);
-        glBufferData(GL_SHADER_STORAGE_BUFFER,
-            gl_cloudsSSBO.size() * sizeof(gl_cloudSSBO),
-            gl_cloudsSSBO.data(),
-            GL_DYNAMIC_DRAW);
-    }
-    else
-    {
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboClouds);
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER,
-            0,
-            gl_cloudsSSBO.size() * sizeof(gl_cloudSSBO),
-            gl_cloudsSSBO.data());
-    }
-
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gl_ssboClouds);
-
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-}
-
-void gl_updateUserView()
-{
-    ImGuiIO& io = ImGui::GetIO();
-
-    Eigen::Affine3f viewLocal1 = Eigen::Affine3f::Identity();
-    viewLocal1.translate(rotation_center);
-
-    viewLocal1.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-    viewLocal1.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
-    viewLocal1.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
-    viewLocal1.translate(-rotation_center);
-
-    //Get the projection matrix from your reshape() or manually rebuild it
-    float aspect = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-    float fov = 60.0f * DEG_TO_RAD;
-    float nearf = 0.001f; //closest distance to camera objects are rendered [m]
-    float farf = 1000.0f; //furthest distance to camera objects are rendered [m]
-
-    Eigen::Matrix4f projection = Eigen::Matrix4f::Zero();
-    float f = 1.0f / tan(fov / 2.0f);
-    projection(0, 0) = f / aspect;
-    projection(1, 1) = f;
-    projection(2, 2) = (farf + nearf) / (nearf - farf);
-    projection(2, 3) = (2 * farf * nearf) / (nearf - farf);
-    projection(3, 2) = -1.0f;
-
-    //Combine into a single MVP (model-view-projection)
-    gl_mvp = projection * viewLocal1.matrix();
-}
-
-void gl_renderPointCloud()
-{
-    glUseProgram(gl_shaderProgram);
-
-    //Set point size from GUI
-    glUniform1f(gl_uPointSize, static_cast<float>(point_size));
-    glUniform1f(gl_uIntensityScale, offset_intensity);
-    glUniform1i(gl_uUsePose, usePose);
-    glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, gl_mvp.data());
-
-    if (oldcolorScheme != colorScheme)
-    {
-        if (colorScheme == 0)
-            for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
-            {
-                gl_cloudsSSBO[i].colorScheme = 0;
-                gl_cloudsSSBO[i].fixedColor[0] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
-                gl_cloudsSSBO[i].fixedColor[1] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
-                gl_cloudsSSBO[i].fixedColor[2] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
-            }
-
-        else if (colorScheme == 1)
-            for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
-                gl_cloudsSSBO[i].colorScheme = 1;
-
-        else if (colorScheme == 2)
-            for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
-            {
-                gl_cloudsSSBO[i].colorScheme = 0;
-                gl_cloudsSSBO[i].fixedColor[0] = float(rand() % 255) / 255.0f;
-                gl_cloudsSSBO[i].fixedColor[1] = float(rand() % 255) / 255.0f;
-                gl_cloudsSSBO[i].fixedColor[2] = float(rand() % 255) / 255.0f;
-            }
-
-		oldcolorScheme = colorScheme;
-
-        gl_updateSSBOs();
-    }
-
-    glBindVertexArray(VAO);
-    /*for (size_t i = 0; i < gl_clouds.size(); i++)
-    {
-        if (!gl_clouds[i].visible) continue;
-
-        // Send per-cloud uniforms
-
-        if (usePose)
+        // check compilation
+        GLint success;
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+        if (!success)
         {
-            Eigen::Matrix4f cloudMVP = gl_mvp * gl_cloudsSSBO[i].pose;
-            glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, cloudMVP.data());
+            char infoLog[512];
+            glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+            std::cerr << "openGL shader compilation failed: " << infoLog << std::endl;
+        }
+        return shader;
+    }
+
+    GLuint gl_createShaderProgram(const char* vertSource, const char* fragSource)
+    {
+        GLuint vertexShader = gl_compileShader(GL_VERTEX_SHADER, vertSource);
+        GLuint fragmentShader = gl_compileShader(GL_FRAGMENT_SHADER, fragSource);
+
+        GLuint program = glCreateProgram();
+        glAttachShader(program, vertexShader);
+        glAttachShader(program, fragmentShader);
+        glLinkProgram(program);
+
+        // check linking
+        GLint success;
+        glGetProgramiv(program, GL_LINK_STATUS, &success);
+        if (!success)
+        {
+            char infoLog[512];
+            glGetProgramInfoLog(program, 512, nullptr, infoLog);
+            std::cerr << "openGL program linking failed: " << infoLog << std::endl;
+        }
+
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
+
+        return program;
+    }
+
+    void gl_loadPointCloudBuffer(const std::vector<gl_point>& points, GLuint& VAO, GLuint& VBO)
+    {
+        // Create VAO + VBO
+        glGenVertexArrays(1, &VAO);
+        glBindVertexArray(VAO);
+
+        glGenBuffers(1, &VBO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(gl_point), points.data(), GL_STATIC_DRAW);
+
+        // --- Attribute 0: position ---
+        // layout(location = 0) in vec3 aPos;
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(
+            0,                                    // attribute index
+            3,                                    // vec3
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(gl_point),                     // stride = full struct
+            (void*)offsetof(gl_point, pos)        // offset of position field
+        );
+
+        // --- Attribute 1: intensity ---
+        // layout(location = 1) in float aIntensity;
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(
+            1,
+            1,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(gl_point),
+            (void*)offsetof(gl_point, intensity)
+        );
+
+        // Unbind
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+    }
+
+    void gl_updateSSBOs() {
+        // Vertex -> Cloud index
+        if (gl_ssboCloudIndex == 0)
+        {
+            glGenBuffers(1, &gl_ssboCloudIndex);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboCloudIndex);
+            glBufferData(GL_SHADER_STORAGE_BUFFER,
+                gl_cloudIndexSSBO.size() * sizeof(int),
+                gl_cloudIndexSSBO.data(),
+                GL_DYNAMIC_DRAW);
         }
         else
-            glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, gl_mvp.data());
+        {
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboCloudIndex);
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER,
+                0,
+                gl_cloudIndexSSBO.size() * sizeof(int),
+                gl_cloudIndexSSBO.data());
+	    }
 
-        // Draw only this cloud’s range
-        //glDrawArrays(GL_POINTS, gl_clouds[i].offset, gl_clouds[i].count);
-    }*/
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gl_ssboCloudIndex);
 
-    glDrawArrays(GL_POINTS, 0, gl_cloudIndexSSBO.size());
+        // Cloud attributes
+        if (gl_ssboClouds == 0)
+        {
+            glGenBuffers(1, &gl_ssboClouds);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboClouds);
+            glBufferData(GL_SHADER_STORAGE_BUFFER,
+                gl_cloudsSSBO.size() * sizeof(gl_cloudSSBO),
+                gl_cloudsSSBO.data(),
+                GL_DYNAMIC_DRAW);
+        }
+        else
+        {
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboClouds);
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER,
+                0,
+                gl_cloudsSSBO.size() * sizeof(gl_cloudSSBO),
+                gl_cloudsSSBO.data());
+        }
 
-    glBindVertexArray(0);
-    glUseProgram(0); // back to fixed-function for legacy code
-}
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gl_ssboClouds);
 
-void gl_init()
-{
-    //Compile shaders and create shader program
-    gl_shaderProgram = gl_createShaderProgram(pointsVertSource, pointsFragSource);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    }
 
-    //Get pointers
-    gl_uMVP = glGetUniformLocation(gl_shaderProgram, "uMVP");
-    gl_uPointSize = glGetUniformLocation(gl_shaderProgram, "uPointSize");
-    gl_uIntensityScale = glGetUniformLocation(gl_shaderProgram, "uIntensityScale");
-	gl_uUsePose = glGetUniformLocation(gl_shaderProgram, "uUsePose");
+    void gl_updateUserView()
+    {
+        ImGuiIO& io = ImGui::GetIO();
 
-    glEnable(GL_PROGRAM_POINT_SIZE);
-}
+        Eigen::Affine3f viewLocal1 = Eigen::Affine3f::Identity();
+        viewLocal1.translate(rotation_center);
 
+        viewLocal1.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
+        viewLocal1.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        viewLocal1.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+        viewLocal1.translate(-rotation_center);
+
+        //Get the projection matrix from your reshape() or manually rebuild it
+        float aspect = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+        float fov = 60.0f * DEG_TO_RAD;
+        float nearf = 0.001f; //closest distance to camera objects are rendered [m]
+        float farf = 1000.0f; //furthest distance to camera objects are rendered [m]
+
+        Eigen::Matrix4f projection = Eigen::Matrix4f::Zero();
+        float f = 1.0f / tan(fov / 2.0f);
+        projection(0, 0) = f / aspect;
+        projection(1, 1) = f;
+        projection(2, 2) = (farf + nearf) / (nearf - farf);
+        projection(2, 3) = (2 * farf * nearf) / (nearf - farf);
+        projection(3, 2) = -1.0f;
+
+        //Combine into a single MVP (model-view-projection)
+        gl_mvp = projection * viewLocal1.matrix();
+    }
+
+    void gl_renderPointCloud()
+    {
+        glUseProgram(gl_shaderProgram);
+
+        //Set point size from GUI
+        glUniform1f(gl_uPointSize, static_cast<float>(point_size));
+        glUniform1f(gl_uIntensityScale, offset_intensity);
+        glUniform1i(gl_uUsePose, usePose);
+        glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, gl_mvp.data());
+
+        if (oldcolorScheme != colorScheme)
+        {
+            if (colorScheme == 0)
+                for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
+                {
+                    gl_cloudsSSBO[i].colorScheme = 0;
+                    gl_cloudsSSBO[i].fixedColor[0] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
+                    gl_cloudsSSBO[i].fixedColor[1] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
+                    gl_cloudsSSBO[i].fixedColor[2] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
+                }
+
+            else if (colorScheme == 1)
+                for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
+                    gl_cloudsSSBO[i].colorScheme = 1;
+
+            else if (colorScheme == 2)
+                for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
+                {
+                    gl_cloudsSSBO[i].colorScheme = 0;
+                    gl_cloudsSSBO[i].fixedColor[0] = float(rand() % 255) / 255.0f;
+                    gl_cloudsSSBO[i].fixedColor[1] = float(rand() % 255) / 255.0f;
+                    gl_cloudsSSBO[i].fixedColor[2] = float(rand() % 255) / 255.0f;
+                }
+
+		    oldcolorScheme = colorScheme;
+
+            gl_updateSSBOs();
+        }
+
+        glBindVertexArray(VAO);
+        /*for (size_t i = 0; i < gl_clouds.size(); i++)
+        {
+            if (!gl_clouds[i].visible) continue;
+
+            // Send per-cloud uniforms
+
+            if (usePose)
+            {
+                Eigen::Matrix4f cloudMVP = gl_mvp * gl_cloudsSSBO[i].pose;
+                glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, cloudMVP.data());
+            }
+            else
+                glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, gl_mvp.data());
+
+            // Draw only this cloud’s range
+            //glDrawArrays(GL_POINTS, gl_clouds[i].offset, gl_clouds[i].count);
+        }*/
+
+        glDrawArrays(GL_POINTS, 0, gl_cloudIndexSSBO.size());
+
+        glBindVertexArray(0);
+        glUseProgram(0); // back to fixed-function for legacy code
+    }
+
+    void gl_init()
+    {
+        GLenum err = glewInit();
+        if (err != GLEW_OK)
+        {
+            std::cerr << "GLEW init failed: " << glewGetErrorString(err) << std::endl;
+            return;
+        }
+
+        //Compile shaders and create shader program
+        gl_shaderProgram = gl_createShaderProgram(pointsVertSource, pointsFragSource);
+
+        //Get pointers
+        gl_uMVP = glGetUniformLocation(gl_shaderProgram, "uMVP");
+        gl_uPointSize = glGetUniformLocation(gl_shaderProgram, "uPointSize");
+        gl_uIntensityScale = glGetUniformLocation(gl_shaderProgram, "uIntensityScale");
+	    gl_uUsePose = glGetUniformLocation(gl_shaderProgram, "uUsePose");
+
+        glEnable(GL_PROGRAM_POINT_SIZE);
+    }
+#endif
 ///////////////////////////////////////////////////////////////////////////////////
 
 
@@ -546,6 +556,7 @@ void openSession()
         session.load(fs::path(session_file_name).string(), false, 0.0, 0.0, 0.0, false);
         index_rendered_points_local = 0;
 
+#ifdef _WIN32
         if (gl_useVBOs)
         {
             GLint offset = 0;
@@ -602,6 +613,7 @@ void openSession()
             //Prepare SSBO data
             gl_updateSSBOs();
 		}
+#endif
 
         std::string newTitle = winTitle + " - " + truncPath(session_file_name);
         glutSetWindowTitle(newTitle.c_str());
@@ -616,11 +628,13 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
+#ifdef _WIN32
     if (gl_useVBOs)
     {
         gl_updateUserView();
         gl_renderPointCloud();
     }
+#endif
 
     view_kbd_shortcuts();
 
@@ -840,6 +854,7 @@ void display()
 
             ImGui::Separator();
 
+#ifdef _WIN32
             ImGui::MenuItem("VBO/VAO proof of concept", nullptr, &gl_useVBOs);
             if (ImGui::IsItemHovered())
             {
@@ -853,6 +868,7 @@ void display()
             }
 
             ImGui::Separator();
+#endif
 
             if (ImGui::BeginMenu("Colors"))
             {
@@ -1022,10 +1038,10 @@ int main(int argc, char *argv[])
 {
     try
     {
-        initGL(&argc, argv, winTitle, display, mouse);
-        
+        initGL(&argc, argv, winTitle, display, mouse); 
+#ifdef _WIN32
         gl_init();
-
+#endif
         glutMainLoop();
 
         ImGui_ImplOpenGL2_Shutdown();

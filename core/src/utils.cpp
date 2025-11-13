@@ -1,6 +1,5 @@
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
-#define GLEW_STATIC
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 
@@ -364,13 +363,6 @@ bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)
 #endif
 
     while (glGetError() != GL_NO_ERROR) {} // Clear any existing GL errors from platform or driver init
-
-    GLenum err = glewInit();
-    if (err != GLEW_OK)
-    {
-        std::cerr << "GLEW init failed: " << glewGetErrorString(err) << std::endl;
-        return false;
-    }
 
     // default initialization
     glClearColor(0.0, 0.0, 0.0, 1.0);

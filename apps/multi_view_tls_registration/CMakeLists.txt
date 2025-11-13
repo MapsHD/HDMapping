@@ -37,7 +37,7 @@ target_include_directories(
 
   target_link_libraries(
           multi_view_tls_registration_step_2
-          PRIVATE ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
+          # PRIVATE ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
           PRIVATE ${FREEGLUT_LIBRARY}
           ${OPENGL_gl_LIBRARY}
           OpenGL::GLU

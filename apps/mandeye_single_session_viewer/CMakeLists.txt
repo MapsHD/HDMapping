@@ -42,10 +42,10 @@ if (WIN32)
     target_link_libraries(mandeye_single_session_viewer PRIVATE
         ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
     )
-else()
-    # Linux / macOS: use system GLEW
-    find_package(GLEW REQUIRED)
-    target_link_libraries(mandeye_single_session_viewer PRIVATE GLEW::GLEW)
+#else()
+#    # Linux / macOS: use system GLEW
+#    find_package(GLEW REQUIRED)
+#    target_link_libraries(mandeye_single_session_viewer PRIVATE GLEW::GLEW)
 endif()
 
 target_link_libraries(

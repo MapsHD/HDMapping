@@ -301,7 +301,9 @@ else()
 endif ()
 
 # Download or Search for OpenCV
-add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY_BINARY}/OpenCV)
+include(${EXTERNAL_LIBRARIES_DIRECTORY_BINARY}/OpenCV/CMakeLists.txt)
+find_package(OpenCV REQUIRED)
+MESSAGE(STATUS "OpenCV include dir: ${OpenCV_INCLUDE_DIRS}, OpenCV librarys: ${OpenCV_LIBS}")
 
 # Option to build with bundled oneTBB
 option(BUILD_WITH_BUNDLED_ONETBB "Build with bundled oneTBB" ON)

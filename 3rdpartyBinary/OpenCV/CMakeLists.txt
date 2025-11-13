@@ -1,14 +1,14 @@
 cmake_minimum_required(VERSION 3.28)
 # Script tries to find OpenCV in system for Linux, downloads OpenCV release for Windows
 if(UNIX)
-    find_package(OpenCV QUIET)
-    if(NOT OpenCV_FOUND)
-          message(FATAL_ERROR 
-            "OpenCV not found. Please install it using your package manager:\n"
-            "  sudo apt install libopencv-dev\n"
-            "Then reconfigure CMake."
-        )
-    endif()
+     find_package(OpenCV QUIET)
+     if(NOT OpenCV_FOUND)
+           message(FATAL_ERROR 
+             "OpenCV not found. Please install it using your package manager:\n"
+             "  sudo apt install libopencv-dev\n"
+             "Then reconfigure CMake."
+         )
+     endif()
 endif()
 
 if (WIN32)
@@ -22,10 +22,10 @@ if (WIN32)
         message(STATUS "Downloading OpenCV...")
         file(DOWNLOAD ${OPENCV_DOWNLOAD_EXE_URL} ${OPENCV_DOWNLOAD_EXE} SHOW_PROGRESS)
         # Verify SHA256 checksum
-        # file(SHA256 ${OPENCV_DOWNLOAD_EXE} OPENCV_COMPUTED_SHA256)
-        # if(NOT OPENCV_COMPUTED_SHA256 STREQUAL OPENCV_DOWNLOAD_EXE_SHA256)
-        #     message(FATAL_ERROR "SHA256 checksum mismatch for downloaded OpenCV executable.")
-        # endif()
+        file(SHA256 ${OPENCV_DOWNLOAD_EXE} OPENCV_COMPUTED_SHA256)
+        if(NOT OPENCV_COMPUTED_SHA256 STREQUAL OPENCV_DOWNLOAD_EXE_SHA256)
+            message(FATAL_ERROR "SHA256 checksum mismatch for downloaded OpenCV executable.")
+        endif()
     endif()
 
     # Extract OpenCV exe
@@ -37,7 +37,7 @@ if (WIN32)
             DESTINATION ${OPENCV_EXTRACT_DIR}
         )
     endif()
-    if(EXISTS ${OPENCV_EXTRACT_DIR})
-        set (OpenCV_DIR ${CMAKE_BINARY_DIR}/3rd_binary/OpenCV/opencv/build) 
-    endif()
+    # add cmake prefix path to find OpenCV
+    list(APPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/3rd_binary/OpenCV/opencv/build")
+    set (OpenCV_DIR ${CMAKE_BINARY_DIR}/3rd_binary/OpenCV/opencv/build) 
 endif()

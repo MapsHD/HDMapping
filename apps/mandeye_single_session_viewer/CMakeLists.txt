@@ -37,17 +37,6 @@ target_include_directories(
   ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
   ${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
 
-if (WIN32)
-    # Static GLEW on Windows
-    target_link_libraries(mandeye_single_session_viewer PRIVATE
-        ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
-    )
-#else()
-#    # Linux / macOS: use system GLEW
-#    find_package(GLEW REQUIRED)
-#    target_link_libraries(mandeye_single_session_viewer PRIVATE GLEW::GLEW)
-endif()
-
 target_link_libraries(
   mandeye_single_session_viewer
   PRIVATE Fusion
@@ -58,7 +47,8 @@ target_link_libraries(
   ${PLATFORM_LASZIP_LIB}
   ${CORE_LIBRARIES}
   ${GUI_LIBRARIES}
-  ${PLATFORM_MISCELLANEOUS_LIBS})
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  ${GLEW_LIBRARY})
 
 if(WIN32)
   add_custom_command(

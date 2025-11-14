@@ -4,10 +4,8 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
-#ifdef _WIN32
 #define GLEW_STATIC
 #include <GL/glew.h>
-#endif
 
 #include <GL/freeglut.h>
 #include <glm/glm.hpp>
@@ -33,6 +31,7 @@
     #include <shellapi.h>  // <-- Required for ShellExecuteA
     #include "resource.h"
 #endif
+#include <GL_assert.h>
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -153,10 +152,9 @@ bool usePose = false;
 Session session;
 
 
-
 //VBO/VAO/SSBO proof of concept implementation through glew. openGL 4.6 required
 ///////////////////////////////////////////////////////////////////////////////////
-#ifdef _WIN32
+//
     //in order to test have to be enabled from View menu before loading session so buffers are created
     //should be tested with smaller sessions since session is "doubled" with gl_Points vector
     bool gl_useVBOs = false;
@@ -297,17 +295,17 @@ Session session;
     //gl_*** functions related to glew/openGL VBO/VAO
     GLuint gl_compileShader(GLenum type, const char* source)
     {
-        GLuint shader = glCreateShader(type);
-        glShaderSource(shader, 1, &source, nullptr);
-        glCompileShader(shader);
+        GLuint shader = GL_CALL_RET(glCreateShader(type));
+        GL_CALL(glShaderSource(shader, 1, &source, nullptr));
+        GL_CALL(glCompileShader(shader));
 
         // check compilation
         GLint success;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+        GL_CALL(glGetShaderiv(shader, GL_COMPILE_STATUS, &success));
         if (!success)
         {
             char infoLog[512];
-            glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+            GL_CALL(glGetShaderInfoLog(shader, 512, nullptr, infoLog));
             std::cerr << "openGL shader compilation failed: " << infoLog << std::endl;
         }
         return shader;
@@ -318,23 +316,23 @@ Session session;
         GLuint vertexShader = gl_compileShader(GL_VERTEX_SHADER, vertSource);
         GLuint fragmentShader = gl_compileShader(GL_FRAGMENT_SHADER, fragSource);
 
-        GLuint program = glCreateProgram();
-        glAttachShader(program, vertexShader);
-        glAttachShader(program, fragmentShader);
-        glLinkProgram(program);
+        GLuint program = GL_CALL_RET(glCreateProgram());
+        GL_CALL(glAttachShader(program, vertexShader));
+        GL_CALL(glAttachShader(program, fragmentShader));
+        GL_CALL(glLinkProgram(program));
 
         // check linking
         GLint success;
-        glGetProgramiv(program, GL_LINK_STATUS, &success);
+        GL_CALL(glGetProgramiv(program, GL_LINK_STATUS, &success));
         if (!success)
         {
             char infoLog[512];
-            glGetProgramInfoLog(program, 512, nullptr, infoLog);
+            GL_CALL(glGetProgramInfoLog(program, 512, nullptr, infoLog));
             std::cerr << "openGL program linking failed: " << infoLog << std::endl;
         }
 
-        glDeleteShader(vertexShader);
-        glDeleteShader(fragmentShader);
+        GL_CALL(glDeleteShader(vertexShader));
+        GL_CALL(glDeleteShader(fragmentShader));
 
         return program;
     }
@@ -342,86 +340,86 @@ Session session;
     void gl_loadPointCloudBuffer(const std::vector<gl_point>& points, GLuint& VAO, GLuint& VBO)
     {
         // Create VAO + VBO
-        glGenVertexArrays(1, &VAO);
-        glBindVertexArray(VAO);
+        GL_CALL(glGenVertexArrays(1, &VAO));
+        GL_CALL(glBindVertexArray(VAO));
 
-        glGenBuffers(1, &VBO);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(gl_point), points.data(), GL_STATIC_DRAW);
+        GL_CALL(glGenBuffers(1, &VBO));
+        GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, VBO));
+        GL_CALL(glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(gl_point), points.data(), GL_STATIC_DRAW));
 
         // --- Attribute 0: position ---
         // layout(location = 0) in vec3 aPos;
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(
+        GL_CALL(glEnableVertexAttribArray(0));
+        GL_CALL(glVertexAttribPointer(
             0,                                    // attribute index
             3,                                    // vec3
             GL_FLOAT,
             GL_FALSE,
             sizeof(gl_point),                     // stride = full struct
             (void*)offsetof(gl_point, pos)        // offset of position field
-        );
+        ));
 
         // --- Attribute 1: intensity ---
         // layout(location = 1) in float aIntensity;
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(
+        GL_CALL(glEnableVertexAttribArray(1));
+        GL_CALL(glVertexAttribPointer(
             1,
             1,
             GL_FLOAT,
             GL_FALSE,
             sizeof(gl_point),
             (void*)offsetof(gl_point, intensity)
-        );
+        ));
 
         // Unbind
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
+        GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, 0));
+        GL_CALL(glBindVertexArray(0));
     }
 
     void gl_updateSSBOs() {
         // Vertex -> Cloud index
         if (gl_ssboCloudIndex == 0)
         {
-            glGenBuffers(1, &gl_ssboCloudIndex);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboCloudIndex);
-            glBufferData(GL_SHADER_STORAGE_BUFFER,
+            GL_CALL(glGenBuffers(1, &gl_ssboCloudIndex));
+            GL_CALL(glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboCloudIndex));
+            GL_CALL(glBufferData(GL_SHADER_STORAGE_BUFFER,
                 gl_cloudIndexSSBO.size() * sizeof(int),
                 gl_cloudIndexSSBO.data(),
-                GL_DYNAMIC_DRAW);
+                GL_DYNAMIC_DRAW));
         }
         else
         {
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboCloudIndex);
-            glBufferSubData(GL_SHADER_STORAGE_BUFFER,
+            GL_CALL(glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboCloudIndex));
+            GL_CALL(glBufferSubData(GL_SHADER_STORAGE_BUFFER,
                 0,
                 gl_cloudIndexSSBO.size() * sizeof(int),
-                gl_cloudIndexSSBO.data());
-	    }
+                gl_cloudIndexSSBO.data()));
+        }
 
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gl_ssboCloudIndex);
+        GL_CALL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gl_ssboCloudIndex));
 
         // Cloud attributes
         if (gl_ssboClouds == 0)
         {
-            glGenBuffers(1, &gl_ssboClouds);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboClouds);
-            glBufferData(GL_SHADER_STORAGE_BUFFER,
+            GL_CALL(glGenBuffers(1, &gl_ssboClouds));
+            GL_CALL(glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboClouds));
+            GL_CALL(glBufferData(GL_SHADER_STORAGE_BUFFER,
                 gl_cloudsSSBO.size() * sizeof(gl_cloudSSBO),
                 gl_cloudsSSBO.data(),
-                GL_DYNAMIC_DRAW);
+                GL_DYNAMIC_DRAW));
         }
         else
         {
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboClouds);
-            glBufferSubData(GL_SHADER_STORAGE_BUFFER,
+            GL_CALL(glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboClouds));
+            GL_CALL(glBufferSubData(GL_SHADER_STORAGE_BUFFER,
                 0,
                 gl_cloudsSSBO.size() * sizeof(gl_cloudSSBO),
-                gl_cloudsSSBO.data());
+                gl_cloudsSSBO.data()));
         }
 
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gl_ssboClouds);
+        GL_CALL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gl_ssboClouds));
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        GL_CALL(glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0));
     }
 
     void gl_updateUserView()
@@ -456,13 +454,13 @@ Session session;
 
     void gl_renderPointCloud()
     {
-        glUseProgram(gl_shaderProgram);
+        GL_CALL(glUseProgram(gl_shaderProgram));
 
         //Set point size from GUI
-        glUniform1f(gl_uPointSize, static_cast<float>(point_size));
-        glUniform1f(gl_uIntensityScale, offset_intensity);
-        glUniform1i(gl_uUsePose, usePose);
-        glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, gl_mvp.data());
+        GL_CALL(glUniform1f(gl_uPointSize, static_cast<float>(point_size)));
+        GL_CALL(glUniform1f(gl_uIntensityScale, offset_intensity));
+        GL_CALL(glUniform1i(gl_uUsePose, usePose));
+        GL_CALL(glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, gl_mvp.data()));
 
         if (oldcolorScheme != colorScheme)
         {
@@ -488,12 +486,12 @@ Session session;
                     gl_cloudsSSBO[i].fixedColor[2] = float(rand() % 255) / 255.0f;
                 }
 
-		    oldcolorScheme = colorScheme;
+            oldcolorScheme = colorScheme;
 
             gl_updateSSBOs();
         }
 
-        glBindVertexArray(VAO);
+        GL_CALL(glBindVertexArray(VAO));
         /*for (size_t i = 0; i < gl_clouds.size(); i++)
         {
             if (!gl_clouds[i].visible) continue;
@@ -503,19 +501,19 @@ Session session;
             if (usePose)
             {
                 Eigen::Matrix4f cloudMVP = gl_mvp * gl_cloudsSSBO[i].pose;
-                glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, cloudMVP.data());
+                GL_CALL(glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, cloudMVP.data()));
             }
             else
-                glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, gl_mvp.data());
+                GL_CALL(glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, gl_mvp.data()));
 
             // Draw only this cloud’s range
-            //glDrawArrays(GL_POINTS, gl_clouds[i].offset, gl_clouds[i].count);
+            //GL_CALL(glDrawArrays(GL_POINTS, gl_clouds[i].offset, gl_clouds[i].count));
         }*/
 
-        glDrawArrays(GL_POINTS, 0, gl_cloudIndexSSBO.size());
+        GL_CALL(glDrawArrays(GL_POINTS, 0, gl_cloudIndexSSBO.size()));
 
-        glBindVertexArray(0);
-        glUseProgram(0); // back to fixed-function for legacy code
+        GL_CALL(glBindVertexArray(0));
+        GL_CALL(glUseProgram(0)); // back to fixed-function for legacy code
     }
 
     void gl_init()
@@ -531,14 +529,13 @@ Session session;
         gl_shaderProgram = gl_createShaderProgram(pointsVertSource, pointsFragSource);
 
         //Get pointers
-        gl_uMVP = glGetUniformLocation(gl_shaderProgram, "uMVP");
-        gl_uPointSize = glGetUniformLocation(gl_shaderProgram, "uPointSize");
-        gl_uIntensityScale = glGetUniformLocation(gl_shaderProgram, "uIntensityScale");
-	    gl_uUsePose = glGetUniformLocation(gl_shaderProgram, "uUsePose");
+        gl_uMVP = static_cast<GLuint>(GL_CALL_RET(glGetUniformLocation(gl_shaderProgram, "uMVP")));
+        gl_uPointSize = static_cast<GLuint>(GL_CALL_RET(glGetUniformLocation(gl_shaderProgram, "uPointSize")));
+        gl_uIntensityScale = static_cast<GLuint>(GL_CALL_RET(glGetUniformLocation(gl_shaderProgram, "uIntensityScale")));
+    	gl_uUsePose = static_cast<GLuint>(GL_CALL_RET(glGetUniformLocation(gl_shaderProgram, "uUsePose")));
 
-        glEnable(GL_PROGRAM_POINT_SIZE);
+        GL_CALL(glEnable(GL_PROGRAM_POINT_SIZE));
     }
-#endif
 ///////////////////////////////////////////////////////////////////////////////////
 
 
@@ -556,7 +553,6 @@ void openSession()
         session.load(fs::path(session_file_name).string(), false, 0.0, 0.0, 0.0, false);
         index_rendered_points_local = 0;
 
-#ifdef _WIN32
         if (gl_useVBOs)
         {
             GLint offset = 0;
@@ -613,7 +609,6 @@ void openSession()
             //Prepare SSBO data
             gl_updateSSBOs();
 		}
-#endif
 
         std::string newTitle = winTitle + " - " + truncPath(session_file_name);
         glutSetWindowTitle(newTitle.c_str());
@@ -628,13 +623,13 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
-#ifdef _WIN32
+
     if (gl_useVBOs)
     {
         gl_updateUserView();
         gl_renderPointCloud();
     }
-#endif
+
 
     view_kbd_shortcuts();
 
@@ -854,7 +849,7 @@ void display()
 
             ImGui::Separator();
 
-#ifdef _WIN32
+
             ImGui::MenuItem("VBO/VAO proof of concept", nullptr, &gl_useVBOs);
             if (ImGui::IsItemHovered())
             {
@@ -868,7 +863,7 @@ void display()
             }
 
             ImGui::Separator();
-#endif
+
 
             if (ImGui::BeginMenu("Colors"))
             {
@@ -1038,10 +1033,8 @@ int main(int argc, char *argv[])
 {
     try
     {
-        initGL(&argc, argv, winTitle, display, mouse); 
-#ifdef _WIN32
+        initGL(&argc, argv, winTitle, display, mouse);
         gl_init();
-#endif
         glutMainLoop();
 
         ImGui_ImplOpenGL2_Shutdown();

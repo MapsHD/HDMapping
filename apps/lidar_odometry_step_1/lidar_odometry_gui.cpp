@@ -1624,6 +1624,10 @@ void display()
 
                 ImGui::Separator();
 
+                ImGui::MenuItem("Saving results with index pose", nullptr, &params.save_index_pose);
+
+                ImGui::Separator();
+
                 if (ImGui::MenuItem("Load parameters"))
                 {
                     auto input_file_names = mandeye::fd::OpenFileDialog("Load parameters file", mandeye::fd::Toml_filter, ".toml");

@@ -847,9 +847,13 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
 
         points_to_vector(
             original_points_to_save, worker_data_concatenated[i].intermediate_trajectory,
-            params.threshould_output_filter, &index_poses_i, global_pointcloud, intensity, timestamps, true);
+            params.threshould_output_filter, &index_poses_i, global_pointcloud, intensity, timestamps, true, params.save_index_pose);
         exportLaz(path.string(), global_pointcloud, intensity, timestamps);
-        index_poses.push_back(index_poses_i);
+        
+        if(params.save_index_pose){
+            index_poses.push_back(index_poses_i);
+        }
+        
         m_poses.push_back(worker_data_concatenated[i].intermediate_trajectory[0]);
         file_names.push_back(filename);
 
@@ -904,16 +908,18 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     save_poses(path2.string(), m_poses, file_names);
 
     fs::path index_poses_path = outwd / "index_poses.json";
-    nlohmann::json j_index_poses = index_poses;
-    std::ofstream out_index(index_poses_path);
-    if (!out_index)
-    {
-        std::cerr << "Failed to open " << index_poses_path << " for writing index poses.\n";
-    }
-    else
-    {
-        out_index << j_index_poses.dump(2);
-        out_index.close();
+    if (params.save_index_pose){
+        nlohmann::json j_index_poses = index_poses;
+        std::ofstream out_index(index_poses_path);
+        if (!out_index)
+        {
+            std::cerr << "Failed to open " << index_poses_path << " for writing index poses.\n";
+        }
+        else
+        {
+            out_index << j_index_poses.dump(2);
+            out_index.close();
+        }
     }
 
     fs::path path3(outwd);
@@ -936,7 +942,9 @@ void save_result(std::vector<WorkerData> &worker_data, LidarOdometryParams &para
     j["lidar_odometry_version"] = HDMAPPING_VERSION_STRING;
     j["length of trajectory[m]"] = params.total_length_of_calculated_trajectory;
     j["elapsed time seconds"] = elapsed_time_s;
-    j["index_poses_path"] = index_poses_path.string();
+    if (params.save_index_pose){
+        j["index_poses_path"] = index_poses_path.string();
+    }
     j["point_sizes_path"] = point_sizes_path.string();
     j["decimation"] = params.decimation;
     j["threshold_nr_poses"] = params.threshold_nr_poses;

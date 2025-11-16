@@ -1953,7 +1953,6 @@ void align_to_reference(NDT::GridParameters &rgd_params, std::vector<Point3Di> &
     }
 }
 
-// extern nglobals::icpProgress.store((float)i / globals::registeredFrames.size());
 bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, double &ts_failure, std::atomic<float> &loProgress, const std::atomic<bool> &pause, bool debugMsg)
 {
     // exit(1);
@@ -2276,7 +2275,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 std::vector<double> timestamps;
                 points_to_vector(
                     intermediate_points, worker_data[i].intermediate_trajectory,
-                    0, nullptr, global_pointcloud, intensity, timestamps, false);
+                    0, nullptr, global_pointcloud, intensity, timestamps, false, params.save_index_pose);
                 std::string fn = params.working_directory_preview + "/temp_point_cloud_" + std::to_string(i) + ".laz";
                 exportLaz(fn.c_str(), global_pointcloud, intensity, timestamps);
             }

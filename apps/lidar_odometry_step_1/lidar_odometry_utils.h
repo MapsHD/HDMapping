@@ -139,10 +139,11 @@ struct LidarOdometryParams
     bool use_removie_imu_bias_from_first_stationary_scan = false;
 
     //ablation study
-    bool ablation_study_use_planarity = true;
-    bool ablation_study_use_norm = true;
+    bool ablation_study_use_planarity = false;
+    bool ablation_study_use_norm = false;
     bool ablation_study_use_hierarchical_rgd = true;
-    bool ablation_study_use_view_point_and_normal_vectors = true;
+    bool ablation_study_use_view_point_and_normal_vectors = false;
+    bool save_index_pose = false;
 };
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);

@@ -69,7 +69,7 @@ bool step_2_done = false;
 bool step_3_done = false;
 bool calculations_failed = false;
 
-int lastPar = 0;
+int lastPar = 1;
 
 std::vector<WorkerData> worker_data;
 
@@ -105,6 +105,33 @@ std::atomic<double> loElapsedSeconds{0.0};
 std::atomic<double> loEstimatedTimeRemaining{0.0};
 
 ///////////////////////////////////////////////////////////////////////////////////
+
+void set_lidar_odometry_default_params(LidarOdometryParams &params)
+{
+    params.decimation = 0.01;
+    params.in_out_params_indoor.resolution_X = 0.1;
+    params.in_out_params_indoor.resolution_Y = 0.1;
+    params.in_out_params_indoor.resolution_Z = 0.1;
+
+    params.in_out_params_outdoor.resolution_X = 0.3;
+    params.in_out_params_outdoor.resolution_Y = 0.3;
+    params.in_out_params_outdoor.resolution_Z = 0.3;
+
+    params.filter_threshold_xy_inner = 0.3;
+    params.filter_threshold_xy_outer = 70.0;
+    params.threshould_output_filter = 0.3;
+
+    params.use_robust_and_accurate_lidar_odometry = false;
+    params.distance_bucket = 0.2;
+    params.polar_angle_deg = 10.0;
+    params.azimutal_angle_deg = 10.0;
+    params.robust_and_accurate_lidar_odometry_iterations = 20;
+
+    params.max_distance_lidar = 70.0;
+    params.nr_iter = 1000;
+    params.sliding_window_trajectory_length_threshold = 200;
+    params.real_time_threshold_seconds = 10;
+}
 
 // Helper function to format time in human-readable format
 std::string formatTime(double seconds)
@@ -1060,6 +1087,8 @@ void progress_window()
 {
     ImGui::Begin("Progress", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
+    ImGui::Text(("Working directory: '" + working_directory +  "'").c_str());
+        
     // Calculate elapsed time and ETA
     auto currentTime = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed = currentTime - loStartTime;
@@ -1455,29 +1484,7 @@ void display()
                 {
                     lastPar = 1;
 
-                    params.decimation = 0.01;
-                    params.in_out_params_indoor.resolution_X = 0.1;
-                    params.in_out_params_indoor.resolution_Y = 0.1;
-                    params.in_out_params_indoor.resolution_Z = 0.1;
-
-                    params.in_out_params_outdoor.resolution_X = 0.3;
-                    params.in_out_params_outdoor.resolution_Y = 0.3;
-                    params.in_out_params_outdoor.resolution_Z = 0.3;
-
-                    params.filter_threshold_xy_inner = 0.3;
-                    params.filter_threshold_xy_outer = 70.0;
-                    params.threshould_output_filter = 0.3;
-
-                    params.use_robust_and_accurate_lidar_odometry = false;
-                    params.distance_bucket = 0.2;
-                    params.polar_angle_deg = 10.0;
-                    params.azimutal_angle_deg = 10.0;
-                    params.robust_and_accurate_lidar_odometry_iterations = 20;
-
-                    params.max_distance_lidar = 70.0;
-                    params.nr_iter = 1000;
-                    params.sliding_window_trajectory_length_threshold = 200;
-                    params.real_time_threshold_seconds = 10;
+                    set_lidar_odometry_default_params(params);
 
                     std::cout << "clicked: Set parameters for velocity up to 8km/h, tiny spaces" << std::endl;
                 }
@@ -1876,6 +1883,8 @@ void mouse(int glut_button, int state, int x, int y)
 
 int main(int argc, char *argv[])
 {
+    set_lidar_odometry_default_params(params);
+
     try
     {
 		if (argc == 4) //runnning from command line
@@ -1915,16 +1924,6 @@ int main(int argc, char *argv[])
         else //full GUI mode
         {
             std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
-
-            params.in_out_params_indoor.resolution_X = 0.1;
-            params.in_out_params_indoor.resolution_Y = 0.1;
-            params.in_out_params_indoor.resolution_Z = 0.1;
-            params.in_out_params_indoor.bounding_box_extension = 20.0;
-
-            params.in_out_params_outdoor.resolution_X = 0.3;
-            params.in_out_params_outdoor.resolution_Y = 0.3;
-            params.in_out_params_outdoor.resolution_Z = 0.3;
-            params.in_out_params_outdoor.bounding_box_extension = 20.0;
 
             initGL(&argc, argv, winTitle, display, mouse);
             glutCloseFunc(on_exit);

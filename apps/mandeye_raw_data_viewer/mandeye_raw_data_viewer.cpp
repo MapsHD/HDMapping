@@ -92,6 +92,7 @@ std::vector<std::string> csv_files;
 std::vector<std::string> sn_files;
 std::vector<std::string> photos_files;
 std::map<uint64_t, std::string> photo_files_ts;
+
 std::string working_directory = "";
 std::string imuSnToUse;
 std::string working_directory_preview;
@@ -370,9 +371,13 @@ void project_gui()
 
                         if (cam_id == "cam0" && !timestamp.empty())
                         {
-                            uint64_t ts = std::stoul(timestamp);
-                            photo_files_ts[ts] = fileName;
-
+                            try {
+                                uint64_t ts = std::stoull(timestamp);
+                                photo_files_ts[ts] = fileName;
+                            }
+                            catch (const std::exception &e) {
+                                std::cerr << "Error parsing timestamp from filename: " << filename << " - " << e.what() << std::endl;
+							}
                         }
                     }
                     });
@@ -902,6 +907,23 @@ void project_gui()
                     ImPlot::PlotLine("roll", imu_data_plot.timestampLidar.data(), imu_data_plot.roll.data(), (int)imu_data_plot.timestampLidar.size());
                     ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
                     ImPlot::EndPlot();
+                }
+
+                if (!photo_files_ts.empty() && ImPlot::BeginPlot("Photos"))
+                {
+                    ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Once);
+                    ImPlot::SetupAxisLinks(ImAxis_X1, &x_min, &x_max);
+                    // plot photos timestamps
+                    std::vector<double> photo_timestamps;
+                    std::vector<double> dummy;
+                    for (const auto &[ts, fn] : photo_files_ts)
+                    {
+                        photo_timestamps.push_back(static_cast<double>(ts) / 1e9);
+						dummy.push_back(0.0);
+                    }
+                    ImPlot::PlotScatter("photos", photo_timestamps.data(), dummy.data(), (int)photo_timestamps.size());
+                    ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
+					ImPlot::EndPlot();
                 }
             }
 

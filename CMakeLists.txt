@@ -6,7 +6,7 @@ set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 project(hd-mapping)
 
 set (HDMAPPING_VERSION_MAJOR 0)
-set (HDMAPPING_VERSION_MINOR 89)
+set (HDMAPPING_VERSION_MINOR 90)
 set (HDMAPPING_VERSION_PATCH 0)
 
 add_definitions(-DHDMAPPING_VERSION_MAJOR=${HDMAPPING_VERSION_MAJOR})
@@ -254,6 +254,8 @@ add_definitions(-D_USE_MATH_DEFINES)
 
 get_filename_component(REPOSITORY_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} ABSOLUTE)
 set(EXTERNAL_LIBRARIES_DIRECTORY ${REPOSITORY_DIRECTORY}/3rdparty)
+set(EXTERNAL_LIBRARIES_DIRECTORY_BINARY ${REPOSITORY_DIRECTORY}/3rdpartyBinary)
+
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -326,8 +328,10 @@ else()
     MESSAGE(STATUS "LASzip include dir: ${LASZIP_INCLUDE_DIR}, LASzip library: ${LASZIP_LIBRARY}")
 endif ()
 
-get_property(tgts DIRECTORY ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip PROPERTY BUILDSYSTEM_TARGETS)
-message(STATUS "LASzip targets: ${tgts}")
+# Download or Search for OpenCV
+include(${EXTERNAL_LIBRARIES_DIRECTORY_BINARY}/OpenCV/CMakeLists.txt)
+find_package(OpenCV REQUIRED)
+MESSAGE(STATUS "OpenCV include dir: ${OpenCV_INCLUDE_DIRS}, OpenCV librarys: ${OpenCV_LIBS}")
 
 # Option to build with bundled oneTBB
 option(BUILD_WITH_BUNDLED_ONETBB "Build with bundled oneTBB" ON)
@@ -369,6 +373,7 @@ else()
     message(STATUS "PYBIND is disabled.")
 endif()
 
+
 add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
 
 add_subdirectory(core)
@@ -377,7 +382,7 @@ add_subdirectory(core_hd_mapping)
 set(CORE_LIBRARIES core core-hd-mapping)
 set(GUI_LIBRARIES imgui imguizmo implot)
 
-add_subdirectory(apps/hd_mapper)
+#add_subdirectory(apps/hd_mapper)
 add_subdirectory(apps/lidar_odometry_step_1)    
 add_subdirectory(apps/manual_color)
 add_subdirectory(apps/console_tools)
@@ -387,7 +392,7 @@ add_subdirectory(apps/split_multi_livox)
 add_subdirectory(apps/precision_forestry_tools)
 add_subdirectory(apps/mandeye_raw_data_viewer)
 add_subdirectory(apps/compare_trajectories)
-add_subdirectory(apps/quick_start_demo)
+#add_subdirectory(apps/quick_start_demo)
 add_subdirectory(apps/mandeye_mission_recorder_calibration)
 add_subdirectory(apps/mandeye_single_session_viewer)
 add_subdirectory(apps/livox_mid_360_intrinsic_calibration)

@@ -473,9 +473,7 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
         }
 
         // fuse_inclination_from_imu
-        // if (fuse_inclination_from_imu)
-        //{
-        //
+        
         double error_imu = 0;
         double error_imu_sum = 0;
 
@@ -527,7 +525,7 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
             tripletListA.emplace_back(ir + 0, ic + 3, -delta_jacobian(0, 3));
             tripletListA.emplace_back(ir + 0, ic + 4, -delta_jacobian(0, 4));
 
-            tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1) * 10000);
+            tripletListP.emplace_back(ir, ir, /*get_cauchy_w(delta(0, 0), 1) * 10000*/ 1);
 
             tripletListB.emplace_back(ir, 0, delta(0, 0));
 
@@ -547,7 +545,7 @@ void PoseGraphLoopClosure::graph_slam(PointClouds &point_clouds_container, GNSS 
             tripletListA.emplace_back(ir + 0, ic + 3, -delta_jacobian(0, 3));
             tripletListA.emplace_back(ir + 0, ic + 4, -delta_jacobian(0, 4));
 
-            tripletListP.emplace_back(ir, ir, get_cauchy_w(delta(0, 0), 1) * 10000);
+            tripletListP.emplace_back(ir, ir, /*get_cauchy_w(delta(0, 0), 1) * 10000*/ 1);
 
             tripletListB.emplace_back(ir, 0, delta(0, 0));
         }

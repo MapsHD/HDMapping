@@ -20,8 +20,10 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
+    - name: Load repository cache
+      run:  sudo apt-get update --allow-releaseinfo-change
     - name: Install Libs
-      run: sudo apt-get install libx11-dev libxi-dev libtbb-dev libegl1-mesa-dev libglu1-mesa-dev
+      run: sudo apt-get install -y --no-install-recommends libx11-dev libxi-dev libtbb-dev libegl1-mesa-dev libglu1-mesa-dev libopencv-dev
 
     - uses: actions/checkout@v4
       with:

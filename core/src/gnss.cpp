@@ -94,6 +94,9 @@ bool GNSS::load(const std::vector<std::string> &input_file_names, bool localize)
     }
 
     auto firstGNSS = *firstGNSSIt;
+    std::cout << std::setprecision(20);
+
+    std::cout << std::setprecision(20);
     std::cout << "firstGNSS: " << firstGNSS.lat << " " << firstGNSS.lon << " " << firstGNSS.alt << std::endl;
     std::cout << "firstGNSS: " << firstGNSS.x << " " << firstGNSS.y << " " << firstGNSS.alt << std::endl;
 
@@ -111,6 +114,10 @@ bool GNSS::load(const std::vector<std::string> &input_file_names, bool localize)
         }
     }
 
+    std::cout << std::setprecision(20);
+    std::cout << "firstGNSS: " << firstGNSS.lat << " " << firstGNSS.lon << " " << firstGNSS.alt << std::endl;
+    std::cout << "firstGNSS: " << firstGNSS.x << " " << firstGNSS.y << " " << firstGNSS.alt << std::endl;
+    
     return true;
 }
 

@@ -25,6 +25,8 @@
 
 #include <export_laz.h>
 
+#include <opencv2/opencv.hpp>
+
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
@@ -88,6 +90,9 @@ std::vector<AllData> all_data;
 std::vector<std::string> laz_files;
 std::vector<std::string> csv_files;
 std::vector<std::string> sn_files;
+std::vector<std::string> photos_files;
+std::map<uint64_t, std::string> photo_files_ts;
+
 std::string working_directory = "";
 std::string imuSnToUse;
 std::string working_directory_preview;
@@ -130,6 +135,15 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> get_nn();
 void draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd);
 std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov();
 
+namespace photos
+{
+    cv::Mat imgToShow;
+    std::string imgToShowFn;
+    GLuint photo_texture_cam0 = 0;
+    double nearestTs = 0;
+    int photo_width_cam0 = 0;
+    int photo_height_cam0 = 0;
+}
 void reshape(int w, int h)
 {
     glViewport(0, 0, (GLsizei)w, (GLsizei)h);
@@ -205,8 +219,83 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
+static ImVec2 DisplayImageFit(ImTextureID tex, int tex_w, int tex_h, bool allow_upscale = true)
+{
+    ImVec2 avail = ImGui::GetContentRegionAvail();
+    if (tex_w <= 0 || tex_h <= 0 || avail.x <= 0.0f || avail.y <= 0.0f)
+        return ImVec2(0, 0);
+
+    float sx = avail.x / float(tex_w);
+    float sy = avail.y / float(tex_h);
+    float scale = std::min(sx, sy);
+    if (!allow_upscale)
+        scale = std::min(scale, 1.0f);
+
+    ImVec2 disp(scale * tex_w, scale * tex_h);
+
+    ImVec2 cur = ImGui::GetCursorPos();
+    ImGui::SetCursorPosX(cur.x + (avail.x - disp.x) * 0.5f); // center horizontally
+    ImGui::Image(tex, disp);
+    // cursor Y is already advanced by Image; no restore needed
+
+    return disp;
+}
+
+void render_nearest_photo(double ts) {
+    using namespace photos;
+    // find closest photo
+    if (photo_files_ts.empty()) {
+        return;
+    }
+    uint64_t ts_uint64 = static_cast<uint64_t>(ts * 1e9);
+    auto it = photo_files_ts.lower_bound(ts_uint64);
+    if (it == photo_files_ts.end()) {
+        return;
+    }
+    const std::string &photo_file = it->second;
+    if (photo_file == imgToShowFn) {
+        return;
+    }
+    std::cout << "render_nearest_photo: " << photo_file << std::endl;
+    cv::Mat img = cv::imread(photo_file);
+    if (img.empty()) {
+        return;
+    }
+    cv::Mat img_rgb;
+    cv::cvtColor(img, img_rgb, cv::COLOR_BGR2RGB);
+    imgToShow = img_rgb;
+    imgToShowFn = photo_file;
+    photos::nearestTs = double(it->first)/1e9;
+    // upload to OpenGL texture
+    photo_width_cam0 = imgToShow.cols;
+    photo_height_cam0 = imgToShow.rows;
+    if (photo_texture_cam0 == 0) {
+        glGenTextures(1, &photo_texture_cam0);
+    }
+    glBindTexture(GL_TEXTURE_2D, photo_texture_cam0);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, photo_width_cam0, photo_height_cam0, 0, GL_RGB, GL_UNSIGNED_BYTE, imgToShow.data);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+}
 void project_gui()
 {
+    if (ImGui::Begin("CAM0")) {
+        if (photos::photo_texture_cam0)
+        {
+            using namespace photos;
+            ImGui::Text("fn name: %s ", photos::imgToShowFn.c_str());
+            ImGui::Text("timestamp:  %s", std::to_string(photos::nearestTs).c_str());
+            // get available size
+            DisplayImageFit((ImTextureID)photos::photo_texture_cam0,  photo_width_cam0, photo_height_cam0);
+
+
+        }
+
+        ImGui::End();
+    }
     if (ImGui::Begin("main gui window"))
     {
         ImGui::ColorEdit3("clear color", (float *)&clear_color);
@@ -261,14 +350,37 @@ void project_gui()
                         laz_files.push_back(fileName);
                         all_file_names.push_back(fileName);
                     }
-                    if (fileName.ends_with(".csv"))
+                    else if (fileName.ends_with(".csv"))
                     {
                         csv_files.push_back(fileName);
                     }
-                    if (fileName.ends_with(".sn"))
+                    else if (fileName.ends_with(".sn"))
                     {
                         sn_files.push_back(fileName);
-                    } });
+                    }
+                    else if (fileName.ends_with(".jpg")) {
+                        photos_files.push_back(fileName);
+                        // decode filename e.g.: ` cam0_1761264773592270949.jpg`
+                        const std::string filename = fs::path(fileName).stem().string();
+                        std::string cam_id = filename.substr(0, filename.find("_"));
+                        std::string timestamp = filename.substr(filename.find("_") + 1, filename.size());
+
+                        std::cout << "cam_id: " << cam_id << std::endl;
+                        std::cout << "timestamp: " << timestamp << std::endl;
+                        std::cout << "filename: " << filename << std::endl;
+
+                        if (cam_id == "cam0" && !timestamp.empty())
+                        {
+                            try {
+                                uint64_t ts = std::stoull(timestamp);
+                                photo_files_ts[ts] = fileName;
+                            }
+                            catch (const std::exception &e) {
+                                std::cerr << "Error parsing timestamp from filename: " << filename << " - " << e.what() << std::endl;
+							}
+                        }
+                    }
+                    });
 
                 if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
                 {
@@ -311,6 +423,8 @@ void project_gui()
                                             "imuToUse" : "47MDL9T0020193"
                         }*/
                     }
+                    std::cout << "Number of found photos: " << photos_files.size() << std::endl;
+
 
                     fs::path wdp = fs::path(input_file_names[0]).parent_path();
                     wdp /= "preview";
@@ -643,6 +757,7 @@ void project_gui()
                 ImGui::Text(fn.c_str());
                 double ts = all_data[index_rendered_points_local].points_local[0].timestamp; // * 1e9;
                 ImGui::Text((std::string("ts: ") + std::to_string(ts)).c_str());
+                render_nearest_photo(ts);
             }
         }
 
@@ -792,6 +907,23 @@ void project_gui()
                     ImPlot::PlotLine("roll", imu_data_plot.timestampLidar.data(), imu_data_plot.roll.data(), (int)imu_data_plot.timestampLidar.size());
                     ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
                     ImPlot::EndPlot();
+                }
+
+                if (!photo_files_ts.empty() && ImPlot::BeginPlot("Photos"))
+                {
+                    ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Once);
+                    ImPlot::SetupAxisLinks(ImAxis_X1, &x_min, &x_max);
+                    // plot photos timestamps
+                    std::vector<double> photo_timestamps;
+                    std::vector<double> dummy;
+                    for (const auto &[ts, fn] : photo_files_ts)
+                    {
+                        photo_timestamps.push_back(static_cast<double>(ts) / 1e9);
+						dummy.push_back(0.0);
+                    }
+                    ImPlot::PlotScatter("photos", photo_timestamps.data(), dummy.data(), (int)photo_timestamps.size());
+                    ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
+					ImPlot::EndPlot();
                 }
             }
 

@@ -1627,7 +1627,7 @@ void project_gui()
         if (ImGui::Button("Print offset to console"))
             std::cout << "Offset: " << std::setprecision(10) << session.point_clouds_container.offset << std::endl;
 
-        ImGui::Checkbox("Decimate during load", &tls_registration.is_decimate);
+        ImGui::Checkbox("Downsample during load", &tls_registration.is_decimate);
 
         ImGui::Text("Bucket [m]:");
         ImGui::PushItemWidth(ImGuiNumberWidth);
@@ -2208,7 +2208,7 @@ void display()
                             save_all_to_las(session, output_file_name, false);
                     }
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("To export in full resolution, close the program and open again, unmark 'simple_gui', unmark 'decimate during load'");
+                        ImGui::SetTooltip("To export in full resolution, close the program and open again, unmark 'simple_gui', unmark 'downsample during load'");
 
                     if (ImGui::MenuItem("Separate global scans (laz)"))
                     {

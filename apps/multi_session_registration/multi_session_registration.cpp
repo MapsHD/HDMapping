@@ -2696,7 +2696,7 @@ void project_gui()
 {
     if (ImGui::Begin("Multi session processing"))
     {
-        ImGui::Checkbox("Decimate during load", &is_decimate);
+        ImGui::Checkbox("Downsample during load", &is_decimate);
         ImGui::SameLine();
         ImGui::Text("Bucket [m]:");
         ImGui::PushItemWidth(ImGuiNumberWidth);

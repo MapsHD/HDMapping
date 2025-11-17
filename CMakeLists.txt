@@ -278,7 +278,9 @@ if (BUILD_WITH_BUNDLED_FREEGLUT)
     set(FREEGLUT_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut/include)
     set(FREEGLUT_LIBRARY freeglut)
     # Suppress unused variable warnings from FreeGlut
-    target_compile_options(freeglut PRIVATE -Wno-unused-const-variable)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(freeglut PRIVATE -Wno-unused-const-variable)
+    endif()
     MESSAGE(STATUS "Using bundled FreeGlut")
 else()
     find_package(GLUT REQUIRED)
@@ -308,13 +310,13 @@ if (BUILD_WITH_BUNDLED_LIBLASZIP)
     set(LASZIP_LIBRARY laszip)
     MESSAGE(STATUS "Using bundled LASzip")
     #suppress warnings from LASzip
-    target_compile_options(laszip PRIVATE
-            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-cast-qual>
-            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-maybe-uninitialized>
-            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-stringop-truncation>
-            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-format>
-            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-format-security>
-    )
+#    target_compile_options(laszip PRIVATE
+#            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-cast-qual>
+#            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-maybe-uninitialized>
+#            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-stringop-truncation>
+#            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-format>
+#            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-format-security>
+#    )
 
 else()
     find_package(LASzip REQUIRED)
@@ -323,6 +325,9 @@ else()
     set(PLATFORM_LASZIP_LIB ${LASZIP_LIBRARY})
     MESSAGE(STATUS "LASzip include dir: ${LASZIP_INCLUDE_DIR}, LASzip library: ${LASZIP_LIBRARY}")
 endif ()
+
+get_property(tgts DIRECTORY ${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip PROPERTY BUILDSYSTEM_TARGETS)
+message(STATUS "LASzip targets: ${tgts}")
 
 # Option to build with bundled oneTBB
 option(BUILD_WITH_BUNDLED_ONETBB "Build with bundled oneTBB" ON)

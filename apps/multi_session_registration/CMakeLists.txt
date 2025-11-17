@@ -32,7 +32,7 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo
           ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
+          ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-cmake/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
           ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut/include
           ${LASZIP_INCLUDE_DIR}/LASzip/include)

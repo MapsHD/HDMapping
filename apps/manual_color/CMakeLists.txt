@@ -18,7 +18,7 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
           ${LASZIP_INCLUDE_DIR}/LASzip/include
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
+          ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-cmake/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
           ${FREEGLUT_INCLUDE_DIR})
 

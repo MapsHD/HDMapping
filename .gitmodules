@@ -37,3 +37,6 @@
 [submodule "3rdparty/oneTBB"]
 	path = 3rdparty/oneTBB
 	url = https://github.com/oneapi-src/oneTBB.git
+[submodule "3rdparty/glew-cmake"]
+	path = 3rdparty/glew-cmake
+	url = https://github.com/Perlmint/glew-cmake.git

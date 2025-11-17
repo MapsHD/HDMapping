@@ -29,7 +29,7 @@ target_include_directories(
   ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui
   ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
   ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo
-  ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
+  ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-cmake/include
   ${FREEGLUT_INCLUDE_DIR}
   ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
   ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
@@ -46,7 +46,8 @@ target_link_libraries(
   ${PLATFORM_LASZIP_LIB}
   ${CORE_LIBRARIES}
   ${GUI_LIBRARIES}
-  ${PLATFORM_MISCELLANEOUS_LIBS})
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  ${GLEW_LIBRARY})
 
 if(WIN32)
   add_custom_command(

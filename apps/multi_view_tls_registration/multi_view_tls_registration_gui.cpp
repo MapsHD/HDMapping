@@ -9,7 +9,8 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
-#include <GL/glew.h>
+//#define GLEW_STATIC
+//#include <GL/glew.h>
 #include <GL/freeglut.h>
 
 #include <Eigen/Eigen>
@@ -256,46 +257,6 @@ double compute_rms(bool initial, Session &session, ObservationPicking &observati
 void reset_poses(Session &session);
 
 ///////////////////////////////////////////////////////////////////////////////////
-
-void my_display_code()
-{
-    // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-    if (show_demo_window)
-        ImGui::ShowDemoWindow(&show_demo_window);
-
-    // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-    {
-        static float f = 0.0f;
-        static int counter = 0;
-
-        ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
-
-        ImGui::Text("This is some useful text.");          // Display some text (you can use a format strings too)
-        ImGui::Checkbox("Demo Window", &show_demo_window); // Edit bools storing our window open/close state
-        ImGui::Checkbox("Another Window", &show_another_window);
-
-        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);             // Edit 1 float using a slider from 0.0f to 1.0f
-        ImGui::ColorEdit3("clear color", (float *)&clear_color); // Edit 3 floats representing a color
-
-        if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
-            counter++;
-        ImGui::SameLine();
-        ImGui::Text("counter = %d", counter);
-
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        ImGui::End();
-    }
-
-    // 3. Show another simple window.
-    if (show_another_window)
-    {
-        ImGui::Begin("Another Window", &show_another_window); // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-        ImGui::Text("Hello from another window!");
-        if (ImGui::Button("Close Me"))
-            show_another_window = false;
-        ImGui::End();
-    }
-}
 
 void ndt_gui()
 {
@@ -1655,9 +1616,7 @@ void project_gui()
     ImGui::NewLine();
 
     if (ImGui::Button("Set initial pose to Identity and update other poses"))
-    {
         initial_pose_to_identity(session);
-    }
 
     if (!simple_gui)
     {
@@ -1756,10 +1715,7 @@ void project_gui()
                     std::cout << input_file_names[i] << std::endl;
 
                 if (!session.point_clouds_container.load_whu_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset))
-                {
                     std::cout << "Check input files laz/las" << std::endl;
-                    // return;
-                }
                 else
                     std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
             }
@@ -1791,9 +1747,7 @@ void project_gui()
 
                 std::cout << "TXT files:" << std::endl;
                 for (size_t i = 0; i < input_file_names.size(); i++)
-                {
                     std::cout << input_file_names[i] << std::endl;
-                }
 
                 if (!session.point_clouds_container.load_3DTK_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z))
                 {
@@ -1801,9 +1755,7 @@ void project_gui()
                     return;
                 }
                 else
-                {
                     std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-                }
             }
         }
         ImGui::Text("3DTK dataset (18: the campus of the Jacobs University Bremen)");
@@ -1821,7 +1773,6 @@ void project_gui()
 
                 if (!session.point_clouds_container.update_initial_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
                 {
-
                     std::cout << "Check input files" << std::endl;
                     return;
                 }
@@ -1939,8 +1890,7 @@ void project_gui()
                         curr_m_pose2 = curr_m_pose2 * (all_m_poses2[j - 1].inverse() * all_m_poses2[j]);
 
                         // std::cout << curr_m_pose2.matrix() << std::endl;
-                        session.point_clouds_container.point_clouds[j]
-                            .m_pose = curr_m_pose2;
+                        session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose2;
                         session.point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
 
                         session.point_clouds_container.point_clouds[j].gui_translation[0] = (float)session.point_clouds_container.point_clouds[j].pose.px;
@@ -2106,7 +2056,7 @@ void display()
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
     }
 
-    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
@@ -2719,19 +2669,17 @@ void display()
             {
                 auto tmp = point_size;
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
-                ImGui::InputInt("points size", &point_size);
+                ImGui::InputInt("Points size", &point_size);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("keyboard 1-9 keys");
                 if (point_size < 1)
                     point_size = 1;
-                if (point_size > 10)
+                else if (point_size > 10)
                     point_size = 10;
 
                 if (tmp != point_size)
-                {
-                    for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-                        session.point_clouds_container.point_clouds[i].point_size = point_size;
-                }
+                    for (auto& point_cloud : session.point_clouds_container.point_clouds)
+                        point_cloud.point_size = point_size;
 
                 ImGui::BeginDisabled(tls_registration.gnss.gnss_poses.size() <= 0);
                 {
@@ -2758,15 +2706,15 @@ void display()
                 ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
 
             ImGui::MenuItem("Show axes", "key X", &show_axes);
+            ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
+
             ImGui::MenuItem("Block Z", nullptr, &block_z);
 
             ImGui::Separator();
 
-            ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
+            ImGui::Text("Colors:");
 
-            ImGui::Separator();
-
-            ImGui::ColorEdit3("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit3("Background color", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
 
             ImGui::BeginDisabled(!session_loaded);
             {
@@ -2955,7 +2903,7 @@ void display()
     info_window(infoLines, appShortcuts, &info_gui);
 
     if (compass_ruler)
-        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), clear_color);
+        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), bg_color);
 
     if (!session.control_points.is_imgui)
     {

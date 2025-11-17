@@ -34,7 +34,7 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
           ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/include
+          ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-cmake/include
           ${FREEGLUT_INCLUDE_DIR}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
@@ -43,8 +43,9 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
 
 target_link_libraries(
-  lidar_odometry_step_1
-  PRIVATE Fusion
+          lidar_odometry_step_1
+          PRIVATE Fusion
+          # PRIVATE ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
           ${FREEGLUT_LIBRARY}
           ${OPENGL_gl_LIBRARY}
           OpenGL::GLU

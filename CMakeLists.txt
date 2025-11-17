@@ -270,6 +270,7 @@ add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)
 set(EIGEN3_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)
 MESSAGE(STATUS "Using bundled Eigen3 : ${EIGEN3_INCLUDE_DIR}")
 
+
 option(BUILD_WITH_BUNDLED_FREEGLUT "Build with bundled FreeGlut" ON)
 if (BUILD_WITH_BUNDLED_FREEGLUT)
     set(FREEGLUT_BUILD_DEMOS
@@ -278,6 +279,10 @@ if (BUILD_WITH_BUNDLED_FREEGLUT)
     add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut)
     set(FREEGLUT_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut/include)
     set(FREEGLUT_LIBRARY freeglut)
+    # Suppress unused variable warnings from FreeGlut
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(freeglut PRIVATE -Wno-unused-const-variable)
+    endif()
     MESSAGE(STATUS "Using bundled FreeGlut")
 else()
     find_package(GLUT REQUIRED)
@@ -286,12 +291,35 @@ else()
     MESSAGE(STATUS "FreeGlut include dir: ${FREEGLUT_INCLUDE_DIR}")
 endif ()
 
+option (BUILD_WITH_BUNDLED_GLEW "Build with bundled GLEW" ON)
+if (BUILD_WITH_BUNDLED_GLEW)
+    add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/glew-cmake)
+    set(GLEW_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-cmake/include)
+    set(GLEW_LIBRARY libglew_static)
+
+    MESSAGE(STATUS "Using bundled GLEW")
+else()
+    find_package(GLEW REQUIRED)
+    set(GLEW_INCLUDE_DIR ${GLEW_INCLUDE_DIRS})
+    set(GLEW_LIBRARY ${GLEW_LIBRARIES})
+    MESSAGE(STATUS "GLEW include dir: ${GLEW_INCLUDE_DIR}, GLEW library: ${GLEW_LIBRARY}")
+endif()
+
 option(BUILD_WITH_BUNDLED_LIBLASZIP "Build with bundled Lib LASZIP" ON)
 if (BUILD_WITH_BUNDLED_LIBLASZIP)
     add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip)
     set(LASZIP_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY})
     set(LASZIP_LIBRARY laszip)
     MESSAGE(STATUS "Using bundled LASzip")
+    #suppress warnings from LASzip
+#    target_compile_options(laszip PRIVATE
+#            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-cast-qual>
+#            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-maybe-uninitialized>
+#            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-stringop-truncation>
+#            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-format>
+#            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-format-security>
+#    )
+
 else()
     find_package(LASzip REQUIRED)
     set(LASZIP_INCLUDE_DIR ${LASZIP_INCLUDE_DIR})

@@ -1,8 +1,10 @@
-#include "utils.hpp"
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
-//#include <GL/glut.h>
+#include <GL/glew.h>
 #include <GL/freeglut.h>
+
+#include "utils.hpp"
+
 #include <cmath>
 #include <cstdio>
 #include <iostream>
@@ -24,7 +26,7 @@ float mouse_sensitivity = 1.0;
 
 bool is_ortho = false;
 bool show_axes = true;
-ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+ImVec4 bg_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 int point_size = 1;
 
 bool info_gui = false;
@@ -581,6 +583,7 @@ void camMenu()
         ImGui::Separator();
         if (ImGui::MenuItem("Reset", "key Z"))
             setCameraPreset(CAMERA_RESET);
+
         ImGui::EndMenu();
     }
     if (ImGui::IsItemHovered())
@@ -877,6 +880,19 @@ void info_window(const std::vector<std::string>& infoLines, const std::vector<Sh
                 ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("ImGui").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
                 if (ImGui::Button("ImGui"))
                     show_about = true;
+                if (ImGui::IsItemHovered())
+                {
+                    ImGui::BeginTooltip();
+                    // Query versions info
+                    const GLubyte* renderer = glGetString(GL_RENDERER);
+                    const GLubyte* version = glGetString(GL_VERSION);
+                    const GLubyte* glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
+
+                    ImGui::Text("Renderer: %s", renderer);
+                    ImGui::Text("OpenGL version supported: %s", version);
+					ImGui::Text("GLSL version: %s", glslVersion);
+                    ImGui::EndTooltip();
+                }
                 
                 firstLine = false;
             }

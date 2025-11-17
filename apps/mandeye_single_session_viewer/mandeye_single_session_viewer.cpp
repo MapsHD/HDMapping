@@ -1,10 +1,12 @@
-#include <imgui.h>
+﻿#include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
+#define GLEW_STATIC
 #include <GL/glew.h>
+
 #include <GL/freeglut.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -29,6 +31,7 @@
     #include <shellapi.h>  // <-- Required for ShellExecuteA
     #include "resource.h"
 #endif
+#include <GL_assert.h>
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -142,9 +145,401 @@ int index_rendered_points_local = -1;
 float offset_intensity = 0.0;
 bool show_neighbouring_scans = false;
 
+int colorScheme = 0; //0=solid color; gradients:1=intensity, 2=cloud height
+int oldcolorScheme = 0;
+bool usePose = false;
+
 Session session;
 
+
+//VBO/VAO/SSBO proof of concept implementation through glew. openGL 4.6 required
 ///////////////////////////////////////////////////////////////////////////////////
+//
+    //in order to test have to be enabled from View menu before loading session so buffers are created
+    //should be tested with smaller sessions since session is "doubled" with gl_Points vector
+    bool gl_useVBOs = false;
+
+    // vertex shader
+    const char* pointsVertSource = R"glsl(
+    #version 460 core
+
+    //SSBOs
+    layout(std430, binding = 0) buffer VertexCloudIndex {
+        int cloudIndex[];  // cloud index per vertex
+    };
+
+    //order matters for std430 layout
+    struct Cloud {
+        int colorScheme;   // 0=solid,1=intensity gradient, etc.
+        vec3 fixedColor;   // fixed color
+        mat4 pose;         // cloud transformation
+    };
+
+    layout(std430, binding = 1) buffer CloudsBuffer {
+        Cloud clouds[];
+    };
+
+    //vertex inputs
+    layout(location = 0) in vec3 aPos;        // vertex position
+    layout(location = 1) in float aIntensity; // per-point intensity
+
+    //uniforms
+    uniform mat4 uMVP;                        // model-view-projection matrix
+    uniform float uPointSize;                 // point size from GUI
+    uniform int uUsePose;                   // whether to use cloud pose
+
+    out float vIntensity;                     // pass intensity to fragment shader
+    flat out int vColorScheme;                     // pass cloud color scheme to fragment shader
+    out vec3 vFixedColor;                     // pass fixed color / computed color to fragment shader
+
+    void main()
+    {
+        int idx = cloudIndex[gl_VertexID];       // get cloud index
+        Cloud c = clouds[idx];                   // fetch attributes
+
+        mat4 finalPose = (uUsePose == 0) ?  mat4(1.0) : c.pose;  // identity if not using pose
+        gl_Position = uMVP * finalPose * vec4(aPos, 1.0);
+
+        gl_PointSize = uPointSize;
+        vIntensity = aIntensity;
+        vColorScheme = c.colorScheme;
+        vFixedColor = c.fixedColor;
+        //vFixedColor = vec3(float(idx % 10) / 10.0, float((idx/10) % 10) / 10.0, 0.0);
+    }
+    )glsl";
+
+    // fragment shader
+    const char* pointsFragSource = R"glsl(
+    #version 460 core
+
+    in float vIntensity;
+    flat in int vColorScheme;
+    in vec3 vFixedColor;
+    out vec4 FragColor;
+
+    uniform float uIntensityScale; // optional multiplier or normalization
+
+    void main()
+    {
+        float norm = clamp(vIntensity * uIntensityScale, 0.0, 1.0);
+        vec3 endColor;
+
+        if (vColorScheme == 0)
+            endColor = vFixedColor;                 // solid color
+        else if (vColorScheme == 1)
+            endColor = vec3(norm, 0.0, 1.0 - norm); // blue–red gradient by intensity
+        else
+            endColor = vec3(0.5);                   // default gray
+
+        FragColor = vec4(endColor, 1.0);
+    }
+    )glsl";
+
+    ///////////////////////////////////////////////////////////////////////////////////
+
+    struct gl_point {
+        Eigen::Vector3f pos;
+        float intensity;
+    };
+
+    std::vector<gl_point> gl_Points;
+    /*= {
+        {{0.0f, 0.0f, 1.0f}, 1.0f},
+        {{0.5f, 0.0f, 1.0f}, 0.7f},
+        {{0.0f, 0.5f, 1.0f}, 0.5f},
+        {{0.0f, 0.0f, 2.0f}, 0.2f},
+    };*/
+
+    struct gl_cloud {
+        GLint offset;     
+        GLsizei count;    
+        bool visible;     // show/hide
+    };
+
+    // Add to clouds vector
+    std::vector<gl_cloud> gl_clouds;
+    /*= { {
+        0,                                //offset
+        static_cast<GLsizei>(gl_Points.size()), //count
+        true,                             //visible
+        Eigen::Matrix4f::Identity(),      //pose
+        1,                                //colorScheme
+        Eigen::Vector3f(1.0f, 0.0f, 0.0f) //color = red, for example
+    } };*/
+
+    // CPU-side vectors for SSBO data
+    struct gl_cloudSSBO {
+        int colorScheme;        // 4 bytes
+        float padding0[3];      // pad to vec4 alignment (std430 requires vec3 as 16 bytes)
+        float fixedColor[3];    // 12 bytes for vec3
+        float padding1;         // pad to 16 bytes
+        float pose[16];         // mat4 = 16 floats (16*4 = 64 bytes)
+    };
+
+    std::vector<int> gl_cloudIndexSSBO;      // size = gl_Points.size()
+    std::vector<gl_cloudSSBO> gl_cloudsSSBO;        // Cloud is your struct from GLSL
+
+    Eigen::Matrix4f gl_mvp; //Model-View-Projection matrix
+
+    // Uniform locations
+    GLuint VAO, VBO = 0;
+
+    GLuint gl_uPointSize = 0;
+    GLuint gl_uMVP = 0;
+    GLuint gl_shaderProgram = 0;
+    GLuint gl_uIntensityScale = 0;
+    GLuint gl_uUsePose = 0;
+
+    GLuint gl_ssboCloudIndex, gl_ssboClouds = 0;
+
+    //gl_*** functions related to glew/openGL VBO/VAO
+    GLuint gl_compileShader(GLenum type, const char* source)
+    {
+        GLuint shader = GL_CALL_RET(glCreateShader(type));
+        GL_CALL(glShaderSource(shader, 1, &source, nullptr));
+        GL_CALL(glCompileShader(shader));
+
+        // check compilation
+        GLint success;
+        GL_CALL(glGetShaderiv(shader, GL_COMPILE_STATUS, &success));
+        if (!success)
+        {
+            char infoLog[512];
+            GL_CALL(glGetShaderInfoLog(shader, 512, nullptr, infoLog));
+            std::cerr << "openGL shader compilation failed: " << infoLog << std::endl;
+        }
+        return shader;
+    }
+
+    GLuint gl_createShaderProgram(const char* vertSource, const char* fragSource)
+    {
+        GLuint vertexShader = gl_compileShader(GL_VERTEX_SHADER, vertSource);
+        GLuint fragmentShader = gl_compileShader(GL_FRAGMENT_SHADER, fragSource);
+
+        GLuint program = GL_CALL_RET(glCreateProgram());
+        GL_CALL(glAttachShader(program, vertexShader));
+        GL_CALL(glAttachShader(program, fragmentShader));
+        GL_CALL(glLinkProgram(program));
+
+        // check linking
+        GLint success;
+        GL_CALL(glGetProgramiv(program, GL_LINK_STATUS, &success));
+        if (!success)
+        {
+            char infoLog[512];
+            GL_CALL(glGetProgramInfoLog(program, 512, nullptr, infoLog));
+            std::cerr << "openGL program linking failed: " << infoLog << std::endl;
+        }
+
+        GL_CALL(glDeleteShader(vertexShader));
+        GL_CALL(glDeleteShader(fragmentShader));
+
+        return program;
+    }
+
+    void gl_loadPointCloudBuffer(const std::vector<gl_point>& points, GLuint& VAO, GLuint& VBO)
+    {
+        // Create VAO + VBO
+        GL_CALL(glGenVertexArrays(1, &VAO));
+        GL_CALL(glBindVertexArray(VAO));
+
+        GL_CALL(glGenBuffers(1, &VBO));
+        GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, VBO));
+        GL_CALL(glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(gl_point), points.data(), GL_STATIC_DRAW));
+
+        // --- Attribute 0: position ---
+        // layout(location = 0) in vec3 aPos;
+        GL_CALL(glEnableVertexAttribArray(0));
+        GL_CALL(glVertexAttribPointer(
+            0,                                    // attribute index
+            3,                                    // vec3
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(gl_point),                     // stride = full struct
+            (void*)offsetof(gl_point, pos)        // offset of position field
+        ));
+
+        // --- Attribute 1: intensity ---
+        // layout(location = 1) in float aIntensity;
+        GL_CALL(glEnableVertexAttribArray(1));
+        GL_CALL(glVertexAttribPointer(
+            1,
+            1,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(gl_point),
+            (void*)offsetof(gl_point, intensity)
+        ));
+
+        // Unbind
+        GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, 0));
+        GL_CALL(glBindVertexArray(0));
+    }
+
+    void gl_updateSSBOs() {
+        // Vertex -> Cloud index
+        if (gl_ssboCloudIndex == 0)
+        {
+            GL_CALL(glGenBuffers(1, &gl_ssboCloudIndex));
+            GL_CALL(glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboCloudIndex));
+            GL_CALL(glBufferData(GL_SHADER_STORAGE_BUFFER,
+                gl_cloudIndexSSBO.size() * sizeof(int),
+                gl_cloudIndexSSBO.data(),
+                GL_DYNAMIC_DRAW));
+        }
+        else
+        {
+            GL_CALL(glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboCloudIndex));
+            GL_CALL(glBufferSubData(GL_SHADER_STORAGE_BUFFER,
+                0,
+                gl_cloudIndexSSBO.size() * sizeof(int),
+                gl_cloudIndexSSBO.data()));
+        }
+
+        GL_CALL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gl_ssboCloudIndex));
+
+        // Cloud attributes
+        if (gl_ssboClouds == 0)
+        {
+            GL_CALL(glGenBuffers(1, &gl_ssboClouds));
+            GL_CALL(glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboClouds));
+            GL_CALL(glBufferData(GL_SHADER_STORAGE_BUFFER,
+                gl_cloudsSSBO.size() * sizeof(gl_cloudSSBO),
+                gl_cloudsSSBO.data(),
+                GL_DYNAMIC_DRAW));
+        }
+        else
+        {
+            GL_CALL(glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl_ssboClouds));
+            GL_CALL(glBufferSubData(GL_SHADER_STORAGE_BUFFER,
+                0,
+                gl_cloudsSSBO.size() * sizeof(gl_cloudSSBO),
+                gl_cloudsSSBO.data()));
+        }
+
+        GL_CALL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gl_ssboClouds));
+
+        GL_CALL(glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0));
+    }
+
+    void gl_updateUserView()
+    {
+        ImGuiIO& io = ImGui::GetIO();
+
+        Eigen::Affine3f viewLocal1 = Eigen::Affine3f::Identity();
+        viewLocal1.translate(rotation_center);
+
+        viewLocal1.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
+        viewLocal1.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        viewLocal1.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+        viewLocal1.translate(-rotation_center);
+
+        //Get the projection matrix from your reshape() or manually rebuild it
+        float aspect = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+        float fov = 60.0f * DEG_TO_RAD;
+        float nearf = 0.001f; //closest distance to camera objects are rendered [m]
+        float farf = 1000.0f; //furthest distance to camera objects are rendered [m]
+
+        Eigen::Matrix4f projection = Eigen::Matrix4f::Zero();
+        float f = 1.0f / tan(fov / 2.0f);
+        projection(0, 0) = f / aspect;
+        projection(1, 1) = f;
+        projection(2, 2) = (farf + nearf) / (nearf - farf);
+        projection(2, 3) = (2 * farf * nearf) / (nearf - farf);
+        projection(3, 2) = -1.0f;
+
+        //Combine into a single MVP (model-view-projection)
+        gl_mvp = projection * viewLocal1.matrix();
+    }
+
+    void gl_renderPointCloud()
+    {
+        GL_CALL(glUseProgram(gl_shaderProgram));
+
+        //Set point size from GUI
+        GL_CALL(glUniform1f(gl_uPointSize, static_cast<float>(point_size)));
+        GL_CALL(glUniform1f(gl_uIntensityScale, offset_intensity));
+        GL_CALL(glUniform1i(gl_uUsePose, usePose));
+        GL_CALL(glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, gl_mvp.data()));
+
+        if (oldcolorScheme != colorScheme)
+        {
+            if (colorScheme == 0)
+                for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
+                {
+                    gl_cloudsSSBO[i].colorScheme = 0;
+                    gl_cloudsSSBO[i].fixedColor[0] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
+                    gl_cloudsSSBO[i].fixedColor[1] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
+                    gl_cloudsSSBO[i].fixedColor[2] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
+                }
+
+            else if (colorScheme == 1)
+                for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
+                    gl_cloudsSSBO[i].colorScheme = 1;
+
+            else if (colorScheme == 2)
+                for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
+                {
+                    gl_cloudsSSBO[i].colorScheme = 0;
+                    gl_cloudsSSBO[i].fixedColor[0] = float(rand() % 255) / 255.0f;
+                    gl_cloudsSSBO[i].fixedColor[1] = float(rand() % 255) / 255.0f;
+                    gl_cloudsSSBO[i].fixedColor[2] = float(rand() % 255) / 255.0f;
+                }
+
+            oldcolorScheme = colorScheme;
+
+            gl_updateSSBOs();
+        }
+
+        GL_CALL(glBindVertexArray(VAO));
+        /*for (size_t i = 0; i < gl_clouds.size(); i++)
+        {
+            if (!gl_clouds[i].visible) continue;
+
+            // Send per-cloud uniforms
+
+            if (usePose)
+            {
+                Eigen::Matrix4f cloudMVP = gl_mvp * gl_cloudsSSBO[i].pose;
+                GL_CALL(glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, cloudMVP.data()));
+            }
+            else
+                GL_CALL(glUniformMatrix4fv(gl_uMVP, 1, GL_FALSE, gl_mvp.data()));
+
+            // Draw only this cloud’s range
+            //GL_CALL(glDrawArrays(GL_POINTS, gl_clouds[i].offset, gl_clouds[i].count));
+        }*/
+
+        GL_CALL(glDrawArrays(GL_POINTS, 0, gl_cloudIndexSSBO.size()));
+
+        GL_CALL(glBindVertexArray(0));
+        GL_CALL(glUseProgram(0)); // back to fixed-function for legacy code
+    }
+
+    void gl_init()
+    {
+        GLenum err = glewInit();
+        if (err != GLEW_OK)
+        {
+            std::cerr << "GLEW init failed: " << glewGetErrorString(err) << std::endl;
+            return;
+        }
+
+        //Compile shaders and create shader program
+        gl_shaderProgram = gl_createShaderProgram(pointsVertSource, pointsFragSource);
+
+        //Get pointers
+        gl_uMVP = static_cast<GLuint>(GL_CALL_RET(glGetUniformLocation(gl_shaderProgram, "uMVP")));
+        gl_uPointSize = static_cast<GLuint>(GL_CALL_RET(glGetUniformLocation(gl_shaderProgram, "uPointSize")));
+        gl_uIntensityScale = static_cast<GLuint>(GL_CALL_RET(glGetUniformLocation(gl_shaderProgram, "uIntensityScale")));
+    	gl_uUsePose = static_cast<GLuint>(GL_CALL_RET(glGetUniformLocation(gl_shaderProgram, "uUsePose")));
+
+        GL_CALL(glEnable(GL_PROGRAM_POINT_SIZE));
+    }
+///////////////////////////////////////////////////////////////////////////////////
+
+
+
 
 void openSession()
 {
@@ -158,6 +553,63 @@ void openSession()
         session.load(fs::path(session_file_name).string(), false, 0.0, 0.0, 0.0, false);
         index_rendered_points_local = 0;
 
+        if (gl_useVBOs)
+        {
+            GLint offset = 0;
+
+            gl_Points.clear();
+            gl_clouds.clear();
+            gl_cloudIndexSSBO.clear();
+            gl_cloudsSSBO.clear();
+
+            //Convert point cloud data to gl_Points
+            for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); ++j)
+            {
+                const auto& pc = session.point_clouds_container.point_clouds[j];
+
+                for (size_t i = 0; i < pc.points_local.size(); ++i)
+                {
+                    const auto& pt = pc.points_local[i];
+
+                    gl_point gp;
+                    gp.pos[0] = pt.x();
+                    gp.pos[1] = pt.y();
+                    gp.pos[2] = pt.z();
+                    gp.intensity = pc.intensities[i];  // same index
+
+                    gl_Points.push_back(gp);
+					gl_cloudIndexSSBO.push_back(static_cast<int>(j)); // cloud index
+                }
+
+                gl_cloud gc;
+                gc.offset = offset;
+                gc.count = static_cast<GLsizei>(pc.points_local.size());
+                gc.visible = true;
+                gl_clouds.push_back(gc);
+
+                gl_cloudSSBO gcSSBO;
+                Eigen::Matrix4f pose_f = pc.m_pose.matrix().cast<float>();
+                std::memcpy(gcSSBO.pose, pose_f.data(), 16 * sizeof(float));
+                //gcSSBO.colorScheme = colorScheme;
+                //gcSSBO.fixedColor[0] = pc.render_color[0];
+                //gcSSBO.fixedColor[1] = pc.render_color[1];
+                //gcSSBO.fixedColor[2] = pc.render_color[2];
+				oldcolorScheme = -1; //force update
+                gl_cloudsSSBO.push_back(gcSSBO);
+
+                offset += static_cast<GLint>(pc.points_local.size());
+            }
+
+            //Load to OpenGL buffers
+            gl_loadPointCloudBuffer(gl_Points, VAO, VBO);
+
+            gl_Points.clear();
+            gl_Points.shrink_to_fit();
+
+            //Prepare SSBO data
+            gl_updateSSBOs();
+		}
+
         std::string newTitle = winTitle + " - " + truncPath(session_file_name);
         glutSetWindowTitle(newTitle.c_str());
     }
@@ -166,6 +618,18 @@ void openSession()
 void display()
 {
     ImGuiIO& io = ImGui::GetIO();
+
+    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+
+
+    if (gl_useVBOs)
+    {
+        gl_updateUserView();
+        gl_renderPointCloud();
+    }
+
 
     view_kbd_shortcuts();
 
@@ -180,12 +644,11 @@ void display()
             offset_intensity += 0.01;
         if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
             offset_intensity -= 0.01;
-        if (offset_intensity < 0) {
+
+        if (offset_intensity < 0)
             offset_intensity = 0;
-        }
-        if (offset_intensity > 1) {
+        else if (offset_intensity > 1)
             offset_intensity = 1;
-        }
 
         if ((!io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
             || ImGui::IsKeyPressed(ImGuiKey_PageUp, true)
@@ -248,10 +711,6 @@ void display()
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
     }
 
-    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
-
     Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
 
     if (!is_ortho)
@@ -284,53 +743,58 @@ void display()
 
     if (index_rendered_points_local >= 0 && index_rendered_points_local < session.point_clouds_container.point_clouds[index_rendered_points_local].points_local.size())
     {
-        double max_intensity = 0.0;
-        for (int i = 0; i < session.point_clouds_container.point_clouds[index_rendered_points_local].intensities.size(); i++)
-        {
-            if (session.point_clouds_container.point_clouds[index_rendered_points_local].intensities[i] > max_intensity)
-                max_intensity = session.point_clouds_container.point_clouds[index_rendered_points_local].intensities[i];
-        }
+		const auto& cloud = session.point_clouds_container.point_clouds[index_rendered_points_local]; //avoiding multiple indexing
 
-        Eigen::Affine3d pose = session.point_clouds_container.point_clouds[index_rendered_points_local].m_pose;
-        pose(0, 3) = 0.0;
-        pose(1, 3) = 0.0;
-        pose(2, 3) = 0.0;
+		const double inv_max_intensity = 1.0 / *std::max_element(cloud.intensities.begin(), cloud.intensities.end()); //precompute for speed
+
+        Eigen::Affine3d pose = cloud.m_pose;
+
+		if (usePose == false)
+            pose.translation().setZero();
 
         glPointSize(point_size);
         glBegin(GL_POINTS);
-        for (int i = 0; i < session.point_clouds_container.point_clouds[index_rendered_points_local].points_local.size(); i++)
+        for (size_t i = 0; i < cloud.points_local.size(); i++)
         {
-            glColor3f(session.point_clouds_container.point_clouds[index_rendered_points_local].intensities[i] / max_intensity + offset_intensity, 0.0, 1.0 - session.point_clouds_container.point_clouds[index_rendered_points_local].intensities[i] / max_intensity + offset_intensity);
+			if (colorScheme == 0) //solid color
+            {
+                glColor3f(cloud.render_color[0], cloud.render_color[1], cloud.render_color[2]);
+            }
+            else if (colorScheme == 1) //intensity gradient
+            {
+                const double norm = cloud.intensities[i] * inv_max_intensity + offset_intensity;
+                glColor3f(norm, 0.0, 1.0 - norm);
+			}
 
-            Eigen::Vector3d p(session.point_clouds_container.point_clouds[index_rendered_points_local].points_local[i].x(),
-                              session.point_clouds_container.point_clouds[index_rendered_points_local].points_local[i].y(),
-                              session.point_clouds_container.point_clouds[index_rendered_points_local].points_local[i].z());
+            Eigen::Vector3d p(cloud.points_local[i].x(),
+                              cloud.points_local[i].y(),
+                              cloud.points_local[i].z());
             p = pose * p;
             glVertex3f(p.x(), p.y(), p.z());
         }
         glEnd();
 
         if (show_neighbouring_scans){
-            //pc_neigbouring_color
-
             glColor3f(pc_neigbouring_color.x, pc_neigbouring_color.y, pc_neigbouring_color.z);
-
             glPointSize(point_size);
             glBegin(GL_POINTS);
             for (int index = index_rendered_points_local - 20; index <= index_rendered_points_local + 20; index +=5){
                 if (index != index_rendered_points_local && index >= 0 && index < session.point_clouds_container.point_clouds.size()){
-                    Eigen::Affine3d pose = session.point_clouds_container.point_clouds[index].m_pose;
-                    Eigen::Affine3d pose_offset = session.point_clouds_container.point_clouds[index_rendered_points_local].m_pose;
+                    const auto& iCloud = session.point_clouds_container.point_clouds[index];  //avoiding multiple indexing
+                    Eigen::Affine3d pose = iCloud.m_pose;
 
-                    pose(0, 3) -= pose_offset(0, 3);
-                    pose(1, 3) -= pose_offset(1, 3);
-                    pose(2, 3) -= pose_offset(2, 3);
-
-                    for (int i = 0; i < session.point_clouds_container.point_clouds[index].points_local.size(); i++)
+                    if (usePose == false)
                     {
-                        Eigen::Vector3d p(session.point_clouds_container.point_clouds[index].points_local[i].x(),
-                                            session.point_clouds_container.point_clouds[index].points_local[i].y(),
-                                            session.point_clouds_container.point_clouds[index].points_local[i].z());
+                        pose(0, 3) -= cloud.m_pose(0, 3);
+                        pose(1, 3) -= cloud.m_pose(1, 3);
+                        pose(2, 3) -= cloud.m_pose(2, 3);
+                    }
+
+                    for (int i = 0; i < iCloud.points_local.size(); i++)
+                    {
+                        Eigen::Vector3d p(iCloud.points_local[i].x(),
+                                          iCloud.points_local[i].y(),
+                                          iCloud.points_local[i].z());
                         p = pose * p;
                         glVertex3f(p.x(), p.y(), p.z());
                     }
@@ -356,58 +820,108 @@ void display()
 
         if (ImGui::BeginMenu("View"))
         {
-            if (session.point_clouds_container.point_clouds.size() > 0)
+            ImGui::BeginDisabled(!(session.point_clouds_container.point_clouds.size() > 0));
             {
-                ImGui::PushItemWidth(ImGuiNumberWidth);
-                ImGui::InputFloat("Offset intensity", &offset_intensity, 0.01, 0.1, "%.2f");
-                if (offset_intensity < 0) {
-                    offset_intensity = 0;
-                }
-                if (offset_intensity > 1) {
-                    offset_intensity = 1;
-                }
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("keyboard up/down arrows");
-
                 auto tmp = point_size;
+                ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputInt("Points size", &point_size);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("keyboard 1-9 keys");
-                ImGui::PopItemWidth();
                 if (point_size < 1)
                     point_size = 1;
-                if (point_size > 10)
+                else if (point_size > 10)
                     point_size = 10;
 
                 if (tmp != point_size)
-                {
-                    for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-                    {
-                        session.point_clouds_container.point_clouds[i].point_size = point_size;
-                    }
-                }
-
-                ImGui::MenuItem("Show neighbouring scans", "Ctrl+N", &show_neighbouring_scans);
-                ImGui::BeginDisabled(!show_neighbouring_scans);
-                {
-                    ImGui::ColorEdit3("Neigbouring color", (float*)&pc_neigbouring_color, ImGuiColorEditFlags_NoInputs);
-                }
-                ImGui::EndDisabled();
+                    for (auto& point_cloud : session.point_clouds_container.point_clouds)
+                        point_cloud.point_size = point_size;
 
                 ImGui::Separator();
             }
+            ImGui::EndDisabled();
 
             ImGui::MenuItem("Show axes", "key X", &show_axes);
-
-            ImGui::Separator();
-
             ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
+            ImGui::MenuItem("Use segment pose", nullptr, &usePose);
+            ImGui::MenuItem("Show neighbouring scans", "Ctrl+N", &show_neighbouring_scans);
 
-            //ImGui::MenuItem("show_covs", nullptr, &show_covs);
+            //ImGui::MenuItem("show_covs", nullptr, &show_covs);      
 
             ImGui::Separator();
 
-            ImGui::ColorEdit3("Background color", (float*)&clear_color, ImGuiColorEditFlags_NoInputs);
+
+            ImGui::MenuItem("VBO/VAO proof of concept", nullptr, &gl_useVBOs);
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Has to be enabled efore loading session so buffers are created");
+                ImGui::Text("Should be tested with smaller sessions as session will be rendered in full, no decimation");
+                ImGui::Text("Should be used with 'Use segment pose' active for relevant session view");
+                ImGui::Text("Proof of concept! Not fully functional");
+
+                ImGui::EndTooltip();
+            }
+
+            ImGui::Separator();
+
+
+            if (ImGui::BeginMenu("Colors"))
+            {
+                ImGui::ColorEdit3("Background color", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
+
+                ImGui::BeginDisabled(!(session.point_clouds_container.point_clouds.size() > 0));
+                {
+                    ImGui::BeginDisabled(!show_neighbouring_scans);
+                    {
+                        ImGui::ColorEdit3("Neigbouring color", (float*)&pc_neigbouring_color, ImGuiColorEditFlags_NoInputs);
+                    }
+                    ImGui::EndDisabled();
+
+                    ImGui::Separator();
+
+					ImGui::Text("Point cloud color:");
+
+                    float color[3];
+                    if (session.point_clouds_container.point_clouds.size() > 0)
+                    {
+                        color[0] = session.point_clouds_container.point_clouds[0].render_color[0];
+                        color[1] = session.point_clouds_container.point_clouds[0].render_color[1];
+                        color[2] = session.point_clouds_container.point_clouds[0].render_color[2];
+                    }
+
+                    if (ImGui::ColorEdit3("", (float*)&color, ImGuiColorEditFlags_NoInputs))
+                    {
+                        for (auto& pc : session.point_clouds_container.point_clouds)
+                        {
+                            pc.render_color[0] = color[0];
+                            pc.render_color[1] = color[1];
+                            pc.render_color[2] = color[2];
+                            pc.show_color = false;
+                        }
+                    }
+					ImGui::SameLine();
+					if (ImGui::MenuItem("> Solid color", nullptr, (colorScheme == 0)))
+						colorScheme = 0;
+
+                    if (ImGui::MenuItem("> Intensity gradient", nullptr, (colorScheme == 1)))
+                        colorScheme = 1;                    
+                    ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                    ImGui::InputFloat("Offset intensity", &offset_intensity, 0.01, 0.1, "%.2f");
+                    if (offset_intensity < 0)
+                        offset_intensity = 0;
+                    else if (offset_intensity > 1)
+                        offset_intensity = 1;
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("keyboard up/down arrows");
+
+                    if (ImGui::MenuItem("> Random colors per segment", nullptr, (colorScheme == 2)))
+                        colorScheme = 2;
+
+                }
+                ImGui::EndDisabled();
+
+                ImGui::EndMenu();
+            }
 
             ImGui::EndMenu();
         }
@@ -423,7 +937,9 @@ void display()
         if (session.point_clouds_container.point_clouds.size() > 0)
         {
             int tempIndex = index_rendered_points_local;
-            ImGui::Text("index_rendered_points_local: ");
+            ImGui::Text("Index: ");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Index of rendered point cloud");
             ImGui::SameLine();
             ImGui::PushItemWidth(ImGuiNumberWidth);
             ImGui::SliderInt("##irpls", &tempIndex, 0, static_cast<int>(session.point_clouds_container.point_clouds.size() - 1));
@@ -443,6 +959,9 @@ void display()
             if ((tempIndex >= 0) && (tempIndex < session.point_clouds_container.point_clouds.size()))
                 index_rendered_points_local = tempIndex;
         }
+
+        ImGui::SameLine();
+        ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
 
         ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
 
@@ -465,7 +984,7 @@ void display()
     info_window(infoLines, appShortcuts, &info_gui);
 
     if (compass_ruler)
-        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), clear_color);
+        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), bg_color);
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
@@ -515,7 +1034,7 @@ int main(int argc, char *argv[])
     try
     {
         initGL(&argc, argv, winTitle, display, mouse);
-
+        gl_init();
         glutMainLoop();
 
         ImGui_ImplOpenGL2_Shutdown();

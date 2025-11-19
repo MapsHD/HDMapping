@@ -134,9 +134,15 @@ if(WIN32)
     set_target_properties(lidar_odometry_py PROPERTIES SUFFIX ".pyd")
     set_target_properties(multi_view_tls_registration_py PROPERTIES SUFFIX ".pyd")
 else()
-    set_target_properties(core_py PROPERTIES SUFFIX ".so")
-    set_target_properties(lidar_odometry_py PROPERTIES SUFFIX ".so")
-    set_target_properties(multi_view_tls_registration_py PROPERTIES SUFFIX ".so")
+    set_target_properties(core_py PROPERTIES 
+        PREFIX ""
+        SUFFIX ".so")
+    set_target_properties(lidar_odometry_py PROPERTIES 
+        PREFIX ""
+        SUFFIX ".so")
+    set_target_properties(multi_view_tls_registration_py PROPERTIES 
+        PREFIX ""
+        SUFFIX ".so")
 endif()
 
 set_target_properties(core_py PROPERTIES
@@ -154,13 +160,36 @@ set_target_properties(multi_view_tls_registration_py PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/pybind"
 )
 
-set(DLL_SOURCE_DIR "${CMAKE_BINARY_DIR}/bin/Release")
-set(DLL_DEST_DIR "${CMAKE_SOURCE_DIR}/pybind/Release")
-
-file(GLOB DLL_FILES "${CMAKE_BINARY_DIR}/bin/Release/*.dll")
-foreach(DLL ${DLL_FILES})
+# Copy DLLs on Windows for runtime dependencies
+if(WIN32)
+    # Generate a config-specific script to copy only DLL files
+    file(GENERATE 
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/copy_dlls_$<CONFIG>.cmake"
+        CONTENT "
+file(GLOB DLL_FILES \"${CMAKE_BINARY_DIR}/bin/$<CONFIG>/*.dll\")
+file(MAKE_DIRECTORY \"${CMAKE_SOURCE_DIR}/pybind/$<CONFIG>\")
+foreach(DLL_FILE \${DLL_FILES})
+    file(COPY \"\${DLL_FILE}\" DESTINATION \"${CMAKE_SOURCE_DIR}/pybind/$<CONFIG>\")
+endforeach()
+message(STATUS \"Copied \${DLL_FILES} to ${CMAKE_SOURCE_DIR}/pybind/$<CONFIG>\")
+"
+    )
+    
+    add_custom_command(
+        TARGET core_py POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_BINARY_DIR}/copy_dlls_$<CONFIG>.cmake"
+        COMMENT "Copying DLLs to pybind/$<CONFIG>"
+    )
+    
     add_custom_command(
         TARGET lidar_odometry_py POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DLL} "${CMAKE_SOURCE_DIR}/pybind/Release"
+        COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_BINARY_DIR}/copy_dlls_$<CONFIG>.cmake"
+        COMMENT "Copying DLLs to pybind/$<CONFIG>"
     )
-endforeach()
+    
+    add_custom_command(
+        TARGET multi_view_tls_registration_py POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_BINARY_DIR}/copy_dlls_$<CONFIG>.cmake"
+        COMMENT "Copying DLLs to pybind/$<CONFIG>"
+    )
+endif()

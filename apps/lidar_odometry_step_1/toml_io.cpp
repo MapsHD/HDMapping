@@ -13,12 +13,17 @@ bool TomlIO::SaveParametersToTomlFile(const std::string &filepath, LidarOdometry
             if (attribute == "in_out_params_indoor" || attribute == "in_out_params_outdoor")
                 continue;
 
+#if WITH_GUI == 1
             if (attribute == "clear_color")
             {
                 const ImVec4& c = params.clear_color;
                 cat_tbl.insert(attribute, toml::array{ c.x, c.y, c.z, c.w });
                 continue;
             }
+#else
+            if (attribute == "clear_color")
+                continue; // Skip GUI-only parameter when building without GUI
+#endif
             
             // Check if it's a motion_model_correction parameter
             auto motion_it = MOTION_MODEL_CORRECTION_POINTERS.find(attribute);
@@ -188,6 +193,7 @@ bool TomlIO::LoadParametersFromTomlFile(const std::string &filepath, LidarOdomet
                         } }, it->second);
         }
 
+#if WITH_GUI == 1
         if (cat_tbl && cat_tbl->contains("clear_color"))
         {
             auto arr = cat_tbl->at("clear_color").as_array();
@@ -199,6 +205,7 @@ bool TomlIO::LoadParametersFromTomlFile(const std::string &filepath, LidarOdomet
                 params.clear_color.w = static_cast<float>(arr->at(3).as_floating_point()->get());
             }
         }
+#endif
     }
     read_grid_params(params.in_out_params_indoor, tbl["in_out_params_indoor"].as_table());
     read_grid_params(params.in_out_params_outdoor, tbl["in_out_params_outdoor"].as_table());

@@ -25,12 +25,14 @@ PYBIND11_MODULE(core_py, m) {
     // Bind WorkerData
     py::class_<WorkerData>(m, "WorkerData")
         .def(py::init<>())
-        .def_readwrite("intermediate_points", &WorkerData::intermediate_points)
-        .def_readwrite("original_points", &WorkerData::original_points)
+        .def_readwrite("intermediate_points_cache_file_name", &WorkerData::intermediate_points_cache_file_name)
+        .def_readwrite("original_points_cache_file_name", &WorkerData::original_points_cache_file_name)
+        .def_readwrite("original_points_to_save_cache_file_name", &WorkerData::original_points_to_save_cache_file_name)
         .def_readwrite("intermediate_trajectory", &WorkerData::intermediate_trajectory)
         .def_readwrite("intermediate_trajectory_motion_model", &WorkerData::intermediate_trajectory_motion_model)
         .def_readwrite("intermediate_trajectory_timestamps", &WorkerData::intermediate_trajectory_timestamps)
         .def_readwrite("imu_om_fi_ka", &WorkerData::imu_om_fi_ka)
+        .def_readwrite("show", &WorkerData::show)
         ;
 
     // Bind Session

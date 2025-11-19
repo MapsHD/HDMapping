@@ -42,7 +42,7 @@ std::vector<std::string> infoLines = {
 };
 
 //App specific shortcuts (using empty dummy until needed)
-std::vector<ShortcutEntry> appShortcuts(77, { "", "", "" });
+std::vector<ShortcutEntry> appShortcuts(78, { "", "", "" });
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
@@ -485,9 +485,9 @@ void project_gui()
                 if (chosen_lidar != -1)
                 {
                     TaitBryanPose tb_pose = pose_tait_bryan_from_affine_matrix(calibrations.at(chosen_lidar));
-                    tb_pose.om = tb_pose.om * 180.0 / M_PI;
-                    tb_pose.fi = tb_pose.fi * 180.0 / M_PI;
-                    tb_pose.ka = tb_pose.ka * 180.0 / M_PI;
+                    tb_pose.om = tb_pose.om * RAD_TO_DEG;
+                    tb_pose.fi = tb_pose.fi * RAD_TO_DEG;
+                    tb_pose.ka = tb_pose.ka * RAD_TO_DEG;
 
                     auto tmp = tb_pose;
 
@@ -515,9 +515,9 @@ void project_gui()
                     if (tmp.px != tb_pose.px || tmp.py != tb_pose.py || tmp.pz != tb_pose.pz ||
                         tmp.om != tb_pose.om || tmp.fi != tb_pose.fi || tmp.ka != tb_pose.ka)
                     {
-                        tb_pose.om = tb_pose.om * M_PI / 180.0;
-                        tb_pose.fi = tb_pose.fi * M_PI / 180.0;
-                        tb_pose.ka = tb_pose.ka * M_PI / 180.0;
+                        tb_pose.om = tb_pose.om * DEG_TO_RAD;
+                        tb_pose.fi = tb_pose.fi * DEG_TO_RAD;
+                        tb_pose.ka = tb_pose.ka * DEG_TO_RAD;
 
                         Eigen::Affine3d m_pose = affine_matrix_from_pose_tait_bryan(tb_pose);
                         calibrations.at(chosen_lidar) = m_pose;
@@ -662,7 +662,7 @@ void display()
         pose_tb.pz = 0.0;
         pose_tb.om = 0.0;
         pose_tb.fi = 0.0;
-        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * M_PI / 180.0;
+        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * DEG_TO_RAD;
         auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
 
         Eigen::Vector3d v_t = m * v;
@@ -690,8 +690,12 @@ void display()
         viewTranslation.translate(rotation_center);
         Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
         viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-        viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
-        viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
+
+        if (!lock_z)
+            viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        else
+            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
 
         Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
         viewTranslation2.translate(-rotation_center);
@@ -835,6 +839,8 @@ void display()
 
             ImGui::MenuItem("Show axes", "key X", &show_axes);
             ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
+
+            ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);
 
             ImGui::Separator();
             ImGui::Text("Colors:");

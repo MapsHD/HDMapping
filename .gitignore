@@ -64,3 +64,7 @@ cmake-*
 
 # imgui
 imgui.ini
+/out/install/x64-Debug
+/out/install/x64-Release/bin
+/out/install/x64-Release
+/out_old/install

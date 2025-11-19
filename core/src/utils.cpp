@@ -25,6 +25,7 @@ int mouse_buttons = 0;
 float mouse_sensitivity = 1.0;
 
 bool is_ortho = false;
+bool lock_z = false;
 bool show_axes = true;
 ImVec4 bg_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 int point_size = 1;
@@ -92,7 +93,7 @@ static const std::vector<ShortcutEntry> shortcuts = {
     {"", "Ctrl+M", ""},
     {"", "N", ""},
     {"", "Ctrl+N", ""},
-    {"", "O", ""},
+    {"", "O", "Ortographic view"},
     {"", "Ctrl+O", "Open/load session/data"},
     {"", "P", ""},
     {"", "Ctrl+P", ""},
@@ -117,6 +118,7 @@ static const std::vector<ShortcutEntry> shortcuts = {
     {"", "Ctrl+Y", ""},
     {"", "Z", "camera reset"},
     {"", "Ctrl+Z", ""},
+    {"", "Shift+Z", "Lock Z"},
     {"", "1-9", "point size"},
     {"Special keys", "Up arrow", ""},
     {"", "Shift + up arrow", "camera translate Up"},
@@ -712,6 +714,9 @@ void view_kbd_shortcuts()
         breakCameraTransition();
     }
 
+    if (io.KeyShift && ImGui::IsKeyPressed('Z', false) && !is_ortho)
+		lock_z = !lock_z;
+
     //only checking for single key press (no modifiers) from this point
     if (io.KeyCtrl || io.KeyShift) return;
 
@@ -733,11 +738,11 @@ void view_kbd_shortcuts()
     if (ImGui::IsKeyPressed('Z'))
         setCameraPreset(CAMERA_RESET);
 
-    if (ImGui::IsKeyPressed('C'))
+    if (ImGui::IsKeyPressed('C'), false)
         compass_ruler = !compass_ruler;
-    if (ImGui::IsKeyPressed('O'))
+    if (ImGui::IsKeyPressed('O'), false)
         is_ortho = !is_ortho;
-    if (ImGui::IsKeyPressed('X'))
+    if (ImGui::IsKeyPressed('X'), false)
         show_axes = !show_axes;
 
 
@@ -759,7 +764,6 @@ void view_kbd_shortcuts()
 		point_size = 8;
 	if (ImGui::IsKeyPressed('9'))
 		point_size = 9;
-
 }
 
 

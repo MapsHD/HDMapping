@@ -66,7 +66,7 @@ std::vector<std::string> infoLines = {
 // App specific shortcuts (Type and Shortcut are just for easy reference)
 static const std::vector<ShortcutEntry> appShortcuts = {
     {"Normal keys", "A", ""},
-    {"", "Ctrl+A", ""},
+    {"", "Ctrl+A", "Add session(s)"},
     {"", "B", ""},
     {"", "Ctrl+B", ""},
     {"", "C", ""},
@@ -88,21 +88,21 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "K", ""},
     {"", "Ctrl+K", ""},
     {"", "L", ""},
-    {"", "Ctrl+L", ""},
+    {"", "Ctrl+L", "Load sessions"},
     {"", "M", ""},
     {"", "Ctrl+M", ""},
     {"", "N", ""},
     {"", "Ctrl+N", ""},
-    {"", "O", "Ortographic view"},
-    {"", "Ctrl+O", ""},
+    {"", "O", ""},
+    {"", "Ctrl+O", "Open project"},
     {"", "P", ""},
     {"", "Ctrl+P", ""},
     {"", "Q", ""},
     {"", "Ctrl+Q", ""},
     {"", "R", ""},
-    {"", "Ctrl+R", ""},
+    {"", "Ctrl+R", "Remove session(s)"},
     {"", "S", ""},
-    {"", "Ctrl+S", ""},
+    {"", "Ctrl+S", "Save project"},
     {"", "Ctrl+Shift+S", ""},
     {"", "T", ""},
     {"", "Ctrl+T", ""},
@@ -118,6 +118,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Ctrl+Y", ""},
     {"", "Z", ""},
     {"", "Ctrl+Z", ""},
+    {"", "Shift+Z", ""},
     {"", "1-9", ""},
     {"Special keys", "Up arrow", ""},
     {"", "Shift + up arrow", ""},
@@ -156,8 +157,6 @@ float m_gizmo[] = {1, 0, 0, 0,
                    0, 0, 1, 0,
                    0, 0, 0, 1};
 
-bool block_z = false;
-
 bool is_decimate = true;
 double bucket_x = 0.1;
 double bucket_y = 0.1;
@@ -174,7 +173,7 @@ bool optimized = false;
 bool gizmo_all_sessions = false;
 bool is_ndt_gui = false;
 bool is_loop_closure_gui = false;
-bool open_remove = false;
+bool remove_gui = false;
 NDT ndt;
 
 int number_visible_sessions = 0;
@@ -345,28 +344,28 @@ void ndt_gui()
     if (ImGui::Button("Set Zoller+Fröhlich TLS Imager 5006i errors"))
     {
         ndt.sigma_r = 0.0068;
-        ndt.sigma_polar_angle = 0.007 / 180.0 * M_PI;
-        ndt.sigma_azimuthal_angle = 0.007 / 180.0 * M_PI;
+        ndt.sigma_polar_angle = 0.007 * DEG_TO_RAD;
+        ndt.sigma_azimuthal_angle = 0.007 * DEG_TO_RAD;
     }
 
     if (ImGui::Button("Set Zoller+Fröhlich TLS Imager 5010C errors"))
     {
         ndt.sigma_r = 0.01;
-        ndt.sigma_polar_angle = 0.007 / 180.0 * M_PI;
-        ndt.sigma_azimuthal_angle = 0.007 / 180.0 * M_PI;
+        ndt.sigma_polar_angle = 0.007 * DEG_TO_RAD;
+        ndt.sigma_azimuthal_angle = 0.007 * DEG_TO_RAD;
     }
 
     if (ImGui::Button("Set Zoller+Fröhlich TLS Imager 5016 errors"))
     {
         ndt.sigma_r = 0.00025;
-        ndt.sigma_polar_angle = 0.004 / 180.0 * M_PI;
-        ndt.sigma_azimuthal_angle = 0.004 / 180.0 * M_PI;
+        ndt.sigma_polar_angle = 0.004 * DEG_TO_RAD;
+        ndt.sigma_azimuthal_angle = 0.004 * DEG_TO_RAD;
     }
     if (ImGui::Button("Set Faro Focus3D errors"))
     {
         ndt.sigma_r = 0.001;
-        ndt.sigma_polar_angle = 19.0 * (1.0 / 3600.0) / 180.0 * M_PI;
-        ndt.sigma_azimuthal_angle = 19.0 * (1.0 / 3600.0) / 180.0 * M_PI;
+        ndt.sigma_polar_angle = 19.0 * (1.0 / 3600.0) * DEG_TO_RAD;
+        ndt.sigma_azimuthal_angle = 19.0 * (1.0 / 3600.0) * DEG_TO_RAD;
     }
     if (ImGui::Button("Set Leica ScanStation C5 C10 errors"))
     {
@@ -377,8 +376,8 @@ void ndt_gui()
     if (ImGui::Button("Set Riegl VZ400 errors"))
     {
         ndt.sigma_r = 0.005;
-        ndt.sigma_polar_angle = 0.0005 / 180.0 * M_PI + 0.0003;     // Laser Beam Dicvergence
-        ndt.sigma_azimuthal_angle = 0.0005 / 180.0 * M_PI + 0.0003; // Laser Beam Dicvergence
+        ndt.sigma_polar_angle = 0.0005 * DEG_TO_RAD + 0.0003;     // Laser Beam Dicvergence
+        ndt.sigma_azimuthal_angle = 0.0005 * DEG_TO_RAD + 0.0003; // Laser Beam Dicvergence
     }
     if (ImGui::Button("Set Leica HDS6100 errors"))
     {
@@ -1593,7 +1592,7 @@ void save_trajectories_to_laz(const Session &session, std::string output_file_na
 
                     if (v1.norm() > 0 && v2.norm() > 0)
                     {
-                        double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+                        double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * RAD_TO_DEG);
 
                         if (angle_deg > 10.0)
                         {
@@ -1727,7 +1726,7 @@ void save_trajectories(
 
                         if (v1.norm() > 0 && v2.norm() > 0)
                         {
-                            double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * 180.0 / M_PI);
+                            double angle_deg = fabs(acos(v1.dot(v2) / (v1.norm() * v2.norm())) * RAD_TO_DEG);
 
                             if (angle_deg > 10.0)
                                 is_curve = true;
@@ -1930,7 +1929,7 @@ bool optimize(std::vector<Session> &sessions)
     std::vector<Edge> all_edges;
 
     // motion model edges;
-    double angle = 0.1 / 180.0 * M_PI;
+    double angle = 0.1 * DEG_TO_RAD;
     double wangle = 1.0 / (angle * angle);
 
     for (int i = 1; i < poses_motion_model.size(); i++)
@@ -2193,7 +2192,7 @@ bool optimize(std::vector<Session> &sessions)
             }
         }
 
-        /*double angle = 1.0 / 180.0 * M_PI;
+        /*double angle = 1.0 * DEG_TO_RAD;
         double wangle = 1.0 / (angle * angle);
 
         for (int index = 0; index < indexes_ground_truth.size(); index++)
@@ -2612,13 +2611,16 @@ void saveProject()
 
 void addSession()
 {
-    std::string input_file_name = "";
-    input_file_name = mandeye::fd::OpenFileDialogOneFile("Add session", mandeye::fd::Session_filter);
-    std::cout << "SESSION file: '" << input_file_name << "'" << std::endl;
-
-    if (input_file_name.size() > 0)
+    auto input_file_names = mandeye::fd::OpenFileDialog("Add session(s)", mandeye::fd::Session_filter, true);
+    
+    if (input_file_names.size() > 0)
     {
-        project_settings.session_file_names.push_back(input_file_name);
+        for (const auto& input_file_name : input_file_names)
+        {
+            std::cout << "Adding session file: '" << input_file_name << "'" << std::endl;
+            project_settings.session_file_names.push_back(input_file_name);
+        }
+
         loaded_sessions = false;
         time_stamp_offset = 0.0;
     }
@@ -2974,13 +2976,14 @@ void display()
             loadSessions();
     if (io.KeyCtrl && ImGui::IsKeyPressed('O', false))
         openProject();
-    if (sessions.size() > 0)
-    {
+
+    if (project_settings.session_file_names.size() > 0)
         if (io.KeyCtrl && ImGui::IsKeyPressed('R', false))
-            open_remove = true;
+            remove_gui = true;
+
+    if (sessions.size() > 0)
         if (io.KeyCtrl && ImGui::IsKeyPressed('S', false))
             saveProject();
-    }
 
     updateCameraTransition();
 
@@ -3014,7 +3017,7 @@ void display()
         pose_tb.pz = 0.0;
         pose_tb.om = 0.0;
         pose_tb.fi = 0.0;
-        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * M_PI / 180.0;
+        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * DEG_TO_RAD;
         auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
 
         Eigen::Vector3d v_t = m * v;
@@ -3081,19 +3084,12 @@ void display()
         viewTranslation.translate(rotation_center);
         Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
         viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-        // viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
-        // viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
 
-        if (!block_z)
-        {
-            viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
-            viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
-        }
+        if (!lock_z)
+            viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
         else
-        {
-            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * M_PI / 180.f, Eigen::Vector3f::UnitX()));
-            viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
-        }
+            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
 
         Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
         viewTranslation2.translate(-rotation_center);
@@ -3359,10 +3355,10 @@ void display()
 
             ImGui::Separator();
 
-            if (ImGui::MenuItem("Add session", "Ctrl+A"))
+            if (ImGui::MenuItem("Add session(s)", "Ctrl+A"))
                 addSession();
-            if (ImGui::MenuItem("Remove session(s)", "Ctrl+R", nullptr, sessions.size() > 0))
-                open_remove = true;
+            if (ImGui::MenuItem("Remove session(s)", "Ctrl+R", nullptr, project_settings.session_file_names.size() > 0))
+                remove_gui = true;
 
             if (ImGui::MenuItem("Load sessions", "Ctrl+L", nullptr, (project_settings.session_file_names.size() > 0) && !loaded_sessions))
                 loadSessions();
@@ -3822,10 +3818,12 @@ void display()
                     }
                     std::cout << "Finished saving all trajectories to TUM TXT files." << std::endl;
                 }
+
+                ImGui::EndMenu();
             }
-            ImGui::EndMenu();  
+
+            ImGui::EndMenu();
         }
-        ImGui::EndMenu();
 
         if (ImGui::BeginMenu("Tools"))
         {
@@ -3844,8 +3842,9 @@ void display()
             ImGui::MenuItem("Manual Loop Closure", "Ctrl+L", &is_loop_closure_gui, (number_visible_sessions == 1 || number_visible_sessions == 2));
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Manually connect overlapping scan sections");
+
+            ImGui::EndMenu();
         }
-        ImGui::EndMenu();
 
         if (ImGui::BeginMenu("View"))
         {
@@ -3868,6 +3867,7 @@ void display()
 
                 ImGui::Separator();
             }
+            ImGui::EndDisabled();
 
             ImGui::MenuItem("Orthographic", "key O", &is_ortho);
             if (is_ortho)
@@ -3886,7 +3886,7 @@ void display()
             ImGui::MenuItem("Show axes", "key X", &show_axes);
             ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
-            ImGui::MenuItem("Block Z", nullptr, &block_z);
+            ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);
 
             // ImGui::MenuItem("show_covs", nullptr, &show_covs);
 
@@ -3895,8 +3895,9 @@ void display()
             ImGui::Text("Colors:");
 
             ImGui::ColorEdit3("Background color", (float *)&bg_color, ImGuiColorEditFlags_NoInputs);
+
+            ImGui::EndMenu();
         }
-        ImGui::EndMenu();
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Scene view relevant parameters");
 
@@ -3944,10 +3945,10 @@ void display()
         ImGui::EndMainMenuBar();
     }
 
-    if (open_remove)
+    if (remove_gui)
     {
         ImGui::OpenPopup("Remove Sessions");
-        open_remove = false;
+        remove_gui = false;
     }
 
     if (ImGui::BeginPopupModal("Remove Sessions", NULL, ImGuiWindowFlags_AlwaysAutoResize))
@@ -4076,9 +4077,9 @@ void display()
                     sessions[i].point_clouds_container.point_clouds[0].gui_translation[1] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.py;
                     sessions[i].point_clouds_container.point_clouds[0].gui_translation[2] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.pz;
 
-                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.om * 180.0 / M_PI);
-                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * 180.0 / M_PI);
-                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * 180.0 / M_PI);
+                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.om * RAD_TO_DEG);
+                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * RAD_TO_DEG);
+                    sessions[i].point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
 
                     ImGui::End();
 
@@ -4093,9 +4094,9 @@ void display()
                         sessions[i].point_clouds_container.point_clouds[j].gui_translation[1] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.py;
                         sessions[i].point_clouds_container.point_clouds[j].gui_translation[2] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.pz;
 
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
                     }
                     //}
                 }
@@ -4123,9 +4124,9 @@ void display()
                     sessions[i].point_clouds_container.point_clouds[i].gui_translation[1] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.py;
                     sessions[i].point_clouds_container.point_clouds[i].gui_translation[2] = (float)sessions[i].point_clouds_container.point_clouds[0].pose.pz;
 
-                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.om * 180.0 / M_PI);
-                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * 180.0 / M_PI);
-                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * 180.0 / M_PI);
+                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.om * RAD_TO_DEG);
+                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * RAD_TO_DEG);
+                    sessions[i].point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
 
                     Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
                     for (int j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
@@ -4138,9 +4139,9 @@ void display()
                         sessions[i].point_clouds_container.point_clouds[j].gui_translation[1] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.py;
                         sessions[i].point_clouds_container.point_clouds[j].gui_translation[2] = (float)sessions[i].point_clouds_container.point_clouds[j].pose.pz;
 
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
-                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
+                        sessions[i].point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
                     }
                 }
             }
@@ -4244,9 +4245,9 @@ void display()
                 session.point_clouds_container.point_clouds[i].gui_translation[1] = (float)session.point_clouds_container.point_clouds[i].pose.py;
                 session.point_clouds_container.point_clouds[i].gui_translation[2] = (float)session.point_clouds_container.point_clouds[i].pose.pz;
 
-                session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[i].pose.om * 180.0 / M_PI);
-                session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[i].pose.fi * 180.0 / M_PI);
-                session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[i].pose.ka * 180.0 / M_PI);
+                session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[i].pose.om * RAD_TO_DEG);
+                session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[i].pose.fi * RAD_TO_DEG);
+                session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[i].pose.ka * RAD_TO_DEG);
 
                 ImGui::End();
 
@@ -4263,9 +4264,9 @@ void display()
                         session.point_clouds_container.point_clouds[j].gui_translation[1] = (float)session.point_clouds_container.point_clouds[j].pose.py;
                         session.point_clouds_container.point_clouds[j].gui_translation[2] = (float)session.point_clouds_container.point_clouds[j].pose.pz;
 
-                        session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
-                        session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
-                        session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
                     }
                 }
             }

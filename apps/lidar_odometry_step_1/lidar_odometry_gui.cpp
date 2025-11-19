@@ -48,8 +48,86 @@ std::vector<std::string> infoLines = {
     "",
     "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program."};
 
-//App specific shortcuts (using empty dummy until needed)
-std::vector<ShortcutEntry> appShortcuts(77, { "", "", "" });
+// App specific shortcuts (Type and Shortcut are just for easy reference)
+static const std::vector<ShortcutEntry> appShortcuts = {
+    {"Normal keys", "A", ""},
+    {"", "Ctrl+A", ""},
+    {"", "B", ""},
+    {"", "Ctrl+B", ""},
+    {"", "C", ""},
+    {"", "Ctrl+C", ""},
+    {"", "D", ""},
+    {"", "Ctrl+D", ""},
+    {"", "E", ""},
+    {"", "Ctrl+E", ""},
+    {"", "F", ""},
+    {"", "Ctrl+F", ""},
+    {"", "G", ""},
+    {"", "Ctrl+G", ""},
+    {"", "H", ""},
+    {"", "Ctrl+H", ""},
+    {"", "I", ""},
+    {"", "Ctrl+I", ""},
+    {"", "J", ""},
+    {"", "Ctrl+K", ""},
+    {"", "K", ""},
+    {"", "Ctrl+K", ""},
+    {"", "L", ""},
+    {"", "Ctrl+L", ""},
+    {"", "M", ""},
+    {"", "Ctrl+M", ""},
+    {"", "N", ""},
+    {"", "Ctrl+N", ""},
+    {"", "O", ""},
+    {"", "Ctrl+O", "Open data"},
+    {"", "P", ""},
+    {"", "Ctrl+P", ""},
+    {"", "Q", ""},
+    {"", "Ctrl+Q", ""},
+    {"", "R", ""},
+    {"", "Ctrl+R", ""},
+    {"", "S", ""},
+    {"", "Ctrl+S", ""},
+    {"", "Ctrl+Shift+S", ""},
+    {"", "T", ""},
+    {"", "Ctrl+T", ""},
+    {"", "U", ""},
+    {"", "Ctrl+U", ""},
+    {"", "V", ""},
+    {"", "Ctrl+V", ""},
+    {"", "W", ""},
+    {"", "Ctrl+W", ""},
+    {"", "X", ""},
+    {"", "Ctrl+X", ""},
+    {"", "Y", ""},
+    {"", "Ctrl+Y", ""},
+    {"", "Z", ""},
+    {"", "Ctrl+Z", ""},
+    {"", "Shift+Z", ""},
+    {"", "1-9", ""},
+    {"Special keys", "Up arrow", ""},
+    {"", "Shift + up arrow", ""},
+    {"", "Ctrl + up arrow", ""},
+    {"", "Down arrow", ""},
+    {"", "Shift + down arrow", ""},
+    {"", "Ctrl + down arrow", ""},
+    {"", "Left arrow", ""},
+    {"", "Shift + left arrow", ""},
+    {"", "Ctrl + left arrow", ""},
+    {"", "Right arrow", ""},
+    {"", "Shift + right arrow", ""},
+    {"", "Ctrl + right arrow", ""},
+    {"", "Pg down", ""},
+    {"", "Pg up", ""},
+    {"", "- key", ""},
+    {"", "+ key", ""},
+    {"Mouse related", "Left click + drag", ""},
+    {"", "Right click + drag", "n"},
+    {"", "Scroll", ""},
+    {"", "Shift + scroll", ""},
+    {"", "Ctrl + left click", ""},
+    {"", "Ctrl + right click", ""},
+    {"", "Ctrl + middle click", ""} };
 
 namespace fs = std::filesystem;
 
@@ -410,7 +488,7 @@ void alternative_approach()
 
             for (const auto& [timestamp_pair, gyr, acc] : imu_data)
             {
-                const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI) };
+                const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * RAD_TO_DEG), static_cast<float>(gyr.axis.y * RAD_TO_DEG), static_cast<float>(gyr.axis.z * RAD_TO_DEG) };
                 const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
 
                 //FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
@@ -1601,8 +1679,13 @@ void display()
     viewTranslation.translate(rotation_center);
     Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
     viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-    viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
-    viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
+
+
+    if (!lock_z)
+        viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+    else
+        viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+    viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
 
     Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
     viewTranslation2.translate(-rotation_center);
@@ -2057,6 +2140,8 @@ void display()
                 ImGui::MenuItem("Show trajectory", nullptr, &show_trajectory);
                 ImGui::MenuItem("Show trajectory as axes", nullptr, &show_trajectory_as_axes);
                 ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
+
+                ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);
 
                 // ImGui::MenuItem("show_covs", nullptr, &show_covs);
 

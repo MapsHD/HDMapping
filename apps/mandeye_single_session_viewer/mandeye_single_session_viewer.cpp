@@ -4,7 +4,7 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
-#define GLEW_STATIC
+//#define GLEW_STATIC
 #include <GL/glew.h>
 
 #include <GL/freeglut.h>
@@ -75,7 +75,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "N", ""},
     {"", "Ctrl+N", "show Neightbouring scans"},
     {"", "O", ""},
-    {"", "Ctrl+O", ""},
+    {"", "Ctrl+O", "Open session"},
     {"", "P", ""},
     {"", "Ctrl+P", ""},
     {"", "Q", ""},
@@ -99,6 +99,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Ctrl+Y", ""},
     {"", "Z", ""},
     {"", "Ctrl+Z", ""},
+    {"", "Shift+Z", ""},
     {"", "1-9", ""},
     {"Special keys", "Up arrow", "Intensity offset +"},
     {"", "Shift + up arrow", ""},
@@ -151,6 +152,148 @@ bool usePose = false;
 
 Session session;
 
+//built in console output redirection to imgui window
+///////////////////////////////////////////////////////////////////////////////////
+
+#ifdef _WIN32
+bool consWin = true;
+#endif
+bool consImGui = false;
+bool consHooked = false;
+
+class DualStreamBuf : public std::streambuf {
+public:
+    DualStreamBuf(std::streambuf* sb1, std::string* imguiBuffer, bool isCerr)
+        : consoleBuf(sb1), imguiBuffer(imguiBuffer), isCerr(isCerr) {
+    }
+
+protected:
+    std::string currentLine;
+    bool isCerr;
+
+    int overflow(int c) override
+    {
+        //handle EOF
+        if (c == traits_type::eof())
+            return traits_type::not_eof(c);
+
+        // Forward character to real console; check for errors
+        if (consoleBuf->sputc((char)c) == traits_type::eof())
+            return traits_type::eof();
+
+        if (c == '\n')
+        {
+            imguiBuffer->append(isCerr ? "cerr: " : "cout: ");
+            imguiBuffer->append(currentLine);
+            imguiBuffer->push_back('\n');
+            currentLine.clear();
+        }
+        else
+        {
+            currentLine.push_back((char)c);
+        }
+
+        return c;
+    }
+
+    int sync() override
+    {
+        // Flush partial line
+        if (!currentLine.empty())
+        {
+            imguiBuffer->append(isCerr ? "cerr: " : "cout: ");
+            imguiBuffer->append(currentLine);
+            imguiBuffer->push_back('\n');
+            currentLine.clear();
+        }
+
+        return consoleBuf->pubsync();
+    }
+
+private:
+    std::streambuf* consoleBuf;
+    std::string* imguiBuffer;
+};
+
+
+
+
+
+static std::string g_ImGuiLog;          // store text for ImGui
+static DualStreamBuf* g_coutBuf = nullptr;
+static DualStreamBuf* g_cerrBuf = nullptr;
+static std::streambuf* g_origCoutBuf = nullptr;
+static std::streambuf* g_origCerrBuf = nullptr;
+
+void ConsoleHook()
+{
+    g_origCoutBuf = std::cout.rdbuf();                     // save original buffer
+    g_origCerrBuf = std::cerr.rdbuf();                     // save original buffer
+    g_coutBuf = new DualStreamBuf(g_origCoutBuf, &g_ImGuiLog, false);
+    g_cerrBuf = new DualStreamBuf(g_origCerrBuf, &g_ImGuiLog, true);
+    std::cout.rdbuf(g_coutBuf);                            // replace
+    std::cerr.rdbuf(g_cerrBuf);                            // replace
+    
+	consHooked = true;
+}
+
+void ConsoleUnhook()
+{
+	if (g_origCoutBuf) std::cout.rdbuf(g_origCoutBuf); //restore original buffer
+    if (g_origCerrBuf) std::cerr.rdbuf(g_origCerrBuf); //restore original buffer
+	delete g_coutBuf; //delete custom buffers
+    delete g_cerrBuf; //delete custom buffers
+    g_coutBuf = g_cerrBuf = nullptr;
+
+    g_ImGuiLog.clear();
+    consHooked = false;
+}
+
+static char g_ImGuiLogBuf[65536]; // or larger if needed
+
+void ImGuiConsole(bool* p_open)
+{
+    if (ImGui::Begin("Console", p_open))
+    {
+       if (ImGui::Button("Clear"))
+           g_ImGuiLog.clear();
+        //ImGui::SameLine();
+        //if (ImGui::Button("Copy"))
+		//	ImGui::LogToClipboard();
+
+        ImGui::Separator();
+
+        if (ImGui::BeginChild("scrolling_region", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar))
+        {
+            // ImGui::TextUnformatted(g_ImGuiLog.c_str());
+
+            // Copy std::string to buffer
+            strncpy(g_ImGuiLogBuf, g_ImGuiLog.c_str(), sizeof(g_ImGuiLogBuf));
+            g_ImGuiLogBuf[sizeof(g_ImGuiLogBuf) - 1] = 0; // ensure null termination
+
+            // Make the input background transparent
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0, 0, 0, 0));
+            ImGui::InputTextMultiline(
+                "##console",
+                g_ImGuiLogBuf, sizeof(g_ImGuiLogBuf),
+                ImVec2(-1.0f, -1.0f),
+                ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_AllowTabInput
+            );
+            ImGui::PopStyleColor(3);
+
+            // auto-scroll
+            //if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+            //    ImGui::SetScrollHereY(1.0f);
+        }
+        ImGui::EndChild();
+    }
+
+    ImGui::End();
+}
+
+
 
 //VBO/VAO/SSBO proof of concept implementation through glew. openGL 4.6 required
 ///////////////////////////////////////////////////////////////////////////////////
@@ -167,9 +310,8 @@ Session session;
     layout(std430, binding = 0) buffer VertexCloudIndex {
         int cloudIndex[];  // cloud index per vertex
     };
-
-    //order matters for std430 layout
-    struct Cloud {
+ 
+    struct Cloud {         //order matters for std430 layout
         int colorScheme;   // 0=solid,1=intensity gradient, etc.
         vec3 fixedColor;   // fixed color
         mat4 pose;         // cloud transformation
@@ -186,10 +328,10 @@ Session session;
     //uniforms
     uniform mat4 uMVP;                        // model-view-projection matrix
     uniform float uPointSize;                 // point size from GUI
-    uniform int uUsePose;                   // whether to use cloud pose
+    uniform int uUsePose;                     // whether to use cloud pose
 
     out float vIntensity;                     // pass intensity to fragment shader
-    flat out int vColorScheme;                     // pass cloud color scheme to fragment shader
+    flat out int vColorScheme;                // pass cloud color scheme to fragment shader
     out vec3 vFixedColor;                     // pass fixed color / computed color to fragment shader
 
     void main()
@@ -550,17 +692,22 @@ void openSession()
 
     if (session_file_name.size() > 0)
     {
+        std::string newTitle = winTitle + " - " + truncPath(session_file_name);
+        glutSetWindowTitle(newTitle.c_str());
+
         session.load(fs::path(session_file_name).string(), false, 0.0, 0.0, 0.0, false);
         index_rendered_points_local = 0;
 
         if (gl_useVBOs)
         {
+			//clearing previous data
             GLint offset = 0;
-
-            gl_Points.clear();
             gl_clouds.clear();
+            gl_clouds.shrink_to_fit();
             gl_cloudIndexSSBO.clear();
+            gl_cloudIndexSSBO.shrink_to_fit();
             gl_cloudsSSBO.clear();
+			gl_cloudsSSBO.shrink_to_fit();
 
             //Convert point cloud data to gl_Points
             for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); ++j)
@@ -603,15 +750,13 @@ void openSession()
             //Load to OpenGL buffers
             gl_loadPointCloudBuffer(gl_Points, VAO, VBO);
 
+			//Clear CPU-side data after load to save memory
             gl_Points.clear();
             gl_Points.shrink_to_fit();
 
             //Prepare SSBO data
             gl_updateSSBOs();
 		}
-
-        std::string newTitle = winTitle + " - " + truncPath(session_file_name);
-        glutSetWindowTitle(newTitle.c_str());
     }
 }
 
@@ -626,7 +771,7 @@ void display()
 
     if (gl_useVBOs)
     {
-        gl_updateUserView();
+		gl_updateUserView(); //this can be optimized to be called only on change (camera movement, parameters, window resize)
         gl_renderPointCloud();
     }
 
@@ -697,7 +842,7 @@ void display()
         pose_tb.pz = 0.0;
         pose_tb.om = 0.0;
         pose_tb.fi = 0.0;
-        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * M_PI / 180.0;
+        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * DEG_TO_RAD;
         auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
 
         Eigen::Vector3d v_t = m * v;
@@ -720,8 +865,12 @@ void display()
         Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
         viewTranslation.translate(rotation_center);
         viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-        viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
-        viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
+
+        if (!lock_z)
+            viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        else
+            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
 
         Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
         viewTranslation2.translate(-rotation_center);
@@ -840,8 +989,25 @@ void display()
             }
             ImGui::EndDisabled();
 
+            ImGui::MenuItem("Orthographic", "key O", &is_ortho);
+            if (is_ortho)
+            {
+                new_rotation_center = rotation_center;
+                new_rotate_x = 0.0;
+                new_rotate_y = 0.0;
+                new_translate_x = translate_x;
+                new_translate_y = translate_y;
+                new_translate_z = translate_z;
+                camera_transition_active = true;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
+
             ImGui::MenuItem("Show axes", "key X", &show_axes);
             ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
+
+            ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);
+
             ImGui::MenuItem("Use segment pose", nullptr, &usePose);
             ImGui::MenuItem("Show neighbouring scans", "Ctrl+N", &show_neighbouring_scans);
 
@@ -854,13 +1020,16 @@ void display()
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Has to be enabled efore loading session so buffers are created");
+                ImGui::Text("Has to be enabled before loading session so buffers are created");
                 ImGui::Text("Should be tested with smaller sessions as session will be rendered in full, no decimation");
                 ImGui::Text("Should be used with 'Use segment pose' active for relevant session view");
                 ImGui::Text("Proof of concept! Not fully functional");
 
                 ImGui::EndTooltip();
             }
+
+            if (gl_useVBOs)
+				usePose = true; //forces usePose when using VBOs for now
 
             ImGui::Separator();
 
@@ -923,6 +1092,43 @@ void display()
                 ImGui::EndMenu();
             }
 
+            ImGui::Separator();
+
+            if (ImGui::BeginMenu("Console"))
+            {
+#ifdef _WIN32
+
+                if (ImGui::MenuItem("Use Windows console", nullptr, &consWin))
+                {
+                    if (consWin)
+                    {
+                        AllocConsole();
+                        freopen("CONOUT$", "w", stdout);
+                        freopen("CONOUT$", "w", stderr);
+                        freopen("CONIN$", "r", stdin);
+                    }
+                    else
+                        FreeConsole();
+                }
+                if (ImGui::IsItemHovered())
+                {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("!!! If not used.. !!!");
+                    ImGui::Text("- old console output is lost");
+                    ImGui::Text("- new console output can only be seen in subwindow");
+                    ImGui::Text("- app might run faster");
+                    ImGui::EndTooltip();
+                }
+#endif
+                ImGui::MenuItem("Subwindow", nullptr, &consImGui);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Show/hide console output as GUI window");
+
+                ImGui::EndMenu();
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Control console output");
+
             ImGui::EndMenu();
         }
         if (ImGui::IsItemHovered())
@@ -979,6 +1185,18 @@ void display()
 
 
         ImGui::EndMainMenuBar();
+    }
+
+    if (consImGui)
+    {
+        if (!consHooked)
+            ConsoleHook();
+        ImGuiConsole(&consImGui);
+    }
+    else
+    {
+        if (consHooked)
+            ConsoleUnhook();
     }
 
     info_window(infoLines, appShortcuts, &info_gui);

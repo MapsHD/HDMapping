@@ -6,7 +6,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-const float DEG_TO_RAD = 3.141592653589793238462643383279502884 / 180.0f;
+const float DEG_TO_RAD = M_PI / 180.0f;
+const float RAD_TO_DEG = 180.0f / M_PI;
 
 const std::string out_fn = "Output file name";
 
@@ -44,6 +45,7 @@ extern int mouse_buttons;
 extern float mouse_sensitivity;
 
 extern bool is_ortho;
+extern bool lock_z;
 extern bool show_axes;
 extern ImVec4 bg_color;
 extern int point_size;

@@ -103,7 +103,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "N", ""},
     {"", "Ctrl+N", ""},
     {"", "O", ""},
-    {"", "Ctrl+O", ""},
+    {"", "Ctrl+O", "Open session"},
     {"", "P", ""},
     {"", "Ctrl+P", "Pose graph slam"},
     {"", "Q", ""},
@@ -127,6 +127,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Ctrl+Y", ""},
     {"", "Z", ""},
     {"", "Ctrl+Z", ""},
+    {"", "Shift+Z", ""},
     {"", "1-9", ""},
     {"Special keys", "Up arrow", ""},
     {"", "Shift + up arrow", ""},
@@ -157,8 +158,6 @@ namespace fs = std::filesystem;
 
 static bool show_demo_window = true;
 static bool show_another_window = false;
-
-bool block_z = false;
 
 bool gnssWithOffset = false;
 
@@ -1099,8 +1098,8 @@ void lio_segments_gui()
     {
         for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
         {
-            double om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x() * 180.0 / M_PI;
-            double fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y() * 180.0 / M_PI;
+            double om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x() * RAD_TO_DEG;
+            double fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y() * RAD_TO_DEG;
 
             std::cout << "om: " << om << " fi " << fi << std::endl;
             if (fabs(om) > angle_diff || fabs(fi) > angle_diff)
@@ -1880,9 +1879,9 @@ void project_gui()
                     session.point_clouds_container.point_clouds[0].gui_translation[1] = (float)session.point_clouds_container.point_clouds[0].pose.py;
                     session.point_clouds_container.point_clouds[0].gui_translation[2] = (float)session.point_clouds_container.point_clouds[0].pose.pz;
 
-                    session.point_clouds_container.point_clouds[0].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[0].pose.om * 180.0 / M_PI);
-                    session.point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[0].pose.fi * 180.0 / M_PI);
-                    session.point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[0].pose.ka * 180.0 / M_PI);
+                    session.point_clouds_container.point_clouds[0].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[0].pose.om * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[0].pose.fi * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
 
                     Eigen::Affine3d curr_m_pose2 = session.point_clouds_container.point_clouds[0].m_pose;
                     for (int j = 1; j < session.point_clouds_container.point_clouds.size(); j++)
@@ -1897,9 +1896,9 @@ void project_gui()
                         session.point_clouds_container.point_clouds[j].gui_translation[1] = (float)session.point_clouds_container.point_clouds[j].pose.py;
                         session.point_clouds_container.point_clouds[j].gui_translation[2] = (float)session.point_clouds_container.point_clouds[j].pose.pz;
 
-                        session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
-                        session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
-                        session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
                     }
                 }
             }
@@ -2042,7 +2041,7 @@ void display()
         pose_tb.pz = 0.0;
         pose_tb.om = 0.0;
         pose_tb.fi = 0.0;
-        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * M_PI / 180.0;
+        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * DEG_TO_RAD;
         auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
 
         Eigen::Vector3d v_t = m * v;
@@ -2109,16 +2108,11 @@ void display()
 
         viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
 
-        if (!block_z)
-        {
-            viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_x / 180.f, Eigen::Vector3f::UnitX()));
-            viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
-        }
+        if (!lock_z)
+            viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
         else
-        {
-            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * M_PI / 180.f, Eigen::Vector3f::UnitX()));
-            viewLocal.rotate(Eigen::AngleAxisf(M_PI * rotate_y / 180.f, Eigen::Vector3f::UnitZ()));
-        }
+            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
 
         Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
 
@@ -2691,7 +2685,7 @@ void display()
             }
             ImGui::EndDisabled();
 
-            ImGui::MenuItem("Orthographic", nullptr, &is_ortho);
+            ImGui::MenuItem("Orthographic", "key O", &is_ortho);
             if (is_ortho)
             {
                 new_rotation_center = rotation_center;
@@ -2708,7 +2702,7 @@ void display()
             ImGui::MenuItem("Show axes", "key X", &show_axes);
             ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
-            ImGui::MenuItem("Block Z", nullptr, &block_z);
+            ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);
 
             ImGui::Separator();
 
@@ -2936,9 +2930,7 @@ void display()
                         ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
                     }
                     else
-                    {
                         ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
-                    }
 
                     session.point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
                     session.point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1];
@@ -2962,9 +2954,9 @@ void display()
                     session.point_clouds_container.point_clouds[i].gui_translation[1] = (float)session.point_clouds_container.point_clouds[i].pose.py;
                     session.point_clouds_container.point_clouds[i].gui_translation[2] = (float)session.point_clouds_container.point_clouds[i].pose.pz;
 
-                    session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[i].pose.om * 180.0 / M_PI);
-                    session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[i].pose.fi * 180.0 / M_PI);
-                    session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[i].pose.ka * 180.0 / M_PI);
+                    session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[i].pose.om * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[i].pose.fi * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[i].pose.ka * RAD_TO_DEG);
 
                     ImGui::End();
 
@@ -2981,9 +2973,9 @@ void display()
                             session.point_clouds_container.point_clouds[j].gui_translation[1] = (float)session.point_clouds_container.point_clouds[j].pose.py;
                             session.point_clouds_container.point_clouds[j].gui_translation[2] = (float)session.point_clouds_container.point_clouds[j].pose.pz;
 
-                            session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * 180.0 / M_PI);
-                            session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * 180.0 / M_PI);
-                            session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * 180.0 / M_PI);
+                            session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
+                            session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
+                            session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
                         }
                     }
                 }
@@ -3089,9 +3081,7 @@ void display()
                     ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
                 }
                 else
-                {
                     ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
-                }
 
                 Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
 

@@ -45,6 +45,11 @@ if (MSVC)
     target_compile_options(multi_view_tls_registration_py PRIVATE /bigobj)
 endif()
 
+add_custom_target(pybind_all
+    DEPENDS core_py lidar_odometry_py multi_view_tls_registration_py
+    COMMENT "Building all Python bindings"
+)
+
 target_sources(core_py
     PRIVATE
         ${CMAKE_SOURCE_DIR}/core/src/session.cpp
@@ -159,4 +164,30 @@ set_target_properties(multi_view_tls_registration_py PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
 )
+
+if(WIN32)
+    add_custom_command(
+        TARGET core_py
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:core_py>
+                "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
+        COMMAND_EXPAND_LISTS
+    )
+    
+    add_custom_command(
+        TARGET lidar_odometry_py
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:lidar_odometry_py>
+                "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
+        COMMAND_EXPAND_LISTS
+    )
+    
+    add_custom_command(
+        TARGET multi_view_tls_registration_py
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:multi_view_tls_registration_py>
+                "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
+        COMMAND_EXPAND_LISTS
+    )
+endif()
 

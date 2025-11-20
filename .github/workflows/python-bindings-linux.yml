@@ -48,7 +48,7 @@ jobs:
             -DPYBIND=ON
 
       - name: Build Python bindings
-        run: cmake --build ${{github.workspace}}/build_pybind --config ${{env.BUILD_TYPE}}
+        run: cmake --build ${{github.workspace}}/build_pybind --target pybind_all --config ${{env.BUILD_TYPE}}
 
       - name: Test Python imports
         working-directory: ${{github.workspace}}/build_pybind/bin/${{env.BUILD_TYPE}}

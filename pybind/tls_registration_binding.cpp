@@ -88,7 +88,7 @@ PYBIND11_MODULE(multi_view_tls_registration_py, m) {
 
     py::class_<ICP>(m, "ICP")
         .def(py::init<>())
-        .def_readwrite("search_radious", &ICP::search_radious)
+        .def_readwrite("search_radius", &ICP::search_radius)
         .def_readwrite("number_of_threads", &ICP::number_of_threads)
         .def_readwrite("number_of_iterations", &ICP::number_of_iterations)
         .def_readwrite("is_adaptive_robust_kernel", &ICP::is_adaptive_robust_kernel)
@@ -96,7 +96,7 @@ PYBIND11_MODULE(multi_view_tls_registration_py, m) {
 
     py::class_<RegistrationPlaneFeature>(m, "RegistrationPlaneFeature")
         .def(py::init<>())
-        .def_readwrite("search_radious", &RegistrationPlaneFeature::search_radious)
+        .def_readwrite("search_radius", &RegistrationPlaneFeature::search_radius)
         .def_readwrite("number_of_threads", &RegistrationPlaneFeature::number_of_threads)
         .def_readwrite("number_of_iterations", &RegistrationPlaneFeature::number_of_iterations)
         .def_readwrite("is_adaptive_robust_kernel", &RegistrationPlaneFeature::is_adaptive_robust_kernel);
@@ -105,7 +105,7 @@ PYBIND11_MODULE(multi_view_tls_registration_py, m) {
         .def(py::init<>())
         .def_readwrite("overlap_threshold", &PoseGraphSLAM::overlap_threshold)
         .def_readwrite("iterations", &PoseGraphSLAM::iterations)
-        .def_readwrite("search_radious", &PoseGraphSLAM::search_radious);
+        .def_readwrite("search_radius", &PoseGraphSLAM::search_radius);
 
     py::class_<GNSS::GlobalPose>(m, "GlobalPose")
         .def(py::init<>())

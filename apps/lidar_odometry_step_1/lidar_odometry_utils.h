@@ -21,7 +21,9 @@
 #include <python-scripts/constraints/constraint_fixed_parameter_jacobian.h>
 #include <common/include/cauchy.h>
 #include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
+#if WITH_GUI == 1
 #include <imgui.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -134,7 +136,9 @@ struct LidarOdometryParams
     double total_length_of_calculated_trajectory = 0.0;
     NDTBucketMapType buckets_indoor;
     NDTBucketMapType buckets_outdoor;
+#if WITH_GUI == 1
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+#endif
 
     bool use_removie_imu_bias_from_first_stationary_scan = false;
 

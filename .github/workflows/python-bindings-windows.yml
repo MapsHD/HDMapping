@@ -1,0 +1,56 @@
+name: Build Python Bindings on Windows
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Display Python version
+        run: python --version
+
+      - name: Install CMake 4.0 on Windows
+        run: |
+          choco install cmake --version=4.0.0 -y
+          refreshenv
+          cmake --version
+        shell: pwsh
+
+      - name: Configure CMake with Python bindings
+        run: |
+          cmake -B ${{github.workspace}}/build_pybind `
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} `
+            -DPYBIND=ON `
+        shell: pwsh
+
+      - name: Build Python bindings
+        run: cmake --build ${{github.workspace}}/build_pybind --target pybind_all --config ${{env.BUILD_TYPE}}
+
+      - name: Test Python imports
+        working-directory: ${{github.workspace}}/build_pybind/bin/${{env.BUILD_TYPE}}
+        run: |
+          python -c "import sys; sys.path.insert(0, '.'); import core_py; print('core_py imported successfully')"
+          python -c "import sys; sys.path.insert(0, '.'); import lidar_odometry_py; print('lidar_odometry_py imported successfully')"
+          python -c "import sys; sys.path.insert(0, '.'); import multi_view_tls_registration_py; print('multi_view_tls_registration_py imported successfully')"
+        shell: pwsh
+

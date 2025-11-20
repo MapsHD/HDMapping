@@ -69,7 +69,3 @@ imgui.ini
 /out/install/x64-Release
 /out_old/install
 
-#pybind
-pybind/Release
-pybind/Debug
-

@@ -46,18 +46,8 @@ jobs:
       - name: Build Python bindings
         run: cmake --build ${{github.workspace}}/build_pybind --config ${{env.BUILD_TYPE}}
 
-      - name: List pybind directory contents
-        run: |
-          echo "Contents of pybind directory:"
-          dir ${{github.workspace}}\pybind
-          if (Test-Path "${{github.workspace}}\pybind\${{env.BUILD_TYPE}}") {
-            echo "Contents of pybind\${{env.BUILD_TYPE}}:"
-            dir ${{github.workspace}}\pybind\${{env.BUILD_TYPE}}
-          }
-        shell: pwsh
-
       - name: Test Python imports
-        working-directory: ${{github.workspace}}/pybind/${{env.BUILD_TYPE}}
+        working-directory: ${{github.workspace}}/build_pybind/bin/${{env.BUILD_TYPE}}
         run: |
           python -c "import sys; sys.path.insert(0, '.'); import core_py; print('core_py imported successfully')"
           python -c "import sys; sys.path.insert(0, '.'); import lidar_odometry_py; print('lidar_odometry_py imported successfully')"

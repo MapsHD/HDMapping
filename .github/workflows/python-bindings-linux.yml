@@ -51,7 +51,7 @@ jobs:
         run: cmake --build ${{github.workspace}}/build_pybind --config ${{env.BUILD_TYPE}}
 
       - name: Test Python imports
-        working-directory: ${{github.workspace}}/pybind
+        working-directory: ${{github.workspace}}/build_pybind/bin/${{env.BUILD_TYPE}}
         run: |
           python -c "import sys; sys.path.insert(0, '.'); import core_py; print('core_py imported successfully')"
           python -c "import sys; sys.path.insert(0, '.'); import lidar_odometry_py; print('lidar_odometry_py imported successfully')"

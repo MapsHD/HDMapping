@@ -27,34 +27,33 @@ unsigned long long int get_rgd_index(const Eigen::Vector3d p, const Eigen::Vecto
 
 Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &trajectory, double query_time)
 {
-    
-    
+
     Eigen::Matrix4d ret(Eigen::Matrix4d::Zero());
     auto it_lower = trajectory.lower_bound(query_time);
     auto it_next = it_lower;
 
     if (it_lower == trajectory.begin())
     {
-        //std::cout << "1" << std::endl;
+        // std::cout << "1" << std::endl;
         return ret;
     }
     if (it_lower->first > query_time)
     {
-        //std::cout << "2" << std::endl;
+        // std::cout << "2" << std::endl;
         it_lower = std::prev(it_lower);
     }
     if (it_lower == trajectory.begin())
     {
-        //std::cout << "3" << std::endl;
+        // std::cout << "3" << std::endl;
         return ret;
     }
     if (it_lower == trajectory.end())
     {
-        //std::cout << "4" << std::endl;
+        // std::cout << "4" << std::endl;
         return ret;
     }
-     //std::cout << std::setprecision(10);
-     //std::cout << it_lower->first << " " << query_time << " " << it_next->first << " " << std::next(it_lower)->first << std::endl;
+    // std::cout << std::setprecision(10);
+    // std::cout << it_lower->first << " " << query_time << " " << it_next->first << " " << std::next(it_lower)->first << std::endl;
 
     double t1 = it_lower->first;
     double t2 = it_next->first;
@@ -62,17 +61,17 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &tra
     double difft2 = t2 - query_time;
     if (t1 == t2 && std::fabs(difft1) < 0.1)
     {
-        //std::cout << "5" << std::endl;
+        // std::cout << "5" << std::endl;
         ret = Eigen::Matrix4d::Identity();
         ret.col(3).head<3>() = it_next->second.col(3).head<3>();
         ret.topLeftCorner(3, 3) = it_lower->second.topLeftCorner(3, 3);
         return ret;
     }
 
-    //std::cout << std::fabs(difft1) << " " << std::fabs(difft2) << std::endl;
-    //if (std::fabs(difft1) < 0.15 && std::fabs(difft2) < 0.15)
+    // std::cout << std::fabs(difft1) << " " << std::fabs(difft2) << std::endl;
+    // if (std::fabs(difft1) < 0.15 && std::fabs(difft2) < 0.15)
     {
-        //std::cout << "6" << std::endl;
+        // std::cout << "6" << std::endl;
         assert(t2 > t1);
         assert(query_time > t1);
         assert(query_time < t2);
@@ -124,8 +123,8 @@ std::vector<Point3Di> decimate(const std::vector<Point3Di> &points, double bucke
 void limit_covariance(Eigen::Matrix3d &io_cov)
 {
     return;
-    //std::cout << "------io_cov in ------------" << std::endl;
-    //std::cout << io_cov << std::endl;
+    // std::cout << "------io_cov in ------------" << std::endl;
+    // std::cout << io_cov << std::endl;
 
     Eigen::EigenSolver<Eigen::Matrix3d> eigensolver;
     eigensolver.compute(io_cov);
@@ -144,8 +143,8 @@ void limit_covariance(Eigen::Matrix3d &io_cov)
 
     // update covariance
     io_cov = eigenVectors * diagonal_matrix * eigenVectors.inverse();
-    //std::cout << "------io_cov out ------------" << std::endl;
-    //std::cout << io_cov << std::endl;
+    // std::cout << "------io_cov out ------------" << std::endl;
+    // std::cout << io_cov << std::endl;
 }
 
 void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
@@ -181,15 +180,15 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
 
-                //limit_covariance(this_bucket.cov);
+                // limit_covariance(this_bucket.cov);
             }
 
             if (this_bucket.number_of_points == 3)
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-                //limit_covariance(this_bucket.cov);
-                // calculate normal vector
+                // limit_covariance(this_bucket.cov);
+                //  calculate normal vector
                 Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
                 Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
 
@@ -212,7 +211,7 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
                 {
                     this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                       cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-                    //limit_covariance(this_bucket.cov);
+                    // limit_covariance(this_bucket.cov);
                 }
             }
         }
@@ -259,40 +258,40 @@ void update_rgd_spherical_coordinates(NDT::GridParameters &rgd_params, NDTBucket
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-                //limit_covariance(this_bucket.cov);
+                // limit_covariance(this_bucket.cov);
             }
 
             if (this_bucket.number_of_points >= 3)
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-                //limit_covariance(this_bucket.cov);
-                // calculate normal vector
-                //Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
-                //Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
+                // limit_covariance(this_bucket.cov);
+                //  calculate normal vector
+                // Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+                // Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
 
-                //Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
-                //nv.normalize();
+                // Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
+                // nv.normalize();
 
                 // flip towards viewport
-                //if (nv.dot(viewport - this_bucket.mean) < 0.0)
+                // if (nv.dot(viewport - this_bucket.mean) < 0.0)
                 //{
                 //    nv *= -1.0;
                 //}
-                //this_bucket.normal_vector = nv;
+                // this_bucket.normal_vector = nv;
             }
 
-            //if (this_bucket.number_of_points > 3)
+            // if (this_bucket.number_of_points > 3)
             //{
-            //Eigen::Vector3d &nv = this_bucket.normal_vector;
+            // Eigen::Vector3d &nv = this_bucket.normal_vector;
 
-            //if (nv.dot(viewport - this_bucket.mean) >= 0.0)
+            // if (nv.dot(viewport - this_bucket.mean) >= 0.0)
             //{
-            //        this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
-            //                          cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-            //limit_covariance(this_bucket.cov);
-            //}
-            //}
+            //         this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+            //                           cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+            // limit_covariance(this_bucket.cov);
+            // }
+            // }
         }
         else
         {
@@ -340,100 +339,110 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
     csv::CSVFormat format;
     format.delimiter({' ', ',', '\t'});
 
-    csv::CSVReader reader(imu_file, format);
-    const auto columns = reader.get_col_names();
-    const std::set<std::string> columnsSet(columns.begin(), columns.end());
-
-    // mandatory columns
-    const bool hasTsColumn = columnsSet.contains("timestamp");
-    const bool hasGyrosColumns = columnsSet.contains("gyroX") && columnsSet.contains("gyroY") && columnsSet.contains("gyroZ");
-    const bool hasAccsColumns = columnsSet.contains("accX") && columnsSet.contains("accY") && columnsSet.contains("accZ");
-
-    // optional
-    const bool hasImuIdColumn = columnsSet.contains("imuId");
-    const bool hasUnixTimestampColumn = columnsSet.contains("timestampUnix");
-
-    // check if legacy
-    bool is_legacy = true;
-    if (hasTsColumn)
+    try
     {
-        is_legacy = false;
-        if (!hasAccsColumns && !hasGyrosColumns && !hasUnixTimestampColumn)
-        {
-            std::cerr << "Input csv file is missing one of the mandatory columns :\n";
-            std::cerr << "timestamp,timestampUnix,gyroX,gyroY,gyroZ,accX,accY,accZ";
-            return all_data;
-        }
-    }
+        csv::CSVReader reader(imu_file, format);
 
-    if (!is_legacy)
-    {
-        // check if all needed columns are in csv
-        for (auto row : reader)
+        const auto columns = reader.get_col_names();
+        const std::set<std::string> columnsSet(columns.begin(), columns.end());
+
+        // mandatory columns
+        const bool hasTsColumn = columnsSet.contains("timestamp");
+        const bool hasGyrosColumns = columnsSet.contains("gyroX") && columnsSet.contains("gyroY") && columnsSet.contains("gyroZ");
+        const bool hasAccsColumns = columnsSet.contains("accX") && columnsSet.contains("accY") && columnsSet.contains("accZ");
+
+        // optional
+        const bool hasImuIdColumn = columnsSet.contains("imuId");
+        const bool hasUnixTimestampColumn = columnsSet.contains("timestampUnix");
+
+        // check if legacy
+        bool is_legacy = true;
+        if (hasTsColumn)
         {
-            int imu_id = -1;
-            if (hasImuIdColumn)
+            is_legacy = false;
+            if (!hasAccsColumns && !hasGyrosColumns && !hasUnixTimestampColumn)
             {
-                imu_id = row["imuId"].get<int>();
-            }
-            if (imu_id < 0 || imuToUse == imu_id)
-            {
-                double timestamp = row["timestamp"].get<double>();
-                double timestampUnix = row["timestampUnix"].get<double>();
-                FusionVector gyr;
-                gyr.axis.x = row["gyroX"].get<double>();
-                gyr.axis.y = row["gyroY"].get<double>();
-                gyr.axis.z = row["gyroZ"].get<double>();
-                FusionVector acc;
-                acc.axis.x = row["accX"].get<double>();
-                acc.axis.y = row["accY"].get<double>();
-                acc.axis.z = row["accZ"].get<double>();
-                all_data.emplace_back(std::pair(timestamp / 1e9, timestampUnix / 1e9), gyr, acc);
-                //std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z " << acc.axis.z << " imu_id: " << imu_id << std::endl;
+                std::cerr << "Input csv file is missing one of the mandatory columns :\n";
+                std::cerr << "timestamp,timestampUnix,gyroX,gyroY,gyroZ,accX,accY,accZ";
+                return all_data;
             }
         }
-    }
-    if (is_legacy)
-    {
-        std::ifstream myfile(imu_file);
-        if (myfile.is_open())
+
+        if (!is_legacy)
         {
-            while (myfile)
+            // check if all needed columns are in csv
+            for (auto row : reader)
             {
-                double data[7];
-                double timestampUnix = 0.0;
-                int imuId = 0;
-                std::string line;
-                std::getline(myfile, line);
-                std::istringstream iss(line);
-                iss >> data[0] >> data[1] >> data[2] >> data[3] >> data[4] >> data[5] >> data[6];
-                if (!iss.eof())
+                int imu_id = -1;
+                if (hasImuIdColumn)
                 {
-                    iss >> imuId;
+                    imu_id = row["imuId"].get<int>();
                 }
-                if (!iss.eof())
+                if (imu_id < 0 || imuToUse == imu_id)
                 {
-                    iss >> timestampUnix;
-                }
-                // std::cout << data[0] << " " << data[1] << " " << data[2] << " " << data[3] << " " << data[4] << " " << data[5] << " " << data[6] << std::endl;
-                if (data[0] > 0 && imuId == imuToUse)
-                {
+                    double timestamp = row["timestamp"].get<double>();
+                    double timestampUnix = row["timestampUnix"].get<double>();
                     FusionVector gyr;
-                    gyr.axis.x = data[1];
-                    gyr.axis.y = data[2];
-                    gyr.axis.z = data[3];
-
+                    gyr.axis.x = row["gyroX"].get<double>();
+                    gyr.axis.y = row["gyroY"].get<double>();
+                    gyr.axis.z = row["gyroZ"].get<double>();
                     FusionVector acc;
-                    acc.axis.x = data[4];
-                    acc.axis.y = data[5];
-                    acc.axis.z = data[6];
-
-                    all_data.emplace_back(std::pair(data[0] / 1e9, timestampUnix / 1e9), gyr, acc);
+                    acc.axis.x = row["accX"].get<double>();
+                    acc.axis.y = row["accY"].get<double>();
+                    acc.axis.z = row["accZ"].get<double>();
+                    all_data.emplace_back(std::pair(timestamp / 1e9, timestampUnix / 1e9), gyr, acc);
+                    // std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z " << acc.axis.z << " imu_id: " << imu_id << std::endl;
                 }
             }
-            myfile.close();
+        }
+        if (is_legacy)
+        {
+            std::ifstream myfile(imu_file);
+            if (myfile.is_open())
+            {
+                while (myfile)
+                {
+                    double data[7];
+                    double timestampUnix = 0.0;
+                    int imuId = 0;
+                    std::string line;
+                    std::getline(myfile, line);
+                    std::istringstream iss(line);
+                    iss >> data[0] >> data[1] >> data[2] >> data[3] >> data[4] >> data[5] >> data[6];
+                    if (!iss.eof())
+                    {
+                        iss >> imuId;
+                    }
+                    if (!iss.eof())
+                    {
+                        iss >> timestampUnix;
+                    }
+                    // std::cout << data[0] << " " << data[1] << " " << data[2] << " " << data[3] << " " << data[4] << " " << data[5] << " " << data[6] << std::endl;
+                    if (data[0] > 0 && imuId == imuToUse)
+                    {
+                        FusionVector gyr;
+                        gyr.axis.x = data[1];
+                        gyr.axis.y = data[2];
+                        gyr.axis.z = data[3];
+
+                        FusionVector acc;
+                        acc.axis.x = data[4];
+                        acc.axis.y = data[5];
+                        acc.axis.z = data[6];
+
+                        all_data.emplace_back(std::pair(data[0] / 1e9, timestampUnix / 1e9), gyr, acc);
+                    }
+                }
+                myfile.close();
+            }
         }
     }
+    catch (...)
+    {
+        std::cout << "load_imu error for file: '" << imu_file << "'" << std::endl;
+        //return all_data;
+    }
+
     return all_data;
 }
 
@@ -453,7 +462,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
         fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", lazFile.c_str());
         std::abort();
     }
-    //std::cout << "compressed : " << is_compressed << std::endl;
+    // std::cout << "compressed : " << is_compressed << std::endl;
     laszip_header *header;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
@@ -461,7 +470,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
         fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
         std::abort();
     }
-    //fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
+    // fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
     laszip_point *point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
@@ -474,7 +483,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
 
     for (laszip_U32 j = 0; j < header->number_of_point_records; j++)
     {
-        
+
         if (laszip_read_point(laszip_reader))
         {
             fprintf(stderr, "DLL ERROR: reading point %u\n", j);
@@ -482,26 +491,28 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
             return points;
             // std::abort();
         }
-        
+
         Point3Di p;
-        int id = point->user_data; 
-        
-        if (!calibrations.empty()){
-            if (!calibrations.contains(id)){
+        int id = point->user_data;
+
+        if (!calibrations.empty())
+        {
+            if (!calibrations.contains(id))
+            {
                 continue;
             }
         }
 
         Eigen::Affine3d calibration = calibrations.empty() ? Eigen::Affine3d::Identity() : calibrations.at(id);
         const Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
-       
+
         p.point = calibration * (pf);
         p.lidarid = id;
         p.timestamp = point->gps_time;
         p.intensity = point->intensity;
 
         // add z correction
-        //if (p.point.z() > 0)
+        // if (p.point.z() > 0)
         //{
         //    double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
         //    double correction = dist * asin(0.08 / 10.0);
@@ -606,12 +617,12 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
     {
         const std::string &lidarSn = calibrationEntry.key();
         Eigen::Matrix4d value;
-        //std::cout << "lidarSn : " << lidarSn << std::endl;
+        // std::cout << "lidarSn : " << lidarSn << std::endl;
 
         if (calibrationEntry.value().contains("identity"))
         {
             std::string identity = calibrationEntry.value()["identity"].get<std::string>();
-            //std::cout << "identity : " << identity << std::endl;
+            // std::cout << "identity : " << identity << std::endl;
             std::transform(identity.begin(), identity.end(), identity.begin(), ::toupper);
             if (identity == "TRUE")
             {
@@ -636,7 +647,7 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
         if (calibrationEntry.value().contains("order"))
         {
             std::string order = calibrationEntry.value()["order"].get<std::string>();
-            //std::cout << "order : " << order << std::endl;
+            // std::cout << "order : " << order << std::endl;
             std::transform(order.begin(), order.end(), order.begin(), ::toupper);
             if (order == "COLUMN")
             {
@@ -648,7 +659,7 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
         if (calibrationEntry.value().contains("inverted"))
         {
             std::string inverted = calibrationEntry.value()["inverted"].get<std::string>();
-            //std::cout << "inverted : " << inverted << std::endl;
+            // std::cout << "inverted : " << inverted << std::endl;
             std::transform(inverted.begin(), inverted.end(), inverted.begin(), ::toupper);
             if (inverted == "TRUE")
             {
@@ -659,9 +670,9 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
 
         Eigen::IOFormat HeavyFmt(Eigen::FullPrecision, 0, ", ", ";\n", "[", "]", "[", "]");
 
-        //std::cout << "Calibration for " << lidarSn << std::endl;
-        //std::cout << value.format(HeavyFmt) << std::endl;
-        // Insert into the map
+        // std::cout << "Calibration for " << lidarSn << std::endl;
+        // std::cout << value.format(HeavyFmt) << std::endl;
+        //  Insert into the map
         dataMap[lidarSn] = value;
     }
     // check for blacklisted
@@ -701,7 +712,7 @@ std::unordered_map<int, Eigen::Affine3d> MLvxCalib::CombineIntoCalibration(const
     std::unordered_map<int, Eigen::Affine3d> dataMap;
     for (const auto &[id, sn] : idToSn)
     {
-        //std::cout << "XXX: "<< id << " " << sn << std::endl;
+        // std::cout << "XXX: "<< id << " " << sn << std::endl;
         const auto &affine = calibration.at(sn);
         dataMap[id] = affine;
     }
@@ -714,13 +725,13 @@ int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string> &idToSn,
     {
         std::cout << "snToUse.empty() || idToSn.empty()" << std::endl;
         std::cout << "(int)snToUse.empty()" << (int)snToUse.empty() << std::endl;
-        std::cout << "(int)idToSn.empty()" <<  (int)idToSn.empty() << std::endl;
+        std::cout << "(int)idToSn.empty()" << (int)idToSn.empty() << std::endl;
         std::cout << __FILE__ << " " << __LINE__ << std::endl;
         return 0;
     }
     for (const auto &[id, sn] : idToSn)
     {
-        //std::cout << "snToUse " << snToUse << " sn " << sn << std::endl;
+        // std::cout << "snToUse " << snToUse << " sn " << sn << std::endl;
         if (snToUse == sn)
         {
             return id;
@@ -733,7 +744,7 @@ int get_next_result_id(const std::string working_directory)
 {
     std::regex pattern(R"(lidar_odometry_result_(\d+))");
     int max_number = -1;
-    for (const auto& entry : fs::directory_iterator(working_directory))
+    for (const auto &entry : fs::directory_iterator(working_directory))
     {
         if (entry.is_directory())
         {
@@ -750,27 +761,31 @@ int get_next_result_id(const std::string working_directory)
     return max_number + 1;
 }
 
-bool loadLaz(const std::string &filename, std::vector<Point3Di> &points_out, std::vector<int> index_poses_i, std::vector<Eigen::Affine3d>& intermediate_trajectory, const Eigen::Affine3d& m_pose)
+bool loadLaz(const std::string &filename, std::vector<Point3Di> &points_out, std::vector<int> index_poses_i, std::vector<Eigen::Affine3d> &intermediate_trajectory, const Eigen::Affine3d &m_pose)
 {
-    if (!std::filesystem::exists(filename)) {
+    if (!std::filesystem::exists(filename))
+    {
         std::cerr << "File does not exist: " << filename << std::endl;
         return false;
     }
 
     laszip_POINTER laszip_reader;
-    if (laszip_create(&laszip_reader)) {
+    if (laszip_create(&laszip_reader))
+    {
         std::cerr << "DLL ERROR: creating laszip reader\n";
         return false;
     }
 
     laszip_BOOL is_compressed = 0;
-    if (laszip_open_reader(laszip_reader, filename.c_str(), &is_compressed)) {
+    if (laszip_open_reader(laszip_reader, filename.c_str(), &is_compressed))
+    {
         std::cerr << "ERROR: cannot open LAZ file: " << filename << std::endl;
         return false;
     }
 
     laszip_header *header;
-    if (laszip_get_header_pointer(laszip_reader, &header)) {
+    if (laszip_get_header_pointer(laszip_reader, &header))
+    {
         std::cerr << "DLL ERROR: getting header pointer from laszip reader\n";
         return false;
     }
@@ -778,18 +793,22 @@ bool loadLaz(const std::string &filename, std::vector<Point3Di> &points_out, std
     laszip_I64 num_points = (header->number_of_point_records ? header->number_of_point_records : header->extended_number_of_point_records);
 
     laszip_point *point;
-    if (laszip_get_point_pointer(laszip_reader, &point)) {
+    if (laszip_get_point_pointer(laszip_reader, &point))
+    {
         std::cerr << "DLL ERROR: getting point pointer from laszip reader\n";
         return false;
     }
 
-    for (laszip_I64 i = 0; i < num_points; i++) {
-        if (laszip_read_point(laszip_reader)) {
+    for (laszip_I64 i = 0; i < num_points; i++)
+    {
+        if (laszip_read_point(laszip_reader))
+        {
             std::cerr << "DLL ERROR: reading point " << i << "\n";
             return false;
         }
         double coordinates[3];
-        if (laszip_get_coordinates(laszip_reader, coordinates)) {
+        if (laszip_get_coordinates(laszip_reader, coordinates))
+        {
             std::cerr << "DLL ERROR: getting coordinates\n";
             return false;
         }
@@ -804,12 +823,14 @@ bool loadLaz(const std::string &filename, std::vector<Point3Di> &points_out, std
         points_out.push_back(p);
     }
 
-    if (laszip_close_reader(laszip_reader)) {
+    if (laszip_close_reader(laszip_reader))
+    {
         std::cerr << "DLL ERROR: closing reader\n";
         return false;
     }
 
-    if (laszip_destroy(laszip_reader)) {
+    if (laszip_destroy(laszip_reader))
+    {
         std::cerr << "DLL ERROR: destroying reader\n";
         return false;
     }
@@ -817,10 +838,11 @@ bool loadLaz(const std::string &filename, std::vector<Point3Di> &points_out, std
     return true;
 }
 
-bool load_poses(const fs::path& poses_file, std::vector<Eigen::Affine3d>& out_poses)
+bool load_poses(const fs::path &poses_file, std::vector<Eigen::Affine3d> &out_poses)
 {
     std::ifstream infile(poses_file);
-    if (!infile.is_open()) return false;
+    if (!infile.is_open())
+        return false;
 
     int N = 0;
     infile >> N;
@@ -829,7 +851,7 @@ bool load_poses(const fs::path& poses_file, std::vector<Eigen::Affine3d>& out_po
     std::string filename_dummy;
     for (int i = 0; i < N; ++i)
     {
-        std::getline(infile >> std::ws, filename_dummy); 
+        std::getline(infile >> std::ws, filename_dummy);
         Eigen::Matrix4d mat;
         for (int r = 0; r < 4; ++r)
         {
@@ -840,10 +862,10 @@ bool load_poses(const fs::path& poses_file, std::vector<Eigen::Affine3d>& out_po
     return true;
 }
 
-bool load_trajectory_csv(const std::string& filename, const Eigen::Affine3d& m_pose,
-    std::vector<std::pair<double, double>>& intermediate_trajectory_timestamps,
-    std::vector<Eigen::Affine3d>& intermediate_trajectory,
-    std::vector<Eigen::Vector3d>& imu_om_fi_ka)
+bool load_trajectory_csv(const std::string &filename, const Eigen::Affine3d &m_pose,
+                         std::vector<std::pair<double, double>> &intermediate_trajectory_timestamps,
+                         std::vector<Eigen::Affine3d> &intermediate_trajectory,
+                         std::vector<Eigen::Vector3d> &imu_om_fi_ka)
 {
     std::ifstream file(filename);
     if (!file.is_open())
@@ -863,16 +885,13 @@ bool load_trajectory_csv(const std::string& filename, const Eigen::Affine3d& m_p
         double p20, p21, p22, p23;
         double imu_x, imu_y, imu_z;
 
-        ss >> ts1 >> p00 >> p01 >> p02 >> p03
-           >> p10 >> p11 >> p12 >> p13
-           >> p20 >> p21 >> p22 >> p23
-           >> ts2 >> imu_x >> imu_y >> imu_z;
+        ss >> ts1 >> p00 >> p01 >> p02 >> p03 >> p10 >> p11 >> p12 >> p13 >> p20 >> p21 >> p22 >> p23 >> ts2 >> imu_x >> imu_y >> imu_z;
 
         Eigen::Matrix4d rel_mat;
         rel_mat << p00, p01, p02, p03,
-                   p10, p11, p12, p13,
-                   p20, p21, p22, p23,
-                   0,    0,   0,    1;
+            p10, p11, p12, p13,
+            p20, p21, p22, p23,
+            0, 0, 0, 1;
 
         Eigen::Affine3d relative_pose(rel_mat);
         Eigen::Affine3d global_pose = m_pose * relative_pose;
@@ -885,7 +904,7 @@ bool load_trajectory_csv(const std::string& filename, const Eigen::Affine3d& m_p
     return true;
 }
 
-bool load_point_sizes(const std::filesystem::path& path, std::vector<int>& vector)
+bool load_point_sizes(const std::filesystem::path &path, std::vector<int> &vector)
 {
     std::ifstream in_file(path);
     if (!in_file)
@@ -903,7 +922,7 @@ bool load_point_sizes(const std::filesystem::path& path, std::vector<int>& vecto
             return false;
         }
         vector.clear();
-        for (const auto& val : j)
+        for (const auto &val : j)
         {
             if (!val.is_number_integer())
             {
@@ -913,7 +932,7 @@ bool load_point_sizes(const std::filesystem::path& path, std::vector<int>& vecto
             vector.push_back(val.get<int>());
         }
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "Error parsing index poses JSON: " << e.what() << std::endl;
         return false;
@@ -921,7 +940,7 @@ bool load_point_sizes(const std::filesystem::path& path, std::vector<int>& vecto
     return true;
 }
 
-bool load_index_poses(const std::filesystem::path& path, std::vector<std::vector<int>>& index_poses_out)
+bool load_index_poses(const std::filesystem::path &path, std::vector<std::vector<int>> &index_poses_out)
 {
     std::ifstream in_file(path);
     if (!in_file)
@@ -940,7 +959,7 @@ bool load_index_poses(const std::filesystem::path& path, std::vector<std::vector
         }
         index_poses_out.clear();
         int tmp = 0;
-        for (const auto& chunk : j)
+        for (const auto &chunk : j)
         {
             if (!chunk.is_array())
             {
@@ -948,7 +967,7 @@ bool load_index_poses(const std::filesystem::path& path, std::vector<std::vector
                 return false;
             }
             std::vector<int> chunk_indices;
-            for (const auto& val : chunk)
+            for (const auto &val : chunk)
             {
                 if (!val.is_number_integer())
                 {
@@ -960,7 +979,7 @@ bool load_index_poses(const std::filesystem::path& path, std::vector<std::vector
             index_poses_out.push_back(std::move(chunk_indices));
         }
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << "Error parsing index poses JSON: " << e.what() << std::endl;
         return false;
@@ -968,9 +987,9 @@ bool load_index_poses(const std::filesystem::path& path, std::vector<std::vector
     return true;
 }
 
-bool load_worker_data_from_results(const fs::path& session_file, std::vector<WorkerData>& worker_data_out)
+bool load_worker_data_from_results(const fs::path &session_file, std::vector<WorkerData> &worker_data_out)
 {
-    #if 0
+#if 0
     std::ifstream f(session_file);
     if (!f.is_open()) {
         std::cerr << "Cannot open session file: " << session_file << std::endl;
@@ -1085,9 +1104,6 @@ bool load_worker_data_from_results(const fs::path& session_file, std::vector<Wor
         }
     }
     return true;
-    #endif
+#endif
     return false;
 }
-
-
-

@@ -762,8 +762,6 @@ void openSession()
 
 void display()
 {
-    ImGuiIO& io = ImGui::GetIO();
-
     glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
@@ -775,44 +773,9 @@ void display()
         gl_renderPointCloud();
     }
 
-
-    view_kbd_shortcuts();
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed('O', false))
-        openSession();
-
-    if (session.point_clouds_container.point_clouds.size() > 0)
-    {
-        if (io.KeyCtrl && ImGui::IsKeyPressed('N'))
-            show_neighbouring_scans = !show_neighbouring_scans;
-        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
-            offset_intensity += 0.01;
-        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
-            offset_intensity -= 0.01;
-
-        if (offset_intensity < 0)
-            offset_intensity = 0;
-        else if (offset_intensity > 1)
-            offset_intensity = 1;
-
-        if ((!io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
-            || ImGui::IsKeyPressed(ImGuiKey_PageUp, true)
-            || ImGui::IsKeyPressed('+', true)
-            )
-            index_rendered_points_local += 1;
-        if ((!io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
-            || ImGui::IsKeyPressed(ImGuiKey_PageDown, true)
-            || ImGui::IsKeyPressed('-', true)
-            )
-            index_rendered_points_local -= 1;
-
-        if (index_rendered_points_local < 0)
-            index_rendered_points_local = 0;
-        if (index_rendered_points_local >= session.point_clouds_container.point_clouds.size())
-            index_rendered_points_local = session.point_clouds_container.point_clouds.size() - 1;
-    }
-
     updateCameraTransition();
+
+    ImGuiIO& io = ImGui::GetIO();
 
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
@@ -955,6 +918,58 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+    ImGui::NewFrame();
+
+    ShowMainDockSpace();
+
+    view_kbd_shortcuts();
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
+    {
+        openSession();
+        
+		//workaround
+        io.AddKeyEvent(ImGuiKey_O, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+    if (session.point_clouds_container.point_clouds.size() > 0)
+    {
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_N, false))
+        {
+            show_neighbouring_scans = !show_neighbouring_scans;
+
+            //workaround
+            io.AddKeyEvent(ImGuiKey_N, false);
+            io.AddKeyEvent(ImGuiMod_Ctrl, false);
+        }
+
+        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
+            offset_intensity += 0.01;
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
+            offset_intensity -= 0.01;
+
+        if (offset_intensity < 0)
+            offset_intensity = 0;
+        else if (offset_intensity > 1)
+            offset_intensity = 1;
+
+        if ((!io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
+            || ImGui::IsKeyPressed(ImGuiKey_PageUp, true)
+            || ImGui::IsKeyPressed(ImGuiKey_KeypadAdd, true)
+            )
+            index_rendered_points_local += 1;
+        if ((!io.KeyCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
+            || ImGui::IsKeyPressed(ImGuiKey_PageDown, true)
+            || ImGui::IsKeyPressed(ImGuiKey_KeypadSubtract, true)
+            )
+            index_rendered_points_local -= 1;
+
+        if (index_rendered_points_local < 0)
+            index_rendered_points_local = 0;
+        if (index_rendered_points_local >= session.point_clouds_container.point_clouds.size())
+            index_rendered_points_local = session.point_clouds_container.point_clouds.size() - 1;
+    }
 
     if (ImGui::BeginMainMenuBar())
     {

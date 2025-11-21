@@ -1,4 +1,4 @@
-#include <imgui_impl_glut.h>
+﻿#include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
 #include <GL/glew.h>
 #include <GL/freeglut.h>
@@ -308,43 +308,83 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
-//SpecialKeys handlers needed because of ImGui version <1.89 bug in handling keys
-void specialDown(int key, int x, int y)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    switch (key)
-    {
-    case GLUT_KEY_UP:    io.KeysDown[ImGuiKey_UpArrow] = true; break;
-    case GLUT_KEY_DOWN:  io.KeysDown[ImGuiKey_DownArrow] = true; break;
-    case GLUT_KEY_LEFT:  io.KeysDown[ImGuiKey_LeftArrow] = true; break;
-    case GLUT_KEY_RIGHT: io.KeysDown[ImGuiKey_RightArrow] = true; break;
-    case GLUT_KEY_PAGE_UP:   io.KeysDown[ImGuiKey_PageUp] = true; break;
-    case GLUT_KEY_PAGE_DOWN: io.KeysDown[ImGuiKey_PageDown] = true; break;
+ImGuiKey keyToImGuiKey(unsigned char key) {
+    if (key >= 'a' && key <= 'z') return ImGuiKey(ImGuiKey_A + (key - 'a'));
+    if (key >= 'A' && key <= 'Z') return ImGuiKey(ImGuiKey_A + (key - 'A'));
+    if (key >= '0' && key <= '9') return ImGuiKey(ImGuiKey_0 + (key - '0'));
+    switch (key) {
+        case 27: return ImGuiKey_Escape;
+        case 13: return ImGuiKey_Enter;
+        case 32: return ImGuiKey_Space;
+        default: return ImGuiKey_None;
     }
-
-    int mods = glutGetModifiers();
-    io.KeyCtrl = (mods & GLUT_ACTIVE_CTRL) != 0;
-    io.KeyShift = (mods & GLUT_ACTIVE_SHIFT) != 0;
-    io.KeyAlt = (mods & GLUT_ACTIVE_ALT) != 0;
 }
 
-void specialUp(int key, int x, int y)
-{
+void keyboardDown(unsigned char key, int x, int y) {
     ImGuiIO& io = ImGui::GetIO();
-    switch (key)
-    {
-    case GLUT_KEY_UP:    io.KeysDown[ImGuiKey_UpArrow] = false; break;
-    case GLUT_KEY_DOWN:  io.KeysDown[ImGuiKey_DownArrow] = false; break;
-    case GLUT_KEY_LEFT:  io.KeysDown[ImGuiKey_LeftArrow] = false; break;
-    case GLUT_KEY_RIGHT: io.KeysDown[ImGuiKey_RightArrow] = false; break;
-    case GLUT_KEY_PAGE_UP:   io.KeysDown[ImGuiKey_PageUp] = false; break;
-    case GLUT_KEY_PAGE_DOWN: io.KeysDown[ImGuiKey_PageDown] = false; break;
-    }
 
     int mods = glutGetModifiers();
-    io.KeyCtrl = (mods & GLUT_ACTIVE_CTRL) != 0;
-    io.KeyShift = (mods & GLUT_ACTIVE_SHIFT) != 0;
-    io.KeyAlt = (mods & GLUT_ACTIVE_ALT) != 0;
+    // Update modifier keys using the new API
+    io.AddKeyEvent(ImGuiMod_Ctrl, (mods & GLUT_ACTIVE_CTRL) != 0);
+    io.AddKeyEvent(ImGuiMod_Shift, (mods & GLUT_ACTIVE_SHIFT) != 0);
+    io.AddKeyEvent(ImGuiMod_Alt, (mods & GLUT_ACTIVE_ALT) != 0);
+
+    // Handle Ctrl+letter (ASCII 1-26) (FreeGLUT “lost key” problem)
+    if ( (mods & GLUT_ACTIVE_CTRL) && (key >= 1 && key <= 26) )
+        key = 'A' + (key - 1);
+
+    io.AddKeyEvent(keyToImGuiKey(key), true);
+
+    //std::cout << "Down key: " << key << ", mod: " << mods << std::endl;
+}
+
+void keyboardUp(unsigned char key, int x, int y) {
+    ImGuiIO& io = ImGui::GetIO();
+
+    int mods = glutGetModifiers();
+    // Update modifier keys using the new API
+    io.AddKeyEvent(ImGuiMod_Ctrl, (mods & GLUT_ACTIVE_CTRL) != 0);
+    io.AddKeyEvent(ImGuiMod_Shift, (mods & GLUT_ACTIVE_SHIFT) != 0);
+    io.AddKeyEvent(ImGuiMod_Alt, (mods & GLUT_ACTIVE_ALT) != 0);
+
+    // Handle Ctrl+letter (ASCII 1-26) (FreeGLUT “lost key” problem)
+    if ((mods & GLUT_ACTIVE_CTRL) && (key >= 1 && key <= 26))
+        key = 'A' + (key - 1);
+
+    io.AddKeyEvent(keyToImGuiKey(key), false);
+
+    //std::cout << "Up key: " << key << ", mod: " << mods << std::endl;
+}
+
+void ShowMainDockSpace()
+{
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking
+                                | ImGuiWindowFlags_NoTitleBar
+                                | ImGuiWindowFlags_NoCollapse
+                                | ImGuiWindowFlags_NoResize
+                                | ImGuiWindowFlags_NoMove
+                                | ImGuiWindowFlags_NoBringToFrontOnFocus
+                                | ImGuiWindowFlags_NoNavFocus
+                                | ImGuiWindowFlags_NoBackground
+                                | ImGuiWindowFlags_NoInputs;
+
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
+    ImGui::SetNextWindowViewport(viewport->ID);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
+    ImGui::Begin("MainDockSpace", nullptr, window_flags);
+
+    ImGui::PopStyleVar(2);
+
+    // This is the dockspace!
+    ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
+    ImGui::DockSpace(dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode);
+
+    ImGui::End();
 }
 
 bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)(), void (*mouse)(int, int, int, int))
@@ -378,22 +418,28 @@ bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)
     glLoadIdentity();
     gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01, 10000.0);
     glutReshapeFunc(reshape);
+
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     (void)io;
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard     // Enable Keyboard Controls
+                   | ImGuiConfigFlags_NavEnableGamepad
+                   | ImGuiConfigFlags_DockingEnable;
 
     ImGui::StyleColorsDark();
     ImGui_ImplGLUT_Init();
-    ImGui_ImplGLUT_InstallFuncs();
     ImGui_ImplOpenGL2_Init();
+
+    ImGui_ImplGLUT_InstallFuncs();
 
     glutDisplayFunc(display);
     glutMouseFunc(mouse);
     glutMotionFunc(motion);
     glutMouseWheelFunc(wheel);
-    glutSpecialFunc(specialDown);
-    glutSpecialUpFunc(specialUp);
+	glutKeyboardFunc(keyboardDown);
+	glutKeyboardUpFunc(keyboardUp);
+    //glutSpecialFunc(specialDown);
+    //glutSpecialUpFunc(specialUp);
 
     return (glGetError() == GL_NO_ERROR);
 }
@@ -714,55 +760,55 @@ void view_kbd_shortcuts()
         breakCameraTransition();
     }
 
-    if (io.KeyShift && ImGui::IsKeyPressed('Z', false) && !is_ortho)
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false) && !is_ortho)
 		lock_z = !lock_z;
 
     //only checking for single key press (no modifiers) from this point
-    if (io.KeyCtrl || io.KeyShift) return;
+    if (io.KeyCtrl || io.KeyAlt || io.KeyShift) return;
 
 
-    if (ImGui::IsKeyPressed('B'))
+    if (ImGui::IsKeyPressed(ImGuiKey_B))
         setCameraPreset(CAMERA_BACK);
-    if (ImGui::IsKeyPressed('F'))
+    if (ImGui::IsKeyPressed(ImGuiKey_F))
         setCameraPreset(CAMERA_FRONT);
-    if (ImGui::IsKeyPressed('I'))
+    if (ImGui::IsKeyPressed(ImGuiKey_I))
         setCameraPreset(CAMERA_ISO);
-    if (ImGui::IsKeyPressed('L'))
+    if (ImGui::IsKeyPressed(ImGuiKey_L))
         setCameraPreset(CAMERA_LEFT);
-    if (ImGui::IsKeyPressed('R'))
+    if (ImGui::IsKeyPressed(ImGuiKey_R))
         setCameraPreset(CAMERA_RIGHT);
-    if (ImGui::IsKeyPressed('T'))
+    if (ImGui::IsKeyPressed(ImGuiKey_T))
         setCameraPreset(CAMERA_TOP);
-    if (ImGui::IsKeyPressed('U'))
+    if (ImGui::IsKeyPressed(ImGuiKey_U))
         setCameraPreset(CAMERA_BOTTOM);
-    if (ImGui::IsKeyPressed('Z'))
+    if (ImGui::IsKeyPressed(ImGuiKey_Z))
         setCameraPreset(CAMERA_RESET);
 
-    if (ImGui::IsKeyPressed('C'), false)
+    if (ImGui::IsKeyPressed(ImGuiKey_C, false))
         compass_ruler = !compass_ruler;
-    if (ImGui::IsKeyPressed('O'), false)
+    if (ImGui::IsKeyPressed(ImGuiKey_O, false))
         is_ortho = !is_ortho;
-    if (ImGui::IsKeyPressed('X'), false)
+    if (ImGui::IsKeyPressed(ImGuiKey_X, false))
         show_axes = !show_axes;
 
 
-    if (ImGui::IsKeyPressed('1'))
+    if (ImGui::IsKeyPressed(ImGuiKey_1))
 		point_size = 1;
-	if (ImGui::IsKeyPressed('2'))
+	if (ImGui::IsKeyPressed(ImGuiKey_2))
 		point_size = 2;
-	if (ImGui::IsKeyPressed('3'))
+	if (ImGui::IsKeyPressed(ImGuiKey_3))
 		point_size = 3;
-	if (ImGui::IsKeyPressed('4'))
+	if (ImGui::IsKeyPressed(ImGuiKey_4))
 		point_size = 4;
-	if (ImGui::IsKeyPressed('5'))
+	if (ImGui::IsKeyPressed(ImGuiKey_5))
 		point_size = 5;
-    if (ImGui::IsKeyPressed('6'))
+    if (ImGui::IsKeyPressed(ImGuiKey_6))
 		point_size = 6;
-	if (ImGui::IsKeyPressed('7'))
+	if (ImGui::IsKeyPressed(ImGuiKey_7))
 		point_size = 7;
-	if (ImGui::IsKeyPressed('8'))
+	if (ImGui::IsKeyPressed(ImGuiKey_8))
 		point_size = 8;
-	if (ImGui::IsKeyPressed('9'))
+	if (ImGui::IsKeyPressed(ImGuiKey_9))
 		point_size = 9;
 }
 
@@ -976,7 +1022,7 @@ void drawMiniCompassWithRuler(
 
     float miniAxisLength = 1.0f;
 
-    // Snap ruler length to a "nice" round number (1, 2, or 5 � 10^n)
+    // Snap ruler length to a "nice" round number (1, 2, or 5 × 10^n)
     float rawUnit = 0.1f * translate_z; // adjust factor to taste
     float base = pow(10.0f, floor(log10(rawUnit)));
     float normalized = rawUnit / base;

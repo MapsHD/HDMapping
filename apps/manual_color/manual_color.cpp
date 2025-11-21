@@ -170,31 +170,24 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
     float speed = io.KeyShift ? 10.f : 1.f;
     int transX = 0;
     int transY = 0;
-    if (io.KeysDown[io.KeyMap[ImGuiKey_UpArrow]])
-    {
-        transY = -10 * speed;
-    }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_DownArrow]])
-    {
-        transY = 10 * speed;
-    }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_LeftArrow]])
-    {
-        transX = -10 * speed;
-    }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_RightArrow]])
-    {
-        transX = 10 * speed;
-    }
-    if (io.KeysDown[io.KeyMap[ImGuiKey_PageUp]])
-    {
-        zoom *= 1.0f + 0.01f * speed;
-    }
 
-    if (io.KeysDown[io.KeyMap[ImGuiKey_PageDown]])
-    {
+    if (ImGui::IsKeyDown(ImGuiKey_UpArrow))
+        transY = -10 * speed;
+
+    if (ImGui::IsKeyDown(ImGuiKey_DownArrow))
+        transY = 10 * speed;
+
+    if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
+        transX = -10 * speed;
+
+    if (ImGui::IsKeyDown(ImGuiKey_RightArrow))
+        transX = 10 * speed;
+
+    if (ImGui::IsKeyDown(ImGuiKey_PageUp))
+        zoom *= 1.0f + 0.01f * speed;
+
+    if (ImGui::IsKeyDown(ImGuiKey_PageDown))
         zoom /= 1.00f + 0.01f * speed;
-    }
 
     ImVec2 uv_min = ImVec2(0.0f, 0.0f);                 // Top-left
     ImVec2 uv_max = ImVec2(1.0f, 1.0f);                 // Lower-right
@@ -934,6 +927,7 @@ void display()
     }
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+	ImGui::NewFrame();
 
     std::vector<ImVec2> picked3DPoints(SystemData::pointPickedPointCloud.size());
     std::transform(SystemData::pointPickedPointCloud.begin(), SystemData::pointPickedPointCloud.end(), picked3DPoints.begin(), UnprojectPoint);

@@ -891,6 +891,7 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+	ImGui::NewFrame();
 
     ImGuizmo::BeginFrame();
     ImGuizmo::Enable(true);

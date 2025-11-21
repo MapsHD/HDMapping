@@ -89,9 +89,7 @@ std::string truncPath(const std::string& fullPath);
 
 void wheel(int button, int dir, int x, int y);
 void reshape(int w, int h);
-void motion(int x, int y);
-void specialDown(int key, int x, int y);
-void specialUp(int key, int x, int y);
+void ShowMainDockSpace();
 bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)(), void (*mouse)(int, int, int, int));
 
 void showAxes();

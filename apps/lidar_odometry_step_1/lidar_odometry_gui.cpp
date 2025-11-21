@@ -604,35 +604,19 @@ void step1(const std::atomic<bool> &loPause)
 
     if (fs::exists(input_folder_name))
     {
-        if (!input_folder_name.empty())
+        std::string newTitle = winTitle + " - ..\\" + std::filesystem::path(input_folder_name).filename().string();
+        glutSetWindowTitle(newTitle.c_str());
+
+        for (const auto &entry : fs::directory_iterator(input_folder_name))
+            if (entry.is_regular_file())
+                input_file_names.push_back(entry.path().string());
+
+        if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
         {
-            std::string newTitle = winTitle + " - ..\\" + std::filesystem::path(input_folder_name).filename().string();
-            glutSetWindowTitle(newTitle.c_str());
-
-            for (const auto &entry : fs::directory_iterator(input_folder_name))
-                if (entry.is_regular_file())
-                    input_file_names.push_back(entry.path().string());
-
-            if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
-            {
-                working_directory = fs::path(input_file_names[0]).parent_path().string();
-                calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages, params.use_removie_imu_bias_from_first_stationary_scan);
-                compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
-                step_1_done = true;
-            }
-            else
-            {
-                std::string message_info = "Problem with loading data from folder '" + input_folder_name + "' (Pease check if folder exists). Program will close once You click OK!!!";
-                std::cout << message_info << std::endl;
-                [[maybe_unused]]
-                pfd::message message(
-                    "Information",
-                    message_info.c_str(),
-                    pfd::choice::ok, pfd::icon::info);
-                message.result();
-
-                exit(1);
-            }
+            working_directory = fs::path(input_file_names[0]).parent_path().string();
+            calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages, params.use_removie_imu_bias_from_first_stationary_scan);
+            compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
+            step_1_done = true;
         }
         else
         {
@@ -647,19 +631,6 @@ void step1(const std::atomic<bool> &loPause)
 
             exit(1);
         }
-    }
-    else
-    {
-        std::string message_info = "Problem with loading data from folder '" + input_folder_name + "' Pease check if folder name is composed of ASCII symbols, if not --> please change folder name. Program will close once You click OK!!!";
-        std::cout << message_info << std::endl;
-        [[maybe_unused]]
-        pfd::message message(
-            "Information",
-            message_info.c_str(),
-            pfd::choice::ok, pfd::icon::info);
-        message.result();
-
-        exit(1);
     }
 }
 
@@ -1656,14 +1627,9 @@ void save_results(bool info, double elapsed_seconds, std::string &working_direct
 
 void display()
 {
-    ImGuiIO &io = ImGui::GetIO();
-
-    view_kbd_shortcuts();
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed('O', false))
-        openData();
-
     updateCameraTransition();
+    
+    ImGuiIO &io = ImGui::GetIO();
 
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
@@ -1879,6 +1845,20 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+	ImGui::NewFrame();
+
+    ShowMainDockSpace();
+
+    view_kbd_shortcuts();
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
+    {
+        openData();
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_O, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
 
     if (!loRunning)
     {

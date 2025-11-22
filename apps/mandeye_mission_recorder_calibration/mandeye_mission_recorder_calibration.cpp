@@ -626,14 +626,9 @@ void project_gui()
 
 void display()
 {
-    ImGuiIO &io = ImGui::GetIO();
-
-    view_kbd_shortcuts();
-
-    if (ImGui::IsKeyPressed('G', false))
-        show_grid = !show_grid;
-
     updateCameraTransition();
+
+    ImGuiIO& io = ImGui::GetIO();
 
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
@@ -814,6 +809,14 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+	ImGui::NewFrame();
+
+    ShowMainDockSpace();
+
+    view_kbd_shortcuts();
+
+    if (ImGui::IsKeyPressed(ImGuiKey_G, false))
+        show_grid = !show_grid;
 
     if (ImGui::BeginMainMenuBar())
     {

@@ -1952,65 +1952,9 @@ void project_gui()
 
 void display()
 {
-    ImGuiIO& io = ImGui::GetIO();
-
-    view_kbd_shortcuts();
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed('A'))
-        is_pca_gui = !is_pca_gui;
-    if (io.KeyCtrl && ImGui::IsKeyPressed('C'))
-    {
-        if (session.control_points.is_imgui)
-            session.control_points.is_imgui = false;
-        else if (!session.ground_control_points.is_imgui)
-            session.control_points.is_imgui = true;
-    }
-    if (io.KeyCtrl && ImGui::IsKeyPressed('E'))
-    {
-        if (is_lio_segments_gui)
-            is_lio_segments_gui = false;
-        else if (!is_loop_closure_gui)
-            is_lio_segments_gui = true;
-    }
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed('G'))
-    {
-        if (session.ground_control_points.is_imgui)
-            session.ground_control_points.is_imgui = false;
-        else if (!session.control_points.is_imgui)
-            session.ground_control_points.is_imgui = true;
-    }
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed('L'))
-    {
-        if (is_loop_closure_gui)
-            is_loop_closure_gui = false;
-        else if (!is_lio_segments_gui)
-            is_loop_closure_gui = true;
-    }
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed('O', false))
-        openSession();
-    if (io.KeyCtrl && ImGui::IsKeyPressed('P'))
-        is_pose_graph_slam = !is_pose_graph_slam;
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed('R')) //random colors
-    {
-        for (auto& pc : session.point_clouds_container.point_clouds)
-        {
-            pc.render_color[0] = float(rand() % 255) / 255.0f;
-            pc.render_color[1] = float(rand() % 255) / 255.0f;
-            pc.render_color[2] = float(rand() % 255) / 255.0f;
-            pc.show_color = false;
-        }
-    }
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed('S', false))
-        saveSession();
-    if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed('S', false))
-        saveSubsession();
-
     updateCameraTransition();
+
+    ImGuiIO& io = ImGui::GetIO();
 
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
@@ -2147,6 +2091,102 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+	ImGui::NewFrame(); 
+
+    ShowMainDockSpace();
+
+    view_kbd_shortcuts();
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A, false))
+    {
+        is_pca_gui = !is_pca_gui;
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_A, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C, false))
+    {
+        session.control_points.is_imgui = !session.control_points.is_imgui;
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_C, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_E, false))
+    {
+        is_lio_segments_gui = !is_lio_segments_gui;
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_E, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_G, false))
+    {
+        session.ground_control_points.is_imgui = !session.ground_control_points.is_imgui;
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_G, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_L, false))
+    {
+        is_loop_closure_gui = !is_loop_closure_gui;
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_L, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
+    {
+        openSession();
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_O, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_P, false))
+    {
+        is_pose_graph_slam = !is_pose_graph_slam;
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_P, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R)) //random colors
+    {
+        for (auto& pc : session.point_clouds_container.point_clouds)
+        {
+            pc.render_color[0] = float(rand() % 255) / 255.0f;
+            pc.render_color[1] = float(rand() % 255) / 255.0f;
+            pc.render_color[2] = float(rand() % 255) / 255.0f;
+            pc.show_color = false;
+        }
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_R, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false))
+    {
+		if (io.KeyShift)
+            saveSubsession();
+		else
+            saveSession();
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_S, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
 
     if (ImGui::BeginMainMenuBar())
     {
@@ -2958,8 +2998,6 @@ void display()
                     session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[i].pose.fi * RAD_TO_DEG);
                     session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[i].pose.ka * RAD_TO_DEG);
 
-                    ImGui::End();
-
                     if (!manipulate_only_marked_gizmo)
                     {
                         Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[i].m_pose;
@@ -3106,8 +3144,6 @@ void display()
 
                 const Eigen::Affine3d &m_src = session.point_clouds_container.point_clouds.at(index_src).m_pose;
                 session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
-
-                ImGui::End();
             }
         }
     }

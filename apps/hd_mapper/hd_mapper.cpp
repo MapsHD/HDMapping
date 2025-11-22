@@ -151,6 +151,7 @@ void display() {
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+	ImGui::NewFrame(); 
 
     //my_display_code();
     project_setings.imgui(odo_with_gnss_fusion, laz_wrapper.sectors, roi_exporter.rois_with_constraints, common_data);

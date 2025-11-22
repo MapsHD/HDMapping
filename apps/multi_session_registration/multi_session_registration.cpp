@@ -177,6 +177,8 @@ bool remove_gui = false;
 NDT ndt;
 
 int number_visible_sessions = 0;
+int index_gizmo = -1;
+int old_index_gizmo = -1;
 
 double time_stamp_offset = 0.0;
 
@@ -2773,8 +2775,6 @@ void project_gui()
 
         ImGui::Text("Session file names:");
 
-        int index_gizmo = -1;
-
         for (int i = 0; i < project_settings.session_file_names.size(); i++)
         {
             ImGui::Text(truncPath(project_settings.session_file_names[i]).c_str());
@@ -2791,17 +2791,12 @@ void project_gui()
                     ImGui::BeginDisabled(sessions[i].is_ground_truth);
                     {
                         ImGui::SameLine();
-                        if (ImGui::Checkbox(("Gizmo##" + std::to_string(i)).c_str(), &sessions[i].is_gizmo))
+                        if (ImGui::RadioButton(("Gizmo##" + std::to_string(i)).c_str(), &index_gizmo, i))
                         {
-                            if (sessions[i].is_gizmo)
-                            {
-                                for (int ii = 0; ii < sessions.size(); ii++)
-                                    if (i != ii)
-                                        sessions[ii].is_gizmo = false;
-                                index_gizmo = i;
-                            }
+                            if (old_index_gizmo == i)
+                                index_gizmo = -1;   // unselect
                             else
-                                index_gizmo = -1;
+                                index_gizmo = i;
                         }
                     }
                     ImGui::EndDisabled();
@@ -2858,10 +2853,17 @@ void project_gui()
                 //
             }
         }
+
         if (project_settings.session_file_names.size() == sessions.size())
         {
-            // for (int i = 0; i < sessions.size(); i++)
-            //     sessions[i].is_gizmo = false;
+            if (old_index_gizmo != index_gizmo)
+            {
+                for (int i = 0; i < sessions.size(); i++)
+                    sessions[i].is_gizmo = (i == index_gizmo);
+
+				old_index_gizmo = index_gizmo;
+            }
+
             if (index_gizmo != -1 && index_gizmo < sessions.size())
             {
                 // sessions[index_gizmo].is_gizmo = true;
@@ -2965,27 +2967,9 @@ void project_gui()
 
 void display()
 {
-    ImGuiIO &io = ImGui::GetIO();
-
-    view_kbd_shortcuts();
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed('A', false))
-        addSession();
-    if ((project_settings.session_file_names.size() > 0) && !loaded_sessions)
-        if (io.KeyCtrl && ImGui::IsKeyPressed('L', false))
-            loadSessions();
-    if (io.KeyCtrl && ImGui::IsKeyPressed('O', false))
-        openProject();
-
-    if (project_settings.session_file_names.size() > 0)
-        if (io.KeyCtrl && ImGui::IsKeyPressed('R', false))
-            remove_gui = true;
-
-    if (sessions.size() > 0)
-        if (io.KeyCtrl && ImGui::IsKeyPressed('S', false))
-            saveProject();
-
     updateCameraTransition();
+
+    ImGuiIO& io = ImGui::GetIO();
 
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
@@ -3343,6 +3327,57 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
+	ImGui::NewFrame();
+
+    ShowMainDockSpace();
+
+    view_kbd_shortcuts();
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A, false))
+    {
+        addSession();
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_A, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+    if ((project_settings.session_file_names.size() > 0) && !loaded_sessions)
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_L, false))
+        {
+            loadSessions();
+
+            //workaround
+            io.AddKeyEvent(ImGuiKey_L, false);
+            io.AddKeyEvent(ImGuiMod_Ctrl, false);
+        }
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
+    {
+        openProject();
+
+        //workaround
+        io.AddKeyEvent(ImGuiKey_O, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+    if (project_settings.session_file_names.size() > 0)
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R, false))
+        {
+            remove_gui = true;
+
+            //workaround
+            io.AddKeyEvent(ImGuiKey_R, false);
+            io.AddKeyEvent(ImGuiMod_Ctrl, false);
+        }
+
+    if (sessions.size() > 0)
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false))
+        {
+            saveProject();
+
+            //workaround
+            io.AddKeyEvent(ImGuiKey_S, false);
+            io.AddKeyEvent(ImGuiMod_Ctrl, false);
+        }
 
     if (ImGui::BeginMainMenuBar())
     {
@@ -4034,7 +4069,7 @@ void display()
 
         for (size_t i = 0; i < sessions.size(); i++)
         {
-            // gizmo_all_sessions;
+            // guizmo_all_sessions;
             if (sessions[i].is_gizmo && !sessions[i].is_ground_truth)
             {
                 if (sessions[i].point_clouds_container.point_clouds.size() > 0)
@@ -4042,9 +4077,7 @@ void display()
                     prev_pose_manipulated = sessions[i].point_clouds_container.point_clouds[0].m_pose;
                     std::vector<Eigen::Affine3d> all_m_poses;
                     for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
-                    {
                         all_m_poses.push_back(sessions[i].point_clouds_container.point_clouds[j].m_pose);
-                    }
 
                     // if (all_m_poses.size() > 1)
                     //{
@@ -4081,8 +4114,6 @@ void display()
                     sessions[i].point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.fi * RAD_TO_DEG);
                     sessions[i].point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
 
-                    ImGui::End();
-
                     Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
                     for (int j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
                     {
@@ -4106,7 +4137,7 @@ void display()
         {
             for (size_t i = 0; i < sessions.size(); i++)
             {
-                // gizmo_all_sessions;
+                // guizmo_all_sessions;
                 if (!sessions[i].is_gizmo && !sessions[i].is_ground_truth)
                 {
                     std::vector<Eigen::Affine3d> all_m_poses;
@@ -4167,9 +4198,7 @@ void display()
                 ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
             }
             else
-            {
                 ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
-            }
 
             Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
 
@@ -4179,8 +4208,6 @@ void display()
 
             const Eigen::Affine3d &m_src = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
             edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
-
-            ImGui::End();
         }
     }
 
@@ -4248,8 +4275,6 @@ void display()
                 session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[i].pose.om * RAD_TO_DEG);
                 session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[i].pose.fi * RAD_TO_DEG);
                 session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[i].pose.ka * RAD_TO_DEG);
-
-                ImGui::End();
 
                 if (!manipulate_only_marked_gizmo)
                 {
@@ -4391,8 +4416,6 @@ void display()
 
             const Eigen::Affine3d &m_src = session.point_clouds_container.point_clouds.at(index_src).m_pose;
             session.manual_pose_graph_loop_closure.edges[session.manual_pose_graph_loop_closure.index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
-
-            ImGui::End();
         }
     }*/
 

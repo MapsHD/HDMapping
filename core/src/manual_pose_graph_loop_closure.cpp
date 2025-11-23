@@ -57,6 +57,9 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
             if (index_loop_closure_source >= point_clouds_container.point_clouds.size() - 1)
                 index_loop_closure_source = point_clouds_container.point_clouds.size() - 1;
 
+            ImGui::SameLine();
+            ImGui::Text("press shift + middle button ");
+
             ImGui::Text("Target: ");
             ImGui::SameLine();
 
@@ -72,6 +75,9 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
             if (index_loop_closure_target >= point_clouds_container.point_clouds.size() - 1)
                 index_loop_closure_target = point_clouds_container.point_clouds.size() - 1;
             ImGui::PopItemWidth();
+
+            ImGui::SameLine();
+            ImGui::Text("press ctrl + middle button ");
 
             if (ImGui::Button("Add edge"))
             {

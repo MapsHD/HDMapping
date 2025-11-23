@@ -1555,8 +1555,10 @@ double distance_point_to_line(const Eigen::Vector3d &point, const LaserBeam &lin
     return dist;
 }
 
-void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking)
+void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking, int &picked_index)
 {
+    picked_index = -1;
+    
     const auto laser_beam = GetLaserBeam(x, y);
     double min_distance = std::numeric_limits<double>::max();
     int index_i = -1;
@@ -1586,6 +1588,8 @@ void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking)
                     session.ground_control_points.picking_mode_index_to_node_inner = index_i;
                     session.ground_control_points.picking_mode_index_to_node_outer = index_j;
                 }
+
+                picked_index = index_i;
 
                 // if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
             }
@@ -3197,13 +3201,13 @@ void mouse(int glut_button, int state, int x, int y)
     if (!io.WantCaptureMouse)
     {
 
-        if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_LEFT_BUTTON) && state == GLUT_DOWN && io.KeyCtrl)
+        if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_LEFT_BUTTON) && state == GLUT_DOWN && (io.KeyCtrl || io.KeyShift))
         {
             if (session.ground_control_points.is_imgui)
             {
                 std::cout << "GCP picking" << std::endl;
- 
-				getClosestTrajectoryPoint(session, x, y, true);
+                int tmp;
+                getClosestTrajectoryPoint(session, x, y, true, tmp);
             }
             else if (session.control_points.is_imgui)
             {
@@ -3246,17 +3250,33 @@ void mouse(int glut_button, int state, int x, int y)
             else
             {
                 if (glut_button == GLUT_MIDDLE_BUTTON)
-                    if (session_loaded)
-                        getClosestTrajectoryPoint(session, x, y, false);
-                    else
+                    if (session_loaded){
+                        int tmp = -1;
+                        getClosestTrajectoryPoint(session, x, y, false, tmp);
+
+                        if (io.KeyCtrl){
+                            if (tmp != -1){
+                                index_loop_closure_target = tmp;
+                            }
+                        }
+                        if (io.KeyShift){
+                            if (tmp != -1)
+                            {
+                                index_loop_closure_source = tmp;
+                            }
+                        }
+                    }
+                    else{
                         setNewRotationCenter(x, y);
+                    }
             }
         }
 
         if (glut_button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN && io.KeyCtrl)
         {
+            int tmp;
             if (session_loaded)
-                getClosestTrajectoryPoint(session, x, y, false);
+                getClosestTrajectoryPoint(session, x, y, false, tmp);
             else
                 setNewRotationCenter(x, y);
         }

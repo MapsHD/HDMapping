@@ -335,6 +335,9 @@ void keyboardDown(unsigned char key, int x, int y) {
 
     io.AddKeyEvent(keyToImGuiKey(key), true);
 
+    //forward to ImGui GLUT backend
+    ImGui_ImplGLUT_KeyboardFunc(key, x, y);
+
     //std::cout << "Down key: " << key << ", mod: " << mods << std::endl;
 }
 
@@ -352,6 +355,8 @@ void keyboardUp(unsigned char key, int x, int y) {
         key = 'A' + (key - 1);
 
     io.AddKeyEvent(keyToImGuiKey(key), false);
+
+    ImGui_ImplGLUT_KeyboardUpFunc(key, x, y);
 
     //std::cout << "Up key: " << key << ", mod: " << mods << std::endl;
 }

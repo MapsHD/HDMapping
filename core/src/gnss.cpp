@@ -24,10 +24,14 @@ inline void split(std::string &str, char delim, std::vector<std::string> &out)
     }
 }
 
-bool GNSS::load(const std::vector<std::string> &input_file_names, bool localize)
+bool GNSS::load(const std::vector<std::string> &input_file_names, Eigen::Vector3d &out_offset, bool localize)
 {
     // 54651848940 5156.43798828125 2009.1610107421875 122.1999969482421875 1.25 8 35.799999237060546875 nan 14:51:42 1
     // timestamp lat lon alt hdop satelites_tracked height age time fix_quality
+
+    out_offset.x() = 0;
+    out_offset.y() = 0;
+    out_offset.z() = 0;
 
     gnss_poses.clear();
 
@@ -103,6 +107,10 @@ bool GNSS::load(const std::vector<std::string> &input_file_names, bool localize)
     WGS84ReferenceLatitude = firstGNSS.lat;
     WGS84ReferenceLongitude = firstGNSS.lon;
 
+    out_offset.x() = firstGNSS.x;
+    out_offset.y() = firstGNSS.y;
+    out_offset.z() = firstGNSS.alt;
+
     if (localize)
     {
         for (auto &pose : gnss_poses)
@@ -110,7 +118,7 @@ bool GNSS::load(const std::vector<std::string> &input_file_names, bool localize)
             pose.x = pose.x - firstGNSS.x;
             pose.y = pose.y - firstGNSS.y;
             pose.alt = pose.alt - firstGNSS.alt;
-            std::cout << "pose.x: " << pose.x << " pose.y: " << pose.y << " pose.alt: " << pose.alt << std::endl;
+            //std::cout << "pose.x: " << pose.x << " pose.y: " << pose.y << " pose.alt: " << pose.alt << std::endl;
         }
     }
 

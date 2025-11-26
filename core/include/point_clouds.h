@@ -31,6 +31,7 @@ public:
 	bool xy_grid_01x01 = false;
 
 	Eigen::Vector3d offset = Eigen::Vector3d(0, 0, 0);
+	Eigen::Vector3d offset_to_apply = Eigen::Vector3d(0, 0, 0);
 	std::string folder_name;
 	std::string out_folder_name;
 	std::string poses_file_name;

@@ -50,6 +50,9 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         point_clouds_container.offset.x() = project_settings_json.value("offset_x", 0.0);
         point_clouds_container.offset.y() = project_settings_json.value("offset_y", 0.0);
         point_clouds_container.offset.z() = project_settings_json.value("offset_z", 0.0);
+        point_clouds_container.offset_to_apply.x() = project_settings_json.value("offset_to_apply_x", 0.0);
+        point_clouds_container.offset_to_apply.y() = project_settings_json.value("offset_to_apply_y", 0.0);
+        point_clouds_container.offset_to_apply.z() = project_settings_json.value("offset_to_apply_z", 0.0);
         folder_name = getNewPath(project_settings_json.value("folder_name",""));
         out_folder_name = getNewPath(project_settings_json.value("out_folder_name", ""));
         poses_file_name = getNewPath(project_settings_json.value("poses_file_name", ""));
@@ -266,6 +269,9 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
     j["offset_x"] = point_clouds_container.offset.x();
     j["offset_y"] = point_clouds_container.offset.y();
     j["offset_z"] = point_clouds_container.offset.z();
+    j["offset_to_apply_x"] = point_clouds_container.offset_to_apply.x();
+    j["offset_to_apply_y"] = point_clouds_container.offset_to_apply.y();
+    j["offset_to_apply_z"] = point_clouds_container.offset_to_apply.z();
     j["folder_name"] = point_clouds_container.folder_name;
     j["out_folder_name"] = point_clouds_container.out_folder_name;
     j["poses_file_name"] = poses_file_name;                 // point_clouds_container.poses_file_name;

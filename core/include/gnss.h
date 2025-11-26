@@ -30,7 +30,7 @@ class GNSS{
     //! \brief Load GNSS data from file and converts to PUWG92
     //! \param input_file_names - vector of file names
     //! \param localize - if true, the data is moved to the first point
-    bool load(const std::vector<std::string> &input_file_names, bool localize = false);
+    bool load(const std::vector<std::string> &input_file_names, Eigen::Vector3d &out_offset, bool localize = false);
     bool load_mercator_projection(const std::vector<std::string> &input_file_names);
     bool load_nmea_mercator_projection(const std::vector<std::string> &input_file_names);
     void render(const PointClouds &point_clouds_container);

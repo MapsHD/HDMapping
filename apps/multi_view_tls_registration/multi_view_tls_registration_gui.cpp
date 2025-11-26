@@ -1927,6 +1927,11 @@ void project_gui()
             ImGui::SetTooltip(zText);
         ImGui::PopItemWidth();
 
+        if (ImGui::Button("Set offset_to_apply --> from session (offset_to_apply_x, offset_to_apply_y, offset_to_apply_z)"))
+        {
+            session.point_clouds_container.offset = session.point_clouds_container.offset_to_apply;
+        }
+
         if (!simple_gui)
         {
             ImGui::NewLine();
@@ -2421,7 +2426,7 @@ void display()
 
                 if (ImGui::BeginMenu("GNSS"))
                 {
-                    ImGui::MenuItem("Load with offset", nullptr, &gnssWithOffset);
+                    ImGui::MenuItem("Load with offset -> move to (0,0,0)", nullptr, &gnssWithOffset);
 
                     if (ImGui::MenuItem("Load GNSS files and convert WGS84 to PUWG92"))
                     {
@@ -2430,8 +2435,15 @@ void display()
 
                         if (input_file_names.size() > 0)
                         {
-                            if (!tls_registration.gnss.load(input_file_names, gnssWithOffset))
+                            Eigen::Vector3d out_offset(0.0, 0.0, 0.0);
+                            if (!tls_registration.gnss.load(input_file_names, out_offset, gnssWithOffset))
+                            {
                                 std::cout << "problem with loading gnss files" << std::endl;
+                            }
+                            else
+                            {
+                                session.point_clouds_container.offset_to_apply = out_offset;
+                            }
                         }
                     }
 
@@ -2447,7 +2459,9 @@ void display()
                         if (input_file_names.size() > 0)
                         {
                             if (!tls_registration.gnss.load_mercator_projection(input_file_names))
+                            {
                                 std::cout << "problem with loading gnss files" << std::endl;
+                            }
                         }
                     }
                     if (ImGui::IsItemHovered())

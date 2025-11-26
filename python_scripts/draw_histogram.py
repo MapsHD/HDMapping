@@ -42,6 +42,11 @@ def main():
         "--xlabel_cm", help="Label for X axis in cm", default="Distances (cm)"
     )
     parser.add_argument("--ylabel", help="Label for Y axis", default="Count")
+    parser.add_argument(
+        "--symmetric",
+        action="store_true",
+        help="Make x-axis symmetric around zero: +/- max(abs(x))",
+    )
 
     args = parser.parse_args()
 
@@ -96,11 +101,17 @@ def main():
         axes = [axes]
 
     # Add a bit of padding to limits
-    x_range = global_max_x - global_min_x
-    if x_range == 0:
-        x_range = 1.0
-    xlim_min = global_min_x - x_range * 0.05
-    xlim_max = global_max_x + x_range * 0.05
+    if args.symmetric:
+        # Symmetric x-axis around zero
+        max_abs = max(abs(global_min_x), abs(global_max_x))
+        xlim_min = -max_abs * 1.05
+        xlim_max = max_abs * 1.05
+    else:
+        x_range = global_max_x - global_min_x
+        if x_range == 0:
+            x_range = 1.0
+        xlim_min = global_min_x - x_range * 0.05
+        xlim_max = global_max_x + x_range * 0.05
 
     x_grid = np.linspace(xlim_min, xlim_max, 1000)
 

@@ -25,6 +25,35 @@ unsigned long long int get_rgd_index(const Eigen::Vector3d p, const Eigen::Vecto
     return get_index(x, y, z);
 }
 
+std::vector<Point3Di> decimate(const std::vector<Point3Di>& points, double bucket_x, double bucket_y, double bucket_z)
+{
+    // std::cout << "points.size before decimation: " << points.size() << std::endl;
+    Eigen::Vector3d b(bucket_x, bucket_y, bucket_z);
+    std::vector<Point3Di> out;
+
+    std::vector<PointCloud::PointBucketIndexPair> ip;
+    ip.resize(points.size());
+    out.reserve(points.size());
+
+    for (int i = 0; i < points.size(); i++)
+    {
+        ip[i].index_of_point = i;
+        ip[i].index_of_bucket = get_rgd_index(points[i].point, b);
+    }
+    std::sort(ip.begin(), ip.end(), [](const PointCloud::PointBucketIndexPair& a, const PointCloud::PointBucketIndexPair& b)
+        { return a.index_of_bucket < b.index_of_bucket; });
+
+    if (ip.size() != 0)
+	    out.emplace_back(points[ip[0].index_of_point]);
+
+    for (int i = 1; i < ip.size(); i++)
+        if (ip[i - 1].index_of_bucket != ip[i].index_of_bucket)
+            out.emplace_back(points[ip[i].index_of_point]);
+
+    // std::cout << "points.size after decimation: " << out.size() << std::endl;
+    return out;
+}
+
 Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &trajectory, double query_time)
 {
 
@@ -89,35 +118,6 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d> &tra
     }
     // std::cout << "Problem with : " << difft1 << " " << difft2 << "  q : " << query_time << " t1 :" << t1 << " t2: " << t2 << std::endl;
     return ret;
-}
-
-std::vector<Point3Di> decimate(const std::vector<Point3Di> &points, double bucket_x, double bucket_y, double bucket_z)
-{
-    // std::cout << "points.size before decimation: " << points.size() << std::endl;
-    Eigen::Vector3d b(bucket_x, bucket_y, bucket_z);
-    std::vector<Point3Di> out;
-
-    std::vector<PointCloud::PointBucketIndexPair> ip;
-    ip.resize(points.size());
-    out.reserve(points.size());
-
-    for (int i = 0; i < points.size(); i++)
-    {
-        ip[i].index_of_point = i;
-        ip[i].index_of_bucket = get_rgd_index(points[i].point, b);
-    }
-    std::sort(ip.begin(), ip.end(), [](const PointCloud::PointBucketIndexPair &a, const PointCloud::PointBucketIndexPair &b)
-              { return a.index_of_bucket < b.index_of_bucket; });
-    for (int i = 1; i < ip.size(); i++)
-    {
-        // std::cout << ip[i].index_of_bucket << " ";
-        if (ip[i - 1].index_of_bucket != ip[i].index_of_bucket)
-        {
-            out.emplace_back(points[ip[i].index_of_point]);
-        }
-    }
-    // std::cout << "points.size after decimation: " << out.size() << std::endl;
-    return out;
 }
 
 void limit_covariance(Eigen::Matrix3d &io_cov)

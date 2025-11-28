@@ -2850,7 +2850,6 @@ void project_gui()
                         }
                     }
                 }
-                //
             }
         }
 
@@ -2960,9 +2959,9 @@ void project_gui()
                 // }
             }
         }
-
-        ImGui::End();
     }
+
+    ImGui::End();
 }
 
 void display()
@@ -3385,7 +3384,7 @@ void display()
         {
             if (ImGui::MenuItem("Open project", "Ctrl+O"))
                 openProject();
-            if (ImGui::MenuItem("Save project", "Ctrl+S", nullptr, sessions.size() > 0))
+            if (ImGui::MenuItem("Save project", "Ctrl+S", nullptr, project_settings.session_file_names.size() > 0))
                 saveProject();
 
             ImGui::Separator();
@@ -3437,7 +3436,7 @@ void display()
                 ImGui::Separator();
 
                 ImGui::Text("(x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)");
-                if (ImGui::MenuItem("Save all as csv (timestamp Lidar)"))
+                if (ImGui::MenuItem("Save all as csv (timestamp Lidar)##1"))
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
@@ -3502,7 +3501,7 @@ void display()
 
                     std::cout << "Finished saving all trajectories to CSV files." << std::endl;
                 }
-                if (ImGui::MenuItem("Save all as csv (timestamp Unix)"))
+                if (ImGui::MenuItem("Save all as csv (timestamp Unix)##1"))
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
@@ -3557,7 +3556,7 @@ void display()
                         }
                     }
                 }
-                if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)"))
+                if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)##1"))
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
@@ -3618,7 +3617,7 @@ void display()
                 ImGui::Separator();
                 ImGui::Text("(x,y,z,qx,qy,qz,qw)");
 
-                if (ImGui::MenuItem("Save all as csv (timestamp Lidar)"))
+                if (ImGui::MenuItem("Save all as csv (timestamp Lidar)##2"))
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
@@ -3678,7 +3677,7 @@ void display()
 
                     std::cout << "Finished saving all trajectories to CSV files." << std::endl;
                 }
-                if (ImGui::MenuItem("Save all as csv (timestamp Unix)"))
+                if (ImGui::MenuItem("Save all as csv (timestamp Unix)##2"))
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {
@@ -3738,7 +3737,7 @@ void display()
 
                     std::cout << "Finished saving all trajectories to CSV files." << std::endl;
                 }
-                if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)"))
+                if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)##2"))
                 {
                     for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
                     {

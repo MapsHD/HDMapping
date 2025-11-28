@@ -843,7 +843,7 @@ void lidar_odometry_gui()
                 params.in_out_params_indoor.resolution_X = 0.01;
             }
             ImGui::SameLine();
-            ImGui::InputDouble("X", &params.in_out_params_outdoor.resolution_X, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("X##ndt", &params.in_out_params_outdoor.resolution_X, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(xText);
             if (params.in_out_params_outdoor.resolution_X < 0.01)
@@ -859,7 +859,7 @@ void lidar_odometry_gui()
                 params.in_out_params_indoor.resolution_Y = 0.01;
             }
             ImGui::SameLine();
-            ImGui::InputDouble("Y", &params.in_out_params_outdoor.resolution_Y, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("Y##ndt", &params.in_out_params_outdoor.resolution_Y, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(yText);
             if (params.in_out_params_outdoor.resolution_Y < 0.01)
@@ -875,7 +875,7 @@ void lidar_odometry_gui()
                 params.in_out_params_indoor.resolution_Z = 0.01;
             }
             ImGui::SameLine();
-            ImGui::InputDouble("Z", &params.in_out_params_outdoor.resolution_Z, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("Z##ndt", &params.in_out_params_outdoor.resolution_Z, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(zText);
             if (params.in_out_params_outdoor.resolution_Z < 0.01)
@@ -1450,8 +1450,9 @@ void lidar_odometry_gui()
                 }
             }
         }
-        ImGui::End();
     }
+
+    ImGui::End();
 }
 
 void progress_window()

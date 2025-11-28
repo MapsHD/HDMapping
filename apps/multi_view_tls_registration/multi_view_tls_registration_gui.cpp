@@ -549,85 +549,86 @@ void rpf_gui()
 void pca_gui()
 {
     ImGui::Begin("Point cloud alignment", &is_pca_gui, ImGuiWindowFlags_MenuBar);
-
-    if (ImGui::BeginMenuBar())
     {
-        bool justPushed = false;
-
-        if (is_ndt_gui) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
-        if (ImGui::Button("Normal Distributions Transform"))
+        if (ImGui::BeginMenuBar())
         {
-            if (!is_ndt_gui)
+            bool justPushed = false;
+
+            if (is_ndt_gui) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (ImGui::Button("Normal Distributions Transform"))
             {
-                is_ndt_gui = true;
-                is_icp_gui = false;
-                is_rpf_gui = false;
-                justPushed = true;
+                if (!is_ndt_gui)
+                {
+                    is_ndt_gui = true;
+                    is_icp_gui = false;
+                    is_rpf_gui = false;
+                    justPushed = true;
+                }
             }
-        }
-        if (is_ndt_gui && !justPushed) ImGui::PopStyleColor();
-        if (ImGui::IsItemHovered())
-        {
-            ImGui::BeginTooltip();
-            ImGui::Text("Probabilistic alternative to ICP that models one cloud (the target)\nas a set of Gaussian distributions rather than raw points");
-            ImGui::Text("Robust for rough initial poses but can converge to a local optimum\nif the initial misalignment is very large");
-            ImGui::Text("Known for being faster and smoother in optimization because\nit replaces discrete point-point correspondences with continuous probability density functions.");
-            ImGui::EndTooltip();
-        }
-
-        ImGui::SameLine();
-
-        if (is_icp_gui) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
-        if (ImGui::Button("Iterative Closest Point"))
-        {
-            if (!is_icp_gui)
+            if (is_ndt_gui && !justPushed) ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
             {
-                is_ndt_gui = false;
-                is_icp_gui = true;
-                is_rpf_gui = false;
-                justPushed = true;
+                ImGui::BeginTooltip();
+                ImGui::Text("Probabilistic alternative to ICP that models one cloud (the target)\nas a set of Gaussian distributions rather than raw points");
+                ImGui::Text("Robust for rough initial poses but can converge to a local optimum\nif the initial misalignment is very large");
+                ImGui::Text("Known for being faster and smoother in optimization because\nit replaces discrete point-point correspondences with continuous probability density functions.");
+                ImGui::EndTooltip();
             }
-        }
-        if (is_icp_gui && !justPushed) ImGui::PopStyleColor();
-        if (ImGui::IsItemHovered())
-        {
-            ImGui::BeginTooltip();
-            ImGui::Text("Geometric registration algorithm that aligns two point clouds\nby minimizing the Euclidean distances between corresponding points");
-            ImGui::Text("Very precise at local refinement, especially point-to-plane ICP,\nbut it struggles if the starting alignment is too far off");
-            ImGui::EndTooltip();
-        }
 
-        ImGui::SameLine();
+            ImGui::SameLine();
 
-        if (is_rpf_gui) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
-        if (ImGui::Button("Registration Plane Feature"))
-        {
-            if (!is_rpf_gui)
+            if (is_icp_gui) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (ImGui::Button("Iterative Closest Point"))
             {
-                is_ndt_gui = false;
-                is_icp_gui = false;
-                is_rpf_gui = true;
-                justPushed = true;
+                if (!is_icp_gui)
+                {
+                    is_ndt_gui = false;
+                    is_icp_gui = true;
+                    is_rpf_gui = false;
+                    justPushed = true;
+                }
             }
-        }
-        if (is_rpf_gui && !justPushed) ImGui::PopStyleColor();
-        if (ImGui::IsItemHovered())
-        {
-            ImGui::BeginTooltip();
-            ImGui::Text("Feature based registration technique that uses detected\nplanar surfaces in the environment (walls, floors, ceilings, etc.) as constraints for alignment");
-            ImGui::Text("Can be much more robust to noise and partial overlap,\nrequire far fewer correspondences (just a few planes can define a full 6 DOF pose),\nhandle low texture regions better than ICP");
-            ImGui::EndTooltip();
+            if (is_icp_gui && !justPushed) ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Geometric registration algorithm that aligns two point clouds\nby minimizing the Euclidean distances between corresponding points");
+                ImGui::Text("Very precise at local refinement, especially point-to-plane ICP,\nbut it struggles if the starting alignment is too far off");
+                ImGui::EndTooltip();
+            }
+
+            ImGui::SameLine();
+
+            if (is_rpf_gui) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (ImGui::Button("Registration Plane Feature"))
+            {
+                if (!is_rpf_gui)
+                {
+                    is_ndt_gui = false;
+                    is_icp_gui = false;
+                    is_rpf_gui = true;
+                    justPushed = true;
+                }
+            }
+            if (is_rpf_gui && !justPushed) ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Feature based registration technique that uses detected\nplanar surfaces in the environment (walls, floors, ceilings, etc.) as constraints for alignment");
+                ImGui::Text("Can be much more robust to noise and partial overlap,\nrequire far fewer correspondences (just a few planes can define a full 6 DOF pose),\nhandle low texture regions better than ICP");
+                ImGui::EndTooltip();
+            }
+
+            ImGui::EndMenuBar();
         }
 
-        ImGui::EndMenuBar();
+        if (is_ndt_gui)
+            ndt_gui();
+        if (is_icp_gui)
+            icp_gui();
+        if (is_rpf_gui)
+            rpf_gui();
     }
-
-    if (is_ndt_gui)
-        ndt_gui();
-    if (is_icp_gui)
-        icp_gui();
-    if (is_rpf_gui)
-        rpf_gui();
 
     ImGui::End();
 }
@@ -635,152 +636,154 @@ void pca_gui()
 void pose_graph_slam_gui()
 {
     ImGui::Begin("Pose Graph SLAM", &is_pose_graph_slam);
+    {
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::InputFloat("Search radius", &tls_registration.pose_graph_slam.search_radius, 0.01f, 2.0f);
+        if (tls_registration.pose_graph_slam.search_radius < 0.01f)
+            tls_registration.pose_graph_slam.search_radius = 0.01f;
 
-    ImGui::PushItemWidth(ImGuiNumberWidth);
-    ImGui::InputFloat("Search radius", &tls_registration.pose_graph_slam.search_radius, 0.01f, 2.0f);
-    if (tls_registration.pose_graph_slam.search_radius < 0.01f)
-        tls_registration.pose_graph_slam.search_radius = 0.01f;
+        ImGui::InputInt("Number of threads", &tls_registration.pose_graph_slam.number_of_threads);
+        if (tls_registration.pose_graph_slam.number_of_threads < 1)
+            tls_registration.pose_graph_slam.number_of_threads = 1;
 
-    ImGui::InputInt("Number of threads", &tls_registration.pose_graph_slam.number_of_threads);
-    if (tls_registration.pose_graph_slam.number_of_threads < 1)
-        tls_registration.pose_graph_slam.number_of_threads = 1;
+        ImGui::InputInt("Number of iterations (pair wise matching)", &tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching);
+        if (tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching < 1)
+            tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching = 1;
 
-    ImGui::InputInt("Number of iterations (pair wise matching)", &tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching);
-    if (tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching < 1)
-        tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching = 1;
+        ImGui::InputFloat("Overlap threshold", &tls_registration.pose_graph_slam.overlap_threshold, 0.1f, 0.8f);
+        if (tls_registration.pose_graph_slam.overlap_threshold < 0.1f)
+            tls_registration.pose_graph_slam.overlap_threshold = 0.1f;
+        ImGui::PopItemWidth();
 
-    ImGui::InputFloat("Overlap threshold", &tls_registration.pose_graph_slam.overlap_threshold, 0.1f, 0.8f);
-    if (tls_registration.pose_graph_slam.overlap_threshold < 0.1f)
-        tls_registration.pose_graph_slam.overlap_threshold = 0.1f;
-    ImGui::PopItemWidth();
+        // ImGui::Checkbox("pgslam adaptive_robust_kernel", &pose_graph_slam.icp.is_adaptive_robust_kernel);
 
-    // ImGui::Checkbox("pgslam adaptive_robust_kernel", &pose_graph_slam.icp.is_adaptive_robust_kernel);
+        //--
+        ImGui::Checkbox("Adaptive robust kernel", &tls_registration.pose_graph_slam.is_adaptive_robust_kernel);
+        ImGui::SameLine();
+        ImGui::Checkbox("Fix first node (add I to first pose in Hessian)", &tls_registration.pose_graph_slam.is_fix_first_node);
 
-    //--
-    ImGui::Checkbox("Adaptive robust kernel", &tls_registration.pose_graph_slam.is_adaptive_robust_kernel);
-    ImGui::SameLine();
-    ImGui::Checkbox("Fix first node (add I to first pose in Hessian)", &tls_registration.pose_graph_slam.is_fix_first_node);
+        ImGui::Text("Nonlinear optimization method:");
+        ImGui::SameLine();
+        ImGui::RadioButton("Gauss-Newton", &PGSnomSelection, 0);
+        ImGui::SameLine();
+        ImGui::RadioButton("Levenberg-Marguardt", &PGSnomSelection, 1);
 
-     ImGui::Text("Nonlinear optimization method:");
-    ImGui::SameLine();
-    ImGui::RadioButton("Gauss-Newton", &PGSnomSelection, 0);
-    ImGui::SameLine();
-    ImGui::RadioButton("Levenberg-Marguardt", &PGSnomSelection, 1);
+        tls_registration.pose_graph_slam.is_gauss_newton = (PGSnomSelection == 0);
+        tls_registration.pose_graph_slam.is_levenberg_marguardt = (PGSnomSelection == 1);
 
-    tls_registration.pose_graph_slam.is_gauss_newton = (PGSnomSelection == 0);
-    tls_registration.pose_graph_slam.is_levenberg_marguardt = (PGSnomSelection == 1);
+        ImGui::Text("Poses expressed as:");
+        ImGui::SameLine();
+        ImGui::RadioButton("camera<-world (cw)", &PGSpeSelection, 0);
+        ImGui::SameLine();
+        ImGui::RadioButton("camera->world (wc)", &PGSpeSelection, 1);
 
-    ImGui::Text("Poses expressed as:");
-    ImGui::SameLine();
-    ImGui::RadioButton("camera<-world (cw)", &PGSpeSelection, 0);
-    ImGui::SameLine();
-    ImGui::RadioButton("camera->world (wc)", &PGSpeSelection, 1);
+        tls_registration.pose_graph_slam.is_cw = (PGSpeSelection == 0);
+        tls_registration.pose_graph_slam.is_wc = (PGSpeSelection == 1);
 
-    tls_registration.pose_graph_slam.is_cw = (PGSpeSelection == 0);
-    tls_registration.pose_graph_slam.is_wc = (PGSpeSelection == 1);
+        ImGui::Text("Parameterizations of 3D rotation:");
+        ImGui::RadioButton("Tait-Bryan angles (om fi ka: RxRyRz)", &PGS3dSelection, 0);
+        ImGui::SameLine();
+        ImGui::RadioButton("Quaternion (q0 q1 q2 q3)", &PGS3dSelection, 1);
+        ImGui::SameLine();
+        ImGui::RadioButton("Rodrigues (sx sy sz)", &PGS3dSelection, 2);
 
-    ImGui::Text("Parameterizations of 3D rotation:");
-    ImGui::RadioButton("Tait-Bryan angles (om fi ka: RxRyRz)", &PGS3dSelection, 0);
-    ImGui::SameLine();
-    ImGui::RadioButton("Quaternion (q0 q1 q2 q3)", &PGS3dSelection, 1);
-    ImGui::SameLine();
-    ImGui::RadioButton("Rodrigues (sx sy sz)", &PGS3dSelection, 2);
+        tls_registration.pose_graph_slam.is_tait_bryan_angles = (PGS3dSelection == 0);
+        tls_registration.pose_graph_slam.is_quaternion = (PGS3dSelection == 1);
+        tls_registration.pose_graph_slam.is_rodrigues = (PGS3dSelection == 2);
 
-    tls_registration.pose_graph_slam.is_tait_bryan_angles = (PGS3dSelection == 0);
-    tls_registration.pose_graph_slam.is_quaternion = (PGS3dSelection == 1);
-    tls_registration.pose_graph_slam.is_rodrigues = (PGS3dSelection == 2);
+        ImGui::Separator();
 
-    ImGui::Separator();
+        ImGui::Text("Method for pair wise matching (general):");
+        ImGui::RadioButton("NDT", &PGSpwmtSelection, 0);
+        ImGui::RadioButton("Optimization_point_to_point_source_to_target", &PGSpwmtSelection, 1);
+        ImGui::RadioButton("Optimize_point_to_projection_onto_plane_source_to_target", &PGSpwmtSelection, 2);
+        ImGui::RadioButton("Optimize_point_to_plane_source_to_target", &PGSpwmtSelection, 3);
+        ImGui::RadioButton("Optimize_distance_point_to_plane_source_to_target", &PGSpwmtSelection, 4);
+        ImGui::RadioButton("Optimize_plane_to_plane_source_to_target", &PGSpwmtSelection, 5);
 
-    ImGui::Text("Method for pair wise matching (general):");
-    ImGui::RadioButton("NDT", &PGSpwmtSelection, 0);
-    ImGui::RadioButton("Optimization_point_to_point_source_to_target", &PGSpwmtSelection, 1);
-    ImGui::RadioButton("Optimize_point_to_projection_onto_plane_source_to_target", &PGSpwmtSelection, 2);
-    ImGui::RadioButton("Optimize_point_to_plane_source_to_target", &PGSpwmtSelection, 3);
-    ImGui::RadioButton("Optimize_distance_point_to_plane_source_to_target", &PGSpwmtSelection, 4);
-    ImGui::RadioButton("Optimize_plane_to_plane_source_to_target", &PGSpwmtSelection, 5);
+        ImGui::Separator();
 
-    ImGui::Separator();
-
-    ImGui::Text("Method for pair wise matching (with Lie-algebra):");
-    ImGui::RadioButton("Optimize NDT (Lie-algebra left Jacobian)", &PGSpwmtSelection, 6);
-    ImGui::RadioButton("Optimize NDT (Lie-algebra right Jacobian)", &PGSpwmtSelection, 7);
-    ImGui::RadioButton("Optimize point to point source to target (Lie-algebra left Jacobian)", &PGSpwmtSelection, 8);
-    ImGui::RadioButton("Optimize point to point source to target (Lie-algebra right Jacobian)", &PGSpwmtSelection, 9);
-    ImGui::RadioButton("Optimize point to projection onto plane source to target (Lie-algebra left Jacobian)", &PGSpwmtSelection, 10);
-    ImGui::RadioButton("Optimize point to projection onto plane source to target (Lie-algebra right Jacobian)", &PGSpwmtSelection, 11);
+        ImGui::Text("Method for pair wise matching (with Lie-algebra):");
+        ImGui::RadioButton("Optimize NDT (Lie-algebra left Jacobian)", &PGSpwmtSelection, 6);
+        ImGui::RadioButton("Optimize NDT (Lie-algebra right Jacobian)", &PGSpwmtSelection, 7);
+        ImGui::RadioButton("Optimize point to point source to target (Lie-algebra left Jacobian)", &PGSpwmtSelection, 8);
+        ImGui::RadioButton("Optimize point to point source to target (Lie-algebra right Jacobian)", &PGSpwmtSelection, 9);
+        ImGui::RadioButton("Optimize point to projection onto plane source to target (Lie-algebra left Jacobian)", &PGSpwmtSelection, 10);
+        ImGui::RadioButton("Optimize point to projection onto plane source to target (Lie-algebra right Jacobian)", &PGSpwmtSelection, 11);
 
 #ifdef WITH_PCL
-    ImGui::Separator();
-    ImGui::Text("Method for pair wise matching (with PCL):");
-    ImGui::RadioButton("Optimize with PCL (NDT based pair wise matching)", &PGSpwmtSelection, 12);
-    ImGui::RadioButton("Optimize with PCL (ICP based pair wise matching)", &PGSpwmtSelection, 13);
+        ImGui::Separator();
+        ImGui::Text("Method for pair wise matching (with PCL):");
+        ImGui::RadioButton("Optimize with PCL (NDT based pair wise matching)", &PGSpwmtSelection, 12);
+        ImGui::RadioButton("Optimize with PCL (ICP based pair wise matching)", &PGSpwmtSelection, 13);
 #endif
 
-    //tls_registration.pose_graph_slam.set_all_to_false();
-    tls_registration.pose_graph_slam.is_ndt = (PGSpwmtSelection == 0);
-    tls_registration.pose_graph_slam.is_optimization_point_to_point_source_to_target = (PGSpwmtSelection == 1);
-    tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target = (PGSpwmtSelection == 2);
-    tls_registration.pose_graph_slam.is_optimize_point_to_plane_source_to_target = (PGSpwmtSelection == 3);
-    tls_registration.pose_graph_slam.is_optimize_distance_point_to_plane_source_to_target = (PGSpwmtSelection == 4);
-    tls_registration.pose_graph_slam.is_optimize_plane_to_plane_source_to_target = (PGSpwmtSelection == 5);
+        //tls_registration.pose_graph_slam.set_all_to_false();
+        tls_registration.pose_graph_slam.is_ndt = (PGSpwmtSelection == 0);
+        tls_registration.pose_graph_slam.is_optimization_point_to_point_source_to_target = (PGSpwmtSelection == 1);
+        tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target = (PGSpwmtSelection == 2);
+        tls_registration.pose_graph_slam.is_optimize_point_to_plane_source_to_target = (PGSpwmtSelection == 3);
+        tls_registration.pose_graph_slam.is_optimize_distance_point_to_plane_source_to_target = (PGSpwmtSelection == 4);
+        tls_registration.pose_graph_slam.is_optimize_plane_to_plane_source_to_target = (PGSpwmtSelection == 5);
 
-    tls_registration.pose_graph_slam.is_ndt_lie_algebra_left_jacobian = (PGSpwmtSelection == 6);
-    tls_registration.pose_graph_slam.is_ndt_lie_algebra_right_jacobian = (PGSpwmtSelection == 7);
-    tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_left_jacobian = (PGSpwmtSelection == 8);
-    tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_right_jacobian = (PGSpwmtSelection == 9);
-    tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian = (PGSpwmtSelection == 10);
-    tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian = (PGSpwmtSelection == 11);
+        tls_registration.pose_graph_slam.is_ndt_lie_algebra_left_jacobian = (PGSpwmtSelection == 6);
+        tls_registration.pose_graph_slam.is_ndt_lie_algebra_right_jacobian = (PGSpwmtSelection == 7);
+        tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_left_jacobian = (PGSpwmtSelection == 8);
+        tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_right_jacobian = (PGSpwmtSelection == 9);
+        tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian = (PGSpwmtSelection == 10);
+        tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian = (PGSpwmtSelection == 11);
 
-    tls_registration.pose_graph_slam.is_optimize_pcl_ndt = (PGSpwmtSelection == 12);
-    tls_registration.pose_graph_slam.is_optimize_pcl_icp = (PGSpwmtSelection == 13);
+        tls_registration.pose_graph_slam.is_optimize_pcl_ndt = (PGSpwmtSelection == 12);
+        tls_registration.pose_graph_slam.is_optimize_pcl_icp = (PGSpwmtSelection == 13);
 
-    if (PGSpwmtSelection >= 0 && PGSpwmtSelection <= 11)
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
-    if (PGSpwmtSelection == 6)
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
-    if (PGSpwmtSelection == 7)
-        tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
-    
-    ImGui::Separator();
-    if (ImGui::Button("Optimize"))
-    {
-        tls_registration.pose_graph_slam.ndt_bucket_size[0] = tls_registration.ndt.bucket_size[0];
-        tls_registration.pose_graph_slam.ndt_bucket_size[1] = tls_registration.ndt.bucket_size[1];
-        tls_registration.pose_graph_slam.ndt_bucket_size[2] = tls_registration.ndt.bucket_size[2];
-        // double rms_initial = 0.0;
-        // double rms_final = 0.0;
-        // double mui = 0.0;
-        tls_registration.pose_graph_slam.optimize(session.point_clouds_container);
-        // pose_graph_slam.optimize(point_clouds_container, rms_initial, rms_final, mui);
-        // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
-    }
+        if (PGSpwmtSelection >= 0 && PGSpwmtSelection <= 11)
+            tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::general;
+        if (PGSpwmtSelection == 6)
+            tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_ndt;
+        if (PGSpwmtSelection == 7)
+            tls_registration.pose_graph_slam.pair_wise_matching_type = PoseGraphSLAM::PairWiseMatchingType::pcl_icp;
+
+        ImGui::Separator();
+        if (ImGui::Button("Optimize"))
+        {
+            tls_registration.pose_graph_slam.ndt_bucket_size[0] = tls_registration.ndt.bucket_size[0];
+            tls_registration.pose_graph_slam.ndt_bucket_size[1] = tls_registration.ndt.bucket_size[1];
+            tls_registration.pose_graph_slam.ndt_bucket_size[2] = tls_registration.ndt.bucket_size[2];
+            // double rms_initial = 0.0;
+            // double rms_final = 0.0;
+            // double mui = 0.0;
+            tls_registration.pose_graph_slam.optimize(session.point_clouds_container);
+            // pose_graph_slam.optimize(point_clouds_container, rms_initial, rms_final, mui);
+            // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
+        }
 
 #if WITH_GTSAM
-    if (ImGui::Button("Optimize with GTSAM"))
-    {
-        ImGui::Separator();
-        ImGui::Text("With GTSAM:");
-        tls_registration.pose_graph_slam.ndt_bucket_size[0] = tls_registration.ndt.bucket_size[0];
-        tls_registration.pose_graph_slam.ndt_bucket_size[1] = tls_registration.ndt.bucket_size[1];
-        tls_registration.pose_graph_slam.ndt_bucket_size[2] = tls_registration.ndt.bucket_size[2];
-        double rms_initial = 0.0;
-        double rms_final = 0.0;
-        double mui = 0.0;
-        tls_registration.pose_graph_slam.optimize_with_GTSAM(session.point_clouds_container);
-        // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
-    }
+        if (ImGui::Button("Optimize with GTSAM"))
+        {
+            ImGui::Separator();
+            ImGui::Text("With GTSAM:");
+            tls_registration.pose_graph_slam.ndt_bucket_size[0] = tls_registration.ndt.bucket_size[0];
+            tls_registration.pose_graph_slam.ndt_bucket_size[1] = tls_registration.ndt.bucket_size[1];
+            tls_registration.pose_graph_slam.ndt_bucket_size[2] = tls_registration.ndt.bucket_size[2];
+            double rms_initial = 0.0;
+            double rms_final = 0.0;
+            double mui = 0.0;
+            tls_registration.pose_graph_slam.optimize_with_GTSAM(session.point_clouds_container);
+            // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
+        }
 #endif
 
 #if WITH_MANIF
-    ImGui::Separator();
-    ImGui::Text("With MANIF:");
-    if (ImGui::Button("Optimize with manif (a small header-only library for Lie theory)"))
-    {
-        tls_registration.pose_graph_slam.optimize_with_manif(session.point_clouds_container);
-        std::cout << "optimize with manif (a small header-only library for Lie theory) DONE" << std::endl;
-    }
+        ImGui::Separator();
+        ImGui::Text("With MANIF:");
+        if (ImGui::Button("Optimize with manif (a small header-only library for Lie theory)"))
+        {
+            tls_registration.pose_graph_slam.optimize_with_manif(session.point_clouds_container);
+            std::cout << "optimize with manif (a small header-only library for Lie theory) DONE" << std::endl;
+        }
 #endif
+    }
+
     ImGui::End();
 }
 
@@ -789,163 +792,164 @@ void observation_picking_gui()
     static std::string observations_file_name = "";
 
     ImGui::Begin("Observations", &is_manual_analisys);
-
-    ImGui::Checkbox("Observation picking mode", &observation_picking.is_observation_picking_mode);
-    ImGui::BeginDisabled(!observation_picking.is_observation_picking_mode);
     {
-        ImGui::Text("Grid [m]:");
-        ImGui::Checkbox("10x10", &observation_picking.grid10x10m);
-        ImGui::SameLine();
-        ImGui::Checkbox("1x1", &observation_picking.grid1x1m);
-        ImGui::SameLine();
-        ImGui::Checkbox("0.1x0.1", &observation_picking.grid01x01m);
-        ImGui::SameLine();
-        ImGui::Checkbox("0.01x0.01", &observation_picking.grid001x001m);
-
-        ImGui::Text("Picking plane:");
-        ImGui::PushItemWidth(ImGuiNumberWidth);
-        // ImGui::SliderFloat("picking_plane_height", &observation_picking.picking_plane_height, -20.0f, 20.0f);
-        ImGui::InputFloat("Height [m]", &observation_picking.picking_plane_height);
-        // ImGui::SliderFloat("picking_plane_threshold", &observation_picking.picking_plane_threshold, 0.01f, 200.0f);
-        ImGui::InputFloat("Threshold [m]", &observation_picking.picking_plane_threshold);
-        // ImGui::SliderFloat("picking_plane_max_xy", &observation_picking.max_xy, 10.0f, 1000.0f);
-        ImGui::InputFloat("Grid size [m]", &observation_picking.max_xy);
-        // ImGui::SliderInt("point_size", &observation_picking.point_size, 1, 10);
-        ImGui::InputInt("Point size", &observation_picking.point_size);
-        ImGui::PopItemWidth();
-        if (observation_picking.point_size < 1)
-            observation_picking.point_size = 1;
-        if (observation_picking.point_size > 20)
-            observation_picking.point_size = 20;
-        ImGui::PopItemWidth();
-
-        if (ImGui::Button("Accept current observation"))
+        ImGui::Checkbox("Observation picking mode", &observation_picking.is_observation_picking_mode);
+        ImGui::BeginDisabled(!observation_picking.is_observation_picking_mode);
         {
-            std::vector<Eigen::Affine3d> m_poses;
-            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-                m_poses.push_back(session.point_clouds_container.point_clouds[i].m_pose);
-            observation_picking.accept_current_observation(m_poses);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Clear current observation"))
-            observation_picking.current_observation.clear();
+            ImGui::Text("Grid [m]:");
+            ImGui::Checkbox("10x10", &observation_picking.grid10x10m);
+            ImGui::SameLine();
+            ImGui::Checkbox("1x1", &observation_picking.grid1x1m);
+            ImGui::SameLine();
+            ImGui::Checkbox("0.1x0.1", &observation_picking.grid01x01m);
+            ImGui::SameLine();
+            ImGui::Checkbox("0.01x0.01", &observation_picking.grid001x001m);
 
-        if (ImGui::Button("Reset view"))
-        {
-			new_rotation_center = rotation_center;
-            new_rotate_x = 0.0;
-            new_rotate_y = 0.0;
-            new_translate_x = translate_x;
-            new_translate_y = translate_y;
-            new_translate_z = translate_z;
-            camera_transition_active = true;
-        }
-    }
-    ImGui::EndDisabled();
+            ImGui::Text("Picking plane:");
+            ImGui::PushItemWidth(ImGuiNumberWidth);
+            // ImGui::SliderFloat("picking_plane_height", &observation_picking.picking_plane_height, -20.0f, 20.0f);
+            ImGui::InputFloat("Height [m]", &observation_picking.picking_plane_height);
+            // ImGui::SliderFloat("picking_plane_threshold", &observation_picking.picking_plane_threshold, 0.01f, 200.0f);
+            ImGui::InputFloat("Threshold [m]", &observation_picking.picking_plane_threshold);
+            // ImGui::SliderFloat("picking_plane_max_xy", &observation_picking.max_xy, 10.0f, 1000.0f);
+            ImGui::InputFloat("Grid size [m]", &observation_picking.max_xy);
+            // ImGui::SliderInt("point_size", &observation_picking.point_size, 1, 10);
+            ImGui::InputInt("Point size", &observation_picking.point_size);
+            ImGui::PopItemWidth();
+            if (observation_picking.point_size < 1)
+                observation_picking.point_size = 1;
+            if (observation_picking.point_size > 20)
+                observation_picking.point_size = 20;
+            ImGui::PopItemWidth();
 
-    ImGui::Text((std::string("Number of observations: ") + std::to_string(observation_picking.observations.size())).c_str());
-
-    if (ImGui::Button("Load observations"))
-    {
-        std::string input_file_name = "";
-        input_file_name = mandeye::fd::OpenFileDialogOneFile("Load observations", {});
-
-        if (input_file_name.size() > 0)
-        {
-            observations_file_name = input_file_name;
-            observation_picking.import_observations(input_file_name);
-
-            for (const auto &obs : observation_picking.observations)
+            if (ImGui::Button("Accept current observation"))
             {
-                for (const auto &[key, value] : obs)
+                std::vector<Eigen::Affine3d> m_poses;
+                for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                    m_poses.push_back(session.point_clouds_container.point_clouds[i].m_pose);
+                observation_picking.accept_current_observation(m_poses);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Clear current observation"))
+                observation_picking.current_observation.clear();
+
+            if (ImGui::Button("Reset view"))
+            {
+                new_rotation_center = rotation_center;
+                new_rotate_x = 0.0;
+                new_rotate_y = 0.0;
+                new_translate_x = translate_x;
+                new_translate_y = translate_y;
+                new_translate_z = translate_z;
+                camera_transition_active = true;
+            }
+        }
+        ImGui::EndDisabled();
+
+        ImGui::Text((std::string("Number of observations: ") + std::to_string(observation_picking.observations.size())).c_str());
+
+        if (ImGui::Button("Load observations"))
+        {
+            std::string input_file_name = "";
+            input_file_name = mandeye::fd::OpenFileDialogOneFile("Load observations", {});
+
+            if (input_file_name.size() > 0)
+            {
+                observations_file_name = input_file_name;
+                observation_picking.import_observations(input_file_name);
+
+                for (const auto& obs : observation_picking.observations)
                 {
-                    if (session.point_clouds_container.show_with_initial_pose)
+                    for (const auto& [key, value] : obs)
                     {
-                        auto p = session.point_clouds_container.point_clouds[key].m_initial_pose * value;
-                        observation_picking.add_intersection(p);
+                        if (session.point_clouds_container.show_with_initial_pose)
+                        {
+                            auto p = session.point_clouds_container.point_clouds[key].m_initial_pose * value;
+                            observation_picking.add_intersection(p);
+                        }
+                        else
+                        {
+                            auto p = session.point_clouds_container.point_clouds[key].m_pose * value;
+                            observation_picking.add_intersection(p);
+                        }
+                        break;
                     }
-                    else
-                    {
-                        auto p = session.point_clouds_container.point_clouds[key].m_pose * value;
-                        observation_picking.add_intersection(p);
-                    }
-                    break;
                 }
             }
         }
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Save observations"))
-    {
-        const auto output_file_name = mandeye::fd::SaveFileDialog("Save observations", {}, ".json");
-        std::cout << "json file to save: '" << output_file_name << "'" << std::endl;
-
-        if (output_file_name.size() > 0)
-            observation_picking.export_observation(output_file_name);
-    }
-
-    ImGui::Text((std::string("Loaded observations from file: '") + observations_file_name + std::string("'")).c_str());
-
-    if (ImGui::Button("Compute RMS (xy)"))
-    {
-        double rms = compute_rms(true, session, observation_picking);
-        std::cout << "RMS (initial poses): " << rms << std::endl;
-        rms = compute_rms(false, session, observation_picking);
-        std::cout << "RMS (current poses): " << rms << std::endl;
-    }
-
-    ImGui::Separator();
-    if (ImGui::Button("Add intersection"))
-        observation_picking.add_intersection(Eigen::Vector3d(0.0, 0.0, 0.0));
-
-    int index_intersection_to_remove = -1;
-    for (int i = 0; i < observation_picking.intersections.size(); i++)
-    {
-        ImGui::Separator();
-        ImGui::SetWindowFontScale(1.25f);
-        ImGui::Text("Intersection %zu", i);
-        ImGui::SetWindowFontScale(1.0f);
         ImGui::SameLine();
-        ImGui::ColorEdit3(std::string("Color##" + std::to_string(i)).c_str(), observation_picking.intersections[i].color, ImGuiColorEditFlags_NoInputs);
-		ImGui::SameLine();
-        if (ImGui::Button(std::string("Remove##" + std::to_string(i)).c_str()))
-            index_intersection_to_remove = i;
+        if (ImGui::Button("Save observations"))
+        {
+            const auto output_file_name = mandeye::fd::SaveFileDialog("Save observations", {}, ".json");
+            std::cout << "json file to save: '" << output_file_name << "'" << std::endl;
 
-        ImGui::InputFloat3(std::string("Translation [m]##" + std::to_string(i)).c_str(), observation_picking.intersections[i].translation);
-        ImGui::InputFloat3(std::string("Rotation [deg]##" + std::to_string(i)).c_str(), observation_picking.intersections[i].rotation);
-        ImGui::InputFloat3(std::string("Width length height [m]##" + std::to_string(i)).c_str(), observation_picking.intersections[i].width_length_height);
-    }
+            if (output_file_name.size() > 0)
+                observation_picking.export_observation(output_file_name);
+        }
 
-    if (index_intersection_to_remove != -1)
-    {
-        std::vector<Intersection> intersections;
+        ImGui::Text((std::string("Loaded observations from file: '") + observations_file_name + std::string("'")).c_str());
+
+        if (ImGui::Button("Compute RMS (xy)"))
+        {
+            double rms = compute_rms(true, session, observation_picking);
+            std::cout << "RMS (initial poses): " << rms << std::endl;
+            rms = compute_rms(false, session, observation_picking);
+            std::cout << "RMS (current poses): " << rms << std::endl;
+        }
+
+        ImGui::Separator();
+        if (ImGui::Button("Add intersection"))
+            observation_picking.add_intersection(Eigen::Vector3d(0.0, 0.0, 0.0));
+
+        int index_intersection_to_remove = -1;
         for (int i = 0; i < observation_picking.intersections.size(); i++)
         {
-            if (i != index_intersection_to_remove)
-                intersections.push_back(observation_picking.intersections[i]);
+            ImGui::Separator();
+            ImGui::SetWindowFontScale(1.25f);
+            ImGui::Text("Intersection %zu", i);
+            ImGui::SetWindowFontScale(1.0f);
+            ImGui::SameLine();
+            ImGui::ColorEdit3(std::string("Color##" + std::to_string(i)).c_str(), observation_picking.intersections[i].color, ImGuiColorEditFlags_NoInputs);
+            ImGui::SameLine();
+            if (ImGui::Button(std::string("Remove##" + std::to_string(i)).c_str()))
+                index_intersection_to_remove = i;
+
+            ImGui::InputFloat3(std::string("Translation [m]##" + std::to_string(i)).c_str(), observation_picking.intersections[i].translation);
+            ImGui::InputFloat3(std::string("Rotation [deg]##" + std::to_string(i)).c_str(), observation_picking.intersections[i].rotation);
+            ImGui::InputFloat3(std::string("Width length height [m]##" + std::to_string(i)).c_str(), observation_picking.intersections[i].width_length_height);
         }
-        observation_picking.intersections = intersections;
-    }
 
-    ImGui::Separator();
-
-    ImGui::BeginDisabled(observation_picking.intersections.size() <= 0);
-    {
-        if (ImGui::Button("Export point clouds inside intersections, RMS and poses"))
+        if (index_intersection_to_remove != -1)
         {
-            std::string output_folder_name = "";
-            output_folder_name = mandeye::fd::SelectFolder("Choose folder");
-            std::cout << "folder: '" << output_folder_name << "'" << std::endl;
-
-            if (output_folder_name.size() > 0)
-                export_result_to_folder(output_folder_name, observation_picking, session);
+            std::vector<Intersection> intersections;
+            for (int i = 0; i < observation_picking.intersections.size(); i++)
+            {
+                if (i != index_intersection_to_remove)
+                    intersections.push_back(observation_picking.intersections[i]);
+            }
+            observation_picking.intersections = intersections;
         }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("in RESSO format to folder");
-        ImGui::SetNextItemWidth(ImGuiNumberWidth);
-        ImGui::InputFloat("Label distance [m]", &observation_picking.label_dist);
+
+        ImGui::Separator();
+
+        ImGui::BeginDisabled(observation_picking.intersections.size() <= 0);
+        {
+            if (ImGui::Button("Export point clouds inside intersections, RMS and poses"))
+            {
+                std::string output_folder_name = "";
+                output_folder_name = mandeye::fd::SelectFolder("Choose folder");
+                std::cout << "folder: '" << output_folder_name << "'" << std::endl;
+
+                if (output_folder_name.size() > 0)
+                    export_result_to_folder(output_folder_name, observation_picking, session);
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("in RESSO format to folder");
+            ImGui::SetNextItemWidth(ImGuiNumberWidth);
+            ImGui::InputFloat("Label distance [m]", &observation_picking.label_dist);
+        }
+        ImGui::EndDisabled();
     }
-    ImGui::EndDisabled();
 
     ImGui::End();
 }
@@ -953,52 +957,53 @@ void observation_picking_gui()
 void loop_closure_gui()
 {
     ImGui::Begin("Manual Pose Graph Loop Closure", &is_loop_closure_gui);
+    {
+        ImGui::Text("Num edge extended:");
 
-    ImGui::Text("Num edge extended:");
+        ImGui::Text("before: ");
+        ImGui::SameLine();
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::SliderInt("##fs", &num_edge_extended_before, 0, session.point_clouds_container.point_clouds.size() - 1);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("min 0; max %zu", session.point_clouds_container.point_clouds.size() - 1);
+        ImGui::SameLine();
+        ImGui::InputInt("##fi", &num_edge_extended_before, 1, 5);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("min 0; max %zu", session.point_clouds_container.point_clouds.size() - 1);
+        if (num_edge_extended_before < 0)
+            num_edge_extended_before = 0;
+        if (num_edge_extended_before >= session.point_clouds_container.point_clouds.size() - 1)
+            num_edge_extended_before = session.point_clouds_container.point_clouds.size() - 1;
 
-    ImGui::Text("before: ");
-    ImGui::SameLine();
-    ImGui::PushItemWidth(ImGuiNumberWidth);
-    ImGui::SliderInt("##fs", &num_edge_extended_before, 0, session.point_clouds_container.point_clouds.size() - 1);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("min 0; max %zu", session.point_clouds_container.point_clouds.size() - 1);
-    ImGui::SameLine();
-    ImGui::InputInt("##fi", &num_edge_extended_before, 1, 5);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("min 0; max %zu", session.point_clouds_container.point_clouds.size() - 1);
-    if (num_edge_extended_before < 0)
-        num_edge_extended_before = 0;
-    if (num_edge_extended_before >= session.point_clouds_container.point_clouds.size() - 1)
-        num_edge_extended_before = session.point_clouds_container.point_clouds.size() - 1;
+        ImGui::Text(" after: ");
+        ImGui::SameLine();
 
-    ImGui::Text(" after: ");
-    ImGui::SameLine();
+        ImGui::SliderInt("##ts", &num_edge_extended_after, index_loop_closure_target, static_cast<int>(session.point_clouds_container.point_clouds.size() - 1));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("min 0; max %zu", session.point_clouds_container.point_clouds.size() - 1);
+        ImGui::SameLine();
+        ImGui::InputInt("##ti", &num_edge_extended_after, 1, 5);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("min 0; max %zu", session.point_clouds_container.point_clouds.size() - 1);
+        if (num_edge_extended_after < 0)
+            num_edge_extended_after = 0;
+        if (num_edge_extended_after >= session.point_clouds_container.point_clouds.size() - 1)
+            num_edge_extended_after = session.point_clouds_container.point_clouds.size() - 1;
+        ImGui::PopItemWidth();
 
-    ImGui::SliderInt("##ts", &num_edge_extended_after, index_loop_closure_target, static_cast<int>(session.point_clouds_container.point_clouds.size() - 1));
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("min 0; max %zu", session.point_clouds_container.point_clouds.size() - 1);
-    ImGui::SameLine();
-    ImGui::InputInt("##ti", &num_edge_extended_after, 1, 5);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("min 0; max %zu", session.point_clouds_container.point_clouds.size() - 1);
-    if (num_edge_extended_after < 0)
-        num_edge_extended_after = 0;
-    if (num_edge_extended_after >= session.point_clouds_container.point_clouds.size() - 1)
-        num_edge_extended_after = session.point_clouds_container.point_clouds.size() - 1;
-    ImGui::PopItemWidth();
+        int prev_index_active_edge = session.pose_graph_loop_closure.index_active_edge;
+        session.pose_graph_loop_closure.Gui(session.point_clouds_container,
+            index_loop_closure_source,
+            index_loop_closure_target,
+            m_gizmo,
+            tls_registration.gnss,
+            session.ground_control_points,
+            session.control_points,
+            num_edge_extended_before,
+            num_edge_extended_after);
 
-	int prev_index_active_edge = session.pose_graph_loop_closure.index_active_edge;
-    session.pose_graph_loop_closure.Gui(session.point_clouds_container,
-        index_loop_closure_source,
-        index_loop_closure_target,
-        m_gizmo,
-        tls_registration.gnss,
-        session.ground_control_points,
-        session.control_points,
-        num_edge_extended_before,
-        num_edge_extended_after);
-
-    new_loop_closure_index = (prev_index_active_edge != session.pose_graph_loop_closure.index_active_edge);
+        new_loop_closure_index = (prev_index_active_edge != session.pose_graph_loop_closure.index_active_edge);
+    }
 
     ImGui::End();
 }
@@ -1006,380 +1011,381 @@ void loop_closure_gui()
 void lio_segments_gui()
 {
     ImGui::Begin("LIO segments editor", &is_lio_segments_gui);
-
-    ImGui::Text("index from: ");
-    ImGui::SameLine();
-    ImGui::PushItemWidth(ImGuiNumberWidth);
-    ImGui::SliderInt("##fs", &index_begin, 0, index_end);
-    ImGui::SameLine();
-    ImGui::InputInt("##fi", &index_begin, 1, 5);
-    if (index_begin < 0)
-        index_begin = 0;
-    if (index_begin >= index_end)
-        index_begin = index_end;
-
-    ImGui::SameLine();
-    ImGui::Text(" to: ");
-    ImGui::SameLine();
-
-    ImGui::SliderInt("##ts", &index_end, index_begin, static_cast<int>(session.point_clouds_container.point_clouds.size() - 1));
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("max %zu", session.point_clouds_container.point_clouds.size() - 1);
-    ImGui::SameLine();
-    ImGui::InputInt("##ti", &index_end, 1, 5);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("max %zu", session.point_clouds_container.point_clouds.size() - 1);    
-    if (index_end < index_begin)
-        index_end = index_begin;
-    if (index_end >= session.point_clouds_container.point_clouds.size() - 1)
-        index_end = session.point_clouds_container.point_clouds.size() - 1;
-    ImGui::PopItemWidth();
-
-    ImGui::Text("Selection: ");
-    ImGui::SameLine();
-    if (ImGui::Button("show <index from, index to>"))
-        session.point_clouds_container.show_all_from_range(index_begin, index_end);
-    ImGui::SameLine();
-    if (ImGui::Button("shift -"))
     {
-        int step = index_end - index_begin;
-        index_begin -= step;
-        index_end -= step;
-
+        ImGui::Text("index from: ");
+        ImGui::SameLine();
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::SliderInt("##fs", &index_begin, 0, index_end);
+        ImGui::SameLine();
+        ImGui::InputInt("##fi", &index_begin, 1, 5);
         if (index_begin < 0)
             index_begin = 0;
-        if (index_end < 0)
-            index_end = 0;
+        if (index_begin >= index_end)
+            index_begin = index_end;
 
-        rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
-        rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
-        rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
-        session.point_clouds_container.show_all_from_range(index_begin, index_end);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("shift +"))
-    {
-        int step = index_end - index_begin;
-        index_begin += step;
-        index_end += step;
+        ImGui::SameLine();
+        ImGui::Text(" to: ");
+        ImGui::SameLine();
 
-        if (index_begin > session.point_clouds_container.point_clouds.size() - 1)
-            index_begin = session.point_clouds_container.point_clouds.size() - 1;
-        if (index_end > session.point_clouds_container.point_clouds.size() - 1)
+        ImGui::SliderInt("##ts", &index_end, index_begin, static_cast<int>(session.point_clouds_container.point_clouds.size() - 1));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("max %zu", session.point_clouds_container.point_clouds.size() - 1);
+        ImGui::SameLine();
+        ImGui::InputInt("##ti", &index_end, 1, 5);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("max %zu", session.point_clouds_container.point_clouds.size() - 1);
+        if (index_end < index_begin)
+            index_end = index_begin;
+        if (index_end >= session.point_clouds_container.point_clouds.size() - 1)
             index_end = session.point_clouds_container.point_clouds.size() - 1;
+        ImGui::PopItemWidth();
 
-        rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
-        rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
-        rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
-        session.point_clouds_container.show_all_from_range(index_begin, index_end);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Show all"))
-        session.point_clouds_container.show_all();
-    ImGui::SameLine();
-    if (ImGui::Button("Hide all"))
-        session.point_clouds_container.hide_all();
-    ImGui::SameLine();
-    if (ImGui::Button("Reset poses"))
-        reset_poses(session);
-
-    ImGui::Checkbox("Show with initial pose", &session.point_clouds_container.show_with_initial_pose);
-    ImGui::SameLine();
-    ImGui::Checkbox("Manipulate only marked gizmo", &manipulate_only_marked_gizmo);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("false: move also succesive nodes");
-
-    ImGui::Text("Fuse IMU inclination: ");
-    ImGui::SameLine();
-
-    static double angle_diff = 5.0;
-
-    if (ImGui::Button("Set those that sattisfy acceptable angle"))
-    {
-        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+        ImGui::Text("Selection: ");
+        ImGui::SameLine();
+        if (ImGui::Button("show <index from, index to>"))
+            session.point_clouds_container.show_all_from_range(index_begin, index_end);
+        ImGui::SameLine();
+        if (ImGui::Button("shift -"))
         {
-            double om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x() * RAD_TO_DEG;
-            double fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y() * RAD_TO_DEG;
+            int step = index_end - index_begin;
+            index_begin -= step;
+            index_end -= step;
 
-            std::cout << "om: " << om << " fi " << fi << std::endl;
-            if (fabs(om) > angle_diff || fabs(fi) > angle_diff)
-            {
-            }
-            else
-                session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = true;
+            if (index_begin < 0)
+                index_begin = 0;
+            if (index_end < 0)
+                index_end = 0;
+
+            rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
+            rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
+            rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
+            session.point_clouds_container.show_all_from_range(index_begin, index_end);
         }
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("unset all"))
-    {
-        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-            session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = false;
-    }
-
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(ImGuiNumberWidth);
-    ImGui::InputDouble("acceptable angle [deg]", &angle_diff);
-
-    ImGui::Separator();
-    //ImGui::Text("motion model");
-
-    //session.pose_graph_loop_closure.edges.
-
-    //ImGui::InputDouble("motion_model_w_px_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_px_1_sigma_m);
-    //ImGui::InputDouble("motion_model_w_py_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_py_1_sigma_m);
-    //ImGui::InputDouble("motion_model_w_pz_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_pz_1_sigma_m);
-    //ImGui::InputDouble("motion_model_w_om_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_om_1_sigma_deg);
-    //ImGui::InputDouble("motion_model_w_fi_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_fi_1_sigma_deg);
-    //ImGui::InputDouble("motion_model_w_ka_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_ka_1_sigma_deg);
-
-    //ImGui::Separator();
-
-    ImGui::BeginChild("LIO segments", ImVec2(0, 0), true);
-    {
-        for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+        ImGui::SameLine();
+        if (ImGui::Button("shift +"))
         {
-            if (i > 0)
-                ImGui::Separator();
-            ImGui::SetWindowFontScale(1.25f);
-            ImGui::Checkbox(std::filesystem::path(session.point_clouds_container.point_clouds[i].file_name).filename().string().c_str(), &session.point_clouds_container.point_clouds[i].visible);
-            ImGui::SetWindowFontScale(1.0f);
-            ImGui::SameLine();
-            ImGui::Checkbox(("gizmo##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
+            int step = index_end - index_begin;
+            index_begin += step;
+            index_end += step;
 
-    #if 0
-            ImGui::SameLine();
-            ImGui::Checkbox(("fixed##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed);
-            ImGui::SameLine();
-            ImGui::PushButtonRepeat(true);
-            float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
-            if (ImGui::ArrowButton(("left##" + std::to_string(i)).c_str(), ImGuiDir_Left))
-            {
-                (session.point_clouds_container.point_clouds[i].point_size)--;
-            }
-            ImGui::SameLine(0.0f, spacing);
-            if (ImGui::ArrowButton(("right##" + std::to_string(i)).c_str(), ImGuiDir_Right))
-            {
-                (session.point_clouds_container.point_clouds[i].point_size)++;
-            }
-            ImGui::PopButtonRepeat();
-            ImGui::SameLine();
-            ImGui::Text("point size %d", session.point_clouds_container.point_clouds[i].point_size);
-            if (session.point_clouds_container.point_clouds[i].point_size < 1)
-            {
-                session.point_clouds_container.point_clouds[i].point_size = 1;
-            }
+            if (index_begin > session.point_clouds_container.point_clouds.size() - 1)
+                index_begin = session.point_clouds_container.point_clouds.size() - 1;
+            if (index_end > session.point_clouds_container.point_clouds.size() - 1)
+                index_end = session.point_clouds_container.point_clouds.size() - 1;
 
-            ImGui::SameLine();
-            if (ImGui::Button(std::string("#" + std::to_string(i) + " save scan(global reference frame)").c_str()))
+            rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
+            rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
+            rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
+            session.point_clouds_container.show_all_from_range(index_begin, index_end);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Show all"))
+            session.point_clouds_container.show_all();
+        ImGui::SameLine();
+        if (ImGui::Button("Hide all"))
+            session.point_clouds_container.hide_all();
+        ImGui::SameLine();
+        if (ImGui::Button("Reset poses"))
+            reset_poses(session);
+
+        ImGui::Checkbox("Show with initial pose", &session.point_clouds_container.show_with_initial_pose);
+        ImGui::SameLine();
+        ImGui::Checkbox("Manipulate only marked gizmo", &manipulate_only_marked_gizmo);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("false: move also succesive nodes");
+
+        ImGui::Text("Fuse IMU inclination: ");
+        ImGui::SameLine();
+
+        static double angle_diff = 5.0;
+
+        if (ImGui::Button("Set those that sattisfy acceptable angle"))
+        {
+            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
             {
-                const auto output_file_name = mandeye::fd::SaveFileDialog("Choose folder", {});
-                std::cout << "Scan file to save: '" << output_file_name << "'" << std::endl;
-                if (output_file_name.size() > 0)
+                double om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x() * RAD_TO_DEG;
+                double fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y() * RAD_TO_DEG;
+
+                std::cout << "om: " << om << " fi " << fi << std::endl;
+                if (fabs(om) > angle_diff || fabs(fi) > angle_diff)
                 {
-                    session.point_clouds_container.point_clouds[i].save_as_global(output_file_name);
                 }
+                else
+                    session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = true;
             }
-            ImGui::SameLine();
-            if (ImGui::Button(std::string("#" + std::to_string(i) + " shift points to center").c_str()))
-            {
-                session.point_clouds_container.point_clouds[i].shift_to_center();
-            }
-    #endif
-            if (session.point_clouds_container.point_clouds[i].gizmo)
-            {
-                for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                {
-                    if (i != j)
-                    {
-                        session.point_clouds_container.point_clouds[j].gizmo = false;
-                    }
-                }
-                m_gizmo[0] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 0);
-                m_gizmo[1] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 0);
-                m_gizmo[2] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 0);
-                m_gizmo[3] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 0);
-                m_gizmo[4] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 1);
-                m_gizmo[5] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 1);
-                m_gizmo[6] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 1);
-                m_gizmo[7] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 1);
-                m_gizmo[8] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 2);
-                m_gizmo[9] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 2);
-                m_gizmo[10] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 2);
-                m_gizmo[11] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 2);
-                m_gizmo[12] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 3);
-                m_gizmo[13] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 3);
-                m_gizmo[14] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 3);
-                m_gizmo[15] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 3);
-            }
-
-            if (session.point_clouds_container.point_clouds[i].visible)
-            {
-                ImGui::SameLine();
-                ImGui::ColorEdit3(("pc_color##" + std::to_string(i)).c_str(), session.point_clouds_container.point_clouds[i].render_color, ImGuiColorEditFlags_NoInputs);
-
-    #if 0
-                ImGui::SameLine();
-                if (ImGui::Button(std::string(("ICP##" + std::to_string(i)).c_str())
-                {
-                    size_t index_target = i;
-                    PointClouds pcs;
-                    for (size_t k = 0; k < index_target; k++)
-                    {
-                        if (session.point_clouds_container.point_clouds[k].visible)
-                        {
-                            pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[k]);
-                        }
-                    }
-
-                    if (pcs.point_clouds.size() > 0)
-                    {
-                        for (size_t k = 0; k < pcs.point_clouds.size(); k++)
-                        {
-                            pcs.point_clouds[k].fixed = true;
-                        }
-                    }
-                    pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[index_target]);
-                    pcs.point_clouds[pcs.point_clouds.size() - 1].fixed = false;
-
-                    ICP icp;
-                    icp.search_radious = 0.3; // ToDo move to params
-                    for (auto& pc : pcs.point_clouds)
-                    {
-                        pc.rgd_params.resolution_X = icp.search_radious;
-                        pc.rgd_params.resolution_Y = icp.search_radious;
-                        pc.rgd_params.resolution_Z = icp.search_radious;
-
-                        pc.build_rgd();
-                        pc.cout_rgd();
-                        pc.compute_normal_vectors(0.5);
-                    }
-
-                    icp.number_of_threads = std::thread::hardware_concurrency();
-
-                    icp.number_of_iterations = 10;
-                    icp.is_adaptive_robust_kernel = false;
-
-                    icp.is_ballanced_horizontal_vs_vertical = false;
-                    icp.is_fix_first_node = false;
-                    icp.is_gauss_newton = true;
-                    icp.is_levenberg_marguardt = false;
-                    icp.is_cw = false;
-                    icp.is_wc = true;
-                    icp.is_tait_bryan_angles = true;
-                    icp.is_quaternion = false;
-                    icp.is_rodrigues = false;
-                    std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                    icp.optimization_point_to_point_source_to_target(pcs);
-
-                    std::cout << "pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
-
-                    std::vector<Eigen::Affine3d> all_m_poses;
-                    for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                    {
-                        all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
-                    }
-
-                    session.point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
-
-                    std::cout << "pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
-
-                    // like gizmo
-                    if (!manipulate_only_marked_gizmo)
-                    {
-                        std::cout << "update all poses after current pose" << std::endl;
-
-                        Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[index_target].m_pose;
-                        for (int j = index_target + 1; j < session.point_clouds_container.point_clouds.size(); j++)
-                        {
-                            curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                            session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                        }
-                    }
-                }
-    #endif
-
-                ImGui::SameLine();
-                ImGui::Checkbox(("fuse IMU inclination##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU);
-                
-                ImGui::SameLine();
-                ImGui::Checkbox(("show IMU##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].show_IMU);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(("show pose##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].show_pose);
-
-                /*ImGui::SameLine();
-                if (ImGui::Button(("set IMU inclination##" + std::to_string(i)).c_str()))
-                {
-                    //session.point_clouds_container.point_clouds[i].m_initial_pose
-                    //session.point_clouds_container.point_clouds[i].m_pose
-                    //session.point_clouds_container.point_clouds[i].m_pose_temp
-
-                    TaitBryanPose target_pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
-
-                    target_pose.om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x();
-                    target_pose.fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y();
-
-                    Eigen::Affine3d m_pose = affine_matrix_from_pose_tait_bryan(target_pose);
-
-                    session.point_clouds_container.point_clouds[i].m_initial_pose = m_pose;
-                    session.point_clouds_container.point_clouds[i].m_pose = m_pose;
-                    session.point_clouds_container.point_clouds[i].m_pose_temp = m_pose;
-
-                    //session.point_clouds_container.point_clouds[i].m_pose = m_pose;
-                    //session.point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
-                    //session.point_clouds_container.point_clouds[i].gui_translation[0] = session.point_clouds_container.point_clouds[i].pose.px;
-                    //session.point_clouds_container.point_clouds[i].gui_translation[1] = session.point_clouds_container.point_clouds[i].pose.py;
-                    //session.point_clouds_container.point_clouds[i].gui_translation[2] = session.point_clouds_container.point_clouds[i].pose.pz;
-                    //session.point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(session.point_clouds_container.point_clouds[i].pose.om);
-                    //session.point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(session.point_clouds_container.point_clouds[i].pose.fi);
-                    //session.point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(session.point_clouds_container.point_clouds[i].pose.ka);
-                }*/
-
-                ImGui::Text("fixed: ");
-
-                ImGui::SameLine();
-                ImGui::Checkbox(("X##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_x);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(xText);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(("Y##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_y);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(yText);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(("Z##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_z);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(zText);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(("om##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_om);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(omText);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(("fi##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_fi);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(fiText);
-
-                ImGui::SameLine();
-                ImGui::Checkbox(("ka##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_ka);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(kaText);
-
-            }
-    #if 0
-            ImGui::SameLine();
-            if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str()))
-            {
-                std::cout << session.point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
-            }
-    #endif
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("unset all"))
+        {
+            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU = false;
         }
 
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGuiNumberWidth);
+        ImGui::InputDouble("acceptable angle [deg]", &angle_diff);
+
+        ImGui::Separator();
+        //ImGui::Text("motion model");
+
+        //session.pose_graph_loop_closure.edges.
+
+        //ImGui::InputDouble("motion_model_w_px_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_px_1_sigma_m);
+        //ImGui::InputDouble("motion_model_w_py_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_py_1_sigma_m);
+        //ImGui::InputDouble("motion_model_w_pz_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_pz_1_sigma_m);
+        //ImGui::InputDouble("motion_model_w_om_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_om_1_sigma_deg);
+        //ImGui::InputDouble("motion_model_w_fi_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_fi_1_sigma_deg);
+        //ImGui::InputDouble("motion_model_w_ka_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_ka_1_sigma_deg);
+
+        //ImGui::Separator();
+
+        ImGui::BeginChild("LIO segments", ImVec2(0, 0), true);
+        {
+            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+            {
+                if (i > 0)
+                    ImGui::Separator();
+                ImGui::SetWindowFontScale(1.25f);
+                ImGui::Checkbox(std::filesystem::path(session.point_clouds_container.point_clouds[i].file_name).filename().string().c_str(), &session.point_clouds_container.point_clouds[i].visible);
+                ImGui::SetWindowFontScale(1.0f);
+                ImGui::SameLine();
+                ImGui::Checkbox(("gizmo##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
+
+#if 0
+                ImGui::SameLine();
+                ImGui::Checkbox(("fixed##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed);
+                ImGui::SameLine();
+                ImGui::PushButtonRepeat(true);
+                float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
+                if (ImGui::ArrowButton(("left##" + std::to_string(i)).c_str(), ImGuiDir_Left))
+                {
+                    (session.point_clouds_container.point_clouds[i].point_size)--;
+                }
+                ImGui::SameLine(0.0f, spacing);
+                if (ImGui::ArrowButton(("right##" + std::to_string(i)).c_str(), ImGuiDir_Right))
+                {
+                    (session.point_clouds_container.point_clouds[i].point_size)++;
+                }
+                ImGui::PopButtonRepeat();
+                ImGui::SameLine();
+                ImGui::Text("point size %d", session.point_clouds_container.point_clouds[i].point_size);
+                if (session.point_clouds_container.point_clouds[i].point_size < 1)
+                {
+                    session.point_clouds_container.point_clouds[i].point_size = 1;
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button(std::string("#" + std::to_string(i) + " save scan(global reference frame)").c_str()))
+                {
+                    const auto output_file_name = mandeye::fd::SaveFileDialog("Choose folder", {});
+                    std::cout << "Scan file to save: '" << output_file_name << "'" << std::endl;
+                    if (output_file_name.size() > 0)
+                    {
+                        session.point_clouds_container.point_clouds[i].save_as_global(output_file_name);
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button(std::string("#" + std::to_string(i) + " shift points to center").c_str()))
+                {
+                    session.point_clouds_container.point_clouds[i].shift_to_center();
+                }
+#endif
+                if (session.point_clouds_container.point_clouds[i].gizmo)
+                {
+                    for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
+                    {
+                        if (i != j)
+                        {
+                            session.point_clouds_container.point_clouds[j].gizmo = false;
+                        }
+                    }
+                    m_gizmo[0] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 0);
+                    m_gizmo[1] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 0);
+                    m_gizmo[2] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 0);
+                    m_gizmo[3] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 0);
+                    m_gizmo[4] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 1);
+                    m_gizmo[5] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 1);
+                    m_gizmo[6] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 1);
+                    m_gizmo[7] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 1);
+                    m_gizmo[8] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 2);
+                    m_gizmo[9] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 2);
+                    m_gizmo[10] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 2);
+                    m_gizmo[11] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 2);
+                    m_gizmo[12] = (float)session.point_clouds_container.point_clouds[i].m_pose(0, 3);
+                    m_gizmo[13] = (float)session.point_clouds_container.point_clouds[i].m_pose(1, 3);
+                    m_gizmo[14] = (float)session.point_clouds_container.point_clouds[i].m_pose(2, 3);
+                    m_gizmo[15] = (float)session.point_clouds_container.point_clouds[i].m_pose(3, 3);
+                }
+
+                if (session.point_clouds_container.point_clouds[i].visible)
+                {
+                    ImGui::SameLine();
+                    ImGui::ColorEdit3(("pc_color##" + std::to_string(i)).c_str(), session.point_clouds_container.point_clouds[i].render_color, ImGuiColorEditFlags_NoInputs);
+
+#if 0
+                    ImGui::SameLine();
+                    if (ImGui::Button(std::string(("ICP##" + std::to_string(i)).c_str())
+                    {
+                        size_t index_target = i;
+                        PointClouds pcs;
+                        for (size_t k = 0; k < index_target; k++)
+                        {
+                            if (session.point_clouds_container.point_clouds[k].visible)
+                            {
+                                pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[k]);
+                            }
+                        }
+
+                        if (pcs.point_clouds.size() > 0)
+                        {
+                            for (size_t k = 0; k < pcs.point_clouds.size(); k++)
+                            {
+                                pcs.point_clouds[k].fixed = true;
+                            }
+                        }
+                        pcs.point_clouds.push_back(session.point_clouds_container.point_clouds[index_target]);
+                        pcs.point_clouds[pcs.point_clouds.size() - 1].fixed = false;
+
+                        ICP icp;
+                        icp.search_radious = 0.3; // ToDo move to params
+                        for (auto& pc : pcs.point_clouds)
+                        {
+                            pc.rgd_params.resolution_X = icp.search_radious;
+                            pc.rgd_params.resolution_Y = icp.search_radious;
+                            pc.rgd_params.resolution_Z = icp.search_radious;
+
+                            pc.build_rgd();
+                            pc.cout_rgd();
+                            pc.compute_normal_vectors(0.5);
+                        }
+
+                        icp.number_of_threads = std::thread::hardware_concurrency();
+
+                        icp.number_of_iterations = 10;
+                        icp.is_adaptive_robust_kernel = false;
+
+                        icp.is_ballanced_horizontal_vs_vertical = false;
+                        icp.is_fix_first_node = false;
+                        icp.is_gauss_newton = true;
+                        icp.is_levenberg_marguardt = false;
+                        icp.is_cw = false;
+                        icp.is_wc = true;
+                        icp.is_tait_bryan_angles = true;
+                        icp.is_quaternion = false;
+                        icp.is_rodrigues = false;
+                        std::cout << "optimization_point_to_point_source_to_target" << std::endl;
+
+                        icp.optimization_point_to_point_source_to_target(pcs);
+
+                        std::cout << "pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+
+                        std::vector<Eigen::Affine3d> all_m_poses;
+                        for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
+                        {
+                            all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
+                        }
+
+                        session.point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
+
+                        std::cout << "pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+
+                        // like gizmo
+                        if (!manipulate_only_marked_gizmo)
+                        {
+                            std::cout << "update all poses after current pose" << std::endl;
+
+                            Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[index_target].m_pose;
+                            for (int j = index_target + 1; j < session.point_clouds_container.point_clouds.size(); j++)
+                            {
+                                curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
+                                session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
+                            }
+                        }
+                    }
+#endif
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox(("fuse IMU inclination##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU);
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox(("show IMU##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].show_IMU);
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox(("show pose##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].show_pose);
+
+                    /*ImGui::SameLine();
+                    if (ImGui::Button(("set IMU inclination##" + std::to_string(i)).c_str()))
+                    {
+                        //session.point_clouds_container.point_clouds[i].m_initial_pose
+                        //session.point_clouds_container.point_clouds[i].m_pose
+                        //session.point_clouds_container.point_clouds[i].m_pose_temp
+
+                        TaitBryanPose target_pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
+
+                        target_pose.om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x();
+                        target_pose.fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y();
+
+                        Eigen::Affine3d m_pose = affine_matrix_from_pose_tait_bryan(target_pose);
+
+                        session.point_clouds_container.point_clouds[i].m_initial_pose = m_pose;
+                        session.point_clouds_container.point_clouds[i].m_pose = m_pose;
+                        session.point_clouds_container.point_clouds[i].m_pose_temp = m_pose;
+
+                        //session.point_clouds_container.point_clouds[i].m_pose = m_pose;
+                        //session.point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
+                        //session.point_clouds_container.point_clouds[i].gui_translation[0] = session.point_clouds_container.point_clouds[i].pose.px;
+                        //session.point_clouds_container.point_clouds[i].gui_translation[1] = session.point_clouds_container.point_clouds[i].pose.py;
+                        //session.point_clouds_container.point_clouds[i].gui_translation[2] = session.point_clouds_container.point_clouds[i].pose.pz;
+                        //session.point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(session.point_clouds_container.point_clouds[i].pose.om);
+                        //session.point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(session.point_clouds_container.point_clouds[i].pose.fi);
+                        //session.point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(session.point_clouds_container.point_clouds[i].pose.ka);
+                    }*/
+
+                    ImGui::Text("fixed: ");
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox(("X##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_x);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(xText);
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox(("Y##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_y);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(yText);
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox(("Z##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_z);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(zText);
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox(("om##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_om);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(omText);
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox(("fi##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_fi);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(fiText);
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox(("ka##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_ka);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(kaText);
+
+                }
+#if 0
+                ImGui::SameLine();
+                if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str()))
+                {
+                    std::cout << session.point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
+                }
+#endif
+            }
+
+        }
+        ImGui::EndChild();
     }
-    ImGui::EndChild();
 
     ImGui::End();
 }

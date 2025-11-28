@@ -984,12 +984,12 @@ void drawMiniCompassWithRuler(
     ImVec2 compassSize)
 {
     auto drawLabel = [](float x, float y, float z, const char* text, float r, float g, float b)
-        {
-            glColor3f(r, g, b);
-            glRasterPos3f(x, y, z);
-            for (const char* c = text; *c; ++c)
-                glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
-        };
+    {
+        glColor3f(r, g, b);
+        glRasterPos3f(x, y, z);
+        for (const char* c = text; *c; ++c)
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
+    };
 
     ImGuiIO& io = ImGui::GetIO();
 

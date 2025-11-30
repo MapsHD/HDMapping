@@ -19,6 +19,8 @@ This is open-source software for large-scale 3D mapping using an open-hardware h
 - Lidar odometry for HDMapping project utilizing KISS-ICP https://github.com/michalpelka/kiss-lidarodometry
 
 # Compatible other SOTA algorithms (benchmark) 
+Download the dataset from [Bunker DVI Dataset](https://charleshamesse.github.io/bunker-dvi-dataset/)  
+
 All following algorithms are generating session compatible with 'multi_view_tls_registration_step_2'
 - https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping (2018)
 - https://github.com/MapsHD/benchmark-LOAM-Livox-to-HDMapping (2019)

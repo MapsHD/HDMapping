@@ -1417,7 +1417,7 @@ void PointCloud::shift_to_center()
 
 #if WITH_GUI == 1
 void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decimate_point_cloud, bool xz_intersection, bool yz_intersection,
-						bool xy_intersection, double intersection_width)
+						bool xy_intersection, double intersection_width, bool visible_imu_diff)
 {
 	// std::cout << (int)xz_grid_10x10 << std::endl;
 
@@ -1427,6 +1427,38 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 	{
 		glColor3f(render_color[0], render_color[1], render_color[2]);
 		glPointSize(point_size);
+
+		// glColor3f(render_color[0], render_color[1], render_color[2]);
+		if (visible_imu_diff)
+		{
+			glBegin(GL_LINES);
+			for (int i = 1; i < this->local_trajectory.size(); i++)
+			{
+				auto m = this->m_pose * this->local_trajectory[i].m_pose;
+
+				glColor3f(1, 0, 0);
+				glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+				glVertex3f(m(0, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.x() * 10,
+						   m(1, 3),
+						   m(2, 3));
+
+				glColor3f(0, 1, 0);
+				glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+				glVertex3f(m(0, 3),
+						   m(1, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.y() * 10,
+						   m(2, 3));
+
+				glColor3f(0, 0, 1);
+				glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+				glVertex3f(m(0, 3),
+						   m(1, 3),
+						   m(2, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.z() * 10);
+
+				// std::cout << this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.x() << " " << this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.y() << " " << this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.z() << std::endl;
+			}
+			glEnd();
+		}
+
 		// glBegin(GL_POINTS);
 		//  for (const auto& p : this->points_local) {
 
@@ -1565,7 +1597,8 @@ void PointCloud::render(bool show_with_initial_pose, const ObservationPicking &o
 			{
 				for (double x = -1.0; x <= 1.0; x += 0.1)
 				{
-					if(fabs(x) < 0.3){
+					if (fabs(x) < 0.3)
+					{
 						continue;
 					}
 
@@ -1667,6 +1700,21 @@ void PointCloud::render(Eigen::Affine3d pose, int viewer_decimate_point_cloud)
 			glVertex3f(m(0, 3), m(1, 3), m(2, 3));
 		}
 		glEnd();
+
+		/*glColor3f(render_color[0], render_color[1], render_color[2]);
+		glBegin(GL_LINES);
+		for (int i = 1; i < this->local_trajectory.size(); i++)
+		{
+			auto m = this->m_pose * this->local_trajectory[i].m_pose;
+			glVertex3f(m(0, 3), m(1, 3), m(2, 3));
+
+			glVertex3f(m(0, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.x() * 10000,
+					   m(1, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.y() * 10000,
+					   m(2, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.z() * 10000);
+
+			std::cout << this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.x() << " " << this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.y() << " " << this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.z() << std::endl;
+		}
+		glEnd();*/
 	}
 }
 #endif

@@ -37,6 +37,7 @@ public:
 	std::string poses_file_name;
 	std::string initial_poses_file_name;
 	std::string out_poses_file_name;
+	bool show_imu_to_lio_diff = false;
 
 	struct PointCloudDimensions {
 		double x_min, x_max, y_min, y_max, z_min, z_max;

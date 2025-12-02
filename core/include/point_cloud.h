@@ -56,6 +56,7 @@ public:
 		std::pair<double, double> timestamps;
 		Eigen::Affine3d m_pose;
 		Eigen::Vector3d imu_om_fi_ka;
+		Eigen::Vector3d imu_diff_angle_om_fi_ka_deg;
 	};
 
 	PointCloud() {
@@ -106,6 +107,7 @@ public:
 	float gui_rotation[3];
 	float render_color[3];
 	bool visible;
+	//bool visible_imu_diff = false;
 	bool gizmo;
 	int num_threads = 16;
 	//bool fixed = false;
@@ -138,8 +140,8 @@ public:
 	//			bool yz_grid_10x10, bool yz_grid_1x1, bool yz_grid_01x01,
 	//			bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01, 
 	//			double intersection_width);
-	void render(bool show_with_initial_pose, const ObservationPicking& observation_picking, int viewer_decmiate_point_cloud,
-		bool xz_intersection, bool yz_intersection, bool xy_intersection, double intersection_width);
+	void render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud,
+				bool xz_intersection, bool yz_intersection, bool xy_intersection, double intersection_width, bool visible_imu_diff);
 	void render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud);
 #endif
 };

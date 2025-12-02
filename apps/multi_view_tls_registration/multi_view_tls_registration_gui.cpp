@@ -1620,6 +1620,8 @@ void project_gui()
 
     std::string wd = "working directory: '" + session.working_directory + "'";
 
+    ImGui::Checkbox("show_imu_to_lio_diff", &session.point_clouds_container.show_imu_to_lio_diff);
+
     ImGui::Text(wd.c_str());
 
     ImGui::NewLine();

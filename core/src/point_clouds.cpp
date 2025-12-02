@@ -807,7 +807,7 @@ void PointClouds::render(const ObservationPicking &observation_picking, int view
 	for (auto& p : point_clouds)
 	{
 		p.render(this->show_with_initial_pose, observation_picking, viewer_decmiate_point_cloud,
-			xz_intersection, yz_intersection, xy_intersection, intersection_width);
+			xz_intersection, yz_intersection, xy_intersection, intersection_width, show_imu_to_lio_diff);
 	}
 }
 #endif

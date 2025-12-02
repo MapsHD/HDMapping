@@ -3112,8 +3112,8 @@ void display()
         else
         {
             ObservationPicking observation_picking;
-            sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, viewer_decimate_point_cloud, false, false, false, 100000);
-            sessions[second_session_index].point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, viewer_decimate_point_cloud, false, false, false, 100000);
+            sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).render(false, observation_picking, viewer_decimate_point_cloud, false, false, false, 100000, false);
+            sessions[second_session_index].point_clouds_container.point_clouds.at(index_loop_closure_target).render(false, observation_picking, viewer_decimate_point_cloud, false, false, false, 100000, false);
         }
 
         // sessions[first_session_index].point_clouds_container.render();

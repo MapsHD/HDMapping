@@ -374,7 +374,7 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
             if (i >= 0 && i < point_clouds_container.point_clouds.size() && point_clouds_container.point_clouds.size() > 0)
             {
                 ObservationPicking observation_picking;
-                point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, false, false, false, 10000);
+                point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, false, false, false, 10000, false);
             }
         }
 
@@ -383,7 +383,7 @@ void ManualPoseGraphLoopClosure::Render(PointClouds &point_clouds_container,
             if (i >= 0 && i < point_clouds_container.point_clouds.size() && point_clouds_container.point_clouds.size() > 0)
             {
                 ObservationPicking observation_picking;
-                point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, false, false, false, 10000);
+                point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, false, false, false, 10000, false);
             }
         }
     }

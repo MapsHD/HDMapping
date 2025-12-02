@@ -1004,6 +1004,10 @@ void display()
             }
             ImGui::EndDisabled();
 
+            //ImGui::MenuItem("show_imu_to_lio_diff", nullptr, &session.point_clouds_container.show_imu_to_lio_diff);
+
+            ImGui::Separator();
+
             ImGui::MenuItem("Orthographic", "key O", &is_ortho);
             if (is_ortho)
             {
@@ -1026,10 +1030,11 @@ void display()
             ImGui::MenuItem("Use segment pose", nullptr, &usePose);
             ImGui::MenuItem("Show neighbouring scans", "Ctrl+N", &show_neighbouring_scans);
 
+
             //ImGui::MenuItem("show_covs", nullptr, &show_covs);      
 
             ImGui::Separator();
-
+            
 
             ImGui::MenuItem("VBO/VAO proof of concept", nullptr, &gl_useVBOs);
             if (ImGui::IsItemHovered())

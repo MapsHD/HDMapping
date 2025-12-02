@@ -30,13 +30,14 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
     // Get a loaded file directory
     std::string directory = fs::path(file_name).parent_path().string();
 
-	// Local pathUpdater lambda (keep directories unchanged, update files to be in session directory)
-    auto getNewPath = [&](const std::string& path) -> std::string {
+    // Local pathUpdater lambda (keep directories unchanged, update files to be in session directory)
+    auto getNewPath = [&](const std::string &path) -> std::string
+    {
         fs::path p(path);
         if (is_directory(p))
             return p.string();
         return (fs::path(directory) / p.filename()).string();
-        };
+    };
 
     try
     {
@@ -46,14 +47,14 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         nlohmann::json data = nlohmann::json::parse(fs);
         fs.close();
 
-        const auto& project_settings_json = data["Session Settings"];
+        const auto &project_settings_json = data["Session Settings"];
         point_clouds_container.offset.x() = project_settings_json.value("offset_x", 0.0);
         point_clouds_container.offset.y() = project_settings_json.value("offset_y", 0.0);
         point_clouds_container.offset.z() = project_settings_json.value("offset_z", 0.0);
         point_clouds_container.offset_to_apply.x() = project_settings_json.value("offset_to_apply_x", 0.0);
         point_clouds_container.offset_to_apply.y() = project_settings_json.value("offset_to_apply_y", 0.0);
         point_clouds_container.offset_to_apply.z() = project_settings_json.value("offset_to_apply_z", 0.0);
-        folder_name = getNewPath(project_settings_json.value("folder_name",""));
+        folder_name = getNewPath(project_settings_json.value("folder_name", ""));
         out_folder_name = getNewPath(project_settings_json.value("out_folder_name", ""));
         poses_file_name = getNewPath(project_settings_json.value("poses_file_name", ""));
         initial_poses_file_name = getNewPath(project_settings_json.value("initial_poses_file_name", ""));
@@ -92,7 +93,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         {
             const std::string fn = getNewPath(fn_json["file_name"]);
             laz_file_names.push_back(fn);
-        
+
             vfixed_x.push_back(fn_json.value("fixed_x", false));
             vfixed_y.push_back(fn_json.value("fixed_y", false));
             vfixed_z.push_back(fn_json.value("fixed_z", false));
@@ -113,10 +114,11 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         std::cout << "Poses_file_name: '" << poses_file_name << "'\n";
         std::cout << "Out_poses_file_name: '" << out_poses_file_name << "'\n";
 
-        if (!loop_closure_edges.empty()) {
+        if (!loop_closure_edges.empty())
+        {
             std::cout << "Loop closure edges:" << std::endl;
 
-            for (const auto& edge : loop_closure_edges)
+            for (const auto &edge : loop_closure_edges)
             {
                 std::cout << "<<<<<<<<<<<<<<<<<<<" << std::endl;
                 std::cout << "index_from: " << edge.index_from
@@ -142,11 +144,11 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             }
         }
 
-        //std::cout << "------laz file names-----" << std::endl;
-        //for (const auto &fn : laz_file_names)
+        // std::cout << "------laz file names-----" << std::endl;
+        // for (const auto &fn : laz_file_names)
         //{
-        //    std::cout << "'" << fn << "'" << std::endl;
-        //}
+        //     std::cout << "'" << fn << "'" << std::endl;
+        // }
 #if WITH_GUI == 1
         for (const auto &gcp_json : data["ground_control_points"])
         {
@@ -248,6 +250,63 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             pc.fixed_ka = vfixed_ka[index];
             pc.fuse_inclination_from_IMU = vfuse_inclination_from_IMU[index];
             index++;
+        }
+
+        // sanity check;
+
+        std::cout << std::setprecision(10);
+        for (int i = 0; i < point_clouds_container.point_clouds.size(); i++)
+            //auto &pc : point_clouds_container.point_clouds)
+        {
+            for (int j = 1; j < point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+            {
+                Eigen::Affine3d m = point_clouds_container.point_clouds[i].local_trajectory[j - 1].m_pose.inverse() * point_clouds_container.point_clouds[i].local_trajectory[j].m_pose;
+
+                TaitBryanPose tb_pose = pose_tait_bryan_from_affine_matrix(m);
+
+                TaitBryanPose tb_prev;
+                tb_prev.om = point_clouds_container.point_clouds[i].local_trajectory[j - 1].imu_om_fi_ka.x();
+                tb_prev.fi = point_clouds_container.point_clouds[i].local_trajectory[j - 1].imu_om_fi_ka.y();
+                tb_prev.ka = point_clouds_container.point_clouds[i].local_trajectory[j - 1].imu_om_fi_ka.z();
+                tb_prev.px = 0.0;
+                tb_prev.py = 0.0;
+                tb_prev.pz = 0.0;
+
+                Eigen::Affine3d m_prev = affine_matrix_from_pose_tait_bryan(tb_prev);
+
+                TaitBryanPose tb_curr;
+                tb_curr.om = point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.x();
+                tb_curr.fi = point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.y();
+                tb_curr.ka = point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.z();
+                tb_curr.px = 0.0;
+                tb_curr.py = 0.0;
+                tb_curr.pz = 0.0;
+
+                Eigen::Affine3d m_curr = affine_matrix_from_pose_tait_bryan(tb_curr);
+
+                Eigen::Affine3d mm = m_prev.inverse() * m_curr;
+
+                TaitBryanPose tb_pose_mm = pose_tait_bryan_from_affine_matrix(mm);
+
+                Eigen::Vector3d diff (fabs(tb_pose_mm.om - tb_pose.om), fabs(tb_pose_mm.fi - tb_pose.fi), fabs(tb_pose_mm.ka - tb_pose.ka));
+
+                point_clouds_container.point_clouds[i].local_trajectory[j].imu_diff_angle_om_fi_ka_deg = diff;
+
+                // TaitBryanPose tb_pose2;
+                //tb_pose2.om = point_clouds_container.point_clouds[i].local_trajectory[j-1].imu_om_fi_ka.x()
+
+                //std::cout << tb_pose.om << " " << tb_pose.fi << " " << tb_pose.ka << " "
+                //          << point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.x() << " " <<
+                //    point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.y() << " " 
+                //    << point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.z() <<  std::endl;
+            }
+            //struct LocalTrajectoryNode{
+            //    std::pair<double, double> timestamps;
+            //    Eigen::Affine3d m_pose;
+            //    Eigen::Vector3d imu_om_fi_ka;
+            //    Eigen::Vector3d imu_diff_angle_om_fi_ka_deg;
+	        //};
+            //pc.local_trajectory
         }
 
         return true;
@@ -429,7 +488,7 @@ void Session::fill_session_from_worker_data(
                 }
             }
             // TODO: check if this is correct pose to be applied
-            //pc.m_pose = worker_data[i].intermediate_trajectory[0].inverse();
+            // pc.m_pose = worker_data[i].intermediate_trajectory[0].inverse();
             pc.m_pose = worker_data[i].intermediate_trajectory[0];
             this->point_clouds_container.point_clouds.push_back(pc);
         }

@@ -101,6 +101,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Ctrl+Q", ""},
     {"", "R", ""},
     {"", "Ctrl+R", "Remove session(s)"},
+    {"", "Shift+R", ""},
     {"", "S", ""},
     {"", "Ctrl+S", "Save project"},
     {"", "Ctrl+Shift+S", ""},
@@ -140,6 +141,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Right click + drag", "n"},
     {"", "Scroll", ""},
     {"", "Shift + scroll", ""},
+    {"", "Shift + drag", ""},
     {"", "Ctrl + left click", ""},
     {"", "Ctrl + right click", ""},
     {"", "Ctrl + middle click", ""}};
@@ -3399,7 +3401,7 @@ void display()
 
             ImGui::Separator();
 
-            if (ImGui::BeginMenu("Save all marked trajectories", loaded_sessions))
+            if (ImGui::BeginMenu("Save all marked trajectories", sessions.size() > 0))
             {
                 if (ImGui::MenuItem("Save all as las/laz files"))
                 {
@@ -3861,7 +3863,7 @@ void display()
 
         if (ImGui::BeginMenu("Tools"))
         {
-            ImGui::MenuItem("Normal Distributions Transform", nullptr, &is_ndt_gui, !is_loop_closure_gui && loaded_sessions);
+            ImGui::MenuItem("Normal Distributions Transform", nullptr, &is_ndt_gui, !is_loop_closure_gui && (sessions.size() > 0));
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
@@ -3981,17 +3983,17 @@ void display()
 
     if (remove_gui)
     {
-        ImGui::OpenPopup("Remove Sessions");
+        ImGui::OpenPopup("Remove session(s)");
         remove_gui = false;
     }
 
-    if (ImGui::BeginPopupModal("Remove Sessions", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    if (ImGui::BeginPopupModal("Remove session(s)", NULL, ImGuiWindowFlags_AlwaysAutoResize))
     {
         static std::vector<bool> session_marked_for_removal;
         if (session_marked_for_removal.size() != project_settings.session_file_names.size())
             session_marked_for_removal.resize(project_settings.session_file_names.size(), false);
 
-        ImGui::Text("Select sessions to remove:");
+        ImGui::Text("Select session(s) to remove:");
         ImGui::Separator();
 
         for (int i = 0; i < project_settings.session_file_names.size(); i++)
@@ -4011,7 +4013,7 @@ void display()
                 {
                     std::cout << "Removing session: " << project_settings.session_file_names[i] << std::endl;
                     project_settings.session_file_names.erase(project_settings.session_file_names.begin() + i);
-                    if (loaded_sessions && i < sessions.size())
+                    if ((sessions.size() > 0) && i < sessions.size())
                         sessions.erase(sessions.begin() + i);
                 }
             }
@@ -4448,7 +4450,12 @@ void mouse(int glut_button, int state, int x, int y)
     if (!io.WantCaptureMouse)
     {
         if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_RIGHT_BUTTON) && state == GLUT_DOWN && io.KeyCtrl)
-            setNewRotationCenter(x, y);
+        {
+            if (sessions.size() > 0)
+                getClosestTrajectoriesPoint(sessions, x, y);
+            else
+                setNewRotationCenter(x, y);
+        }
 
         if (state == GLUT_DOWN)
         {

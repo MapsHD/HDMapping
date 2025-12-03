@@ -1510,13 +1510,9 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
     };
 
     if (multithread)
-    {
         std::for_each(std::execution::par_unseq, std::begin(intermediate_points), std::end(intermediate_points), hessian_fun_indoor);
-    }
     else
-    {
         std::for_each(std::begin(intermediate_points), std::end(intermediate_points), hessian_fun_indoor);
-    }
 
     if (ablation_study_use_hierarchical_rgd)
     {
@@ -1525,9 +1521,7 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
         const auto hessian_fun_outdoor = [&](const Point3Di &intermediate_points_i)
         {
             if (intermediate_points_i.point.norm() < 5.0 || intermediate_points_i.point.norm() > max_distance) // ToDo
-            {
                 return;
-            }
 
             Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
             auto index_of_bucket = get_rgd_index(point_global, b_outdoor);
@@ -1535,22 +1529,18 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
             auto bucket_it = buckets_outdoor.find(index_of_bucket);
             // no bucket found
             if (bucket_it == buckets_outdoor.end())
-            {
                 return;
-            }
+            
             auto &this_bucket = bucket_it->second;
 
             const Eigen::Matrix3d &infm = this_bucket.cov.inverse();
             const double threshold = 100000.0;
 
             if ((infm.array() > threshold).any())
-            {
                 return;
-            }
+
             if ((infm.array() < -threshold).any())
-            {
                 return;
-            }
 
             if (ablation_study_use_view_point_and_normal_vectors)
             {
@@ -1558,9 +1548,7 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
                 Eigen::Vector3d &nv = this_bucket.normal_vector;
                 Eigen::Vector3d viewport = intermediate_trajectory[intermediate_points_i.index_pose].translation();
                 if (nv.dot(viewport - this_bucket.mean) < 0)
-                {
                     return;
-                }
             }
 
             const Eigen::Affine3d &m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
@@ -1617,32 +1605,23 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
         };
 
         if (multithread)
-        {
             std::for_each(std::execution::par_unseq, std::begin(intermediate_points), std::end(intermediate_points), hessian_fun_outdoor);
-        }
         else
-        {
             std::for_each(std::begin(intermediate_points), std::end(intermediate_points), hessian_fun_outdoor);
-        }
     }
 
     std::vector<std::pair<int, int>> odo_edges;
     for (size_t i = 1; i < intermediate_trajectory.size(); i++)
-    {
         odo_edges.emplace_back(i - 1, i);
-    }
 
     std::vector<TaitBryanPose> poses;
     std::vector<TaitBryanPose> poses_desired;
 
     for (size_t i = 0; i < intermediate_trajectory.size(); i++)
-    {
         poses.push_back(pose_tait_bryan_from_affine_matrix(intermediate_trajectory[i]));
-    }
+
     for (size_t i = 0; i < intermediate_trajectory_motion_model.size(); i++)
-    {
         poses_desired.push_back(pose_tait_bryan_from_affine_matrix(intermediate_trajectory_motion_model[i]));
-    }
 
     for (size_t i = 0; i < odo_edges.size(); i++)
     {
@@ -1804,12 +1783,8 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
     Eigen::SparseMatrix<double> x = solver.solve(AtPB);
     std::vector<double> h_x;
     for (int k = 0; k < x.outerSize(); ++k)
-    {
         for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
-        {
             h_x.push_back(it.value());
-        }
-    }
 
     delta = 1000000.0;
     if (h_x.size() == 6 * intermediate_trajectory.size())
@@ -1843,9 +1818,7 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
         }
         delta = 0.0;
         for (int i = 0; i < h_x.size(); i++)
-        {
             delta += sqrt(h_x[i] * h_x[i]);
-        }
     }
     return;
 }

@@ -110,6 +110,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Ctrl+Q", ""},
     {"", "R", ""},
     {"", "Ctrl+R", "Random cloud colors"},
+    {"", "Shift+R", ""},
     {"", "S", ""},
     {"", "Ctrl+S", "Save session"},
     {"", "Ctrl+Shift+S", "Save subsession"},
@@ -149,6 +150,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Right click + drag", "n"},
     {"", "Scroll", ""},
     {"", "Shift + scroll", ""},
+    {"", "Shift + drag", ""},
     {"", "Ctrl + left click", ""},
     {"", "Ctrl + right click", ""},
     {"", "Ctrl + middle click", ""}
@@ -1551,63 +1553,6 @@ void saveSubsession()
     }else{
         std::cout << "saving canceled" << std::endl;
     }
-}
-
-double distance_point_to_line(const Eigen::Vector3d &point, const LaserBeam &line)
-{
-    Eigen::Vector3d AP = point - line.position;
-
-    double dist = (AP.cross(line.direction)).norm();
-    return dist;
-}
-
-void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking, int &picked_index)
-{
-    picked_index = -1;
-    
-    const auto laser_beam = GetLaserBeam(x, y);
-    double min_distance = std::numeric_limits<double>::max();
-    int index_i = -1;
-    int index_j = -1;
-
-    for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-    {
-        for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
-        {
-            const auto& p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
-            Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
-
-            double dist = distance_point_to_line(vp, laser_beam);
-
-            if (dist < min_distance)
-            {
-                min_distance = dist;
-                index_i = i;
-                index_j = j;
-
-                new_rotation_center.x() = vp.x();
-                new_rotation_center.y() = vp.y();
-                new_rotation_center.z() = vp.z();
-
-                if (gcpPicking)
-                {
-                    session.ground_control_points.picking_mode_index_to_node_inner = index_i;
-                    session.ground_control_points.picking_mode_index_to_node_outer = index_j;
-                }
-
-                picked_index = index_i;
-
-                // if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
-            }
-        }
-    }
-
-    new_rotate_x = rotate_x;
-    new_rotate_y = rotate_y;
-    new_translate_x = -new_rotation_center.x();
-    new_translate_y = -new_rotation_center.y();
-    new_translate_z = translate_z;
-    camera_transition_active = true;
 }
 
 void project_gui()
@@ -3199,6 +3144,7 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observ
     return pos;
 }
 
+
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -3272,25 +3218,24 @@ void mouse(int glut_button, int state, int x, int y)
             else
             {
                 if (glut_button == GLUT_MIDDLE_BUTTON)
-                    if (session_loaded){
+                    if (session_loaded)
+                    {
                         int tmp = -1;
                         getClosestTrajectoryPoint(session, x, y, false, tmp);
 
-                        if (io.KeyCtrl){
-                            if (tmp != -1){
-                                index_loop_closure_target = tmp;
-                            }
-                        }
-                        if (io.KeyShift){
+                        if (io.KeyCtrl)
+                        {
                             if (tmp != -1)
-                            {
+                                index_loop_closure_target = tmp;
+                        }
+                        else if (io.KeyShift)
+                        {
+                            if (tmp != -1)
                                 index_loop_closure_source = tmp;
-                            }
                         }
                     }
-                    else{
+                    else
                         setNewRotationCenter(x, y);
-                    }
             }
         }
 

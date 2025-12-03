@@ -1,8 +1,10 @@
 #pragma once
+
 #include <Eigen/Geometry>
 #include <imgui.h>
 #include <structures.h>
 #include <registration_plane_feature.h>
+#include <session.h>
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -110,4 +112,8 @@ void drawMiniCompassWithRuler(
 
 Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane);
 LaserBeam GetLaserBeam(int x, int y);
+double distance_point_to_line(const Eigen::Vector3d& point, const LaserBeam& line);
+void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking, int& picked_index);
+void getClosestTrajectoriesPoint(std::vector<Session>& sessions, int x, int y);
+
 void setNewRotationCenter(int x, int y);

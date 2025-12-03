@@ -86,6 +86,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Ctrl+Q", ""},
     {"", "R", ""},
     {"", "Ctrl+R", ""},
+    {"", "Shift+R", ""},
     {"", "S", ""},
     {"", "Ctrl+S", ""},
     {"", "Ctrl+Shift+S", ""},
@@ -125,6 +126,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Right click + drag", "n"},
     {"", "Scroll", ""},
     {"", "Shift + scroll", ""},
+    {"", "Shift + drag", ""},
     {"", "Ctrl + left click", ""},
     {"", "Ctrl + right click", ""},
     {"", "Ctrl + middle click", ""} };
@@ -638,9 +640,7 @@ void step2(const std::atomic<bool> &loPause)
 {
     double ts_failure = 0.0;
     if (compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages))
-    {
         step_2_done = true;
-    }
     else
     {
         for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
@@ -655,9 +655,7 @@ void step2(const std::atomic<bool> &loPause)
             if (imu.size() > 0)
             {
                 if (std::get<0>(imu[imu.size() - 1]).first > ts_failure)
-                {
                     break;
-                }
             }
             std::cout << "file: '" << imufn << "' [OK]" << std::endl;
         }
@@ -1459,7 +1457,7 @@ void progress_window()
 {
     ImGui::Begin("Progress", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
-    ImGui::Text(("Working directory: '" + working_directory +  "'").c_str());
+    ImGui::Text(("Working directory:\n'" + working_directory +  "'").c_str());
         
     // Calculate elapsed time and ETA
     auto currentTime = std::chrono::system_clock::now();
@@ -1507,9 +1505,8 @@ void progress_window()
     if (!loPause)
     {
         if (ImGui::Button("Pause"))
-        {
             loPause.store(true);
-        }
+
         if (ImGui::IsItemHovered())
         {
             ImGui::BeginTooltip();
@@ -1521,9 +1518,7 @@ void progress_window()
     else
     {
         if (ImGui::Button("Resume"))
-        {
             loPause.store(false);
-        }
     }
     ImGui::SameLine();
     ImGui::Text("Also check console for progress..");
@@ -1579,9 +1574,7 @@ void openData()
         loThread.detach();
     }
     else //no data loaded
-    {
         loRunning = false;
-    }
 }
 
 void step1(const std::string &folder,
@@ -1680,9 +1673,7 @@ void display()
     if (show_covs)
     {
         for (const auto &b : params.buckets_indoor)
-        {
             draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
-        }
     }
 
 #if 0 // ToDo
@@ -1724,9 +1715,7 @@ void display()
         glColor3f(1, 0, 0);
         glBegin(GL_POINTS);
         for (int i = 0; i < params.reference_points.size(); i += dec_reference_points)
-        {
             glVertex3f(params.reference_points[i].point.x(), params.reference_points[i].point.y(), params.reference_points[i].point.z());
-        }
         glEnd();
     }
 
@@ -1762,9 +1751,7 @@ void display()
         for (const auto &wd : worker_data)
         {
             for (const auto &it : wd.intermediate_trajectory)
-            {
                 glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-            }
         }
         glEnd();
         glPointSize(1);
@@ -1796,9 +1783,7 @@ void display()
         glColor3f(1, 0, 0);
         glBegin(GL_POINTS);
         for (const auto &b : params.reference_buckets)
-        {
             glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-        }
         glEnd();
     }
 
@@ -2039,7 +2024,7 @@ void display()
                             toml_io.LoadParametersFromTomlFile(input_file_names[0], params);
                             std::cout << "Parameters loaded from: " << input_file_names[0] << std::endl;
                         }
-                        catch (const std::exception &e)
+                        catch (const std::exception& e)
                         {
                             std::cerr << "Error loading TOML file: " << e.what() << std::endl;
                         }

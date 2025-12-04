@@ -956,7 +956,7 @@ void project_gui()
 
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Select all IMU *.csv and LiDAR *.laz files produced by MANDEYE saved in 'continousScanning_*' folder");
+                ImGui::SetTooltip("Select folder containing IMU *.csv and LiDAR *.laz files produced by MANDEYE (e.g.: 'continousScanning_*')");
         }
         if (step_1_done && !step_2_done)
         {

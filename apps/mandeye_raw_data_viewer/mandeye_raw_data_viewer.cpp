@@ -9,6 +9,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <utils.hpp>
+
 #include <Eigen/Eigen>
 
 #include <transformations.h>
@@ -27,31 +29,33 @@
 
 #include <opencv2/opencv.hpp>
 
+#ifdef _WIN32
+    #include <windows.h>
+    #include <shellapi.h>  // <-- Required for ShellExecuteA
+    #include "resource.h"
+#endif
+
+///////////////////////////////////////////////////////////////////////////////////
+
+std::string winTitle = std::string("Raw data viewer ") + HDMAPPING_VERSION_STRING;
+
+std::vector<std::string> infoLines = {
+    "This program is optional step in MANDEYE process",
+    "",
+    "It analyzes LiDAR data created by Mission Recorder",
+    "Next step will be to load data with 'lidar_odometry_step_1' app"
+};
+
+//App specific shortcuts (using empty dummy until needed)
+std::vector<ShortcutEntry> appShortcuts(80, { "", "", "" });
+
+
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
-const unsigned int window_width = 800;
-const unsigned int window_height = 600;
-double camera_ortho_xy_view_zoom = 10;
-double camera_ortho_xy_view_shift_x = 0.0;
-double camera_ortho_xy_view_shift_y = 0.0;
-double camera_mode_ortho_z_center_h = 0.0;
-double camera_ortho_xy_view_rotation_angle_deg = 0;
-bool is_ortho = false;
-bool show_axes = true;
 ImVec4 clear_color = ImVec4(0.8f, 0.8f, 0.8f, 1.00f);
 ImVec4 pc_color = ImVec4(1.0f, 0.0f, 0.0f, 1.00f);
 ImVec4 pc_color2 = ImVec4(0.0f, 0.0f, 1.0f, 1.00f);
-
-int point_size = 1;
-Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
-float translate_x, translate_y = 0.0;
-float translate_z = -50.0;
-float rotate_x = 0.0, rotate_y = 0.0;
-int mouse_old_x, mouse_old_y;
-int mouse_buttons = 0;
-bool gui_mouse_down{false};
-float mouse_sensitivity = 1.0;
 
 float m_ortho_projection[] = {1, 0, 0, 0,
                               0, 1, 0, 0,
@@ -144,80 +148,6 @@ namespace photos
     int photo_width_cam0 = 0;
     int photo_height_cam0 = 0;
 }
-void reshape(int w, int h)
-{
-    glViewport(0, 0, (GLsizei)w, (GLsizei)h);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    if (!is_ortho)
-    {
-        gluPerspective(60.0, (GLfloat)w / (GLfloat)h, 0.01, 10000.0);
-    }
-    else
-    {
-        ImGuiIO &io = ImGui::GetIO();
-        float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
-        // glOrtho(-translate_z, translate_z, -translate_z * (float)h / float(w), translate_z * float(h) / float(w), -10000, 10000);
-    }
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-}
-
-void motion(int x, int y)
-{
-    ImGuiIO &io = ImGui::GetIO();
-    io.MousePos = ImVec2((float)x, (float)y);
-
-    if (!io.WantCaptureMouse)
-    {
-        float dx, dy;
-        dx = (float)(x - mouse_old_x);
-        dy = (float)(y - mouse_old_y);
-
-        if (is_ortho)
-        {
-            if (mouse_buttons & 1)
-            {
-                float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-                Eigen::Vector3d v(dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
-                                  dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio), 0);
-                TaitBryanPose pose_tb;
-                pose_tb.px = 0.0;
-                pose_tb.py = 0.0;
-                pose_tb.pz = 0.0;
-                pose_tb.om = 0.0;
-                pose_tb.fi = 0.0;
-                pose_tb.ka = camera_ortho_xy_view_rotation_angle_deg * M_PI / 180.0;
-                auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
-                Eigen::Vector3d v_t = m * v;
-                camera_ortho_xy_view_shift_x += v_t.x();
-                camera_ortho_xy_view_shift_y += v_t.y();
-            }
-        }
-        else
-        {
-            gui_mouse_down = mouse_buttons > 0;
-            if (mouse_buttons & 1)
-            {
-                rotate_x += dy * 0.2f; // * mouse_sensitivity;
-                rotate_y += dx * 0.2f; // * mouse_sensitivity;
-            }
-            if (mouse_buttons & 4)
-            {
-                translate_x += dx * 0.05f * mouse_sensitivity;
-                translate_y -= dy * 0.05f * mouse_sensitivity;
-            }
-        }
-
-        mouse_old_x = x;
-        mouse_old_y = y;
-    }
-    glutPostRedisplay();
-}
 
 static ImVec2 DisplayImageFit(ImTextureID tex, int tex_w, int tex_h, bool allow_upscale = true)
 {
@@ -290,12 +220,11 @@ void project_gui()
             ImGui::Text("timestamp:  %s", std::to_string(photos::nearestTs).c_str());
             // get available size
             DisplayImageFit((ImTextureID)photos::photo_texture_cam0,  photo_width_cam0, photo_height_cam0);
-
-
         }
 
         ImGui::End();
     }
+
     if (ImGui::Begin("main gui window"))
     {
         ImGui::ColorEdit3("clear color", (float *)&clear_color);
@@ -351,13 +280,9 @@ void project_gui()
                         all_file_names.push_back(fileName);
                     }
                     else if (fileName.ends_with(".csv"))
-                    {
                         csv_files.push_back(fileName);
-                    }
                     else if (fileName.ends_with(".sn"))
-                    {
                         sn_files.push_back(fileName);
-                    }
                     else if (fileName.ends_with(".jpg")) {
                         photos_files.push_back(fileName);
                         // decode filename e.g.: ` cam0_1761264773592270949.jpg`
@@ -394,9 +319,7 @@ void project_gui()
                     {
                         std::cout << "Loaded calibration for: \n";
                         for (const auto &[sn, _] : preloadedCalibration)
-                        {
                             std::cout << " -> " << sn << std::endl;
-                        }
                     }
                     else
                     {
@@ -429,16 +352,13 @@ void project_gui()
                     fs::path wdp = fs::path(input_file_names[0]).parent_path();
                     wdp /= "preview";
                     if (!fs::exists(wdp))
-                    {
                         fs::create_directory(wdp);
-                    }
 
                     working_directory_preview = wdp.string();
 
                     for (size_t i = 0; i < input_file_names.size(); i++)
-                    {
                         std::cout << input_file_names[i] << std::endl;
-                    }
+
                     std::cout << "loading imu" << std::endl;
                     std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
 
@@ -492,9 +412,7 @@ void project_gui()
 
                                            std::ofstream testPointcloud{calibrationValidtationFile.c_str()};
                                            for (const auto &p : data)
-                                           {
                                                testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int)p.lidarid << "\n";
-                                           }
                                        }
 
                                        std::unique_lock lck(mtx);
@@ -513,17 +431,14 @@ void project_gui()
                     FusionAhrsInitialise(&ahrs);
 
                     if (fusionConventionNwu)
-                    {
                         ahrs.settings.convention = FusionConventionNwu;
-                    }
+
                     if (fusionConventionEnu)
-                    {
                         ahrs.settings.convention = FusionConventionEnu;
-                    }
+
                     if (fusionConventionNed)
-                    {
                         ahrs.settings.convention = FusionConventionNed;
-                    }
+
                     ahrs.settings.gain = ahrs_gain;
 
                     std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;
@@ -586,9 +501,7 @@ void project_gui()
                         const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
                         counter++;
                         if (counter % 100 == 0)
-                        {
                             printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
-                        }
 
                         // log it for implot
                         imu_data_plot.timestampLidar.push_back(timestamp_pair.first);
@@ -615,9 +528,8 @@ void project_gui()
 
                     int number_of_points = 0;
                     for (const auto &pp : pointsPerFile)
-                    {
                         number_of_points += pp.size();
-                    }
+
                     std::cout << "number of points: " << number_of_points << std::endl;
 
                     std::cout << "start indexing points" << std::endl;
@@ -714,9 +626,7 @@ void project_gui()
                                     //std::cout << "ts_end " << data.timestamps[data.timestamps.size() - 1].first << std::endl;
 
                                     for (int pp = 0; pp < data.points_local.size(); pp++)
-                                    {
                                         data.points_local[pp].timestamp = ts_begin + pp * ts_step;
-                                    }
                                 }
 
                                 all_data.push_back(data);
@@ -784,9 +694,7 @@ void project_gui()
                 }*/
 
                 if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
-                {
                     std::cout << "problem with saving file: " << output_file_name << std::endl;
-                }
             }
         }
 
@@ -806,20 +714,16 @@ void project_gui()
         ImGui::Text("---------------------------------------------");
 
         if (ImGui::Button("optimize"))
-        {
             optimize();
-        }
 
         if (ImGui::Button("get_nn"))
-        {
             rgd_nn = get_nn();
-        }
+
         ImGui::Checkbox("show show_rgd_nn", &show_rgd_nn);
 
         if (ImGui::Button("get_mean_cov"))
-        {
             mean_cov = get_mean_cov();
-        }
+
         ImGui::Checkbox("show_mean_cov", &show_mean_cov);
 
         if (ImGui::Button("debug text"))
@@ -850,9 +754,7 @@ void project_gui()
                 std::cout << "max_diff " << max_diff << std::endl;
                 std::cout << "----------------" << std::endl;
                 for (int k = 0; k < all_data[index_rendered_points_local].timestamps.size(); k++)
-                {
                     std::cout << all_data[index_rendered_points_local].timestamps[k].first << std::endl;
-                }
             }
         }
 
@@ -872,9 +774,7 @@ void project_gui()
                 if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
                 {
                     if (all_data[index_rendered_points_local].timestamps.size() > 0)
-                    {
                         annotation = all_data[index_rendered_points_local].timestamps.front().first;
-                    }
                 }
                 if (ImPlot::BeginPlot("Imu - acceleration 'm/s^2", ImVec2(-1, 0)))
                 {
@@ -1133,13 +1033,10 @@ void display()
                     Eigen::Vector3d p = m * all_data[index_rendered_points_local].points_local[i].point;
 
                     if (all_data[index_rendered_points_local].lidar_ids[i] == 0)
-                    {
                         glColor3f(pc_color.x, pc_color.y, pc_color.z);
-                    }
                     else
-                    {
                         glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
-                    }
+
                     glVertex3f(p.x(), p.y(), p.z());
                     //}
                 }
@@ -1210,9 +1107,7 @@ void display()
     if (show_mean_cov)
     {
         for (const auto &mc : mean_cov)
-        {
             draw_ellipse(mc.second, mc.first, Eigen::Vector3f(1, 0, 0), 1);
-        }
     }
 
     ImGui_ImplOpenGL2_NewFrame();
@@ -1227,42 +1122,6 @@ void display()
     glutSwapBuffers();
     glutPostRedisplay();
 }
-
-bool initGL(int *argc, char **argv)
-{
-    glutInit(argc, argv);
-    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
-    glutInitWindowSize(window_width, window_height);
-    glutCreateWindow("mandeye raw data viewer " HDMAPPING_VERSION_STRING);
-    glutDisplayFunc(display);
-    glutMotionFunc(motion);
-
-    // default initialization
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glEnable(GL_DEPTH_TEST);
-
-    // viewport
-    glViewport(0, 0, window_width, window_height);
-
-    // projection
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01, 10000.0);
-    glutReshapeFunc(reshape);
-    ImGui::CreateContext();
-    ImPlot::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-
-    ImGui::StyleColorsDark();
-    ImGui_ImplGLUT_Init();
-    ImGui_ImplGLUT_InstallFuncs();
-    ImGui_ImplOpenGL2_Init();
-    return true;
-}
-
-void wheel(int button, int dir, int x, int y);
 
 void mouse(int glut_button, int state, int x, int y)
 {
@@ -1306,60 +1165,33 @@ void mouse(int glut_button, int state, int x, int y)
     }
 }
 
-void wheel(int button, int dir, int x, int y)
+int main(int argc, char* argv[])
 {
-    ImGuiIO &io = ImGui::GetIO();
-    io.MouseWheel += (float)dir;
-    if (io.WantCaptureMouse)
+    try
     {
-        // ImGui is handling the mouse wheel
-        return;
+        initGL(&argc, argv, winTitle, display, mouse);
+
+        glutMainLoop();
+
+        ImGui_ImplOpenGL2_Shutdown();
+        ImGui_ImplGLUT_Shutdown();
+        ImGui::DestroyContext();
+		ImPlot::DestroyContext();
+    }
+    catch (const std::bad_alloc& e)
+    {
+        std::cerr << "System is out of memory : " << e.what() << std::endl;
+        mandeye::fd::OutOfMemMessage();
+    }
+    catch (const std::exception& e)
+    {
+        std::cout << e.what();
+    }
+    catch (...)
+    {
+        std::cerr << "Unknown fatal error occurred." << std::endl;
     }
 
-    if (dir > 0)
-    {
-        if (is_ortho)
-        {
-            camera_ortho_xy_view_zoom -= 0.1f * camera_ortho_xy_view_zoom;
-
-            if (camera_ortho_xy_view_zoom < 0.1)
-            {
-                camera_ortho_xy_view_zoom = 0.1;
-            }
-        }
-        else
-        {
-            translate_z -= 0.05f * translate_z;
-        }
-    }
-    else
-    {
-        if (is_ortho)
-        {
-            camera_ortho_xy_view_zoom += 0.1 * camera_ortho_xy_view_zoom;
-        }
-        else
-        {
-            translate_z += 0.05f * translate_z;
-        }
-    }
-    return;
-}
-
-int main(int argc, char *argv[])
-{
-    initGL(&argc, argv);
-    glutDisplayFunc(display);
-    glutMouseFunc(mouse);
-    glutMotionFunc(motion);
-    glutMouseWheelFunc(wheel);
-    glutMainLoop();
-
-    ImGui_ImplOpenGL2_Shutdown();
-    ImGui_ImplGLUT_Shutdown();
-
-    ImPlot::DestroyContext();
-    ImGui::DestroyContext();
     return 0;
 }
 
@@ -1980,13 +1812,9 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov()
             int index_pose = std::distance(worker_data.timestamps.begin(), lower) - 1;
 
             if (index_pose >= 0 && index_pose < worker_data.poses.size())
-            {
                 worker_data.points_local[i].index_pose = index_pose;
-            }
             else
-            {
                 worker_data.points_local[i].index_pose = -1;
-            }
         }
 
         NDT::GridParameters rgd_params;

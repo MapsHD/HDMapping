@@ -708,7 +708,7 @@ void project_gui()
                     for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
                     {
                         h_x.push_back(it.value());
-                        std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
+                        std::cout << std::fixed << std::setprecision(6) << it.row() << " " << it.col() << " " << it.value() << std::endl;
                     }
                 }
 

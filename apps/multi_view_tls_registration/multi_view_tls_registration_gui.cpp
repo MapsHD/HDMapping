@@ -3304,7 +3304,6 @@ int main(int argc, char *argv[])
     {
         initGL(&argc, argv, winTitle, display, mouse);
 
-
         glutMainLoop();
 
         ImGui_ImplOpenGL2_Shutdown();

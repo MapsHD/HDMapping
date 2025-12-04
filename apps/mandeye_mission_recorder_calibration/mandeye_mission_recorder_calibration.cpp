@@ -33,6 +33,8 @@
     #include "resource.h"
 #endif
 
+///////////////////////////////////////////////////////////////////////////////////
+
 std::string winTitle = std::string("MR calibration ") + HDMAPPING_VERSION_STRING;
 
 std::vector<std::string> infoLines = {

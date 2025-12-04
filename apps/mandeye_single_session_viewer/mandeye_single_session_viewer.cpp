@@ -77,7 +77,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "O", ""},
     {"", "Ctrl+O", "Open session"},
     {"", "P", ""},
-    {"", "Ctrl+P", ""},
+    {"", "Ctrl+P", "Properties"},
     {"", "Q", ""},
     {"", "Ctrl+Q", ""},
     {"", "R", ""},
@@ -152,8 +152,15 @@ int colorScheme = 0; //0=solid color; gradients:1=intensity, 2=cloud height
 int oldcolorScheme = 0;
 bool usePose = false;
 
+bool is_properties_gui = false;
+bool is_session_gui = true;
+bool is_index_gui = false;
+
 Session session;
 bool session_loaded = false;
+
+int session_total_number_of_points = 0;
+PointClouds::PointCloudDimensions session_dims;
 
 //built in console output redirection to imgui window
 ///////////////////////////////////////////////////////////////////////////////////
@@ -695,11 +702,19 @@ void openSession()
 
     if (session_file_name.size() > 0)
     {
-        std::string newTitle = winTitle + " - " + truncPath(session_file_name);
-        glutSetWindowTitle(newTitle.c_str());
-
         session_loaded = session.load(fs::path(session_file_name).string(), false, 0.0, 0.0, 0.0, false);
         index_rendered_points_local = 0;
+
+        if (session_loaded)
+        {
+            std::string newTitle = winTitle + " - " + truncPath(session_file_name);
+            glutSetWindowTitle(newTitle.c_str());
+
+            for (const auto& pc : session.point_clouds_container.point_clouds)
+                session_total_number_of_points += pc.points_local.size();
+
+            session_dims = session.point_clouds_container.compute_point_cloud_dimension();
+        }
 
         if (gl_useVBOs)
         {
@@ -763,8 +778,180 @@ void openSession()
     }
 }
 
+void session_gui()
+{
+    ImGui::Text("File name:");
+    ImGui::Text(session.session_file_name.c_str());
+    ImGui::Text("Working directory:");
+    ImGui::Text(session.working_directory.c_str());
+
+    ImGui::Separator();
+
+    ImGui::Text("Is ground truth: %s", session.is_ground_truth ? "yes" : "no");
+    ImGui::Text("Number of clouds: %zu", session.point_clouds_container.point_clouds.size());
+    ImGui::Text("Number of points: %zu", session_total_number_of_points);
+
+    ImGui::Separator();
+
+	ImGui::Text("Dimensions:");
+    if (ImGui::BeginTable("Dimensions", 4))
+    {
+        ImGui::TableSetupColumn("Coord [m]");
+        ImGui::TableSetupColumn("min");
+        ImGui::TableSetupColumn("max");
+        ImGui::TableSetupColumn("size");
+        ImGui::TableHeadersRow();
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+
+
+        std::string text = "X";
+        float centered = ImGui::GetColumnWidth() - ImGui::CalcTextSize(text.c_str()).x;
+        // Set cursor so text is centered
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+
+        ImGui::Text("X");
+
+        ImGui::TableSetColumnIndex(1);
+        ImGui::Text("%.3f", session_dims.x_min);
+        ImGui::TableSetColumnIndex(2);
+        ImGui::Text("%.3f", session_dims.x_max);
+        ImGui::TableSetColumnIndex(3);
+        ImGui::Text("%.3f", session_dims.length);
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+        ImGui::Text("Y");
+
+        ImGui::TableSetColumnIndex(1);
+        ImGui::Text("%.3f", session_dims.y_min);
+        ImGui::TableSetColumnIndex(2);
+        ImGui::Text("%.3f", session_dims.y_max);
+        ImGui::TableSetColumnIndex(3);
+        ImGui::Text("%.3f", session_dims.width);
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+        ImGui::Text("Z");
+
+        ImGui::TableSetColumnIndex(1);
+        ImGui::Text("%.3f", session_dims.z_min);
+        ImGui::TableSetColumnIndex(2);
+        ImGui::Text("%.3f", session_dims.z_max);
+        ImGui::TableSetColumnIndex(3);
+        ImGui::Text("%.3f", session_dims.height);
+
+        ImGui::EndTable();
+    }
+
+}
+
+void index_gui()
+{
+    ImGui::Text("File name:");
+    ImGui::Text(session.point_clouds_container.point_clouds[index_rendered_points_local].file_name.c_str());
+
+    ImGui::Text("Current index: %zu / %zu", index_rendered_points_local, session.point_clouds_container.point_clouds.size());
+
+    ImGui::Separator();
+
+    ImGui::Text("Vector sizes:");
+
+    ImGui::Text("index_pairs         : %zu", session.point_clouds_container.point_clouds[index_rendered_points_local].index_pairs.size());
+    ImGui::Text("buckets             : %zu", session.point_clouds_container.point_clouds[index_rendered_points_local].buckets.size());
+    ImGui::Text("points_local        : %zu", session.point_clouds_container.point_clouds[index_rendered_points_local].points_local.size());
+    ImGui::Text("normal_vectors_local: %zu", session.point_clouds_container.point_clouds[index_rendered_points_local].normal_vectors_local.size());
+    ImGui::Text("colors              : %zu", session.point_clouds_container.point_clouds[index_rendered_points_local].colors.size());
+    ImGui::Text("points_type         : %zu", session.point_clouds_container.point_clouds[index_rendered_points_local].points_type.size());
+    ImGui::Text("intensities         : %zu", session.point_clouds_container.point_clouds[index_rendered_points_local].intensities.size());
+    ImGui::Text("timestamps          : %zu", session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps.size());
+
+    ImGui::Separator();
+
+    ImGui::Text("Timestamps:");
+    double t = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps.front();
+
+    ImGui::Text("First point: %.0f [ns]", t);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Click to copy to clipboard");
+    if (ImGui::IsItemClicked())
+    {
+        char tmp[64];
+        snprintf(tmp, sizeof(tmp), "%.0f", t);
+        ImGui::SetClipboardText(tmp);
+    }
+
+    t = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps.back();
+    ImGui::Text("Last point : %.0f [ns]", t);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Click to copy to clipboard");
+    if (ImGui::IsItemClicked())
+    {
+        char tmp[64];
+        snprintf(tmp, sizeof(tmp), "%.0f", t);
+        ImGui::SetClipboardText(tmp);
+    }
+}
+
+void properties_gui()
+{
+    ImGui::Begin("Properties", &is_properties_gui, ImGuiWindowFlags_MenuBar);
+    {
+        if (ImGui::BeginMenuBar())
+        {
+            bool justPushed = false;
+
+            if (is_session_gui) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (ImGui::Button("Session"))
+            {
+                if (!is_session_gui)
+                {
+                    is_session_gui = true;
+                    is_index_gui = false;
+                    justPushed = true;
+                }
+            }
+            if (is_session_gui && !justPushed) ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Properties related to whole session");
+
+            ImGui::SameLine();
+
+            if (is_index_gui) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (ImGui::Button("Index"))
+            {
+                if (!is_index_gui)
+                {
+                    is_session_gui = false;
+                    is_index_gui = true;
+                    justPushed = true;
+                }
+            }
+            if (is_index_gui && !justPushed) ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Properties related to current cloud index");
+
+            ImGui::EndMenuBar();
+        }
+
+        if (is_session_gui)
+            session_gui();
+        if (is_index_gui)
+            index_gui();
+    }
+
+    ImGui::End();
+}
+
+
 void display()
 {
+    ImGuiIO& io = ImGui::GetIO();
+    glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+
     glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
@@ -772,29 +959,44 @@ void display()
 
     if (gl_useVBOs)
     {
-		gl_updateUserView(); //this can be optimized to be called only on change (camera movement, parameters, window resize)
+        gl_updateUserView(); //this can be optimized to be called only on change (camera movement, parameters, window resize)
         gl_renderPointCloud();
     }
 
-    updateCameraTransition();
-
-    ImGuiIO& io = ImGui::GetIO();
-
-    glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
-    if (is_ortho)
-    {
+    updateCameraTransition();
 
+    viewLocal = Eigen::Affine3f::Identity();
+
+    if (!is_ortho)
+    {
+        reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+
+        viewLocal.translate(rotation_center);
+
+        viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
+        if (!lock_z)
+            viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        else
+            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+
+        viewLocal.translate(-rotation_center);
+
+        glLoadMatrixf(viewLocal.matrix().data());
+    }
+    else
+    {
         glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio, -100000, 100000);
 
         glm::mat4 proj = glm::orthoLH_ZO<float>(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                                                -camera_ortho_xy_view_zoom / ratio,
-                                                camera_ortho_xy_view_zoom / ratio, -100, 100);
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio, -100, 100);
 
         std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
 
@@ -814,42 +1016,13 @@ void display()
         Eigen::Vector3d v_t = m * v;
 
         gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
-                  v_center_t.x(), v_center_t.y(), v_center_t.z(),
-                  v_t.x(), v_t.y(), v_t.z());
+            v_center_t.x(), v_center_t.y(), v_center_t.z(),
+            v_t.x(), v_t.y(), v_t.z());
         glm::mat4 lookat = glm::lookAt(glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
-                                       glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
-                                       glm::vec3(v_t.x(), v_t.y(), v_t.z()));
+            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
+            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
-    }
 
-    Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
-
-    if (!is_ortho)
-    {
-        reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-
-        Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
-        viewTranslation.translate(rotation_center);
-        viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-
-        if (!lock_z)
-            viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
-        else
-            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
-        viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
-
-        Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
-        viewTranslation2.translate(-rotation_center);
-
-        Eigen::Affine3f result = viewTranslation * viewLocal * viewTranslation2;
-
-        glLoadMatrixf(result.matrix().data());
-        /*      glTranslatef(translate_x, translate_y, translate_z);
-              glRotatef(rotate_x, 1.0, 0.0, 0.0);
-              glRotatef(rotate_y, 0.0, 0.0, 1.0);*/
-    }
-    else
-    {
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
     }
@@ -858,20 +1031,20 @@ void display()
 
     if (index_rendered_points_local >= 0 && index_rendered_points_local < session.point_clouds_container.point_clouds[index_rendered_points_local].points_local.size())
     {
-		const auto& cloud = session.point_clouds_container.point_clouds[index_rendered_points_local]; //avoiding multiple indexing
+        const auto& cloud = session.point_clouds_container.point_clouds[index_rendered_points_local]; //avoiding multiple indexing
 
-		const double inv_max_intensity = 1.0 / *std::max_element(cloud.intensities.begin(), cloud.intensities.end()); //precompute for speed
+        const double inv_max_intensity = 1.0 / *std::max_element(cloud.intensities.begin(), cloud.intensities.end()); //precompute for speed
 
         Eigen::Affine3d pose = cloud.m_pose;
 
-		if (usePose == false)
+        if (usePose == false)
             pose.translation().setZero();
 
         glPointSize(point_size);
         glBegin(GL_POINTS);
         for (size_t i = 0; i < cloud.points_local.size(); i++)
         {
-			if (colorScheme == 0) //solid color
+            if (colorScheme == 0) //solid color
             {
                 glColor3f(cloud.render_color[0], cloud.render_color[1], cloud.render_color[2]);
             }
@@ -879,22 +1052,22 @@ void display()
             {
                 const double norm = cloud.intensities[i] * inv_max_intensity + offset_intensity;
                 glColor3f(norm, 0.0, 1.0 - norm);
-			}
+            }
 
             Eigen::Vector3d p(cloud.points_local[i].x(),
-                              cloud.points_local[i].y(),
-                              cloud.points_local[i].z());
+                cloud.points_local[i].y(),
+                cloud.points_local[i].z());
             p = pose * p;
             glVertex3f(p.x(), p.y(), p.z());
         }
         glEnd();
 
-        if (show_neighbouring_scans){
+        if (show_neighbouring_scans) {
             glColor3f(pc_neigbouring_color.x, pc_neigbouring_color.y, pc_neigbouring_color.z);
             glPointSize(point_size);
             glBegin(GL_POINTS);
-            for (int index = index_rendered_points_local - 20; index <= index_rendered_points_local + 20; index +=5){
-                if (index != index_rendered_points_local && index >= 0 && index < session.point_clouds_container.point_clouds.size()){
+            for (int index = index_rendered_points_local - 20; index <= index_rendered_points_local + 20; index += 5) {
+                if (index != index_rendered_points_local && index >= 0 && index < session.point_clouds_container.point_clouds.size()) {
                     const auto& iCloud = session.point_clouds_container.point_clouds[index];  //avoiding multiple indexing
                     Eigen::Affine3d pose = iCloud.m_pose;
 
@@ -908,8 +1081,8 @@ void display()
                     for (int i = 0; i < iCloud.points_local.size(); i++)
                     {
                         Eigen::Vector3d p(iCloud.points_local[i].x(),
-                                          iCloud.points_local[i].y(),
-                                          iCloud.points_local[i].z());
+                            iCloud.points_local[i].y(),
+                            iCloud.points_local[i].z());
                         p = pose * p;
                         glVertex3f(p.x(), p.y(), p.z());
                     }
@@ -930,10 +1103,22 @@ void display()
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
     {
         openSession();
-        
-		//workaround
+
+        //workaround
         io.AddKeyEvent(ImGuiKey_O, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+    if (session_loaded)
+    {
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_P, false))
+        {
+            is_properties_gui = !is_properties_gui;
+
+            //workaround
+            io.AddKeyEvent(ImGuiKey_P, false);
+            io.AddKeyEvent(ImGuiMod_Ctrl, false);
+        }
     }
 
     if (session.point_clouds_container.point_clouds.size() > 0)
@@ -1056,7 +1241,6 @@ void display()
 
             ImGui::Separator();
 
-
             if (ImGui::BeginMenu("Colors"))
             {
                 ImGui::ColorEdit3("Background color", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
@@ -1117,6 +1301,8 @@ void display()
 
             ImGui::Separator();
 
+            ImGui::MenuItem("Properties", "Ctrl+P", &is_properties_gui, session_loaded);
+
             if (ImGui::BeginMenu("Console"))
             {
 #ifdef _WIN32
@@ -1172,18 +1358,31 @@ void display()
             ImGui::SameLine();
             ImGui::PushItemWidth(ImGuiNumberWidth);
             ImGui::SliderInt("##irpls", &tempIndex, 0, static_cast<int>(session.point_clouds_container.point_clouds.size() - 1));
-            ImGui::SameLine();
-            ImGui::InputInt("##irpli", &tempIndex, 1, 10);
-            ImGui::PopItemWidth();
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
                 ImGui::Text(session.point_clouds_container.point_clouds[index_rendered_points_local].file_name.c_str());
                 double ts = (session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps[0]
-                           - session.point_clouds_container.point_clouds[0].timestamps[0]) / 1e9;
+                    - session.point_clouds_container.point_clouds[0].timestamps[0]) / 1e9;
                 ImGui::Text("Delta 1st points timestamp [s]: %.6f", ts);
+                ImGui::NewLine();
+                ImGui::Text("Check Properties (Ctrl+P) for more info");
                 ImGui::EndTooltip();
             }
+            ImGui::SameLine();
+            ImGui::InputInt("##irpli", &tempIndex, 1, 10);
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text(session.point_clouds_container.point_clouds[index_rendered_points_local].file_name.c_str());
+                double ts = (session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps[0]
+                    - session.point_clouds_container.point_clouds[0].timestamps[0]) / 1e9;
+                ImGui::Text("Delta 1st points timestamp [s]: %.6f", ts);
+                ImGui::NewLine();
+                ImGui::Text("Check Properties (Ctrl+P) for more info");
+                ImGui::EndTooltip();
+            }
+            ImGui::PopItemWidth();
 
             if ((tempIndex >= 0) && (tempIndex < session.point_clouds_container.point_clouds.size()))
                 index_rendered_points_local = tempIndex;
@@ -1200,15 +1399,16 @@ void display()
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
         if (ImGui::SmallButton("Info"))
-        {
             info_gui = !info_gui;
-        }
+
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(3);
 
-
         ImGui::EndMainMenuBar();
     }
+
+    if (is_properties_gui)
+		properties_gui();
 
     if (consImGui)
     {
@@ -1222,10 +1422,12 @@ void display()
             ConsoleUnhook();
     }
 
-    info_window(infoLines, appShortcuts, &info_gui);
+    cor_window();
+
+    info_window(infoLines, appShortcuts);
 
     if (compass_ruler)
-        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), bg_color);
+        drawMiniCompassWithRuler();
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());

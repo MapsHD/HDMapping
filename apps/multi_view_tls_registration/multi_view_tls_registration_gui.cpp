@@ -230,8 +230,6 @@ bool session_loaded = false;
 int num_edge_extended_before = 0;
 int num_edge_extended_after = 0;
 
-ImVec4 orangeBorder(1.0f, 0.5f, 0.0f, 1.0f);
-
 void export_result_to_folder(std::string output_folder_name, ObservationPicking &observation_picking, Session &session);
 void reshape(int w, int h);
 
@@ -446,22 +444,19 @@ void icp_gui()
     tls_registration.icp.is_rodrigues = (ICP3dSelection == 2);
 
     if (ImGui::Button("Optimization point to point source to target"))
-    {
         tls_registration.icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
-    }
+
     ImGui::Separator();
 
     ImGui::Text("Optimization source to target Lie-algebra:");
     ImGui::SameLine();
     if (ImGui::Button("left Jacobian"))
-    {
         tls_registration.icp.optimize_source_to_target_lie_algebra_left_jacobian(session.point_clouds_container);
-    }
+
     ImGui::SameLine();
     if (ImGui::Button("right Jacobian"))
-    {
         tls_registration.icp.optimize_source_to_target_lie_algebra_right_jacobian(session.point_clouds_container);
-    }
+
     ImGui::Separator();
 
     if (ImGui::Button("Compute rms (optimization_point_to_point_source_to_target)"))
@@ -822,7 +817,6 @@ void observation_picking_gui()
                 observation_picking.point_size = 1;
             if (observation_picking.point_size > 20)
                 observation_picking.point_size = 20;
-            ImGui::PopItemWidth();
 
             if (ImGui::Button("Accept current observation"))
             {
@@ -1101,7 +1095,7 @@ void lio_segments_gui()
 
         static double angle_diff = 5.0;
 
-        if (ImGui::Button("Set those that sattisfy acceptable angle"))
+        if (ImGui::Button("Set those that satisfy acceptable angle"))
         {
             for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
             {
@@ -1417,6 +1411,45 @@ void openSession()
     }
 }
 
+void openLaz()
+{
+    session.point_clouds_container.point_clouds.clear();
+    std::vector<std::string> input_file_names;
+    input_file_names = mandeye::fd::OpenFileDialog("Load las/laz files", mandeye::fd::LAS_LAZ_filter, true);
+    if (input_file_names.size() > 0)
+    {
+        session.working_directory = fs::path(input_file_names[0]).parent_path().string();
+
+        std::cout << "Creating session from las/laz files:" << std::endl;
+        for (size_t i = 0; i < input_file_names.size(); i++)
+            std::cout << input_file_names[i] << std::endl;
+
+        if (!session.point_clouds_container.load_whu_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset))
+            std::cout << "Problem creating! Check input files laz/las" << std::endl;
+        else
+            std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+
+        session_loaded = true;
+        index_begin = 0;
+        index_end = session.point_clouds_container.point_clouds.size() - 1;
+
+        std::string newTitle = winTitle + " - " + fs::path(input_file_names[0]).parent_path().string();
+        glutSetWindowTitle(newTitle.c_str());
+
+        for (const auto& pc : session.point_clouds_container.point_clouds)
+            session_total_number_of_points += pc.points_local.size();
+
+        session_dims = session.point_clouds_container.compute_point_cloud_dimension();
+
+        [[maybe_unused]]
+        pfd::message message(
+            "Information",
+            "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
+            pfd::choice::ok, pfd::icon::info);
+        message.result();
+    }
+}
+
 void saveSession()
 {
     const auto output_file_name = mandeye::fd::SaveFileDialog("Save session as", mandeye::fd::Session_filter, ".mjs", session_file_name);
@@ -1494,6 +1527,8 @@ void saveSession()
             std::cerr << "Error copying poses file: " << e.what() << '\n';
         }
     }
+    else
+        std::cout << "saving canceled" << std::endl;
 }
 
 void saveSubsession()
@@ -1509,12 +1544,8 @@ void saveSubsession()
     }
 
     for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-    {
         if (session.point_clouds_container.point_clouds[i].visible)
-        {
             inx_end = i;
-        }
-    }
 
     // creating filename proposal based on current selection
     fs::path path(session_file_name);
@@ -1550,9 +1581,9 @@ void saveSubsession()
         catch (const fs::filesystem_error& e) {
             std::cerr << "Error copying poses file: " << e.what() << '\n';
         }
-    }else{
-        std::cout << "saving canceled" << std::endl;
     }
+    else
+        std::cout << "saving canceled" << std::endl;
 }
 
 void project_gui()
@@ -1636,6 +1667,8 @@ void project_gui()
         ImGui::SameLine();
         ImGuiHyperlink("https://3d.bk.tudelft.nl/liangliang/publications/2019/plade/resso.html");
 
+        ImGui::NewLine();
+
         if (ImGui::Button("Load ETH file (pairs.txt)"))
         {
             std::string input_file_name = "";
@@ -1657,39 +1690,20 @@ void project_gui()
         ImGui::SameLine();
         ImGuiHyperlink("https://prs.igp.ethz.ch/research/completed_projects/automatic_registration_of_point_clouds.html");
 
-        if (ImGui::Button("Load AlignedPointCloud from WHU-TLS (select all *.las or *.laz files in folder 2-AlignedPointCloud)"))
-        {
-            session.point_clouds_container.point_clouds.clear();
-            std::vector<std::string> input_file_names;
-            input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
-            if (input_file_names.size() > 0)
-            {
-                session.working_directory = fs::path(input_file_names[0]).parent_path().string();
+        ImGui::NewLine();
 
-                std::cout << "Las/Laz files:" << std::endl;
-                for (size_t i = 0; i < input_file_names.size(); i++)
-                    std::cout << input_file_names[i] << std::endl;
+        if (ImGui::Button("Load aligned point cloud from WHU-TLS"))
+            openLaz();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Select all *.las/*.laz files in folder 2-AlignedPointCloud");
 
-                if (!session.point_clouds_container.load_whu_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset))
-                    std::cout << "Check input files laz/las" << std::endl;
-                else
-                    std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-            }
-
-            session.point_clouds_container.print_point_cloud_dimension();
-
-            [[maybe_unused]]
-            pfd::message message(
-                "Information",
-                "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
-                pfd::choice::ok, pfd::icon::info);
-            message.result();
-        }
         ImGui::SameLine();
         ImGui::Checkbox("Calculate_offset for WHU-TLS", &tls_registration.calculate_offset);
         ImGui::Text("WHU-TLS dataset: ");
         ImGui::SameLine();
         ImGuiHyperlink("http://3s.whu.edu.cn/ybs/en/benchmark.htm");
+
+        ImGui::NewLine();
 
         if (ImGui::Button("Load 3DTK files (select all *.txt files)"))
         {
@@ -1717,6 +1731,8 @@ void project_gui()
         ImGui::Text("3DTK dataset (18: the campus of the Jacobs University Bremen)");
         ImGui::SameLine();
         ImGuiHyperlink("http://kos.informatik.uni-osnabrueck.de/3Dscans/");
+
+        ImGui::NewLine();
 
         if (ImGui::Button("Update initial poses from RESSO file"))
         {
@@ -1880,10 +1896,8 @@ void project_gui()
             ImGui::SetTooltip(zText);
         ImGui::PopItemWidth();
 
-        if (ImGui::Button("Set offset_to_apply --> from session (offset_to_apply_x, offset_to_apply_y, offset_to_apply_z)"))
-        {
+        if (ImGui::Button("Set offset_to_apply --> from session (X, Y, Z)"))
             session.point_clouds_container.offset = session.point_clouds_container.offset_to_apply;
-        }
 
         if (!simple_gui)
         {
@@ -1914,62 +1928,24 @@ void project_gui()
 
 void display()
 {
-    updateCameraTransition();
-
     ImGuiIO& io = ImGui::GetIO();
-
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-
-    Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
-
-    if (is_ortho)
-    {
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio, -100000, 100000);
-
-        glm::mat4 proj = glm::orthoLH_ZO<float>(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio, -100, 100);
-
-        std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
-
-        Eigen::Vector3d v_eye_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h + 10);
-        Eigen::Vector3d v_center_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h);
-        Eigen::Vector3d v(0, 1, 0);
-
-        TaitBryanPose pose_tb;
-        pose_tb.px = 0.0;
-        pose_tb.py = 0.0;
-        pose_tb.pz = 0.0;
-        pose_tb.om = 0.0;
-        pose_tb.fi = 0.0;
-        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * DEG_TO_RAD;
-        auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
-
-        Eigen::Vector3d v_t = m * v;
-
-        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
-            v_center_t.x(), v_center_t.y(), v_center_t.z(),
-            v_t.x(), v_t.y(), v_t.z());
-        glm::mat4 lookat = glm::lookAt(glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
-            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
-            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
-        std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
-    }
 
     glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+
+    updateCameraTransition();
+
+    viewLocal = Eigen::Affine3f::Identity();
+
     if (!is_ortho)
     {
         reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-
-        Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
 
         // janusz
         if (is_loop_closure_gui)
@@ -2010,29 +1986,54 @@ void display()
             }
         }
 
-        viewTranslation.translate(rotation_center);
+        viewLocal.translate(rotation_center);
 
         viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-
         if (!lock_z)
             viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
         else
             viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
         viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
 
-        Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
+        viewLocal.translate(-rotation_center);
 
-        viewTranslation2.translate(-rotation_center);
-
-        Eigen::Affine3f result = viewTranslation * viewLocal * viewTranslation2;
-
-        glLoadMatrixf(result.matrix().data());
-        /*      glTranslatef(translate_x, translate_y, translate_z);
-              glRotatef(rotate_x, 1.0, 0.0, 0.0);
-              glRotatef(rotate_y, 0.0, 0.0, 1.0);*/
+        glLoadMatrixf(viewLocal.matrix().data());
     }
     else
     {
+        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+
+        glm::mat4 proj = glm::orthoLH_ZO<float>(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio, -100, 100);
+
+        std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
+
+        Eigen::Vector3d v_eye_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h + 10);
+        Eigen::Vector3d v_center_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h);
+        Eigen::Vector3d v(0, 1, 0);
+
+        TaitBryanPose pose_tb;
+        pose_tb.px = 0.0;
+        pose_tb.py = 0.0;
+        pose_tb.pz = 0.0;
+        pose_tb.om = 0.0;
+        pose_tb.fi = 0.0;
+        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * DEG_TO_RAD;
+        auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
+
+        Eigen::Vector3d v_t = m * v;
+
+        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
+            v_center_t.x(), v_center_t.y(), v_center_t.z(),
+            v_t.x(), v_t.y(), v_t.z());
+        glm::mat4 lookat = glm::lookAt(glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
+            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
+            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
+        std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
+
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
     }
@@ -2049,6 +2050,246 @@ void display()
 
         tls_registration.gnss.render(session.point_clouds_container);
         session.ground_control_points.render(session.point_clouds_container);
+    }
+
+    int prev_index_pose = session.control_points.index_pose;
+    if (session.control_points.is_imgui)
+        session.control_points.imgui(session.point_clouds_container, rotation_center);
+
+    if (prev_index_pose != session.control_points.index_pose)
+    {
+        session.control_points.index_picked_point = -1; // reset picked point when pose changes
+
+        new_rotation_center.x() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().x();
+        new_rotation_center.y() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().y();
+        new_rotation_center.z() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().z();
+
+        new_rotate_x = rotate_x;
+        new_rotate_y = rotate_y;
+        if (session.control_points.track_pose_with_camera)
+        {
+            new_translate_x = -new_rotation_center.x();
+            new_translate_y = -new_rotation_center.y();
+        }
+        else
+        {
+            new_translate_x = translate_x;
+            new_translate_y = translate_y;
+        }
+        new_translate_z = translate_z;
+        camera_transition_active = true;
+    }
+
+    if (session.ground_control_points.is_imgui)
+        session.ground_control_points.imgui(session.point_clouds_container);
+
+    if (!session.control_points.is_imgui)
+    {
+        if (!is_loop_closure_gui)
+        {
+            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+            {
+                if (session.point_clouds_container.point_clouds[i].gizmo)
+                {
+                    std::vector<Eigen::Affine3d> all_m_poses;
+                    for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
+                    {
+                        all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
+                    }
+
+                    ImGuiIO& io = ImGui::GetIO();
+                    // ImGuizmo -----------------------------------------------
+                    ImGuizmo::BeginFrame();
+                    ImGuizmo::Enable(true);
+                    ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+                    if (!is_ortho)
+                    {
+                        GLfloat projection[16];
+                        glGetFloatv(GL_PROJECTION_MATRIX, projection);
+
+                        GLfloat modelview[16];
+                        glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+
+                        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                    }
+                    else
+                        ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+
+                    session.point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
+                    session.point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1];
+                    session.point_clouds_container.point_clouds[i].m_pose(2, 0) = m_gizmo[2];
+                    session.point_clouds_container.point_clouds[i].m_pose(3, 0) = m_gizmo[3];
+                    session.point_clouds_container.point_clouds[i].m_pose(0, 1) = m_gizmo[4];
+                    session.point_clouds_container.point_clouds[i].m_pose(1, 1) = m_gizmo[5];
+                    session.point_clouds_container.point_clouds[i].m_pose(2, 1) = m_gizmo[6];
+                    session.point_clouds_container.point_clouds[i].m_pose(3, 1) = m_gizmo[7];
+                    session.point_clouds_container.point_clouds[i].m_pose(0, 2) = m_gizmo[8];
+                    session.point_clouds_container.point_clouds[i].m_pose(1, 2) = m_gizmo[9];
+                    session.point_clouds_container.point_clouds[i].m_pose(2, 2) = m_gizmo[10];
+                    session.point_clouds_container.point_clouds[i].m_pose(3, 2) = m_gizmo[11];
+                    session.point_clouds_container.point_clouds[i].m_pose(0, 3) = m_gizmo[12];
+                    session.point_clouds_container.point_clouds[i].m_pose(1, 3) = m_gizmo[13];
+                    session.point_clouds_container.point_clouds[i].m_pose(2, 3) = m_gizmo[14];
+                    session.point_clouds_container.point_clouds[i].m_pose(3, 3) = m_gizmo[15];
+                    session.point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
+
+                    session.point_clouds_container.point_clouds[i].gui_translation[0] = (float)session.point_clouds_container.point_clouds[i].pose.px;
+                    session.point_clouds_container.point_clouds[i].gui_translation[1] = (float)session.point_clouds_container.point_clouds[i].pose.py;
+                    session.point_clouds_container.point_clouds[i].gui_translation[2] = (float)session.point_clouds_container.point_clouds[i].pose.pz;
+
+                    session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[i].pose.om * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[i].pose.fi * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[i].pose.ka * RAD_TO_DEG);
+
+                    if (!manipulate_only_marked_gizmo)
+                    {
+                        Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[i].m_pose;
+                        for (int j = i + 1; j < session.point_clouds_container.point_clouds.size(); j++)
+                        {
+                            curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
+                            session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
+                            session.point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
+
+                            session.point_clouds_container.point_clouds[j].gui_translation[0] = (float)session.point_clouds_container.point_clouds[j].pose.px;
+                            session.point_clouds_container.point_clouds[j].gui_translation[1] = (float)session.point_clouds_container.point_clouds[j].pose.py;
+                            session.point_clouds_container.point_clouds[j].gui_translation[2] = (float)session.point_clouds_container.point_clouds[j].pose.pz;
+
+                            session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
+                            session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
+                            session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
+                        }
+                    }
+                }
+            }
+
+            session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection,
+                session.point_clouds_container.xy_intersection,
+                session.point_clouds_container.xz_grid_10x10, session.point_clouds_container.xz_grid_1x1, session.point_clouds_container.xz_grid_01x01,
+                session.point_clouds_container.yz_grid_10x10, session.point_clouds_container.yz_grid_1x1, session.point_clouds_container.yz_grid_01x01,
+                session.point_clouds_container.xy_grid_10x10, session.point_clouds_container.xy_grid_1x1, session.point_clouds_container.xy_grid_01x01,
+                session.point_clouds_container.intersection_width, session_dims);
+
+            // std::cout << "session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 << std::endl;
+
+            observation_picking.render();
+
+            glPushAttrib(GL_ALL_ATTRIB_BITS);
+            glPointSize(5);
+            for (const auto& obs : observation_picking.observations)
+            {
+                for (const auto& [key1, value1] : obs)
+                {
+                    for (const auto& [key2, value2] : obs)
+                    {
+                        if (key1 != key2)
+                        {
+                            Eigen::Vector3d p1, p2;
+                            if (session.point_clouds_container.show_with_initial_pose)
+                            {
+                                p1 = session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
+                                p2 = session.point_clouds_container.point_clouds[key2].m_initial_pose * value2;
+                            }
+                            else
+                            {
+                                p1 = session.point_clouds_container.point_clouds[key1].m_pose * value1;
+                                p2 = session.point_clouds_container.point_clouds[key2].m_pose * value2;
+                            }
+                            glColor3f(0, 1, 0);
+                            glBegin(GL_POINTS);
+                            glVertex3f(p1.x(), p1.y(), p1.z());
+                            glVertex3f(p2.x(), p2.y(), p2.z());
+                            glEnd();
+                            glColor3f(1, 0, 0);
+                            glBegin(GL_LINES);
+                            glVertex3f(p1.x(), p1.y(), p1.z());
+                            glVertex3f(p2.x(), p2.y(), p2.z());
+                            glEnd();
+                        }
+                    }
+                }
+            }
+            glPopAttrib();
+
+            for (const auto& obs : observation_picking.observations)
+            {
+                Eigen::Vector3d mean(0, 0, 0);
+                int counter = 0;
+                for (const auto& [key1, value1] : obs)
+                {
+                    mean += session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
+                    counter++;
+                }
+                if (counter > 0)
+                {
+                    mean /= counter;
+
+                    glColor3f(1, 0, 0);
+                    glBegin(GL_LINE_STRIP);
+                    glVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
+                    glVertex3f(mean.x() + 1, mean.y() - 1, mean.z());
+                    glVertex3f(mean.x() + 1, mean.y() + 1, mean.z());
+                    glVertex3f(mean.x() - 1, mean.y() + 1, mean.z());
+                    glVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
+                    glEnd();
+                }
+            }
+
+            glColor3f(1, 0, 1);
+            glBegin(GL_POINTS);
+            for (auto p : picked_points)
+            {
+                glVertex3f(p.x(), p.y(), p.z());
+            }
+            glEnd();
+        }
+        else
+        {
+            // ImGuizmo -----------------------------------------------
+            if (session.pose_graph_loop_closure.gizmo && session.pose_graph_loop_closure.edges.size() > 0)
+            {
+                ImGuizmo::BeginFrame();
+                ImGuizmo::Enable(true);
+                ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+                if (!is_ortho)
+                {
+                    GLfloat projection[16];
+                    glGetFloatv(GL_PROJECTION_MATRIX, projection);
+
+                    GLfloat modelview[16];
+                    glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+
+                    ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                }
+                else
+                    ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+
+                Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
+
+                m_g(0, 0) = m_gizmo[0];
+                m_g(1, 0) = m_gizmo[1];
+                m_g(2, 0) = m_gizmo[2];
+                m_g(3, 0) = m_gizmo[3];
+                m_g(0, 1) = m_gizmo[4];
+                m_g(1, 1) = m_gizmo[5];
+                m_g(2, 1) = m_gizmo[6];
+                m_g(3, 1) = m_gizmo[7];
+                m_g(0, 2) = m_gizmo[8];
+                m_g(1, 2) = m_gizmo[9];
+                m_g(2, 2) = m_gizmo[10];
+                m_g(3, 2) = m_gizmo[11];
+                m_g(0, 3) = m_gizmo[12];
+                m_g(1, 3) = m_gizmo[13];
+                m_g(2, 3) = m_gizmo[14];
+                m_g(3, 3) = m_gizmo[15];
+
+                const int& index_src = session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from;
+
+                const Eigen::Affine3d& m_src = session.point_clouds_container.point_clouds.at(index_src).m_pose;
+                session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
+            }
+        }
     }
 
     ImGui_ImplOpenGL2_NewFrame();
@@ -2154,10 +2395,30 @@ void display()
     {
         if (!session_loaded)
         {
-            if (ImGui::Button("Load session"))
+            if (ImGui::Button("Open session"))
                 openSession();
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Select session to open (Ctrl+O)");
+
+            ImGui::SameLine();
+
+            if (ImGui::ArrowButton("##menuArrow", ImGuiDir_Down))
+            {
+                ImGui::OpenPopup("OpenMenu");
+            }
+
+            if (ImGui::BeginPopup("OpenMenu"))
+            {
+                if (ImGui::MenuItem("Open las/laz"))
+                    openLaz();
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Create session from las/laz files");
+
+
+                ImGui::MenuItem("Calculate_offset", nullptr, &tls_registration.calculate_offset);
+
+                ImGui::EndPopup();
+			}
 
             ImGui::SameLine();
             ImGui::Dummy(ImVec2(20, 0));
@@ -2571,7 +2832,7 @@ void display()
                 }
                 ImGui::Separator();
                 ImGui::MenuItem("Pose Graph SLAM", "Ctrl+P", &is_pose_graph_slam);
-                ImGui::MenuItem("Manual Analysis", nullptr, &is_manual_analisys);
+                ImGui::MenuItem("Observations", nullptr, &is_manual_analisys);
 
 
                 ImGui::Separator();
@@ -2828,9 +3089,8 @@ void display()
             //ImGui::Text("(avg %.1f)", fps_avg);
 
             if (viewer_decimate_point_cloud < 1)
-            {
                 viewer_decimate_point_cloud = 1;
-            }
+
             ImGui::SameLine();
             ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
         }
@@ -2845,9 +3105,8 @@ void display()
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
 
         if (ImGui::SmallButton("Info"))
-        {
             info_gui = !info_gui;
-        }
+
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(3);
 
@@ -2874,250 +3133,12 @@ void display()
     if (is_lio_segments_gui)
         lio_segments_gui();
 
-    int prev_index_pose = session.control_points.index_pose;
-    if (session.control_points.is_imgui)
-        session.control_points.imgui(session.point_clouds_container, rotation_center);
+    cor_window();
 
-    if (prev_index_pose != session.control_points.index_pose)
-    {
-        session.control_points.index_picked_point = -1; // reset picked point when pose changes
-
-        new_rotation_center.x() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().x();
-        new_rotation_center.y() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().y();
-        new_rotation_center.z() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().z();
-
-        new_rotate_x = rotate_x;
-        new_rotate_y = rotate_y;
-        if (session.control_points.track_pose_with_camera)
-        {
-            new_translate_x = -new_rotation_center.x();
-            new_translate_y = -new_rotation_center.y();
-        }
-        else
-        {
-            new_translate_x = translate_x;
-            new_translate_y = translate_y;
-        }
-        new_translate_z = translate_z;
-        camera_transition_active = true;
-    }
-
-    if (session.ground_control_points.is_imgui)
-        session.ground_control_points.imgui(session.point_clouds_container);
-
-    info_window(infoLines, appShortcuts, &info_gui);
+    info_window(infoLines, appShortcuts);
 
     if (compass_ruler)
-        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), bg_color);
-
-    if (!session.control_points.is_imgui)
-    {
-        if (!is_loop_closure_gui)
-        {
-            for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-            {
-                if (session.point_clouds_container.point_clouds[i].gizmo)
-                {
-                    std::vector<Eigen::Affine3d> all_m_poses;
-                    for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
-                    {
-                        all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
-                    }
-
-                    ImGuiIO &io = ImGui::GetIO();
-                    // ImGuizmo -----------------------------------------------
-                    ImGuizmo::BeginFrame();
-                    ImGuizmo::Enable(true);
-                    ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-                    if (!is_ortho)
-                    {
-                        GLfloat projection[16];
-                        glGetFloatv(GL_PROJECTION_MATRIX, projection);
-
-                        GLfloat modelview[16];
-                        glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-
-                        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
-                    }
-                    else
-                        ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
-
-                    session.point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
-                    session.point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1];
-                    session.point_clouds_container.point_clouds[i].m_pose(2, 0) = m_gizmo[2];
-                    session.point_clouds_container.point_clouds[i].m_pose(3, 0) = m_gizmo[3];
-                    session.point_clouds_container.point_clouds[i].m_pose(0, 1) = m_gizmo[4];
-                    session.point_clouds_container.point_clouds[i].m_pose(1, 1) = m_gizmo[5];
-                    session.point_clouds_container.point_clouds[i].m_pose(2, 1) = m_gizmo[6];
-                    session.point_clouds_container.point_clouds[i].m_pose(3, 1) = m_gizmo[7];
-                    session.point_clouds_container.point_clouds[i].m_pose(0, 2) = m_gizmo[8];
-                    session.point_clouds_container.point_clouds[i].m_pose(1, 2) = m_gizmo[9];
-                    session.point_clouds_container.point_clouds[i].m_pose(2, 2) = m_gizmo[10];
-                    session.point_clouds_container.point_clouds[i].m_pose(3, 2) = m_gizmo[11];
-                    session.point_clouds_container.point_clouds[i].m_pose(0, 3) = m_gizmo[12];
-                    session.point_clouds_container.point_clouds[i].m_pose(1, 3) = m_gizmo[13];
-                    session.point_clouds_container.point_clouds[i].m_pose(2, 3) = m_gizmo[14];
-                    session.point_clouds_container.point_clouds[i].m_pose(3, 3) = m_gizmo[15];
-                    session.point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
-
-                    session.point_clouds_container.point_clouds[i].gui_translation[0] = (float)session.point_clouds_container.point_clouds[i].pose.px;
-                    session.point_clouds_container.point_clouds[i].gui_translation[1] = (float)session.point_clouds_container.point_clouds[i].pose.py;
-                    session.point_clouds_container.point_clouds[i].gui_translation[2] = (float)session.point_clouds_container.point_clouds[i].pose.pz;
-
-                    session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[i].pose.om * RAD_TO_DEG);
-                    session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[i].pose.fi * RAD_TO_DEG);
-                    session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[i].pose.ka * RAD_TO_DEG);
-
-                    if (!manipulate_only_marked_gizmo)
-                    {
-                        Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[i].m_pose;
-                        for (int j = i + 1; j < session.point_clouds_container.point_clouds.size(); j++)
-                        {
-                            curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
-                            session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                            session.point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
-
-                            session.point_clouds_container.point_clouds[j].gui_translation[0] = (float)session.point_clouds_container.point_clouds[j].pose.px;
-                            session.point_clouds_container.point_clouds[j].gui_translation[1] = (float)session.point_clouds_container.point_clouds[j].pose.py;
-                            session.point_clouds_container.point_clouds[j].gui_translation[2] = (float)session.point_clouds_container.point_clouds[j].pose.pz;
-
-                            session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
-                            session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
-                            session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
-                        }
-                    }
-                }
-            }
-
-            session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection,
-                                                  session.point_clouds_container.xy_intersection,
-                                                  session.point_clouds_container.xz_grid_10x10, session.point_clouds_container.xz_grid_1x1, session.point_clouds_container.xz_grid_01x01,
-                                                  session.point_clouds_container.yz_grid_10x10, session.point_clouds_container.yz_grid_1x1, session.point_clouds_container.yz_grid_01x01,
-                                                  session.point_clouds_container.xy_grid_10x10, session.point_clouds_container.xy_grid_1x1, session.point_clouds_container.xy_grid_01x01,
-                                                  session.point_clouds_container.intersection_width, session_dims);
-
-            // std::cout << "session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 << std::endl;
-
-            observation_picking.render();
-
-            glPushAttrib(GL_ALL_ATTRIB_BITS);
-            glPointSize(5);
-            for (const auto &obs : observation_picking.observations)
-            {
-                for (const auto &[key1, value1] : obs)
-                {
-                    for (const auto &[key2, value2] : obs)
-                    {
-                        if (key1 != key2)
-                        {
-                            Eigen::Vector3d p1, p2;
-                            if (session.point_clouds_container.show_with_initial_pose)
-                            {
-                                p1 = session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-                                p2 = session.point_clouds_container.point_clouds[key2].m_initial_pose * value2;
-                            }
-                            else
-                            {
-                                p1 = session.point_clouds_container.point_clouds[key1].m_pose * value1;
-                                p2 = session.point_clouds_container.point_clouds[key2].m_pose * value2;
-                            }
-                            glColor3f(0, 1, 0);
-                            glBegin(GL_POINTS);
-                            glVertex3f(p1.x(), p1.y(), p1.z());
-                            glVertex3f(p2.x(), p2.y(), p2.z());
-                            glEnd();
-                            glColor3f(1, 0, 0);
-                            glBegin(GL_LINES);
-                            glVertex3f(p1.x(), p1.y(), p1.z());
-                            glVertex3f(p2.x(), p2.y(), p2.z());
-                            glEnd();
-                        }
-                    }
-                }
-            }
-            glPopAttrib();
-
-            for (const auto &obs : observation_picking.observations)
-            {
-                Eigen::Vector3d mean(0, 0, 0);
-                int counter = 0;
-                for (const auto &[key1, value1] : obs)
-                {
-                    mean += session.point_clouds_container.point_clouds[key1].m_initial_pose * value1;
-                    counter++;
-                }
-                if (counter > 0)
-                {
-                    mean /= counter;
-
-                    glColor3f(1, 0, 0);
-                    glBegin(GL_LINE_STRIP);
-                    glVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
-                    glVertex3f(mean.x() + 1, mean.y() - 1, mean.z());
-                    glVertex3f(mean.x() + 1, mean.y() + 1, mean.z());
-                    glVertex3f(mean.x() - 1, mean.y() + 1, mean.z());
-                    glVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
-                    glEnd();
-                }
-            }
-
-            glColor3f(1, 0, 1);
-            glBegin(GL_POINTS);
-            for (auto p : picked_points)
-            {
-                glVertex3f(p.x(), p.y(), p.z());
-            }
-            glEnd();
-        }
-        else
-        {
-            // ImGuizmo -----------------------------------------------
-            if (session.pose_graph_loop_closure.gizmo && session.pose_graph_loop_closure.edges.size() > 0)
-            {
-                ImGuizmo::BeginFrame();
-                ImGuizmo::Enable(true);
-                ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-                if (!is_ortho)
-                {
-                    GLfloat projection[16];
-                    glGetFloatv(GL_PROJECTION_MATRIX, projection);
-
-                    GLfloat modelview[16];
-                    glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-
-                    ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
-                }
-                else
-                    ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
-
-                Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
-
-                m_g(0, 0) = m_gizmo[0];
-                m_g(1, 0) = m_gizmo[1];
-                m_g(2, 0) = m_gizmo[2];
-                m_g(3, 0) = m_gizmo[3];
-                m_g(0, 1) = m_gizmo[4];
-                m_g(1, 1) = m_gizmo[5];
-                m_g(2, 1) = m_gizmo[6];
-                m_g(3, 1) = m_gizmo[7];
-                m_g(0, 2) = m_gizmo[8];
-                m_g(1, 2) = m_gizmo[9];
-                m_g(2, 2) = m_gizmo[10];
-                m_g(3, 2) = m_gizmo[11];
-                m_g(0, 3) = m_gizmo[12];
-                m_g(1, 3) = m_gizmo[13];
-                m_g(2, 3) = m_gizmo[14];
-                m_g(3, 3) = m_gizmo[15];
-
-                const int &index_src = session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from;
-
-                const Eigen::Affine3d &m_src = session.point_clouds_container.point_clouds.at(index_src).m_pose;
-                session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
-            }
-        }
-    }
+        drawMiniCompassWithRuler();
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());

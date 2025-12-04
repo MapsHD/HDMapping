@@ -11,6 +11,8 @@
 const float DEG_TO_RAD = M_PI / 180.0f;
 const float RAD_TO_DEG = 180.0f / M_PI;
 
+const ImVec4 orangeBorder(1.0f, 0.5f, 0.0f, 1.0f);
+
 const std::string out_fn = "Output file name";
 
 constexpr float ImGuiNumberWidth = 120.0f;
@@ -54,6 +56,8 @@ extern int point_size;
 
 extern bool info_gui;
 extern bool compass_ruler;
+
+extern Eigen::Affine3f viewLocal;
 
 extern Eigen::Vector3f rotation_center;
 extern float rotate_x, rotate_y;
@@ -100,15 +104,12 @@ void breakCameraTransition();
 void setCameraPreset(CameraPreset preset);
 void camMenu();
 void view_kbd_shortcuts();
+void cor_window();
 
 void ImGuiHyperlink(const char* url, ImVec4 color = ImVec4(0.2f, 0.4f, 0.8f, 1.0f));
-void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts, bool* open);
+void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts);
 
-void drawMiniCompassWithRuler(
-    const Eigen::Affine3f& viewLocal,
-    float translate_z,
-    const ImVec4& bg_color,
-    ImVec2 compassSize = ImVec2(200, 200));
+void drawMiniCompassWithRuler();
 
 Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane);
 LaserBeam GetLaserBeam(int x, int y);

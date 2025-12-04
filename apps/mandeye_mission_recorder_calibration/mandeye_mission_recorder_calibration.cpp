@@ -626,24 +626,47 @@ void project_gui()
 
 void display()
 {
-    updateCameraTransition();
-
     ImGuiIO& io = ImGui::GetIO();
-
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+
+    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
-    if (is_ortho)
+    updateCameraTransition();
+
+    viewLocal = Eigen::Affine3f::Identity();
+
+    if (!is_ortho)
+    {
+        reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+
+        viewLocal.translate(rotation_center);
+
+        viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
+        if (!lock_z)
+            viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        else
+            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+
+        viewLocal.translate(-rotation_center);
+
+        glLoadMatrixf(viewLocal.matrix().data());
+    }
+    else
     {
         glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio, -100000, 100000);
 
         glm::mat4 proj = glm::orthoLH_ZO<float>(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                                                -camera_ortho_xy_view_zoom / ratio,
-                                                camera_ortho_xy_view_zoom / ratio, -100, 100);
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio, -100, 100);
 
         std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
 
@@ -663,47 +686,13 @@ void display()
         Eigen::Vector3d v_t = m * v;
 
         gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
-                  v_center_t.x(), v_center_t.y(), v_center_t.z(),
-                  v_t.x(), v_t.y(), v_t.z());
+            v_center_t.x(), v_center_t.y(), v_center_t.z(),
+            v_t.x(), v_t.y(), v_t.z());
         glm::mat4 lookat = glm::lookAt(glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
-                                       glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
-                                       glm::vec3(v_t.x(), v_t.y(), v_t.z()));
+            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
+            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
-    }
 
-    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
-
-    Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
-
-    if (!is_ortho)
-    {
-        reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-
-        Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
-        viewTranslation.translate(rotation_center);
-        Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
-        viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-
-        if (!lock_z)
-            viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
-        else
-            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
-        viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
-
-        Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
-        viewTranslation2.translate(-rotation_center);
-
-        Eigen::Affine3f result = viewTranslation * viewLocal * viewTranslation2;
-
-        glLoadMatrixf(result.matrix().data());
-        /*      glTranslatef(translate_x, translate_y, translate_z);
-              glRotatef(rotate_x, 1.0, 0.0, 0.0);
-              glRotatef(rotate_y, 0.0, 0.0, 1.0);*/
-    }
-    else
-    {
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
     }
@@ -838,6 +827,20 @@ void display()
             }
             ImGui::EndDisabled();
 
+            ImGui::MenuItem("Orthographic", "key O", &is_ortho);
+            if (is_ortho)
+            {
+                new_rotation_center = rotation_center;
+                new_rotate_x = 0.0;
+                new_rotate_y = 0.0;
+                new_translate_x = translate_x;
+                new_translate_y = translate_y;
+                new_translate_z = translate_z;
+                camera_transition_active = true;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
+
             ImGui::MenuItem("Show grid", "key G", &show_grid);
 
             ImGui::MenuItem("Show axes", "key X", &show_axes);
@@ -875,9 +878,8 @@ void display()
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
         if (ImGui::SmallButton("Info"))
-        {
             info_gui = !info_gui;
-        }
+
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(3);
 
@@ -885,10 +887,12 @@ void display()
         ImGui::EndMainMenuBar();
     }
 
-    info_window(infoLines, appShortcuts, &info_gui);
+    cor_window();
+
+    info_window(infoLines, appShortcuts);
 
     if (compass_ruler)
-        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), bg_color);
+        drawMiniCompassWithRuler();
 
     project_gui();
 

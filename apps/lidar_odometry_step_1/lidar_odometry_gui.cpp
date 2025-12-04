@@ -681,7 +681,7 @@ void save_results(bool info, double elapsed_seconds)
     }
 }
 
-void lidar_odometry_gui()
+void project_gui()
 {
     if (ImGui::Begin("full_lidar_odometry_gui", &full_lidar_odometry_gui))
     {
@@ -1620,40 +1620,37 @@ void save_results(bool info, double elapsed_seconds, std::string &working_direct
 }
 
 void display()
-{
-    updateCameraTransition();
-    
-    ImGuiIO &io = ImGui::GetIO();
-
+{ 
+    ImGuiIO& io = ImGui::GetIO();
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+
+    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
-    glClearColor(params.clear_color.x * params.clear_color.w, params.clear_color.y * params.clear_color.w, params.clear_color.z * params.clear_color.w, params.clear_color.w);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
+    updateCameraTransition();
 
     reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-    Eigen::Affine3f viewTranslation = Eigen::Affine3f::Identity();
-    viewTranslation.translate(rotation_center);
-    Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
+
+    viewLocal = Eigen::Affine3f::Identity();
+
+    viewLocal.translate(rotation_center);
+
     viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-
-
     if (!lock_z)
         viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
     else
         viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
     viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
 
-    Eigen::Affine3f viewTranslation2 = Eigen::Affine3f::Identity();
-    viewTranslation2.translate(-rotation_center);
-
-    Eigen::Affine3f result = viewTranslation * viewLocal * viewTranslation2;
+    viewLocal.translate(-rotation_center);
 
     glMatrixMode(GL_MODELVIEW);
-    glLoadMatrixf(result.matrix().data());
+    glLoadMatrixf(viewLocal.matrix().data());
 
     showAxes();
 
@@ -2117,6 +2114,8 @@ void display()
 
                 ImGui::ColorEdit3("Background color", (float *)&params.clear_color, ImGuiColorEditFlags_NoInputs);
 
+                bg_color = params.clear_color;
+
                 ImGui::EndMenu();
             }
             if (ImGui::IsItemHovered())
@@ -2132,30 +2131,13 @@ void display()
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
             if (ImGui::SmallButton("Info"))
-            {
                 info_gui = !info_gui;
-            }
+
             ImGui::PopStyleVar(2);
             ImGui::PopStyleColor(3);
 
             ImGui::EndMainMenuBar();
         }
-    }
-
-    if (full_lidar_odometry_gui)
-    {
-        lastPar = 0;
-
-        lidar_odometry_gui();
-    }
-
-    if (loRunning)
-        progress_window();
-
-    if (info_gui)
-    {
-        infoLines[infoLines.size() - 2] = "It saves session file in " + working_directory + "\\lidar_odometry_result_*";
-        info_window(infoLines, appShortcuts, &info_gui);
     }
 
     if (initial_transformation_gizmo)
@@ -2226,8 +2208,26 @@ void display()
         stretch_gizmo_m(3, 3) = m_gizmo[15];
     }
 
+    if (full_lidar_odometry_gui)
+    {
+        lastPar = 0;
+
+        project_gui();
+    }
+
+    if (loRunning)
+        progress_window();
+
+    cor_window();
+
+    if (info_gui)
+    {
+        infoLines[infoLines.size() - 2] = "It saves session file in " + working_directory + "\\lidar_odometry_result_*";
+        info_window(infoLines, appShortcuts);
+    }
+
     if (compass_ruler)
-        drawMiniCompassWithRuler(viewLocal, fabs(translate_z), params.clear_color);
+        drawMiniCompassWithRuler();
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());

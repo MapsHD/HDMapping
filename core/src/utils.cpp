@@ -35,6 +35,8 @@ int point_size = 1;
 bool info_gui = false;
 bool compass_ruler = true;
 
+Eigen::Affine3f viewLocal;
+
 Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
 float rotate_x = 0.0, rotate_y = 0.0;
 float translate_x, translate_y = 0.0;
@@ -403,7 +405,7 @@ void ShowMainDockSpace()
         auto dock_id_left = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.2f, nullptr, &dockspace_id);
         auto dock_id_bottom = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.2f, nullptr, &dockspace_id);
 
-        ImGui::DockBuilderDockWindow("Settings", dock_id_left);
+        //ImGui::DockBuilderDockWindow("Settings", dock_id_left);
         ImGui::DockBuilderDockWindow("Console", dock_id_bottom);
         ImGui::DockBuilderFinish(dockspace_id);
     }
@@ -842,6 +844,59 @@ void view_kbd_shortcuts()
 
 
 
+void cor_window()
+{
+    //temporary location for new rotation center (minimal impact change in all apps)
+    if (cor_gui)
+    {
+        ImGui::OpenPopup("Center of rotation");
+        cor_gui = false;
+    }
+
+    if (ImGui::BeginPopupModal("Center of rotation", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("Select new center of rotation [m]:");
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::InputFloat("X", &new_rotation_center.x(), 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(xText);
+        ImGui::SameLine();
+        ImGui::InputFloat("Y", &new_rotation_center.y(), 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(yText);
+        ImGui::SameLine();
+        ImGui::InputFloat("Z", &new_rotation_center.z(), 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(zText);
+        ImGui::PopItemWidth();
+
+        ImGui::Separator();
+
+        if (ImGui::Button("Set"))
+        {
+            new_rotate_x = rotate_x;
+            new_rotate_y = rotate_y;
+            new_translate_x = -new_rotation_center.x();
+            new_translate_y = -new_rotation_center.y();
+            new_translate_z = translate_z;
+
+            camera_transition_active = true;
+
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+}
+
+
+
 void ImGuiHyperlink(const char* url, ImVec4 color)
 {
     ImGui::PushStyleColor(ImGuiCol_Text, color);
@@ -937,59 +992,11 @@ void ShowShortcutsTable(const std::vector<ShortcutEntry> appShortcuts)
 
 
 
-void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts, bool* open)
+void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts)
 {
-	//temporary location for new rotation center (minimal impact change in all apps)
-    if (cor_gui)
-    {
-        ImGui::OpenPopup("Center of rotation");
-        cor_gui = false;
-    }
+    if (!info_gui) return;
 
-    if (ImGui::BeginPopupModal("Center of rotation", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::Text("Select new center of rotation [m]:");
-        ImGui::PushItemWidth(ImGuiNumberWidth);
-        ImGui::InputFloat("X", &new_rotation_center.x(), 0.0, 0.0, "%.3f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(xText);
-        ImGui::SameLine();
-        ImGui::InputFloat("Y", &new_rotation_center.y(), 0.0, 0.0, "%.3f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(yText);
-        ImGui::SameLine();
-        ImGui::InputFloat("Z", &new_rotation_center.z(), 0.0, 0.0, "%.3f");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(zText);
-        ImGui::PopItemWidth();
-
-        ImGui::Separator();
-
-        if (ImGui::Button("Set"))
-        {
-            new_rotate_x = rotate_x;
-            new_rotate_y = rotate_y;
-            new_translate_x = -new_rotation_center.x();
-            new_translate_y = -new_rotation_center.y();
-            new_translate_z = translate_z;
-
-            camera_transition_active = true;
-
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel"))
-        {
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
-    }
-
-    if (!open || !*open) return;
-
-    if (ImGui::Begin("Info", open, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking))
+    if (ImGui::Begin("Info", &info_gui, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse))
     {
         bool firstLine = true;
         for (const auto& line : infoLines)
@@ -1041,19 +1048,17 @@ void info_window(const std::vector<std::string>& infoLines, const std::vector<Sh
 
         if (show_about)
             ImGui::ShowAboutWindow(&show_about);
-
-        ImGui::End();
     }
+
+    ImGui::End();
 }
 
 
 
-void drawMiniCompassWithRuler(
-    const Eigen::Affine3f& viewLocal,
-    float translate_z,
-    const ImVec4& bg_color,
-    ImVec2 compassSize)
+void drawMiniCompassWithRuler()
 {
+    const ImVec2 compassSize = ImVec2(200, 200);
+
     auto drawLabel = [](float x, float y, float z, const char* text, float r, float g, float b)
     {
         glColor3f(r, g, b);
@@ -1099,7 +1104,7 @@ void drawMiniCompassWithRuler(
     float miniAxisLength = 1.0f;
 
     // Snap ruler length to a "nice" round number (1, 2, or 5 × 10^n)
-    float rawUnit = 0.1f * translate_z; // adjust factor to taste
+    float rawUnit = 0.1f * fabs(translate_z); // adjust factor to taste
     float base = pow(10.0f, floor(log10(rawUnit)));
     float normalized = rawUnit / base;
     float niceUnit;

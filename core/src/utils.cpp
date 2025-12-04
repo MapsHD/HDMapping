@@ -5,6 +5,8 @@
 
 #include "utils.hpp"
 
+#include "imgui_internal.h"
+
 #include <cmath>
 #include <cstdio>
 #include <iostream>
@@ -51,6 +53,8 @@ float new_rotate_y = rotate_y;
 float new_translate_x = translate_x;
 float new_translate_y = translate_y;
 float new_translate_z = translate_z;
+
+bool cor_gui = false;
 
 // Transition timing
 bool camera_transition_active = false;
@@ -101,6 +105,7 @@ static const std::vector<ShortcutEntry> shortcuts = {
     {"", "Ctrl+Q", ""},
     {"", "R", "camera Right"},
     {"", "Ctrl+R", ""},
+    {"", "Shift+R", "Rotation center"},
     {"", "S", ""},
     {"", "Ctrl+S", ""},
     {"", "Ctrl+Shift+S", ""},
@@ -140,6 +145,7 @@ static const std::vector<ShortcutEntry> shortcuts = {
     {"", "Right click + drag", "camera pan"},
     {"", "Scroll", "camera zoom"},
     {"", "Shift + scroll", "camera 5x zoom"},
+    {"", "Shift + drag", "Dock window to screen edges"},
     {"", "Ctrl + left click", ""},
     {"", "Ctrl + right click", "change center of rotation"},
     {"", "Ctrl + middle click", "change center of rotation (if no CP GUI active)"}
@@ -361,6 +367,8 @@ void keyboardUp(unsigned char key, int x, int y) {
     //std::cout << "Up key: " << key << ", mod: " << mods << std::endl;
 }
 
+static bool first_time = true;
+
 void ShowMainDockSpace()
 {
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking
@@ -387,7 +395,18 @@ void ShowMainDockSpace()
 
     // This is the dockspace!
     ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
-    ImGui::DockSpace(dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGui::DockSpace(dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoDockingInCentralNode);
+
+    if (first_time) {
+        first_time = false;
+
+        auto dock_id_left = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.2f, nullptr, &dockspace_id);
+        auto dock_id_bottom = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.2f, nullptr, &dockspace_id);
+
+        ImGui::DockBuilderDockWindow("Settings", dock_id_left);
+        ImGui::DockBuilderDockWindow("Console", dock_id_bottom);
+        ImGui::DockBuilderFinish(dockspace_id);
+    }
 
     ImGui::End();
 }
@@ -430,6 +449,8 @@ bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard     // Enable Keyboard Controls
                    | ImGuiConfigFlags_NavEnableGamepad
                    | ImGuiConfigFlags_DockingEnable;
+    io.ConfigDockingWithShift = true;
+    io.MouseDrawCursor = false;   // use OS cursor (for future ImGUI update to 1.93+)
 
     ImGui::StyleColorsDark();
     ImGui_ImplGLUT_Init();
@@ -765,6 +786,9 @@ void view_kbd_shortcuts()
         breakCameraTransition();
     }
 
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_R, false))
+		cor_gui = true;
+
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false) && !is_ortho)
 		lock_z = !lock_z;
 
@@ -795,7 +819,6 @@ void view_kbd_shortcuts()
         is_ortho = !is_ortho;
     if (ImGui::IsKeyPressed(ImGuiKey_X, false))
         show_axes = !show_axes;
-
 
     if (ImGui::IsKeyPressed(ImGuiKey_1))
 		point_size = 1;
@@ -916,9 +939,57 @@ void ShowShortcutsTable(const std::vector<ShortcutEntry> appShortcuts)
 
 void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts, bool* open)
 {
+	//temporary location for new rotation center (minimal impact change in all apps)
+    if (cor_gui)
+    {
+        ImGui::OpenPopup("Center of rotation");
+        cor_gui = false;
+    }
+
+    if (ImGui::BeginPopupModal("Center of rotation", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("Select new center of rotation [m]:");
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::InputFloat("X", &new_rotation_center.x(), 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(xText);
+        ImGui::SameLine();
+        ImGui::InputFloat("Y", &new_rotation_center.y(), 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(yText);
+        ImGui::SameLine();
+        ImGui::InputFloat("Z", &new_rotation_center.z(), 0.0, 0.0, "%.3f");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(zText);
+        ImGui::PopItemWidth();
+
+        ImGui::Separator();
+
+        if (ImGui::Button("Set"))
+        {
+            new_rotate_x = rotate_x;
+            new_rotate_y = rotate_y;
+            new_translate_x = -new_rotation_center.x();
+            new_translate_y = -new_rotation_center.y();
+            new_translate_z = translate_z;
+
+            camera_transition_active = true;
+
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
     if (!open || !*open) return;
 
-    if (ImGui::Begin("Info", open, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
+    if (ImGui::Begin("Info", open, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking))
     {
         bool firstLine = true;
         for (const auto& line : infoLines)
@@ -1143,6 +1214,107 @@ LaserBeam GetLaserBeam(int x, int y)
     laser_beam.direction.z() = posZfar - posZnear;
 
     return laser_beam;
+}
+
+double distance_point_to_line(const Eigen::Vector3d& point, const LaserBeam& line)
+{
+    Eigen::Vector3d AP = point - line.position;
+
+    double dist = (AP.cross(line.direction)).norm();
+    return dist;
+}
+
+void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking, int& picked_index)
+{
+    picked_index = -1;
+
+    const auto laser_beam = GetLaserBeam(x, y);
+    double min_distance = std::numeric_limits<double>::max();
+    int index_i = -1;
+    int index_j = -1;
+
+    for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+    {
+        for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+        {
+            const auto& p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+            Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
+
+            double dist = distance_point_to_line(vp, laser_beam);
+
+            if (dist < min_distance)
+            {
+                min_distance = dist;
+                index_i = i;
+                index_j = j;
+
+                new_rotation_center.x() = static_cast<float>(vp.x());
+                new_rotation_center.y() = static_cast<float>(vp.y());
+                new_rotation_center.z() = static_cast<float>(vp.z());
+
+#if WITH_GUI == 1
+                if (gcpPicking)
+                {
+                    session.ground_control_points.picking_mode_index_to_node_inner = index_i;
+                    session.ground_control_points.picking_mode_index_to_node_outer = index_j;
+                }
+#endif
+
+                picked_index = index_i;
+
+                // if (picking_mode_index_to_node_inner != -1 && picking_mode_index_to_node_outer != -1)
+            }
+        }
+    }
+
+    new_rotate_x = rotate_x;
+    new_rotate_y = rotate_y;
+    new_translate_x = -new_rotation_center.x();
+    new_translate_y = -new_rotation_center.y();
+    new_translate_z = translate_z;
+    camera_transition_active = true;
+}
+
+void getClosestTrajectoriesPoint(std::vector<Session>& sessions, int x, int y)
+{
+    //picked_index = -1;
+    //picked_session = nullptr;
+
+    const auto laser_beam = GetLaserBeam(x, y);
+    double min_distance = std::numeric_limits<double>::max();
+
+    for (auto& session : sessions)
+    {
+        for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+        {
+            for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+            {
+                const auto& p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+                Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
+
+                double dist = distance_point_to_line(vp, laser_beam);
+
+                if (dist < min_distance)
+                {
+                    min_distance = dist;
+
+                    new_rotation_center.x() = static_cast<float>(vp.x());
+                    new_rotation_center.y() = static_cast<float>(vp.y());
+                    new_rotation_center.z() = static_cast<float>(vp.z());
+
+                    //picked_index = i;
+                    //picked_session = session;
+                }
+            }
+        }
+    }
+
+    new_translate_x = -new_rotation_center.x();
+    new_translate_y = -new_rotation_center.y();
+    new_translate_z = translate_z;
+    new_rotate_x = rotate_x;
+    new_rotate_y = rotate_y;
+    camera_transition_active = true;
 }
 
 

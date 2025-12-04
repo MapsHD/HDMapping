@@ -82,6 +82,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Ctrl+Q", ""},
     {"", "R", ""},
     {"", "Ctrl+R", ""},
+    {"", "Shift+R", ""},
     {"", "S", ""},
     {"", "Ctrl+S", ""},
     {"", "Ctrl+Shift+S", ""},
@@ -121,6 +122,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
     {"", "Right click + drag", "n"},
     {"", "Scroll", ""},
     {"", "Shift + scroll", ""},
+    {"", "Shift + drag", ""},
     {"", "Ctrl + left click", ""},
     {"", "Ctrl + right click", ""},
     {"", "Ctrl + middle click", ""}
@@ -151,6 +153,7 @@ int oldcolorScheme = 0;
 bool usePose = false;
 
 Session session;
+bool session_loaded = false;
 
 //built in console output redirection to imgui window
 ///////////////////////////////////////////////////////////////////////////////////
@@ -695,7 +698,7 @@ void openSession()
         std::string newTitle = winTitle + " - " + truncPath(session_file_name);
         glutSetWindowTitle(newTitle.c_str());
 
-        session.load(fs::path(session_file_name).string(), false, 0.0, 0.0, 0.0, false);
+        session_loaded = session.load(fs::path(session_file_name).string(), false, 0.0, 0.0, 0.0, false);
         index_rendered_points_local = 0;
 
         if (gl_useVBOs)
@@ -1255,7 +1258,41 @@ void mouse(int glut_button, int state, int x, int y)
     if (!io.WantCaptureMouse)
     {
         if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_RIGHT_BUTTON) && state == GLUT_DOWN && io.KeyCtrl)
-            setNewRotationCenter(x, y);
+        {
+            if (session_loaded)
+            {
+                const auto laser_beam = GetLaserBeam(x, y);
+                double min_distance = std::numeric_limits<double>::max();
+
+                for (int j = 0; j < session.point_clouds_container.point_clouds[index_rendered_points_local].points_local.size(); j++)
+                {
+                    auto vp = session.point_clouds_container.point_clouds[index_rendered_points_local].points_local[j];
+
+                    if (usePose == true)
+                        vp = session.point_clouds_container.point_clouds[index_rendered_points_local].m_pose * vp;
+
+                    double dist = distance_point_to_line(vp, laser_beam);
+
+                    if (dist < min_distance && dist < 0.1)
+                    {
+                        min_distance = dist;
+
+                        new_rotation_center.x() = vp.x();
+                        new_rotation_center.y() = vp.y();
+                        new_rotation_center.z() = vp.z();
+                    }
+                }
+
+                new_rotate_x = rotate_x;
+                new_rotate_y = rotate_y;
+                new_translate_x = -new_rotation_center.x();
+                new_translate_y = -new_rotation_center.y();
+                new_translate_z = translate_z;
+                camera_transition_active = true;
+            }
+            else
+                setNewRotationCenter(x, y);
+        }
 
         if (state == GLUT_DOWN)
             mouse_buttons |= 1 << glut_button;

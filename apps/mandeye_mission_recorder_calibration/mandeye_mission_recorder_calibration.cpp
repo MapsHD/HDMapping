@@ -42,7 +42,7 @@ std::vector<std::string> infoLines = {
 };
 
 //App specific shortcuts (using empty dummy until needed)
-std::vector<ShortcutEntry> appShortcuts(78, { "", "", "" });
+std::vector<ShortcutEntry> appShortcuts(80, { "", "", "" });
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;

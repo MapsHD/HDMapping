@@ -853,7 +853,7 @@ void display()
             ImGui::Separator();
             ImGui::Text("Colors:");
 
-            ImGui::ColorEdit3("Background color", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit3("Background", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
             if (idToSn.size() == 2)
             {
                 ImGui::ColorEdit3(idToSn.at(0).c_str(), (float*)&pc_color, ImGuiColorEditFlags_NoInputs);
@@ -861,8 +861,8 @@ void display()
             }
             else
             {
-                ImGui::ColorEdit3("Cloud 1 color", (float*)&pc_color, ImGuiColorEditFlags_NoInputs);
-                ImGui::ColorEdit3("Cloud 2 color", (float*)&pc_color2, ImGuiColorEditFlags_NoInputs);
+                ImGui::ColorEdit3("Point cloud 1", (float*)&pc_color, ImGuiColorEditFlags_NoInputs);
+                ImGui::ColorEdit3("Point cloud 2", (float*)&pc_color2, ImGuiColorEditFlags_NoInputs);
             }
 
             ImGui::EndMenu();

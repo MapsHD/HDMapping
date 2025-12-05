@@ -872,26 +872,26 @@ void index_gui()
     ImGui::Separator();
 
     ImGui::Text("Timestamps:");
-    double t = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps.front();
+    double ts = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps.front();
 
-    ImGui::Text("First point: %.0f [ns]", t);
+    ImGui::Text("First point: %.0f [ns]", ts);
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Click to copy to clipboard");
     if (ImGui::IsItemClicked())
     {
         char tmp[64];
-        snprintf(tmp, sizeof(tmp), "%.0f", t);
+        snprintf(tmp, sizeof(tmp), "%.0f", ts);
         ImGui::SetClipboardText(tmp);
     }
 
-    t = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps.back();
-    ImGui::Text("Last point : %.0f [ns]", t);
+    ts = session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps.back();
+    ImGui::Text("Last point : %.0f [ns]", ts);
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Click to copy to clipboard");
     if (ImGui::IsItemClicked())
     {
         char tmp[64];
-        snprintf(tmp, sizeof(tmp), "%.0f", t);
+        snprintf(tmp, sizeof(tmp), "%.0f", ts);
         ImGui::SetClipboardText(tmp);
     }
 }
@@ -1188,13 +1188,11 @@ void display()
                     for (auto& point_cloud : session.point_clouds_container.point_clouds)
                         point_cloud.point_size = point_size;
 
+                //ImGui::MenuItem("show_imu_to_lio_diff", nullptr, &session.point_clouds_container.show_imu_to_lio_diff);
+
                 ImGui::Separator();
             }
             ImGui::EndDisabled();
-
-            //ImGui::MenuItem("show_imu_to_lio_diff", nullptr, &session.point_clouds_container.show_imu_to_lio_diff);
-
-            ImGui::Separator();
 
             ImGui::MenuItem("Orthographic", "key O", &is_ortho);
             if (is_ortho)
@@ -1243,19 +1241,19 @@ void display()
 
             if (ImGui::BeginMenu("Colors"))
             {
-                ImGui::ColorEdit3("Background color", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
+                ImGui::ColorEdit3("Background", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
 
                 ImGui::BeginDisabled(!(session.point_clouds_container.point_clouds.size() > 0));
                 {
                     ImGui::BeginDisabled(!show_neighbouring_scans);
                     {
-                        ImGui::ColorEdit3("Neigbouring color", (float*)&pc_neigbouring_color, ImGuiColorEditFlags_NoInputs);
+                        ImGui::ColorEdit3("Neighbours", (float*)&pc_neigbouring_color, ImGuiColorEditFlags_NoInputs);
                     }
                     ImGui::EndDisabled();
 
                     ImGui::Separator();
 
-					ImGui::Text("Point cloud color:");
+					ImGui::Text("Point cloud:");
 
                     float color[3];
                     if (session.point_clouds_container.point_clouds.size() > 0)

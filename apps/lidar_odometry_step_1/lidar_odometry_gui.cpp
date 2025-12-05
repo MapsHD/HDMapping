@@ -683,7 +683,7 @@ void save_results(bool info, double elapsed_seconds)
 
 void project_gui()
 {
-    if (ImGui::Begin("full_lidar_odometry_gui", &full_lidar_odometry_gui))
+    if (ImGui::Begin("Settings", &full_lidar_odometry_gui))
     {
         ImGui::Checkbox("simple_gui", &simple_gui);
         if (ImGui::IsItemHovered())
@@ -2112,7 +2112,7 @@ void display()
 
                 ImGui::Text("Colors:");
 
-                ImGui::ColorEdit3("Background color", (float *)&params.clear_color, ImGuiColorEditFlags_NoInputs);
+                ImGui::ColorEdit3("Background", (float *)&params.clear_color, ImGuiColorEditFlags_NoInputs);
 
                 bg_color = params.clear_color;
 

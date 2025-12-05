@@ -69,3 +69,4 @@ imgui.ini
 /out/install/x64-Release
 /out_old/install
 
+/.gitmodules

@@ -1588,7 +1588,7 @@ void saveSubsession()
 
 void project_gui()
 {
-    ImGui::Begin("Single session processing");
+    ImGui::Begin("Settings");
 
     ImGui::Checkbox("Simple_gui", &simple_gui);
     ImGui::SameLine();
@@ -2083,6 +2083,12 @@ void display()
     if (session.ground_control_points.is_imgui)
         session.ground_control_points.imgui(session.point_clouds_container);
 
+    ImGui_ImplOpenGL2_NewFrame();
+    ImGui_ImplGLUT_NewFrame();
+    ImGui::NewFrame();
+
+    ShowMainDockSpace();
+
     if (!session.control_points.is_imgui)
     {
         if (!is_loop_closure_gui)
@@ -2291,12 +2297,6 @@ void display()
             }
         }
     }
-
-    ImGui_ImplOpenGL2_NewFrame();
-    ImGui_ImplGLUT_NewFrame();
-	ImGui::NewFrame(); 
-
-    ShowMainDockSpace();
 
     view_kbd_shortcuts();
 
@@ -2980,7 +2980,7 @@ void display()
 
             ImGui::Text("Colors:");
 
-            ImGui::ColorEdit3("Background color", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit3("Background", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
 
             ImGui::BeginDisabled(!session_loaded);
             {
@@ -2993,7 +2993,7 @@ void display()
                     color[2] = session.point_clouds_container.point_clouds[0].render_color[2];
                 }
 
-                if (ImGui::ColorEdit3("Cloud color", (float*)&color, ImGuiColorEditFlags_NoInputs))
+                if (ImGui::ColorEdit3("Point cloud", (float*)&color, ImGuiColorEditFlags_NoInputs))
                 {
                     for (auto& pc : session.point_clouds_container.point_clouds)
                     {

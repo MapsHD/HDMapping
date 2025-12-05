@@ -2732,9 +2732,8 @@ void project_gui()
 
         ImGui::InputDouble("Increment", &fast_plus);
         ImGui::InputDouble("Fast increment", &fast_plus_plus);
-		ImGui::PopItemWidth();
-        ImGui::SetNextItemWidth(ImGuiNumberWidth);
         ImGui::InputDouble("Timestamp offset", &time_stamp_offset, fast_plus, fast_plus_plus);
+        ImGui::PopItemWidth();
         ImGui::SameLine();
         if (ImGui::Button("Set to origin"))
         {

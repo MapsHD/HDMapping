@@ -2,12 +2,22 @@ cmake_minimum_required(VERSION 4.0.0)
 
 project(mandeye_raw_data_viewer)
 
-add_executable(
-  mandeye_raw_data_viewer
+# Source files
+set(SOURCES
   mandeye_raw_data_viewer.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils.cpp
   ../lidar_odometry_step_1/lidar_odometry_gui_utils.cpp
   ../lidar_odometry_step_1/lidar_odometry_utils_optimizers.cpp
+    "../../core/src/utils.cpp"
+)
+
+# Windows: add resource file
+if(WIN32)
+    list(APPEND SOURCES resource.rc)
+endif()
+
+add_executable(
+  mandeye_raw_data_viewer ${SOURCES}
 )
 
 target_include_directories(

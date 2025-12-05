@@ -44,7 +44,6 @@ enum CameraPreset {
 extern int viewer_decimate_point_cloud;
 
 extern int mouse_old_x, mouse_old_y;
-extern bool gui_mouse_down;
 extern int mouse_buttons;
 extern float mouse_sensitivity;
 
@@ -61,8 +60,7 @@ extern Eigen::Affine3f viewLocal;
 
 extern Eigen::Vector3f rotation_center;
 extern float rotate_x, rotate_y;
-extern float translate_x, translate_y;
-extern float translate_z;
+extern float translate_x, translate_y, translate_z;
 
 extern double camera_ortho_xy_view_zoom;
 extern double camera_ortho_xy_view_shift_x;

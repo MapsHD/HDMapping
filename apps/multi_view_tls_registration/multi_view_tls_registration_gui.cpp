@@ -2507,7 +2507,7 @@ void display()
                     ImGui::Separator();
 
                     ImGui::Text("(x,y,z,r00,r01,r02,r10,r11,r12,r20,r21,r22)");
-                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar)"))
+                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar)##1"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
@@ -2515,7 +2515,7 @@ void display()
                         if (output_file_name.size() > 0)
                             save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, false, false, false);
                     }
-                    if (ImGui::MenuItem("Save all as csv (timestamp Unix)"))
+                    if (ImGui::MenuItem("Save all as csv (timestamp Unix)##1"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
@@ -2523,7 +2523,7 @@ void display()
                         if (output_file_name.size() > 0)
                             save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, true, false, false);
                     }
-                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)"))
+                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)##1"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
@@ -2535,7 +2535,7 @@ void display()
                     ImGui::Separator();
                     ImGui::Text("(x,y,z,qx,qy,qz,qw)");
 
-                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar)"))
+                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar)##2"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
@@ -2543,7 +2543,7 @@ void display()
                         if (output_file_name.size() > 0)
                             save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, false, true, false);
                     }
-                    if (ImGui::MenuItem("Save all as csv (timestamp Unix)"))
+                    if (ImGui::MenuItem("Save all as csv (timestamp Unix)##2"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
@@ -2551,7 +2551,7 @@ void display()
                         if (output_file_name.size() > 0)
                             save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, true, true, false);
                     }
-                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)"))
+                    if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)##2"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;

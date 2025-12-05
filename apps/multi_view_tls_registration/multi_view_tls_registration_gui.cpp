@@ -1411,7 +1411,7 @@ void openSession()
     }
 }
 
-void openLaz()
+void openLaz(bool ground_truth)
 {
     session.point_clouds_container.point_clouds.clear();
     std::vector<std::string> input_file_names;
@@ -1447,6 +1447,52 @@ void openLaz()
             "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
             pfd::choice::ok, pfd::icon::info);
         message.result();
+
+        if (ground_truth){
+            session.is_ground_truth = true;
+
+            for(auto &pc:session.point_clouds_container.point_clouds){
+                Eigen::Affine3d m = Eigen::Affine3d::Identity();
+                if (pc.points_local.size() > 100 ){
+                    int counter = 1;
+                    Eigen::Vector3d mean(pc.points_local[0]);
+                    //std::cout << "mean " << mean << std::endl;
+                    for (int i = 100; i < pc.points_local.size(); i += 100)
+                    {
+                        mean += pc.points_local[i];
+                        counter++;
+                    }
+
+                    mean /= counter;
+                    m.translation() = mean;
+
+                    PointCloud::LocalTrajectoryNode node;
+                    node.imu_diff_angle_om_fi_ka_deg = {0,0,0};
+                    node.imu_om_fi_ka = {0,0,0};
+                    node.m_pose = Eigen::Affine3d::Identity();
+                    node.timestamps = {0,0};
+
+                    pc.local_trajectory.push_back(node);
+
+                    for (auto &p : pc.points_local)
+                    {
+                        p -= mean;
+                    }
+                }
+
+                pc.m_initial_pose = m;
+                pc.m_pose = m;
+                pc.m_pose_temp = m;
+
+                pc.pose = pose_tait_bryan_from_affine_matrix(m);
+            }
+
+            //save to folder
+            for (auto &pc : session.point_clouds_container.point_clouds)
+            {
+                std::cout << "pc.file_name: '" << pc.file_name << "'" << std::endl;
+            }
+        }
     }
 }
 
@@ -1693,7 +1739,7 @@ void project_gui()
         ImGui::NewLine();
 
         if (ImGui::Button("Load aligned point cloud from WHU-TLS"))
-            openLaz();
+            openLaz(false);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Select all *.las/*.laz files in folder 2-AlignedPointCloud");
 
@@ -2409,10 +2455,17 @@ void display()
 
             if (ImGui::BeginPopup("OpenMenu"))
             {
-                if (ImGui::MenuItem("Open las/laz"))
-                    openLaz();
-                if (ImGui::IsItemHovered())
+                if (ImGui::MenuItem("Open las/laz")){
+                    openLaz(false);
+                }
+                if (ImGui::MenuItem("Create ground truth session from las/laz"))
+                {
+                    openLaz(true);
+                }
+
+                if (ImGui::IsItemHovered()){
                     ImGui::SetTooltip("Create session from las/laz files");
+                }
 
 
                 ImGui::MenuItem("Calculate_offset", nullptr, &tls_registration.calculate_offset);

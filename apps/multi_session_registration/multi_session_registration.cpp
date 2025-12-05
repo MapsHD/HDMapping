@@ -1494,72 +1494,6 @@ void loop_closure_gui()
     }
 }
 
-bool load_project_settings(const std::string &file_name, ProjectSettings &_project_settings)
-{
-    std::cout << "loading file: '" << file_name << "'" << std::endl;
-    std::vector<std::string> session_file_names;
-
-    try
-    {
-        std::ifstream fs(file_name);
-        if (!fs.good())
-            return false;
-        nlohmann::json data = nlohmann::json::parse(fs);
-        fs.close();
-
-        for (const auto &fn_json : data["session_file_names"])
-        {
-            std::string fn = fn_json["session_file_name"];
-            session_file_names.push_back(fn);
-        }
-
-        std::cout << "------session file names-----" << std::endl;
-        for (const auto &fn : session_file_names)
-        {
-            std::cout << "'" << fn << "'" << std::endl;
-        }
-
-        _project_settings.session_file_names = session_file_names;
-
-        edges.clear();
-        for (const auto &edge_json : data["loop_closure_edges"])
-        {
-            Edge edge;
-            edge.index_from = edge_json["index_from"];
-            edge.index_to = edge_json["index_to"];
-            edge.is_fixed_fi = edge_json["is_fixed_fi"];
-            edge.is_fixed_ka = edge_json["is_fixed_ka"];
-            edge.is_fixed_om = edge_json["is_fixed_om"];
-            edge.is_fixed_px = edge_json["is_fixed_px"];
-            edge.is_fixed_py = edge_json["is_fixed_py"];
-            edge.is_fixed_pz = edge_json["is_fixed_pz"];
-            edge.relative_pose_tb.fi = edge_json["fi"];
-            edge.relative_pose_tb.ka = edge_json["ka"];
-            edge.relative_pose_tb.om = edge_json["om"];
-            edge.relative_pose_tb.px = edge_json["px"];
-            edge.relative_pose_tb.py = edge_json["py"];
-            edge.relative_pose_tb.pz = edge_json["pz"];
-            edge.relative_pose_tb_weights.fi = edge_json["w_fi"];
-            edge.relative_pose_tb_weights.ka = edge_json["w_ka"];
-            edge.relative_pose_tb_weights.om = edge_json["w_om"];
-            edge.relative_pose_tb_weights.px = edge_json["w_px"];
-            edge.relative_pose_tb_weights.py = edge_json["w_py"];
-            edge.relative_pose_tb_weights.pz = edge_json["w_pz"];
-            edge.index_session_from = edge_json["index_session_from"];
-            edge.index_session_to = edge_json["index_session_to"];
-            edges.push_back(edge);
-        }
-        return true;
-    }
-    catch (std::exception &e)
-    {
-        std::cout << "cant load project settings: " << e.what() << std::endl;
-        return false;
-    }
-
-    return true;
-}
-
 void save_trajectories_to_laz(const Session &session, std::string output_file_name, float curve_consecutive_distance_meters, float not_curve_consecutive_distance_meters, bool is_trajectory_export_downsampling)
 {
     std::vector<Eigen::Vector3d> pointcloud;
@@ -2582,11 +2516,78 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observ
     return pos;
 }
 
+bool load_project_settings(const std::string& file_name, ProjectSettings& _project_settings)
+{
+    std::cout << "Opening project file: '" << file_name << "'\n";
+
+    try
+    {
+        std::ifstream fs(file_name);
+        if (!fs.good())
+            return false;
+        nlohmann::json data = nlohmann::json::parse(fs);
+        fs.close();
+
+		_project_settings.session_file_names.clear();
+
+        std::cout << "Contained sessions:\n";
+
+        for (const auto& fn_json : data["session_file_names"])
+        {
+            std::string fn = fn_json["session_file_name"];
+            _project_settings.session_file_names.push_back(fn);
+            std::cout << "'" << fn << "'";
+            if (!fs::exists(fn))
+				std::cout << "  (WARNING: session file does not exist! Please manually adapt path)";
+            std::cout << "\n";
+        }
+
+        edges.clear();
+        for (const auto& edge_json : data["loop_closure_edges"])
+        {
+            Edge edge;
+            edge.index_from = edge_json["index_from"];
+            edge.index_to = edge_json["index_to"];
+            edge.is_fixed_fi = edge_json["is_fixed_fi"];
+            edge.is_fixed_ka = edge_json["is_fixed_ka"];
+            edge.is_fixed_om = edge_json["is_fixed_om"];
+            edge.is_fixed_px = edge_json["is_fixed_px"];
+            edge.is_fixed_py = edge_json["is_fixed_py"];
+            edge.is_fixed_pz = edge_json["is_fixed_pz"];
+            edge.relative_pose_tb.fi = edge_json["fi"];
+            edge.relative_pose_tb.ka = edge_json["ka"];
+            edge.relative_pose_tb.om = edge_json["om"];
+            edge.relative_pose_tb.px = edge_json["px"];
+            edge.relative_pose_tb.py = edge_json["py"];
+            edge.relative_pose_tb.pz = edge_json["pz"];
+            edge.relative_pose_tb_weights.fi = edge_json["w_fi"];
+            edge.relative_pose_tb_weights.ka = edge_json["w_ka"];
+            edge.relative_pose_tb_weights.om = edge_json["w_om"];
+            edge.relative_pose_tb_weights.px = edge_json["w_px"];
+            edge.relative_pose_tb_weights.py = edge_json["w_py"];
+            edge.relative_pose_tb_weights.pz = edge_json["w_pz"];
+            edge.index_session_from = edge_json["index_session_from"];
+            edge.index_session_to = edge_json["index_session_to"];
+            edges.push_back(edge);
+        }
+
+        std::cout << "Found " << edges.size() << "edges\nOpening done\n";
+
+        return true;
+    }
+    catch (std::exception& e)
+    {
+        std::cout << "can't load project settings: " << e.what() << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
 void openProject()
 {
     std::string input_file_name = "";
-    input_file_name = mandeye::fd::OpenFileDialogOneFile("Load project", mandeye::fd::Project_filter);
-    std::cout << "Project file: '" << input_file_name << "'" << std::endl;
+    input_file_name = mandeye::fd::OpenFileDialogOneFile("Open project", mandeye::fd::Project_filter);
 
     if (input_file_name.size() > 0)
     {
@@ -3306,6 +3307,12 @@ void display()
 
     // gnss.render(session.point_clouds_container);
 
+    ImGui_ImplOpenGL2_NewFrame();
+    ImGui_ImplGLUT_NewFrame();
+    ImGui::NewFrame();
+
+    ShowMainDockSpace();
+
     if (!is_loop_closure_gui)
     {
         Eigen::Affine3d prev_pose_manipulated = Eigen::Affine3d::Identity();
@@ -3650,12 +3657,6 @@ else
         session.manual_pose_graph_loop_closure.edges[session.manual_pose_graph_loop_closure.index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
     }
 }*/
-
-    ImGui_ImplOpenGL2_NewFrame();
-    ImGui_ImplGLUT_NewFrame();
-	ImGui::NewFrame();
-
-    ShowMainDockSpace();
 
     view_kbd_shortcuts();
 
@@ -4255,7 +4256,7 @@ else
 
             ImGui::Text("Colors:");
 
-            ImGui::ColorEdit3("Background color", (float *)&bg_color, ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit3("Background", (float *)&bg_color, ImGuiColorEditFlags_NoInputs);
 
             ImGui::EndMenu();
         }

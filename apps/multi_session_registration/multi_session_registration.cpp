@@ -13,8 +13,8 @@
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
 
-//#define GLEW_STATIC
-//#include <GL/glew.h>
+// #define GLEW_STATIC
+// #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -2516,7 +2516,7 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking &observ
     return pos;
 }
 
-bool load_project_settings(const std::string& file_name, ProjectSettings& _project_settings)
+bool load_project_settings(const std::string &file_name, ProjectSettings &_project_settings)
 {
     std::cout << "Opening project file: '" << file_name << "'\n";
 
@@ -2528,22 +2528,22 @@ bool load_project_settings(const std::string& file_name, ProjectSettings& _proje
         nlohmann::json data = nlohmann::json::parse(fs);
         fs.close();
 
-		_project_settings.session_file_names.clear();
+        _project_settings.session_file_names.clear();
 
         std::cout << "Contained sessions:\n";
 
-        for (const auto& fn_json : data["session_file_names"])
+        for (const auto &fn_json : data["session_file_names"])
         {
             std::string fn = fn_json["session_file_name"];
             _project_settings.session_file_names.push_back(fn);
             std::cout << "'" << fn << "'";
             if (!fs::exists(fn))
-				std::cout << "  (WARNING: session file does not exist! Please manually adapt path)";
+                std::cout << "  (WARNING: session file does not exist! Please manually adapt path)";
             std::cout << "\n";
         }
 
         edges.clear();
-        for (const auto& edge_json : data["loop_closure_edges"])
+        for (const auto &edge_json : data["loop_closure_edges"])
         {
             Edge edge;
             edge.index_from = edge_json["index_from"];
@@ -2575,7 +2575,7 @@ bool load_project_settings(const std::string& file_name, ProjectSettings& _proje
 
         return true;
     }
-    catch (std::exception& e)
+    catch (std::exception &e)
     {
         std::cout << "can't load project settings: " << e.what() << std::endl;
         return false;
@@ -2617,10 +2617,10 @@ void saveProject()
 void addSession()
 {
     auto input_file_names = mandeye::fd::OpenFileDialog("Add session(s)", mandeye::fd::Session_filter, true);
-    
+
     if (input_file_names.size() > 0)
     {
-        for (const auto& input_file_name : input_file_names)
+        for (const auto &input_file_name : input_file_names)
         {
             std::cout << "Adding session file: '" << input_file_name << "'" << std::endl;
             project_settings.session_file_names.push_back(input_file_name);
@@ -2785,8 +2785,10 @@ void project_gui()
 
             if (project_settings.session_file_names.size() == sessions.size())
             {
-                ImGui::SameLine();
-                ImGui::Checkbox(("Visible##" + std::to_string(i)).c_str(), &sessions[i].visible);
+                if (!is_loop_closure_gui){
+                    ImGui::SameLine();
+                    ImGui::Checkbox(("Visible##" + std::to_string(i)).c_str(), &sessions[i].visible);
+                }
 
                 ImGui::BeginDisabled(!sessions[i].visible);
                 {
@@ -2796,7 +2798,7 @@ void project_gui()
                         if (ImGui::RadioButton(("Gizmo##" + std::to_string(i)).c_str(), &index_gizmo, i))
                         {
                             if (old_index_gizmo == i)
-                                index_gizmo = -1;   // unselect
+                                index_gizmo = -1; // unselect
                             else
                                 index_gizmo = i;
                         }
@@ -2844,9 +2846,9 @@ void project_gui()
                             int index_last = sessions[i].point_clouds_container.point_clouds.size() - 1;
                             int index_last2 = sessions[i].point_clouds_container.point_clouds[index_last].local_trajectory.size() - 1;
 
-                            ImGui::Text("Timestamp range: <%.0f, %.0f>", 
-                                sessions[i].point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first,
-                                sessions[i].point_clouds_container.point_clouds[index_last].local_trajectory[index_last2].timestamps.first);
+                            ImGui::Text("Timestamp range: <%.0f, %.0f>",
+                                        sessions[i].point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first,
+                                        sessions[i].point_clouds_container.point_clouds[index_last].local_trajectory[index_last2].timestamps.first);
                         }
                     }
                 }
@@ -2860,7 +2862,7 @@ void project_gui()
                 for (int i = 0; i < sessions.size(); i++)
                     sessions[i].is_gizmo = (i == index_gizmo);
 
-				old_index_gizmo = index_gizmo;
+                old_index_gizmo = index_gizmo;
             }
 
             if (index_gizmo != -1 && index_gizmo < sessions.size())
@@ -2966,7 +2968,7 @@ void project_gui()
 
 void display()
 {
-    ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
 
     glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
@@ -3042,12 +3044,12 @@ void display()
     else
     {
         glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+                -camera_ortho_xy_view_zoom / ratio,
+                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
 
         glm::mat4 proj = glm::orthoLH_ZO<float>(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio, -100, 100);
+                                                -camera_ortho_xy_view_zoom / ratio,
+                                                camera_ortho_xy_view_zoom / ratio, -100, 100);
 
         std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
 
@@ -3067,11 +3069,11 @@ void display()
         Eigen::Vector3d v_t = m * v;
 
         gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
-            v_center_t.x(), v_center_t.y(), v_center_t.z(),
-            v_t.x(), v_t.y(), v_t.z());
+                  v_center_t.x(), v_center_t.y(), v_center_t.z(),
+                  v_t.x(), v_t.y(), v_t.z());
         glm::mat4 lookat = glm::lookAt(glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
-            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
-            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
+                                       glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
+                                       glm::vec3(v_t.x(), v_t.y(), v_t.z()));
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
 
         glMatrixMode(GL_MODELVIEW);
@@ -3221,24 +3223,27 @@ void display()
 
                 if (index_point_clouds != -1 && index_local_trajectory != -1)
                 {
-                    glColor3f(session.point_clouds_container.point_clouds[index_point_clouds].render_color[0], session.point_clouds_container.point_clouds[index_point_clouds].render_color[1], session.point_clouds_container.point_clouds[index_point_clouds].render_color[2]);
-                    glBegin(GL_LINES);
+                    if (index_local_trajectory < session.point_clouds_container.point_clouds[index_point_clouds].local_trajectory.size())
+                    {
+                        glColor3f(session.point_clouds_container.point_clouds[index_point_clouds].render_color[0], session.point_clouds_container.point_clouds[index_point_clouds].render_color[1], session.point_clouds_container.point_clouds[index_point_clouds].render_color[2]);
+                        glBegin(GL_LINES);
 
-                    auto m1 = session.point_clouds_container.point_clouds[index_point_clouds].m_pose;
-                    auto m2 = session.point_clouds_container.point_clouds[index_point_clouds].local_trajectory[index_local_trajectory].m_pose;
+                        auto m1 = session.point_clouds_container.point_clouds[index_point_clouds].m_pose;
+                        auto m2 = session.point_clouds_container.point_clouds[index_point_clouds].local_trajectory[index_local_trajectory].m_pose;
 
-                    auto v1 = (m1 * m2).translation();
+                        auto v1 = (m1 * m2).translation();
 
-                    glVertex3f(v1.x() - 1.0, v1.y(), v1.z());
-                    glVertex3f(v1.x() + 1.0, v1.y(), v1.z());
+                        glVertex3f(v1.x() - 1.0, v1.y(), v1.z());
+                        glVertex3f(v1.x() + 1.0, v1.y(), v1.z());
 
-                    glVertex3f(v1.x(), v1.y() - 1.0, v1.z());
-                    glVertex3f(v1.x(), v1.y() + 1.0, v1.z());
+                        glVertex3f(v1.x(), v1.y() - 1.0, v1.z());
+                        glVertex3f(v1.x(), v1.y() + 1.0, v1.z());
 
-                    glVertex3f(v1.x(), v1.y(), v1.z() - 1.0);
-                    glVertex3f(v1.x(), v1.y(), v1.z() + 1.0);
+                        glVertex3f(v1.x(), v1.y(), v1.z() - 1.0);
+                        glVertex3f(v1.x(), v1.y(), v1.z() + 1.0);
 
-                    glEnd();
+                        glEnd();
+                    }
                 }
             }
         }
@@ -3332,7 +3337,7 @@ void display()
 
                     // if (all_m_poses.size() > 1)
                     //{
-                    ImGuiIO& io = ImGui::GetIO();
+                    ImGuiIO &io = ImGui::GetIO();
                     // ImGuizmo -----------------------------------------------
                     ImGuizmo::BeginFrame();
                     ImGuizmo::Enable(true);
@@ -3455,9 +3460,9 @@ void display()
 
             m_g.matrix() = Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>();
 
-            const int& index_src = edges[index_active_edge].index_from;
+            const int &index_src = edges[index_active_edge].index_from;
 
-            const Eigen::Affine3d& m_src = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
+            const Eigen::Affine3d &m_src = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
             edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
         }
     }
@@ -3664,7 +3669,7 @@ else
     {
         addSession();
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_A, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
@@ -3673,7 +3678,7 @@ else
         {
             loadSessions();
 
-            //workaround
+            // workaround
             io.AddKeyEvent(ImGuiKey_L, false);
             io.AddKeyEvent(ImGuiMod_Ctrl, false);
         }
@@ -3681,7 +3686,7 @@ else
     {
         openProject();
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_O, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
@@ -3691,7 +3696,7 @@ else
         {
             remove_gui = true;
 
-            //workaround
+            // workaround
             io.AddKeyEvent(ImGuiKey_R, false);
             io.AddKeyEvent(ImGuiMod_Ctrl, false);
         }
@@ -3701,7 +3706,7 @@ else
         {
             saveProject();
 
-            //workaround
+            // workaround
             io.AddKeyEvent(ImGuiKey_S, false);
             io.AddKeyEvent(ImGuiMod_Ctrl, false);
         }
@@ -4224,7 +4229,7 @@ else
 
                 if (tmp != point_size)
                     for (auto &session : sessions)
-                        for (auto& point_cloud : session.point_clouds_container.point_clouds)
+                        for (auto &point_cloud : session.point_clouds_container.point_clouds)
                             point_cloud.point_size = point_size;
 
                 ImGui::Separator();
@@ -4298,7 +4303,7 @@ else
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
         if (ImGui::SmallButton("Info"))
             info_gui = !info_gui;
-        
+
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(3);
 
@@ -4423,12 +4428,35 @@ void mouse(int glut_button, int state, int x, int y)
 
     if (!io.WantCaptureMouse)
     {
-        if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_RIGHT_BUTTON) && state == GLUT_DOWN && io.KeyCtrl)
+        if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_RIGHT_BUTTON) && state == GLUT_DOWN && (io.KeyCtrl || io.KeyShift) && !manipulate_active_edge)
         {
-            if (sessions.size() > 0)
+            /*if (sessions.size() > 0){
                 getClosestTrajectoriesPoint(sessions, x, y);
-            else
+            }
+            else{
                 setNewRotationCenter(x, y);
+            }*/
+
+            if (io.KeyCtrl)
+            {
+                /*if(number_visible_sessions == 1){
+                    std::cout << "number_visible_sessions == 1" << std::endl;
+                    getClosestTrajectoriesPoint(sessions, x, y, 1, );
+                }
+                if(number_visible_sessions == 2){
+                    std::cout << "number_visible_sessions == 2" << std::endl;
+                    getClosestTrajectoriesPoint(sessions, x, y, 2);
+                }
+                else if (sessions.size() > 0)
+                {
+                    getClosestTrajectoriesPoint(sessions, x, y, -1);
+                }*/
+                getClosestTrajectoriesPoint(sessions, x, y, index_loop_closure_source, index_loop_closure_target, 0);
+            }
+            if (io.KeyShift)
+            {
+                getClosestTrajectoriesPoint(sessions, x, y, index_loop_closure_source, index_loop_closure_target, 1);
+            }
         }
 
         if (state == GLUT_DOWN)

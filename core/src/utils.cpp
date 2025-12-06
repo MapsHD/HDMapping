@@ -69,7 +69,7 @@ double scroll_hint_lastT = 0.0;
 
 bool show_about = false;
 
-//General shortcuts applicable to any app
+// General shortcuts applicable to any app
 static const std::vector<ShortcutEntry> shortcuts = {
     {"Normal keys", "A", ""},
     {"", "Ctrl+A", ""},
@@ -150,13 +150,11 @@ static const std::vector<ShortcutEntry> shortcuts = {
     {"", "Shift + drag", "Dock window to screen edges"},
     {"", "Ctrl + left click", ""},
     {"", "Ctrl + right click", "change center of rotation"},
-    {"", "Ctrl + middle click", "change center of rotation (if no CP GUI active)"}
-};
-
+    {"", "Ctrl + middle click", "change center of rotation (if no CP GUI active)"}};
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-std::string truncPath(const std::string& fullPath)
+std::string truncPath(const std::string &fullPath)
 {
     namespace fs = std::filesystem;
     fs::path path(fullPath);
@@ -167,11 +165,9 @@ std::string truncPath(const std::string& fullPath)
     return "..\\" + parent + "\\..\\" + filename;
 }
 
-
-
 void wheel(int button, int dir, int x, int y)
 {
-    ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
     io.MouseWheel += dir; // or direction * 1.0f depending on your setup
 
     if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
@@ -203,12 +199,12 @@ void wheel(int button, int dir, int x, int y)
             {
                 if (io.KeyShift)
                     translate_z -= 5.0f;
-				else
+                else
                     translate_z -= 1.0f;
             }
         }
 
-        mouse_sensitivity = fabs(translate_z) / 100; //1 for translate_z 50 (default zoom)
+        mouse_sensitivity = fabs(translate_z) / 100; // 1 for translate_z 50 (default zoom)
         camera_transition_active = false;
 
         if (scroll_hint_enabled)
@@ -217,24 +213,24 @@ void wheel(int button, int dir, int x, int y)
             {
                 scroll_hint_accu += fabs(dir);
 
-                if (scroll_hint_accu > 30.0f)  // tweak threshold
+                if (scroll_hint_accu > 30.0f) // tweak threshold
                 {
                     scroll_hint_accu = 0.0f;
                     scroll_hint_active = true;
                     scroll_hint_count++;
                 }
             }
-            
-			if (scroll_hint_active)
+
+            if (scroll_hint_active)
                 scroll_hint_lastT = ImGui::GetTime();
-                
-            //Reset and disable hint if Shift is pressed while scrolling
+
+            // Reset and disable hint if Shift is pressed while scrolling
             if (io.KeyShift || scroll_hint_count > 3)
             {
                 scroll_hint_active = false;
                 scroll_hint_enabled = false;
             }
-		}
+        }
     }
 }
 
@@ -249,12 +245,12 @@ void reshape(int w, int h)
     }
     else
     {
-        ImGuiIO& io = ImGui::GetIO();
+        ImGuiIO &io = ImGui::GetIO();
         float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
         glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+                -camera_ortho_xy_view_zoom / ratio,
+                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
         // glOrtho(-translate_z, translate_z, -translate_z * (float)h / float(w), translate_z * float(h) / float(w), -10000, 10000);
     }
     glMatrixMode(GL_MODELVIEW);
@@ -263,7 +259,7 @@ void reshape(int w, int h)
 
 void motion(int x, int y)
 {
-    ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
     io.MousePos = ImVec2((float)x, (float)y);
 
     if (!io.WantCaptureMouse)
@@ -278,7 +274,7 @@ void motion(int x, int y)
             {
                 float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
                 Eigen::Vector3d v(dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
-                    dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio), 0);
+                                  dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio), 0);
                 TaitBryanPose pose_tb;
                 pose_tb.px = 0.0;
                 pose_tb.py = 0.0;
@@ -294,19 +290,19 @@ void motion(int x, int y)
         }
         else
         {
-            if (mouse_buttons & 1) //left button
+            if (mouse_buttons & 1) // left button
             {
                 rotate_x += dy * 0.2f; // * mouse_sensitivity;
                 rotate_y += dx * 0.2f; // * mouse_sensitivity;
                 breakCameraTransition();
-                //camera_transition_active = false;
+                // camera_transition_active = false;
             }
-            if (mouse_buttons & 4) //right button
+            if (mouse_buttons & 4) // right button
             {
                 translate_x += dx * 0.1f * mouse_sensitivity;
                 translate_y -= dy * 0.1f * mouse_sensitivity;
                 breakCameraTransition();
-                //camera_transition_active = false;
+                // camera_transition_active = false;
             }
         }
 
@@ -316,20 +312,30 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
-ImGuiKey keyToImGuiKey(unsigned char key) {
-    if (key >= 'a' && key <= 'z') return ImGuiKey(ImGuiKey_A + (key - 'a'));
-    if (key >= 'A' && key <= 'Z') return ImGuiKey(ImGuiKey_A + (key - 'A'));
-    if (key >= '0' && key <= '9') return ImGuiKey(ImGuiKey_0 + (key - '0'));
-    switch (key) {
-        case 27: return ImGuiKey_Escape;
-        case 13: return ImGuiKey_Enter;
-        case 32: return ImGuiKey_Space;
-        default: return ImGuiKey_None;
+ImGuiKey keyToImGuiKey(unsigned char key)
+{
+    if (key >= 'a' && key <= 'z')
+        return ImGuiKey(ImGuiKey_A + (key - 'a'));
+    if (key >= 'A' && key <= 'Z')
+        return ImGuiKey(ImGuiKey_A + (key - 'A'));
+    if (key >= '0' && key <= '9')
+        return ImGuiKey(ImGuiKey_0 + (key - '0'));
+    switch (key)
+    {
+    case 27:
+        return ImGuiKey_Escape;
+    case 13:
+        return ImGuiKey_Enter;
+    case 32:
+        return ImGuiKey_Space;
+    default:
+        return ImGuiKey_None;
     }
 }
 
-void keyboardDown(unsigned char key, int x, int y) {
-    ImGuiIO& io = ImGui::GetIO();
+void keyboardDown(unsigned char key, int x, int y)
+{
+    ImGuiIO &io = ImGui::GetIO();
 
     int mods = glutGetModifiers();
     // Update modifier keys using the new API
@@ -338,19 +344,20 @@ void keyboardDown(unsigned char key, int x, int y) {
     io.AddKeyEvent(ImGuiMod_Alt, (mods & GLUT_ACTIVE_ALT) != 0);
 
     // Handle Ctrl+letter (ASCII 1-26) (FreeGLUT “lost key” problem)
-    if ( (mods & GLUT_ACTIVE_CTRL) && (key >= 1 && key <= 26) )
+    if ((mods & GLUT_ACTIVE_CTRL) && (key >= 1 && key <= 26))
         key = 'A' + (key - 1);
 
     io.AddKeyEvent(keyToImGuiKey(key), true);
 
-    //forward to ImGui GLUT backend
+    // forward to ImGui GLUT backend
     ImGui_ImplGLUT_KeyboardFunc(key, x, y);
 
-    //std::cout << "Down key: " << key << ", mod: " << mods << std::endl;
+    // std::cout << "Down key: " << key << ", mod: " << mods << std::endl;
 }
 
-void keyboardUp(unsigned char key, int x, int y) {
-    ImGuiIO& io = ImGui::GetIO();
+void keyboardUp(unsigned char key, int x, int y)
+{
+    ImGuiIO &io = ImGui::GetIO();
 
     int mods = glutGetModifiers();
     // Update modifier keys using the new API
@@ -366,24 +373,16 @@ void keyboardUp(unsigned char key, int x, int y) {
 
     ImGui_ImplGLUT_KeyboardUpFunc(key, x, y);
 
-    //std::cout << "Up key: " << key << ", mod: " << mods << std::endl;
+    // std::cout << "Up key: " << key << ", mod: " << mods << std::endl;
 }
 
 static bool first_time = true;
 
 void ShowMainDockSpace()
 {
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking
-                                | ImGuiWindowFlags_NoTitleBar
-                                | ImGuiWindowFlags_NoCollapse
-                                | ImGuiWindowFlags_NoResize
-                                | ImGuiWindowFlags_NoMove
-                                | ImGuiWindowFlags_NoBringToFrontOnFocus
-                                | ImGuiWindowFlags_NoNavFocus
-                                | ImGuiWindowFlags_NoBackground
-                                | ImGuiWindowFlags_NoInputs;
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs;
 
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGuiViewport *viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
     ImGui::SetNextWindowViewport(viewport->ID);
@@ -399,13 +398,14 @@ void ShowMainDockSpace()
     ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
     ImGui::DockSpace(dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoDockingInCentralNode);
 
-    if (first_time) {
+    if (first_time)
+    {
         first_time = false;
 
         auto dock_id_left = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.2f, nullptr, &dockspace_id);
         auto dock_id_bottom = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.2f, nullptr, &dockspace_id);
 
-        //ImGui::DockBuilderDockWindow("Settings", dock_id_left);
+        // ImGui::DockBuilderDockWindow("Settings", dock_id_left);
         ImGui::DockBuilderDockWindow("Console", dock_id_bottom);
         ImGui::DockBuilderFinish(dockspace_id);
     }
@@ -413,7 +413,7 @@ void ShowMainDockSpace()
     ImGui::End();
 }
 
-bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)(), void (*mouse)(int, int, int, int))
+bool initGL(int *argc, char **argv, const std::string &winTitle, void (*display)(), void (*mouse)(int, int, int, int))
 {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
@@ -424,13 +424,15 @@ bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)
 #ifdef _WIN32
     HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
     if (!hwnd)
-		return false; //couldn't find window handle
+        return false; // couldn't find window handle
     HINSTANCE hInstance = GetModuleHandle(NULL);
     SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
     SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1)));
 #endif
 
-    while (glGetError() != GL_NO_ERROR) {} // Clear any existing GL errors from platform or driver init
+    while (glGetError() != GL_NO_ERROR)
+    {
+    } // Clear any existing GL errors from platform or driver init
 
     // default initialization
     glClearColor(0.0, 0.0, 0.0, 1.0);
@@ -446,13 +448,12 @@ bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)
     glutReshapeFunc(reshape);
 
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
     (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard     // Enable Keyboard Controls
-                   | ImGuiConfigFlags_NavEnableGamepad
-                   | ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard // Enable Keyboard Controls
+                      | ImGuiConfigFlags_NavEnableGamepad | ImGuiConfigFlags_DockingEnable;
     io.ConfigDockingWithShift = true;
-    io.MouseDrawCursor = false;   // use OS cursor (for future ImGUI update to 1.93+)
+    io.MouseDrawCursor = false; // use OS cursor (for future ImGUI update to 1.93+)
 
     ImGui::StyleColorsDark();
     ImGui_ImplGLUT_Init();
@@ -464,19 +465,17 @@ bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)
     glutMouseFunc(mouse);
     glutMotionFunc(motion);
     glutMouseWheelFunc(wheel);
-	glutKeyboardFunc(keyboardDown);
-	glutKeyboardUpFunc(keyboardUp);
-    //glutSpecialFunc(specialDown);
-    //glutSpecialUpFunc(specialUp);
+    glutKeyboardFunc(keyboardDown);
+    glutKeyboardUpFunc(keyboardUp);
+    // glutSpecialFunc(specialDown);
+    // glutSpecialUpFunc(specialUp);
 
     return (glGetError() == GL_NO_ERROR);
 }
 
-
-
 void showAxes()
 {
-    if (show_axes || ImGui::GetIO().KeyCtrl) //rotation center axes
+    if (show_axes || ImGui::GetIO().KeyCtrl) // rotation center axes
     {
         glBegin(GL_LINES);
         glColor3f(1.f, 1.f, 1.f);
@@ -495,7 +494,7 @@ void showAxes()
         glEnd();
     }
 
-    if (show_axes || ImGui::GetIO().KeyCtrl) //origin axes
+    if (show_axes || ImGui::GetIO().KeyCtrl) // origin axes
     {
         glBegin(GL_LINES);
         glColor3f(1.0f, 0.0f, 0.0f);
@@ -519,7 +518,7 @@ void updateCameraTransition()
         return;
 
     // Smoothly approach the target using exponential interpolation
-    //const float t = std::min(deltaTime * camera_transition_speed, 1.0f);
+    // const float t = std::min(deltaTime * camera_transition_speed, 1.0f);
 
     // Ease out curve, slow down effect
     float t = 1.0f - powf(1.0f - std::min(ImGui::GetIO().DeltaTime * camera_transition_speed, 1.0f), 3.0f);
@@ -533,18 +532,26 @@ void updateCameraTransition()
     bool doneYt = fabs(new_translate_y - translate_y) < 0.01f;
     bool doneZt = fabs(new_translate_z - translate_z) < 0.01f;
 
-    if (!doneXrc) rotation_center.x() += (new_rotation_center.x() - rotation_center.x()) * t;
-    if (!doneYrc) rotation_center.y() += (new_rotation_center.y() - rotation_center.y()) * t;
-    if (!doneZrc) rotation_center.z() += (new_rotation_center.z() - rotation_center.z()) * t;
-    if (!doneXr) rotate_x += (new_rotate_x - rotate_x) * t;
-    if (!doneYr) rotate_y += (new_rotate_y - rotate_y) * t;
-    if (!doneXt) translate_x += (new_translate_x - translate_x) * t;
-    if (!doneYt) translate_y += (new_translate_y - translate_y) * t;
-    if (!doneZt) translate_z += (new_translate_z - translate_z) * t;
+    if (!doneXrc)
+        rotation_center.x() += (new_rotation_center.x() - rotation_center.x()) * t;
+    if (!doneYrc)
+        rotation_center.y() += (new_rotation_center.y() - rotation_center.y()) * t;
+    if (!doneZrc)
+        rotation_center.z() += (new_rotation_center.z() - rotation_center.z()) * t;
+    if (!doneXr)
+        rotate_x += (new_rotate_x - rotate_x) * t;
+    if (!doneYr)
+        rotate_y += (new_rotate_y - rotate_y) * t;
+    if (!doneXt)
+        translate_x += (new_translate_x - translate_x) * t;
+    if (!doneYt)
+        translate_y += (new_translate_y - translate_y) * t;
+    if (!doneZt)
+        translate_z += (new_translate_z - translate_z) * t;
 
     camera_transition_active = !(doneXrc && doneYrc && doneZrc && doneXr && doneYr && doneXt && doneYt && doneZt);
 
-	//making sure exact coordinates are reached at the end of the transition
+    // making sure exact coordinates are reached at the end of the transition
     if (!camera_transition_active)
     {
         rotation_center = new_rotation_center;
@@ -553,17 +560,17 @@ void updateCameraTransition()
         translate_x = new_translate_x;
         translate_y = new_translate_y;
         translate_z = new_translate_z;
-	}
+    }
 }
 
 void breakCameraTransition()
 {
     if (camera_transition_active == false)
         return;
-    //commit new rotation center
-	rotation_center = new_rotation_center;
-	//reset transition
-	camera_transition_active = false;
+    // commit new rotation center
+    rotation_center = new_rotation_center;
+    // reset transition
+    camera_transition_active = false;
 }
 
 void setCameraPreset(CameraPreset preset)
@@ -575,7 +582,7 @@ void setCameraPreset(CameraPreset preset)
     case CAMERA_FRONT:
         new_rotate_x = -90.0f;
         new_rotate_y = +90.0f;
-		triggered = true;
+        triggered = true;
         break;
     case CAMERA_BACK:
         new_rotate_x = -90.0f;
@@ -614,7 +621,7 @@ void setCameraPreset(CameraPreset preset)
         new_translate_x = 0;
         new_translate_y = 0;
         new_translate_z = -50.0f;
-        mouse_sensitivity = fabs(translate_z) / 100; //1 for translate_z 50 (default zoom)
+        mouse_sensitivity = fabs(translate_z) / 100; // 1 for translate_z 50 (default zoom)
 
         camera_ortho_xy_view_zoom = 10;
         camera_ortho_xy_view_shift_x = 0.0;
@@ -679,7 +686,6 @@ void camMenu()
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
 
-
             std::string text = "X";
             float centered = ImGui::GetColumnWidth() - ImGui::CalcTextSize(text.c_str()).x;
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
@@ -738,11 +744,12 @@ void camMenu()
 
 void view_kbd_shortcuts()
 {
-    ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
 
-    if (io.WantCaptureKeyboard) return;
+    if (io.WantCaptureKeyboard)
+        return;
 
-    //translate camera
+    // translate camera
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
     {
         translate_x += 0.2f * mouse_sensitivity;
@@ -765,7 +772,7 @@ void view_kbd_shortcuts()
         breakCameraTransition();
     }
 
-    //rotate camera
+    // rotate camera
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
     {
         rotate_y -= mouse_sensitivity;
@@ -789,14 +796,14 @@ void view_kbd_shortcuts()
     }
 
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_R, false))
-		cor_gui = true;
+        cor_gui = true;
 
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false) && !is_ortho)
-		lock_z = !lock_z;
+        lock_z = !lock_z;
 
-    //only checking for single key press (no modifiers) from this point
-    if (io.KeyCtrl || io.KeyAlt || io.KeyShift) return;
-
+    // only checking for single key press (no modifiers) from this point
+    if (io.KeyCtrl || io.KeyAlt || io.KeyShift)
+        return;
 
     if (ImGui::IsKeyPressed(ImGuiKey_B))
         setCameraPreset(CAMERA_BACK);
@@ -823,30 +830,28 @@ void view_kbd_shortcuts()
         show_axes = !show_axes;
 
     if (ImGui::IsKeyPressed(ImGuiKey_1))
-		point_size = 1;
-	if (ImGui::IsKeyPressed(ImGuiKey_2))
-		point_size = 2;
-	if (ImGui::IsKeyPressed(ImGuiKey_3))
-		point_size = 3;
-	if (ImGui::IsKeyPressed(ImGuiKey_4))
-		point_size = 4;
-	if (ImGui::IsKeyPressed(ImGuiKey_5))
-		point_size = 5;
+        point_size = 1;
+    if (ImGui::IsKeyPressed(ImGuiKey_2))
+        point_size = 2;
+    if (ImGui::IsKeyPressed(ImGuiKey_3))
+        point_size = 3;
+    if (ImGui::IsKeyPressed(ImGuiKey_4))
+        point_size = 4;
+    if (ImGui::IsKeyPressed(ImGuiKey_5))
+        point_size = 5;
     if (ImGui::IsKeyPressed(ImGuiKey_6))
-		point_size = 6;
-	if (ImGui::IsKeyPressed(ImGuiKey_7))
-		point_size = 7;
-	if (ImGui::IsKeyPressed(ImGuiKey_8))
-		point_size = 8;
-	if (ImGui::IsKeyPressed(ImGuiKey_9))
-		point_size = 9;
+        point_size = 6;
+    if (ImGui::IsKeyPressed(ImGuiKey_7))
+        point_size = 7;
+    if (ImGui::IsKeyPressed(ImGuiKey_8))
+        point_size = 8;
+    if (ImGui::IsKeyPressed(ImGuiKey_9))
+        point_size = 9;
 }
-
-
 
 void cor_window()
 {
-    //temporary location for new rotation center (minimal impact change in all apps)
+    // temporary location for new rotation center (minimal impact change in all apps)
     if (cor_gui)
     {
         ImGui::OpenPopup("Center of rotation");
@@ -895,9 +900,7 @@ void cor_window()
     }
 }
 
-
-
-void ImGuiHyperlink(const char* url, ImVec4 color)
+void ImGuiHyperlink(const char *url, ImVec4 color)
 {
     ImGui::PushStyleColor(ImGuiCol_Text, color);
     ImGui::TextUnformatted(url);
@@ -914,12 +917,11 @@ void ImGuiHyperlink(const char* url, ImVec4 color)
     // Draw underline on hover
     if (ImGui::IsItemHovered())
     {
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        ImDrawList *draw_list = ImGui::GetWindowDrawList();
         draw_list->AddLine(
             ImVec2(pos.x, pos.y + size.y),
             ImVec2(pos.x + size.x, pos.y + size.y),
-            ImColor(color)
-        );
+            ImColor(color));
     }
 
     // Open URL on click
@@ -937,12 +939,10 @@ void ImGuiHyperlink(const char* url, ImVec4 color)
     }
 }
 
-
-
 void ShowShortcutsTable(const std::vector<ShortcutEntry> appShortcuts)
 {
     if (ImGui::BeginTable("ShortcutsTable", 2,
-        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY, ImVec2(-FLT_MIN, 200)))
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY, ImVec2(-FLT_MIN, 200)))
     {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthFixed, 120);
@@ -953,7 +953,7 @@ void ShowShortcutsTable(const std::vector<ShortcutEntry> appShortcuts)
 
         for (size_t i = 0; i < shortcuts.size(); ++i)
         {
-            const auto& s = shortcuts[i];
+            const auto &s = shortcuts[i];
 
             // Insert a "fake" type row when type changes
             if (!s.type.empty() && s.type != lastType)
@@ -983,23 +983,21 @@ void ShowShortcutsTable(const std::vector<ShortcutEntry> appShortcuts)
                 ImGui::TableSetColumnIndex(1);
                 ImGui::TextUnformatted(description.c_str());
             }
-
         }
 
         ImGui::EndTable();
     }
 }
 
-
-
-void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts)
+void info_window(const std::vector<std::string> &infoLines, const std::vector<ShortcutEntry> &appShortcuts)
 {
-    if (!info_gui) return;
+    if (!info_gui)
+        return;
 
     if (ImGui::Begin("Info", &info_gui, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse))
     {
         bool firstLine = true;
-        for (const auto& line : infoLines)
+        for (const auto &line : infoLines)
         {
             if (line.empty())
                 ImGui::NewLine();
@@ -1017,16 +1015,16 @@ void info_window(const std::vector<std::string>& infoLines, const std::vector<Sh
                 {
                     ImGui::BeginTooltip();
                     // Query versions info
-                    const GLubyte* renderer = glGetString(GL_RENDERER);
-                    const GLubyte* version = glGetString(GL_VERSION);
-                    const GLubyte* glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
+                    const GLubyte *renderer = glGetString(GL_RENDERER);
+                    const GLubyte *version = glGetString(GL_VERSION);
+                    const GLubyte *glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
 
                     ImGui::Text("Renderer: %s", renderer);
                     ImGui::Text("OpenGL version supported: %s", version);
-					ImGui::Text("GLSL version: %s", glslVersion);
+                    ImGui::Text("GLSL version: %s", glslVersion);
                     ImGui::EndTooltip();
                 }
-                
+
                 firstLine = false;
             }
         }
@@ -1041,7 +1039,7 @@ void info_window(const std::vector<std::string>& infoLines, const std::vector<Sh
         ImGuiHyperlink("https://github.com/MapsHD/HDMapping");
 
         ImGui::NewLine();
-		ImGui::Separator();
+        ImGui::Separator();
         ImGui::NewLine();
 
         ShowShortcutsTable(appShortcuts);
@@ -1053,21 +1051,19 @@ void info_window(const std::vector<std::string>& infoLines, const std::vector<Sh
     ImGui::End();
 }
 
-
-
 void drawMiniCompassWithRuler()
 {
     const ImVec2 compassSize = ImVec2(200, 200);
 
-    auto drawLabel = [](float x, float y, float z, const char* text, float r, float g, float b)
+    auto drawLabel = [](float x, float y, float z, const char *text, float r, float g, float b)
     {
         glColor3f(r, g, b);
         glRasterPos3f(x, y, z);
-        for (const char* c = text; *c; ++c)
+        for (const char *c = text; *c; ++c)
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
     };
 
-    ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
 
     // Save viewport
     GLint prevViewport[4];
@@ -1108,20 +1104,29 @@ void drawMiniCompassWithRuler()
     float base = pow(10.0f, floor(log10(rawUnit)));
     float normalized = rawUnit / base;
     float niceUnit;
-    if (normalized < 2.0f)      niceUnit = 1.0f;
-    else if (normalized < 5.0f) niceUnit = 2.0f;
-    else                        niceUnit = 5.0f;
+    if (normalized < 2.0f)
+        niceUnit = 1.0f;
+    else if (normalized < 5.0f)
+        niceUnit = 2.0f;
+    else
+        niceUnit = 5.0f;
     float worldLength = niceUnit * base;
 
-    float scale = miniAxisLength / rawUnit; // convert scroll units to visual units
+    float scale = miniAxisLength / rawUnit;     // convert scroll units to visual units
     float axisDrawLength = worldLength * scale; // final axis length in mini compass
 
     // Draw axes
     glLineWidth(2.0f);
     glBegin(GL_LINES);
-    glColor3f(1, 0, 0); glVertex3f(0, 0, 0); glVertex3f(axisDrawLength, 0, 0); // X
-    glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, axisDrawLength, 0); // Y
-    glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, axisDrawLength); // Z
+    glColor3f(1, 0, 0);
+    glVertex3f(0, 0, 0);
+    glVertex3f(axisDrawLength, 0, 0); // X
+    glColor3f(0, 1, 0);
+    glVertex3f(0, 0, 0);
+    glVertex3f(0, axisDrawLength, 0); // Y
+    glColor3f(0, 0, 1);
+    glVertex3f(0, 0, 0);
+    glVertex3f(0, 0, axisDrawLength); // Z
     glEnd();
 
     // Draw axis labels
@@ -1131,13 +1136,17 @@ void drawMiniCompassWithRuler()
 
     // End scale label
     char label[24];
-    if (worldLength >= 1000.0f)      sprintf(label, "%.0f [km]", worldLength / 1000.0f);
-    else if (worldLength >= 1.0f)    sprintf(label, "%.0f [m]", worldLength);
-    else if (worldLength >= 0.01f)   sprintf(label, "%.0f [cm]", worldLength * 100.0f);
-    else                             sprintf(label, "<1 [cm]");
+    if (worldLength >= 1000.0f)
+        sprintf(label, "%.0f [km]", worldLength / 1000.0f);
+    else if (worldLength >= 1.0f)
+        sprintf(label, "%.0f [m]", worldLength);
+    else if (worldLength >= 0.01f)
+        sprintf(label, "%.0f [cm]", worldLength * 100.0f);
+    else
+        sprintf(label, "<1 [cm]");
 
-    //drawLabel(axes[2].x() + 0.2f, axes[2].y() + 0.4f, axes[2].z() - 0.2f, label,
-    //    colors[2][0], colors[2][1], colors[2][2]);
+    // drawLabel(axes[2].x() + 0.2f, axes[2].y() + 0.4f, axes[2].z() - 0.2f, label,
+    //     colors[2][0], colors[2][1], colors[2][2]);
     drawLabel(axisDrawLength / 2, axisDrawLength / 2, axisDrawLength / 2, label, 1.0 - bg_color.x, 1.0 - bg_color.y, 1.0 - bg_color.z);
 
     // Restore line width
@@ -1159,14 +1168,12 @@ void drawMiniCompassWithRuler()
     glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
 }
 
-
-
-float distanceToPlane(const RegistrationPlaneFeature::Plane& plane, const Eigen::Vector3d& p)
+float distanceToPlane(const RegistrationPlaneFeature::Plane &plane, const Eigen::Vector3d &p)
 {
     return (plane.a * p.x() + plane.b * p.y() + plane.c * p.z() + plane.d);
 }
 
-Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane)
+Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane)
 {
     float TOLERANCE = 0.0001;
     Eigen::Vector3d out_point;
@@ -1221,7 +1228,7 @@ LaserBeam GetLaserBeam(int x, int y)
     return laser_beam;
 }
 
-double distance_point_to_line(const Eigen::Vector3d& point, const LaserBeam& line)
+double distance_point_to_line(const Eigen::Vector3d &point, const LaserBeam &line)
 {
     Eigen::Vector3d AP = point - line.position;
 
@@ -1229,7 +1236,7 @@ double distance_point_to_line(const Eigen::Vector3d& point, const LaserBeam& lin
     return dist;
 }
 
-void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking, int& picked_index)
+void getClosestTrajectoryPoint(Session &session, int x, int y, bool gcpPicking, int &picked_index)
 {
     picked_index = -1;
 
@@ -1242,7 +1249,7 @@ void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking, 
     {
         for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
         {
-            const auto& p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+            const auto &p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
             Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
 
             double dist = distance_point_to_line(vp, laser_beam);
@@ -1280,21 +1287,198 @@ void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking, 
     camera_transition_active = true;
 }
 
-void getClosestTrajectoriesPoint(std::vector<Session>& sessions, int x, int y)
+void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, int &index_loop_closure_source, int &index_loop_closure_target, int ctrl_shift)
 {
-    //picked_index = -1;
-    //picked_session = nullptr;
+    std::cout << "getClosestTrajectoriesPoint" << std::endl;
+
+    int first_session_index = -1;
+    int second_session_index = -1;
+    int number_visible_sessions = 0;
+
+    bool first_session_index_found = false;
+    for (int index = 0; index < sessions.size(); index++)
+    {
+        if (sessions[index].visible)
+        {
+            number_visible_sessions++;
+            if (!first_session_index_found)
+            {
+                first_session_index = index;
+                second_session_index = index;
+                first_session_index_found = true;
+            }
+            else
+            {
+                second_session_index = index;
+            }
+        }
+    }
+
+    std::cout << "first_session_index: " << first_session_index << std::endl;
+    std::cout << "second_session_index: " << second_session_index << std::endl;
+    std::cout << "number_visible_sessions: " << number_visible_sessions << std::endl;
+    // picked_index = -1;
+    // picked_session = nullptr;
 
     const auto laser_beam = GetLaserBeam(x, y);
     double min_distance = std::numeric_limits<double>::max();
 
-    for (auto& session : sessions)
+    if (number_visible_sessions == 1)
     {
+        // std::cout << "first_session_index " << first_session_index << std::endl;
+        for (int i = 0; i < sessions[first_session_index].point_clouds_container.point_clouds.size(); i++)
+        {
+            for (int j = 0; j < sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+            {
+                const auto &p = sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+                Eigen::Vector3d vp = sessions[first_session_index].point_clouds_container.point_clouds[i].m_pose * p;
+
+                double dist = distance_point_to_line(vp, laser_beam);
+
+                if (dist < min_distance)
+                {
+                    min_distance = dist;
+
+                    if (number_visible_sessions == 1)
+                    {
+                        if (ctrl_shift == 0)
+                        {
+                            new_rotation_center.x() = static_cast<float>(vp.x());
+                            new_rotation_center.y() = static_cast<float>(vp.y());
+                            new_rotation_center.z() = static_cast<float>(vp.z());
+                            index_loop_closure_source = i;
+                        }
+                        if (ctrl_shift == 1)
+                        {
+                            index_loop_closure_target = i;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (number_visible_sessions > 2)
+    {
+        // std::cout << "first_session_index " << first_session_index << std::endl;
+        for (int s = 0; s < sessions.size(); s++){
+            if (sessions[s].visible){
+
+                for (int i = 0; i < sessions[s].point_clouds_container.point_clouds.size(); i++)
+                {
+                    for (int j = 0; j < sessions[s].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+                    {
+                        const auto &p = sessions[s].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+                        Eigen::Vector3d vp = sessions[s].point_clouds_container.point_clouds[i].m_pose * p;
+
+                        double dist = distance_point_to_line(vp, laser_beam);
+
+                        if (dist < min_distance)
+                        {
+                            min_distance = dist;
+
+                            new_rotation_center.x() = static_cast<float>(vp.x());
+                            new_rotation_center.y() = static_cast<float>(vp.y());
+                            new_rotation_center.z() = static_cast<float>(vp.z());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (number_visible_sessions == 2)
+    {
+        int index = -1;
+        if (ctrl_shift == 0)
+        {
+            index = first_session_index;
+        }
+        if (ctrl_shift == 1)
+        {
+            index = second_session_index;
+        }
+        // std::cout << "first_session_index " << first_session_index << std::endl;
+        for (int i = 0; i < sessions[index].point_clouds_container.point_clouds.size(); i++)
+        {
+            for (int j = 0; j < sessions[index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+            {
+                const auto &p = sessions[index].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+                Eigen::Vector3d vp = sessions[index].point_clouds_container.point_clouds[i].m_pose * p;
+
+                double dist = distance_point_to_line(vp, laser_beam);
+
+                if (dist < min_distance)
+                {
+                    min_distance = dist;
+
+                    if (ctrl_shift == 0)
+                    {
+                        index_loop_closure_source = i;
+                        new_rotation_center.x() = static_cast<float>(vp.x());
+                        new_rotation_center.y() = static_cast<float>(vp.y());
+                        new_rotation_center.z() = static_cast<float>(vp.z());
+                    }
+                    if (ctrl_shift == 1)
+                    {
+                        index_loop_closure_target = i;
+                    }
+                    
+                }
+            }
+        }
+    }
+
+#if 0
+    // for (auto &session : sessions)
+    for (int index = 0; index < sessions.size(); index++)
+    {
+        auto &session = sessions[index];
+
+        if (number_visible_sessions > 2)
+        {
+            if (!session.visible)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+            {
+                for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+                {
+                    const auto &p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+                    Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
+
+                    double dist = distance_point_to_line(vp, laser_beam);
+
+                    if (dist < min_distance)
+                    {
+                        min_distance = dist;
+
+                        new_rotation_center.x() = static_cast<float>(vp.x());
+                        new_rotation_center.y() = static_cast<float>(vp.y());
+                        new_rotation_center.z() = static_cast<float>(vp.z());
+
+                        // picked_index = i;
+                        // picked_session = session;
+                    }
+                }
+            }
+        }
+        
+
+        if (number_visible_sessions == 2)
+        {
+        }
+        /*if (!session.visible)
+        {
+            continue;
+        }
         for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
         {
             for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
             {
-                const auto& p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+                const auto &p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
                 Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
 
                 double dist = distance_point_to_line(vp, laser_beam);
@@ -1307,12 +1491,13 @@ void getClosestTrajectoriesPoint(std::vector<Session>& sessions, int x, int y)
                     new_rotation_center.y() = static_cast<float>(vp.y());
                     new_rotation_center.z() = static_cast<float>(vp.z());
 
-                    //picked_index = i;
-                    //picked_session = session;
+                    // picked_index = i;
+                    // picked_session = session;
                 }
             }
-        }
+        }*/
     }
+#endif
 
     new_translate_x = -new_rotation_center.x();
     new_translate_y = -new_rotation_center.y();
@@ -1321,8 +1506,6 @@ void getClosestTrajectoriesPoint(std::vector<Session>& sessions, int x, int y)
     new_rotate_y = rotate_y;
     camera_transition_active = true;
 }
-
-
 
 void setNewRotationCenter(int x, int y)
 {
@@ -1336,7 +1519,8 @@ void setNewRotationCenter(int x, int y)
     pl.d = 0;
     new_rotation_center = rayIntersection(laser_beam, pl).cast<float>();
 
-    std::cout << "Setting new rotation center to:\n" << new_rotation_center << std::endl;
+    std::cout << "Setting new rotation center to:\n"
+              << new_rotation_center << std::endl;
 
     new_rotate_x = rotate_x;
     new_rotate_y = rotate_y;

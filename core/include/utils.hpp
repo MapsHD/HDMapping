@@ -113,6 +113,7 @@ Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationP
 LaserBeam GetLaserBeam(int x, int y);
 double distance_point_to_line(const Eigen::Vector3d& point, const LaserBeam& line);
 void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking, int& picked_index);
-void getClosestTrajectoriesPoint(std::vector<Session>& sessions, int x, int y);
+void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, 
+                                 int &index_loop_closure_source, int &index_loop_closure_target, int ctrl_shift);
 
 void setNewRotationCenter(int x, int y);

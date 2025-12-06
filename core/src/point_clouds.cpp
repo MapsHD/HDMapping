@@ -549,16 +549,16 @@ bool PointClouds::load_eth(const std::string &folder_with_point_clouds, const st
 	folder_name = folder_with_point_clouds;
 
 	std::cout << "sum_points before/after decimation: "
-		<< sum_points_before_decimation << " / "
-		<< sum_points_after_decimation << std::endl;
+			  << sum_points_before_decimation << " / "
+			  << sum_points_after_decimation << std::endl;
 	print_point_cloud_dimension();
 	return true;
 }
 
 #if WITH_GUI == 1
 void PointClouds::draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_01x01,
-	bool yz_grid_10x10, bool yz_grid_1x1, bool yz_grid_01x01,
-	bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01, PointClouds::PointCloudDimensions dims)
+							 bool yz_grid_10x10, bool yz_grid_1x1, bool yz_grid_01x01,
+							 bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01, PointClouds::PointCloudDimensions dims)
 {
 	float step;
 
@@ -804,10 +804,10 @@ void PointClouds::render(const ObservationPicking &observation_picking, int view
 				   xy_grid_10x10, xy_grid_1x1, xy_grid_01x01, dims);
 
 	// Render each point cloud (points + trajectories)
-	for (auto& p : point_clouds)
+	for (auto &p : point_clouds)
 	{
 		p.render(this->show_with_initial_pose, observation_picking, viewer_decmiate_point_cloud,
-			xz_intersection, yz_intersection, xy_intersection, intersection_width, show_imu_to_lio_diff);
+				 xz_intersection, yz_intersection, xy_intersection, intersection_width, show_imu_to_lio_diff);
 	}
 }
 #endif
@@ -1149,17 +1149,17 @@ bool PointClouds::load_pc(PointCloud &pc, std::string input_file_name)
 		pc.intensities.push_back(point->intensity);
 		pc.timestamps.push_back(p.timestamp);
 
-		//Eigen::Vector3d color(
+		// Eigen::Vector3d color(
 		//	static_cast<uint8_t>(0xFFU * ((point->rgb[0] > 0) ? static_cast<float>(point->rgb[0]) / static_cast<float>(0xFFFFU) : 1.0f)) / 256.0,
 		//	static_cast<uint8_t>(0xFFU * ((point->rgb[1] > 0) ? static_cast<float>(point->rgb[1]) / static_cast<float>(0xFFFFU) : 1.0f)) / 256.0,
 		//	static_cast<uint8_t>(0xFFU * ((point->rgb[2] > 0) ? static_cast<float>(point->rgb[2]) / static_cast<float>(0xFFFFU) : 1.0f)) / 256.0);
 
 		Eigen::Vector3d color(
 			static_cast<float>(point->rgb[0]) / 256.0,
-		    static_cast<float>(point->rgb[1]) / 256.0,
-		    static_cast<float>(point->rgb[2]) / 256.0);
+			static_cast<float>(point->rgb[1]) / 256.0,
+			static_cast<float>(point->rgb[2]) / 256.0);
 
-		//std::cout << point->rgb[0] << " " << point->rgb[1] << " " << point->rgb[2] << std::endl;
+		// std::cout << point->rgb[0] << " " << point->rgb[1] << " " << point->rgb[2] << std::endl;
 
 		pc.colors.push_back(color);
 
@@ -1184,15 +1184,22 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 	{
 		std::cout << "Loading file " << i + 1 << "/" << input_file_names.size() << " (" << (std::filesystem::path(input_file_names[i]).filename().string()) << "). ";
 
-		auto& pc = point_clouds_nodata[i];  // reference directly to vector slot
+		auto &pc = point_clouds_nodata[i]; // reference directly to vector slot
 
 		pc.file_name = input_file_names[i];
 		auto trj_path = std::filesystem::path(input_file_names[i]).parent_path();
 		std::filesystem::path trajectorypath(pc.file_name);
-		std::string fn = (trajectorypath.filename().stem()).string();
-		fn.replace(0, 9, "trajectory_lio_");
-		std::string trajectory_filename = (fn + ".csv");
-		trj_path /= trajectory_filename;
+		// std::string fn = (trajectorypath.filename().stem()).string();
+
+		trajectorypath.remove_filename();
+
+		std::string trj_fn = "trajectory_lio_" + std::to_string(i) + ".csv";
+
+		// fn.replace(0, 9, "trajectory_lio_");
+		// std::string trajectory_filename = (fn + ".csv");
+		// trj_path /= trajectory_filename;
+
+		trj_path /= trj_fn;
 
 		std::cout << "From trajectory file (" << (std::filesystem::path(trj_path).filename().string()) << ")";
 
@@ -1289,8 +1296,10 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 			infile.close();
 
 			pc.local_trajectory = local_trajectory;
-		}else{
-			std::cout << "trajectory path: '" << trj_path.string() << "' does not exist" << std::endl; 
+		}
+		else
+		{
+			std::cout << "trajectory path: '" << trj_path.string() << "' does not exist" << std::endl;
 		}
 	}
 
@@ -1352,12 +1361,11 @@ PointClouds::PointCloudDimensions PointClouds::compute_point_cloud_dimension() c
 		std::numeric_limits<double>::max(), std::numeric_limits<double>::lowest(),
 		std::numeric_limits<double>::max(), std::numeric_limits<double>::lowest(),
 		std::numeric_limits<double>::max(), std::numeric_limits<double>::lowest(),
-		0, 0, 0
-	};
+		0, 0, 0};
 
-	for (const auto& pc : this->point_clouds)
+	for (const auto &pc : this->point_clouds)
 	{
-		for (const auto& p : pc.points_local)
+		for (const auto &p : pc.points_local)
 		{
 			auto pt = pc.m_initial_pose * p;
 			dim.x_min = std::min(dim.x_min, pt.x());
@@ -1381,17 +1389,17 @@ void PointClouds::print_point_cloud_dimension()
 	auto dims = compute_point_cloud_dimension();
 
 	std::cout << "------------------------" << std::endl;
-	
+
 	std::cout << "Coordinates: min / max / size [m]" << std::endl;
 	std::cout << "X (length): " << std::fixed << std::setprecision(3) << dims.x_min
-		<< " / " << std::fixed << std::setprecision(3) << dims.x_max
-		<< " / " << std::fixed << std::setprecision(3) << dims.length << std::endl;
+			  << " / " << std::fixed << std::setprecision(3) << dims.x_max
+			  << " / " << std::fixed << std::setprecision(3) << dims.length << std::endl;
 	std::cout << "Y (width) : " << std::fixed << std::setprecision(3) << dims.y_min
-		<< " / " << std::fixed << std::setprecision(3) << dims.y_max
-		<< " / " << std::fixed << std::setprecision(3) << dims.width << std::endl;
+			  << " / " << std::fixed << std::setprecision(3) << dims.y_max
+			  << " / " << std::fixed << std::setprecision(3) << dims.width << std::endl;
 	std::cout << "Z (height): " << std::setprecision(3) << dims.z_min
-		<< " / " << std::fixed << std::setprecision(3) << dims.z_max
-		<< " / " << std::fixed << std::setprecision(3) << dims.height << std::endl;
+			  << " / " << std::fixed << std::setprecision(3) << dims.z_max
+			  << " / " << std::fixed << std::setprecision(3) << dims.height << std::endl;
 
 	std::cout << "------------------------" << std::endl;
 }
@@ -1483,8 +1491,8 @@ bool PointClouds::load_3DTK_tls(std::vector<std::string> input_file_names, bool 
 		sum_points_after_decimation = sum_points_before_decimation;
 	}
 	std::cout << "downsampling finished. sum_points before/after decimation: "
-		<< sum_points_before_decimation << " / "
-		<< sum_points_after_decimation << std::endl;
+			  << sum_points_before_decimation << " / "
+			  << sum_points_after_decimation << std::endl;
 	print_point_cloud_dimension();
 	return true;
 }

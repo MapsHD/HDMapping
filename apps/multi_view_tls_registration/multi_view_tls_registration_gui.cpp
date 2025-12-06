@@ -1411,94 +1411,11 @@ void openSession()
     }
 }
 
-void openLaz(bool ground_truth)
+void saveSession(std::string output_file_name = "")
 {
-    session.point_clouds_container.point_clouds.clear();
-    std::vector<std::string> input_file_names;
-    input_file_names = mandeye::fd::OpenFileDialog("Load las/laz files", mandeye::fd::LAS_LAZ_filter, true);
-    if (input_file_names.size() > 0)
-    {
-        session.working_directory = fs::path(input_file_names[0]).parent_path().string();
-
-        std::cout << "Creating session from las/laz files:" << std::endl;
-        for (size_t i = 0; i < input_file_names.size(); i++)
-            std::cout << input_file_names[i] << std::endl;
-
-        if (!session.point_clouds_container.load_whu_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset))
-            std::cout << "Problem creating! Check input files laz/las" << std::endl;
-        else
-            std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
-
-        session_loaded = true;
-        index_begin = 0;
-        index_end = session.point_clouds_container.point_clouds.size() - 1;
-
-        std::string newTitle = winTitle + " - " + fs::path(input_file_names[0]).parent_path().string();
-        glutSetWindowTitle(newTitle.c_str());
-
-        for (const auto& pc : session.point_clouds_container.point_clouds)
-            session_total_number_of_points += pc.points_local.size();
-
-        session_dims = session.point_clouds_container.compute_point_cloud_dimension();
-
-        [[maybe_unused]]
-        pfd::message message(
-            "Information",
-            "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
-            pfd::choice::ok, pfd::icon::info);
-        message.result();
-
-        if (ground_truth){
-            session.is_ground_truth = true;
-
-            for(auto &pc:session.point_clouds_container.point_clouds){
-                Eigen::Affine3d m = Eigen::Affine3d::Identity();
-                if (pc.points_local.size() > 100 ){
-                    int counter = 1;
-                    Eigen::Vector3d mean(pc.points_local[0]);
-                    //std::cout << "mean " << mean << std::endl;
-                    for (int i = 100; i < pc.points_local.size(); i += 100)
-                    {
-                        mean += pc.points_local[i];
-                        counter++;
-                    }
-
-                    mean /= counter;
-                    m.translation() = mean;
-
-                    PointCloud::LocalTrajectoryNode node;
-                    node.imu_diff_angle_om_fi_ka_deg = {0,0,0};
-                    node.imu_om_fi_ka = {0,0,0};
-                    node.m_pose = Eigen::Affine3d::Identity();
-                    node.timestamps = {0,0};
-
-                    pc.local_trajectory.push_back(node);
-
-                    for (auto &p : pc.points_local)
-                    {
-                        p -= mean;
-                    }
-                }
-
-                pc.m_initial_pose = m;
-                pc.m_pose = m;
-                pc.m_pose_temp = m;
-
-                pc.pose = pose_tait_bryan_from_affine_matrix(m);
-            }
-
-            //save to folder
-            for (auto &pc : session.point_clouds_container.point_clouds)
-            {
-                std::cout << "pc.file_name: '" << pc.file_name << "'" << std::endl;
-            }
-        }
+    if (output_file_name.empty()){
+        const auto output_file_name = mandeye::fd::SaveFileDialog("Save session as", mandeye::fd::Session_filter, ".mjs", session_file_name);
     }
-}
-
-void saveSession()
-{
-    const auto output_file_name = mandeye::fd::SaveFileDialog("Save session as", mandeye::fd::Session_filter, ".mjs", session_file_name);
 
     if (output_file_name.size() > 0)
     {
@@ -1573,8 +1490,201 @@ void saveSession()
             std::cerr << "Error copying poses file: " << e.what() << '\n';
         }
     }
-    else
+    else{
         std::cout << "saving canceled" << std::endl;
+    }
+}
+
+void openLaz(bool ground_truth)
+{
+    session.point_clouds_container.point_clouds.clear();
+    std::vector<std::string> input_file_names;
+    input_file_names = mandeye::fd::OpenFileDialog("Load las/laz files", mandeye::fd::LAS_LAZ_filter, true);
+    if (input_file_names.size() > 0)
+    {
+        session.working_directory = fs::path(input_file_names[0]).parent_path().string();
+
+        std::cout << "Creating session from las/laz files:" << std::endl;
+        for (size_t i = 0; i < input_file_names.size(); i++)
+            std::cout << input_file_names[i] << std::endl;
+
+        if (!session.point_clouds_container.load_whu_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset))
+            std::cout << "Problem creating! Check input files laz/las" << std::endl;
+        else
+            std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+
+        session_loaded = true;
+        index_begin = 0;
+        index_end = session.point_clouds_container.point_clouds.size() - 1;
+
+        std::string newTitle = winTitle + " - " + fs::path(input_file_names[0]).parent_path().string();
+        glutSetWindowTitle(newTitle.c_str());
+
+        for (const auto &pc : session.point_clouds_container.point_clouds)
+            session_total_number_of_points += pc.points_local.size();
+
+        session_dims = session.point_clouds_container.compute_point_cloud_dimension();
+
+        [[maybe_unused]]
+        pfd::message message(
+            "Information",
+            "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
+            pfd::choice::ok, pfd::icon::info);
+        message.result();
+
+        if (ground_truth)
+        {
+            session.is_ground_truth = true;
+
+            for (auto &pc : session.point_clouds_container.point_clouds)
+            {
+                Eigen::Affine3d m = Eigen::Affine3d::Identity();
+                if (pc.points_local.size() > 100)
+                {
+                    int counter = 1;
+                    Eigen::Vector3d mean(pc.points_local[0]);
+                    // std::cout << "mean " << mean << std::endl;
+                    for (int i = 100; i < pc.points_local.size(); i += 100)
+                    {
+                        mean += pc.points_local[i];
+                        counter++;
+                    }
+
+                    mean /= counter;
+                    m.translation() = mean;
+
+                    PointCloud::LocalTrajectoryNode node;
+                    node.imu_diff_angle_om_fi_ka_deg = {0, 0, 0};
+                    node.imu_om_fi_ka = {0, 0, 0};
+                    node.m_pose = Eigen::Affine3d::Identity();
+                    node.timestamps = {0, 0};
+
+                    pc.local_trajectory.push_back(node);
+
+                    for (auto &p : pc.points_local)
+                    {
+                        p -= mean;
+                    }
+                }
+
+                pc.m_initial_pose = m;
+                pc.m_pose = m;
+                pc.m_pose_temp = m;
+
+                pc.pose = pose_tait_bryan_from_affine_matrix(m);
+            }
+
+            std::filesystem::path path_ground_truth_session_folder;
+            // save to folder
+            for (auto &pc : session.point_clouds_container.point_clouds)
+            {
+                // std::cout << "pc.file_name: '" << pc.file_name << "'" << std::endl;
+
+                std::filesystem::path path(pc.file_name);
+
+                // std::cout <<  path.parent_path() << std::endl;
+                // std::cout <<  path.relative_path() << std::endl;
+                // std::cout <<  path.root_directory() << std::endl;
+
+                auto fn = path.filename();
+
+                path.remove_filename();
+
+                // std::cout << path << std::endl;
+
+                path /= "session_ground_truth";
+
+                path_ground_truth_session_folder = path;
+
+                if (std::filesystem::create_directory(path))
+                {
+                    std::cout << "Directory '" << path << "' created successfully.\n";
+                }
+                else
+                {
+                    std::cout << "Directory '" << path << "' already exists or failed to create.\n";
+                }
+
+                auto fpath = path;
+                fpath /= fn;
+
+                std::cout << fpath << std::endl;
+
+                std::cout << "saving file: '" << fpath << "'" << std::endl;
+
+                exportLaz(fpath.string(), pc.points_local, pc.intensities, pc.timestamps);
+
+                //--
+                fpath = path;
+                fpath /= "session_ground_truth.mjs";
+
+                auto initial_poses_file_name = path;
+                initial_poses_file_name /= "session_ini_poses.mri";
+                session.point_clouds_container.initial_poses_file_name = initial_poses_file_name.string();
+
+                auto poses_file_name = path;
+                poses_file_name /= "session_poses.mrp";
+                session.point_clouds_container.poses_file_name = poses_file_name.string();
+
+                saveSession(fpath.string());
+
+                //saving terajectory files
+                for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++){
+                    // save trajectory
+
+                    auto pathtrj = path;
+
+                    std::string trajectory_filename = ("trajectory_lio_" + std::to_string(i) + ".csv");
+                    pathtrj /= trajectory_filename;
+                    std::cout << "saving to: " << pathtrj << std::endl;
+
+                    ///
+                    std::ofstream outfile;
+                    outfile.open(pathtrj);
+                    if (!outfile.good())
+                    {
+                        std::cout << "can not save file: " << pathtrj << std::endl;
+                        return;
+                    }
+
+                    outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 timestampUnix_nanoseconds om_rad fi_rad ka_rad" << std::endl;
+                    for (int j = 0; j < 1; j++)
+                    {
+                        auto pose = Eigen::Affine3d::Identity();
+
+                        outfile
+                            << std::setprecision(20) << 0.0 << " " << std::setprecision(10)
+                            << pose(0, 0) << " "
+                            << pose(0, 1) << " "
+                            << pose(0, 2) << " "
+                            << pose(0, 3) << " "
+                            << pose(1, 0) << " "
+                            << pose(1, 1) << " "
+                            << pose(1, 2) << " "
+                            << pose(1, 3) << " "
+                            << pose(2, 0) << " "
+                            << pose(2, 1) << " "
+                            << pose(2, 2) << " "
+                            << pose(2, 3) << " "
+                            << std::setprecision(20) << 0.0 << " "
+                            << 0.0 << " "
+                            << 0.0 << " "
+                            << 0.0 << " "
+                            << std::endl;
+                    }
+                    outfile.close();
+                }
+
+                
+            }
+
+            std::string mes = "Session saved to folder '" + path_ground_truth_session_folder.string() + "'";
+            [[maybe_unused]] pfd::message message(
+                "Ground truth session info", mes,
+                pfd::choice::ok, pfd::icon::info);
+            message.result();
+        }
+    }
 }
 
 void saveSubsession()

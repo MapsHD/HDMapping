@@ -1556,7 +1556,7 @@ void openData()
                 loRunning = false;
 
                 std::ostringstream oss;
-                oss << "Data saved to folder:\n'" << working_directory << "\\lidar_odometry_result_*'\n"
+                oss << "Data saved to folder:\n'" << working_directory << "\\lio_result_*'\n"
                     << "Calculated trajectory length: "
                     << std::fixed << std::setprecision(1) << params.total_length_of_calculated_trajectory << "[m]\n"
                     << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str();
@@ -2221,7 +2221,7 @@ void display()
 
     if (info_gui)
     {
-        infoLines[infoLines.size() - 2] = "It saves session file in " + working_directory + "\\lidar_odometry_result_*";
+        infoLines[infoLines.size() - 2] = "It saves session file in " + working_directory + "\\lio_result_*";
         info_window(infoLines, appShortcuts);
     }
 

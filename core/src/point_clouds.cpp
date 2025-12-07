@@ -1187,13 +1187,25 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		auto &pc = point_clouds_nodata[i]; // reference directly to vector slot
 
 		pc.file_name = input_file_names[i];
+		//---
+		std::filesystem::path path = std::filesystem::path(pc.file_name);
+
+		auto only_fn = (path.filename()).stem();
+
+		std::vector<std::string> strs;
+		std::string line = only_fn.string();
+		split(line, '_', strs);
+
+		//--
+
 		auto trj_path = std::filesystem::path(input_file_names[i]).parent_path();
 		std::filesystem::path trajectorypath(pc.file_name);
 		// std::string fn = (trajectorypath.filename().stem()).string();
 
 		trajectorypath.remove_filename();
 
-		std::string trj_fn = "trajectory_lio_" + std::to_string(i) + ".csv";
+		//std::string trj_fn = "trajectory_lio_" + std::to_string(i) + ".csv";
+		std::string trj_fn = "trajectory_lio_" + strs[strs.size() - 1] + ".csv";
 
 		// fn.replace(0, 9, "trajectory_lio_");
 		// std::string trajectory_filename = (fn + ".csv");

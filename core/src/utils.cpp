@@ -12,6 +12,7 @@
 #include <iostream>
 #include <HDMapping/Version.hpp>
 #include <filesystem>
+#include <regex>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -38,7 +39,7 @@ bool compass_ruler = true;
 Eigen::Affine3f viewLocal;
 
 Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
-float rotate_x = 0.0, rotate_y = 0.0;
+float rotate_x = -35.264f, rotate_y = 135.0f;
 float translate_x, translate_y = 0.0;
 float translate_z = -50.0;
 
@@ -164,6 +165,8 @@ std::string truncPath(const std::string &fullPath)
 
     return "..\\" + parent + "\\..\\" + filename;
 }
+
+
 
 void wheel(int button, int dir, int x, int y)
 {
@@ -1287,48 +1290,17 @@ void getClosestTrajectoryPoint(Session &session, int x, int y, bool gcpPicking, 
     camera_transition_active = true;
 }
 
-void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, int &index_loop_closure_source, int &index_loop_closure_target, int ctrl_shift)
+void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, const int first_session_index, const int second_session_index, const int number_visible_sessions, int &index_loop_closure_source, int &index_loop_closure_target, bool KeyShift)
 {
-    std::cout << "getClosestTrajectoriesPoint" << std::endl;
-
-    int first_session_index = -1;
-    int second_session_index = -1;
-    int number_visible_sessions = 0;
-
-    bool first_session_index_found = false;
-    for (int index = 0; index < sessions.size(); index++)
-    {
-        if (sessions[index].visible)
-        {
-            number_visible_sessions++;
-            if (!first_session_index_found)
-            {
-                first_session_index = index;
-                second_session_index = index;
-                first_session_index_found = true;
-            }
-            else
-            {
-                second_session_index = index;
-            }
-        }
-    }
-
-    std::cout << "first_session_index: " << first_session_index << std::endl;
-    std::cout << "second_session_index: " << second_session_index << std::endl;
-    std::cout << "number_visible_sessions: " << number_visible_sessions << std::endl;
-    // picked_index = -1;
-    // picked_session = nullptr;
-
     const auto laser_beam = GetLaserBeam(x, y);
     double min_distance = std::numeric_limits<double>::max();
 
     if (number_visible_sessions == 1)
     {
         // std::cout << "first_session_index " << first_session_index << std::endl;
-        for (int i = 0; i < sessions[first_session_index].point_clouds_container.point_clouds.size(); i++)
+        for (size_t i = 0; i < sessions[first_session_index].point_clouds_container.point_clouds.size(); i++)
         {
-            for (int j = 0; j < sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+            for (size_t j = 0; j < sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
             {
                 const auto &p = sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
                 Eigen::Vector3d vp = sessions[first_session_index].point_clouds_container.point_clouds[i].m_pose * p;
@@ -1341,14 +1313,14 @@ void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, i
 
                     if (number_visible_sessions == 1)
                     {
-                        if (ctrl_shift == 0)
+                        if (!KeyShift) // io.KeyCtrl
                         {
                             new_rotation_center.x() = static_cast<float>(vp.x());
                             new_rotation_center.y() = static_cast<float>(vp.y());
                             new_rotation_center.z() = static_cast<float>(vp.z());
                             index_loop_closure_source = i;
                         }
-                        if (ctrl_shift == 1)
+						else // io.KeyShift
                         {
                             index_loop_closure_target = i;
                         }
@@ -1357,18 +1329,57 @@ void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, i
             }
         }
     }
+    else if (number_visible_sessions == 2)
+    {
+        int index = -1;
+		if (!KeyShift) // io.KeyCtrl
+        {
+            index = first_session_index;
+        }
+		else // io.KeyShift
+        {
+            index = second_session_index;
+        }
+        // std::cout << "first_session_index " << first_session_index << std::endl;
+        for (size_t i = 0; i < sessions[index].point_clouds_container.point_clouds.size(); i++)
+        {
+            for (size_t j = 0; j < sessions[index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+            {
+                const auto &p = sessions[index].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+                Eigen::Vector3d vp = sessions[index].point_clouds_container.point_clouds[i].m_pose * p;
 
-    if (number_visible_sessions > 2)
+                double dist = distance_point_to_line(vp, laser_beam);
+
+                if (dist < min_distance)
+                {
+                    min_distance = dist;
+
+					if (!KeyShift) // io.KeyCtrl
+                    {
+                        index_loop_closure_source = i;
+                        new_rotation_center.x() = static_cast<float>(vp.x());
+                        new_rotation_center.y() = static_cast<float>(vp.y());
+                        new_rotation_center.z() = static_cast<float>(vp.z());
+                    }
+					else // io.KeyShift
+                    {
+                        index_loop_closure_target = i;
+                    } 
+                }
+            }
+        }
+    }
+    else // (number_visible_sessions > 2)
     {
         // std::cout << "first_session_index " << first_session_index << std::endl;
-        for (int s = 0; s < sessions.size(); s++){
-            if (sessions[s].visible){
+        for (size_t s = 0; s < sessions.size(); s++) {
+            if (sessions[s].visible) {
 
-                for (int i = 0; i < sessions[s].point_clouds_container.point_clouds.size(); i++)
+                for (size_t i = 0; i < sessions[s].point_clouds_container.point_clouds.size(); i++)
                 {
-                    for (int j = 0; j < sessions[s].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+                    for (size_t j = 0; j < sessions[s].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
                     {
-                        const auto &p = sessions[s].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+                        const auto& p = sessions[s].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
                         Eigen::Vector3d vp = sessions[s].point_clouds_container.point_clouds[i].m_pose * p;
 
                         double dist = distance_point_to_line(vp, laser_beam);
@@ -1386,118 +1397,6 @@ void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, i
             }
         }
     }
-
-    if (number_visible_sessions == 2)
-    {
-        int index = -1;
-        if (ctrl_shift == 0)
-        {
-            index = first_session_index;
-        }
-        if (ctrl_shift == 1)
-        {
-            index = second_session_index;
-        }
-        // std::cout << "first_session_index " << first_session_index << std::endl;
-        for (int i = 0; i < sessions[index].point_clouds_container.point_clouds.size(); i++)
-        {
-            for (int j = 0; j < sessions[index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
-            {
-                const auto &p = sessions[index].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
-                Eigen::Vector3d vp = sessions[index].point_clouds_container.point_clouds[i].m_pose * p;
-
-                double dist = distance_point_to_line(vp, laser_beam);
-
-                if (dist < min_distance)
-                {
-                    min_distance = dist;
-
-                    if (ctrl_shift == 0)
-                    {
-                        index_loop_closure_source = i;
-                        new_rotation_center.x() = static_cast<float>(vp.x());
-                        new_rotation_center.y() = static_cast<float>(vp.y());
-                        new_rotation_center.z() = static_cast<float>(vp.z());
-                    }
-                    if (ctrl_shift == 1)
-                    {
-                        index_loop_closure_target = i;
-                    }
-                    
-                }
-            }
-        }
-    }
-
-#if 0
-    // for (auto &session : sessions)
-    for (int index = 0; index < sessions.size(); index++)
-    {
-        auto &session = sessions[index];
-
-        if (number_visible_sessions > 2)
-        {
-            if (!session.visible)
-            {
-                continue;
-            }
-
-            for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-            {
-                for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
-                {
-                    const auto &p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
-                    Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
-
-                    double dist = distance_point_to_line(vp, laser_beam);
-
-                    if (dist < min_distance)
-                    {
-                        min_distance = dist;
-
-                        new_rotation_center.x() = static_cast<float>(vp.x());
-                        new_rotation_center.y() = static_cast<float>(vp.y());
-                        new_rotation_center.z() = static_cast<float>(vp.z());
-
-                        // picked_index = i;
-                        // picked_session = session;
-                    }
-                }
-            }
-        }
-        
-
-        if (number_visible_sessions == 2)
-        {
-        }
-        /*if (!session.visible)
-        {
-            continue;
-        }
-        for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
-        {
-            for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
-            {
-                const auto &p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
-                Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
-
-                double dist = distance_point_to_line(vp, laser_beam);
-
-                if (dist < min_distance)
-                {
-                    min_distance = dist;
-
-                    new_rotation_center.x() = static_cast<float>(vp.x());
-                    new_rotation_center.y() = static_cast<float>(vp.y());
-                    new_rotation_center.z() = static_cast<float>(vp.z());
-
-                    // picked_index = i;
-                    // picked_session = session;
-                }
-            }
-        }*/
-    }
-#endif
 
     new_translate_x = -new_rotation_center.x();
     new_translate_y = -new_rotation_center.y();

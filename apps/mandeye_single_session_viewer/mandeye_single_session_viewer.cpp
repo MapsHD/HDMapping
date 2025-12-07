@@ -793,6 +793,19 @@ void session_gui()
 
     ImGui::Separator();
 
+    ImGui::Text("Offset [m]:");
+    ImGui::Text("X: %.10f; Y: %.10f; Z: %.10f", session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Click to copy to clipboard");
+    if (ImGui::IsItemClicked())
+    {
+        char tmp[64];
+        snprintf(tmp, sizeof(tmp), "%.10f %.10f %.10f", session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
+        ImGui::SetClipboardText(tmp);
+    }
+
+    ImGui::Separator();
+
 	ImGui::Text("Dimensions:");
     if (ImGui::BeginTable("Dimensions", 4))
     {
@@ -1078,7 +1091,7 @@ void display()
                         pose(2, 3) -= cloud.m_pose(2, 3);
                     }
 
-                    for (int i = 0; i < iCloud.points_local.size(); i++)
+                    for (size_t i = 0; i < iCloud.points_local.size(); i++)
                     {
                         Eigen::Vector3d p(iCloud.points_local[i].x(),
                             iCloud.points_local[i].y(),
@@ -1464,7 +1477,7 @@ void mouse(int glut_button, int state, int x, int y)
                 const auto laser_beam = GetLaserBeam(x, y);
                 double min_distance = std::numeric_limits<double>::max();
 
-                for (int j = 0; j < session.point_clouds_container.point_clouds[index_rendered_points_local].points_local.size(); j++)
+                for (size_t j = 0; j < session.point_clouds_container.point_clouds[index_rendered_points_local].points_local.size(); j++)
                 {
                     auto vp = session.point_clouds_container.point_clouds[index_rendered_points_local].points_local[j];
 

@@ -740,9 +740,9 @@ int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string> &idToSn,
     return 0;
 }
 
-int get_next_result_id(const std::string working_directory)
+fs::path get_next_result_path(const std::string working_directory)
 {
-    std::regex pattern(R"(lidar_odometry_result_(\d+))");
+    std::regex pattern(R"(lio_result_(\d+))");
     int max_number = -1;
     for (const auto &entry : fs::directory_iterator(working_directory))
     {
@@ -758,7 +758,7 @@ int get_next_result_id(const std::string working_directory)
             }
         }
     }
-    return max_number + 1;
+    return (working_directory / fs::path("lio_result_" + std::to_string(max_number + 1)));
 }
 
 bool loadLaz(const std::string &filename, std::vector<Point3Di> &points_out, std::vector<int> index_poses_i, std::vector<Eigen::Affine3d> &intermediate_trajectory, const Eigen::Affine3d &m_pose)

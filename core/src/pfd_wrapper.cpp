@@ -21,6 +21,11 @@ namespace mandeye::fd{
         
         files = pfd::open_file(title, internal::lastLocationHint, filter, multiselect).result();
 
+        for (auto& f : files)
+        {
+            f = std::filesystem::path(f).lexically_normal().string();
+        }
+
         if (!files.empty())
         {
             std::filesystem::path pfile(files.back());

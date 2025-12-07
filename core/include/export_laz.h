@@ -21,8 +21,8 @@ inline bool exportLaz(const std::string &filename,
 
     constexpr float scale = 0.0001f; // one tenth of milimeter
     // find max
-    Eigen::Vector3d _max(-1000000000.0, -1000000000.0, -1000000000.0);
-    Eigen::Vector3d _min(1000000000.0, 1000000000.0, 1000000000.0);
+    Eigen::Vector3d _max(-std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max());
+    Eigen::Vector3d _min(std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
 
     for (auto &p : pointcloud)
     {

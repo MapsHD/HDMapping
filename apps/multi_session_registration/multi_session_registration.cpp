@@ -169,7 +169,7 @@ int index_loop_closure_source = -1;
 int index_loop_closure_target = -1;
 int first_session_index = -1;
 int second_session_index = -1;
-double search_radious = 0.3;
+double search_radius = 0.3;
 bool loaded_sessions = false;
 bool optimized = false;
 bool gizmo_all_sessions = false;
@@ -179,6 +179,8 @@ bool remove_gui = false;
 NDT ndt;
 
 int number_visible_sessions = 0;
+int index_gt = -1;
+int old_index_gt = -1;
 int index_gizmo = -1;
 int old_index_gizmo = -1;
 
@@ -488,7 +490,7 @@ void loop_closure_gui()
                 if (remove_edge_index != -1)
                 {
                     std::vector<Edge> new_edges;
-                    for (int i = 0; i < edges.size(); i++)
+                    for (size_t i = 0; i < edges.size(); i++)
                     {
                         if (remove_edge_index != i)
                             new_edges.push_back(edges[i]);
@@ -613,7 +615,7 @@ void loop_closure_gui()
                                 std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
                                 std::vector<Eigen::Vector3d> target = ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
 
-                                if (icp.compute(source, target, search_radious, number_of_iterations, m_pose))
+                                if (icp.compute(source, target, search_radius, number_of_iterations, m_pose))
                                     edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
 
                                 /*PointClouds pcs;
@@ -625,13 +627,13 @@ void loop_closure_gui()
 
 
                                 ICP icp;
-                                icp.search_radious = (float)search_radious;
+                                icp.search_radius = (float)search_radius;
 
                                 for (auto &pc : pcs.point_clouds)
                                 {
-                                    pc.rgd_params.resolution_X = icp.search_radious;
-                                    pc.rgd_params.resolution_Y = icp.search_radious;
-                                    pc.rgd_params.resolution_Z = icp.search_radious;
+                                    pc.rgd_params.resolution_X = icp.search_radius;
+                                    pc.rgd_params.resolution_Y = icp.search_radius;
+                                    pc.rgd_params.resolution_Z = icp.search_radius;
                                     pc.build_rgd();
                                     pc.cout_rgd();
                                     pc.compute_normal_vectors(0.5);
@@ -665,13 +667,13 @@ void loop_closure_gui()
                                 pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
                                 pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
                                 ICP icp;
-                                icp.search_radious = (float)search_radious;
+                                icp.search_radius = (float)search_radius;
 
                                 for (auto &pc : pcs.point_clouds)
                                 {
-                                    pc.rgd_params.resolution_X = icp.search_radious;
-                                    pc.rgd_params.resolution_Y = icp.search_radious;
-                                    pc.rgd_params.resolution_Z = icp.search_radious;
+                                    pc.rgd_params.resolution_X = icp.search_radius;
+                                    pc.rgd_params.resolution_Y = icp.search_radius;
+                                    pc.rgd_params.resolution_Z = icp.search_radius;
                                     pc.build_rgd();
                                     pc.cout_rgd();
                                     pc.compute_normal_vectors(0.5);
@@ -703,15 +705,15 @@ void loop_closure_gui()
                                 std::vector<Eigen::Vector3d> source = sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to].points_local;
                                 std::vector<Eigen::Vector3d> target = sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
 
-                                if (icp.compute(source, target, search_radious, number_of_iterations, m_pose))
+                                if (icp.compute(source, target, search_radius, number_of_iterations, m_pose))
                                     edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
                             }
                         }
                     }
                     ImGui::SameLine();
-                    ImGui::InputDouble("search_radious", &search_radious);
-                    if (search_radious < 0.01)
-                        search_radious = 0.01;
+                    ImGui::InputDouble("search_radius", &search_radius);
+                    if (search_radius < 0.01)
+                        search_radius = 0.01;
 
                     /*if (ImGui::Button("ICP"))
                     {
@@ -813,13 +815,13 @@ void loop_closure_gui()
                                 pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
                                 pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
                                 ICP icp;
-                                icp.search_radious = (float)search_radious;
+                                icp.search_radius = (float)search_radius;
 
                                 for (auto &pc : pcs.point_clouds)
                                 {
-                                    pc.rgd_params.resolution_X = icp.search_radious;
-                                    pc.rgd_params.resolution_Y = icp.search_radious;
-                                    pc.rgd_params.resolution_Z = icp.search_radious;
+                                    pc.rgd_params.resolution_X = icp.search_radius;
+                                    pc.rgd_params.resolution_Y = icp.search_radius;
+                                    pc.rgd_params.resolution_Z = icp.search_radius;
                                     pc.build_rgd();
                                     pc.cout_rgd();
                                     pc.compute_normal_vectors(0.5);
@@ -852,13 +854,13 @@ void loop_closure_gui()
                                 pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
                                 pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
                                 ICP icp;
-                                icp.search_radious = (float)search_radious;
+                                icp.search_radius = (float)search_radius;
 
                                 for (auto &pc : pcs.point_clouds)
                                 {
-                                    pc.rgd_params.resolution_X = icp.search_radious;
-                                    pc.rgd_params.resolution_Y = icp.search_radious;
-                                    pc.rgd_params.resolution_Z = icp.search_radious;
+                                    pc.rgd_params.resolution_X = icp.search_radius;
+                                    pc.rgd_params.resolution_Y = icp.search_radius;
+                                    pc.rgd_params.resolution_Z = icp.search_radius;
                                     pc.build_rgd();
                                     pc.cout_rgd();
                                     pc.compute_normal_vectors(0.5);
@@ -886,14 +888,14 @@ void loop_closure_gui()
                         }
                     }
                     ImGui::SameLine();
-                    ImGui::InputDouble("search_radious", &search_radious);
-                    if (search_radious < 0.01)
+                    ImGui::InputDouble("search_radius", &search_radius);
+                    if (search_radius < 0.01)
                     {
-                        search_radious = 0.01;
+                        search_radius = 0.01;
                     }*/
 
                     /////////////////////////////////
-                    if (ImGui::Button("ICP [search radious 2m]"))
+                    if (ImGui::Button("ICP [search radius 2m]"))
                     {
                         float sr = 2.0;
                         std::cout << "Iterative Closest Point" << std::endl;
@@ -1001,7 +1003,7 @@ void loop_closure_gui()
                     }
 
                     ImGui::SameLine();
-                    if (ImGui::Button("ICP [search radious 1m]"))
+                    if (ImGui::Button("ICP [search radius 1m]"))
                     {
                         float sr = 1.0;
                         std::cout << "Iterative Closest Point" << std::endl;
@@ -1108,7 +1110,7 @@ void loop_closure_gui()
                         }
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("ICP [search radious 0.5m]"))
+                    if (ImGui::Button("ICP [search radius 0.5m]"))
                     {
                         float sr = 0.5;
                         std::cout << "Iterative Closest Point" << std::endl;
@@ -1219,7 +1221,7 @@ void loop_closure_gui()
                         }
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("ICP [search radious 0.25m]"))
+                    if (ImGui::Button("ICP [search radius 0.25m]"))
                     {
                         float sr = 0.25;
                         std::cout << "Iterative Closest Point" << std::endl;
@@ -1330,7 +1332,7 @@ void loop_closure_gui()
                         }
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("ICP [search radious 0.1m]"))
+                    if (ImGui::Button("ICP [search radius 0.1m]"))
                     {
                         float sr = 0.1;
                         std::cout << "Iterative Closest Point" << std::endl;
@@ -1453,7 +1455,7 @@ void loop_closure_gui()
                             std::vector<unsigned short> intensity;
                             std::vector<double> timestamps;
 
-                            for (int i = 0; i < source.size(); i++)
+                            for (size_t i = 0; i < source.size(); i++)
                             {
                                 pointcloud.push_back(source[i]);
                                 intensity.push_back(0);
@@ -1505,7 +1507,7 @@ void save_trajectories_to_laz(const Session &session, std::string output_file_na
     {
         if (p.visible)
         {
-            for (int i = 0; i < p.local_trajectory.size(); i++)
+            for (size_t i = 0; i < p.local_trajectory.size(); i++)
             {
                 const auto &pp = p.local_trajectory[i].m_pose.translation();
                 Eigen::Vector3d vp;
@@ -1639,7 +1641,7 @@ void save_trajectories(
         {
             if (p.visible)
             {
-                for (int i = 0; i < p.local_trajectory.size(); i++)
+                for (size_t i = 0; i < p.local_trajectory.size(); i++)
                 {
                     const auto &m = p.local_trajectory[i].m_pose;
                     Eigen::Affine3d pose = p.m_pose * m;
@@ -1803,12 +1805,12 @@ bool optimize(std::vector<Session> &sessions)
     std::vector<bool> vfixed_fi;
     std::vector<bool> vfixed_ka;
 
-    for (int i = 0; i < sessions.size(); i++)
+    for (size_t i = 0; i < sessions.size(); i++)
     {
         sum += sessions[i].point_clouds_container.point_clouds.size();
         sums.push_back(sum);
 
-        for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+        for (size_t j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
         {
             vfixed_x.push_back(sessions[i].point_clouds_container.point_clouds[j].fixed_x);
             vfixed_y.push_back(sessions[i].point_clouds_container.point_clouds[j].fixed_y);
@@ -1827,7 +1829,7 @@ bool optimize(std::vector<Session> &sessions)
     std::vector<Eigen::Affine3d> poses_motion_model;
     std::vector<int> index_trajectory;
 
-    for (int j = 0; j < sessions.size(); j++)
+    for (size_t j = 0; j < sessions.size(); j++)
     {
         for (size_t i = 0; i < sessions[j].point_clouds_container.point_clouds.size(); i++)
         {
@@ -1845,7 +1847,7 @@ bool optimize(std::vector<Session> &sessions)
     int iterations = 1;
     bool is_fix_first_node = true;
     std::vector<int> indexes_ground_truth;
-    for (int j = 0; j < sessions.size(); j++)
+    for (size_t j = 0; j < sessions.size(); j++)
     {
         for (size_t i = 0; i < sessions[j].point_clouds_container.point_clouds.size(); i++)
         {
@@ -1870,7 +1872,7 @@ bool optimize(std::vector<Session> &sessions)
     double angle = 0.1 * DEG_TO_RAD;
     double wangle = 1.0 / (angle * angle);
 
-    for (int i = 1; i < poses_motion_model.size(); i++)
+    for (size_t i = 1; i < poses_motion_model.size(); i++)
     {
         if (index_trajectory[i - 1] == index_trajectory[i])
         {
@@ -1891,9 +1893,9 @@ bool optimize(std::vector<Session> &sessions)
         }
     }
 
-    for (int i = 0; i < sessions.size(); i++)
+    for (size_t i = 0; i < sessions.size(); i++)
     {
-        for (int j = 0; j < sessions[i].pose_graph_loop_closure.edges.size(); j++)
+        for (size_t j = 0; j < sessions[i].pose_graph_loop_closure.edges.size(); j++)
         {
             Edge edge;
             edge.index_from = sessions[i].pose_graph_loop_closure.edges[j].index_from + sums[i];
@@ -1905,7 +1907,7 @@ bool optimize(std::vector<Session> &sessions)
         }
     }
 
-    for (int i = 0; i < edges.size(); i++)
+    for (size_t i = 0; i < edges.size(); i++)
     {
         Edge edge;
         edge.index_from = edges[i].index_from + sums[edges[i].index_session_from];
@@ -2101,7 +2103,7 @@ bool optimize(std::vector<Session> &sessions)
             tripletListB.emplace_back(ir + 4, 0, 0);
             tripletListB.emplace_back(ir + 5, 0, 0);
 
-            for (int i = 1; i < index_trajectory.size(); i++)
+            for (size_t i = 1; i < index_trajectory.size(); i++)
             {
                 if (index_trajectory[i - 1] != index_trajectory[i])
                 {
@@ -2133,7 +2135,7 @@ bool optimize(std::vector<Session> &sessions)
         /*double angle = 1.0 * DEG_TO_RAD;
         double wangle = 1.0 / (angle * angle);
 
-        for (int index = 0; index < indexes_ground_truth.size(); index++)
+        for (size_t index = 0; index < indexes_ground_truth.size(); index++)
         {
             int ir = tripletListB.size();
             int ic = indexes_ground_truth[index] * 6;
@@ -2161,10 +2163,10 @@ bool optimize(std::vector<Session> &sessions)
 
         // gnss
         // for (const auto &pc : point_clouds_container.point_clouds)
-        /*for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
+        /*for (size_t index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
         {
             const auto &pc = point_clouds_container.point_clouds[index_pose];
-            for (int i = 0; i < gnss.gnss_poses.size(); i++)
+            for (size_t i = 0; i < gnss.gnss_poses.size(); i++)
             {
                 double time_stamp = gnss.gnss_poses[i].timestamp;
 
@@ -2228,9 +2230,9 @@ bool optimize(std::vector<Session> &sessions)
         }*/
         //
 
-        for (int j = 0; j < sessions.size(); j++)
+        for (size_t j = 0; j < sessions.size(); j++)
         {
-            for (int jj = 0; jj < sessions[j].ground_control_points.gpcs.size(); jj++)
+            for (size_t jj = 0; jj < sessions[j].ground_control_points.gpcs.size(); jj++)
             {
                 Eigen::Vector3d p_s = sessions[j].point_clouds_container.point_clouds[sessions[j].ground_control_points.gpcs[jj].index_to_node_inner].local_trajectory[sessions[j].ground_control_points.gpcs[jj].index_to_node_outer].m_pose.translation();
                 Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
@@ -2273,9 +2275,9 @@ bool optimize(std::vector<Session> &sessions)
         }
 
         ///////////////////////////////////////////////////////
-        for (int i = 0; i < sessions.size(); i++)
+        for (size_t i = 0; i < sessions.size(); i++)
         {
-            for (int index_pose = 0; index_pose < sessions[i].point_clouds_container.point_clouds.size(); index_pose++)
+            for (size_t index_pose = 0; index_pose < sessions[i].point_clouds_container.point_clouds.size(); index_pose++)
             {
                 if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_x)
                 {
@@ -2343,7 +2345,7 @@ bool optimize(std::vector<Session> &sessions)
         }
 
         //////////////////////////////////////////////////////
-        // for (int i = 0; i < gcps.gpcs.size(); i++)
+        // for (size_t i = 0; i < gcps.gpcs.size(); i++)
         //{
 
         Eigen::SparseMatrix<double> matA(tripletListB.size(), poses.size() * 6);
@@ -2639,6 +2641,8 @@ void loadSessions()
         Session session;
         session.load(fs::path(ps).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
         sessions.push_back(session);
+        if (session.is_ground_truth)
+			index_gt = sessions.size() - 1;
     }
     loaded_sessions = true;
 
@@ -2649,7 +2653,7 @@ void loadSessions()
     std::map<int, int> map_reorder;
     // project_settings.session_file_names.
     int new_index = 0;
-    for (int i = 0; i < sessions.size(); i++)
+    for (size_t i = 0; i < sessions.size(); i++)
     {
         if (sessions[i].is_ground_truth)
         {
@@ -2658,7 +2662,7 @@ void loadSessions()
             map_reorder[i] = new_index++;
         }
     }
-    for (int i = 0; i < sessions.size(); i++)
+    for (size_t i = 0; i < sessions.size(); i++)
     {
         if (!sessions[i].is_ground_truth)
         {
@@ -2701,7 +2705,7 @@ void loadSessions()
 
 void project_gui()
 {
-    if (ImGui::Begin("Multi session processing"))
+    if (ImGui::Begin("Settings"))
     {
         ImGui::Checkbox("Downsample during load", &is_decimate);
         ImGui::SameLine();
@@ -2743,9 +2747,9 @@ void project_gui()
                 int index_point_clouds = -1;
                 int index_local_trajectory = -1;
                 bool found = false;
-                for (int a = 0; a < session.point_clouds_container.point_clouds.size(); a++)
+                for (size_t a = 0; a < session.point_clouds_container.point_clouds.size(); a++)
                 {
-                    for (int b = 0; b < session.point_clouds_container.point_clouds[a].local_trajectory.size(); b++)
+                    for (size_t b = 0; b < session.point_clouds_container.point_clouds[a].local_trajectory.size(); b++)
                     {
                         if (session.point_clouds_container.point_clouds[a].local_trajectory[b].timestamps.first > time_stamp_offset)
                         {
@@ -2767,146 +2771,149 @@ void project_gui()
 
                     auto inv = (m1 * m2).inverse();
 
-                    for (int index = 0; index < session.point_clouds_container.point_clouds.size(); index++)
+                    for (size_t index = 0; index < session.point_clouds_container.point_clouds.size(); index++)
                         session.point_clouds_container.point_clouds[index].m_pose = inv * session.point_clouds_container.point_clouds[index].m_pose;
                 }
             }
         }
 
-        ImGui::Separator();
-
-        ImGui::Text("Session file names:");
-
-        for (int i = 0; i < project_settings.session_file_names.size(); i++)
+        if (project_settings.session_file_names.size() > 0)
         {
-            ImGui::Text(truncPath(project_settings.session_file_names[i]).c_str());
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(project_settings.session_file_names[i].c_str());
+            ImGui::Separator();
 
-            if (project_settings.session_file_names.size() == sessions.size())
+            ImGui::Text("Sessions:");
+
+            for (size_t i = 0; i < project_settings.session_file_names.size(); i++)
             {
-                if (!is_loop_closure_gui){
-                    ImGui::SameLine();
-                    ImGui::Checkbox(("Visible##" + std::to_string(i)).c_str(), &sessions[i].visible);
-                }
+                ImGui::Text(truncPath(project_settings.session_file_names[i]).c_str());
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(project_settings.session_file_names[i].c_str());
 
-                ImGui::BeginDisabled(!sessions[i].visible);
+                if (project_settings.session_file_names.size() == sessions.size())
                 {
-                    ImGui::BeginDisabled(sessions[i].is_ground_truth);
+                    ImGui::BeginDisabled(is_loop_closure_gui);
                     {
                         ImGui::SameLine();
-                        if (ImGui::RadioButton(("Gizmo##" + std::to_string(i)).c_str(), &index_gizmo, i))
+                        ImGui::Checkbox(("Visible##" + std::to_string(i)).c_str(), &sessions[i].visible);
+                    }
+				    ImGui::EndDisabled();
+
+                    ImGui::SameLine();
+                    if (ImGui::RadioButton(("Ground truth##" + std::to_string(i)).c_str(), &index_gt, i))
+                        if (old_index_gt == i)
+                            index_gt = -1; // unselect
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Select session as unmovable reference");
+
+                    ImGui::BeginDisabled(!sessions[i].visible);
+                    {
+                        ImGui::BeginDisabled(sessions[i].is_ground_truth);
                         {
-                            if (old_index_gizmo == i)
-                                index_gizmo = -1; // unselect
-                            else
-                                index_gizmo = i;
+                            ImGui::SameLine();
+                            if (ImGui::RadioButton(("Gizmo##" + std::to_string(i)).c_str(), &index_gizmo, i))
+                                if (old_index_gizmo == i)
+                                    index_gizmo = -1; // unselect
+                        }
+                        ImGui::EndDisabled();
+
+                        ImGui::SameLine();
+                        ImGui::Checkbox(("Show RGB##" + std::to_string(i)).c_str(), &sessions[i].show_rgb);
+
+                        if (!sessions[i].show_rgb)
+                        {
+                            ImGui::SameLine();
+                            ImGui::ColorEdit3(("Color##" + std::to_string(i)).c_str(), (float *)&sessions[i].render_color, ImGuiColorEditFlags_NoInputs);
+                            for (auto &pc : sessions[i].point_clouds_container.point_clouds)
+                            {
+                                pc.render_color[0] = sessions[i].render_color[0];
+                                pc.render_color[1] = sessions[i].render_color[1];
+                                pc.render_color[2] = sessions[i].render_color[2];
+                                pc.show_color = sessions[i].show_rgb;
+                            }
+                        }
+                        else
+                        {
+                            for (auto &pc : sessions[i].point_clouds_container.point_clouds)
+                                pc.show_color = sessions[i].show_rgb;
                         }
                     }
                     ImGui::EndDisabled();
 
-                    ImGui::SameLine();
-                    ImGui::Checkbox(("Show RGB##" + std::to_string(i)).c_str(), &sessions[i].show_rgb);
-
-                    if (!sessions[i].show_rgb)
+                    //
+                    if (sessions[i].point_clouds_container.point_clouds.size() > 0)
                     {
-                        ImGui::SameLine();
-                        ImGui::ColorEdit3(("Color##" + std::to_string(i)).c_str(), (float *)&sessions[i].render_color, ImGuiColorEditFlags_NoInputs);
-                        for (auto &pc : sessions[i].point_clouds_container.point_clouds)
+                        if (sessions[i].point_clouds_container.point_clouds[0].local_trajectory.size() > 0)
                         {
-                            pc.render_color[0] = sessions[i].render_color[0];
-                            pc.render_color[1] = sessions[i].render_color[1];
-                            pc.render_color[2] = sessions[i].render_color[2];
-                            pc.show_color = sessions[i].show_rgb;
-                        }
-                    }
-                    else
-                    {
-                        for (auto &pc : sessions[i].point_clouds_container.point_clouds)
-                            pc.show_color = sessions[i].show_rgb;
-                    }
-                }
-                ImGui::EndDisabled();
+                            if (sessions[i].point_clouds_container.point_clouds[sessions[i].point_clouds_container.point_clouds.size() - 1].local_trajectory.size() > 0)
+                            {
+                                ImGui::SameLine();
 
-                if (sessions[i].is_ground_truth)
-                {
-                    ImGui::SameLine();
-                    ImGui::Text(" [ground_truth]");
-                }
+                                int index_last = sessions[i].point_clouds_container.point_clouds.size() - 1;
+                                int index_last2 = sessions[i].point_clouds_container.point_clouds[index_last].local_trajectory.size() - 1;
 
-                //
-                if (sessions[i].point_clouds_container.point_clouds.size() > 0)
-                {
-                    if (sessions[i].point_clouds_container.point_clouds[0].local_trajectory.size() > 0)
-                    {
-                        if (sessions[i].point_clouds_container.point_clouds[sessions[i].point_clouds_container.point_clouds.size() - 1].local_trajectory.size() > 0)
-                        {
-                            ImGui::SameLine();
-
-                            int index_last = sessions[i].point_clouds_container.point_clouds.size() - 1;
-                            int index_last2 = sessions[i].point_clouds_container.point_clouds[index_last].local_trajectory.size() - 1;
-
-                            ImGui::Text("Timestamp range: <%.0f, %.0f>",
-                                        sessions[i].point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first,
-                                        sessions[i].point_clouds_container.point_clouds[index_last].local_trajectory[index_last2].timestamps.first);
+                                ImGui::Text("Timestamp range: <%.0f, %.0f>",
+                                            sessions[i].point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first,
+                                            sessions[i].point_clouds_container.point_clouds[index_last].local_trajectory[index_last2].timestamps.first);
+                            }
                         }
                     }
                 }
             }
-        }
 
-        if (project_settings.session_file_names.size() == sessions.size())
-        {
-            if (old_index_gizmo != index_gizmo)
+            if (project_settings.session_file_names.size() == sessions.size())
             {
-                for (int i = 0; i < sessions.size(); i++)
-                    sessions[i].is_gizmo = (i == index_gizmo);
+                if ((old_index_gt != index_gt) || (old_index_gizmo != index_gizmo))
+                {
+                    for (size_t i = 0; i < sessions.size(); i++)
+                    {
+					    sessions[i].is_ground_truth = (i == index_gt);
+                        sessions[i].is_gizmo = (i == index_gizmo);
+                    }
 
-                old_index_gizmo = index_gizmo;
+                    old_index_gt = index_gt;
+                    old_index_gizmo = index_gizmo;
+                }
+
+                if (index_gizmo != -1 && index_gizmo < sessions.size())
+                {
+                    // sessions[index_gizmo].is_gizmo = true;
+                    m_gizmo[0] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 0);
+                    m_gizmo[1] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 0);
+                    m_gizmo[2] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 0);
+                    m_gizmo[3] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 0);
+                    m_gizmo[4] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 1);
+                    m_gizmo[5] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 1);
+                    m_gizmo[6] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 1);
+                    m_gizmo[7] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 1);
+                    m_gizmo[8] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 2);
+                    m_gizmo[9] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 2);
+                    m_gizmo[10] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 2);
+                    m_gizmo[11] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 2);
+                    m_gizmo[12] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 3);
+                    m_gizmo[13] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 3);
+                    m_gizmo[14] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 3);
+                    m_gizmo[15] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 3);
+                }
             }
 
-            if (index_gizmo != -1 && index_gizmo < sessions.size())
+            ImGui::BeginDisabled((project_settings.session_file_names.size() < 2) || (index_gizmo == -1));
             {
-                // sessions[index_gizmo].is_gizmo = true;
-                m_gizmo[0] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 0);
-                m_gizmo[1] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 0);
-                m_gizmo[2] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 0);
-                m_gizmo[3] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 0);
-                m_gizmo[4] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 1);
-                m_gizmo[5] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 1);
-                m_gizmo[6] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 1);
-                m_gizmo[7] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 1);
-                m_gizmo[8] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 2);
-                m_gizmo[9] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 2);
-                m_gizmo[10] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 2);
-                m_gizmo[11] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 2);
-                m_gizmo[12] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(0, 3);
-                m_gizmo[13] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(1, 3);
-                m_gizmo[14] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(2, 3);
-                m_gizmo[15] = (float)sessions[index_gizmo].point_clouds_container.point_clouds[0].m_pose(3, 3);
+                ImGui::Checkbox("Gizmo all sessions", &gizmo_all_sessions);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Gizmo will move all sessions except ground truth one");
             }
-        }
+            ImGui::EndDisabled();
 
-        ImGui::BeginDisabled((project_settings.session_file_names.size() < 2) || (index_gizmo == -1));
-        {
-            ImGui::Checkbox("Gizmo all sessions", &gizmo_all_sessions);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Gizmo will move all sessions");
-        }
-        ImGui::EndDisabled();
+            ImGui::Separator();
 
-        ImGui::Separator();
+            ImGui::NewLine();
 
-        ImGui::NewLine();
-
-        if (project_settings.session_file_names.size() > 0)
-        {
             if (project_settings.session_file_names.size() == sessions.size())
             {
                 number_visible_sessions = 0;
 
                 bool first_session_index_found = false;
-                for (int index = 0; index < sessions.size(); index++)
+                for (size_t index = 0; index < sessions.size(); index++)
                 {
                     if (sessions[index].visible)
                     {
@@ -3141,9 +3148,9 @@ void display()
             i++;
         }
 
-        for (int i = 0; i < sessions.size(); i++)
+        for (size_t i = 0; i < sessions.size(); i++)
         {
-            for (int j = 0; j < sessions[i].pose_graph_loop_closure.edges.size(); j++)
+            for (size_t j = 0; j < sessions[i].pose_graph_loop_closure.edges.size(); j++)
             {
                 int index_src = sessions[i].pose_graph_loop_closure.edges[j].index_from;
                 int index_trg = sessions[i].pose_graph_loop_closure.edges[j].index_to;
@@ -3164,7 +3171,7 @@ void display()
             }
         }
 
-        for (int i = 0; i < edges.size(); i++)
+        for (size_t i = 0; i < edges.size(); i++)
         {
             int index_src = edges[i].index_from;
             int index_trg = edges[i].index_to;
@@ -3204,9 +3211,9 @@ void display()
                 int index_point_clouds = -1;
                 int index_local_trajectory = -1;
                 bool found = false;
-                for (int a = 0; a < session.point_clouds_container.point_clouds.size(); a++)
+                for (size_t a = 0; a < session.point_clouds_container.point_clouds.size(); a++)
                 {
-                    for (int b = 0; b < session.point_clouds_container.point_clouds[a].local_trajectory.size(); b++)
+                    for (size_t b = 0; b < session.point_clouds_container.point_clouds[a].local_trajectory.size(); b++)
                     {
                         if (session.point_clouds_container.point_clouds[a].local_trajectory[b].timestamps.first > time_stamp_offset)
                         {
@@ -3332,7 +3339,7 @@ void display()
                 {
                     prev_pose_manipulated = sessions[i].point_clouds_container.point_clouds[0].m_pose;
                     std::vector<Eigen::Affine3d> all_m_poses;
-                    for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+                    for (size_t j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
                         all_m_poses.push_back(sessions[i].point_clouds_container.point_clouds[j].m_pose);
 
                     // if (all_m_poses.size() > 1)
@@ -3371,7 +3378,7 @@ void display()
                     sessions[i].point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
 
                     Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
-                    for (int j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+                    for (size_t j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
                     {
                         curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
                         sessions[i].point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
@@ -3397,7 +3404,7 @@ void display()
                 if (!sessions[i].is_gizmo && !sessions[i].is_ground_truth)
                 {
                     std::vector<Eigen::Affine3d> all_m_poses;
-                    for (int j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+                    for (size_t j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
                         all_m_poses.push_back(sessions[i].point_clouds_container.point_clouds[j].m_pose);
 
                     Eigen::Affine3d m_rel_org = prev_pose_manipulated.inverse() * sessions[i].point_clouds_container.point_clouds[0].m_pose;
@@ -3416,7 +3423,7 @@ void display()
                     sessions[i].point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(sessions[i].point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
 
                     Eigen::Affine3d curr_m_pose = sessions[i].point_clouds_container.point_clouds[0].m_pose;
-                    for (int j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
+                    for (size_t j = 1; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
                     {
                         curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
                         sessions[i].point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
@@ -3474,7 +3481,7 @@ void display()
         if (session.point_clouds_container.point_clouds[i].gizmo)
         {
             std::vector<Eigen::Affine3d> all_m_poses;
-            for (int j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
+            for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
                 all_m_poses.push_back(session.point_clouds_container.point_clouds[j].m_pose);
 
             ImGuiIO &io = ImGui::GetIO();
@@ -3525,7 +3532,7 @@ void display()
             if (!manipulate_only_marked_gizmo)
             {
                 Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[i].m_pose;
-                for (int j = i + 1; j < session.point_clouds_container.point_clouds.size(); j++)
+                for (size_t j = i + 1; j < session.point_clouds_container.point_clouds.size(); j++)
                 {
                     curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
                     session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
@@ -4325,7 +4332,7 @@ else
         ImGui::Text("Select session(s) to remove:");
         ImGui::Separator();
 
-        for (int i = 0; i < project_settings.session_file_names.size(); i++)
+        for (size_t i = 0; i < project_settings.session_file_names.size(); i++)
         {
             bool checked = session_marked_for_removal[i];
             if (ImGui::Checkbox(project_settings.session_file_names[i].c_str(), &checked))
@@ -4336,7 +4343,7 @@ else
 
         if (ImGui::Button("Remove"))
         {
-            for (int i = project_settings.session_file_names.size() - 1; i >= 0; i--)
+            for (size_t i = project_settings.session_file_names.size() - 1; i >= 0; i--)
             {
                 if (session_marked_for_removal[i])
                 {
@@ -4430,32 +4437,14 @@ void mouse(int glut_button, int state, int x, int y)
     {
         if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_RIGHT_BUTTON) && state == GLUT_DOWN && (io.KeyCtrl || io.KeyShift) && !manipulate_active_edge)
         {
-            /*if (sessions.size() > 0){
-                getClosestTrajectoriesPoint(sessions, x, y);
+            //if (s_loop_closure_gui)
+            if ((sessions.size() > 0) && (number_visible_sessions > 0))
+            {
+                getClosestTrajectoriesPoint(sessions, x, y, first_session_index, second_session_index, number_visible_sessions, index_loop_closure_source, index_loop_closure_target, io.KeyShift);
             }
-            else{
+            else
+            {
                 setNewRotationCenter(x, y);
-            }*/
-
-            if (io.KeyCtrl)
-            {
-                /*if(number_visible_sessions == 1){
-                    std::cout << "number_visible_sessions == 1" << std::endl;
-                    getClosestTrajectoriesPoint(sessions, x, y, 1, );
-                }
-                if(number_visible_sessions == 2){
-                    std::cout << "number_visible_sessions == 2" << std::endl;
-                    getClosestTrajectoriesPoint(sessions, x, y, 2);
-                }
-                else if (sessions.size() > 0)
-                {
-                    getClosestTrajectoriesPoint(sessions, x, y, -1);
-                }*/
-                getClosestTrajectoriesPoint(sessions, x, y, index_loop_closure_source, index_loop_closure_target, 0);
-            }
-            if (io.KeyShift)
-            {
-                getClosestTrajectoriesPoint(sessions, x, y, index_loop_closure_source, index_loop_closure_target, 1);
             }
         }
 

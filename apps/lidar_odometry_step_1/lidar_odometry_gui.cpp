@@ -277,7 +277,7 @@ std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, i
 
     std::vector<Point3Di> tmp_points = prev_points;
     int counter = tmp_points.size();
-    for (int i = 0; i < points.size(); i++)
+    for (size_t i = 0; i < points.size(); i++)
     {
         counter++;
         tmp_points.push_back(points[i]);
@@ -312,7 +312,7 @@ int get_index(set<int> s, int k)
 
 void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timestamps, std::vector<Eigen::Affine3d> poses, std::string fn1, std::string fn2)
 {
-    for (int i = 0; i < points.size(); i++)
+    for (size_t i = 0; i < points.size(); i++)
     {
         auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), points[i].timestamp);
         points[i].index_pose = std::distance(timestamps.begin(), lower);
@@ -321,7 +321,7 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
 
     std::set<int> indexes;
 
-    for (int i = 0; i < points.size(); i++)
+    for (size_t i = 0; i < points.size(); i++)
     {
         indexes.insert(points[i].index_pose);
     }
@@ -339,7 +339,7 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
     // Sleep(2000);
 
     std::vector<Point3Di> points_reindexed = points;
-    for (int i = 0; i < points_reindexed.size(); i++)
+    for (size_t i = 0; i < points_reindexed.size(); i++)
     {
         points_reindexed[i].index_pose = get_index(indexes, points[i].index_pose);
     }
@@ -356,7 +356,7 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
 
         Eigen::Affine3d m = trajectory[0];
         trajectory_stretched.push_back(m);
-        for (int i = 1; i < trajectory.size(); i++)
+        for (size_t i = 1; i < trajectory.size(); i++)
         {
             Eigen::Affine3d m_update = trajectory[i - 1].inverse() * trajectory[i] * (m_x_offset);
             m = m * m_update;
@@ -396,7 +396,7 @@ void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timesta
     }
 
     std::map<double, Eigen::Matrix4d> trajectory_for_interpolation;
-    for (int i = 0; i < best_trajectory.size(); i++)
+    for (size_t i = 0; i < best_trajectory.size(); i++)
     {
         trajectory_for_interpolation[ts[i]] = best_trajectory[i].matrix();
     }
@@ -546,7 +546,7 @@ void alternative_approach()
                 all_points.push_back(tmp_points[i]);
             }
 
-            for (int i = 1; i < laz_files.size(); i++)
+            for (size_t i = 1; i < laz_files.size(); i++)
             {
                 prev_points = tmp_points[tmp_points.size() - 1];
                 tmp_points = get_batches_of_points(laz_files[i], point_count_threshold, prev_points);
@@ -567,7 +567,7 @@ void alternative_approach()
                 poses.push_back(m);
             }
 
-            for (int i = 0; i < all_points.size(); i++)
+            for (size_t i = 0; i < all_points.size(); i++)
             {
                 std::cout << all_points[i].size() << std::endl;
                 std::string fn1 = "C:/data/tmp/" + std::to_string(i) + "_best.laz";
@@ -665,8 +665,7 @@ void step2(const std::atomic<bool> &loPause)
 
 void save_results(bool info, double elapsed_seconds)
 {
-    int result = get_next_result_id(working_directory);
-    fs::path outwd = working_directory / fs::path("lidar_odometry_result_" + std::to_string(result));
+    fs::path outwd = get_next_result_path(working_directory);
     save_result(worker_data, params, outwd, elapsed_seconds);
     if (info)
     {
@@ -1185,7 +1184,7 @@ void project_gui()
                 ImGui::Text("Selection: ");
                 if (ImGui::Button("Select all"))
                 {
-                    for (int k = 0; k < worker_data.size(); k++)
+                    for (size_t k = 0; k < worker_data.size(); k++)
                     {
                         worker_data[k].show = true;
                     }
@@ -1193,7 +1192,7 @@ void project_gui()
                 ImGui::SameLine();
                 if (ImGui::Button("Unselect"))
                 {
-                    for (int k = 0; k < worker_data.size(); k++)
+                    for (size_t k = 0; k < worker_data.size(); k++)
                     {
                         worker_data[k].show = false;
                     }
@@ -1203,7 +1202,7 @@ void project_gui()
                 ImGui::SameLine();
                 if (ImGui::Button("<from, to>"))
                 {
-                    for (int k = 0; k < worker_data.size(); k++)
+                    for (size_t k = 0; k < worker_data.size(); k++)
                         worker_data[k].show = (k >= index_begin && k <= index_end);
                 }
 
@@ -1214,7 +1213,7 @@ void project_gui()
                         index_begin--;
                         index_end--;
 
-                        for (int k = 0; k < worker_data.size(); k++)
+                        for (size_t k = 0; k < worker_data.size(); k++)
                             worker_data[k].show = (k >= index_begin && k <= index_end);
                     }
                 }
@@ -1226,7 +1225,7 @@ void project_gui()
                         index_begin++;
                         index_end++;
 
-                        for (int k = 0; k < worker_data.size(); k++)
+                        for (size_t k = 0; k < worker_data.size(); k++)
                             worker_data[k].show = (k >= index_begin && k <= index_end);
                     }
                 }
@@ -1238,7 +1237,7 @@ void project_gui()
                         index_begin -= 10;
                         index_end -= 10;
 
-                        for (int k = 0; k < worker_data.size(); k++)
+                        for (size_t k = 0; k < worker_data.size(); k++)
                             worker_data[k].show = (k >= index_begin && k <= index_end);
                     }
                 }
@@ -1250,7 +1249,7 @@ void project_gui()
                         index_begin += 10;
                         index_end += 10;
 
-                        for (int k = 0; k < worker_data.size(); k++)
+                        for (size_t k = 0; k < worker_data.size(); k++)
                             worker_data[k].show = (k >= index_begin && k <= index_end);
                     }
                 }
@@ -1371,10 +1370,10 @@ void project_gui()
                                 }
 
                                 std::vector<std::vector<Eigen::Affine3d>> all_poses;
-                                for (int i = 0; i < worker_data.size(); i++)
+                                for (size_t i = 0; i < worker_data.size(); i++)
                                 {
                                     std::vector<Eigen::Affine3d> poses;
-                                    for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
+                                    for (size_t j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
                                     {
                                         poses.push_back(worker_data[i].intermediate_trajectory[j]);
                                     }
@@ -1387,7 +1386,7 @@ void project_gui()
 
                                 for (int i = index_begin; i < index_end; i++)
                                 {
-                                    for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
+                                    for (size_t j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
                                     {
                                         TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[j]);
 
@@ -1403,9 +1402,9 @@ void project_gui()
                                     }
                                 }
 
-                                for (int i = index_end; i < worker_data.size(); i++)
+                                for (size_t i = index_end; i < worker_data.size(); i++)
                                 {
-                                    for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
+                                    for (size_t j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
                                     {
                                         Eigen::Affine3d m_update = Eigen::Affine3d::Identity();
 
@@ -1674,7 +1673,7 @@ void display()
     }
 
 #if 0 // ToDo
-    for (int i = 0; i < worker_data.size(); i++)
+    for (size_t i = 0; i < worker_data.size(); i++)
     {
         if (worker_data[i].show)
         {
@@ -1711,7 +1710,7 @@ void display()
     {
         glColor3f(1, 0, 0);
         glBegin(GL_POINTS);
-        for (int i = 0; i < params.reference_points.size(); i += dec_reference_points)
+        for (size_t i = 0; i < params.reference_points.size(); i += dec_reference_points)
             glVertex3f(params.reference_points[i].point.x(), params.reference_points[i].point.y(), params.reference_points[i].point.z());
         glEnd();
     }

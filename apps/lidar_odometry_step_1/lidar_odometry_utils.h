@@ -189,7 +189,7 @@ std::vector<Point3Di> load_point_cloud(const std::string &lazFile, bool ommit_po
 
 bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_poses, std::vector<std::string> filenames);
 
-int get_next_result_id(const std::string working_directory);
+fs::path get_next_result_path(const std::string working_directory);
 
 // this function performs main LiDAR odometry calculations
 void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points, std::vector<Eigen::Affine3d> &intermediate_trajectory,

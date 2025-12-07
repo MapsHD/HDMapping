@@ -339,7 +339,7 @@ void project_gui()
                     input_file_names = mandeye::fd::OpenFileDialog("Point cloud files", mandeye::fd::LAS_LAZ_filter, true);
 
                     if (input_file_names.size() > 0)
-                        for (int i = 0; i < input_file_names.size(); i++)
+                        for (size_t i = 0; i < input_file_names.size(); i++)
                             load_pc(input_file_names[i].c_str(), point_cloud, true, filter_threshold_xy);
 
                     // Initialize imu_lidar according to imuSnToUse
@@ -390,7 +390,7 @@ void project_gui()
                 ImGui::Separator();
                 ImGui::Text("Select LiDAR to calibrate:");
 
-                for (int i = 0; i < calibrated_lidar.size(); i++)
+                for (size_t i = 0; i < calibrated_lidar.size(); i++)
                 {
                     std::string name = idToSn.at(i);
                     ImGui::RadioButton(name.c_str(), &chosen_lidar, i);
@@ -398,7 +398,7 @@ void project_gui()
 
                 if (chosen_lidar != -1)
                 {
-                    for (int i = 0; i < calibrated_lidar.size(); i++)
+                    for (size_t i = 0; i < calibrated_lidar.size(); i++)
                         calibrated_lidar[i].check = (i == chosen_lidar);
                 }
             }
@@ -540,7 +540,7 @@ void project_gui()
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(hintText);
 
-                for (int i = 0; i < imu_lidar.size(); i++)
+                for (size_t i = 0; i < imu_lidar.size(); i++)
                 {
                     std::string name = idToSn.at(i);
                     ImGui::RadioButton(std::string(name + "##imu").c_str(), &chosen_imu, i);
@@ -550,7 +550,7 @@ void project_gui()
 
                 if (chosen_imu != -1)
                 {
-                    for (int i = 0; i < imu_lidar.size(); i++)
+                    for (size_t i = 0; i < imu_lidar.size(); i++)
                         imu_lidar[i].check = (i == chosen_imu);
                 }
 
@@ -727,7 +727,7 @@ void display()
     if (manual_calibration)
     {
         int index_calibrated_lidar = -1;
-        for (int i = 0; i < calibrated_lidar.size(); i++)
+        for (size_t i = 0; i < calibrated_lidar.size(); i++)
         {
             if (calibrated_lidar[i].check)
                 index_calibrated_lidar = i;

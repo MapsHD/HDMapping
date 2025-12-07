@@ -999,8 +999,7 @@ void load_reference_point_clouds(std::vector<std::string> input_file_names, Lida
 
 std::string save_results_automatic(LidarOdometryParams &params, std::vector<WorkerData> &worker_data, std::string working_directory, double elapsed_seconds)
 {
-    int result = get_next_result_id(working_directory);
-    fs::path outwd = working_directory / fs::path("lidar_odometry_result_" + std::to_string(result));
+    fs::path outwd = get_next_result_path(working_directory);
     save_result(worker_data, params, outwd, elapsed_seconds);
     return outwd.string();
 }

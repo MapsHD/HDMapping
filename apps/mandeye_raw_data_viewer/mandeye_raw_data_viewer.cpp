@@ -226,7 +226,7 @@ void optimize()
         auto tr = all_data[index_rendered_points_local].poses;
         auto trmm = all_data[index_rendered_points_local].poses;
 
-        for (int i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
+        for (size_t i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
         {
             auto lower = std::lower_bound(all_data[index_rendered_points_local].timestamps.begin(), all_data[index_rendered_points_local].timestamps.end(), all_data[index_rendered_points_local].points_local[i].timestamp,
                 [](std::pair<double, double> lhs, double rhs) -> bool
@@ -265,7 +265,7 @@ void optimize()
             point_cloud_global;
         std::vector<Eigen::Vector3d> point_cloud_global_sc;
 
-        for (int i = 0; i < points_local.size(); i++)
+        for (size_t i = 0; i < points_local.size(); i++)
         {
             Point3Di pg = points_local[i];
             pg.point = tr[points_local[i].index_pose] * pg.point;
@@ -289,7 +289,7 @@ void optimize()
         std::vector<Eigen::Triplet<double>> tripletListP;
         std::vector<Eigen::Triplet<double>> tripletListB;
 
-        for (int i = 0; i < point_cloud_global.size(); i++)
+        for (size_t i = 0; i < point_cloud_global.size(); i++)
         {
 
             auto index_of_bucket = get_rgd_index(point_cloud_global_sc[i], b);
@@ -600,7 +600,7 @@ void optimize()
         std::vector<Point3Di> points_local_sf;
         std::vector<Point3Di> points_local;
 
-        for (int i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
+        for (size_t i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
         {
             auto lower = std::lower_bound(all_data[index_rendered_points_local].timestamps.begin(), all_data[index_rendered_points_local].timestamps.end(), all_data[index_rendered_points_local].points_local[i].timestamp,
                 [](std::pair<double, double> lhs, double rhs) -> bool
@@ -650,14 +650,14 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> get_nn()
     std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> nn;
     if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
     {
-        // for (int i = 0; i < all_data[index_rendered_points_local].poses.size(); i++){
+        // for (size_t i = 0; i < all_data[index_rendered_points_local].poses.size(); i++){
         //     all_data[index_rendered_points_local].poses[i](0, 3) += 1.0;
         // }
 
         auto worker_data = all_data[index_rendered_points_local];
 
         // index data
-        for (int i = 0; i < worker_data.points_local.size(); i++)
+        for (size_t i = 0; i < worker_data.points_local.size(); i++)
         {
             auto lower = std::lower_bound(worker_data.timestamps.begin(), worker_data.timestamps.end(), worker_data.points_local[i].timestamp,
                 [](std::pair<double, double> lhs, double rhs) -> bool
@@ -690,7 +690,7 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> get_nn()
         std::vector<Eigen::Vector3d> point_cloud_global_sc;
         std::vector<Point3Di> points_local_sc;
 
-        for (int i = 0; i < worker_data.points_local.size(); i++)
+        for (size_t i = 0; i < worker_data.points_local.size(); i++)
         {
             double r_l = worker_data.points_local[i].point.norm();
             if (r_l > 0.5 && worker_data.points_local[i].index_pose != -1 && r_l < max_distance_lidar)
@@ -742,7 +742,7 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> get_nn()
         // std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> nn;
         Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
-        for (int i = 0; i < point_cloud_global_sc.size(); i++)
+        for (size_t i = 0; i < point_cloud_global_sc.size(); i++)
         {
             auto index_of_bucket = get_rgd_index(point_cloud_global_sc[i], b);
 
@@ -808,14 +808,14 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov()
     std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> mc;
     if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
     {
-        // for (int i = 0; i < all_data[index_rendered_points_local].poses.size(); i++){
+        // for (size_t i = 0; i < all_data[index_rendered_points_local].poses.size(); i++){
         //     all_data[index_rendered_points_local].poses[i](0, 3) += 1.0;
         // }
 
         auto worker_data = all_data[index_rendered_points_local];
 
         // index data
-        for (int i = 0; i < worker_data.points_local.size(); i++)
+        for (size_t i = 0; i < worker_data.points_local.size(); i++)
         {
             auto lower = std::lower_bound(worker_data.timestamps.begin(), worker_data.timestamps.end(), worker_data.points_local[i].timestamp,
                 [](std::pair<double, double> lhs, double rhs) -> bool
@@ -844,7 +844,7 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov()
         std::vector<Eigen::Vector3d> point_cloud_global_sc;
         std::vector<Point3Di> points_local_sc;
 
-        for (int i = 0; i < worker_data.points_local.size(); i++)
+        for (size_t i = 0; i < worker_data.points_local.size(); i++)
         {
             double r_l = worker_data.points_local[i].point.norm();
             if (r_l > 0.5 && worker_data.points_local[i].index_pose != -1 && r_l < max_distance_lidar)
@@ -1198,7 +1198,7 @@ void loadData()
 
         double t;
 
-        for (int i = 0; i < pointsPerFile.size(); i++)
+        for (size_t i = 0; i < pointsPerFile.size(); i++)
         {
             std::cout << "indexed: " << i + 1 << " of " << pointsPerFile.size() << " files" << std::endl;
             for (const auto& pp : pointsPerFile[i])
@@ -1253,7 +1253,7 @@ void loadData()
                     data.points_local = points_local;
                     data.lidar_ids = lidar_ids;
 
-                    for (int i = 0; i < timestamps.size(); i++)
+                    for (size_t i = 0; i < timestamps.size(); i++)
                     {
                         if (timestamps[i].first >= points_local[0].timestamp && timestamps[i].first <= points_local[points_local.size() - 1].timestamp)
                         {
@@ -1272,7 +1272,7 @@ void loadData()
                         //std::cout << "ts_step " << ts_step << std::endl;
                         //std::cout << "ts_end " << data.timestamps[data.timestamps.size() - 1].first << std::endl;
 
-                        for (int pp = 0; pp < data.points_local.size(); pp++)
+                        for (size_t pp = 0; pp < data.points_local.size(); pp++)
                             data.points_local[pp].timestamp = ts_begin + pp * ts_step;
                     }
 
@@ -1379,7 +1379,7 @@ void imu_data_gui()
             ofstream file;
             file.open(output_file_name);
             file << std::setprecision(20);
-            for (int i = 0; i < imu_data_plot.timestampLidar.size(); i++)
+            for (size_t i = 0; i < imu_data_plot.timestampLidar.size(); i++)
             {
                 file << imu_data_plot.timestampLidar[i] << " " <<
                     imu_data_plot.angX[i] << " " <<
@@ -1446,7 +1446,7 @@ void project_gui()
 
                 /*if (index_rendered_points_local >= 0 && index_rendered_points_local < all_points_local.size())
                 {
-                    for (int i = 0; i < all_points_local[index_rendered_points_local].size(); i++)
+                    for (size_t i = 0; i < all_points_local[index_rendered_points_local].size(); i++)
                     {
                         pointcloud.emplace_back(all_points_local[index_rendered_points_local][i].point.x(), all_points_local[index_rendered_points_local][i].point.y(), all_points_local[index_rendered_points_local][i].point.z());
                         intensity.push_back(all_points_local[index_rendered_points_local][i].intensity);
@@ -1487,7 +1487,7 @@ void project_gui()
             std::cout << std::setprecision(20);
             if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
             {
-                for (int i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
+                for (size_t i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
                 {
                     auto lower = std::lower_bound(all_data[index_rendered_points_local].timestamps.begin(), all_data[index_rendered_points_local].timestamps.end(), all_data[index_rendered_points_local].points_local[i].timestamp,
                                                   [](std::pair<double, double> lhs, double rhs) -> bool
@@ -1508,7 +1508,7 @@ void project_gui()
                 }
                 std::cout << "max_diff " << max_diff << std::endl;
                 std::cout << "----------------" << std::endl;
-                for (int k = 0; k < all_data[index_rendered_points_local].timestamps.size(); k++)
+                for (size_t k = 0; k < all_data[index_rendered_points_local].timestamps.size(); k++)
                     std::cout << all_data[index_rendered_points_local].timestamps[k].first << std::endl;
             }
         }
@@ -1595,7 +1595,7 @@ void display()
      glBegin(GL_POINTS);
      if (index_rendered_points_local >= 0 && index_rendered_points_local < all_points_local.size())
      {
-         for (int i = 0; i < all_points_local[index_rendered_points_local].size(); i++)
+         for (size_t i = 0; i < all_points_local[index_rendered_points_local].size(); i++)
          {
              if (all_lidar_ids[index_rendered_points_local][i] == 0)
              {
@@ -1617,7 +1617,7 @@ void display()
     {
 
         double max_diff = 0.0;
-        for (int i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
+        for (size_t i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
         {
             auto lower = std::lower_bound(all_data[index_rendered_points_local].timestamps.begin(), all_data[index_rendered_points_local].timestamps.end(), all_data[index_rendered_points_local].points_local[i].timestamp,
                                           [](std::pair<double, double> lhs, double rhs) -> bool
@@ -1633,7 +1633,7 @@ void display()
             }
         }
 
-        for (int i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
+        for (size_t i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
         {
             auto lower = std::lower_bound(all_data[index_rendered_points_local].timestamps.begin(), all_data[index_rendered_points_local].timestamps.end(), all_data[index_rendered_points_local].points_local[i].timestamp,
                                           [](std::pair<double, double> lhs, double rhs) -> bool
@@ -1668,7 +1668,7 @@ void display()
 
     if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
     {
-        for (int i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
+        for (size_t i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
         {
             auto lower = std::lower_bound(all_data[index_rendered_points_local].timestamps.begin(), all_data[index_rendered_points_local].timestamps.end(), all_data[index_rendered_points_local].points_local[i].timestamp,
                                           [](std::pair<double, double> lhs, double rhs) -> bool

@@ -8,10 +8,9 @@ namespace mandeye::fd{
   {
       auto sel = OpenFileDialog(title, filter, false);
       if (sel.empty())
-      {
         return "";
-      }
-      return sel.back();
+
+      return std::filesystem::path(sel.back()).lexically_normal().string();
   }
 
   std::vector<std::string> OpenFileDialog(const std::string& title, const std::vector<std::string>&filter, bool multiselect)

@@ -1491,6 +1491,8 @@ std::string saveSession()
     }
     else{
         std::cout << "saving canceled" << std::endl;
+
+        return "";
     }
 }
 
@@ -2135,8 +2137,6 @@ void display()
     }
 
     int prev_index_pose = session.control_points.index_pose;
-    if (session.control_points.is_imgui)
-        session.control_points.imgui(session.point_clouds_container, rotation_center);
 
     if (prev_index_pose != session.control_points.index_pose)
     {
@@ -2162,14 +2162,17 @@ void display()
         camera_transition_active = true;
     }
 
-    if (session.ground_control_points.is_imgui)
-        session.ground_control_points.imgui(session.point_clouds_container);
-
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
     ImGui::NewFrame();
 
     ShowMainDockSpace();
+
+    if (session.control_points.is_imgui)
+        session.control_points.imgui(session.point_clouds_container, rotation_center);
+
+    if (session.ground_control_points.is_imgui)
+        session.ground_control_points.imgui(session.point_clouds_container);
 
     if (!session.control_points.is_imgui)
     {
@@ -2547,7 +2550,7 @@ void display()
                             save_all_to_las(session, output_file_name, false);
                     }
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("To export in full resolution, close the program and open again, unmark 'simple_gui', unmark 'downsample during load'");
+                        ImGui::SetTooltip("To export in full resolution, close the program and open again and unmark 'downsample during load' before loading session");
 
                     if (ImGui::MenuItem("Separate global scans (laz)"))
                     {

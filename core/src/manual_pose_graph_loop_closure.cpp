@@ -292,8 +292,9 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
             {
                 for (size_t i = 0; i < edges.size(); i++)
                 {
-                    if (i > 0)
+                    if (i > 0){
                         ImGui::Separator();
+                    }
                     ImGui::SetWindowFontScale(1.25f);
                     ImGui::RadioButton(("Active edge " + std::to_string(i)).c_str(), &index_active_edge, i);
                     ImGui::SetWindowFontScale(1.0f);
@@ -321,6 +322,49 @@ void ManualPoseGraphLoopClosure::Gui(PointClouds &point_clouds_container,
                         index_active_edge = std::min(index_active_edge, static_cast<int>(edges.size()-1));
                         manipulate_active_edge = (edges.size() > 0);
                     }
+
+                    if (index_active_edge == i){
+                        ImGui::SameLine();
+
+                        // if(session.)
+
+                        static double downsampling_voxel_size = 0.1;
+
+                        if (ImGui::Button(("Reload cache##" + std::to_string(i)).c_str()))
+                        {
+                            // std::cout << edges[index_active_edge].index_from
+
+                            std::cout << point_clouds_container.point_clouds[edges[index_active_edge].index_from].file_name << std::endl;
+                            std::cout << point_clouds_container.point_clouds[edges[index_active_edge].index_to].file_name << std::endl;
+
+                            point_clouds_container.point_clouds[edges[index_active_edge].index_from].load_pc(point_clouds_container.point_clouds[edges[index_active_edge].index_from].file_name, true);
+                            point_clouds_container.point_clouds[edges[index_active_edge].index_from].decimate(downsampling_voxel_size, downsampling_voxel_size, downsampling_voxel_size);
+
+                            point_clouds_container.point_clouds[edges[index_active_edge].index_to].load_pc(point_clouds_container.point_clouds[edges[index_active_edge].index_to].file_name, true);
+                            point_clouds_container.point_clouds[edges[index_active_edge].index_to].decimate(downsampling_voxel_size, downsampling_voxel_size, downsampling_voxel_size);
+
+                            // gizmo = false;
+
+                            // std::vector<Edge> new_edges;
+                            // for (int ni = 0; ni < edges.size(); ni++)
+                            //{
+                            //     if (i != ni)
+                            //         new_edges.push_back(edges[ni]);
+                            // }
+                            // edges = new_edges;
+
+                            // index_active_edge = std::min(index_active_edge, static_cast<int>(edges.size() - 1));
+                            // manipulate_active_edge = (edges.size() > 0);
+
+                            //for (int i = 0; i < point_clouds_container.point_clouds.size(); i++)
+                           // {
+                           // }
+                        }
+
+                        ImGui::SameLine();
+                        ImGui::InputDouble("downsampling_voxel_size ", &downsampling_voxel_size);
+                    }
+                        
 
                     ImGui::BeginDisabled(true);
                     ImGui::PushItemWidth(ImGuiNumberWidth);

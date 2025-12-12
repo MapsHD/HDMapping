@@ -486,7 +486,7 @@ void run_multi_view_tls_registration(
 	{
 		std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
 		session.working_directory = fs::path(input_file_name).parent_path().string();
-		session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z);
+		session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, session.load_cache_mode);
 	}
 	else if (has_extension(input_file_name, ".txt"))
 	{
@@ -519,7 +519,7 @@ void run_multi_view_tls_registration(
 			{
 				std::cout << las_files[i] << std::endl;
 			}
-			session.point_clouds_container.load_whu_tls(las_files, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset);
+			session.point_clouds_container.load_whu_tls(las_files, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset, session.load_cache_mode);
 		}
 		else if (txt_files.size() > 0)
 		{

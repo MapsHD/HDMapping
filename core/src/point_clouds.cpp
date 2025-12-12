@@ -27,7 +27,8 @@ inline void split(std::string &str, char delim, std::vector<std::string> &out)
 	}
 }
 
-bool PointClouds::load(const std::string &folder_with_point_clouds, const std::string &poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z)
+bool PointClouds::load(const std::string &folder_with_point_clouds, const std::string &poses_file_name, bool decimation,
+					   double bucket_x, double bucket_y, double bucket_z, bool load_cache_mode)
 {
 	point_clouds.clear();
 
@@ -98,19 +99,22 @@ bool PointClouds::load(const std::string &folder_with_point_clouds, const std::s
 		pc.gui_rotation[1] = rad2deg(pc.pose.fi);
 		pc.gui_rotation[2] = rad2deg(pc.pose.ka);
 
-		if (!pc.load(folder_with_point_clouds + "/" + pc.file_name))
+		if (!load_cache_mode)
 		{
-			point_clouds.clear();
-			std::cout << "problem with file '" << folder_with_point_clouds + "/" + pc.file_name << "'" << std::endl;
-			return false;
+			if (!pc.load(folder_with_point_clouds + "/" + pc.file_name))
+			{
+				point_clouds.clear();
+				std::cout << "problem with file '" << folder_with_point_clouds + "/" + pc.file_name << "'" << std::endl;
+				return false;
+			}
+			if (decimation)
+			{
+				sum_points_before_decimation += pc.points_local.size();
+				pc.decimate(bucket_x, bucket_y, bucket_z);
+				sum_points_after_decimation += pc.points_local.size();
+			}
 		}
 
-		if (decimation)
-		{
-			sum_points_before_decimation += pc.points_local.size();
-			pc.decimate(bucket_x, bucket_y, bucket_z);
-			sum_points_after_decimation += pc.points_local.size();
-		}
 		point_clouds.push_back(pc);
 	}
 	infile.close();
@@ -1023,8 +1027,10 @@ bool PointClouds::load_pose_ETH(const std::string &fn, Eigen::Affine3d &m_increm
 	return true;
 }
 
-bool PointClouds::load_pc(PointCloud &pc, std::string input_file_name)
+bool PointClouds::load_pc(PointCloud &pc, std::string input_file_name, bool load_cache_mode)
 {
+	return pc.load_pc(input_file_name, load_cache_mode);
+#if 0
 	laszip_POINTER laszip_reader;
 	if (laszip_create(&laszip_reader))
 	{
@@ -1171,9 +1177,11 @@ bool PointClouds::load_pc(PointCloud &pc, std::string input_file_name)
 	// laszip_destroy(laszip_reader);
 
 	return true;
+
+	#endif
 }
 
-bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
+bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset, bool load_cache_mode)
 {
 	const auto start = std::chrono::system_clock::now();
 	std::vector<PointCloud> point_clouds_nodata;
@@ -1204,7 +1212,7 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 
 		trajectorypath.remove_filename();
 
-		//std::string trj_fn = "trajectory_lio_" + std::to_string(i) + ".csv";
+		// std::string trj_fn = "trajectory_lio_" + std::to_string(i) + ".csv";
 		std::string trj_fn = "trajectory_lio_" + strs[strs.size() - 1] + ".csv";
 
 		// fn.replace(0, 9, "trajectory_lio_");
@@ -1321,19 +1329,21 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 	std::transform(std::execution::par_unseq, std::begin(point_clouds_nodata), std::end(point_clouds_nodata), std::begin(point_clouds), [&](auto &pc)
 				   {
 
-			if (load_pc(pc, pc.file_name))
-			{
-				if (is_decimate && pc.points_local.size() > 0)
+			if(!load_cache_mode){
+				if (load_pc(pc, pc.file_name, load_cache_mode))
 				{
-					std::cout << "start downsampling.." << std::endl;
+					if (is_decimate && pc.points_local.size() > 0)
+					{
+						std::cout << "start downsampling.." << std::endl;
 
-					size_t sum_points_before_decimation = pc.points_local.size();
-					pc.decimate(bucket_x, bucket_y, bucket_z);
-					size_t sum_points_after_decimation = pc.points_local.size();
+						size_t sum_points_before_decimation = pc.points_local.size();
+						pc.decimate(bucket_x, bucket_y, bucket_z);
+						size_t sum_points_after_decimation = pc.points_local.size();
 
-					std::cout << "downsampling finished. sum_points before/after decimation: "
-						<< sum_points_before_decimation << " / "
-						<< sum_points_after_decimation << std::endl;
+						std::cout << "downsampling finished. sum_points before/after decimation: "
+							<< sum_points_before_decimation << " / "
+							<< sum_points_after_decimation << std::endl;
+					}
 				}
 			}
 			return pc; });

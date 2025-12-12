@@ -1509,7 +1509,7 @@ void openLaz(bool fillInSession)
         for (size_t i = 0; i < input_file_names.size(); i++)
             std::cout << input_file_names[i] << std::endl;
 
-        if (!session.point_clouds_container.load_whu_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset))
+        if (!session.point_clouds_container.load_whu_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset, session.load_cache_mode))
             std::cout << "Problem creating! Check input files laz/las" << std::endl;
         else
             std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
@@ -1720,6 +1720,7 @@ void project_gui()
         ImGui::NewLine();
 
         ImGui::Checkbox("Downsample during load", &tls_registration.is_decimate);
+        ImGui::Checkbox("Loading Point Cloud Cache Mode", &session.load_cache_mode);
 
         ImGui::Text("Bucket [m]:");
         ImGui::PushItemWidth(ImGuiNumberWidth);
@@ -1751,7 +1752,7 @@ void project_gui()
 
                 session.working_directory = fs::path(input_file_name).parent_path().string();
 
-                if (!session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z))
+                if (!session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, session.load_cache_mode))
                 {
                     std::cout << "check input files" << std::endl;
                     return;

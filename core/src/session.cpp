@@ -194,7 +194,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         std::cout << "-----------------------------" << std::endl;
 
         // loading all data
-        point_clouds_container.load_whu_tls(laz_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
+        point_clouds_container.load_whu_tls(laz_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset, this->load_cache_mode);
 
         if (laz_file_names.size() > 0)
         {

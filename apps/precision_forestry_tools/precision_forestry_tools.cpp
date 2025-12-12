@@ -216,7 +216,7 @@ void project_gui()
 
         session.working_directory = fs::path(input_file_names[0]).parent_path().string();
 
-        if (!session.point_clouds_container.load_whu_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset))
+        if (!session.point_clouds_container.load_whu_tls(input_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset, session.load_cache_mode))
         {
           std::cout << "check input files laz/las" << std::endl;
         }

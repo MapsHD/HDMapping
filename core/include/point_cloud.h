@@ -120,6 +120,7 @@ public:
 	bool fixed_ka = false;
 
 	bool load(const std::string& file_name);
+	bool load_pc(std::string input_file_name, bool load_cache_mode);
 	void update_from_gui();
 	bool save_as_global(std::string file_name);
 	//rgd

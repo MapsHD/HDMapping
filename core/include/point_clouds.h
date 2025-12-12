@@ -44,7 +44,8 @@ public:
 		double length, width, height;
 	};
 
-	bool load(const std::string& folder_with_point_clouds, const std::string& poses_file_name, bool decimation, double bucket_x, double bucket_y, double bucket_z);
+	bool load(const std::string &folder_with_point_clouds, const std::string &poses_file_name, bool decimation,
+			  double bucket_x, double bucket_y, double bucket_z, bool load_cache_mode);
 	bool update_poses_from_RESSO(const std::string& folder_with_point_clouds, const std::string& poses_file_name);
 	bool update_poses_from_RESSO_inverse(const std::string &folder_with_point_clouds, const std::string &poses_file_name);
 	bool update_initial_poses_from_RESSO(const std::string &folder_with_point_clouds, const std::string &poses_file_name);
@@ -69,12 +70,12 @@ public:
 	bool show_with_initial_pose = false;
 	
 	bool load_pose_ETH(const std::string& fn, Eigen::Affine3d &m_increment);
-	bool load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset);
+	bool load_whu_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset, bool load_cache_mode);
 	PointCloudDimensions compute_point_cloud_dimension() const;
 	void print_point_cloud_dimension();
 	bool load_3DTK_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z);
 
-	bool load_pc(PointCloud &pc, std::string input_file_name);
+	bool load_pc(PointCloud &pc, std::string input_file_name, bool load_cache_mode);
 };
 
 double get_mean_uncertainty_xyz_impact6x6(std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>& uncertainty_before, std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>& uncertainty_after);

@@ -44,16 +44,18 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025)
 
 ToDo
-- https://github.com/HKUST-Aerial-Robotics/A-LOAM (2019)
-- https://github.com/wh200720041/floam (2021)
-- https://github.com/XikunLiu-huskit/GLIO (2023)
-- https://github.com/StephLin/LIO-SEGMOT (2023)
-- https://github.com/BrenYi/Light-LOAM (2024)
-- https://github.com/ZikangYuan/sr_lio (2024)
-- https://github.com/Ji1Xingyu/lio_gvm (2024)
-- https://github.com/MapsHD/rko_lio (2025)
-- https://github.com/PRBonn/kiss-slam (2025)
+- https://github.com/MOLAorg/mola_lidar_odometry(2025)
 - https://github.com/93won/lidar_odometry?tab=readme-ov-file (2025)
+- https://github.com/PRBonn/kiss-slam (2025)
+- https://github.com/MapsHD/rko_lio (2025)
+- https://github.com/Ji1Xingyu/lio_gvm (2024)
+- https://github.com/ZikangYuan/sr_lio (2024)
+- https://github.com/BrenYi/Light-LOAM (2024)
+- https://github.com/StephLin/LIO-SEGMOT (2023)
+- https://github.com/XikunLiu-huskit/GLIO (2023)
+- https://github.com/wh200720041/floam (2021)
+- https://github.com/HKUST-Aerial-Robotics/A-LOAM (2019)
+
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

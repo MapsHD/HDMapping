@@ -44,7 +44,7 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025)
 
 ToDo
-- https://github.com/MOLAorg/mola_lidar_odometry(2025)
+- https://github.com/MOLAorg/mola_lidar_odometry (2025)
 - https://github.com/93won/lidar_odometry?tab=readme-ov-file (2025)
 - https://github.com/PRBonn/kiss-slam (2025)
 - https://github.com/MapsHD/rko_lio (2025)

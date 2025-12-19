@@ -135,7 +135,12 @@ Terrestrial Laser Scanner data registration is elaborated in following paper:
 }
 ```
 
-# VIDEOs
+# 0.94 VIDEOs
+
+[![IMU inclination prior](https://img.youtube.com/vi/k6nysHveoKU/default.jpg)](https://youtu.be/k6nysHveoKU)
+
+
+# Obsolete VIDEOs
 Where to find, how to download HDMAPPING software and manual
 
 [![Where to find, how to download HDMAPPING software and manual](https://img.youtube.com/vi/dHCOAeto9-M/default.jpg)](https://youtu.be/dHCOAeto9-M)

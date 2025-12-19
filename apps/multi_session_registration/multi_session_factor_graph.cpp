@@ -6,6 +6,7 @@
 #include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 #include <m_estimators.h>
+#include <python-scripts/point-to-feature-metrics/point_to_plane_tait_bryan_wc_jacobian.h>
 
 bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
 {
@@ -562,6 +563,90 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                 // edge.relative_pose_tb_weights = sessions[i].pose_graph_loop_closure.edges[j].relative_pose_tb_weights;
                 // edge.is_fixed_fi = ToDo
                 // all_edges.push_back(edge);
+            }
+        }
+
+        // fuse_inclination_from_imu
+
+        double error_imu = 0;
+        double error_imu_sum = 0;
+
+        for (size_t j = 0; j < sessions.size(); j++)
+        {
+
+            for (size_t index_pose = 0; index_pose < sessions[j].point_clouds_container.point_clouds.size(); index_pose++)
+            {
+                const auto &pc = sessions[j].point_clouds_container.point_clouds[index_pose];
+                if (!pc.fuse_inclination_from_IMU)
+                {
+                    continue;
+                }
+                if (pc.local_trajectory.size() == 0)
+                {
+                    continue;
+                }
+
+                TaitBryanPose target_pose;
+                target_pose.om = pc.local_trajectory[0].imu_om_fi_ka.x();
+                target_pose.fi = pc.local_trajectory[0].imu_om_fi_ka.y();
+                target_pose.ka = pc.local_trajectory[0].imu_om_fi_ka.z();
+                target_pose.px = pc.m_pose(0, 3);
+                target_pose.py = pc.m_pose(1, 3);
+                target_pose.pz = pc.m_pose(2, 3);
+
+                Eigen::Affine3d target_mpose = affine_matrix_from_pose_tait_bryan(target_pose);
+
+                double xtg = target_mpose(0, 3);
+                double ytg = target_mpose(1, 3);
+                double ztg = target_mpose(2, 3);
+                double vzx = target_mpose(0, 2);
+                double vzy = target_mpose(1, 2);
+                double vzz = target_mpose(2, 2);
+
+                TaitBryanPose current_pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
+
+                Eigen::Matrix<double, 1, 1> delta;
+                point_to_plane_tait_bryan_wc(delta,
+                                             current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                             1, 0, 0, // add 0,1,0
+                                             xtg, ytg, ztg, vzx, vzy, vzz);
+
+                Eigen::Matrix<double, 1, 6> delta_jacobian;
+                point_to_plane_tait_bryan_wc_jacobian(delta_jacobian,
+                                                      current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                                      1, 0, 0,
+                                                      xtg, ytg, ztg, vzx, vzy, vzz);
+
+                int ir = tripletListB.size();
+                int ic = (index_pose + sums[j]) * 6;
+                tripletListA.emplace_back(ir + 0, ic + 3, -delta_jacobian(0, 3));
+                tripletListA.emplace_back(ir + 0, ic + 4, -delta_jacobian(0, 4));
+
+                tripletListP.emplace_back(ir, ir, /*get_cauchy_w(delta(0, 0), 1) * 10000*/ 1);
+
+                tripletListB.emplace_back(ir, 0, delta(0, 0));
+
+                ///////////////////////////////
+                point_to_plane_tait_bryan_wc(delta,
+                                             current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                             0, 1, 0,
+                                             xtg, ytg, ztg, vzx, vzy, vzz);
+
+                point_to_plane_tait_bryan_wc_jacobian(delta_jacobian,
+                                                      current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
+                                                      0, 1, 0,
+                                                      xtg, ytg, ztg, vzx, vzy, vzz);
+
+                ir = tripletListB.size();
+                //ic = index_pose * 6;
+                ic = (index_pose + sums[j]) * 6;
+
+                tripletListA.emplace_back(ir + 0, ic + 3, -delta_jacobian(0, 3));
+                tripletListA.emplace_back(ir + 0, ic + 4, -delta_jacobian(0, 4));
+
+                tripletListP.emplace_back(ir, ir, /*get_cauchy_w(delta(0, 0), 1) * 10000*/ 1);
+
+                tripletListB.emplace_back(ir, 0, delta(0, 0));
             }
         }
 

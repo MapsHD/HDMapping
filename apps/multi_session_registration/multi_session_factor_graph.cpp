@@ -68,7 +68,7 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
     bool is_cw = false;
     int iterations = 1;
     bool is_fix_first_node = true;
-    std::vector<int> indexes_ground_truth;
+    //std::vector<int> indexes_ground_truth;
     for (size_t j = 0; j < sessions.size(); j++)
     {
         for (size_t i = 0; i < sessions[j].point_clouds_container.point_clouds.size(); i++)
@@ -81,10 +81,10 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
             {
                 poses.push_back(pose_tait_bryan_from_affine_matrix(sessions[j].point_clouds_container.point_clouds[i].m_pose.inverse()));
             }
-            if (sessions[j].is_ground_truth)
-            {
-                indexes_ground_truth.push_back(poses.size() - 1);
-            }
+            //if (sessions[j].is_ground_truth)
+            //{
+            //    indexes_ground_truth.push_back(poses.size() - 1);
+            //}
         }
     }
 
@@ -501,7 +501,7 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
         {
             for (size_t index_pose = 0; index_pose < sessions[i].point_clouds_container.point_clouds.size(); index_pose++)
             {
-                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_x)
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_x || sessions[i].is_ground_truth)
                 {
                     int ir = tripletListB.size();
                     int ic = (index_pose + sums[i]) * 6;
@@ -510,7 +510,7 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                     tripletListB.emplace_back(ir, 0, 0);
                 }
 
-                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_y)
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_y || sessions[i].is_ground_truth)
                 {
                     int ir = tripletListB.size();
                     int ic = (index_pose + sums[i]) * 6 + 1;
@@ -519,7 +519,7 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                     tripletListB.emplace_back(ir, 0, 0);
                 }
 
-                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_z)
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_z || sessions[i].is_ground_truth)
                 {
                     int ir = tripletListB.size();
                     int ic = (index_pose + sums[i]) * 6 + 2;
@@ -528,7 +528,7 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                     tripletListB.emplace_back(ir, 0, 0);
                 }
 
-                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_om)
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_om || sessions[i].is_ground_truth)
                 {
                     int ir = tripletListB.size();
                     int ic = (index_pose + sums[i]) * 6 + 3;
@@ -537,7 +537,7 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                     tripletListB.emplace_back(ir, 0, 0);
                 }
 
-                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_fi)
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_fi || sessions[i].is_ground_truth)
                 {
                     int ir = tripletListB.size();
                     int ic = (index_pose + sums[i]) * 6 + 4;
@@ -546,7 +546,7 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                     tripletListB.emplace_back(ir, 0, 0);
                 }
 
-                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_ka)
+                if (sessions[i].point_clouds_container.point_clouds[index_pose].fixed_ka || sessions[i].is_ground_truth)
                 {
                     int ir = tripletListB.size();
                     int ic = (index_pose + sums[i]) * 6 + 5;
@@ -718,7 +718,7 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                 pose.fi += h_x[counter++] * 0.1;
                 pose.ka += h_x[counter++] * 0.1;
 
-                if (!vfixed_x[i])
+                /*if (!vfixed_x[i])
                     poses[i].px = pose.px;
                 if (!vfixed_y[i])
                     poses[i].py = pose.py;
@@ -729,7 +729,15 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                 if (!vfixed_fi[i])
                     poses[i].fi = pose.fi;
                 if (!vfixed_ka[i])
-                    poses[i].ka = pose.ka;
+                    poses[i].ka = pose.ka;*/
+
+                poses[i].px = pose.px;
+                poses[i].py = pose.py;
+                poses[i].pz = pose.pz;
+                poses[i].om = pose.om;
+                poses[i].fi = pose.fi;
+                poses[i].ka = pose.ka;
+
 
                 // if (i == 0 && is_fix_first_node)
                 //     poses[i] = pose;
@@ -765,8 +773,8 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                     if (index_trajectory[i - 1] != index_trajectory[i])
                         index = 0;
                 }
-                if (!sessions[index_trajectory[i]].is_ground_truth)
-                {
+                //if (!sessions[index_trajectory[i]].is_ground_truth)
+                //{
                     sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].m_pose = m_poses[i];
                     sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose = pose_tait_bryan_from_affine_matrix(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].m_pose);
                     sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_translation[0] = sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.px;
@@ -775,7 +783,7 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                     sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[0] = rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.om);
                     sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[1] = rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.fi);
                     sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[2] = rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.ka);
-                }
+                //}
                 index++;
             }
         }

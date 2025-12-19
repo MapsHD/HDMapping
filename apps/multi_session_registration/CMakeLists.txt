@@ -5,6 +5,7 @@ project(multi_session_registration_step_3)
 # Source files
 set(SOURCES
     multi_session_registration.cpp
+    multi_session_factor_graph.cpp
     "../../core/src/utils.cpp"
 )
 

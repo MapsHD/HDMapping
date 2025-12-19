@@ -1090,6 +1090,33 @@ void lio_segments_gui()
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("false: move also succesive nodes");
 
+        ImGui::SameLine();
+
+        if(ImGui::Button("Set fuse IMU inclination for picked trajectory node")){
+
+            if (index_loop_closure_target >= 0 && index_loop_closure_target < session.point_clouds_container.point_clouds.size()){
+                session.point_clouds_container.point_clouds[index_loop_closure_target].fuse_inclination_from_IMU = true;
+            }
+
+            // picked_index
+            /*int tmp = -1;
+            getClosestTrajectoryPoint(session, x, y, false, tmp);
+
+            if (io.KeyCtrl)
+            {
+                if (tmp != -1)
+                    index_loop_closure_target = tmp;
+            }
+            else if (io.KeyShift)
+            {
+                if (tmp != -1)
+                    index_loop_closure_source = tmp;
+            }
+
+            januszjanusz*/
+        }
+
+
         ImGui::Text("Fuse IMU inclination: ");
         ImGui::SameLine();
 

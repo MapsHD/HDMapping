@@ -103,6 +103,7 @@ DOI: 10.36227/techrxiv.174552824.47146860/v1 [[PDF]](https://www.techrxiv.org/us
 - Jozef Výbošťok et al. An Open and Low-Cost Terrestrial Laser Scanner Prototype: Delivering Reliable Accuracy for Forest Practice on a Budget [[PDF]](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5386703)
 - Janusz Będkowski et al. Acquisition and digitization of large scale heritage scenes with open source project https://github.com/MapsHD/HDMapping [[PDF]](https://diglib.eg.org/items/5ce9eb81-e04f-4e58-a0c8-4e66c4ae6960)
 - Samuele Facenda et al. 3D Robotics and LMM for Vineyard Inspection [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-G-2025/431/2025/isprs-archives-XLVIII-G-2025-431-2025.pdf)
+- Jozef Výbošťok et al. An Open and Novel Low-Cost Terrestrial Laser Scanner Prototype for Forest Monitoring [[PDF]](https://www.mdpi.com/1424-8220/26/1/63)
 
 # To cite this work please use as follows:
 Mobile mapping system: hardware and software are elaborated in the following paper:

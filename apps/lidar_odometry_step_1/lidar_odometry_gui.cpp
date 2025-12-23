@@ -9,7 +9,6 @@
 #include <GL/freeglut.h>
 #include <portable-file-dialogs.h>
 
-#include "lidar_odometry_gui_utils.h"
 #include "lidar_odometry_utils.h"
 #include "lidar_odometry.h"
 #include <registration_plane_feature.h>

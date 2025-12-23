@@ -48,7 +48,9 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
             // int picking_mode_index_to_node_outer = -1;
         }
 
+		ImGui::NewLine();   
         ImGui::Separator();
+        ImGui::NewLine();
 
         int remove_gcp_index = -1;
         for (int i = 0; i < gpcs.size(); i++)
@@ -63,7 +65,7 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
             ImGui::PushItemWidth(ImGuiNumberWidth);
             ImGui::InputText(("GCP name##" + std::to_string(i)).c_str(), gpcs[i].name, IM_ARRAYSIZE(gpcs[i].name));
 
-			ImGui::Text(("sigma [m]:##" + std::to_string(i)).c_str());
+			ImGui::Text("sigma [m]:");
             ImGui::InputDouble(("X##" + std::to_string(i)).c_str(), &gpcs[i].sigma_x, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(xText);
@@ -76,7 +78,7 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(zText);
 
-            ImGui::Text(("coordinates [m]:##" + std::to_string(i)).c_str());
+            ImGui::Text("coordinates [m]:");
             ImGui::InputDouble(("X##c" + std::to_string(i)).c_str(), &gpcs[i].x);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(xText);
@@ -276,8 +278,8 @@ void GroundControlPoints::render(const PointClouds &point_clouds_container)
 
         glVertex3f(g.x(), g.y(), g.z());
         glVertex3f(g.x(), g.y(), g.z() + gpcs[i].lidar_height_above_ground);
-
         glEnd();
+
         glColor3f(0.0f, 0.3f, 0.6f);
         glBegin(GL_LINES);
         glVertex3f(c.x(), c.y(), c.z());
@@ -303,21 +305,19 @@ void GroundControlPoints::render(const PointClouds &point_clouds_container)
             draw_ellipse(covar, gcp, Eigen::Vector3f(0.5, 0.5, 0.5), 1.0f);
         }
 
+        glColor3f(0.7f, 0.3f, 0.5f);
+        glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z + gpcs[i].lidar_height_above_ground);
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)(("GCP_" + std::to_string(i) + ": LiDAR center").c_str()));
+
+        glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z);
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)(("GCP_" + std::to_string(i) + ": 'plane on the ground'").c_str()));
+
         glColor3f(0, 0, 0);
         glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z + gpcs[i].lidar_height_above_ground + 0.1);
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)gpcs[i].name);
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char*)gpcs[i].name);
 
-        glColor3f(0, 0, 0);
-        glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z + gpcs[i].lidar_height_above_ground);
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)("LiDAR center"));
-
-        glColor3f(0, 0, 0);
-        glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z);
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)("GCP 'plane on the ground'"));
-
-        glColor3f(0, 0, 0);
         glRasterPos3f(c.x(), c.y(), c.z());
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)("trajectory node assigned to GCP"));
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)(("GCP_" + std::to_string(i) + ": assigned trajectory node").c_str()));
     }
 
     return;

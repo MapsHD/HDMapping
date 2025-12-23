@@ -132,14 +132,12 @@ bool load_data(std::vector<std::string>& input_file_names,
         const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
         const std::string imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
         const auto idToSn = MLvxCalib::GetIdToSnMapping(sn_file);
-        const int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
-        std::size_t minSize = std::min(laz_files.size(), csv_files.size());
 
         if (!preloadedCalibration.empty())
         {
             std::cout << "Loaded calibration for:\n";
             for (const auto& [sn, _] : preloadedCalibration)
-                std::cout << " -> " << sn << "\n\n";
+                std::cout << " -> " << sn << "\n";
 
             bool hasError = false;
 
@@ -197,27 +195,12 @@ bool load_data(std::vector<std::string>& input_file_names,
             }*/
         }
 
-        // --- Working directories
-        fs::path wdp = fs::path(working_directory) / "preview";
-        if (!fs::exists(wdp))
-        {
-            std::cout << "Creating folder: " << wdp << "\n";
-            fs::create_directory(wdp);
-        }
-        params.working_directory_preview = wdp.string();
-
-        fs::path wdp_cache = fs::path(working_directory) / "cache";
-        if (!fs::exists(wdp_cache))
-        {
-            std::cout << "Creating folder: " << wdp_cache << "\n";
-            fs::create_directory(wdp_cache);
-        }
-        params.working_directory_cache = wdp_cache.string();
-
+        const int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
         // --- Load IMU data (still sequential, could parallelize later)
         std::cout << "loading IMU data from 'imu****.csv' using ID " << imuNumberToUse
-            << " from reference '" << sn_file << "' ..\n\n";
+            << " from reference '" << sn_file << "' ..\n";
 
+        std::size_t minSize = std::min(laz_files.size(), csv_files.size());
         // Each thread loads into its own local vector
         std::vector<std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>>> imuChunks(minSize);
 
@@ -254,6 +237,13 @@ bool load_data(std::vector<std::string>& input_file_names,
 
         pointsPerFile.resize(minSize);
 
+        // --- Working directories
+
+        fs::path wdp = fs::path(working_directory) / "preview";
+        params.working_directory_preview = wdp.string();
+        fs::path wdp_cache = fs::path(working_directory) / "cache";
+        params.working_directory_cache = wdp_cache.string();
+
         // --- Parallel load of LAZ files
         tbb::parallel_for(size_t(0), minSize, [&](size_t i)
             {
@@ -267,6 +257,12 @@ bool load_data(std::vector<std::string>& input_file_names,
                 // Optional calibration validation (first file only)
                 if ((i == 0) && params.save_calibration_validation)
                 {
+                    if (!fs::exists(wdp))
+                    {
+                        std::cout << "Creating folder: " << wdp << "\n";
+                        fs::create_directory(wdp);
+                    }
+
                     fs::path outFile = wdp / "calibrationValidation.asc";
                     std::ofstream testPointcloud(outFile);
                     if (!testPointcloud)
@@ -500,6 +496,14 @@ bool compute_step_1(
     worker_data.clear();
     worker_data.reserve(n_iter);
 
+    std::filesystem::path wdp_cache = params.working_directory_cache;
+
+    if (!fs::exists(wdp_cache))
+    {
+        std::cout << "Creating folder: " << wdp_cache << "\n";
+        fs::create_directory(wdp_cache);
+    }
+
     for (size_t i = 0; i < n_iter; i++)
     {
         if (i % 50 == 0)
@@ -598,14 +602,9 @@ bool compute_step_1(
             if (params.decimation > 0.0 && points.size() > 1000)
                 intermediate_points = decimate(points, params.decimation, params.decimation, params.decimation);
 
-            std::filesystem::path path = params.working_directory_cache;
-
             std::string original_points_cache_filename = "original_points_" + std::to_string(worker_data.size()) + ".cache";
-            wd.original_points_cache_file_name = path / original_points_cache_filename;
+            wd.original_points_cache_file_name = wdp_cache / original_points_cache_filename;
 
-            // std::cout << "original_points_cache_file_name " << path.string() << std::endl;
-            //  wd.save_points(filtered_points, wd.original_points_cache_file_name);
-            //  wd.original_points = filtered_points;
             if (!save_vector_data(wd.original_points_cache_file_name.string(), points))
             {
                 std::cout << "problem with save_vector_data file '" << wd.original_points_cache_file_name.string() << "'" << std::endl;
@@ -613,10 +612,7 @@ bool compute_step_1(
             }
 
             std::string intermediate_points_cache_filename = "intermediate_points_" + std::to_string(worker_data.size()) + ".cache";
-            wd.intermediate_points_cache_file_name = path / intermediate_points_cache_filename;
-
-            // remove "flooding" messages from console. this also interfered with previous message of "running iterations: i/total"
-            // std::cout << "intermediate_points_cache_file_name " << path2.string() << std::endl;
+            wd.intermediate_points_cache_file_name = wdp_cache / intermediate_points_cache_filename;
 
             if (intermediate_points.size() > 0)
             {

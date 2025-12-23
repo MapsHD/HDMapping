@@ -49,6 +49,7 @@ extern float mouse_sensitivity;
 
 extern bool is_ortho;
 extern bool lock_z;
+void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd);
 extern bool show_axes;
 extern ImVec4 bg_color;
 extern int point_size;

@@ -7,7 +7,6 @@ set(SOURCES
   lidar_odometry_gui.cpp lidar_odometry_utils.h lidar_odometry_utils.cpp
   lidar_odometry_utils_optimizers.cpp
   lidar_odometry.cpp lidar_odometry.h
-  lidar_odometry_gui_utils.cpp lidar_odometry_gui_utils.h
   toml.hpp toml_io.h toml_io.cpp
   "../../core/src/utils.cpp"
 )

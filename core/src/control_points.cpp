@@ -63,7 +63,9 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
             }
         }
 
+        ImGui::NewLine();
         ImGui::Separator();
+        ImGui::NewLine();
 
         int remove_gcp_index = -1;
         for (int i = 0; i < cps.size(); i++)
@@ -77,12 +79,13 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
 
             ImGui::PushItemWidth(ImGuiNumberWidth);
 
-            ImGui::InputText("CP name", cps[i].name, IM_ARRAYSIZE(cps[i].name));
+            ImGui::InputText(("CP name##" + std::to_string(i)).c_str(), cps[i].name, IM_ARRAYSIZE(cps[i].name));
+			ImGui::SameLine();
             ImGui::Checkbox(("is z_0##" + std::to_string(i)).c_str(), &cps[i].is_z_0);
 
             if (!cps[i].is_z_0)
             {
-                ImGui::Text(("sigma [m]:##" + std::to_string(i)).c_str());
+                ImGui::Text("sigma [m]:");
                 ImGui::InputDouble(("X##" + std::to_string(i)).c_str(), &cps[i].sigma_x, 0.0, 0.0, "%.3f");
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(xText);
@@ -95,7 +98,7 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(zText);
 
-                ImGui::Text(("target_global [m]:##" + std::to_string(i)).c_str());
+                ImGui::Text("target_global [m]:");
                 ImGui::InputDouble(("X##t" + std::to_string(i)).c_str(), &cps[i].x_target_global);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(xText);
@@ -351,8 +354,8 @@ void ControlPoints::render(const PointClouds &point_clouds_container)
 
         glVertex3f(g.x(), g.y(), g.z());
         glVertex3f(g.x(), g.y(), g.z());
-
         glEnd();
+
         glColor3f(0.0f, 0.3f, 0.6f);
         glBegin(GL_LINES);
         glVertex3f(c.x(), c.y(), c.z());
@@ -398,13 +401,12 @@ void ControlPoints::render(const PointClouds &point_clouds_container)
         glRasterPos3f(cps[i].x_target_global, cps[i].y_target_global, cps[i].z_target_global + 0.1);
         glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)cps[i].name);
 
-        glColor3f(0, 0, 0);
         glRasterPos3f(cps[i].x_target_global, cps[i].y_target_global, cps[i].z_target_global);
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)("CP"));
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)(("CP_" + std::to_string(i)).c_str()));
 
-        glColor3f(0, 0, 0);
+        glColor3f(0.7f, 0.3f, 0.5f);
         glRasterPos3f(c.x(), c.y(), c.z());
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)("Point assigned to CP"));
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)(("CP_" + std::to_string(i) + ": initial location").c_str()));
     }
 
     return;

@@ -599,37 +599,68 @@ std::unordered_map<int, std::string> MLvxCalib::GetIdToSnMapping(const std::stri
     return dataMap;
 }
 
+inline bool JsonGetBool(
+    const nlohmann::json& obj,
+    const char* key,
+    bool defaultValue = false)
+{
+    if (!obj.contains(key))
+        return defaultValue;
+
+    const auto& v = obj.at(key);
+
+    if (v.is_boolean())
+        return v.get<bool>();
+
+    if (v.is_string())
+    {
+        std::string s = v.get<std::string>();
+        std::transform(s.begin(), s.end(), s.begin(), ::toupper);
+        return (s == "TRUE" || s == "1" || s == "YES");
+    }
+
+    return defaultValue;
+}
+
 std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFile(const std::string &filename)
 {
-    if (!std::filesystem::exists(filename))
-    {
-        return std::unordered_map<std::string, Eigen::Affine3d>();
-    }
     std::unordered_map<std::string, Eigen::Affine3d> dataMap;
-    std::ifstream file(filename);
-
+    std::ifstream file;
     using json = nlohmann::json;
-    json jsonData = json::parse(file);
+    json jsonData;
+
+    file.open(filename);
+    if (!file)
+    {
+        std::cerr << "Cannot open file '" << filename << "'" << std::endl;
+        return {};
+    }
+
+    try
+    {
+        jsonData = json::parse(file);
+    }
+    catch (const json::exception& e)
+    {
+		std::cerr << "JSON parsing error in file '" << filename << "': " << e.what() << std::endl;
+        return {};
+    }
+
+    if (!jsonData.contains("calibration"))
+        return {};
 
     // Iterate through the JSON object and parse each value into Eigen::Affine3d
-
     for (auto &calibrationEntry : jsonData["calibration"].items())
     {
         const std::string &lidarSn = calibrationEntry.key();
         Eigen::Matrix4d value;
         // std::cout << "lidarSn : " << lidarSn << std::endl;
 
-        if (calibrationEntry.value().contains("identity"))
+        bool identity = JsonGetBool(calibrationEntry.value(),"identity", false);
+        if (identity)
         {
-            std::string identity = calibrationEntry.value()["identity"].get<std::string>();
-            // std::cout << "identity : " << identity << std::endl;
-            std::transform(identity.begin(), identity.end(), identity.begin(), ::toupper);
-            if (identity == "TRUE")
-            {
-                dataMap[lidarSn] = Eigen::Matrix4d::Identity();
-                continue;
-                continue;
-            }
+            dataMap[lidarSn] = Eigen::Matrix4d::Identity();
+            continue;
         }
 
         assert(calibrationEntry.value().contains("data"));
@@ -640,7 +671,7 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
         {
             for (int j = 0; j < 4; ++j)
             {
-                value(i, j) = matrixRawData[i * 4 + j]; // default is column-major order
+                value(i, j) = matrixRawData[i * 4 + j]; // default is row-major order
             }
         }
 
@@ -650,23 +681,12 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
             // std::cout << "order : " << order << std::endl;
             std::transform(order.begin(), order.end(), order.begin(), ::toupper);
             if (order == "COLUMN")
-            {
-                Eigen::Matrix4d valueT = value.transpose();
-                value = valueT;
-            }
+                value = value.transpose();
         }
 
-        if (calibrationEntry.value().contains("inverted"))
-        {
-            std::string inverted = calibrationEntry.value()["inverted"].get<std::string>();
-            // std::cout << "inverted : " << inverted << std::endl;
-            std::transform(inverted.begin(), inverted.end(), inverted.begin(), ::toupper);
-            if (inverted == "TRUE")
-            {
-                Eigen::Matrix4d valueI = value.inverse();
-                value = valueI;
-            }
-        }
+        bool inverted = JsonGetBool(calibrationEntry.value(),"inverted", false);
+        if (inverted)
+            value = value.inverse();
 
         Eigen::IOFormat HeavyFmt(Eigen::FullPrecision, 0, ", ", ";\n", "[", "]", "[", "]");
 
@@ -675,6 +695,7 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
         //  Insert into the map
         dataMap[lidarSn] = value;
     }
+
     // check for blacklisted
     if (jsonData.contains("blacklist"))
     {
@@ -682,7 +703,9 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
         for (const auto &item : blacklist)
         {
             std::string blacklistedSn = item.get<std::string>();
-            dataMap[blacklistedSn] = Eigen::Matrix4d::Zero();
+            //dataMap[blacklistedSn] = Eigen::Matrix4d::Zero();
+			//avoid dealing with zero matrices later on
+            dataMap.erase(blacklistedSn);
         }
     }
     return dataMap;
@@ -690,17 +713,33 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
 
 std::string MLvxCalib::GetImuSnToUse(const std::string &filename)
 {
-    if (!std::filesystem::exists(filename))
-    {
-        return "";
-    }
-    std::unordered_map<std::string, Eigen::Affine3d> dataMap;
-    std::ifstream file(filename);
-
+    std::ifstream file;
     using json = nlohmann::json;
-    json jsonData = json::parse(file);
+    json jsonData;
 
-    return jsonData["imuToUse"];
+    file.open(filename);
+    if (!file)
+    {
+        std::cerr << "Cannot open file '" << filename << "'" << std::endl;
+        return {};
+    }
+
+    try
+    {
+        jsonData = json::parse(file);
+    }
+    catch (const json::exception& e)
+    {
+        std::cerr << "JSON parsing error in file '" << filename << "': " << e.what() << std::endl;
+        return {};
+    }
+
+    if (!jsonData.contains("imuToUse"))
+        return {};
+    if (!jsonData["imuToUse"].is_string())
+        return {};
+
+    return jsonData["imuToUse"].get<std::string>();
 }
 
 std::unordered_map<int, Eigen::Affine3d> MLvxCalib::CombineIntoCalibration(const std::unordered_map<int, std::string> &idToSn, const std::unordered_map<std::string, Eigen::Affine3d> &calibration)

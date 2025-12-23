@@ -1959,6 +1959,12 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
         update_rgd(params.in_out_params_indoor, params.buckets_indoor, pp, params.m_g.translation());
         update_rgd(params.in_out_params_outdoor, params.buckets_outdoor, pp, params.m_g.translation());
 
+        if (!fs::exists(params.working_directory_preview))
+        {
+            std::cout << "Creating folder: " << params.working_directory_preview << "\n";
+            fs::create_directory(params.working_directory_preview);
+        }
+
         for (int i = 0; i < worker_data.size(); i++)
         {
             std::vector<Point3Di> intermediate_points;

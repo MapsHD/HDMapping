@@ -19,10 +19,11 @@
 
 #include <filesystem>
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
-#include "../lidar_odometry_step_1/lidar_odometry_gui_utils.h"
+#include "../lidar_odometry_step_1/lidar_odometry.h"
 
 #include <HDMapping/Version.hpp>
 
+#include "tbb/tbb.h"
 #include <mutex>
 
 #include <export_laz.h>
@@ -73,6 +74,7 @@ struct AllData
     std::vector<Point3Di> points_local;
     std::vector<int> lidar_ids;
 };
+std::vector<AllData> all_data;
 
 struct ImuData
 {
@@ -88,19 +90,15 @@ struct ImuData
     std::vector<double> roll;
 };
 ImuData imu_data_plot;
-std::vector<AllData> all_data;
 
 std::vector<std::string> laz_files;
-std::vector<std::string> csv_files;
-std::vector<std::string> sn_files;
 std::vector<std::string> photos_files;
 std::map<uint64_t, std::string> photo_files_ts;
 
 std::string working_directory = "";
-std::string imuSnToUse;
 std::string working_directory_preview;
-double filter_threshold_xy_inner = 0.1;
-double filter_threshold_xy_outer = 70.0;
+double filter_threshold_xy_inner = 0.0; //no filtering for raw viewing
+double filter_threshold_xy_outer = 300.0; //no filtering for raw viewing
 bool fusionConventionNwu = true;
 bool fusionConventionEnu = false;
 bool fusionConventionNed = false;
@@ -111,7 +109,6 @@ int index_rendered_points_local = -1;
 // std::vector<std::vector<Point3Di>> all_points_local;
 // std::vector<std::vector<int>> all_lidar_ids;
 std::vector<int> indexes_to_filename;
-std::vector<std::string> all_file_names;
 double ahrs_gain = 0.5;
 double wx = 1000000.0;
 double wy = 1000000.0;
@@ -764,45 +761,6 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> get_nn()
     return nn;
 }
 
-void draw_ellipse(const Eigen::Matrix3d& covar, Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd = 3)
-{
-
-    Eigen::LLT<Eigen::Matrix<double, 3, 3>> cholSolver(covar);
-    Eigen::Matrix3d transform = cholSolver.matrixL();
-
-    const double pi = 3.141592;
-    const double di = 0.02;
-    const double dj = 0.04;
-    const double du = di * 2 * pi;
-    const double dv = dj * pi;
-    glColor3f(color.x(), color.y(), color.z());
-
-    for (double i = 0; i < 1.0; i += di) // horizonal
-    {
-        for (double j = 0; j < 1.0; j += dj) // vertical
-        {
-            double u = i * 2 * pi;     // 0     to  2pi
-            double v = (j - 0.5) * pi; //-pi/2 to pi/2
-
-            const Eigen::Vector3d pp0(cos(v) * cos(u), cos(v) * sin(u), sin(v));
-            const Eigen::Vector3d pp1(cos(v) * cos(u + du), cos(v) * sin(u + du), sin(v));
-            const Eigen::Vector3d pp2(cos(v + dv) * cos(u + du), cos(v + dv) * sin(u + du), sin(v + dv));
-            const Eigen::Vector3d pp3(cos(v + dv) * cos(u), cos(v + dv) * sin(u), sin(v + dv));
-            Eigen::Vector3d tp0 = transform * (nstd * pp0) + mean;
-            Eigen::Vector3d tp1 = transform * (nstd * pp1) + mean;
-            Eigen::Vector3d tp2 = transform * (nstd * pp2) + mean;
-            Eigen::Vector3d tp3 = transform * (nstd * pp3) + mean;
-
-            glBegin(GL_LINE_LOOP);
-            glVertex3dv(tp0.data());
-            glVertex3dv(tp1.data());
-            glVertex3dv(tp2.data());
-            glVertex3dv(tp3.data());
-            glEnd();
-        }
-    }
-}
-
 std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov()
 {
     std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> mc;
@@ -908,30 +866,54 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov()
 
 void loadData()
 {
-    if (!is_init)
+    std::vector<std::string> input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
+
+	//no files selected, quit loading
+    if (input_file_names.empty())
 		return;
 
-    laz_files.clear();
-    csv_files.clear();
-    sn_files.clear();
-    all_file_names.clear();
-    std::vector<std::string> input_file_names;
-    input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
+    LidarOdometryParams params; //dummy for load_data function
+	params.save_calibration_validation = false;
+	params.filter_threshold_xy_inner = filter_threshold_xy_inner;
+    params.filter_threshold_xy_outer = filter_threshold_xy_outer;
 
+    std::vector<std::vector<Point3Di>> pointsPerFile;
+    std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
+
+    /*
+	//start loading process
     std::sort(std::begin(input_file_names), std::end(input_file_names));
+
+    std::string calibrationFile;
+
+    std::cout << "Selected files for open:\n";
 
     std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string& fileName)
         {
-            if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
+            std::cout << fileName << "\n";
+
+            std::string ext = fs::path(fileName).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+            if (ext == ".laz" || ext == ".las")
             {
                 laz_files.push_back(fileName);
-                all_file_names.push_back(fileName);
             }
-            else if (fileName.ends_with(".csv"))
+            else if (ext == ".csv")
                 csv_files.push_back(fileName);
-            else if (fileName.ends_with(".sn"))
-                sn_files.push_back(fileName);
-            else if (fileName.ends_with(".jpg")) {
+            else if ((ext == ".sn") && sn_file.empty())
+            {
+                sn_file = fileName;
+                std::cout << "Only using first SN file found\n";
+            }
+            else if (ext == ".mjc")
+            {
+                if (calibrationFile.empty())
+                    calibrationFile = fileName;
+                else
+                    std::cout << "Unexpected calibration file found (" << fileName << "). Ignored.." << std::endl;
+            }
+            else if (ext == ".jpg" || ext == ".jpeg") {
                 photos_files.push_back(fileName);
                 // decode filename e.g.: ` cam0_1761264773592270949.jpg`
                 const std::string filename = fs::path(fileName).stem().string();
@@ -955,45 +937,64 @@ void loadData()
             }
         });
 
+    std::cout << "\n";
+
     if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
 
-        const auto calibrationFile = (fs::path(working_directory) / "calibration.json").string();
+        if (calibrationFile.empty())
+			calibrationFile = (fs::path(working_directory) / "calibration.json").string(); //if no calibration file provided, try to load old default from working directory
+                         
+        // --- Calibration and IMU setup
         const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
-        imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
-        std::cout << "imuSnToUse: " << imuSnToUse << std::endl;
+        const std::string imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
+        const auto idToSn = MLvxCalib::GetIdToSnMapping(sn_file);
+
         if (!preloadedCalibration.empty())
         {
-            std::cout << "Loaded calibration for: \n";
+            std::cout << "Loaded calibration for:\n";
             for (const auto& [sn, _] : preloadedCalibration)
-                std::cout << " -> " << sn << std::endl;
+                std::cout << " -> " << sn << "\n\n";
+
+            bool hasError = false;
+
+            for (const auto& [id, sn] : idToSn)
+            {
+                if (preloadedCalibration.find(sn) == preloadedCalibration.end())
+                {
+                    std::cerr << "WRONG CALIBRATION FILE! THE SERIAL NUMBER SHOULD BE " << sn << "!!!\n";
+                    hasError = true;
+                }
+            }
+
+            if (!hasError && preloadedCalibration.find(imuSnToUse) == preloadedCalibration.end())
+            {
+                std::cerr << "MISSING CALIBRATION FOR imuSnToUse: " << imuSnToUse << "!!!\n";
+                std::cerr << "Available serial numbers in calibration file are:\n";
+                for (const auto& [snKey, _] : preloadedCalibration)
+                    std::cerr << "  - " << snKey << "\n";
+
+                hasError = true;
+            }
+
+            if (hasError)
+            {
+                std::cerr << "Press ENTER to exit...\n";
+                std::cin.get();
+                std::exit(EXIT_FAILURE);
+            }
         }
         else
         {
-            std::cout << "There is no calibration.json file in folder (check comment in source code) file: " << __FILE__ << " line: " << __LINE__ << std::endl;
-            // example file for 2x livox";
-            /*
-            {
-                "calibration" : {
-                    "47MDL9T0020193" : {
-                        "identity" : "true"
-                    },
-                    "47MDL9S0020300" :
-                        {
-                            "order" : "ROW",
-                            "inverted" : "TRUE",
-                            "data" : [
-                                0.999824, 0.00466397, -0.0181595, -0.00425984,
-                                -0.0181478, -0.00254457, -0.999832, -0.151599,
-                                -0.0047094, 0.999986, -0.00245948, -0.146408,
-                                0, 0, 0, 1
-                            ]
-                        }
-                },
-                                "imuToUse" : "47MDL9T0020193"
-            }*/
+            std::cout << "There is no calibration file in folder!" << std::endl;
+            std::cout << "IGNORE THIS MESSAGE IF YOU ONLY HAVE 1 LiDAR" << std::endl;
+
+            // example file for 2x LiDAR":
         }
+
+        std::cout << "imuSnToUse: " << imuSnToUse << std::endl;
+
         std::cout << "Number of found photos: " << photos_files.size() << std::endl;
 
         fs::path wdp = fs::path(input_file_names[0]).parent_path();
@@ -1003,20 +1004,13 @@ void loadData()
 
         working_directory_preview = wdp.string();
 
-        for (size_t i = 0; i < input_file_names.size(); i++)
-            std::cout << input_file_names[i] << std::endl;
+        std::cout << "Loading IMU" << std::endl;
 
-        std::cout << "loading imu" << std::endl;
         std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
 
         for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
         {
             const std::string& imufn = csv_files.at(fileNo);
-            const std::string snFn = (fileNo >= sn_files.size()) ? ("") : (sn_files.at(fileNo));
-
-            std::cout << "parsing sn file '" << snFn << "'" << std::endl;
-
-            const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
             // GetId of Imu to use
             int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
             std::cout << "imuNumberToUse  " << imuNumberToUse << " at: '" << imufn << "'" << std::endl;
@@ -1033,14 +1027,13 @@ void loadData()
                 return std::get<0>(a).first < std::get<0>(b).first;
             });
 
-        std::cout
-            << "loading points" << std::endl;
+        std::cout << "Loading points\n";
         std::vector<std::vector<Point3Di>> pointsPerFile;
         pointsPerFile.resize(laz_files.size());
         // std::vector<std::vector<int>> indexesPerFile;
 
         std::mutex mtx;
-        std::cout << "start std::transform" << std::endl;
+        std::cout << "Start std::transform\n";
 
         std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [&](const std::string& fn)
             {
@@ -1073,6 +1066,76 @@ void loadData()
                 //
             });
         std::cout << "std::transform finished" << std::endl;
+        */
+
+    if (load_data(input_file_names, params, pointsPerFile, imu_data, false))
+    {
+        //clear possible previous data
+
+        all_data.clear();
+        all_data.shrink_to_fit();
+
+        imu_data_plot.timestampLidar.clear();
+        imu_data_plot.angX.clear();
+        imu_data_plot.angY.clear();
+        imu_data_plot.angZ.clear();
+        imu_data_plot.accX.clear();
+        imu_data_plot.accY.clear();
+        imu_data_plot.accZ.clear();
+        imu_data_plot.yaw.clear();
+        imu_data_plot.pitch.clear();
+        imu_data_plot.roll.clear();
+
+        imu_data_plot.timestampLidar.shrink_to_fit();
+        imu_data_plot.angX.shrink_to_fit();
+        imu_data_plot.angY.shrink_to_fit();
+        imu_data_plot.angZ.shrink_to_fit();
+        imu_data_plot.accX.shrink_to_fit();
+        imu_data_plot.accY.shrink_to_fit();
+        imu_data_plot.accZ.shrink_to_fit();
+        imu_data_plot.yaw.shrink_to_fit();
+        imu_data_plot.pitch.shrink_to_fit();
+        imu_data_plot.roll.shrink_to_fit();
+
+        photo_files_ts.clear();
+
+        laz_files.clear();
+
+		//specific processing for RAW data viewer
+
+        std::sort(input_file_names.begin(), input_file_names.end());
+        for (const auto& fileName : input_file_names)
+        {
+            std::string ext = fs::path(fileName).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+            if (ext == ".laz" || ext == ".las")
+                laz_files.push_back(fileName);
+            else if (ext == ".jpg" || ext == ".jpeg") {
+                photos_files.push_back(fileName);
+                // decode filename e.g.: ` cam0_1761264773592270949.jpg`
+                const std::string filename = fs::path(fileName).stem().string();
+                std::string cam_id = filename.substr(0, filename.find("_"));
+                std::string timestamp = filename.substr(filename.find("_") + 1, filename.size());
+
+                std::cout << "cam_id: " << cam_id << std::endl;
+                std::cout << "timestamp: " << timestamp << std::endl;
+                std::cout << "filename: " << filename << std::endl;
+
+                if (cam_id == "cam0" && !timestamp.empty())
+                {
+                    try {
+                        uint64_t ts = std::stoull(timestamp);
+                        photo_files_ts[ts] = fileName;
+                    }
+                    catch (const std::exception& e) {
+                        std::cerr << "Error parsing timestamp from filename: " << filename << " - " << e.what() << std::endl;
+                    }
+                }
+            }
+        }
+
+        //rest of RAW data viewer processing
 
         FusionAhrs ahrs;
         FusionAhrsInitialise(&ahrs);
@@ -1177,9 +1240,9 @@ void loadData()
         for (const auto& pp : pointsPerFile)
             number_of_points += pp.size();
 
-        std::cout << "number of points: " << number_of_points << std::endl;
+        std::cout << "Number of points: " << number_of_points << std::endl;
 
-        std::cout << "start indexing points" << std::endl;
+        std::cout << "Start indexing points" << std::endl;
 
         // std::vector<Point3Di> points_global;
         std::vector<Point3Di> points_local;
@@ -1200,7 +1263,7 @@ void loadData()
 
         for (size_t i = 0; i < pointsPerFile.size(); i++)
         {
-            std::cout << "indexed: " << i + 1 << " of " << pointsPerFile.size() << " files" << std::endl;
+            std::cout << "Indexed: " << i + 1 << " of " << pointsPerFile.size() << " files\r";
             for (const auto& pp : pointsPerFile[i])
             {
                 auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), pp.timestamp,
@@ -1285,7 +1348,7 @@ void loadData()
             }
         }
 
-        std::cout << "indexing points finished" << std::endl;
+        std::cout << "\nIndexing points finished\n\n";
 
         if (all_data.size() > 0)
         {
@@ -1293,21 +1356,11 @@ void loadData()
             index_rendered_points_local = 0;
         }
     }
-    else
-    {
-        std::cout << "please select files correctly" << std::endl;
-        std::cout << "input_file_names.size(): " << input_file_names.size() << std::endl;
-        std::cout << "laz_files.size(): " << laz_files.size() << std::endl;
-        std::cout << "csv_files.size(): " << csv_files.size() << std::endl;
-        std::cout << "sn_files.size(): " << sn_files.size() << std::endl;
-
-        std::cout << "condition: input_file_names.size() > 0 && laz_files.size() == csv_files.size() && laz_files.size() == sn_files.size() NOT SATISFIED!!!" << std::endl;
-    }
 }
 
 void imu_data_gui()
 {
-    ImGui::Begin("ImuData");
+    ImGui::Begin("IMU data");
     {
         if (imu_data_plot.timestampLidar.size() > 0)
         {
@@ -1319,7 +1372,7 @@ void imu_data_gui()
                 if (all_data[index_rendered_points_local].timestamps.size() > 0)
                     annotation = all_data[index_rendered_points_local].timestamps.front().first;
             }
-            if (ImPlot::BeginPlot("Imu - acceleration 'm/s^2", ImVec2(-1, 0)))
+            if (ImPlot::BeginPlot("IMU - acceleration 'm/s^2", ImVec2(-1, 0)))
             {
                 ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Once);
                 ImPlot::SetupAxisLinks(ImAxis_X1, &x_min, &x_max);
@@ -1341,7 +1394,7 @@ void imu_data_gui()
                 ImPlot::EndPlot();
             }
 
-            if (ImPlot::BeginPlot("Imu - AHRS angles [deg]", ImVec2(-1, 0)))
+            if (ImPlot::BeginPlot("IMU - AHRS angles [deg]", ImVec2(-1, 0)))
             {
                 ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Once);
                 ImPlot::SetupAxisLinks(ImAxis_X1, &x_min, &x_max);
@@ -1413,6 +1466,15 @@ void project_gui()
         }
 
         ImGui::InputDouble("AHRS gain", &ahrs_gain);
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::BeginTooltip();
+            ImGui::Text("Parameter for AHRS(Attitude and Heading Reference System) filter");
+            ImGui::Text("Controls how strongly the filter corrects its orientation estimate");
+            ImGui::Text("using accelerometer and magnetometer data, relative to the gyroscope integration");
+            ImGui::EndTooltip();
+        }
+
         // ImGui::Checkbox("is_slerp", &is_slerp);
 
         ImGui::PopItemWidth();
@@ -1423,7 +1485,7 @@ void project_gui()
         if (index_rendered_points_local >= all_data.size())
             index_rendered_points_local = all_data.size() - 1;
 
-        if (all_file_names.size() > 0)
+        if (laz_files.size() > 0)
         {
             if (index_rendered_points_local >= 0 && index_rendered_points_local < indexes_to_filename.size())
             {
@@ -1761,14 +1823,17 @@ void display()
 
     if (ImGui::BeginMainMenuBar())
     {
-        if (ImGui::Button("Load data"))
-            loadData();
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Select session to open for analyze (Ctrl+O)");
+        //if (!is_init)
+        {
+            if (ImGui::Button("Load data"))
+                loadData();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Select session to open for analyze (Ctrl+O)");
 
-        ImGui::SameLine();
-        ImGui::Dummy(ImVec2(20, 0));
-        ImGui::SameLine();
+            ImGui::SameLine();
+            ImGui::Dummy(ImVec2(20, 0));
+            ImGui::SameLine();
+        }
 
         if (ImGui::BeginMenu("View"))
         {
@@ -1853,7 +1918,7 @@ void display()
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                std::string fn = all_file_names[indexes_to_filename[index_rendered_points_local]];
+                std::string fn = laz_files[indexes_to_filename[index_rendered_points_local]];
                 ImGui::Text(fn.c_str());
                 ImGui::EndTooltip();
             }
@@ -1862,7 +1927,7 @@ void display()
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                std::string fn = all_file_names[indexes_to_filename[index_rendered_points_local]];
+                std::string fn = laz_files[indexes_to_filename[index_rendered_points_local]];
                 ImGui::Text(fn.c_str());
                 ImGui::EndTooltip();
             }

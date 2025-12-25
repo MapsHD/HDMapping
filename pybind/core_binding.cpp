@@ -48,5 +48,6 @@ PYBIND11_MODULE(core_py, m) {
           py::arg("session"),
           py::arg("output_las_name"),
           py::arg("as_local") = false,
+          py::arg("skip_ts_0") = false,
           "Saves point cloud data from session into a .las/.laz file.");
 }

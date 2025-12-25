@@ -2153,7 +2153,7 @@ void display()
     showAxes();
 
     if (session.control_points.is_imgui)
-        session.control_points.render(session.point_clouds_container);
+        session.control_points.render(session.point_clouds_container, true);
     else
     {
         if (is_loop_closure_gui)

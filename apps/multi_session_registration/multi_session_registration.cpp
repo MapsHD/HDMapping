@@ -2496,6 +2496,7 @@ void display()
             {
                 session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, false, false, false, false, false, false, false, false, false, false, false, false, 10000);
                 session.ground_control_points.render(session.point_clouds_container);
+                session.control_points.render(session.point_clouds_container);
 
                 ////
                 int index_point_clouds = -1;

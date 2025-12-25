@@ -95,15 +95,13 @@ std::vector<std::string> laz_files;
 std::vector<std::string> photos_files;
 std::map<uint64_t, std::string> photo_files_ts;
 
-std::string working_directory = "";
-std::string working_directory_preview;
 double filter_threshold_xy_inner = 0.0; //no filtering for raw viewing
 double filter_threshold_xy_outer = 300.0; //no filtering for raw viewing
 bool fusionConventionNwu = true;
 bool fusionConventionEnu = false;
 bool fusionConventionNed = false;
 int number_of_points_threshold = 20000;
-bool is_init = true;
+bool is_init = false;
 int index_rendered_points_local = -1;
 // std::vector<std::vector<Point3Di>> all_points_local;
 // std::vector<std::vector<Point3Di>> all_points_local;
@@ -130,6 +128,8 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> mean_cov;
 bool show_mean_cov = false;
 bool show_rgd_nn = false;
 bool show_imu_data = false;
+
+bool is_settings_gui = false;
 
 namespace photos
 {
@@ -880,194 +880,6 @@ void loadData()
     std::vector<std::vector<Point3Di>> pointsPerFile;
     std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
 
-    /*
-	//start loading process
-    std::sort(std::begin(input_file_names), std::end(input_file_names));
-
-    std::string calibrationFile;
-
-    std::cout << "Selected files for open:\n";
-
-    std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string& fileName)
-        {
-            std::cout << fileName << "\n";
-
-            std::string ext = fs::path(fileName).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-            if (ext == ".laz" || ext == ".las")
-            {
-                laz_files.push_back(fileName);
-            }
-            else if (ext == ".csv")
-                csv_files.push_back(fileName);
-            else if ((ext == ".sn") && sn_file.empty())
-            {
-                sn_file = fileName;
-                std::cout << "Only using first SN file found\n";
-            }
-            else if (ext == ".mjc")
-            {
-                if (calibrationFile.empty())
-                    calibrationFile = fileName;
-                else
-                    std::cout << "Unexpected calibration file found (" << fileName << "). Ignored.." << std::endl;
-            }
-            else if (ext == ".jpg" || ext == ".jpeg") {
-                photos_files.push_back(fileName);
-                // decode filename e.g.: ` cam0_1761264773592270949.jpg`
-                const std::string filename = fs::path(fileName).stem().string();
-                std::string cam_id = filename.substr(0, filename.find("_"));
-                std::string timestamp = filename.substr(filename.find("_") + 1, filename.size());
-
-                std::cout << "cam_id: " << cam_id << std::endl;
-                std::cout << "timestamp: " << timestamp << std::endl;
-                std::cout << "filename: " << filename << std::endl;
-
-                if (cam_id == "cam0" && !timestamp.empty())
-                {
-                    try {
-                        uint64_t ts = std::stoull(timestamp);
-                        photo_files_ts[ts] = fileName;
-                    }
-                    catch (const std::exception& e) {
-                        std::cerr << "Error parsing timestamp from filename: " << filename << " - " << e.what() << std::endl;
-                    }
-                }
-            }
-        });
-
-    std::cout << "\n";
-
-    if (input_file_names.size() > 0 && laz_files.size() == csv_files.size())
-    {
-        working_directory = fs::path(input_file_names[0]).parent_path().string();
-
-        if (calibrationFile.empty())
-			calibrationFile = (fs::path(working_directory) / "calibration.json").string(); //if no calibration file provided, try to load old default from working directory
-                         
-        // --- Calibration and IMU setup
-        const auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
-        const std::string imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
-        const auto idToSn = MLvxCalib::GetIdToSnMapping(sn_file);
-
-        if (!preloadedCalibration.empty())
-        {
-            std::cout << "Loaded calibration for:\n";
-            for (const auto& [sn, _] : preloadedCalibration)
-                std::cout << " -> " << sn << "\n\n";
-
-            bool hasError = false;
-
-            for (const auto& [id, sn] : idToSn)
-            {
-                if (preloadedCalibration.find(sn) == preloadedCalibration.end())
-                {
-                    std::cerr << "WRONG CALIBRATION FILE! THE SERIAL NUMBER SHOULD BE " << sn << "!!!\n";
-                    hasError = true;
-                }
-            }
-
-            if (!hasError && preloadedCalibration.find(imuSnToUse) == preloadedCalibration.end())
-            {
-                std::cerr << "MISSING CALIBRATION FOR imuSnToUse: " << imuSnToUse << "!!!\n";
-                std::cerr << "Available serial numbers in calibration file are:\n";
-                for (const auto& [snKey, _] : preloadedCalibration)
-                    std::cerr << "  - " << snKey << "\n";
-
-                hasError = true;
-            }
-
-            if (hasError)
-            {
-                std::cerr << "Press ENTER to exit...\n";
-                std::cin.get();
-                std::exit(EXIT_FAILURE);
-            }
-        }
-        else
-        {
-            std::cout << "There is no calibration file in folder!" << std::endl;
-            std::cout << "IGNORE THIS MESSAGE IF YOU ONLY HAVE 1 LiDAR" << std::endl;
-
-            // example file for 2x LiDAR":
-        }
-
-        std::cout << "imuSnToUse: " << imuSnToUse << std::endl;
-
-        std::cout << "Number of found photos: " << photos_files.size() << std::endl;
-
-        fs::path wdp = fs::path(input_file_names[0]).parent_path();
-        wdp /= "preview";
-        if (!fs::exists(wdp))
-            fs::create_directory(wdp);
-
-        working_directory_preview = wdp.string();
-
-        std::cout << "Loading IMU" << std::endl;
-
-        std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
-
-        for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
-        {
-            const std::string& imufn = csv_files.at(fileNo);
-            // GetId of Imu to use
-            int imuNumberToUse = MLvxCalib::GetImuIdToUse(idToSn, imuSnToUse);
-            std::cout << "imuNumberToUse  " << imuNumberToUse << " at: '" << imufn << "'" << std::endl;
-            auto imu = load_imu(imufn.c_str(), imuNumberToUse);
-            std::cout << imufn << " with mapping " << snFn << std::endl;
-            imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu));
-        }
-
-        // sort IMU data
-        // imu_data
-        std::sort(imu_data.begin(), imu_data.end(),
-            [](const std::tuple<std::pair<double, double>, FusionVector, FusionVector>& a, const std::tuple<std::pair<double, double>, FusionVector, FusionVector>& b)
-            {
-                return std::get<0>(a).first < std::get<0>(b).first;
-            });
-
-        std::cout << "Loading points\n";
-        std::vector<std::vector<Point3Di>> pointsPerFile;
-        pointsPerFile.resize(laz_files.size());
-        // std::vector<std::vector<int>> indexesPerFile;
-
-        std::mutex mtx;
-        std::cout << "Start std::transform\n";
-
-        std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [&](const std::string& fn)
-            {
-                // Load mapping from id to sn
-                fs::path fnSn(fn);
-                fnSn.replace_extension(".sn");
-
-                // GetId of Imu to use
-                const auto idToSn = MLvxCalib::GetIdToSnMapping(fnSn.string());
-                auto calibration = MLvxCalib::CombineIntoCalibration(idToSn, preloadedCalibration);
-                auto data = load_point_cloud(fn.c_str(), true, filter_threshold_xy_inner, filter_threshold_xy_outer, calibration);
-
-                if (fn == laz_files.front())
-                {
-                    fs::path calibrationValidtationFile = wdp / "calibrationValidation.asc";
-
-                    std::ofstream testPointcloud{ calibrationValidtationFile.c_str() };
-                    for (const auto& p : data)
-                        testPointcloud << p.point.x() << "\t" << p.point.y() << "\t" << p.point.z() << "\t" << p.intensity << "\t" << (int)p.lidarid << "\n";
-                }
-
-                std::unique_lock lck(mtx);
-                for (const auto& [id, calib] : calibration)
-                {
-                    std::cout << " id : " << id << std::endl;
-                    std::cout << calib.matrix() << std::endl;
-                }
-                return data;
-                // std::cout << fn << std::endl;
-                //
-            });
-        std::cout << "std::transform finished" << std::endl;
-        */
-
     if (load_data(input_file_names, params, pointsPerFile, imu_data, false))
     {
         //clear possible previous data
@@ -1352,7 +1164,7 @@ void loadData()
 
         if (all_data.size() > 0)
         {
-            is_init = false;
+            is_init = true;
             index_rendered_points_local = 0;
         }
     }
@@ -1426,7 +1238,7 @@ void imu_data_gui()
         if (ImGui::Button("Save 'ts gyr_x gyr_y gyr_z acc_x acc_y acc_z yaw_rad pitch_rad roll_rad' to csv"))
         {
             std::string output_file_name = "";
-            output_file_name = mandeye::fd::SaveFileDialog("Save imu data", {}, "");
+            output_file_name = mandeye::fd::SaveFileDialog("Save IMU data", {}, "");
             std::cout << "file to save: '" << output_file_name << "'" << std::endl;
 
             ofstream file;
@@ -1453,12 +1265,12 @@ void imu_data_gui()
     ImGui::End();
 }
 
-void project_gui()
+void settings_gui()
 {
-    if (ImGui::Begin("Settings"))
+    if (ImGui::Begin("Settings", &is_settings_gui))
     {
         ImGui::PushItemWidth(ImGuiNumberWidth);
-        if (is_init)
+        if (!is_init)
         {
             ImGui::InputInt("number_of_points_threshold", &number_of_points_threshold);
             if (number_of_points_threshold < 0)
@@ -1494,14 +1306,16 @@ void project_gui()
             }
         }
 
+		ImGui::BeginDisabled(!is_init);
         if (ImGui::Button("Save point cloud"))
         {
             std::string output_file_name = "";
             output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter);
-            std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
-
+            
             if (output_file_name.size() > 0)
             {
+                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+
                 std::vector<Eigen::Vector3d> pointcloud;
                 std::vector<unsigned short> intensity;
                 std::vector<double> timestamps;
@@ -1520,8 +1334,10 @@ void project_gui()
                     std::cout << "problem with saving file: " << output_file_name << std::endl;
             }
         }
+		ImGui::EndDisabled();
 
         ImGui::Separator();
+
         ImGui::PushItemWidth(ImGuiNumberWidth);
         ImGui::InputDouble("distance_bucket", &distance_bucket);
         ImGui::InputDouble("polar_angle_deg", &polar_angle_deg);
@@ -1536,12 +1352,13 @@ void project_gui()
         ImGui::InputDouble("wfi", &wfi);
         ImGui::InputDouble("wka", &wka);
         ImGui::PopItemWidth();
-        ImGui::Separator();
+
+        ImGui::NewLine();
 
         if (ImGui::Button("Optimize"))
             optimize();
 
-		ImGui::SameLine();
+        ImGui::Separator();
 
         if (ImGui::Button("Print to console debug text"))
         {
@@ -1895,6 +1712,12 @@ void display()
                 ImGui::EndMenu();
             }
 
+            ImGui::Separator();
+
+            ImGui::MenuItem("Settings", nullptr, &is_settings_gui);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Show power user settings window with more parameters");
+
             ImGui::EndMenu();
         }
         if (ImGui::IsItemHovered())
@@ -1993,7 +1816,8 @@ void display()
     if (show_imu_data)
         imu_data_gui();
 
-    project_gui();
+	if (is_settings_gui)
+        settings_gui();
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());

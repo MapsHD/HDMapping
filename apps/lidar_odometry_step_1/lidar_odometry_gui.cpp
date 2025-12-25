@@ -132,7 +132,7 @@ static const std::vector<ShortcutEntry> appShortcuts = {
 
 namespace fs = std::filesystem;
 
-bool full_lidar_odometry_gui = false;
+bool is_settings_gui = false;
 bool full_debug_messages = false;
 NDT ndt;
 bool show_reference_buckets = true;
@@ -679,9 +679,9 @@ void save_results(bool info, double elapsed_seconds)
     }
 }
 
-void project_gui()
+void settings_gui()
 {
-    if (ImGui::Begin("Settings", &full_lidar_odometry_gui))
+    if (ImGui::Begin("Settings", &is_settings_gui))
     {
         ImGui::Checkbox("simple_gui", &simple_gui);
         if (ImGui::IsItemHovered())
@@ -1526,7 +1526,7 @@ void progress_window()
 
 void openData()
 {
-    full_lidar_odometry_gui = false;
+    is_settings_gui = false;
     info_gui = false;
 
     loRunning.store(true);
@@ -2048,20 +2048,6 @@ void display()
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Processing parameter list");
 
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 2));
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
-            if (ImGui::SmallButton(full_lidar_odometry_gui ? "[X] Full GUI" : "[ ] Full GUI"))
-                full_lidar_odometry_gui = !full_lidar_odometry_gui;
-            ImGui::PopStyleVar(2);
-            ImGui::PopStyleColor(3);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Show power user settings window with more parameters");
-
-            ImGui::SameLine();
-
             ImGui::SameLine();
             ImGui::Dummy(ImVec2(20, 0));
             ImGui::SameLine();
@@ -2113,6 +2099,12 @@ void display()
                 ImGui::ColorEdit3("Background", (float *)&params.clear_color, ImGuiColorEditFlags_NoInputs);
 
                 bg_color = params.clear_color;
+
+                ImGui::Separator();
+
+                ImGui::MenuItem("Settings", nullptr, &is_settings_gui);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Show power user settings window with more parameters");
 
                 ImGui::EndMenu();
             }
@@ -2206,11 +2198,11 @@ void display()
         stretch_gizmo_m(3, 3) = m_gizmo[15];
     }
 
-    if (full_lidar_odometry_gui)
+    if (is_settings_gui)
     {
         lastPar = 0;
 
-        project_gui();
+        settings_gui();
     }
 
     if (loRunning)

@@ -225,7 +225,7 @@ void load_pc(const std::string &lazFile, std::vector<Point3Di>& points, bool omm
     laszip_close_reader(laszip_reader);
 }
 
-void project_gui()
+void settings_gui()
 {
     if (ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
@@ -896,7 +896,7 @@ void display()
     if (compass_ruler)
         drawMiniCompassWithRuler();
 
-    project_gui();
+    settings_gui();
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());

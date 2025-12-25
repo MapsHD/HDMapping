@@ -72,6 +72,21 @@ struct Point3Di
 	int index_point;
 };
 
+// Point3Di POD (Plain Old Data) variant
+// Used for safe binary I/O via read()/write() or memcpy
+// Contains only trivially copyable members
+#pragma pack(push, 1)
+struct Point3DiDisk
+{
+	double x, y, z;
+	double timestamp;
+	float intensity;
+	int32_t index_pose;
+	uint8_t lidarid;
+	int32_t index_point;
+};
+#pragma pack(pop)
+
 struct Point
 {
 	double x = 0.0f;
@@ -94,7 +109,35 @@ struct ChunkFile {
 	double time_end_inclusive;
 };
 
-template<typename T>
+//Extra measures are needed when writting/reading non-trivial types
+//Point3Di containing Eigen::Vector3d to avoid:
+//- structure alignment & padding written to file
+//- unreadable file on another build
+//- undefined behavior if read back via raw load
+
+inline void convert_to_disk(const Point3Di& src, Point3DiDisk& dst)
+{
+	dst.x = src.point.x();
+	dst.y = src.point.y();
+	dst.z = src.point.z();
+	dst.timestamp = src.timestamp;
+	dst.intensity = src.intensity;
+	dst.index_pose = src.index_pose;
+	dst.lidarid = src.lidarid;
+	dst.index_point = src.index_point;
+}
+
+inline void convert_from_disk(const Point3DiDisk& src, Point3Di& dst)
+{
+	dst.point = Eigen::Vector3d(src.x, src.y, src.z);
+	dst.timestamp = src.timestamp;
+	dst.intensity = src.intensity;
+	dst.index_pose = src.index_pose;
+	dst.lidarid = src.lidarid;
+	dst.index_point = src.index_point;
+}
+
+/*template<typename T>
 inline bool save_vector_data(const std::string& file_name, std::vector<T>& vector_data) {
 	std::ofstream ofs(file_name, std::ios::binary);
 	if (!ofs.good()) {
@@ -102,9 +145,35 @@ inline bool save_vector_data(const std::string& file_name, std::vector<T>& vecto
 	}
 	ofs.write(reinterpret_cast<char*>(vector_data.data()), vector_data.size()* sizeof(T));
 	return true;
-}
+}*/
 
 template<typename T>
+bool save_vector_data(const std::string& file_name, const std::vector<T>& out)
+{
+	static_assert(
+		std::is_trivially_copyable_v<T> || std::is_same_v<T, Point3Di>,
+		"Binary loading only supported for POD or Point3Di"
+		);
+
+	std::ofstream file(file_name, std::ios::binary);
+	if (!file)
+		return false;
+
+	if constexpr (std::is_trivially_copyable_v<T>)
+		// direct write for POD
+		return file.write(reinterpret_cast<const char*>(out.data()), out.size() * sizeof(T)).good();
+	else
+	{
+		// convert to disk type first
+		std::vector<Point3DiDisk> disk(out.size());
+		for (size_t i = 0; i < out.size(); ++i)
+			convert_to_disk(out[i], disk[i]);
+
+		return file.write(reinterpret_cast<const char*>(disk.data()), disk.size() * sizeof(Point3DiDisk)).good();
+	}
+}
+
+/*template<typename T>
 inline bool load_vector_data(const std::string& file_name, std::vector<T>& vector_data) {
 	std::basic_ifstream<char> vd_str(file_name, std::ios::binary);
 	if (!vd_str.good()) {
@@ -115,6 +184,78 @@ inline bool load_vector_data(const std::string& file_name, std::vector<T>& vecto
 	memcpy(v.data(), data.data(), data.size());
 	vector_data = v;
 	return true;
+}*/
+
+/*template<typename T>
+bool load_vector_data(const std::string& file_name, std::vector<T>& out)
+{
+	//static_assert(std::is_trivially_copyable_v<T>,
+	//	"T must be trivially copyable");
+
+	std::ifstream file(file_name, std::ios::binary | std::ios::ate);
+	if (!file)
+		return false;
+
+	const std::streamsize size = file.tellg();
+	if (size < 0 || size % sizeof(T) != 0)
+		return false;
+
+	const size_t count = size / sizeof(T);
+	out.resize(count);
+
+	file.seekg(0, std::ios::beg);
+	if (!file.read(reinterpret_cast<char*>(out.data()), size))
+		return false;
+
+	return true;
+}*/
+
+template<typename T>
+bool load_vector_data(const std::string& file_name, std::vector<T>& out)
+{
+	static_assert(
+		std::is_trivially_copyable_v<T> || std::is_same_v<T, Point3Di>,
+		"Binary loading only supported for POD or Point3Di"
+		);
+
+	std::ifstream file(file_name, std::ios::binary | std::ios::ate);
+	if (!file)
+		return false;
+
+	const std::streamsize size = file.tellg();
+	if (size < 0)
+		return false;
+
+	file.seekg(0, std::ios::beg);
+
+	if constexpr (std::is_trivially_copyable_v<T>)
+	{
+		if (size % sizeof(T) != 0)
+			return false;
+
+		const size_t count = size / sizeof(T);
+		out.resize(count);
+
+		return file.read(reinterpret_cast<char*>(out.data()), size).good();
+	}
+	else
+	{
+		// Non-trivial type path (Point3Di)
+		if (size % sizeof(Point3DiDisk) != 0)
+			return false;
+
+		const size_t count = size / sizeof(Point3DiDisk);
+		std::vector<Point3DiDisk> disk(count);
+
+		if (!file.read(reinterpret_cast<char*>(disk.data()), size))
+			return false;
+
+		out.resize(count);
+		for (size_t i = 0; i < count; ++i)
+			convert_from_disk(disk[i], out[i]);
+
+		return true;
+	}
 }
 
 struct LaserBeam {

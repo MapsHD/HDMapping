@@ -173,6 +173,8 @@ bool is_loop_closure_gui = false;
 bool remove_gui = false;
 NDT ndt;
 
+bool is_settings_gui = true;
+
 int number_visible_sessions = 0;
 int index_gt = -1;
 int old_index_gt = -1;
@@ -185,8 +187,6 @@ struct ProjectSettings
 {
     std::vector<std::string> session_file_names;
 };
-
-
 
 std::vector<Edge> edges;
 int index_active_edge = -1;
@@ -1993,9 +1993,9 @@ void loadSessions()
     }
 }
 
-void project_gui()
+void settings_gui()
 {
-    if (ImGui::Begin("Settings"))
+    if (ImGui::Begin("Settings", &is_settings_gui))
     {
         ImGui::Checkbox("Downsample during load", &is_decimate);
         ImGui::SameLine();
@@ -3560,6 +3560,12 @@ else
 
             ImGui::ColorEdit3("Background", (float *)&bg_color, ImGuiColorEditFlags_NoInputs);
 
+            ImGui::Separator();
+
+            ImGui::MenuItem("Settings", nullptr, &is_settings_gui);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Show power user settings window with more parameters");
+
             ImGui::EndMenu();
         }
         if (ImGui::IsItemHovered())
@@ -3694,7 +3700,8 @@ else
     // if (is_loop_closure_gui)
     //     manual_pose_graph_loop_closure.Gui();
 
-    project_gui();
+    if (is_settings_gui)
+        settings_gui();
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());

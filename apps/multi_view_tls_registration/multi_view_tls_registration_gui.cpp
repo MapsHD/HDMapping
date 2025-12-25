@@ -194,6 +194,7 @@ bool is_pose_graph_slam = false;
 bool is_manual_analisys = false;
 bool is_loop_closure_gui = false;
 bool is_lio_segments_gui = false;
+bool is_settings_gui = true;
 
 bool fillInSession = true;
 
@@ -1731,9 +1732,9 @@ void saveSubsession()
         std::cout << "saving canceled" << std::endl;
 }
 
-void project_gui()
+void settings_gui()
 {
-    ImGui::Begin("Settings");
+    ImGui::Begin("Settings", &is_settings_gui);
     {
         std::string wd = "Working directory: '" + session.working_directory + "'";
 
@@ -3134,6 +3135,10 @@ void display()
 
             ImGui::Separator();
 
+            ImGui::MenuItem("Settings", nullptr, &is_settings_gui);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Show power user settings window with more parameters");
+
             if (ImGui::BeginMenu("Console"))
             {
 #ifdef _WIN32
@@ -3228,7 +3233,8 @@ void display()
         ImGui::EndMainMenuBar();
     }
 
-    project_gui();
+    if (is_settings_gui)
+        settings_gui();
 
     // my_display_code(); 
 

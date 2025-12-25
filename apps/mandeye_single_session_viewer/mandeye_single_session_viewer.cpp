@@ -1374,7 +1374,7 @@ void display()
                 ImGui::BeginTooltip();
                 ImGui::Text(session.point_clouds_container.point_clouds[index_rendered_points_local].file_name.c_str());
                 double ts = (session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps[0]
-                    - session.point_clouds_container.point_clouds[0].timestamps[0]) / 1e9;
+                           - session.point_clouds_container.point_clouds[0].timestamps[0]) / 1e9;
                 ImGui::Text("Delta 1st points timestamp [s]: %.6f", ts);
                 ImGui::NewLine();
                 ImGui::Text("Check Properties (Ctrl+P) for more info");
@@ -1387,7 +1387,7 @@ void display()
                 ImGui::BeginTooltip();
                 ImGui::Text(session.point_clouds_container.point_clouds[index_rendered_points_local].file_name.c_str());
                 double ts = (session.point_clouds_container.point_clouds[index_rendered_points_local].timestamps[0]
-                    - session.point_clouds_container.point_clouds[0].timestamps[0]) / 1e9;
+                           - session.point_clouds_container.point_clouds[0].timestamps[0]) / 1e9;
                 ImGui::Text("Delta 1st points timestamp [s]: %.6f", ts);
                 ImGui::NewLine();
                 ImGui::Text("Check Properties (Ctrl+P) for more info");

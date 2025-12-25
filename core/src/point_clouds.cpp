@@ -1318,18 +1318,16 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 			pc.local_trajectory = local_trajectory;
 		}
 		else
-		{
 			std::cout << "trajectory path: '" << trj_path.string() << "' does not exist" << std::endl;
-		}
 	}
 
 	//// load actual pointclouds
 	point_clouds.resize(point_clouds_nodata.size());
 
 	std::transform(std::execution::par_unseq, std::begin(point_clouds_nodata), std::end(point_clouds_nodata), std::begin(point_clouds), [&](auto &pc)
-				   {
-
-			if(!load_cache_mode){
+		{
+			if(!load_cache_mode)
+			{
 				if (load_pc(pc, pc.file_name, load_cache_mode))
 				{
 					if (is_decimate && pc.points_local.size() > 0)
@@ -1346,8 +1344,11 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 					}
 				}
 			}
-			return pc; });
+		
+			return pc;
+		});
 
+	//calculate average position of a subset of points from all clouds to center the point clouds around the origin
 	if (calculate_offset)
 	{
 		int num = 0;
@@ -1362,12 +1363,12 @@ bool PointClouds::load_whu_tls(std::vector<std::string> input_file_names, bool i
 		this->offset /= num;
 	}
 
-	for (int i = 0; i < point_clouds.size(); i++)
+	//recenter point clouds around calculated offset
+	if (!this->offset.isZero())
 	{
-		for (int j = 0; j < point_clouds[i].points_local.size(); j++)
-		{
-			point_clouds[i].points_local[j] -= this->offset;
-		}
+		for (int i = 0; i < point_clouds.size(); i++)
+			for (int j = 0; j < point_clouds[i].points_local.size(); j++)
+				point_clouds[i].points_local[j] -= this->offset;
 	}
 
 	print_point_cloud_dimension();

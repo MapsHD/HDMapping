@@ -19,12 +19,12 @@ inline bool exportLaz(const std::string &filename,
                       double offset_x = 0.0, double offset_y = 0.0, double offset_alt = 0.0)
 {
     double min_ts = std::numeric_limits<double>::max();
-    double max_ts = std::numeric_limits<double>::min();
+    double max_ts = std::numeric_limits<double>::lowest();
     int number_of_points_with_timestamp_eq_0 = 0;
 
     constexpr float scale = 0.0001f; // one tenth of milimeter
     // find max
-    Eigen::Vector3d _max(std::numeric_limits<double>::min(), std::numeric_limits<double>::min(), std::numeric_limits<double>::min());
+    Eigen::Vector3d _max(std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest());
     Eigen::Vector3d _min(std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
 
     for (auto &p : pointcloud)

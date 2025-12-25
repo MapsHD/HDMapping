@@ -1386,6 +1386,7 @@ PointClouds::PointCloudDimensions PointClouds::compute_point_cloud_dimension() c
 		std::numeric_limits<double>::max(), std::numeric_limits<double>::lowest(),
 		0, 0, 0};
 
+	int sum = 0;
 	for (const auto &pc : this->point_clouds)
 	{
 		for (const auto &p : pc.points_local)
@@ -1397,13 +1398,28 @@ PointClouds::PointCloudDimensions PointClouds::compute_point_cloud_dimension() c
 			dim.y_max = std::max(dim.y_max, pt.y());
 			dim.z_min = std::min(dim.z_min, pt.z());
 			dim.z_max = std::max(dim.z_max, pt.z());
+
+			sum ++;
 		}
 	}
 
-	dim.length = dim.x_max - dim.x_min;
-	dim.width = dim.y_max - dim.y_min;
-	dim.height = dim.z_max - dim.z_min;
+	if (sum == 0){
+		dim.length = 0.0;
+		dim.width = 0.0;
+		dim.height = 0.0;
 
+		dim.x_min = 0.0;
+		dim.y_min = 0.0;
+		dim.z_min = 0.0;
+
+		dim.x_max = 0.0;
+		dim.y_max = 0.0;
+		dim.z_max = 0.0;
+	}else{
+		dim.length = dim.x_max - dim.x_min;
+		dim.width = dim.y_max - dim.y_min;
+		dim.height = dim.z_max - dim.z_min;
+	}
 	return dim;
 }
 

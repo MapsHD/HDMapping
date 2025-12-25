@@ -103,7 +103,7 @@ bool PointCloud::load(const std::string &file_name)
 bool PointCloud::load_pc(std::string input_file_name, bool load_cache_mode)
 {
 	double min_ts = std::numeric_limits<double>::max();
-	double max_ts = std::numeric_limits<double>::min();
+	double max_ts = std::numeric_limits<double>::lowest();
 	int number_of_points_with_timestamp_eq_0 = 0;
 
 	laszip_POINTER laszip_reader;

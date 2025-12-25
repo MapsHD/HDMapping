@@ -7,9 +7,9 @@
 #include <imgui_internal.h>
 
 static constexpr float ImGuiNumberWidth = 120.0f;
-static constexpr const char* xText = "Longitudinal (forward/backward)";
-static constexpr const char* yText = "Lateral (left/right)";
-static constexpr const char* zText = "Vertical (up/down)";
+static constexpr const char *xText = "Longitudinal (forward/backward)";
+static constexpr const char *yText = "Lateral (left/right)";
+static constexpr const char *zText = "Vertical (up/down)";
 
 void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &rotation_center)
 {
@@ -80,7 +80,7 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
             ImGui::PushItemWidth(ImGuiNumberWidth);
 
             ImGui::InputText(("CP name##" + std::to_string(i)).c_str(), cps[i].name, IM_ARRAYSIZE(cps[i].name));
-			ImGui::SameLine();
+            ImGui::SameLine();
             ImGui::Checkbox(("is z_0##" + std::to_string(i)).c_str(), &cps[i].is_z_0);
 
             if (!cps[i].is_z_0)
@@ -314,20 +314,23 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
     return;
 }
 
-void ControlPoints::render(const PointClouds &point_clouds_container)
+void ControlPoints::render(const PointClouds &point_clouds_container, bool show_pc)
 {
-    if (index_pose < point_clouds_container.point_clouds.size() && point_clouds_container.point_clouds.size() > 0)
+    if (show_pc)
     {
-        glColor3f(1.0, 0.0, 0.0);
-        glPointSize(1.0);
-        glBegin(GL_POINTS);
-        for (int i = 0; i < point_clouds_container.point_clouds[index_pose].points_local.size(); i++)
+        if (index_pose < point_clouds_container.point_clouds.size() && point_clouds_container.point_clouds.size() > 0)
         {
-            glColor3f(point_clouds_container.point_clouds[index_pose].intensities[i], 0.0, 1 - point_clouds_container.point_clouds[index_pose].intensities[i]);
-            auto p = point_clouds_container.point_clouds[index_pose].m_pose * point_clouds_container.point_clouds[index_pose].points_local[i];
-            glVertex3f(p.x(), p.y(), p.z());
+            glColor3f(1.0, 0.0, 0.0);
+            glPointSize(1.0);
+            glBegin(GL_POINTS);
+            for (int i = 0; i < point_clouds_container.point_clouds[index_pose].points_local.size(); i++)
+            {
+                glColor3f(point_clouds_container.point_clouds[index_pose].intensities[i], 0.0, 1 - point_clouds_container.point_clouds[index_pose].intensities[i]);
+                auto p = point_clouds_container.point_clouds[index_pose].m_pose * point_clouds_container.point_clouds[index_pose].points_local[i];
+                glVertex3f(p.x(), p.y(), p.z());
+            }
+            glEnd();
         }
-        glEnd();
     }
 
     for (int i = 0; i < cps.size(); i++)

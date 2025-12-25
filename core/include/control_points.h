@@ -44,7 +44,7 @@ class ControlPoints{
         //ControlPoint picked_control_point;
 
         void imgui(PointClouds &point_clouds_container, Eigen::Vector3f &rotation_center);
-        void render(const PointClouds &point_clouds_container);
+        void render(const PointClouds &point_clouds_container, bool show_pc);
         void draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd = 1);
 #endif
 };

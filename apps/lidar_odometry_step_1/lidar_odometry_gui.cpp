@@ -999,7 +999,7 @@ void settings_gui()
                 {
                     session.fill_session_from_worker_data(worker_data, false, true, true, params.threshould_output_filter);
                     // save_all_to_las(session, output_file_name, false);
-                    save_all_to_las(session, output_file_name, true);
+                    save_all_to_las(session, output_file_name, true, true);
                 }
             }
         }
@@ -1260,7 +1260,7 @@ void settings_gui()
                     if (output_file_name.size() > 0)
                     {
                         session.fill_session_from_worker_data(worker_data, true, false, false, params.threshould_output_filter);
-                        save_all_to_las(session, output_file_name, false);
+                        save_all_to_las(session, output_file_name, false, true);
                     }
                     // TODO: give value to pose even if output_file_name is wrong
 

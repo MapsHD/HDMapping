@@ -102,6 +102,10 @@ bool PointCloud::load(const std::string &file_name)
 
 bool PointCloud::load_pc(std::string input_file_name, bool load_cache_mode)
 {
+	double min_ts = std::numeric_limits<double>::max();
+	double max_ts = std::numeric_limits<double>::min();
+	int number_of_points_with_timestamp_eq_0 = 0;
+
 	laszip_POINTER laszip_reader;
 	if (laszip_create(&laszip_reader))
 	{
@@ -231,6 +235,23 @@ bool PointCloud::load_pc(std::string input_file_name, bool load_cache_mode)
 		p.z = header->z_offset + header->z_scale_factor * static_cast<double>(point->Z);
 		p.timestamp = point->gps_time;
 
+		if (point->gps_time < min_ts)
+		{
+			min_ts = point->gps_time;
+		}
+
+		if (point->gps_time > max_ts)
+		{
+			max_ts = point->gps_time;
+		}
+
+		if (point->gps_time == 0.0)
+		{
+			number_of_points_with_timestamp_eq_0++;
+		}
+
+		//std::cout << "p.timestamp: " << p.timestamp << std::endl;
+
 		Eigen::Vector3d pp(p.x, p.y, p.z);
 		this->points_local.emplace_back(pp);
 		this->intensities.emplace_back(point->intensity);
@@ -257,6 +278,10 @@ bool PointCloud::load_pc(std::string input_file_name, bool load_cache_mode)
 	// laszip_clean(laszip_reader);
 	// laszip_destroy(laszip_reader);
 
+	std::cout << std::setprecision(20);
+	std::cout << "min_ts " << min_ts << std::endl;
+	std::cout << "max_ts " << max_ts << std::endl;
+	std::cout << "number_of_points_with_timestamp_eq_0: " << number_of_points_with_timestamp_eq_0 << std::endl;
 	return true;
 }
 

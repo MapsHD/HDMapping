@@ -20,6 +20,7 @@ inline bool exportLaz(const std::string &filename,
 {
     double min_ts = std::numeric_limits<double>::max();
     double max_ts = std::numeric_limits<double>::min();
+    int number_of_points_with_timestamp_eq_0 = 0;
 
     constexpr float scale = 0.0001f; // one tenth of milimeter
     // find max
@@ -141,6 +142,11 @@ inline bool exportLaz(const std::string &filename,
         {
             max_ts = point->gps_time;
         }
+
+        if (point->gps_time == 0.0)
+        {
+            number_of_points_with_timestamp_eq_0++;
+        }
         // std::setprecision(20);
         // std::cout << "point->gps_time " << point->gps_time << " " << timestamps[i] << " " << timestamps[i] * 1e9 << std::endl;
 
@@ -187,6 +193,7 @@ inline bool exportLaz(const std::string &filename,
 
     std::cout << "min_ts " << min_ts << std::endl;
     std::cout << "max_ts " << max_ts << std::endl;
+    std::cout << "number_of_points_with_timestamp_eq_0: " << number_of_points_with_timestamp_eq_0 << std::endl;
 
     return true;
 }

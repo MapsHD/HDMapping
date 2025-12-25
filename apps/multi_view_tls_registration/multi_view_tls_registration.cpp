@@ -714,11 +714,11 @@ void run_multi_view_tls_registration(
 
 	if (tls_registration.save_laz)
 	{
-		save_all_to_las(session, (outwd / "all_step_2.laz").string(), false);
+		save_all_to_las(session, (outwd / "all_step_2.laz").string(), false, true);
 	}
 	if (tls_registration.save_las)
 	{
-		save_all_to_las(session, (outwd / "all_step_2.las").string(), false);
+		save_all_to_las(session, (outwd / "all_step_2.las").string(), false, true);
 	}
 	if (tls_registration.save_as_separate_las)
 	{

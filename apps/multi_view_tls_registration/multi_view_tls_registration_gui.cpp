@@ -2564,7 +2564,7 @@ void display()
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                            save_all_to_las(session, output_file_name, true);
+                            save_all_to_las(session, output_file_name, true, true);
                     }
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("As one local scan transformed via inverse pose of first scan");
@@ -2575,7 +2575,7 @@ void display()
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                            save_all_to_las(session, output_file_name, false);
+                            save_all_to_las(session, output_file_name, false, true);
                     }
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("To export in full resolution, close the program and open again and unmark 'downsample during load' before loading session");

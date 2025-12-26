@@ -2163,6 +2163,7 @@ void display()
 
         tls_registration.gnss.render(session.point_clouds_container);
         session.ground_control_points.render(session.point_clouds_container);
+        session.control_points.render(session.point_clouds_container, false);
     }
 
     int prev_index_pose = session.control_points.index_pose;

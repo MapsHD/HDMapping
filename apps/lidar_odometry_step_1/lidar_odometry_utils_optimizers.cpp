@@ -1850,7 +1850,10 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             pp[i].point = params.m_g * pp[i].point;
 
         update_rgd(params.in_out_params_indoor, params.buckets_indoor, pp, params.m_g.translation());
-        update_rgd(params.in_out_params_outdoor, params.buckets_outdoor, pp, params.m_g.translation());
+
+        if (params.ablation_study_use_hierarchical_rgd){
+            update_rgd(params.in_out_params_outdoor, params.buckets_outdoor, pp, params.m_g.translation());
+        }
 
         if (!fs::exists(params.working_directory_preview))
         {
@@ -2189,8 +2192,9 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 points_global = points_global_new;
 
                 // decimate
-                if (params.decimation > 0)
+                if (params.decimation > 0){
                     decimate(points_global, params.decimation, params.decimation, params.decimation);
+                }
 
                 update_rgd(params.in_out_params_indoor, params.buckets_indoor, points_global, worker_data[i].intermediate_trajectory[0].translation());
                 if (!params.ablation_study_use_hierarchical_rgd)
@@ -2208,7 +2212,6 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             }
             else
             {
-
                 std::vector<Point3Di> pg;
                 for (int j = 0; j < intermediate_points.size(); j++)
                 {

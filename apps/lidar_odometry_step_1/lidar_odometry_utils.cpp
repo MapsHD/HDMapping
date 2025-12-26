@@ -219,7 +219,7 @@ void update_rgd(NDT::GridParameters &rgd_params, NDTBucketMapType &buckets,
         {
             NDT::Bucket bucket_to_add;
             bucket_to_add.mean = points_global[i].point;
-            bucket_to_add.cov = Eigen::Matrix3d::Identity() * 0.03 * 0.03;
+            bucket_to_add.cov = Eigen::Matrix3d::Identity() * 0.03 * 0.03; //ToDo move to params
             bucket_to_add.number_of_points = 1;
             buckets.emplace(index_of_bucket, bucket_to_add);
         }

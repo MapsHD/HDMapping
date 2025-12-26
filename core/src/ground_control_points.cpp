@@ -112,7 +112,7 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
 
         if (gpcs.size() >= 3)
         {
-            if (ImGui::Button("Register session to GSPs"))
+            if (ImGui::Button("Register session to GCPs"))
             {
                 ////////////////////////////////////
                 TaitBryanPose pose_s;
@@ -244,8 +244,9 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
                     std::cout << "AtPA=AtPB FAILED" << std::endl;
                 }
             }
-            if (ImGui::IsItemHovered())
+            if (ImGui::IsItemHovered()){
                 ImGui::SetTooltip("trajectory is rigid");
+            }
         }
 
         ImGui::End();

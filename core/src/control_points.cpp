@@ -330,6 +330,17 @@ void ControlPoints::render(const PointClouds &point_clouds_container, bool show_
                 glVertex3f(p.x(), p.y(), p.z());
             }
             glEnd();
+
+            glColor3f(0.0, 1.0, 0.0);
+            glLineWidth(2.0);
+            glBegin(GL_LINE_STRIP);
+            for (int i = 0; i < point_clouds_container.point_clouds[index_pose].local_trajectory.size(); i++){
+                auto pose = point_clouds_container.point_clouds[index_pose].m_pose * point_clouds_container.point_clouds[index_pose].local_trajectory[i].m_pose;
+                glVertex3f(pose(0, 3), pose(1, 3), pose(2, 3));
+            }
+
+            glEnd();
+            glLineWidth(1.0);
         }
     }
 

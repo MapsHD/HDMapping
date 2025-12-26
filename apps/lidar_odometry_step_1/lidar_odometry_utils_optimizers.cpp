@@ -1447,7 +1447,7 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
             // no bucket found
             if (bucket_it == buckets_outdoor.end())
                 return;
-            
+
             auto &this_bucket = bucket_it->second;
 
             const Eigen::Matrix3d &infm = this_bucket.cov.inverse();
@@ -1504,12 +1504,12 @@ void optimize_lidar_odometry(std::vector<Point3Di> &intermediate_points,
                 double sum_ev = ev1 + ev2 + ev3;
                 planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
 
-                //double norm = p_s.norm();
+                // double norm = p_s.norm();
 
-                //if (norm < 5.0)
+                // if (norm < 5.0)
                 //{
-                //    return;
-                //}
+                //     return;
+                // }
 
                 AtPA *= planarity;
                 AtPB *= planarity;
@@ -2050,7 +2050,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             start = std::chrono::system_clock::now();
 
             int iter_end = 0;
-            
+
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
                 iter_end = iter;
@@ -2079,7 +2079,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                                         params.ablation_study_use_view_point_and_normal_vectors);
                 if (delta < 1e-12)
                 {
-                    //std::cout << "finished at iteration " << iter + 1 << "/" << params.nr_iter;
+                    // std::cout << "finished at iteration " << iter + 1 << "/" << params.nr_iter;
                     break;
                 }
 
@@ -2101,7 +2101,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
             end1 = std::chrono::system_clock::now();
 
             std::chrono::duration<double> elapsed_seconds1 = end1 - start1;
-            
+
             std::cout << "finished at iteration " << iter_end + 1 << "/" << params.nr_iter;
 
             std::cout << " optimizing worker_data " << i + 1 << "/" << worker_data.size()
@@ -2193,7 +2193,10 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                     decimate(points_global, params.decimation, params.decimation, params.decimation);
 
                 update_rgd(params.in_out_params_indoor, params.buckets_indoor, points_global, worker_data[i].intermediate_trajectory[0].translation());
-                update_rgd(params.in_out_params_outdoor, params.buckets_outdoor, points_global, worker_data[i].intermediate_trajectory[0].translation());
+                if (!params.ablation_study_use_hierarchical_rgd)
+                {
+                    update_rgd(params.in_out_params_outdoor, params.buckets_outdoor, points_global, worker_data[i].intermediate_trajectory[0].translation());
+                }
                 //
                 endu = std::chrono::system_clock::now();
 
@@ -2214,7 +2217,10 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                     pg.push_back(pp);
                 }
                 update_rgd(params.in_out_params_indoor, params.buckets_indoor, pg, worker_data[i].intermediate_trajectory[0].translation());
-                update_rgd(params.in_out_params_outdoor, params.buckets_outdoor, pg, worker_data[i].intermediate_trajectory[0].translation());
+                if (!params.ablation_study_use_hierarchical_rgd)
+                {
+                    update_rgd(params.in_out_params_outdoor, params.buckets_outdoor, pg, worker_data[i].intermediate_trajectory[0].translation());
+                }
             }
 
             if (i > 1)

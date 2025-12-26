@@ -295,7 +295,8 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_f
               // register if there  is not nans
               if (gp.lat == gp.lat && gp.lon == gp.lon &&
                   gp.alt == gp.alt) {
-                gnss_poses.push_back(gp);
+                  //std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << std::endl;
+                  gnss_poses.push_back(gp);
               }
             }
         }
@@ -331,6 +332,8 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_f
         std::array<double, 2> result{wgs84::toCartesian(WGS84Reference, WGS84Position)};
         gnss_poses[i].x = result[0];
         gnss_poses[i].y = result[1];
+
+        //std::cout << "gnss_poses[i].x " << gnss_poses[i].x << " gnss_poses[i].y " << gnss_poses[i].y << std::endl;
     }
 
     return true;

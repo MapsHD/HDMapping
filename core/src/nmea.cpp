@@ -1,4 +1,6 @@
 #include "nmea.h"
+#include <iostream>
+
 namespace hd_mapping::nmea {
 
 double dm_to_dd(const std::string& dm, char direction, bool is_latitude) {
@@ -105,6 +107,7 @@ std::optional<GNGGAData> parseGNGGA(const std::string &nmea) {
   data.longitude = dm_to_dd(lonStr, lonDir, false);
   data.lon_dir = lonDir;
   data.altitude = fields[9].empty() ? 0.0 : std::stod(fields[9]);
+  //std::cout << "data.altitude " << data.altitude << std::endl;
   data.hdop = fields[8].empty() ? 0.0 : std::stod(fields[8]);
   data.fix_quality = fields[6].empty() ? 0 : std::stoi(fields[6]);
   data.satellites_tracked = fields[7].empty() ? 0 : std::stoi(fields[7]);

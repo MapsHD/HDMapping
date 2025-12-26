@@ -2197,7 +2197,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                 }
 
                 update_rgd(params.in_out_params_indoor, params.buckets_indoor, points_global, worker_data[i].intermediate_trajectory[0].translation());
-                if (!params.ablation_study_use_hierarchical_rgd)
+                if (params.ablation_study_use_hierarchical_rgd)
                 {
                     update_rgd(params.in_out_params_outdoor, params.buckets_outdoor, points_global, worker_data[i].intermediate_trajectory[0].translation());
                 }
@@ -2220,7 +2220,7 @@ bool compute_step_2(std::vector<WorkerData> &worker_data, LidarOdometryParams &p
                     pg.push_back(pp);
                 }
                 update_rgd(params.in_out_params_indoor, params.buckets_indoor, pg, worker_data[i].intermediate_trajectory[0].translation());
-                if (!params.ablation_study_use_hierarchical_rgd)
+                if (params.ablation_study_use_hierarchical_rgd)
                 {
                     update_rgd(params.in_out_params_outdoor, params.buckets_outdoor, pg, worker_data[i].intermediate_trajectory[0].translation());
                 }

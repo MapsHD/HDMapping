@@ -1,0 +1,1 @@
+sudo apt update && sudo apt upgrade && sudo apt install g++ cmake libglx-dev libopengl-dev libgl-dev libglut-dev libopencv-dev libopencv-contrib-dev

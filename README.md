@@ -75,6 +75,7 @@ ToDo
 - https://github.com/XikunLiu-huskit/GLIO (2023)
 - https://github.com/wh200720041/floam (2021)
 - https://github.com/HKUST-Aerial-Robotics/A-LOAM (2019)
+- https://neufs-ma.github.io/M3DSS/index.html
 
 
 # Quick DEMO (Windows OS, installation is not required):

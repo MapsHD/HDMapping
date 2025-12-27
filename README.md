@@ -1,5 +1,5 @@
 # Open-source (Windows and Linux), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
-This is open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
+This is open-source software for large-scale 3D mapping using an open-hardware hand-held/wearable/mountable measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
 We provide an end-to-end mobile mapping framework that does not require any installation, including:
 - HDMapping-LI0: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art.
 - Pose-GRAPH SLAM to create city-level maps.

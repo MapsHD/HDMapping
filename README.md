@@ -7,7 +7,7 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 
 If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches. 
 
-More significant inforamtion can be found here:
+More information can be found here:
 - The introductory paper is available here: https://www.sciencedirect.com/science/article/pii/S235271102300314X
 - Sample data is available at https://github.com/MapsHD/OmniWarsawDataset 
 - VIDEO (how to build mobile mapping hardware) https://www.youtube.com/watch?v=BXBbuSJMFEo

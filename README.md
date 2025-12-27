@@ -1,5 +1,13 @@
-# Open-source (Windows and Linux), open hardware hand-held mobile mapping system for large-scale surveys:
+# Open-source (Windows and Linux), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
 This is open-source software for large-scale 3D mapping using an open-hardware hand-held measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
+We provide an end-to-end mobile mapping framework that does not require any installation, including:
+- HDMapping-LI0: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art.
+- Pose-GRAPH SLAM to create city-level maps.
+- Georeferencing (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
+
+If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches. 
+
+More significant inforamtion can be found here:
 - The introductory paper is available here: https://www.sciencedirect.com/science/article/pii/S235271102300314X
 - Sample data is available at https://github.com/MapsHD/OmniWarsawDataset 
 - VIDEO (how to build mobile mapping hardware) https://www.youtube.com/watch?v=BXBbuSJMFEo
@@ -21,11 +29,14 @@ A portable NTRIP (Networked Transport of RTCM via Internet Protocol) client for 
 - Handheld Setup for Recording with Mid360 Lidar and Camera https://github.com/RomanStadlhuber/livo-handheld 
 - Lidar odometry for HDMapping project utilizing KISS-ICP https://github.com/michalpelka/kiss-lidarodometry
 
-# Compatible other SOTA algorithms (benchmark) 
+# Compatible other SOTA algorithms (benchmark)
 Download the dataset from [Bunker DVI Dataset](https://charleshamesse.github.io/bunker-dvi-dataset/)  
 
 ![bunkier](images/sx1.png)
 ![benchmark](images/bunker1.png)
+![hdmapping-lio](images/hdmapping-lio.png)
+We provide HDMapping-LIO: easy to run, easy to test LiDAR Inertial Odometry that is as accurate as FAST-LIO, FASTER-LIO and much more precise.
+
 
 All following algorithms are generating session compatible with 'multi_view_tls_registration_step_2'
 - https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping (2018)

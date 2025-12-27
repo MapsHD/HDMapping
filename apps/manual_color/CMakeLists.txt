@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.0.0)
+cmake_minimum_required(VERSION 3.25.0)
 
 project(mandeye_with_360_camera_manual_coloring)
 

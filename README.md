@@ -1,11 +1,12 @@
 # Open-source (Windows and Linux), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
 This is open-source software for large-scale 3D mapping using an open-hardware hand-held/wearable/mountable measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
 We provide an end-to-end mobile mapping framework that does not require any installation, including:
-- HDMapping-LI0: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art.
-- Pose-GRAPH SLAM to create city-level maps.
-- Georeferencing (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
+- **HDMapping_LI0**: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art.
+- **HDMapping_Pose_GRAPH_SLAM** to create city-level maps.
+- **HDMapping_Georeferencing** (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
 
-If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches. 
+If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches: LeGO-LOAM, LOAM, FAST-LIO, LIO-SAM, CT-ICP, DLO, VoxelMap, Faster-LIO, LiDAR-IMU, KISS-ICP, SLICT, DLIO, Point-LIO, GLIM, MAD-ICP, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE. We work on integration: mola_lidar_odometry, 93won/lidar_odometry, rko_li, lio_gvm, sr_lio, Light-LOAM, LIO-SEGMOT, GLIO, floam, A-LOAM.
+**Our goal is to find/develop/discover best end-to-end mobile mapping framework.**
 
 More information can be found here:
 - The introductory paper is available here: https://www.sciencedirect.com/science/article/pii/S235271102300314X
@@ -24,6 +25,8 @@ A portable NTRIP (Networked Transport of RTCM via Internet Protocol) client for 
 [![MANDEYE-K9](https://img.youtube.com/vi/7a_o7ACH0-M/default.jpg)](https://youtu.be/7a_o7ACH0-M)
 [![MANDEYE-MR (Caver)](https://img.youtube.com/vi/Bu9kDF5y39s/default.jpg)](https://youtu.be/Bu9kDF5y39s)
 [![MANDEYE-MR (Precise Forestry)](https://img.youtube.com/vi/i6Xg_vPuqrY/default.jpg)](https://youtu.be/i6Xg_vPuqrY)
+
+Our MANDEYE is designed for freedom in motion. You can also climb and crawl in most challenging scenarios.
 
 # Compatible community projects
 - Handheld Setup for Recording with Mid360 Lidar and Camera https://github.com/RomanStadlhuber/livo-handheld 

@@ -296,31 +296,25 @@ cmake --version
 - Run the installer and follow the instructions
 - Ensure CMake is added to your system PATH
 
-## Quick Start (Ubuntu)
-```bash
-git clone https://github.com/MapsHD/HDMapping.git
+## Quick Start (Ubuntu / Ubuntu 24.04 @ WSL2)
+``` bash
+git clone --recursive https://github.com/MapsHD/HDMapping.git
 cd HDMapping
-mkdir build
-git submodule init
-git submodule update --recursive
-cd build
+./ubuntu-24.04-apt-requirements.sh
 
 # Auto-optimized build (detects your CPU automatically)
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j
 ```
 
 ## Quick Start (Windows)
 ```bash
-git clone https://github.com/MapsHD/HDMapping.git
+git clone --recursive https://github.com/MapsHD/HDMapping.git
 cd HDMapping
-mkdir build
-git submodule init
-git submodule update --recursive
 
 # Auto-optimized build (detects your CPU automatically)
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build ./build --config Release
+cmake  -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
 ```
 
 ## WSL2 GUI

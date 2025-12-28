@@ -66,7 +66,7 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 
 ToDo
 - https://github.com/MOLAorg/mola_lidar_odometry (2025)  (not solved issue: https://github.com/MOLAorg/mola_lidar_odometry/issues/37)
-- https://github.com/MapsHD/rko_lio (2025)
+- https://github.com/MapsHD/rko_lio (2025) (not solved issue: https://github.com/marcinmatecki/rko-lio-to-HDMapping/issues/1 )
 - https://github.com/Ji1Xingyu/lio_gvm (2024)
 - https://github.com/ZikangYuan/sr_lio (2024)
 - https://github.com/BrenYi/Light-LOAM (2024)

@@ -61,10 +61,10 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping (2024)
 - https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025)
 - https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025)
+- https://github.com/MapsHD/benchmark-lidar_odometry_ros_wrapper-to-HDMapping (2025)
 
 ToDo
 - https://github.com/MOLAorg/mola_lidar_odometry (2025)  (not solved issue: https://github.com/MOLAorg/mola_lidar_odometry/issues/37)
-- https://github.com/93won/lidar_odometry (2025)
 - https://github.com/PRBonn/kiss-slam (2025)
 - https://github.com/MapsHD/rko_lio (2025)
 - https://github.com/Ji1Xingyu/lio_gvm (2024)

@@ -5,7 +5,7 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 - **HDMapping_Pose_GRAPH_SLAM** to create city-level maps.
 - **HDMapping_Georeferencing** (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
 
-If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches: LeGO-LOAM, LOAM, FAST-LIO, LIO-SAM, CT-ICP, DLO, VoxelMap, Faster-LIO, KISS-ICP, SLICT, DLIO, Point-LIO, GLIM, MAD-ICP, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE. We work on integration: mola_lidar_odometry, 93won/lidar_odometry, rko_li, lio_gvm, sr_lio, Light-LOAM, LIO-SEGMOT, GLIO, floam, A-LOAM.
+If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches: LeGO-LOAM, LOAM, FAST-LIO, LIO-SAM, CT-ICP, DLO, VoxelMap, Faster-LIO, KISS-ICP, SLICT, DLIO, Point-LIO, GLIM, MAD-ICP, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE, 93won/lidar_odometry, KISS-SLAM. We work on integration: mola_lidar_odometry, rko_lio, lio_gvm, sr_lio, Light-LOAM, LIO-SEGMOT, GLIO, floam, A-LOAM, LOG-LIO, LOG-LIO2, VOX-LIO.
 **Our goal is to find/develop/discover best end-to-end mobile mapping framework.**
 
 More information can be found here:
@@ -76,7 +76,9 @@ ToDo
 - https://github.com/HKUST-Aerial-Robotics/A-LOAM (2019)
 - https://neufs-ma.github.io/M3DSS/index.html
 - https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022) 
-
+- https://github.com/tiev-tongji/LOG-LIO
+- https://github.com/tiev-tongji/LOG-LIO2
+- VOX-LIO https://www.mdpi.com/2072-4292/17/13/2214 (no code)
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

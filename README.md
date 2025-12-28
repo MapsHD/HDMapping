@@ -76,7 +76,7 @@ ToDo
 - https://github.com/HKUST-Aerial-Robotics/A-LOAM (2019)
 - https://neufs-ma.github.io/M3DSS/index.html
 - https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022)
-
+- https://github.com/kpmrozowski/KISS-SLAM-to-HDMapping
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

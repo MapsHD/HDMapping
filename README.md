@@ -5,7 +5,7 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 - **HDMapping_Pose_GRAPH_SLAM** to create city-level maps.
 - **HDMapping_Georeferencing** (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
 
-If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches: LeGO-LOAM, LOAM, FAST-LIO, LIO-SAM, CT-ICP, DLO, VoxelMap, Faster-LIO, LiDAR-IMU, KISS-ICP, SLICT, DLIO, Point-LIO, GLIM, MAD-ICP, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE. We work on integration: mola_lidar_odometry, 93won/lidar_odometry, rko_li, lio_gvm, sr_lio, Light-LOAM, LIO-SEGMOT, GLIO, floam, A-LOAM.
+If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches: LeGO-LOAM, LOAM, FAST-LIO, LIO-SAM, CT-ICP, DLO, VoxelMap, Faster-LIO, KISS-ICP, SLICT, DLIO, Point-LIO, GLIM, MAD-ICP, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE. We work on integration: mola_lidar_odometry, 93won/lidar_odometry, rko_li, lio_gvm, sr_lio, Light-LOAM, LIO-SEGMOT, GLIO, floam, A-LOAM.
 **Our goal is to find/develop/discover best end-to-end mobile mapping framework.**
 
 More information can be found here:
@@ -50,7 +50,6 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-DLO-to-HDMapping (2022)
 - https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping (2022)
 - https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping (2022)
-- https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022)
 - https://github.com/MapsHD/benchmark-KISS-ICP-to-HDMapping (2023)
 - https://github.com/MapsHD/benchmark-SLICT-to-HDMapping (2023)
 - https://github.com/MapsHD/benchmark-DLIO-to-HDMapping (2023)
@@ -76,6 +75,7 @@ ToDo
 - https://github.com/wh200720041/floam (2021)
 - https://github.com/HKUST-Aerial-Robotics/A-LOAM (2019)
 - https://neufs-ma.github.io/M3DSS/index.html
+- https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022)
 
 
 # Quick DEMO (Windows OS, installation is not required):

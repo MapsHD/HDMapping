@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25.0)
+cmake_minimum_required(VERSION 4.0.0)
 
 project(mandeye_mission_recorder_calibration)
 

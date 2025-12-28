@@ -66,8 +66,8 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 
 ToDo
 - https://github.com/MOLAorg/mola_lidar_odometry (2025)  (not solved issue: https://github.com/MOLAorg/mola_lidar_odometry/issues/37)
-- https://github.com/MapsHD/rko_lio (2025) (not solved issue: https://github.com/marcinmatecki/rko-lio-to-HDMapping/issues/1 )
-- https://github.com/Ji1Xingyu/lio_gvm (2024)
+- https://github.com/MapsHD/rko_lio (2025) (not solved issue: https://github.com/marcinmatecki/rko-lio-to-HDMapping/issues/1)
+- https://github.com/Ji1Xingyu/lio_gvm (2024) (not solved issues: https://github.com/Ji1Xingyu/lio_gvm/issues/13, https://github.com/Ji1Xingyu/lio_gvm/issues/12, https://github.com/Ji1Xingyu/lio_gvm/issues/7)
 - https://github.com/ZikangYuan/sr_lio (2024)
 - https://github.com/BrenYi/Light-LOAM (2024)
 - https://github.com/StephLin/LIO-SEGMOT (2023)
@@ -75,7 +75,7 @@ ToDo
 - https://github.com/wh200720041/floam (2021)
 - https://github.com/HKUST-Aerial-Robotics/A-LOAM (2019)
 - https://neufs-ma.github.io/M3DSS/index.html
-- https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022)
+- https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022) 
 
 
 # Quick DEMO (Windows OS, installation is not required):

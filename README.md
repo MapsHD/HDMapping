@@ -8,6 +8,11 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches: LeGO-LOAM, LOAM, FAST-LIO, LIO-SAM, CT-ICP, DLO, VoxelMap, Faster-LIO, KISS-ICP, SLICT, DLIO, Point-LIO, GLIM, MAD-ICP, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE, 93won/lidar_odometry, KISS-SLAM. We work on integration: mola_lidar_odometry, rko_lio, lio_gvm, sr_lio, Light-LOAM, LIO-SEGMOT, GLIO, floam, A-LOAM, LOG-LIO, LOG-LIO2, VOX-LIO.
 **Our goal is to find/develop/discover best end-to-end mobile mapping framework.**
 
+# Supported LiDARs
+![lidars](images/IMG_2561.jpeg)
+We support LIVOX AVIA, HAP, MID360, Ouster OS0, OS1, OS2, OSDome, SICK multiScan100, HESAI JT16, HESAI JT128, HESAI XT, Robosense AIRY.
+HESAI XT requires external IMU. We are going to support more LiDARs ASAP.
+
 More information can be found here:
 - The introductory paper is available here: https://www.sciencedirect.com/science/article/pii/S235271102300314X
 - Sample data is available at https://github.com/MapsHD/OmniWarsawDataset 

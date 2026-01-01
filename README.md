@@ -109,14 +109,14 @@ ToDo
 - Multi-view terrestrial laser scanning registration (all available methods from literature and more)
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.) 
-- Będkowski Janusz, et al. "A Novel Approach to Global Positioning System Accuracy Assessment, Verified on LiDAR Alignment of One Million Kilometers at a Continent Scale, as a Foundation for Autonomous DRIVING Safety Analysis." Sensors 2021, 21, 5691 [[PDF]](https://www.mdpi.com/1424-8220/21/17/5691)
+- Janusz Będkowski et al. "A Novel Approach to Global Positioning System Accuracy Assessment, Verified on LiDAR Alignment of One Million Kilometers at a Continent Scale, as a Foundation for Autonomous DRIVING Safety Analysis." Sensors 2021, 21, 5691 [[PDF]](https://www.mdpi.com/1424-8220/21/17/5691)
 - Loris Redovniković, Antun Jakopec, Janusz Będkowski, Jurica Jagetić. "The affordable DIY Mandeye LiDAR system for surveying caves, and how to convert 3D clouds into traditional cave ground plans and extended profiles." International Journal of Speleology, 53(3), 2024 [[PDF]](https://digitalcommons.usf.edu/ijs/vol53/iss3/7/) 
 - Bartosz Mitka, Klapa Przemysław and Gawronek Pelagia. "Laboratory Tests of Metrological Characteristics of a Non-Repetitive Low-Cost Mobile Handheld Laser Scanner." Sensors 24.18 (2024): 6010. [[PDF]](https://www.mdpi.com/1424-8220/24/18/6010)
 - Elalailyi, Ahmad, et al. "Pose Graph Data Fusion for Visual-and LiDAR-based Low-Cost Portable Mapping Systems." International Archives of the Photogrammetry, Remote Sensing and Spatial Information Sciences 48 (2024): 147-154.[[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/147/2024/isprs-archives-XLVIII-2-W8-2024-147-2024.pdf)
 - Balestra Mattia, et al. "Advancing forest inventory: a comparative study of low-cost MLS lidar device with professional laser scanners." The International Archives of the Photogrammetry, Remote Sensing and Spatial Information Sciences 48 (2024): 9-15.[[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/9/2024/isprs-archives-XLVIII-2-W8-2024-9-2024.pdf)
 - Będkowski Janusz and Tresya Yuliana Fitri. "Novel (re-configurable, wearable, lightweight, ergonomic) low cost 3D mobile mapping system not only for extreme mapping applications." The International Archives of Photogrammetry, Remote Sensing and Spatial Information Sciences 48 (2024): 25-30.[[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/25/2024/isprs-archives-XLVIII-2-W8-2024-25-2024.pdf)
 - Biloš Josip. 3D mobilno kartiranje pomoću MandEye sustava prikupljanja i obrade prostornih podataka. Diss. University of Zagreb. Faculty of Geodesy. Institute for Applied Geodesy. Chair of Surveying, 2024.[[PDF]](https://repozitorij.geof.unizg.hr/islandora/object/geof%3A142/datastream/PDF/view)
-- Będkowski Janusz. "Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms." Measurement 219 (2023): 113199.[[PDF]](https://www.sciencedirect.com/science/article/abs/pii/S0263224123007637)
+- Janusz Będkowski, "Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms." Measurement 219 (2023): 113199.[[PDF]](https://www.sciencedirect.com/science/article/abs/pii/S0263224123007637)
 - Affordable geo-localisation of humanitarian demining tools (mountable on K9, robot, hand-held device, etc.) in GNSS-denied environment, HCR-CTRO [[PDF]](https://www.ctro.hr/userfiles/files/Affordable%20geo-localisation%20in%20GNSS%20denied%20environment%2C%20Janusz%20B%C4%99dkowski.pdf)
 - Aguilar Fernando J., et al. ‘Preliminary Results of a Low-Cost Portable Terrestrial LiDAR Based on ICP-SLAM Algorithms. Application to Automatic Forest Digital Inventory’. 6th Euro-Mediterranean Conference for Environmental Integration (EMCEI-2024), 2024.
 [[PDF]](https://www.ibles.pl/wp-content/uploads/2024/06/Torana-Arya.pdf)
@@ -128,6 +128,7 @@ DOI: 10.36227/techrxiv.174552824.47146860/v1 [[PDF]](https://www.techrxiv.org/us
 - Janusz Będkowski et al. Acquisition and digitization of large scale heritage scenes with open source project https://github.com/MapsHD/HDMapping [[PDF]](https://diglib.eg.org/items/5ce9eb81-e04f-4e58-a0c8-4e66c4ae6960)
 - Samuele Facenda et al. 3D Robotics and LMM for Vineyard Inspection [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-G-2025/431/2025/isprs-archives-XLVIII-G-2025-431-2025.pdf)
 - Jozef Výbošťok et al. An Open and Novel Low-Cost Terrestrial Laser Scanner Prototype for Forest Monitoring [[PDF]](https://www.mdpi.com/1424-8220/26/1/63)
+- Janusz Będkowski et al. MapsHD: A Benchmark Suite for LiDAR Odometry Frameworks [[PDF]](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5986422)
 
 # To cite this work please use as follows:
 Mobile mapping system: hardware and software are elaborated in the following paper:

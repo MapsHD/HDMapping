@@ -80,6 +80,7 @@ ToDo
 - https://github.com/tiev-tongji/LOG-LIO2
 - VOX-LIO https://www.mdpi.com/2072-4292/17/13/2214 (no code)
 - https://github.com/Whan000/MOLA-SLAM
+- https://github.com/clegenti/2fast2lamaa
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

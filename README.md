@@ -129,7 +129,7 @@ DOI: 10.36227/techrxiv.174552824.47146860/v1 [[PDF]](https://www.techrxiv.org/us
 - Samuele Facenda et al. 3D Robotics and LMM for Vineyard Inspection [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-G-2025/431/2025/isprs-archives-XLVIII-G-2025-431-2025.pdf)
 - Jozef Výbošťok et al. An Open and Novel Low-Cost Terrestrial Laser Scanner Prototype for Forest Monitoring [[PDF]](https://www.mdpi.com/1424-8220/26/1/63)
 - Janusz Będkowski et al. MapsHD: A Benchmark Suite for LiDAR Odometry Frameworks [[PDF]](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5986422)
--Będkowski, J., Matecki, M., Pełka, M., Majek, K., Lekston, P., Kostrzewa, A., Markiewicz, J., Łapiński, S., Własiuk, M., and Mrozowski, K.: The benchmark of LiDAR odometry algorithms utilised for a low-cost mobile mapping system, Int. Arch. Photogramm. Remote Sens. Spatial Inf. Sci., XLVIII-1/W6-2025, 25–32, 2025 [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W6-2025/25/2025/isprs-archives-XLVIII-1-W6-2025-25-2025.pdf)
+- Janusz Będkowski et al. The benchmark of LiDAR odometry algorithms utilised for a low-cost mobile mapping system, Int. Arch. Photogramm. Remote Sens. Spatial Inf. Sci., XLVIII-1/W6-2025, 25–32, 2025 [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W6-2025/25/2025/isprs-archives-XLVIII-1-W6-2025-25-2025.pdf)
 
 
 # To cite this work please use as follows:

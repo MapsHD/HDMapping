@@ -79,13 +79,13 @@ ToDo
 - https://github.com/BrenYi/Light-LOAM (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Light-LOAM.bib))
 - https://github.com/tiev-tongji/LOG-LIO2 (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LOG-LIO2.bib))
 - https://github.com/dhchung/nv_liom (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/NV-LIOM.bib))
+- https://github.com/hku-mars/Voxel-SLAM (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Voxel-SLAM.bib), 2nd place ICRA HILTI 2023 SLAM Challenge, 1st place ICCV 2023 SLAM Challenge) 
 - https://github.com/StephLin/LIO-SEGMOT (2023, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SEGMOT.bib))
 - https://github.com/XikunLiu-huskit/GLIO (2023, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIO.bib))
 - https://github.com/tiev-tongji/LOG-LIO (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LOG-LIO.bib))
 - https://github.com/wh200720041/floam (2021, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/F-LOAM.bib))
 - https://github.com/HKUST-Aerial-Robotics/A-LOAM (2019, no publication)
 - VOX-LIO https://www.mdpi.com/2072-4292/17/13/2214 (no code)
-- https://github.com/hku-mars/Voxel-SLAM
 - https://github.com/lian-yue0515/MM-LINS
 - https://github.com/Liansheng-Wang/Super-LIO (2025)
 - https://neufs-ma.github.io/M3DSS/index.html (benchmark, dataset)

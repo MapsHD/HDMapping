@@ -52,10 +52,10 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-FAST-LIO-to-HDMapping (2020, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/FAST-LIO.bib))
 - https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib))
 - https://github.com/MapsHD/benchmark-CT-ICP-to-HDMapping (2021, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/CT-ICP.bib))
-- https://github.com/MapsHD/benchmark-DLO-to-HDMapping (2022, RAL, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLO.bib))
+- https://github.com/MapsHD/benchmark-DLO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLO.bib))
 - https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping (2022, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/VoxelMap.bib))
-- https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping (2022, RAL, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Faster-LIO.bib))
-- https://github.com/MapsHD/benchmark-KISS-ICP-to-HDMapping (2023)
+- https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Faster-LIO.bib))
+- https://github.com/MapsHD/benchmark-KISS-ICP-to-HDMapping (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/KISS-ICP.bib))
 - https://github.com/MapsHD/benchmark-SLICT-to-HDMapping (2023)
 - https://github.com/MapsHD/benchmark-DLIO-to-HDMapping (2023)
 - https://github.com/MapsHD/benchmark-Point-LIO-to-HDMapping (2024)
@@ -172,7 +172,7 @@ Terrestrial Laser Scanner data registration is elaborated in following paper:
 }
 ```
 
-The optimization framework is implemented from scratch https://github.com/JanuszBedkowski/observation_equations using the Eigen library, thus there is no need to install any additional libraries such as Ceres, g2o, GTSAM, manif, Sophus, etc. 
+The **HDMapping** optimization framework is implemented from scratch https://github.com/JanuszBedkowski/observation_equations using the Eigen library, thus there is no need to install any additional libraries such as Ceres, g2o, GTSAM, manif, Sophus, etc. 
 More information can be found in:
 
 ```

@@ -61,7 +61,7 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-Point-LIO-to-HDMapping (2024, JAIS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Point-LIO.bib))
 - https://github.com/MapsHD/benchmark-GLIM-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIM.bib))
 - https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MAD-ICP.bib))
-- https://github.com/MapsHD/benchmark-iG-LIO-to-HDMapping (2024)
+- https://github.com/MapsHD/benchmark-iG-LIO-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/iG-LIO.bib))
 - https://github.com/MapsHD/benchmark-LIO-EKF-to-HDMapping (2024)
 - https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping (2024)
 - https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025)

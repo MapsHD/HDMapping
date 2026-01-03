@@ -89,6 +89,7 @@ ToDo
 - https://github.com/dhchung/nv_liom
 - https://github.com/hku-mars/Voxel-SLAM
 - https://github.com/lian-yue0515/MM-LINS
+- https://github.com/Liansheng-Wang/Super-LIO (2025)
 
 
 # Quick DEMO (Windows OS, installation is not required):

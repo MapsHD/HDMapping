@@ -77,7 +77,7 @@ ToDo
 - https://github.com/BrenYi/Light-LOAM (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Light-LOAM.bib))
 - https://github.com/StephLin/LIO-SEGMOT (2023, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SEGMOT.bib))
 - https://github.com/XikunLiu-huskit/GLIO (2023, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIO.bib))
-- https://github.com/wh200720041/floam (2021)
+- https://github.com/wh200720041/floam (2021, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/F-LOAM.bib))
 - https://github.com/HKUST-Aerial-Robotics/A-LOAM (2019)
 - https://neufs-ma.github.io/M3DSS/index.html
 - https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022) 

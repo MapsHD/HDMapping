@@ -70,8 +70,8 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-KISS-SLAM-to-HDMapping (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/kiss-slam.bib))
 
 ToDo
-- https://github.com/MOLAorg/mola_lidar_odometry (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/mola-lidar-odometry.bib)) (not solved issue: https://github.com/MOLAorg/mola_lidar_odometry/issues/37)
-- https://github.com/MapsHD/rko_lio (2025) (not solved issue: https://github.com/marcinmatecki/rko-lio-to-HDMapping/issues/1)
+- https://github.com/MOLAorg/mola_lidar_odometry (2025, IJRR, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/mola-lidar-odometry.bib)) (not solved issue: https://github.com/MOLAorg/mola_lidar_odometry/issues/37)
+- https://github.com/MapsHD/rko_lio (2025arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RKO-LIO.bib)) (not solved issue: https://github.com/marcinmatecki/rko-lio-to-HDMapping/issues/1)
 - https://github.com/Ji1Xingyu/lio_gvm (2024) (not solved issues: https://github.com/Ji1Xingyu/lio_gvm/issues/13, https://github.com/Ji1Xingyu/lio_gvm/issues/12, https://github.com/Ji1Xingyu/lio_gvm/issues/7)
 - https://github.com/ZikangYuan/sr_lio (2024)
 - https://github.com/BrenYi/Light-LOAM (2024)

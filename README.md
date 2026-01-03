@@ -76,6 +76,8 @@ ToDo
 - https://github.com/clegenti/2fast2lamaa (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/2FAST-2LAMAA.bib))
 - https://github.com/lian-yue0515/MM-LINS (2025, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MM-LINS.bib))
 - https://github.com/Liansheng-Wang/Super-LIO (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib))
+- VOX-LIO https://www.mdpi.com/2072-4292/17/13/2214 (2025, MDPI Remote Sensing, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/VOX-LIO.bib), no code)
+- SS-LIO: Robust Tightly Coupled Solid-State LiDAR–Inertial Odometry for Indoor Degraded Environments (2025, MDPI electronics, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SS-LIO.bib), no code)
 - https://github.com/Ji1Xingyu/lio_gvm (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-GVM.bib)) (not solved issues: https://github.com/Ji1Xingyu/lio_gvm/issues/13, https://github.com/Ji1Xingyu/lio_gvm/issues/12, https://github.com/Ji1Xingyu/lio_gvm/issues/7)
 - https://github.com/ZikangYuan/sr_lio (2024, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sr-lio.bib))
 - https://github.com/BrenYi/Light-LOAM (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Light-LOAM.bib))
@@ -87,7 +89,6 @@ ToDo
 - https://github.com/tiev-tongji/LOG-LIO (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LOG-LIO.bib))
 - https://github.com/wh200720041/floam (2021, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/F-LOAM.bib))
 - https://github.com/HKUST-Aerial-Robotics/A-LOAM (2019, no publication)
-- VOX-LIO https://www.mdpi.com/2072-4292/17/13/2214 (no code)
 - https://neufs-ma.github.io/M3DSS/index.html (benchmark, dataset)
 - https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022) (extrinsic calibration)
 

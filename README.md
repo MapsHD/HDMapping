@@ -87,6 +87,9 @@ ToDo
 - https://github.com/Whan000/MOLA-SLAM
 - https://github.com/clegenti/2fast2lamaa
 - https://github.com/dhchung/nv_liom
+- https://github.com/hku-mars/Voxel-SLAM
+- https://github.com/lian-yue0515/MM-LINS
+
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

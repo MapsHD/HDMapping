@@ -123,9 +123,8 @@ ToDo
 - Janusz Będkowski et al. "Novel (re-configurable, wearable, lightweight, ergonomic) low cost 3D mobile mapping system not only for extreme mapping applications." (2024, LowCost 3D, [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/25/2024/isprs-archives-XLVIII-2-W8-2024-25-2024.pdf), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/isprs-archives-XLVIII-2-W8-2024-25-2024.bib))
 - Biloš Josip. "3D mobilno kartiranje pomoću MandEye sustava prikupljanja i obrade prostornih podataka" (2024, [[PDF]](https://repozitorij.geof.unizg.hr/islandora/object/geof%3A142/datastream/PDF/view))
 - Janusz Będkowski, "Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms." (2023, Elsevier-Measurement, [[PDF]](https://www.sciencedirect.com/science/article/abs/pii/S0263224123007637), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/S0263224123007637.bib))
-- Affordable geo-localisation of humanitarian demining tools (mountable on K9, robot, hand-held device, etc.) in GNSS-denied environment, HCR-CTRO [[PDF]](https://www.ctro.hr/userfiles/files/Affordable%20geo-localisation%20in%20GNSS%20denied%20environment%2C%20Janusz%20B%C4%99dkowski.pdf)
-- Aguilar Fernando J., et al. ‘Preliminary Results of a Low-Cost Portable Terrestrial LiDAR Based on ICP-SLAM Algorithms. Application to Automatic Forest Digital Inventory’. 6th Euro-Mediterranean Conference for Environmental Integration (EMCEI-2024), 2024.
-[[PDF]](https://www.ibles.pl/wp-content/uploads/2024/06/Torana-Arya.pdf)
+- Affordable geo-localisation of humanitarian demining tools (mountable on K9, robot, hand-held device, etc.) in GNSS-denied environment, (2024, HCR-CTRO [[PDF]](https://www.ctro.hr/userfiles/files/Affordable%20geo-localisation%20in%20GNSS%20denied%20environment%2C%20Janusz%20B%C4%99dkowski.pdf))
+- Aguilar Fernando J., et al. ‘Preliminary Results of a Low-Cost Portable Terrestrial LiDAR Based on ICP-SLAM Algorithms. Application to Automatic Forest Digital Inventory’. 6th Euro-Mediterranean Conference for Environmental Integration (2024, EMCEI, [[PDF]](https://www.ibles.pl/wp-content/uploads/2024/06/Torana-Arya.pdf)
 - Janusz Będkowski. Novel wearable mobile mapping system for Forensic and Security, mountable on trained dogs and humans. TechRxiv. April 24, 2025.
 DOI: 10.36227/techrxiv.174552824.47146860/v1 [[PDF]](https://www.techrxiv.org/users/915148/articles/1288112-novel-wearable-mobile-mapping-system-for-forensic-and-security-mountable-on-trained-dog-and-human)
 - Janusz Będkowski et al. Method for spherical camera to 3D LiDAR calibration and synchronization with example on Insta360 X4 and LiVOX MID 360 [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W4-2025/13/2025/isprs-archives-XLVIII-1-W4-2025-13-2025.pdf)
@@ -173,7 +172,7 @@ Terrestrial Laser Scanner data registration is elaborated in following paper:
 }
 ```
 
-The **HDMapping** optimization framework is implemented from scratch https://github.com/JanuszBedkowski/observation_equations using the Eigen library, thus there is no need to install any additional libraries such as Ceres, g2o, GTSAM, manif, Sophus, etc. 
+The **HDMapping** optimization framework is implemented from scratch https://github.com/JanuszBedkowski/observation_equations using the Eigen library, thus there is no need to install any additional libraries such as **Ceres**, **g2o**, **GTSAM**, **manif**, **Sophus**, etc. 
 More information can be found in:
 
 ```

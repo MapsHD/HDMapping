@@ -70,6 +70,7 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 
 
 ToDo
+- https://robotics-upo.github.io/D-LIO/
 - https://github.com/MapsHD/benchmark-KISS-SLAM-to-HDMapping (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/kiss-slam.bib)) (not solved issue https://github.com/kpmrozowski/KISS-SLAM-to-HDMapping/issues/1)
 - https://github.com/MOLAorg/mola_lidar_odometry (2025, IJRR, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/mola-lidar-odometry.bib)) (not solved issue: https://github.com/MOLAorg/mola_lidar_odometry/issues/37)
 - https://github.com/Whan000/MOLA-SLAM (instruction to https://github.com/MOLAorg/mola_lidar_odometry)
@@ -93,6 +94,7 @@ ToDo
 - https://neufs-ma.github.io/M3DSS/index.html (benchmark, dataset)
 - https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022) (extrinsic calibration)
 - Fast and Robust LiDAR-Inertial Odometry by Tightly-Coupled Iterated Kalman Smoother and Robocentric Voxels
+- https://www.sciencedirect.com/science/article/abs/pii/S1566253525002052
 
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z

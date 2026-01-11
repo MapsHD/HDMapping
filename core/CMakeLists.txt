@@ -68,7 +68,8 @@ set(CORE_INCLUDE_FILES_GUI
 # GUI-independent target
 add_library(core_no_gui STATIC ${CORE_SOURCE_FILES} ${CORE_INCLUDE_FILES})
 target_compile_definitions(core_no_gui PRIVATE WITH_GUI=0)
-target_compile_options(core_no_gui PRIVATE -fPIC)
+set_target_properties(core_no_gui PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(core_no_gui PRIVATE ${PLATFORM_LASZIP_LIB} ${PLATFORM_MISCELLANEOUS_LIBS})
 target_include_directories(core_no_gui PRIVATE 
     include

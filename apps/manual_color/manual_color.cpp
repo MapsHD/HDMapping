@@ -1168,7 +1168,7 @@ void display()
             }
         }
         ImGui::SameLine();
-        ImGui::Text("%d: %.1f,%.1f,%.1f", index, p.x(), p.y(), p.z());
+        ImGui::Text("%ld: %.1f,%.1f,%.1f", index, p.x(), p.y(), p.z());
     }
     ImGui::EndChild();
 

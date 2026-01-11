@@ -70,7 +70,8 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
         int remove_gcp_index = -1;
         for (int i = 0; i < cps.size(); i++)
         {
-            ImGui::Text((std::string("CP_") + std::to_string(i) + " [" + cps[i].name + "]").c_str());
+            const auto gui_text =  (std::string("CP_") + std::to_string(i) + " [" + cps[i].name + "]");
+            ImGui::Text("%s", gui_text.c_str());
             ImGui::SameLine();
             if (ImGui::Button(("Remove##" + std::to_string(i)).c_str()))
             {

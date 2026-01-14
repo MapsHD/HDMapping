@@ -1023,7 +1023,7 @@ void loadData()
             const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
             counter++;
             if (counter % 100 == 0)
-                printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+                printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %zu]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
 
             // log it for implot
             imu_data_plot.timestampLidar.push_back(timestamp_pair.first);

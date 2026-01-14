@@ -4,7 +4,7 @@
 
 namespace fs = std::filesystem;
 
-const float RAD_TO_DEG = 180.0f / M_PI;
+const float RAD_TO_DEG = 180.0f / static_cast<float>(M_PI);
 
 bool load_data(std::vector<std::string>& input_file_names,
     LidarOdometryParams& params,
@@ -360,7 +360,10 @@ void calculate_trajectory(
 
     for (const auto& [timestamp_pair, gyr, acc] : imu_data)
     {
-        const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * RAD_TO_DEG) - bias_gyr_x, static_cast<float>(gyr.axis.y * RAD_TO_DEG) - bias_gyr_y, static_cast<float>(gyr.axis.z * RAD_TO_DEG) - bias_gyr_z };
+        const FusionVector gyroscope = { 
+            static_cast<float>(gyr.axis.x * RAD_TO_DEG) - static_cast<float>(bias_gyr_x), 
+            static_cast<float>(gyr.axis.y * RAD_TO_DEG) - static_cast<float>(bias_gyr_y), 
+            static_cast<float>(gyr.axis.z * RAD_TO_DEG) - static_cast<float>(bias_gyr_z) };
         const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
 
         /*if (provious_time_stamp == 0.0)

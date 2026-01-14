@@ -7,7 +7,7 @@ set(SOURCES
   lidar_odometry_gui.cpp lidar_odometry_utils.h lidar_odometry_utils.cpp
   lidar_odometry_utils_optimizers.cpp
   lidar_odometry.cpp lidar_odometry.h
-  toml.hpp toml_io.h toml_io.cpp
+  toml_io.h toml_io.cpp
   "../../core/src/utils.cpp"
 )
 
@@ -30,6 +30,7 @@ target_include_directories(
           ${EXTERNAL_LIBRARIES_DIRECTORY}
           ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
           ${EIGEN3_INCLUDE_DIR}
+          ${EXTERNAL_LIBRARIES_DIRECTORY}/tomlplusplus/include
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui
           ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
           ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo

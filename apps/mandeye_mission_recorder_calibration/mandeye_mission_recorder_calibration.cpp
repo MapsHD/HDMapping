@@ -1,12 +1,14 @@
+#include <GL/freeglut.h>
+
 #include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
-#include <ImGuizmo.h>
 #include <imgui_internal.h>
+
+#include <ImGuizmo.h>
 
 //#define GLEW_STATIC
 //#include <GL/glew.h>
-#include <GL/freeglut.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -18,8 +20,8 @@
 
 #include "pfd_wrapper.hpp"
 
-#include <filesystem>
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
+#include <filesystem>
 
 #include <HDMapping/Version.hpp>
 
@@ -28,22 +30,21 @@
 #include <pair_wise_iterative_closest_point.h>
 
 #ifdef _WIN32
-    #include <windows.h>
-    #include <shellapi.h>  // <-- Required for ShellExecuteA
-    #include "resource.h"
+#include "resource.h"
+#include <shellapi.h> // <-- Required for ShellExecuteA
+#include <windows.h>
+
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
 
 std::string winTitle = std::string("MR calibration ") + HDMAPPING_VERSION_STRING;
 
-std::vector<std::string> infoLines = {
-    "This program is optional step in MANDEYE process",
-    "",
-    "Used for MR (Mission Recorder) hardware using two LiDAR units"
-};
+std::vector<std::string> infoLines = { "This program is optional step in MANDEYE process",
+                                       "",
+                                       "Used for MR (Mission Recorder) hardware using two LiDAR units" };
 
-//App specific shortcuts (using empty dummy until needed)
+// App specific shortcuts (using empty dummy until needed)
 std::vector<ShortcutEntry> appShortcuts(80, { "", "", "" });
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
@@ -52,15 +53,9 @@ namespace fs = std::filesystem;
 ImVec4 pc_color = ImVec4(1.0f, 0.0f, 0.0f, 1.00f);
 ImVec4 pc_color2 = ImVec4(0.0f, 0.0f, 1.0f, 1.00f);
 
-float m_ortho_projection[] = {1, 0, 0, 0,
-                              0, 1, 0, 0,
-                              0, 0, 1, 0,
-                              0, 0, 0, 1};
+float m_ortho_projection[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
-float m_ortho_gizmo_view[] = {1, 0, 0, 0,
-                              0, 1, 0, 0,
-                              0, 0, 1, 0,
-                              0, 0, 0, 1};
+float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 std::vector<std::string> laz_files;
 std::vector<std::string> csv_files;
@@ -107,7 +102,8 @@ bool manual_calibration = false;
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-void load_pc(const std::string &lazFile, std::vector<Point3Di>& points, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy)
+void load_pc(
+    const std::string& lazFile, std::vector<Point3Di>& points, bool ommit_points_with_timestamp_equals_zero, double filter_threshold_xy)
 {
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))
@@ -123,7 +119,7 @@ void load_pc(const std::string &lazFile, std::vector<Point3Di>& points, bool omm
         std::abort();
     }
     std::cout << "Compressed : " << is_compressed << std::endl;
-    laszip_header *header;
+    laszip_header* header;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
@@ -131,7 +127,7 @@ void load_pc(const std::string &lazFile, std::vector<Point3Di>& points, bool omm
         std::abort();
     }
     fprintf(stderr, "File '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
-    laszip_point *point;
+    laszip_point* point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
         fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
@@ -145,7 +141,6 @@ void load_pc(const std::string &lazFile, std::vector<Point3Di>& points, bool omm
 
     for (laszip_U32 j = 0; j < header->number_of_point_records; j++)
     {
-
         if (laszip_read_point(laszip_reader))
         {
             fprintf(stderr, "DLL ERROR: reading point %u\n", j);
@@ -164,7 +159,10 @@ void load_pc(const std::string &lazFile, std::vector<Point3Di>& points, bool omm
         // }
 
         // Eigen::Affine3d calibration = calibrations.empty() ? Eigen::Affine3d::Identity() : calibrations.at(id);
-        const Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
+        const Eigen::Vector3d pf(
+            header->x_offset + header->x_scale_factor * static_cast<double>(point->X),
+            header->y_offset + header->y_scale_factor * static_cast<double>(point->Y),
+            header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
 
         p.point = /*calibration **/ (pf);
         p.lidarid = id;
@@ -250,22 +248,21 @@ void settings_gui()
                 ImGui::Separator();
             }
 
-
             ImGui::BeginDisabled(!(idToSn.size() > 0 && calibrations.size() == 0));
             {
                 if (calibrations.size() == 0)
                 {
                     if (ImGui::Button("Create new calibration (optional before step 2)"))
                     {
-                        const auto input_file_name = mandeye::fd::SaveFileDialog("Save calibration file", mandeye::fd::Calibration_filter, ".mjc", "calibration.mjc");
+                        const auto input_file_name = mandeye::fd::SaveFileDialog(
+                            "Save calibration file", mandeye::fd::Calibration_filter, ".mjc", "calibration.mjc");
 
                         if (input_file_name.size() > 0)
                         {
                             std::string l1 = idToSn.at(0);
                             std::string l2 = idToSn.at(1);
 
-                            std::cout
-                                << "output_file_name: " << input_file_name << std::endl;
+                            std::cout << "output_file_name: " << input_file_name << std::endl;
                             nlohmann::json j;
 
                             j["calibration"][l1.c_str()]["identity"] = "true";
@@ -373,8 +370,8 @@ void settings_gui()
 
                     if (calibrated_lidar.size() == 1)
                     {
-                        manual_calibration = true; //if only one LiDAR, force manual calibration
-						chosen_lidar = 0;
+                        manual_calibration = true; // if only one LiDAR, force manual calibration
+                        chosen_lidar = 0;
                     }
                 }
             }
@@ -514,8 +511,8 @@ void settings_gui()
                         ImGui::SetTooltip(kaText);
                     ImGui::PopItemWidth();
 
-                    if (tmp.px != tb_pose.px || tmp.py != tb_pose.py || tmp.pz != tb_pose.pz ||
-                        tmp.om != tb_pose.om || tmp.fi != tb_pose.fi || tmp.ka != tb_pose.ka)
+                    if (tmp.px != tb_pose.px || tmp.py != tb_pose.py || tmp.pz != tb_pose.pz || tmp.om != tb_pose.om ||
+                        tmp.fi != tb_pose.fi || tmp.ka != tb_pose.ka)
                     {
                         tb_pose.om = tb_pose.om * DEG_TO_RAD;
                         tb_pose.fi = tb_pose.fi * DEG_TO_RAD;
@@ -532,7 +529,7 @@ void settings_gui()
                 // calibrations.at(0) = m0;
             }
             ImGui::EndDisabled();
-        
+
             if (imu_lidar.size() > 1)
             {
                 const auto hintText = "Choose LiDAR in horizontal orientation!";
@@ -559,7 +556,8 @@ void settings_gui()
 
             if (ImGui::Button("Save resulted calibration file (step 5)"))
             {
-                const auto new_calibration_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::Calibration_filter, ".mjc", calibration_file_name);
+                const auto new_calibration_file_name =
+                    mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::Calibration_filter, ".mjc", calibration_file_name);
 
                 if (new_calibration_file_name.size() > 0)
                 {
@@ -662,13 +660,21 @@ void display()
     }
     else
     {
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
+        glOrtho(
+            -camera_ortho_xy_view_zoom,
+            camera_ortho_xy_view_zoom,
             -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+            camera_ortho_xy_view_zoom / ratio,
+            -100000,
+            100000);
 
-        glm::mat4 proj = glm::orthoLH_ZO<float>(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
+        glm::mat4 proj = glm::orthoLH_ZO<float>(
+            -camera_ortho_xy_view_zoom,
+            camera_ortho_xy_view_zoom,
             -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio, -100, 100);
+            camera_ortho_xy_view_zoom / ratio,
+            -100,
+            100);
 
         std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
 
@@ -687,10 +693,9 @@ void display()
 
         Eigen::Vector3d v_t = m * v;
 
-        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
-            v_center_t.x(), v_center_t.y(), v_center_t.z(),
-            v_t.x(), v_t.y(), v_t.z());
-        glm::mat4 lookat = glm::lookAt(glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
+        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(), v_center_t.x(), v_center_t.y(), v_center_t.z(), v_t.x(), v_t.y(), v_t.z());
+        glm::mat4 lookat = glm::lookAt(
+            glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
             glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
             glm::vec3(v_t.x(), v_t.y(), v_t.z()));
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
@@ -703,7 +708,7 @@ void display()
 
     if (calibration.size() > 0)
     {
-        for (const auto &c : calibration)
+        for (const auto& c : calibration)
         {
             Eigen::Affine3d m = c.second;
             glBegin(GL_LINES);
@@ -735,7 +740,7 @@ void display()
 
         glPointSize(point_size);
         glBegin(GL_POINTS);
-        for (const auto &p : point_cloud)
+        for (const auto& p : point_cloud)
         {
             Eigen::Affine3d cal = calibrations.empty() ? Eigen::Affine3d::Identity() : calibrations.at(p.lidarid);
 
@@ -764,7 +769,7 @@ void display()
     {
         glPointSize(point_size);
         glBegin(GL_POINTS);
-        for (const auto &p : point_cloud)
+        for (const auto& p : point_cloud)
         {
             Eigen::Affine3d cal = calibrations.empty() ? Eigen::Affine3d::Identity() : calibrations.at(p.lidarid);
 
@@ -800,7 +805,7 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
-	ImGui::NewFrame();
+    ImGui::NewFrame();
 
     ShowMainDockSpace();
 
@@ -811,7 +816,6 @@ void display()
 
     if (ImGui::BeginMainMenuBar())
     {
-
         if (ImGui::BeginMenu("View"))
         {
             ImGui::BeginDisabled(!(point_cloud.size() > 0));
@@ -872,7 +876,9 @@ void display()
 
         camMenu();
 
-        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
+        ImGui::SameLine(
+            ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 -
+            ImGui::GetStyle().FramePadding.x * 2);
 
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 2));
@@ -884,7 +890,6 @@ void display()
 
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(3);
-
 
         ImGui::EndMainMenuBar();
     }
@@ -907,7 +912,7 @@ void display()
 
 void mouse(int glut_button, int state, int x, int y)
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     io.MousePos = ImVec2((float)x, (float)y);
     int button = -1;
     if (glut_button == GLUT_LEFT_BUTTON)
@@ -940,7 +945,7 @@ void mouse(int glut_button, int state, int x, int y)
     }
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     params.decimation = 0.03;
 
@@ -953,17 +958,14 @@ int main(int argc, char *argv[])
         ImGui_ImplOpenGL2_Shutdown();
         ImGui_ImplGLUT_Shutdown();
         ImGui::DestroyContext();
-    }
-    catch (const std::bad_alloc& e)
+    } catch (const std::bad_alloc& e)
     {
         std::cerr << "System is out of memory : " << e.what() << std::endl;
         mandeye::fd::OutOfMemMessage();
-    }
-    catch (const std::exception& e)
+    } catch (const std::exception& e)
     {
         std::cout << e.what();
-    }
-    catch (...)
+    } catch (...)
     {
         std::cerr << "Unknown fatal error occurred." << std::endl;
     }

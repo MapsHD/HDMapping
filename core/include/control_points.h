@@ -1,5 +1,4 @@
-#ifndef _CONTROL_POINTS_H_
-#define _CONTROL_POINTS_H_
+#pragma once
 
 #include <vector>
 #include <string>
@@ -48,5 +47,3 @@ class ControlPoints{
         void draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd = 1);
 #endif
 };
-
-#endif

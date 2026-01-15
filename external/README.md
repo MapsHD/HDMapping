@@ -1,0 +1,1 @@
+# This directory contains 3rdparty libraries that are not distributed using GitHub (or are modified) and are copied

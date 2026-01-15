@@ -1,6 +1,6 @@
-#include <iostream>
-#include <fstream>
 #include <Eigen/Eigen>
+#include <fstream>
+#include <iostream>
 #include <structures.h>
 #include <transformations.h>
 
@@ -10,7 +10,7 @@
 
 #include <export_laz.h>
 
-bool load_pc(PointCloud &pc, std::string input_file_name)
+bool load_pc(PointCloud& pc, std::string input_file_name)
 {
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))
@@ -49,7 +49,7 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
         point_clouds.push_back(pc);*/
         return false;
     }
-    laszip_header *header;
+    laszip_header* header;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
@@ -71,7 +71,7 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 
     // fprintf(stderr, "file '%s' contains %u points\n", input_file_name.c_str(), header->number_of_point_records);
 
-    laszip_point *point;
+    laszip_point* point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
         fprintf(stderr, ":DLL ERROR: getting point pointer from laszip reader\n");
@@ -112,7 +112,8 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
 
     laszip_I64 npoints = (header->number_of_point_records ? header->number_of_point_records : header->extended_number_of_point_records);
 
-    std::cout << (is_compressed ? "" : "un") << "compressed file '" << (std::filesystem::path(input_file_name).filename().string()) << "' contains " << npoints << " points" << std::endl;
+    std::cout << (is_compressed ? "" : "un") << "compressed file '" << (std::filesystem::path(input_file_name).filename().string())
+              << "' contains " << npoints << " points" << std::endl;
 
     laszip_I64 p_count = 0;
 
@@ -137,9 +138,10 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
         pc.timestamps.push_back(p.timestamp);
 
         // Eigen::Vector3d color(
-        //	static_cast<uint8_t>(0xFFU * ((point->rgb[0] > 0) ? static_cast<float>(point->rgb[0]) / static_cast<float>(0xFFFFU) : 1.0f)) / 256.0,
-        //	static_cast<uint8_t>(0xFFU * ((point->rgb[1] > 0) ? static_cast<float>(point->rgb[1]) / static_cast<float>(0xFFFFU) : 1.0f)) / 256.0,
-        //	static_cast<uint8_t>(0xFFU * ((point->rgb[2] > 0) ? static_cast<float>(point->rgb[2]) / static_cast<float>(0xFFFFU) : 1.0f)) / 256.0);
+        //	static_cast<uint8_t>(0xFFU * ((point->rgb[0] > 0) ? static_cast<float>(point->rgb[0]) / static_cast<float>(0xFFFFU) : 1.0f))
+        /// 256.0, 	static_cast<uint8_t>(0xFFU * ((point->rgb[1] > 0) ? static_cast<float>(point->rgb[1]) / static_cast<float>(0xFFFFU)
+        //: 1.0f)) / 256.0, 	static_cast<uint8_t>(0xFFU * ((point->rgb[2] > 0) ? static_cast<float>(point->rgb[2]) /
+        // static_cast<float>(0xFFFFU) : 1.0f)) / 256.0);
 
         Eigen::Vector3d color(
             static_cast<float>(point->rgb[0]) / 256.0,
@@ -160,21 +162,24 @@ bool load_pc(PointCloud &pc, std::string input_file_name)
     return true;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    if(argc != 4){
+    if (argc != 4)
+    {
         std::cout << "USAGE: " << argv[0] << " input_point_cloud output_point_cloud multiplier(e.g. 1000)" << std::endl;
         return 1;
     }
 
     PointCloud pc;
-    
-    if(!load_pc(pc, argv[1])){
+
+    if (!load_pc(pc, argv[1]))
+    {
         std::cout << "Problem with loading '" << argv[1] << "'" << std::endl;
         return 2;
     }
 
-    for (auto &t:pc.timestamps){
+    for (auto& t : pc.timestamps)
+    {
         t *= atof(argv[2]);
     }
 

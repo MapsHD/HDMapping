@@ -1,14 +1,15 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl/filesystem.h>
-#include <pybind11/stl.h>
-#include <pybind11/eigen.h>
-#include <structures.h>
-#include <session.h>
 #include <export_laz.h>
+#include <pybind11/eigen.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/stl/filesystem.h>
+#include <session.h>
+#include <structures.h>
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(core_py, m) {
+PYBIND11_MODULE(core_py, m)
+{
     m.doc() = "Python bindings for HDMapping core";
 
     // Bind Point3Di
@@ -19,8 +20,7 @@ PYBIND11_MODULE(core_py, m) {
         .def_readwrite("intensity", &Point3Di::intensity)
         .def_readwrite("index_pose", &Point3Di::index_pose)
         .def_readwrite("lidarid", &Point3Di::lidarid)
-        .def_readwrite("index_point", &Point3Di::index_point)
-        ;
+        .def_readwrite("index_point", &Point3Di::index_point);
 
     // Bind WorkerData
     py::class_<WorkerData>(m, "WorkerData")
@@ -32,22 +32,22 @@ PYBIND11_MODULE(core_py, m) {
         .def_readwrite("intermediate_trajectory_motion_model", &WorkerData::intermediate_trajectory_motion_model)
         .def_readwrite("intermediate_trajectory_timestamps", &WorkerData::intermediate_trajectory_timestamps)
         .def_readwrite("imu_om_fi_ka", &WorkerData::imu_om_fi_ka)
-        .def_readwrite("show", &WorkerData::show)
-        ;
+        .def_readwrite("show", &WorkerData::show);
 
     // Bind Session
     py::class_<Session>(m, "Session")
         .def(py::init<>())
         .def("load", &Session::load)
         .def("save", &Session::save)
-        .def("fill_session_from_worker_data", &Session::fill_session_from_worker_data)
-        ;
+        .def("fill_session_from_worker_data", &Session::fill_session_from_worker_data);
 
     // Bind save_all_to_las
-    m.def("save_all_to_las", &save_all_to_las,
-          py::arg("session"),
-          py::arg("output_las_name"),
-          py::arg("as_local") = false,
-          py::arg("skip_ts_0") = false,
-          "Saves point cloud data from session into a .las/.laz file.");
+    m.def(
+        "save_all_to_las",
+        &save_all_to_las,
+        py::arg("session"),
+        py::arg("output_las_name"),
+        py::arg("as_local") = false,
+        py::arg("skip_ts_0") = false,
+        "Saves point cloud data from session into a .las/.laz file.");
 }

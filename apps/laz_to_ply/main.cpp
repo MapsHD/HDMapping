@@ -1,17 +1,17 @@
 #include <laszip/laszip_api.h>
 
-#include <cstdio>
-#include <vector>
-#include <fstream>
-#include <filesystem>
 #include <cassert>
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <vector>
 
-bool check_path_ext(const char *path, const char *ext)
+bool check_path_ext(const char* path, const char* ext)
 {
     return std::filesystem::path(path).extension() == ext;
 }
 
-bool convert_and_save(const char *from, const char *to)
+bool convert_and_save(const char* from, const char* to)
 {
     laszip_POINTER laszip_reader = nullptr;
     if (laszip_create(&laszip_reader))
@@ -25,13 +25,13 @@ bool convert_and_save(const char *from, const char *to)
         return false;
     }
 
-    laszip_header *header = nullptr;
+    laszip_header* header = nullptr;
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
         return false;
     }
 
-    laszip_point *point = nullptr;
+    laszip_point* point = nullptr;
     if (laszip_get_point_pointer(header, &point))
     {
         return false;
@@ -66,7 +66,7 @@ bool convert_and_save(const char *from, const char *to)
         to_file << "property float z\n";
         to_file << "end_header\n";
 
-        to_file.write((const char *)points.data(), points.size() * sizeof(float));
+        to_file.write((const char*)points.data(), points.size() * sizeof(float));
     }
     else
     {
@@ -76,12 +76,12 @@ bool convert_and_save(const char *from, const char *to)
     return true;
 }
 
-int main(const int argc, const char **argv)
+int main(const int argc, const char** argv)
 {
     const int expected_argc = 3;
 
-    const char *expected_laz_extension = ".laz";
-    const char *expected_ply_extension = ".ply";
+    const char* expected_laz_extension = ".laz";
+    const char* expected_ply_extension = ".ply";
 
     if (argc != expected_argc)
     {
@@ -91,8 +91,8 @@ int main(const int argc, const char **argv)
         return EXIT_FAILURE;
     }
 
-    const char *from = argv[1];
-    const char *to = argv[2];
+    const char* from = argv[1];
+    const char* to = argv[2];
 
     if (!check_path_ext(from, expected_laz_extension))
     {

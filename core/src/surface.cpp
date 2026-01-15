@@ -1,13 +1,15 @@
+#include <pch/pch.h>
+
 #include <surface.h>
-#include <iostream>
 
 #include <GL/freeglut.h>
 
 #include <structures.h>
 #include <transformations.h>
+
 #include <../../3rdparty/observation_equations/codes/common/include/cauchy.h>
-#include <../../3rdparty/observation_equations/codes/python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 #include <../../3rdparty/observation_equations/codes/python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
+#include <../../3rdparty/observation_equations/codes/python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 
 #include <execution>
 
@@ -20,7 +22,7 @@ inline double random(double low, double high)
     return dist(gen);
 }
 
-void Surface::generate_initial_surface(const std::vector<Eigen::Vector3d> &point_cloud)
+void Surface::generate_initial_surface(const std::vector<Eigen::Vector3d>& point_cloud)
 {
     std::cout << "Surface::generate_initial_surface" << std::endl;
 
@@ -41,7 +43,7 @@ void Surface::generate_initial_surface(const std::vector<Eigen::Vector3d> &point
     double min_z = 1000000.0;
     double max_z = -1000000.0;
 
-    for (const auto &p : point_cloud)
+    for (const auto& p : point_cloud)
     {
         if (p.x() < min_x)
         {
@@ -153,7 +155,7 @@ void Surface::render()
     }
 }
 
-void Surface::align_surface_to_ground_points(const std::vector<Eigen::Vector3d> &point_cloud)
+void Surface::align_surface_to_ground_points(const std::vector<Eigen::Vector3d>& point_cloud)
 {
     std::cout << "Surface::align_surface_to_ground_points" << std::endl;
     std::vector<Eigen::Triplet<double>> tripletListA;
@@ -175,19 +177,20 @@ void Surface::align_surface_to_ground_points(const std::vector<Eigen::Vector3d> 
     for (size_t i = 0; i < odo_edges.size(); i++)
     {
         Eigen::Matrix<double, 6, 1> relative_pose_measurement_odo;
-        relative_pose_tait_bryan_wc_case1(relative_pose_measurement_odo,
-                                          poses_odo[odo_edges[i].first].px,
-                                          poses_odo[odo_edges[i].first].py,
-                                          poses_odo[odo_edges[i].first].pz,
-                                          poses_odo[odo_edges[i].first].om,
-                                          poses_odo[odo_edges[i].first].fi,
-                                          poses_odo[odo_edges[i].first].ka,
-                                          poses_odo[odo_edges[i].second].px,
-                                          poses_odo[odo_edges[i].second].py,
-                                          poses_odo[odo_edges[i].second].pz,
-                                          poses_odo[odo_edges[i].second].om,
-                                          poses_odo[odo_edges[i].second].fi,
-                                          poses_odo[odo_edges[i].second].ka);
+        relative_pose_tait_bryan_wc_case1(
+            relative_pose_measurement_odo,
+            poses_odo[odo_edges[i].first].px,
+            poses_odo[odo_edges[i].first].py,
+            poses_odo[odo_edges[i].first].pz,
+            poses_odo[odo_edges[i].first].om,
+            poses_odo[odo_edges[i].first].fi,
+            poses_odo[odo_edges[i].first].ka,
+            poses_odo[odo_edges[i].second].px,
+            poses_odo[odo_edges[i].second].py,
+            poses_odo[odo_edges[i].second].pz,
+            poses_odo[odo_edges[i].second].om,
+            poses_odo[odo_edges[i].second].fi,
+            poses_odo[odo_edges[i].second].ka);
 
         Eigen::Matrix<double, 6, 1> delta;
         relative_pose_obs_eq_tait_bryan_wc_case1(
@@ -212,19 +215,20 @@ void Surface::align_surface_to_ground_points(const std::vector<Eigen::Vector3d> 
             relative_pose_measurement_odo(5, 0));
 
         Eigen::Matrix<double, 6, 12, Eigen::RowMajor> jacobian;
-        relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(jacobian,
-                                                          poses[odo_edges[i].first].px,
-                                                          poses[odo_edges[i].first].py,
-                                                          poses[odo_edges[i].first].pz,
-                                                          poses[odo_edges[i].first].om,
-                                                          poses[odo_edges[i].first].fi,
-                                                          poses[odo_edges[i].first].ka,
-                                                          poses[odo_edges[i].second].px,
-                                                          poses[odo_edges[i].second].py,
-                                                          poses[odo_edges[i].second].pz,
-                                                          poses[odo_edges[i].second].om,
-                                                          poses[odo_edges[i].second].fi,
-                                                          poses[odo_edges[i].second].ka);
+        relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(
+            jacobian,
+            poses[odo_edges[i].first].px,
+            poses[odo_edges[i].first].py,
+            poses[odo_edges[i].first].pz,
+            poses[odo_edges[i].first].om,
+            poses[odo_edges[i].first].fi,
+            poses[odo_edges[i].first].ka,
+            poses[odo_edges[i].second].px,
+            poses[odo_edges[i].second].py,
+            poses[odo_edges[i].second].pz,
+            poses[odo_edges[i].second].om,
+            poses[odo_edges[i].second].fi,
+            poses[odo_edges[i].second].ka);
 
         int ir = tripletListB.size();
 
@@ -279,10 +283,26 @@ void Surface::align_surface_to_ground_points(const std::vector<Eigen::Vector3d> 
         double delta_x;
         double delta_y;
         double delta_z;
-        point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+        point_to_point_source_to_target_tait_bryan_wc(
+            delta_x,
+            delta_y,
+            delta_z,
+            pose_s.px,
+            pose_s.py,
+            pose_s.pz,
+            pose_s.om,
+            pose_s.fi,
+            pose_s.ka,
+            p_s.x(),
+            p_s.y(),
+            p_s.z(),
+            p_t.x(),
+            p_t.y(),
+            p_t.z());
 
         Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
-        point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z());
+        point_to_point_source_to_target_tait_bryan_wc_jacobian(
+            jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z());
 
         int ic = i * 6;
         tripletListA.emplace_back(ir, ic + 0, -jacobian(0, 0));
@@ -293,11 +313,14 @@ void Surface::align_surface_to_ground_points(const std::vector<Eigen::Vector3d> 
         tripletListP.emplace_back(ir + 1, ir + 1, 1);
         tripletListP.emplace_back(ir + 2, ir + 2, 1);
 
-        if (robust_kernel){
-            tripletListB.emplace_back(ir,  0,    cauchy (delta_x, 1));
-            tripletListB.emplace_back(ir + 1, 0, cauchy (delta_y, 1));
-            tripletListB.emplace_back(ir + 2, 0, cauchy (delta_z, 1));
-        }else{
+        if (robust_kernel)
+        {
+            tripletListB.emplace_back(ir, 0, cauchy(delta_x, 1));
+            tripletListB.emplace_back(ir + 1, 0, cauchy(delta_y, 1));
+            tripletListB.emplace_back(ir + 2, 0, cauchy(delta_z, 1));
+        }
+        else
+        {
             tripletListB.emplace_back(ir, 0, delta_x);
             tripletListB.emplace_back(ir + 1, 0, delta_y);
             tripletListB.emplace_back(ir + 2, 0, delta_z);
@@ -380,7 +403,7 @@ void Surface::align_surface_to_ground_points(const std::vector<Eigen::Vector3d> 
     }
 }
 
-bool Surface::find_nearest_neighbour(Eigen::Vector3d &p_t, Eigen::Affine3d vertex, const std::vector<Eigen::Vector3d> &reference_points)
+bool Surface::find_nearest_neighbour(Eigen::Vector3d& p_t, Eigen::Affine3d vertex, const std::vector<Eigen::Vector3d>& reference_points)
 {
     double min_dist_xy = 1000000.0;
     double search_radious = 1.0;
@@ -388,7 +411,9 @@ bool Surface::find_nearest_neighbour(Eigen::Vector3d &p_t, Eigen::Affine3d verte
 
     for (size_t i = 0; i < reference_points.size(); i++)
     {
-        float dist = sqrt((vertex(0, 3) - reference_points[i].x()) * (vertex(0, 3) - reference_points[i].x()) + (vertex(1, 3) - reference_points[i].y()) * (vertex(1, 3) - reference_points[i].y()));
+        float dist = sqrt(
+            (vertex(0, 3) - reference_points[i].x()) * (vertex(0, 3) - reference_points[i].x()) +
+            (vertex(1, 3) - reference_points[i].y()) * (vertex(1, 3) - reference_points[i].y()));
 
         if (dist < search_radious)
         {
@@ -405,7 +430,8 @@ bool Surface::find_nearest_neighbour(Eigen::Vector3d &p_t, Eigen::Affine3d verte
     return found;
 }
 
-std::vector<int> Surface::get_filtered_indexes(const std::vector<Eigen::Vector3d> &pc, const std::vector<int> &lowest_points_indexes, Eigen::Vector2d bucket_dim_xy)
+std::vector<int> Surface::get_filtered_indexes(
+    const std::vector<Eigen::Vector3d>& pc, const std::vector<int>& lowest_points_indexes, Eigen::Vector2d bucket_dim_xy)
 {
     bool multithread = true;
     std::vector<int> out_indexes;
@@ -424,9 +450,13 @@ std::vector<int> Surface::get_filtered_indexes(const std::vector<Eigen::Vector3d
         indexes.emplace_back(index, i);
     }
 
-    std::sort(indexes.begin(), indexes.end(),
-              [](const std::pair<unsigned long long int, unsigned int> &a, const std::pair<unsigned long long int, unsigned int> &b)
-              { return a.first < b.first; });
+    std::sort(
+        indexes.begin(),
+        indexes.end(),
+        [](const std::pair<unsigned long long int, unsigned int>& a, const std::pair<unsigned long long int, unsigned int>& b)
+        {
+            return a.first < b.first;
+        });
 
     std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
 
@@ -444,7 +474,7 @@ std::vector<int> Surface::get_filtered_indexes(const std::vector<Eigen::Vector3d
         }
     }
 
-    const auto hessian_fun = [&](const std::pair<unsigned long long int, unsigned int> &index)
+    const auto hessian_fun = [&](const std::pair<unsigned long long int, unsigned int>& index)
     {
         int index_element_source = index.second;
         Eigen::Vector3d source = lowest_points[index_element_source].first;
@@ -482,8 +512,8 @@ std::vector<int> Surface::get_filtered_indexes(const std::vector<Eigen::Vector3d
                 //}
             }
         }
-        //batch_of_points.push_back(source);
-        //number_of_points_nn++;
+        // batch_of_points.push_back(source);
+        // number_of_points_nn++;
 
         if (number_of_points_nn >= 10)
         {
@@ -517,7 +547,8 @@ std::vector<int> Surface::get_filtered_indexes(const std::vector<Eigen::Vector3d
             //  points[index_element_source].eigen_values = eigen_solver.eigenvalues();
             //  points[index_element_source].eigen_vectors = eigen_solver.eigenvectors();
 
-            // points[index_element_source].normal_vector = Eigen::Vector3d(points[index_element_source].eigen_vectors(0, 0), points[index_element_source].eigen_vectors(1, 0), points[index_element_source].eigen_vectors(2, 0));
+            // points[index_element_source].normal_vector = Eigen::Vector3d(points[index_element_source].eigen_vectors(0, 0),
+            // points[index_element_source].eigen_vectors(1, 0), points[index_element_source].eigen_vectors(2, 0));
 
             // double ev1 = points[index_element_source].eigen_values.x();
             // double ev2 = points[index_element_source].eigen_values.y();
@@ -575,8 +606,11 @@ std::vector<int> Surface::get_filtered_indexes(const std::vector<Eigen::Vector3d
     return out_indexes;
 }
 
-std::vector<Eigen::Vector3d> Surface::get_points_without_surface(const std::vector<Eigen::Vector3d> &points, double distance_to_ground_threshold_bottom,
-                                                                 double distance_to_ground_threshold_up, Eigen::Vector2d bucket_dim_xy)
+std::vector<Eigen::Vector3d> Surface::get_points_without_surface(
+    const std::vector<Eigen::Vector3d>& points,
+    double distance_to_ground_threshold_bottom,
+    double distance_to_ground_threshold_up,
+    Eigen::Vector2d bucket_dim_xy)
 {
     bool multithread = true;
 
@@ -600,9 +634,13 @@ std::vector<Eigen::Vector3d> Surface::get_points_without_surface(const std::vect
         indexes.emplace_back(index, i);
     }
 
-    std::sort(indexes.begin(), indexes.end(),
-              [](const std::pair<unsigned long long int, unsigned int> &a, const std::pair<unsigned long long int, unsigned int> &b)
-              { return a.first < b.first; });
+    std::sort(
+        indexes.begin(),
+        indexes.end(),
+        [](const std::pair<unsigned long long int, unsigned int>& a, const std::pair<unsigned long long int, unsigned int>& b)
+        {
+            return a.first < b.first;
+        });
 
     std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
 
@@ -634,8 +672,10 @@ std::vector<Eigen::Vector3d> Surface::get_points_without_surface(const std::vect
                 points[i].z() > z_ground + distance_to_ground_threshold_up)
             {
                 to_remove[i] = true;
-                // std::cout << vertices[index_element_target].translation().x() << " " << vertices[index_element_target].translation().y() << " "
-                //          << vertices[index_element_target].translation().z() << " " << points[i].x() << " " << points[i].y() << " " << points[i].z() << std::endl;
+                // std::cout << vertices[index_element_target].translation().x() << " " << vertices[index_element_target].translation().y()
+                // << " "
+                //          << vertices[index_element_target].translation().z() << " " << points[i].x() << " " << points[i].y() << " " <<
+                //          points[i].z() << std::endl;
             }
         }
     }

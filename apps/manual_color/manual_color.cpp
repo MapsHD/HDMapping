@@ -1,6 +1,6 @@
 
-#include <iostream>
 #include <GL/freeglut.h>
+#include <iostream>
 
 #include "imgui.h"
 #include "imgui_impl_glut.h"
@@ -13,20 +13,20 @@
 
 #include <array>
 #include <cstdint>
-#include <sstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <sstream>
 
 #include "color_las_loader.h"
 #include "pfd_wrapper.hpp"
 #include <execution>
 
-#include <structures.h>
-#include <transformations.h>
-#include <observation_equations/codes/python-scripts/camera-metrics/equirectangular_camera_colinearity_tait_bryan_wc_jacobian.h>
 #include <Eigen/Eigen>
 #include <observation_equations/codes/common/include/cauchy.h>
+#include <observation_equations/codes/python-scripts/camera-metrics/equirectangular_camera_colinearity_tait_bryan_wc_jacobian.h>
 #include <observation_equations/codes/python-scripts/camera-metrics/fisheye_camera_calibRT_tait_bryan_wc_jacobian.h>
+#include <structures.h>
+#include <transformations.h>
 
 #include <HDMapping/Version.hpp>
 
@@ -44,9 +44,9 @@ bool color = false;
 
 GLuint tex1;
 
-GLUquadric *sphere;
+GLUquadric* sphere;
 
-GLuint make_tex(const std::string &fn)
+GLuint make_tex(const std::string& fn)
 {
     GLuint tex;
     glGenTextures(1, &tex);
@@ -58,7 +58,7 @@ GLuint make_tex(const std::string &fn)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     // load and generate the texture
     int width, height, nrChannels;
-    unsigned char *data = stbi_load(fn.c_str(), &width, &height, &nrChannels, 0);
+    unsigned char* data = stbi_load(fn.c_str(), &width, &height, &nrChannels, 0);
 
     std::cout << "width: " << width << " height: " << height << " nrChannels: " << nrChannels << std::endl;
 
@@ -66,7 +66,7 @@ GLuint make_tex(const std::string &fn)
     {
         if (nrChannels == 1)
         {
-            unsigned char *data3 = (unsigned char *)malloc(width * height * 3);
+            unsigned char* data3 = (unsigned char*)malloc(width * height * 3);
 
             int counter = 0;
             for (int wh = 0; wh < width * height; wh++)
@@ -105,16 +105,16 @@ int mouse_buttons = 0;
 float rotate_x = 0.0, rotate_y = 0.0;
 float translate_z = -90.0;
 float translate_x, translate_y = 0.0;
-bool gui_mouse_down{false};
+bool gui_mouse_down{ false };
 
 void display();
 void reshape(int w, int h);
 void mouse(int glut_button, int state, int x, int y);
 void motion(int x, int y);
-bool initGL(int *argc, char **argv);
+bool initGL(int* argc, char** argv);
 
-float imgui_co_size{1000.0f};
-bool imgui_draw_co{true};
+float imgui_co_size{ 1000.0f };
+bool imgui_draw_co{ true };
 
 double CameraRotationZ = 0;
 double CameraHeight = 0;
@@ -123,19 +123,19 @@ namespace SystemData
 {
     std::vector<mandeye::PointRGB> points;
     std::pair<Eigen::Vector3d, Eigen::Vector3d> clickedRay;
-    int closestPointIndex{-1};
+    int closestPointIndex{ -1 };
     std::vector<ImVec2> pointPickedImage;
     std::vector<Eigen::Vector3d> pointPickedPointCloud;
 
-    unsigned char *imageData;
+    unsigned char* imageData;
     int imageWidth, imageHeight, imageNrChannels;
 
     Eigen::Affine3d camera_pose = Eigen::Affine3d::Identity();
 
     int point_size = 1;
-}
+} // namespace SystemData
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
     // pose.om = M_PI * 0.5;
@@ -160,9 +160,9 @@ int main(int argc, char *argv[])
     glutMainLoop();
 }
 
-void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> &point_picked, std::vector<ImVec2> point_pickedInPointcloud)
+void imagePicker(const std::string& name, ImTextureID tex1, std::vector<ImVec2>& point_picked, std::vector<ImVec2> point_pickedInPointcloud)
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     static float zoom = 0.1f;
     const int Tex_width = 5000;
     const int Tex_height = 2500;
@@ -189,9 +189,9 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
     if (ImGui::IsKeyDown(ImGuiKey_PageDown))
         zoom /= 1.00f + 0.01f * speed;
 
-    ImVec2 uv_min = ImVec2(0.0f, 0.0f);                 // Top-left
-    ImVec2 uv_max = ImVec2(1.0f, 1.0f);                 // Lower-right
-    ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);   // No tint
+    ImVec2 uv_min = ImVec2(0.0f, 0.0f); // Top-left
+    ImVec2 uv_max = ImVec2(1.0f, 1.0f); // Lower-right
+    ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
     ImVec4 border_col = ImVec4(1.0f, 1.0f, 1.0f, 0.5f); // 50% opaque white
 
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
@@ -199,7 +199,7 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
     ImGui::InputFloat("zoom", &zoom, 0.1f, 0.5f);
     float my_tex_w = Tex_width * zoom;
     float my_tex_h = Tex_height * zoom;
-    const ImVec2 child_size{ImGui::GetWindowWidth() * 1.0f, ImGui::GetWindowHeight() * 0.5f};
+    const ImVec2 child_size{ ImGui::GetWindowWidth() * 1.0f, ImGui::GetWindowHeight() * 0.5f };
 
     ImGui::Checkbox("color", &color);
 
@@ -211,10 +211,10 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
         bool visible2;
     };
 
-    auto draw_zoom_pick_point = [my_tex_w, my_tex_h, tint_col, border_col](const ImTextureID &tex, std::vector<ImVec2> &point_picked)
+    auto draw_zoom_pick_point = [my_tex_w, my_tex_h, tint_col, border_col](const ImTextureID& tex, std::vector<ImVec2>& point_picked)
     {
         ImVec2 img_start = ImGui::GetItemRectMin();
-        ImGuiIO &io = ImGui::GetIO();
+        ImGuiIO& io = ImGui::GetIO();
         ImGui::BeginTooltip();
         float region_sz = 32.0f;
         float region_x = io.MousePos.x - img_start.x - region_sz * 0.5f;
@@ -223,7 +223,7 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
         // add point
         if (io.MouseClicked[2] && io.KeyShift)
         {
-            ImVec2 picked_point{(io.MousePos.x - img_start.x) / my_tex_w, (io.MousePos.y - img_start.y) / my_tex_h};
+            ImVec2 picked_point{ (io.MousePos.x - img_start.x) / my_tex_w, (io.MousePos.y - img_start.y) / my_tex_h };
             point_picked.push_back(picked_point);
         }
 
@@ -253,10 +253,12 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
         ImVec2 uv1 = ImVec2((region_x + region_sz) / my_tex_w, (region_y + region_sz) / my_tex_h);
         ImGui::Image(tex, ImVec2(region_sz * local_zoom, region_sz * local_zoom), uv0, uv1, tint_col, border_col);
         ImVec2 img_start_loc = ImGui::GetItemRectMin();
-        ImVec2 img_sz = {ImGui::GetItemRectMax().x - ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y - ImGui::GetItemRectMin().y};
+        ImVec2 img_sz = { ImGui::GetItemRectMax().x - ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y - ImGui::GetItemRectMin().y };
         ImVec2 window_center = ImVec2(img_start_loc.x + img_sz.x * 0.5f, img_start_loc.y + img_sz.y * 0.5f);
-        ImGui::GetForegroundDrawList()->AddLine({window_center.x - 10, window_center.y}, {window_center.x + 10, window_center.y}, IM_COL32(0, 255, 0, 200), 1);
-        ImGui::GetForegroundDrawList()->AddLine({window_center.x, window_center.y - 10}, {window_center.x, window_center.y + 10}, IM_COL32(0, 255, 0, 200), 1);
+        ImGui::GetForegroundDrawList()->AddLine(
+            { window_center.x - 10, window_center.y }, { window_center.x + 10, window_center.y }, IM_COL32(0, 255, 0, 200), 1);
+        ImGui::GetForegroundDrawList()->AddLine(
+            { window_center.x, window_center.y - 10 }, { window_center.x, window_center.y + 10 }, IM_COL32(0, 255, 0, 200), 1);
         ImGui::EndTooltip();
     };
 
@@ -264,27 +266,30 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
     {
         ImGui::Image(tex1, ImVec2(my_tex_w, my_tex_h), uv_min, uv_max, tint_col, border_col);
         const ImVec2 view_port_start = ImGui::GetWindowPos();
-        const ImVec2 view_port_end{view_port_start.x + ImGui::GetWindowWidth(), view_port_start.y + ImGui::GetWindowHeight()};
+        const ImVec2 view_port_end{ view_port_start.x + ImGui::GetWindowWidth(), view_port_start.y + ImGui::GetWindowHeight() };
         ImVec2 img_start = ImGui::GetItemRectMin();
         for (int i = 0; i < point_picked.size(); i++)
         {
-            const auto &p = point_picked[i];
+            const auto& p = point_picked[i];
 
-            ImVec2 center{img_start.x + p.x * my_tex_w, img_start.y + p.y * my_tex_h};
+            ImVec2 center{ img_start.x + p.x * my_tex_w, img_start.y + p.y * my_tex_h };
 
             if (center.x > view_port_start.x && center.x < view_port_end.x && center.y > view_port_start.y && center.y < view_port_end.y)
             {
                 char data[16];
                 snprintf(data, 16, "%d", i);
 
-                ImGui::GetForegroundDrawList()->AddLine({center.x - 10, center.y}, {center.x + 10, center.y}, IM_COL32(255, 255, 0, 200), 1);
-                ImGui::GetForegroundDrawList()->AddLine({center.x, center.y - 10}, {center.x, center.y + 10}, IM_COL32(255, 255, 0, 200), 1);
-                ImGui::GetForegroundDrawList()->AddText({center.x, center.y + 10}, IM_COL32(255, 0, 0, 200), data);
+                ImGui::GetForegroundDrawList()->AddLine(
+                    { center.x - 10, center.y }, { center.x + 10, center.y }, IM_COL32(255, 255, 0, 200), 1);
+                ImGui::GetForegroundDrawList()->AddLine(
+                    { center.x, center.y - 10 }, { center.x, center.y + 10 }, IM_COL32(255, 255, 0, 200), 1);
+                ImGui::GetForegroundDrawList()->AddText({ center.x, center.y + 10 }, IM_COL32(255, 0, 0, 200), data);
                 if (i < point_pickedInPointcloud.size())
                 {
-                    ImGui::GetForegroundDrawList()->AddLine({center.x, center.y}, point_pickedInPointcloud.at(i), IM_COL32(255, 0, 0, 200), 1);
+                    ImGui::GetForegroundDrawList()->AddLine(
+                        { center.x, center.y }, point_pickedInPointcloud.at(i), IM_COL32(255, 0, 0, 200), 1);
 
-                    ImGui::GetForegroundDrawList()->AddText({point_pickedInPointcloud.at(i)}, IM_COL32(255, 0, 0, 200), data);
+                    ImGui::GetForegroundDrawList()->AddText({ point_pickedInPointcloud.at(i) }, IM_COL32(255, 0, 0, 200), data);
                 }
             }
         }
@@ -298,7 +303,7 @@ void imagePicker(const std::string &name, ImTextureID tex1, std::vector<ImVec2> 
     ImGui::EndChild();
 }
 
-ImVec2 UnprojectPoint(const Eigen::Vector3d &point)
+ImVec2 UnprojectPoint(const Eigen::Vector3d& point)
 {
     GLint viewport[4];
     GLdouble modelview[16];
@@ -310,7 +315,7 @@ ImVec2 UnprojectPoint(const Eigen::Vector3d &point)
 
     GLdouble winX, winY, winZ;
     gluProject(point[0], point[1], point[2], modelview, projection, viewport, &winX, &winY, &winZ);
-    return {static_cast<float>(winX), static_cast<float>(viewport[3] - winY)};
+    return { static_cast<float>(winX), static_cast<float>(viewport[3] - winY) };
 }
 
 std::pair<Eigen::Vector3d, Eigen::Vector3d> GetRay(int x, int y)
@@ -344,23 +349,44 @@ std::pair<Eigen::Vector3d, Eigen::Vector3d> GetRay(int x, int y)
 
     direction.normalize();
 
-    return {position, direction};
+    return { position, direction };
 }
 
-double GetDistanceToRay(const Eigen::Vector3d &qureyPoint, const std::pair<Eigen::Vector3d, Eigen::Vector3d> &ray)
+double GetDistanceToRay(const Eigen::Vector3d& qureyPoint, const std::pair<Eigen::Vector3d, Eigen::Vector3d>& ray)
 {
     return ray.second.cross(qureyPoint - ray.first).norm();
 }
 
-std::vector<mandeye::PointRGB> ApplyColorToPointcloud(const std::vector<mandeye::PointRGB> &pointsRGB, const unsigned char *imageData, int imageWidth, int imageHeight, int nrChannels, const Eigen::Affine3d &transfom)
+std::vector<mandeye::PointRGB> ApplyColorToPointcloud(
+    const std::vector<mandeye::PointRGB>& pointsRGB,
+    const unsigned char* imageData,
+    int imageWidth,
+    int imageHeight,
+    int nrChannels,
+    const Eigen::Affine3d& transfom)
 {
     std::vector<mandeye::PointRGB> newCloud(pointsRGB.size());
-    std::transform(std::execution::par_unseq, pointsRGB.begin(), pointsRGB.end(), newCloud.begin(), [&](mandeye::PointRGB p)
-                   {
+    std::transform(
+        std::execution::par_unseq,
+        pointsRGB.begin(),
+        pointsRGB.end(),
+        newCloud.begin(),
+        [&](mandeye::PointRGB p)
+        {
             TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(transfom);
             double du, dv;
-            equrectangular_camera_colinearity_tait_bryan_wc(du,dv, imageHeight, imageWidth,
-                M_PI, pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+            equrectangular_camera_colinearity_tait_bryan_wc(
+                du,
+                dv,
+                imageHeight,
+                imageWidth,
+                M_PI,
+                pose.px,
+                pose.py,
+                pose.pz,
+                pose.om,
+                pose.fi,
+                pose.ka,
                 p.point.x(),
                 p.point.y(),
                 p.point.z());
@@ -372,28 +398,58 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloud(const std::vector<mandeye:
                 unsigned char red = imageData[index];
                 unsigned char green = imageData[index + 1];
                 unsigned char blue = imageData[index + 2];
-                p.rgb = { 1.f * red / 256.f,1.f * green / 256.f, 1.f * blue / 256.f, 1.f };
+                p.rgb = { 1.f * red / 256.f, 1.f * green / 256.f, 1.f * blue / 256.f, 1.f };
             }
-        return p; });
+            return p;
+        });
     return newCloud;
 }
 
-std::vector<mandeye::PointRGB> ApplyColorToPointcloudFishEye(const std::vector<mandeye::PointRGB> &pointsRGB, const unsigned char *imageData, int imageWidth, int imageHeight, int nrChannels, const Eigen::Affine3d &transfom)
+std::vector<mandeye::PointRGB> ApplyColorToPointcloudFishEye(
+    const std::vector<mandeye::PointRGB>& pointsRGB,
+    const unsigned char* imageData,
+    int imageWidth,
+    int imageHeight,
+    int nrChannels,
+    const Eigen::Affine3d& transfom)
 {
     std::vector<mandeye::PointRGB> newCloud(pointsRGB.size());
-    std::transform(std::execution::par_unseq, pointsRGB.begin(), pointsRGB.end(), newCloud.begin(), [&](mandeye::PointRGB p)
-                   {
+    std::transform(
+        std::execution::par_unseq,
+        pointsRGB.begin(),
+        pointsRGB.end(),
+        newCloud.begin(),
+        [&](mandeye::PointRGB p)
+        {
             TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(transfom);
             double du, dv;
-            //equrectangular_camera_colinearity_tait_bryan_wc(du,dv, imageHeight, imageWidth,
+            // equrectangular_camera_colinearity_tait_bryan_wc(du,dv, imageHeight, imageWidth,
             //    M_PI, pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
             //    p.point.x(),
             //    p.point.y(),
             //    p.point.z());
 
-            projection_fisheye_camera_tait_bryan_wc(du, dv, fx, fy, cx, cy,
-                                                    pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
-                                                    p.point.x(), p.point.y(), p.point.z(), k1, k2, k3, k4, alpha);
+            projection_fisheye_camera_tait_bryan_wc(
+                du,
+                dv,
+                fx,
+                fy,
+                cx,
+                cy,
+                pose.px,
+                pose.py,
+                pose.pz,
+                pose.om,
+                pose.fi,
+                pose.ka,
+                p.point.x(),
+                p.point.y(),
+                p.point.z(),
+                k1,
+                k2,
+                k3,
+                k4,
+                alpha);
 
             int u = std::round(du);
             int v = std::round(dv);
@@ -403,32 +459,38 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloudFishEye(const std::vector<m
                 unsigned char red = imageData[index];
                 unsigned char green = imageData[index + 1];
                 unsigned char blue = imageData[index + 2];
-                p.rgb = { 1.f * red / 256.f,1.f * green / 256.f, 1.f * blue / 256.f, 1.f };
+                p.rgb = { 1.f * red / 256.f, 1.f * green / 256.f, 1.f * blue / 256.f, 1.f };
             }
-        return p; });
+            return p;
+        });
     return newCloud;
 }
 
-
-uint32_t fromGrayCode(uint32_t gray) {
+uint32_t fromGrayCode(uint32_t gray)
+{
     uint32_t num = 0;
-    for (; gray; gray >>= 1) {
+    for (; gray; gray >>= 1)
+    {
         num ^= gray;
     }
     return num;
 }
 
-uint32_t packBoolsToUint32(const std::array<bool, 18>& bools) {
+uint32_t packBoolsToUint32(const std::array<bool, 18>& bools)
+{
     uint32_t result = 0;
-    for (size_t i = 0; i < bools.size(); ++i) {
-        if (bools[i]) {
+    for (size_t i = 0; i < bools.size(); ++i)
+    {
+        if (bools[i])
+        {
             result |= (1U << i);
         }
     }
     return result;
 }
 
-void TimeStampCount() {
+void TimeStampCount()
+{
     namespace SD = SystemData;
 
     static bool show_terminal = false;
@@ -437,32 +499,29 @@ void TimeStampCount() {
     static uint64_t decodedValue = 0;
     static std::array<bool, 18> diodeBits = {};
     static uint64_t fullTimestamp = 0;
-    static const std::array<int, 18> newOrder = {
-        8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 0, 1, 2, 3, 4, 5, 6, 7
-    };
+    static const std::array<int, 18> newOrder = { 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 0, 1, 2, 3, 4, 5, 6, 7 };
     static uint64_t sessionStart = 0;
 
-    static const std::array<ImVec2, 18> diodePositions = {
-        ImVec2(400, 3375), ImVec2(840, 3375),
-        ImVec2(1250, 3350), ImVec2(1600, 3330), ImVec2(2000, 3350),
-        ImVec2(2400, 3400), ImVec2(2850, 3450), ImVec2(3370, 3470),
-        ImVec2(3870, 3460), ImVec2(4400, 3450), ImVec2(4900, 3400),
-        ImVec2(5300, 3350), ImVec2(5600, 3300), ImVec2(6000, 3300),
-        ImVec2(6400, 3330), ImVec2(6800, 3350), ImVec2(7200, 3375),
-        ImVec2(7600, 3375) 
-    };
-    
-    if (ImGui::Button("Manual Calculate Timestamp")) {
+    static const std::array<ImVec2, 18> diodePositions = { ImVec2(400, 3375),  ImVec2(840, 3375),  ImVec2(1250, 3350), ImVec2(1600, 3330),
+                                                           ImVec2(2000, 3350), ImVec2(2400, 3400), ImVec2(2850, 3450), ImVec2(3370, 3470),
+                                                           ImVec2(3870, 3460), ImVec2(4400, 3450), ImVec2(4900, 3400), ImVec2(5300, 3350),
+                                                           ImVec2(5600, 3300), ImVec2(6000, 3300), ImVec2(6400, 3330), ImVec2(6800, 3350),
+                                                           ImVec2(7200, 3375), ImVec2(7600, 3375) };
+
+    if (ImGui::Button("Manual Calculate Timestamp"))
+    {
         show_terminal = true;
     }
 
-    if (show_terminal) {
+    if (show_terminal)
+    {
         ImGui::Begin("Timestamp Terminal", &show_terminal);
 
         float scale = 1.0f;
         ImVec2 imgPos = ImGui::GetCursorScreenPos();
 
-        if (SD::imageData != nullptr) {
+        if (SD::imageData != nullptr)
+        {
             ImVec2 windowSize = ImGui::GetContentRegionAvail();
             float aspectRatio = (float)SD::imageWidth / (float)SD::imageHeight;
             float scaleX = windowSize.x / SD::imageWidth;
@@ -473,79 +532,100 @@ void TimeStampCount() {
             float scaledHeight = SD::imageHeight * scale;
 
             ImGui::Text("Loaded image:");
-            imgPos = ImGui::GetCursorScreenPos(); 
+            imgPos = ImGui::GetCursorScreenPos();
             ImGui::Image(reinterpret_cast<void*>(static_cast<uintptr_t>(tex1)), ImVec2(scaledWidth, scaledHeight));
 
             auto* drawList = ImGui::GetWindowDrawList();
             ImGui::SetWindowFontScale(1.25f);
-            for (int i = 0; i < 18; ++i) {
+            for (int i = 0; i < 18; ++i)
+            {
                 ImVec2 pos = diodePositions[i];
                 pos.x = imgPos.x + pos.x * scale;
                 pos.y = imgPos.y + pos.y * scale;
                 ImU32 color = diodeBits[i] ? IM_COL32(255, 0, 0, 255) : IM_COL32(0, 0, 0, 255);
                 drawList->AddText(pos, color, std::to_string(i).c_str());
             }
-        } else {
+        }
+        else
+        {
             ImGui::Text("No image loaded.");
         }
 
         ImGui::SetWindowFontScale(1.0f);
         ImGui::Text("Click on bits:");
-        for (int i = 0; i < 18; ++i) {
-            if (diodeBits[i]) {
-                ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(255, 0, 0, 255));         
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(200, 0, 0, 255));  
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(150, 0, 0, 255));   
-            } else {
-                ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(50, 50, 50, 255));        
+        for (int i = 0; i < 18; ++i)
+        {
+            if (diodeBits[i])
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(255, 0, 0, 255));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(200, 0, 0, 255));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(150, 0, 0, 255));
+            }
+            else
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(50, 50, 50, 255));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(80, 80, 80, 255));
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(100, 100, 100, 255));
             }
-        
+
             std::string label = std::to_string(i) + ": " + (diodeBits[i] ? "1" : "0");
-            if (ImGui::SmallButton(label.c_str())) {
+            if (ImGui::SmallButton(label.c_str()))
+            {
                 diodeBits[i] = !diodeBits[i];
             }
-        
-            ImGui::PopStyleColor(3); 
-        
-            if (i != 17) ImGui::SameLine();
+
+            ImGui::PopStyleColor(3);
+
+            if (i != 17)
+                ImGui::SameLine();
         }
         ImGui::NewLine();
 
-        if (ImGui::Button("Load status.json")) {
+        if (ImGui::Button("Load status.json"))
+        {
             const auto input_file_names = mandeye::fd::OpenFileDialog("Choose json", mandeye::fd::Session_filter, false);
-            if (!input_file_names.empty()) {
+            if (!input_file_names.empty())
+            {
                 std::ifstream file(input_file_names.front());
-                if (file) {
-                    try {
+                if (file)
+                {
+                    try
+                    {
                         nlohmann::json j;
                         file >> j;
-        
-                        if (j.contains("livox") && j["livox"].contains("LivoxLidarInfo") && j["livox"]["LivoxLidarInfo"].contains("m_sessionStart")) {
+
+                        if (j.contains("livox") && j["livox"].contains("LivoxLidarInfo") &&
+                            j["livox"]["LivoxLidarInfo"].contains("m_sessionStart"))
+                        {
                             sessionStart = j["livox"]["LivoxLidarInfo"]["m_sessionStart"];
                             std::cout << "m_sessionStart: " << sessionStart << std::endl;
-        
+
                             fullTimestamp = sessionStart + decodedValue;
-                        } else {
+                        }
+                        else
+                        {
                             std::cerr << "Invalid JSON or missing 'm_sessionStart' key\n";
                         }
-                    } catch (const std::exception &e) {
+                    } catch (const std::exception& e)
+                    {
                         std::cerr << "JSON read error: " << e.what() << "\n";
                     }
                 }
             }
         }
 
-        if (ImGui::Button("Calculate timestamp")) {
+        if (ImGui::Button("Calculate timestamp"))
+        {
             std::array<bool, 18> reorderedBits = {};
-            for (int i = 0; i < 18; ++i) {
-                reorderedBits[i] = diodeBits[newOrder[i]];  
+            for (int i = 0; i < 18; ++i)
+            {
+                reorderedBits[i] = diodeBits[newOrder[i]];
             }
 
             packedValue = packBoolsToUint32(reorderedBits);
             decodedValue = static_cast<uint64_t>(fromGrayCode(packedValue)) * 10'000'000;
-            if (sessionStart != 0) {
+            if (sessionStart != 0)
+            {
                 fullTimestamp = sessionStart + decodedValue;
             }
         }
@@ -560,10 +640,8 @@ void TimeStampCount() {
     }
 }
 
-
 void ImGuiLoadSaveButtons()
 {
-
     namespace SD = SystemData;
     if (ImGui::Button("Load Image"))
     {
@@ -577,7 +655,13 @@ void ImGuiLoadSaveButtons()
             // std::cout << "3" << std::endl;
         }
         // std::cout << "4" << std::endl;
-        SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+        SystemData::points = ApplyColorToPointcloud(
+            SystemData::points,
+            SystemData::imageData,
+            SystemData::imageWidth,
+            SystemData::imageHeight,
+            SystemData::imageNrChannels,
+            SystemData::camera_pose);
         // std::cout << "5" << std::endl;
     }
     ImGui::SameLine();
@@ -588,10 +672,22 @@ void ImGuiLoadSaveButtons()
         {
             auto points = mandeye::load(input_file_names.front());
             SystemData::points.resize(points.size());
-            std::transform(points.begin(), points.end(), SystemData::points.begin(), [&](const mandeye::Point &p)
-                           { return p; });
+            std::transform(
+                points.begin(),
+                points.end(),
+                SystemData::points.begin(),
+                [&](const mandeye::Point& p)
+                {
+                    return p;
+                });
         }
-        SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+        SystemData::points = ApplyColorToPointcloud(
+            SystemData::points,
+            SystemData::imageData,
+            SystemData::imageWidth,
+            SystemData::imageHeight,
+            SystemData::imageNrChannels,
+            SystemData::camera_pose);
     }
     ImGui::SameLine();
     if (ImGui::Button("Save Pointcloud"))
@@ -616,23 +712,41 @@ void optimize()
         TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
         for (int i = 0; i < SystemData::pointPickedImage.size(); i++)
         {
-
             Eigen::Matrix<double, 2, 1> delta;
-            observation_equation_equrectangular_camera_colinearity_tait_bryan_wc(delta, SystemData::imageHeight, SystemData::imageWidth, M_PI,
-                                                                                 pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
-                                                                                 SystemData::pointPickedPointCloud[i].x(),
-                                                                                 SystemData::pointPickedPointCloud[i].y(),
-                                                                                 SystemData::pointPickedPointCloud[i].z(),
-                                                                                 SystemData::pointPickedImage[i].x * SystemData::imageWidth,
-                                                                                 SystemData::pointPickedImage[i].y * SystemData::imageHeight);
+            observation_equation_equrectangular_camera_colinearity_tait_bryan_wc(
+                delta,
+                SystemData::imageHeight,
+                SystemData::imageWidth,
+                M_PI,
+                pose.px,
+                pose.py,
+                pose.pz,
+                pose.om,
+                pose.fi,
+                pose.ka,
+                SystemData::pointPickedPointCloud[i].x(),
+                SystemData::pointPickedPointCloud[i].y(),
+                SystemData::pointPickedPointCloud[i].z(),
+                SystemData::pointPickedImage[i].x * SystemData::imageWidth,
+                SystemData::pointPickedImage[i].y * SystemData::imageHeight);
 
             Eigen::Matrix<double, 2, 9, Eigen::RowMajor> jacobian;
-            observation_equation_equrectangular_camera_colinearity_tait_bryan_wc_jacobian(jacobian, SystemData::imageHeight, SystemData::imageWidth, M_PI,
-                                                                                          pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
-                                                                                          SystemData::pointPickedPointCloud[i].x(),
-                                                                                          SystemData::pointPickedPointCloud[i].y(),
-                                                                                          SystemData::pointPickedPointCloud[i].z(),
-                                                                                          SystemData::pointPickedImage[i].x, SystemData::pointPickedImage[i].y);
+            observation_equation_equrectangular_camera_colinearity_tait_bryan_wc_jacobian(
+                jacobian,
+                SystemData::imageHeight,
+                SystemData::imageWidth,
+                M_PI,
+                pose.px,
+                pose.py,
+                pose.pz,
+                pose.om,
+                pose.fi,
+                pose.ka,
+                SystemData::pointPickedPointCloud[i].x(),
+                SystemData::pointPickedPointCloud[i].y(),
+                SystemData::pointPickedPointCloud[i].z(),
+                SystemData::pointPickedImage[i].x,
+                SystemData::pointPickedImage[i].y);
 
             int ir = tripletListB.size();
             int ic_camera = 0;
@@ -736,39 +850,70 @@ void optimize_fish_eye()
         TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
         for (int i = 0; i < SystemData::pointPickedImage.size(); i++)
         {
-
             Eigen::Matrix<double, 2, 1> delta;
-            // observation_equation_equrectangular_camera_colinearity_tait_bryan_wc(delta, SystemData::imageHeight, SystemData::imageWidth, M_PI,
+            // observation_equation_equrectangular_camera_colinearity_tait_bryan_wc(delta, SystemData::imageHeight, SystemData::imageWidth,
+            // M_PI,
             //                                                                      pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
             //                                                                      SystemData::pointPickedPointCloud[i].x(),
             //                                                                      SystemData::pointPickedPointCloud[i].y(),
             //                                                                      SystemData::pointPickedPointCloud[i].z(),
-            //                                                                      SystemData::pointPickedImage[i].x * SystemData::imageWidth,
-            //                                                                      SystemData::pointPickedImage[i].y * SystemData::imageHeight);
+            //                                                                      SystemData::pointPickedImage[i].x *
+            //                                                                      SystemData::imageWidth,
+            //                                                                      SystemData::pointPickedImage[i].y *
+            //                                                                      SystemData::imageHeight);
 
-            observation_equation_fisheye_camera_tait_bryan_wc(delta, fx, fy, cx, cy,
-                                                              pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
-                                                              SystemData::pointPickedPointCloud[i].x(),
-                                                              SystemData::pointPickedPointCloud[i].y(),
-                                                              SystemData::pointPickedPointCloud[i].z(),
-                                                              SystemData::pointPickedImage[i].x * SystemData::imageWidth,
-                                                              SystemData::pointPickedImage[i].y * SystemData::imageHeight,
-                                                              k1, k2, k3, k4, alpha);
+            observation_equation_fisheye_camera_tait_bryan_wc(
+                delta,
+                fx,
+                fy,
+                cx,
+                cy,
+                pose.px,
+                pose.py,
+                pose.pz,
+                pose.om,
+                pose.fi,
+                pose.ka,
+                SystemData::pointPickedPointCloud[i].x(),
+                SystemData::pointPickedPointCloud[i].y(),
+                SystemData::pointPickedPointCloud[i].z(),
+                SystemData::pointPickedImage[i].x * SystemData::imageWidth,
+                SystemData::pointPickedImage[i].y * SystemData::imageHeight,
+                k1,
+                k2,
+                k3,
+                k4,
+                alpha);
 
             Eigen::Matrix<double, 2, 6> jacobian;
-            // observation_equation_equrectangular_camera_colinearity_tait_bryan_wc_jacobian(jacobian, SystemData::imageHeight, SystemData::imageWidth, M_PI,
-            //                                                                               pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+            // observation_equation_equrectangular_camera_colinearity_tait_bryan_wc_jacobian(jacobian, SystemData::imageHeight,
+            // SystemData::imageWidth, M_PI,
+            //                                                                               pose.px, pose.py, pose.pz, pose.om, pose.fi,
+            //                                                                               pose.ka,
             //                                                                               SystemData::pointPickedPointCloud[i].x(),
             //                                                                               SystemData::pointPickedPointCloud[i].y(),
             //                                                                               SystemData::pointPickedPointCloud[i].z(),
-            //                                                                               SystemData::pointPickedImage[i].x, SystemData::pointPickedImage[i].y);
+            //                                                                               SystemData::pointPickedImage[i].x,
+            //                                                                               SystemData::pointPickedImage[i].y);
 
-            observation_equation_fisheye_camera_tait_bryan_wc_jacobian(jacobian, fx, fy,
-                                                                       pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
-                                                                       SystemData::pointPickedPointCloud[i].x(),
-                                                                       SystemData::pointPickedPointCloud[i].y(),
-                                                                       SystemData::pointPickedPointCloud[i].z(),
-                                                                       k1, k2, k3, k4, alpha);
+            observation_equation_fisheye_camera_tait_bryan_wc_jacobian(
+                jacobian,
+                fx,
+                fy,
+                pose.px,
+                pose.py,
+                pose.pz,
+                pose.om,
+                pose.fi,
+                pose.ka,
+                SystemData::pointPickedPointCloud[i].x(),
+                SystemData::pointPickedPointCloud[i].y(),
+                SystemData::pointPickedPointCloud[i].z(),
+                k1,
+                k2,
+                k3,
+                k4,
+                alpha);
 
             int ir = tripletListB.size();
             int ic_camera = 0;
@@ -865,7 +1010,7 @@ void optimize_fish_eye()
 
 void display()
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -883,7 +1028,7 @@ void display()
     // glColor3f(p.rgb.data());
     glPointSize(SystemData::point_size);
     glBegin(GL_POINTS);
-    for (const auto &p : SystemData::points)
+    for (const auto& p : SystemData::points)
     {
         if (color)
         {
@@ -901,7 +1046,7 @@ void display()
     //////////////////////////////////
     glPointSize(10);
     glBegin(GL_POINTS);
-    for (const auto &p : SystemData::pointPickedPointCloud)
+    for (const auto& p : SystemData::pointPickedPointCloud)
     {
         glColor3f(1.f, 0.f, 0.f);
         glVertex3dv(p.data());
@@ -927,17 +1072,19 @@ void display()
     }
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
-	ImGui::NewFrame();
+    ImGui::NewFrame();
 
     std::vector<ImVec2> picked3DPoints(SystemData::pointPickedPointCloud.size());
-    std::transform(SystemData::pointPickedPointCloud.begin(), SystemData::pointPickedPointCloud.end(), picked3DPoints.begin(), UnprojectPoint);
+    std::transform(
+        SystemData::pointPickedPointCloud.begin(), SystemData::pointPickedPointCloud.end(), picked3DPoints.begin(), UnprojectPoint);
 
     ImGui::Begin("Image");
     ImGuiLoadSaveButtons();
     TimeStampCount();
-    //if (ImGui::Button("apply color to PC (fishEye)"))
+    // if (ImGui::Button("apply color to PC (fishEye)"))
     //{
-    //    SystemData::points = ApplyColorToPointcloudFishEye(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+    //    SystemData::points = ApplyColorToPointcloudFishEye(SystemData::points, SystemData::imageData, SystemData::imageWidth,
+    //    SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
     //}
 
     if (ImGui::Button("Optimize"))
@@ -952,7 +1099,13 @@ void display()
         std::cout << "om " << pose.om << std::endl;
         std::cout << "fi " << pose.fi << std::endl;
         std::cout << "ka " << pose.ka << std::endl;
-        SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+        SystemData::points = ApplyColorToPointcloud(
+            SystemData::points,
+            SystemData::imageData,
+            SystemData::imageWidth,
+            SystemData::imageHeight,
+            SystemData::imageNrChannels,
+            SystemData::camera_pose);
     }
     ImGui::SameLine();
 
@@ -968,7 +1121,8 @@ void display()
         std::cout << "om " << pose.om << std::endl;
         std::cout << "fi " << pose.fi << std::endl;
         std::cout << "ka " << pose.ka << std::endl;
-        SystemData::points = ApplyColorToPointcloudFishEye(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+        SystemData::points = ApplyColorToPointcloudFishEye(SystemData::points, SystemData::imageData, SystemData::imageWidth,
+    SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
     }*/
     ImGui::SameLine();
 
@@ -990,7 +1144,13 @@ void display()
         std::cout << "om " << pose.om << std::endl;
         std::cout << "fi " << pose.fi << std::endl;
         std::cout << "ka " << pose.ka << std::endl;
-        SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+        SystemData::points = ApplyColorToPointcloud(
+            SystemData::points,
+            SystemData::imageData,
+            SystemData::imageWidth,
+            SystemData::imageHeight,
+            SystemData::imageNrChannels,
+            SystemData::camera_pose);
     }
     ImGui::InputInt("point_size", &SystemData::point_size);
 
@@ -1009,17 +1169,20 @@ void display()
         if (!outfile.good())
         {
             std::cout << "can not save file: " << output_file_name << std::endl;
-            
+
             return;
         }
 
         outfile << 1 << std::endl;
         outfile << "camera_to_lidar_relative_pose" << std::endl;
-        outfile << SystemData::camera_pose(0, 0) << " " << SystemData::camera_pose(0, 1) << " " << SystemData::camera_pose(0, 2) << " " << SystemData::camera_pose(0, 3) << std::endl;
-        outfile << SystemData::camera_pose(1, 0) << " " << SystemData::camera_pose(1, 1) << " " << SystemData::camera_pose(1, 2) << " " << SystemData::camera_pose(1, 3) << std::endl;
-        outfile << SystemData::camera_pose(2, 0) << " " << SystemData::camera_pose(2, 1) << " " << SystemData::camera_pose(2, 2) << " " << SystemData::camera_pose(2, 3) << std::endl;
+        outfile << SystemData::camera_pose(0, 0) << " " << SystemData::camera_pose(0, 1) << " " << SystemData::camera_pose(0, 2) << " "
+                << SystemData::camera_pose(0, 3) << std::endl;
+        outfile << SystemData::camera_pose(1, 0) << " " << SystemData::camera_pose(1, 1) << " " << SystemData::camera_pose(1, 2) << " "
+                << SystemData::camera_pose(1, 3) << std::endl;
+        outfile << SystemData::camera_pose(2, 0) << " " << SystemData::camera_pose(2, 1) << " " << SystemData::camera_pose(2, 2) << " "
+                << SystemData::camera_pose(2, 3) << std::endl;
         outfile << "0 0 0 1" << std::endl;
-           
+
         outfile.close();
     }
 
@@ -1072,8 +1235,8 @@ void display()
 
             std::getline(infile, line);
 
-            //PointCloud pc;
-            //pc.file_name = point_cloud_file_name;
+            // PointCloud pc;
+            // pc.file_name = point_cloud_file_name;
             SystemData::camera_pose = Eigen::Affine3d::Identity();
             SystemData::camera_pose(0, 0) = r11;
             SystemData::camera_pose(0, 1) = r12;
@@ -1098,7 +1261,13 @@ void display()
         std::cout << "om " << pose.om << std::endl;
         std::cout << "fi " << pose.fi << std::endl;
         std::cout << "ka " << pose.ka << std::endl;
-        SystemData::points = ApplyColorToPointcloud(SystemData::points, SystemData::imageData, SystemData::imageWidth, SystemData::imageHeight, SystemData::imageNrChannels, SystemData::camera_pose);
+        SystemData::points = ApplyColorToPointcloud(
+            SystemData::points,
+            SystemData::imageData,
+            SystemData::imageWidth,
+            SystemData::imageHeight,
+            SystemData::imageNrChannels,
+            SystemData::camera_pose);
     }
 
     imagePicker("ImagePicker", (ImTextureID)tex1, SystemData::pointPickedImage, picked3DPoints);
@@ -1116,7 +1285,7 @@ void display()
     for (auto it = SystemData::pointPickedImage.begin(); it != SystemData::pointPickedImage.end(); it++)
     {
         auto index = std::distance(SystemData::pointPickedImage.begin(), it);
-        const auto &p = *it;
+        const auto& p = *it;
         ImGui::Text("%d : %.1f,%.1f", index, p.x, p.y);
         ImGui::SameLine();
         const auto label = std::string("-##2s") + std::to_string(index);
@@ -1135,7 +1304,7 @@ void display()
     ImGui::Text("3D:");
     for (auto it = SystemData::pointPickedPointCloud.begin(); it != SystemData::pointPickedPointCloud.end(); it++)
     {
-        const auto &p = *it;
+        const auto& p = *it;
         const auto index = std::distance(SystemData::pointPickedPointCloud.begin(), it);
         auto prev = it != SystemData::pointPickedPointCloud.begin() ? it - 1 : SystemData::pointPickedPointCloud.end();
         auto next = it + 1 != SystemData::pointPickedPointCloud.end() ? it + 1 : SystemData::pointPickedPointCloud.end();
@@ -1183,7 +1352,7 @@ void display()
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGui_ImplGLUT_MouseFunc(glut_button, state, x, y);
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     int button = -1;
     if (glut_button == GLUT_LEFT_BUTTON)
         button = 0;
@@ -1212,24 +1381,29 @@ void mouse(int glut_button, int state, int x, int y)
                 SystemData::clickedRay = GetRay(x, y);
 
                 std::mutex mtx;
-                std::pair<double, int> distanceIndexPair{std::numeric_limits<double>::max(), -1};
+                std::pair<double, int> distanceIndexPair{ std::numeric_limits<double>::max(), -1 };
 
-                std::for_each(std::execution::par_unseq, SystemData::points.begin(), SystemData::points.end(), [&](const mandeye::PointRGB &p)
-                              {
-                    double D = GetDistanceToRay(p.point, SystemData::clickedRay);
-                    std::lock_guard<std::mutex> guard(mtx);
-                    if (D < distanceIndexPair.first)
+                std::for_each(
+                    std::execution::par_unseq,
+                    SystemData::points.begin(),
+                    SystemData::points.end(),
+                    [&](const mandeye::PointRGB& p)
                     {
-                        // Assume that SystemData::point is an array-like type implementation, naked pointer arithmetic ahead:
-                        const int index = &p - &SystemData::points.front();
-                        assert(index >= 0);
-                        assert(index < SystemData::points.size());
-                        distanceIndexPair = { D, index };
-                    } });
+                        double D = GetDistanceToRay(p.point, SystemData::clickedRay);
+                        std::lock_guard<std::mutex> guard(mtx);
+                        if (D < distanceIndexPair.first)
+                        {
+                            // Assume that SystemData::point is an array-like type implementation, naked pointer arithmetic ahead:
+                            const int index = &p - &SystemData::points.front();
+                            assert(index >= 0);
+                            assert(index < SystemData::points.size());
+                            distanceIndexPair = { D, index };
+                        }
+                    });
 
                 if (distanceIndexPair.second > 0)
                 {
-                    const auto &[distance, index] = distanceIndexPair;
+                    const auto& [distance, index] = distanceIndexPair;
                     std::cout << "Closest point found, distance " << distance << std::endl;
                     SystemData::closestPointIndex = distanceIndexPair.second;
                     SystemData::pointPickedPointCloud.push_back(SystemData::points.at(index).point);
@@ -1249,7 +1423,7 @@ void mouse(int glut_button, int state, int x, int y)
 void motion(int x, int y)
 {
     ImGui_ImplGLUT_MotionFunc(x, y);
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
 
     if (!io.WantCaptureMouse)
     {
@@ -1287,7 +1461,7 @@ void reshape(int w, int h)
     glLoadIdentity();
 }
 
-bool initGL(int *argc, char **argv)
+bool initGL(int* argc, char** argv)
 {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
@@ -1305,11 +1479,10 @@ bool initGL(int *argc, char **argv)
     // projection
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01,
-                   1000.0);
+    gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01, 1000.0);
     glutReshapeFunc(reshape);
     ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     (void)io;
 
     ImGui::StyleColorsDark();

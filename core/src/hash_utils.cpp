@@ -1,10 +1,12 @@
+#include <pch/pch.h>
+
 #include <hash_utils.h>
 
 unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z)
 {
     return ((static_cast<unsigned long long int>(x) << 32) & (0x0000FFFF00000000ull)) |
-           ((static_cast<unsigned long long int>(y) << 16) & (0x00000000FFFF0000ull)) |
-           ((static_cast<unsigned long long int>(z) << 0) & (0x000000000000FFFFull));
+        ((static_cast<unsigned long long int>(y) << 16) & (0x00000000FFFF0000ull)) |
+        ((static_cast<unsigned long long int>(z) << 0) & (0x000000000000FFFFull));
 }
 
 unsigned long long int get_rgd_index(const Eigen::Vector3d p, const Eigen::Vector3d b)

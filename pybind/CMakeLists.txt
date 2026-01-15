@@ -74,11 +74,11 @@ target_include_directories(core_py
             ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
             ${EIGEN3_INCLUDE_DIR}
             ${LASZIP_INCLUDE_DIR}/LASzip/include
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
-            ${EXTERNAL_LIBRARIES_DIRECTORY}
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
+            ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+            ${THIRDPARTY_DIRECTORY}/json/include
+            ${THIRDPARTY_DIRECTORY}
+            ${THIRDPARTY_DIRECTORY}/glm
+            ${THIRDPARTY_DIRECTORY}/observation_equations/codes
 )
 
 target_include_directories(lidar_odometry_py
@@ -88,11 +88,12 @@ target_include_directories(lidar_odometry_py
             ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
             ${EIGEN3_INCLUDE_DIR}
             ${LASZIP_INCLUDE_DIR}/LASzip/include
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
-            ${EXTERNAL_LIBRARIES_DIRECTORY}
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
+            ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+            ${THIRDPARTY_DIRECTORY}/json/include
+            ${THIRDPARTY_DIRECTORY}/tomlplusplus/include
+            ${THIRDPARTY_DIRECTORY}
+            ${THIRDPARTY_DIRECTORY}/glm
+            ${THIRDPARTY_DIRECTORY}/observation_equations/codes
 )
 
 target_include_directories(multi_view_tls_registration_py
@@ -102,11 +103,11 @@ target_include_directories(multi_view_tls_registration_py
             ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
             ${EIGEN3_INCLUDE_DIR}
             ${LASZIP_INCLUDE_DIR}/LASzip/include
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
-            ${EXTERNAL_LIBRARIES_DIRECTORY}
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
-            ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
+            ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+            ${THIRDPARTY_DIRECTORY}/json/include
+            ${THIRDPARTY_DIRECTORY}
+            ${THIRDPARTY_DIRECTORY}/glm
+            ${THIRDPARTY_DIRECTORY}/observation_equations/codes
 )
 
 target_link_libraries(core_py

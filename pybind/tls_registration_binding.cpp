@@ -1,17 +1,18 @@
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <pybind11/eigen.h>
 
-#include <pose_graph_loop_closure.h>
-#include <multi_view_tls_registration.h>
-#include <icp.h>
 #include <gnss.h>
-#include <registration_plane_feature.h>
+#include <icp.h>
+#include <multi_view_tls_registration.h>
+#include <pose_graph_loop_closure.h>
 #include <pose_graph_slam.h>
+#include <registration_plane_feature.h>
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(multi_view_tls_registration_py, m) {
+PYBIND11_MODULE(multi_view_tls_registration_py, m)
+{
     py::class_<TLSRegistration>(m, "TLSRegistration")
         .def(py::init<>())
         .def_readwrite("use_ndt", &TLSRegistration::use_ndt)
@@ -60,31 +61,26 @@ PYBIND11_MODULE(multi_view_tls_registration_py, m) {
         .def_readwrite("write_lidar_timestamp", &TLSRegistration::write_lidar_timestamp)
         .def_readwrite("write_unix_timestamp", &TLSRegistration::write_unix_timestamp)
         .def_readwrite("use_quaternions", &TLSRegistration::use_quaternions)
-        .def("set_zoller_frohlich_tls_imager_5006i_errors",
+        .def(
+            "set_zoller_frohlich_tls_imager_5006i_errors",
             &TLSRegistration::set_zoller_frohlich_tls_imager_5006i_errors,
             "Set the Zoller-Frohlich TLS Imager 5006i errors")
-        .def("set_zoller_frohlich_tls_imager_5010c_errors",
+        .def(
+            "set_zoller_frohlich_tls_imager_5010c_errors",
             &TLSRegistration::set_zoller_frohlich_tls_imager_5010c_errors,
             "Set the Zoller-Frohlich TLS Imager 5010c errors")
-        .def("set_zoller_frohlich_tls_imager_5016_errors",
+        .def(
+            "set_zoller_frohlich_tls_imager_5016_errors",
             &TLSRegistration::set_zoller_frohlich_tls_imager_5016_errors,
             "Set the Zoller-Frohlich TLS Imager 5016 errors")
-        .def("set_faro_focus3d_errors",
-            &TLSRegistration::set_faro_focus3d_errors,
-            "Set the FARO Focus3D errors")
-        .def("set_leica_scanstation_c5_c10_errors",
+        .def("set_faro_focus3d_errors", &TLSRegistration::set_faro_focus3d_errors, "Set the FARO Focus3D errors")
+        .def(
+            "set_leica_scanstation_c5_c10_errors",
             &TLSRegistration::set_leica_scanstation_c5_c10_errors,
             "Set the Leica ScanStation C5/C10 errors")
-        .def("set_riegl_vz400_errors",
-            &TLSRegistration::set_riegl_vz400_errors,
-            "Set the Riegl VZ400 errors")
-        .def("set_leica_hds6100_errors",
-            &TLSRegistration::set_leica_hds6100_errors,
-            "Set the Leica HDS6100 errors")
-        .def("set_leica_p40_errors",
-            &TLSRegistration::set_leica_p40_errors,
-            "Set the Leica P40 errors")
-        ;
+        .def("set_riegl_vz400_errors", &TLSRegistration::set_riegl_vz400_errors, "Set the Riegl VZ400 errors")
+        .def("set_leica_hds6100_errors", &TLSRegistration::set_leica_hds6100_errors, "Set the Leica HDS6100 errors")
+        .def("set_leica_p40_errors", &TLSRegistration::set_leica_p40_errors, "Set the Leica P40 errors");
 
     py::class_<ICP>(m, "ICP")
         .def(py::init<>())
@@ -141,32 +137,29 @@ PYBIND11_MODULE(multi_view_tls_registration_py, m) {
         .def_readwrite("is_fixed_pz", &PoseGraphLoopClosure::Edge::is_fixed_pz)
         .def_readwrite("is_fixed_om", &PoseGraphLoopClosure::Edge::is_fixed_om)
         .def_readwrite("is_fixed_fi", &PoseGraphLoopClosure::Edge::is_fixed_fi)
-        .def_readwrite("is_fixed_ka", &PoseGraphLoopClosure::Edge::is_fixed_ka);       
+        .def_readwrite("is_fixed_ka", &PoseGraphLoopClosure::Edge::is_fixed_ka);
 
     py::class_<PoseGraphLoopClosure>(m, "PoseGraphLoopClosure")
         .def(py::init<>())
         .def_readwrite("edges", &PoseGraphLoopClosure::edges)
         .def_readwrite("poses_motion_model", &PoseGraphLoopClosure::poses_motion_model)
-        .def("set_initial_poses_as_motion_model",
+        .def(
+            "set_initial_poses_as_motion_model",
             &PoseGraphLoopClosure::set_initial_poses_as_motion_model,
             "Set initial poses as motion model")
-        .def("set_current_poses_as_motion_model",
+        .def(
+            "set_current_poses_as_motion_model",
             &PoseGraphLoopClosure::set_current_poses_as_motion_model,
             "Set current poses as motion model")
-        .def("graph_slam",
-            &PoseGraphLoopClosure::graph_slam,
-            "Run graph SLAM for given point clouds, GNSS and control points")
-        .def("run_icp",
-            &PoseGraphLoopClosure::run_icp,
-            "Run ICP for the selected active edge")
-        .def("add_edge",
-            &PoseGraphLoopClosure::add_edge,
-            "Add new edge to the pose graph")
-        ;
+        .def("graph_slam", &PoseGraphLoopClosure::graph_slam, "Run graph SLAM for given point clouds, GNSS and control points")
+        .def("run_icp", &PoseGraphLoopClosure::run_icp, "Run ICP for the selected active edge")
+        .def("add_edge", &PoseGraphLoopClosure::add_edge, "Add new edge to the pose graph");
 
-    m.def("run_multi_view_tls_registration", &run_multi_view_tls_registration,
-          py::arg("input_file_name"),
-          py::arg("tls_registration"),
-          py::arg("output_dir"),
-          "Run multi-view TLS registration with the provided input file, output file, and TLS registration configuration.");
+    m.def(
+        "run_multi_view_tls_registration",
+        &run_multi_view_tls_registration,
+        py::arg("input_file_name"),
+        py::arg("tls_registration"),
+        py::arg("output_dir"),
+        "Run multi-view TLS registration with the provided input file, output file, and TLS registration configuration.");
 }

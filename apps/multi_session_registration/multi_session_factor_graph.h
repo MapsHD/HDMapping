@@ -1,5 +1,4 @@
-#ifndef _MULTI_SESSION_FACTOR_GRAPH_H_
-#define _MULTI_SESSION_FACTOR_GRAPH_H_
+#pragma once
 
 #include <session.h>
 
@@ -19,6 +18,4 @@ struct Edge
     bool is_fixed_ka = false;
 };
 
-bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges);
-
-#endif
+bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges);

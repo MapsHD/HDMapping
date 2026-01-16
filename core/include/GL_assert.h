@@ -1,7 +1,9 @@
 #pragma once
+
+#include <GL/glew.h>
+
 #include <cassert>
 #include <iostream>
-#include <GL/glew.h>
 
 // Macro to wrap OpenGL calls and check for errors
 #define GL_CALL(x)                                                                                                                         \
@@ -19,17 +21,18 @@
 // Macro to wrap OpenGL calls that return a value. Evaluates the call once, checks for GL errors,
 // and returns the call result. Implemented as a lambda to preserve the expression type.
 #define GL_CALL_RET(x)                                                                                                                     \
-    ([&]() -> decltype(x)                                                                                                                  \
-    {                                                                                                                                      \
-        auto _gl_call_result = (x);                                                                                                        \
-        GLenum _gl_call_err = glGetError();                                                                                                \
-        if (_gl_call_err != GL_NO_ERROR)                                                                                                   \
-        {                                                                                                                                   \
-            std::cerr << "OpenGL Error (" << _gl_call_err << "): " << __FILE__ << " at line " << __LINE__ << std::endl;                      \
-            assert(false && "OpenGL Error");                                                                                              \
-        }                                                                                                                                   \
-        return _gl_call_result;                                                                                                             \
-    }())
+    (                                                                                                                                      \
+        [&]() -> decltype(x)                                                                                                               \
+        {                                                                                                                                  \
+            auto _gl_call_result = (x);                                                                                                    \
+            GLenum _gl_call_err = glGetError();                                                                                            \
+            if (_gl_call_err != GL_NO_ERROR)                                                                                               \
+            {                                                                                                                              \
+                std::cerr << "OpenGL Error (" << _gl_call_err << "): " << __FILE__ << " at line " << __LINE__ << std::endl;                \
+                assert(false && "OpenGL Error");                                                                                           \
+            }                                                                                                                              \
+            return _gl_call_result;                                                                                                        \
+        }())
 
 static bool CheckUniformLocation(GLint location, const char* name)
 {

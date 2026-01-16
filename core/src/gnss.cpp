@@ -1,18 +1,17 @@
-#include <gnss.h>
-#include <wgs84_do_puwg92.h>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <iomanip>
-#include <algorithm>
+#include <pch/pch.h>
+
 #include <WGS84toCartesian.hpp>
-#include <laszip/laszip_api.h>
+#include <gnss.h>
 #include <nmea.h>
+#include <wgs84_do_puwg92.h>
+
 #if WITH_GUI == 1
 #include <GL/freeglut.h>
 #endif
 
-inline void split(std::string &str, char delim, std::vector<std::string> &out)
+#include <laszip/laszip_api.h>
+
+inline void split(std::string& str, char delim, std::vector<std::string>& out)
 {
     size_t start;
     size_t end = 0;
@@ -24,7 +23,7 @@ inline void split(std::string &str, char delim, std::vector<std::string> &out)
     }
 }
 
-bool GNSS::load(const std::vector<std::string> &input_file_names, Eigen::Vector3d &out_offset, bool localize)
+bool GNSS::load(const std::vector<std::string>& input_file_names, Eigen::Vector3d& out_offset, bool localize)
 {
     // 54651848940 5156.43798828125 2009.1610107421875 122.1999969482421875 1.25 8 35.799999237060546875 nan 14:51:42 1
     // timestamp lat lon alt hdop satelites_tracked height age time fix_quality
@@ -36,12 +35,12 @@ bool GNSS::load(const std::vector<std::string> &input_file_names, Eigen::Vector3
     gnss_poses.clear();
 
     std::cout << "loading GNSS data from following files:" << std::endl;
-    for (const auto &fn : input_file_names)
+    for (const auto& fn : input_file_names)
     {
         std::cout << fn << std::endl;
     }
 
-    for (const auto &fn : input_file_names)
+    for (const auto& fn : input_file_names)
     {
         std::ifstream infile(fn);
         if (!infile.good())
@@ -86,11 +85,21 @@ bool GNSS::load(const std::vector<std::string> &input_file_names, Eigen::Vector3
         infile.close();
     }
 
-    std::sort(gnss_poses.begin(), gnss_poses.end(), [](GNSS::GlobalPose &a, GNSS::GlobalPose &b)
-              { return (a.timestamp < b.timestamp); });
+    std::sort(
+        gnss_poses.begin(),
+        gnss_poses.end(),
+        [](GNSS::GlobalPose& a, GNSS::GlobalPose& b)
+        {
+            return (a.timestamp < b.timestamp);
+        });
 
-    auto firstGNSSIt = std::find_if(gnss_poses.begin(), gnss_poses.end(), [](const GNSS::GlobalPose &gp)
-                                    { return gp.x != 0 && gp.y != 0 && gp.alt != 0; });
+    auto firstGNSSIt = std::find_if(
+        gnss_poses.begin(),
+        gnss_poses.end(),
+        [](const GNSS::GlobalPose& gp)
+        {
+            return gp.x != 0 && gp.y != 0 && gp.alt != 0;
+        });
     if (firstGNSSIt == gnss_poses.end())
     {
         std::cout << "no valid GNSS data" << std::endl;
@@ -113,33 +122,33 @@ bool GNSS::load(const std::vector<std::string> &input_file_names, Eigen::Vector3
 
     if (localize)
     {
-        for (auto &pose : gnss_poses)
+        for (auto& pose : gnss_poses)
         {
             pose.x = pose.x - firstGNSS.x;
             pose.y = pose.y - firstGNSS.y;
             pose.alt = pose.alt - firstGNSS.alt;
-            //std::cout << "pose.x: " << pose.x << " pose.y: " << pose.y << " pose.alt: " << pose.alt << std::endl;
+            // std::cout << "pose.x: " << pose.x << " pose.y: " << pose.y << " pose.alt: " << pose.alt << std::endl;
         }
     }
 
     std::cout << std::setprecision(20);
     std::cout << "firstGNSS: " << firstGNSS.lat << " " << firstGNSS.lon << " " << firstGNSS.alt << std::endl;
     std::cout << "firstGNSS: " << firstGNSS.x << " " << firstGNSS.y << " " << firstGNSS.alt << std::endl;
-    
+
     return true;
 }
 
-bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_names)
+bool GNSS::load_mercator_projection(const std::vector<std::string>& input_file_names)
 {
     gnss_poses.clear();
 
     std::cout << "loading GNSS data from following files:" << std::endl;
-    for (const auto &fn : input_file_names)
+    for (const auto& fn : input_file_names)
     {
         std::cout << fn << std::endl;
     }
 
-    for (const auto &fn : input_file_names)
+    for (const auto& fn : input_file_names)
     {
         std::ifstream infile(fn);
         if (!infile.good())
@@ -179,8 +188,8 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
                                 if (gp.lon != 0)
                                 {
                                     gnss_poses.push_back(gp);
-                                   // std::cout << std::setprecision(20);
-                                  //  std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << " gp.alt " << gp.alt << std::endl;
+                                    // std::cout << std::setprecision(20);
+                                    //  std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << " gp.alt " << gp.alt << std::endl;
                                 }
                             }
                         }
@@ -191,10 +200,15 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
         infile.close();
     }
 
-    std::sort(gnss_poses.begin(), gnss_poses.end(), [](GNSS::GlobalPose &a, GNSS::GlobalPose &b)
-              { return (a.timestamp < b.timestamp); });
+    std::sort(
+        gnss_poses.begin(),
+        gnss_poses.end(),
+        [](GNSS::GlobalPose& a, GNSS::GlobalPose& b)
+        {
+            return (a.timestamp < b.timestamp);
+        });
 
-    std::array<double, 2> WGS84Reference{0, 0};
+    std::array<double, 2> WGS84Reference{ 0, 0 };
 
     if (gnss_poses.size() > 0)
     {
@@ -214,8 +228,8 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
 
     for (int i = 0; i < gnss_poses.size(); i++)
     {
-        std::array<double, 2> WGS84Position{gnss_poses[i].lat, gnss_poses[i].lon};
-        std::array<double, 2> result{wgs84::toCartesian(WGS84Reference, WGS84Position)};
+        std::array<double, 2> WGS84Position{ gnss_poses[i].lat, gnss_poses[i].lon };
+        std::array<double, 2> result{ wgs84::toCartesian(WGS84Reference, WGS84Position) };
         gnss_poses[i].x = result[0];
         gnss_poses[i].y = result[1];
     }
@@ -223,7 +237,7 @@ bool GNSS::load_mercator_projection(const std::vector<std::string> &input_file_n
     return true;
 }
 
-double dm_to_dd(const std::string &dm, char direction, bool is_latitude)
+double dm_to_dd(const std::string& dm, char direction, bool is_latitude)
 {
     if (dm.empty())
         return 0.0;
@@ -240,19 +254,18 @@ double dm_to_dd(const std::string &dm, char direction, bool is_latitude)
     return dd;
 }
 
-
-bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_file_names)
+bool GNSS::load_nmea_mercator_projection(const std::vector<std::string>& input_file_names)
 {
     gnss_poses.clear();
 
     std::cout << "loading NMEA data from following files:" << std::endl;
-    for (const auto &fn : input_file_names)
+    for (const auto& fn : input_file_names)
     {
         std::cout << fn << std::endl;
     }
     std::optional<hd_mapping::nmea::GNGGAData> lastGGAData;
     std::optional<hd_mapping::nmea::GNRMCData> lastRMCData;
-    for (const auto &fn : input_file_names)
+    for (const auto& fn : input_file_names)
     {
         std::ifstream infile(fn);
         if (!infile.good())
@@ -267,48 +280,57 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_f
             using namespace hd_mapping::nmea;
 
             auto [timestampLidar, timestampUnix, nmeaSentence] = BreakLineFromNMEAFile(line);
-            if (!validateNMEAChecksum(nmeaSentence)) {
-                  std::cout << "Invalid NMEA checksum in line: " << line << std::endl;
-                  continue;
+            if (!validateNMEAChecksum(nmeaSentence))
+            {
+                std::cout << "Invalid NMEA checksum in line: " << line << std::endl;
+                continue;
             }
 
             const auto gga = parseGNGGA(nmeaSentence);
             const auto rmc = parseGNRMC(nmeaSentence);
-            if (rmc.has_value()) {
+            if (rmc.has_value())
+            {
                 lastRMCData = rmc;
             }
-            if (gga.has_value()) {
-                    lastGGAData = gga;
+            if (gga.has_value())
+            {
+                lastGGAData = gga;
             }
-            if (gga.has_value()) {
-              GlobalPose gp;
-              gp.timestamp = timestampLidar;
-              gp.lat = gga->latitude;
-              gp.lon = gga->longitude;
-              gp.alt = gga->altitude;
-              gp.hdop = gga->hdop;
-              gp.height = gga->altitude;
-              gp.age = gga->age_of_data;
-              gp.time = 0; // todo convert to seconds from string
-              gp.fix_quality = gga->fix_quality;
+            if (gga.has_value())
+            {
+                GlobalPose gp;
+                gp.timestamp = timestampLidar;
+                gp.lat = gga->latitude;
+                gp.lon = gga->longitude;
+                gp.alt = gga->altitude;
+                gp.hdop = gga->hdop;
+                gp.height = gga->altitude;
+                gp.age = gga->age_of_data;
+                gp.time = 0; // todo convert to seconds from string
+                gp.fix_quality = gga->fix_quality;
 
-              // register if there  is not nans
-              if (gp.lat == gp.lat && gp.lon == gp.lon &&
-                  gp.alt == gp.alt) {
-                  //std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << std::endl;
-                  gnss_poses.push_back(gp);
-              }
+                // register if there  is not nans
+                if (gp.lat == gp.lat && gp.lon == gp.lon && gp.alt == gp.alt)
+                {
+                    // std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << std::endl;
+                    gnss_poses.push_back(gp);
+                }
             }
         }
         infile.close();
     }
 
     std::cout << "loaded " << gnss_poses.size() << " gps poses" << std::endl;
-    
-    std::sort(gnss_poses.begin(), gnss_poses.end(), [](GNSS::GlobalPose &a, GNSS::GlobalPose &b)
-                                                  { return (a.timestamp < b.timestamp); });
 
-    std::array<double, 2> WGS84Reference{0, 0};
+    std::sort(
+        gnss_poses.begin(),
+        gnss_poses.end(),
+        [](GNSS::GlobalPose& a, GNSS::GlobalPose& b)
+        {
+            return (a.timestamp < b.timestamp);
+        });
+
+    std::array<double, 2> WGS84Reference{ 0, 0 };
 
     if (gnss_poses.size() > 0)
     {
@@ -328,25 +350,28 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string> &input_f
 
     for (int i = 0; i < gnss_poses.size(); i++)
     {
-        std::array<double, 2> WGS84Position{gnss_poses[i].lat, gnss_poses[i].lon};
-        std::array<double, 2> result{wgs84::toCartesian(WGS84Reference, WGS84Position)};
+        std::array<double, 2> WGS84Position{ gnss_poses[i].lat, gnss_poses[i].lon };
+        std::array<double, 2> result{ wgs84::toCartesian(WGS84Reference, WGS84Position) };
         gnss_poses[i].x = result[0];
         gnss_poses[i].y = result[1];
 
-        //std::cout << "gnss_poses[i].x " << gnss_poses[i].x << " gnss_poses[i].y " << gnss_poses[i].y << std::endl;
+        // std::cout << "gnss_poses[i].x " << gnss_poses[i].x << " gnss_poses[i].y " << gnss_poses[i].y << std::endl;
     }
 
     return true;
 }
 
 #if WITH_GUI == 1
-void GNSS::render(const PointClouds &point_clouds_container)
+void GNSS::render(const PointClouds& point_clouds_container)
 {
     glColor3f(1, 1, 1);
     glBegin(GL_LINE_STRIP);
     for (int i = 0; i < gnss_poses.size(); i++)
     {
-        glVertex3f(gnss_poses[i].x - point_clouds_container.offset.x(), gnss_poses[i].y - point_clouds_container.offset.y(), gnss_poses[i].alt - point_clouds_container.offset.z());
+        glVertex3f(
+            gnss_poses[i].x - point_clouds_container.offset.x(),
+            gnss_poses[i].y - point_clouds_container.offset.y(),
+            gnss_poses[i].alt - point_clouds_container.offset.z());
     }
     glEnd();
 
@@ -354,27 +379,34 @@ void GNSS::render(const PointClouds &point_clouds_container)
     {
         glColor3f(1, 0, 0);
         glBegin(GL_LINES);
-        for (const auto &pc : point_clouds_container.point_clouds)
+        for (const auto& pc : point_clouds_container.point_clouds)
         {
             for (int i = 0; i < gnss_poses.size(); i++)
             {
                 double time_stamp = gnss_poses[i].timestamp;
 
-                auto it = std::lower_bound(pc.local_trajectory.begin(), pc.local_trajectory.end(),
-                                           time_stamp, [](const PointCloud::LocalTrajectoryNode &lhs, const double &time) -> bool
-                                           { return lhs.timestamps.first < time; });
+                auto it = std::lower_bound(
+                    pc.local_trajectory.begin(),
+                    pc.local_trajectory.end(),
+                    time_stamp,
+                    [](const PointCloud::LocalTrajectoryNode& lhs, const double& time) -> bool
+                    {
+                        return lhs.timestamps.first < time;
+                    });
 
                 int index = it - pc.local_trajectory.begin();
 
                 if (index > 0 && index < pc.local_trajectory.size())
                 {
-
                     if (fabs(time_stamp - pc.local_trajectory[index].timestamps.first) < 10e12)
                     {
                         auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
                         glVertex3f(m(0, 3), m(1, 3), m(2, 3));
 
-                        glVertex3f(gnss_poses[i].x - point_clouds_container.offset.x(), gnss_poses[i].y - point_clouds_container.offset.y(), gnss_poses[i].alt - point_clouds_container.offset.z());
+                        glVertex3f(
+                            gnss_poses[i].x - point_clouds_container.offset.x(),
+                            gnss_poses[i].y - point_clouds_container.offset.y(),
+                            gnss_poses[i].alt - point_clouds_container.offset.z());
                     }
                 }
             }
@@ -384,11 +416,12 @@ void GNSS::render(const PointClouds &point_clouds_container)
 }
 #endif
 
-bool GNSS::save_to_laz(const std::string &output_file_names, double offset_x, double offset_y, double offset_alt)
+bool GNSS::save_to_laz(const std::string& output_file_names, double offset_x, double offset_y, double offset_alt)
 {
     constexpr float scale = 0.0001f; // one tenth of milimeter
     // find max
-    Eigen::Vector3d max(std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest());
+    Eigen::Vector3d max(
+        std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest());
     Eigen::Vector3d min(std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
 
     for (int i = 0; i < gnss_poses.size(); i++)
@@ -412,7 +445,7 @@ bool GNSS::save_to_laz(const std::string &output_file_names, double offset_x, do
 
     // get a pointer to the header of the writer so we can populate it
 
-    laszip_header *header;
+    laszip_header* header;
 
     if (laszip_get_header_pointer(laszip_writer, &header))
     {
@@ -463,7 +496,7 @@ bool GNSS::save_to_laz(const std::string &output_file_names, double offset_x, do
 
     // get a pointer to the point of the writer that we will populate and write
 
-    laszip_point *point;
+    laszip_point* point;
     if (laszip_get_point_pointer(laszip_writer, &point))
     {
         fprintf(stderr, "DLL ERROR: getting point pointer from laszip writer\n");
@@ -477,7 +510,7 @@ bool GNSS::save_to_laz(const std::string &output_file_names, double offset_x, do
     {
         point->intensity = 0;
 
-        const auto &p = gnss_poses[i];
+        const auto& p = gnss_poses[i];
         p_count++;
         coordinates[0] = p.x;
         coordinates[1] = p.y;

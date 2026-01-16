@@ -1,16 +1,16 @@
-#ifndef _USE_MATH_DEFINES
-#define _USE_MATH_DEFINES
-#endif
 #include <cmath>
+
+// clang-format off
+#include <GL/glew.h>
+#include <GL/freeglut.h>
+// clang-format on
 
 #include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
-#include <ImGuizmo.h>
 #include <imgui_internal.h>
 
-#include <GL/glew.h>
-#include <GL/freeglut.h>
+#include <ImGuizmo.h>
 
 #include <Eigen/Eigen>
 
@@ -22,7 +22,6 @@
 #include <registration_plane_feature.h>
 #include <transformations.h>
 #include <pose_graph_slam.h>
-#include <pcl_wrapper.h>
 #include <observation_picking.h>
 
 #include <portable-file-dialogs.h>
@@ -40,7 +39,7 @@
 
 namespace fs = std::filesystem;
 
-void export_result_to_folder(std::string output_folder_name, ObservationPicking &observation_picking, Session &session)
+void export_result_to_folder(std::string output_folder_name, ObservationPicking& observation_picking, Session& session)
 {
     fs::path path(output_folder_name);
     std::string file_name_rms = "rms.csv";
@@ -71,7 +70,7 @@ void export_result_to_folder(std::string output_folder_name, ObservationPicking 
         outfile_initial.open(path_initial, std::ios_base::app);
         outfile_result.open(path_result, std::ios_base::app);
 
-        const auto &intersection = observation_picking.intersections[i];
+        const auto& intersection = observation_picking.intersections[i];
         TaitBryanPose pose;
         pose.px = intersection.translation[0];
         pose.py = intersection.translation[1];
@@ -90,8 +89,8 @@ void export_result_to_folder(std::string output_folder_name, ObservationPicking 
 
         for (int pc_index = 0; pc_index < session.point_clouds_container.point_clouds.size(); pc_index++)
         {
-            const auto &pc = session.point_clouds_container.point_clouds[pc_index];
-            for (const auto &p : pc.points_local)
+            const auto& pc = session.point_clouds_container.point_clouds[pc_index];
+            for (const auto& p : pc.points_local)
             {
                 Eigen::Vector3d vpi = pc.m_initial_pose * p;
                 Eigen::Vector3d vpr = pc.m_pose * p;
@@ -105,7 +104,8 @@ void export_result_to_folder(std::string output_folder_name, ObservationPicking 
                     {
                         if (fabs(vpit.z()) < h)
                         {
-                            outfile_initial << vpit.x() << ";" << vpit.y() << ";" << vpit.z() << ";" << pc_index << ";1;" << i << ";" << pc.file_name << std::endl;
+                            outfile_initial << vpit.x() << ";" << vpit.y() << ";" << vpit.z() << ";" << pc_index << ";1;" << i << ";"
+                                            << pc.file_name << std::endl;
                         }
                     }
                 }
@@ -115,7 +115,8 @@ void export_result_to_folder(std::string output_folder_name, ObservationPicking 
                     {
                         if (fabs(vprt.z()) < h)
                         {
-                            outfile_result << vprt.x() << ";" << vprt.y() << ";" << vprt.z() << ";" << pc_index << ";0;" << i << ";" << pc.file_name << std::endl;
+                            outfile_result << vprt.x() << ";" << vprt.y() << ";" << vprt.z() << ";" << pc_index << ";0;" << i << ";"
+                                           << pc.file_name << std::endl;
                         }
                     }
                 }
@@ -124,14 +125,14 @@ void export_result_to_folder(std::string output_folder_name, ObservationPicking 
         outfile_initial.close();
         outfile_result.close();
 
-        const auto &obs = observation_picking.observations[i];
+        const auto& obs = observation_picking.observations[i];
         double rms_initial = 0.0;
         int sum = 0;
         double rms_result = 0.0;
 
-        for (const auto &[key1, value1] : obs)
+        for (const auto& [key1, value1] : obs)
         {
-            for (const auto &[key2, value2] : obs)
+            for (const auto& [key2, value2] : obs)
             {
                 if (key1 != key2)
                 {
@@ -167,7 +168,7 @@ void export_result_to_folder(std::string output_folder_name, ObservationPicking 
     session.point_clouds_container.save_poses(path_poses.string(), false);
 }
 
-void export_result_to_folder(std::string output_folder_name, int method_id, ObservationPicking &observation_picking, Session &session)
+void export_result_to_folder(std::string output_folder_name, int method_id, ObservationPicking& observation_picking, Session& session)
 {
     fs::path path(output_folder_name);
     path /= std::to_string(method_id);
@@ -175,14 +176,16 @@ void export_result_to_folder(std::string output_folder_name, int method_id, Obse
     export_result_to_folder(path.string(), observation_picking, session);
 }
 
-template <typename T>
-void append_to_result_file(std::string file_name, std::string method, const T &t, float rms, int id_method, std::chrono::milliseconds elapsed)
+template<typename T>
+void append_to_result_file(
+    std::string file_name, std::string method, const T& t, float rms, int id_method, std::chrono::milliseconds elapsed)
 {
     std::ofstream outfile;
     outfile.open(file_name, std::ios_base::app);
-    outfile << method << ";" << id_method << ";" << int(t.is_gauss_newton) << ";" << int(t.is_levenberg_marguardt) << ";" << int(t.is_wc) << ";" << int(t.is_cw)
-            << ";" << int(t.is_tait_bryan_angles) << ";" << int(t.is_quaternion) << ";" << int(t.is_rodrigues) << ";" << int(t.is_lie_algebra_left_jacobian)
-            << ";" << int(t.is_lie_algebra_right_jacobian) << ";" << rms << ";" << elapsed.count() << std::endl;
+    outfile << method << ";" << id_method << ";" << int(t.is_gauss_newton) << ";" << int(t.is_levenberg_marguardt) << ";" << int(t.is_wc)
+            << ";" << int(t.is_cw) << ";" << int(t.is_tait_bryan_angles) << ";" << int(t.is_quaternion) << ";" << int(t.is_rodrigues) << ";"
+            << int(t.is_lie_algebra_left_jacobian) << ";" << int(t.is_lie_algebra_right_jacobian) << ";" << rms << ";" << elapsed.count()
+            << std::endl;
     outfile.close();
 }
 
@@ -190,7 +193,9 @@ void create_header(std::string file_name)
 {
     std::ofstream outfile;
     outfile.open(file_name);
-    outfile << "method;id_method;gauss_newton;levenberg_marguardt;wc;cw;tait_bryan_angles;quaternion;rodrigues;Lie_algebra_left_jacobian;Lie_algebra_right_jacobian;rms;elapsed_time_miliseconds" << std::endl;
+    outfile << "method;id_method;gauss_newton;levenberg_marguardt;wc;cw;tait_bryan_angles;quaternion;rodrigues;Lie_algebra_left_jacobian;"
+               "Lie_algebra_right_jacobian;rms;elapsed_time_miliseconds"
+            << std::endl;
     outfile.close();
 }
 
@@ -198,35 +203,41 @@ void add_initial_rms_to_file(std::string file_name, float rms)
 {
     std::ofstream outfile;
     outfile.open(file_name, std::ios_base::app);
-    // outfile << "method;is_gauss_newton;is_levenberg_marguardt;is_wc;is_cw;is_tait_bryan_angles;is_quaternion;is_rodrigues;is_Lie_algebra_left;Lie_algebra_right;rms;elapsed_time_miliseconds" << std::endl;
+    // outfile <<
+    // "method;is_gauss_newton;is_levenberg_marguardt;is_wc;is_cw;is_tait_bryan_angles;is_quaternion;is_rodrigues;is_Lie_algebra_left;Lie_algebra_right;rms;elapsed_time_miliseconds"
+    // << std::endl;
     outfile << "initial_rms;0;0;0;0;0;0;0;0;0;0;" << rms << ";0" << std::endl;
     outfile.close();
 }
 
-void reset_poses(Session &session)
+void reset_poses(Session& session)
 {
     for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
     {
         session.point_clouds_container.point_clouds[i].m_pose = session.point_clouds_container.point_clouds[i].m_initial_pose;
-        session.point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
+        session.point_clouds_container.point_clouds[i].pose =
+            pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
         session.point_clouds_container.point_clouds[i].gui_translation[0] = (float)session.point_clouds_container.point_clouds[i].pose.px;
         session.point_clouds_container.point_clouds[i].gui_translation[1] = (float)session.point_clouds_container.point_clouds[i].pose.py;
         session.point_clouds_container.point_clouds[i].gui_translation[2] = (float)session.point_clouds_container.point_clouds[i].pose.pz;
-        session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)rad2deg(session.point_clouds_container.point_clouds[i].pose.om);
-        session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)rad2deg(session.point_clouds_container.point_clouds[i].pose.fi);
-        session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)rad2deg(session.point_clouds_container.point_clouds[i].pose.ka);
+        session.point_clouds_container.point_clouds[i].gui_rotation[0] =
+            (float)rad2deg(session.point_clouds_container.point_clouds[i].pose.om);
+        session.point_clouds_container.point_clouds[i].gui_rotation[1] =
+            (float)rad2deg(session.point_clouds_container.point_clouds[i].pose.fi);
+        session.point_clouds_container.point_clouds[i].gui_rotation[2] =
+            (float)rad2deg(session.point_clouds_container.point_clouds[i].pose.ka);
     }
 }
 
-double compute_rms(bool initial, Session &session, ObservationPicking &observation_picking)
+double compute_rms(bool initial, Session& session, ObservationPicking& observation_picking)
 {
     double rms = 0.0;
     int sum = 0;
-    for (const auto &obs : observation_picking.observations)
+    for (const auto& obs : observation_picking.observations)
     {
-        for (const auto &[key1, value1] : obs)
+        for (const auto& [key1, value1] : obs)
         {
-            for (const auto &[key2, value2] : obs)
+            for (const auto& [key2, value2] : obs)
             {
                 if (key1 != key2)
                 {
@@ -261,8 +272,13 @@ double compute_rms(bool initial, Session &session, ObservationPicking &observati
     }
 }
 
-void perform_experiment_on_windows(Session &session, ObservationPicking &observation_picking, ICP &icp, NDT &ndt,
-                                   RegistrationPlaneFeature &registration_plane_feature, PoseGraphSLAM &pose_graph_slam)
+void perform_experiment_on_windows(
+    Session& session,
+    ObservationPicking& observation_picking,
+    ICP& icp,
+    NDT& ndt,
+    RegistrationPlaneFeature& registration_plane_feature,
+    PoseGraphSLAM& pose_graph_slam)
 {
     bool compute_mean_and_cov_for_bucket = false;
     session.point_clouds_container.show_with_initial_pose = false;
@@ -314,8 +330,7 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     auto start = std::chrono::system_clock::now();
     icp.optimization_point_to_point_source_to_target(session.point_clouds_container);
     auto end = std::chrono::system_clock::now();
-    auto elapsed =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
     std::cout << "final RMS: " << rms << std::endl;
 
@@ -1058,7 +1073,8 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     registration_plane_feature.is_lie_algebra_right_jacobian = false;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(session.point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(
+        session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -1072,7 +1088,8 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     registration_plane_feature.is_levenberg_marguardt = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(session.point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(
+        session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -1088,7 +1105,8 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     registration_plane_feature.is_lie_algebra_right_jacobian = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(session.point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(
+        session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -1102,7 +1120,8 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     registration_plane_feature.is_levenberg_marguardt = true;
 
     start = std::chrono::system_clock::now();
-    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(session.point_clouds_container);
+    registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(
+        session.point_clouds_container);
     end = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
@@ -1862,7 +1881,8 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
     id_method = 90;
-    append_to_result_file(result_file, "pose_graph_slam (point_to_point_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method, elapsed);
+    append_to_result_file(
+        result_file, "pose_graph_slam (point_to_point_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method, observation_picking, session);
 
     //--91
@@ -1877,7 +1897,8 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
     id_method = 91;
-    append_to_result_file(result_file, "pose_graph_slam (point_to_point_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method, elapsed);
+    append_to_result_file(
+        result_file, "pose_graph_slam (point_to_point_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method, elapsed);
     export_result_to_folder(path_result.string(), id_method, observation_picking, session);
 
     //--92
@@ -1892,7 +1913,13 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
     id_method = 92;
-    append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_left_jacobian)", pose_graph_slam, rms, id_method, elapsed);
+    append_to_result_file(
+        result_file,
+        "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_left_jacobian)",
+        pose_graph_slam,
+        rms,
+        id_method,
+        elapsed);
     export_result_to_folder(path_result.string(), id_method, observation_picking, session);
 
     //--93
@@ -1907,12 +1934,23 @@ void perform_experiment_on_windows(Session &session, ObservationPicking &observa
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     rms = compute_rms(false, session, observation_picking);
     id_method = 93;
-    append_to_result_file(result_file, "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_right_jacobian)", pose_graph_slam, rms, id_method, elapsed);
+    append_to_result_file(
+        result_file,
+        "pose_graph_slam (point_to_projection_onto_plane_lie_algebra_right_jacobian)",
+        pose_graph_slam,
+        rms,
+        id_method,
+        elapsed);
     export_result_to_folder(path_result.string(), id_method, observation_picking, session);
 }
 
-void perform_experiment_on_linux(Session &session, ObservationPicking &observation_picking, ICP &icp, NDT &ndt,
-                                 RegistrationPlaneFeature &registration_plane_feature, PoseGraphSLAM &pose_graph_slam)
+void perform_experiment_on_linux(
+    Session& session,
+    ObservationPicking& observation_picking,
+    ICP& icp,
+    NDT& ndt,
+    RegistrationPlaneFeature& registration_plane_feature,
+    PoseGraphSLAM& pose_graph_slam)
 {
     fs::path path_result(session.working_directory);
     path_result /= "results_linux";
@@ -1973,8 +2011,7 @@ void perform_experiment_on_linux(Session &session, ObservationPicking &observati
     auto start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(session.point_clouds_container);
     auto end = std::chrono::system_clock::now();
-    auto elapsed =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
     rms = compute_rms(false, session, observation_picking);
     id_method = 94;
@@ -1990,8 +2027,7 @@ void perform_experiment_on_linux(Session &session, ObservationPicking &observati
     start = std::chrono::system_clock::now();
     pose_graph_slam.optimize(session.point_clouds_container);
     end = std::chrono::system_clock::now();
-    elapsed =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
     rms = compute_rms(false, session, observation_picking);
     id_method = 95;
@@ -2022,8 +2058,7 @@ void perform_experiment_on_linux(Session &session, ObservationPicking &observati
         append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_ndt)", pose_graph_slam, rms, id_method, elapsed);
         export_result_to_folder(path_result.string(), id_method, observation_picking, session);
         session.point_clouds_container = temp_data;
-    }
-    catch (std::exception &e)
+    } catch (std::exception& e)
     {
         std::cout << e.what() << std::endl;
         rms = compute_rms(false, session, observation_picking);
@@ -2049,8 +2084,7 @@ void perform_experiment_on_linux(Session &session, ObservationPicking &observati
         append_to_result_file(result_file, "pose_graph_slam (GTSAM pcl_icp)", pose_graph_slam, rms, id_method, elapsed);
         export_result_to_folder(path_result.string(), id_method, observation_picking, session);
         session.point_clouds_container = temp_data;
-    }
-    catch (std::exception &e)
+    } catch (std::exception& e)
     {
         std::cout << e.what() << std::endl;
         rms = compute_rms(false, session, observation_picking);

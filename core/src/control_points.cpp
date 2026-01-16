@@ -1,5 +1,9 @@
+#include <pch/pch.h>
+
 #include <control_points.h>
+
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
+
 #if WITH_GUI == 1
 #include <imgui.h>
 #include <imgui_impl_glut.h>
@@ -7,11 +11,11 @@
 #include <imgui_internal.h>
 
 static constexpr float ImGuiNumberWidth = 120.0f;
-static constexpr const char *xText = "Longitudinal (forward/backward)";
-static constexpr const char *yText = "Lateral (left/right)";
-static constexpr const char *zText = "Vertical (up/down)";
+static constexpr const char* xText = "Longitudinal (forward/backward)";
+static constexpr const char* yText = "Lateral (left/right)";
+static constexpr const char* zText = "Vertical (up/down)";
 
-void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &rotation_center)
+void ControlPoints::imgui(PointClouds& point_clouds_container, Eigen::Vector3f& rotation_center)
 {
     if (ImGui::Begin("Control Point", &is_imgui))
     {
@@ -70,7 +74,7 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
         int remove_gcp_index = -1;
         for (int i = 0; i < cps.size(); i++)
         {
-            const auto gui_text =  (std::string("CP_") + std::to_string(i) + " [" + cps[i].name + "]");
+            const auto gui_text = (std::string("CP_") + std::to_string(i) + " [" + cps[i].name + "]");
             ImGui::Text("%s", gui_text.c_str());
             ImGui::SameLine();
             if (ImGui::Button(("Remove##" + std::to_string(i)).c_str()))
@@ -159,16 +163,29 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
 
                         Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
 
-                        point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                               p_s.x(), p_s.y(), p_s.z());
+                        point_to_point_source_to_target_tait_bryan_wc_jacobian(
+                            jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z());
 
                         double delta_x;
                         double delta_y;
                         double delta_z;
                         Eigen::Vector3d p_t(cps[i].x_target_global, cps[i].y_target_global, cps[i].z_target_global);
-                        point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                                                                      pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                      p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+                        point_to_point_source_to_target_tait_bryan_wc(
+                            delta_x,
+                            delta_y,
+                            delta_z,
+                            pose_s.px,
+                            pose_s.py,
+                            pose_s.pz,
+                            pose_s.om,
+                            pose_s.fi,
+                            pose_s.ka,
+                            p_s.x(),
+                            p_s.y(),
+                            p_s.z(),
+                            p_t.x(),
+                            p_t.y(),
+                            p_t.z());
 
                         int ir = tripletListB.size();
                         int ic = 0;
@@ -200,16 +217,29 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
 
                         Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
 
-                        point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                               p_s.x(), p_s.y(), p_s.z());
+                        point_to_point_source_to_target_tait_bryan_wc_jacobian(
+                            jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z());
 
                         double delta_x;
                         double delta_y;
                         double delta_z;
                         Eigen::Vector3d p_t(cps[i].x_target_global, cps[i].y_target_global, 0.0);
-                        point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                                                                      pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                      p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+                        point_to_point_source_to_target_tait_bryan_wc(
+                            delta_x,
+                            delta_y,
+                            delta_z,
+                            pose_s.px,
+                            pose_s.py,
+                            pose_s.pz,
+                            pose_s.om,
+                            pose_s.fi,
+                            pose_s.ka,
+                            p_s.x(),
+                            p_s.y(),
+                            p_s.z(),
+                            p_t.x(),
+                            p_t.y(),
+                            p_t.z());
 
                         int ir = tripletListB.size();
                         int ic = 0;
@@ -293,7 +323,8 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
                     for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
                     {
                         point_clouds_container.point_clouds[i].m_pose = m_pose * point_clouds_container.point_clouds[i].m_pose;
-                        point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+                        point_clouds_container.point_clouds[i].pose =
+                            pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
                         point_clouds_container.point_clouds[i].gui_translation[0] = point_clouds_container.point_clouds[i].pose.px;
                         point_clouds_container.point_clouds[i].gui_translation[1] = point_clouds_container.point_clouds[i].pose.py;
                         point_clouds_container.point_clouds[i].gui_translation[2] = point_clouds_container.point_clouds[i].pose.pz;
@@ -315,7 +346,7 @@ void ControlPoints::imgui(PointClouds &point_clouds_container, Eigen::Vector3f &
     return;
 }
 
-void ControlPoints::render(const PointClouds &point_clouds_container, bool show_pc)
+void ControlPoints::render(const PointClouds& point_clouds_container, bool show_pc)
 {
     if (show_pc)
     {
@@ -326,8 +357,12 @@ void ControlPoints::render(const PointClouds &point_clouds_container, bool show_
             glBegin(GL_POINTS);
             for (int i = 0; i < point_clouds_container.point_clouds[index_pose].points_local.size(); i++)
             {
-                glColor3f(point_clouds_container.point_clouds[index_pose].intensities[i], 0.0, 1 - point_clouds_container.point_clouds[index_pose].intensities[i]);
-                auto p = point_clouds_container.point_clouds[index_pose].m_pose * point_clouds_container.point_clouds[index_pose].points_local[i];
+                glColor3f(
+                    point_clouds_container.point_clouds[index_pose].intensities[i],
+                    0.0,
+                    1 - point_clouds_container.point_clouds[index_pose].intensities[i]);
+                auto p = point_clouds_container.point_clouds[index_pose].m_pose *
+                    point_clouds_container.point_clouds[index_pose].points_local[i];
                 glVertex3f(p.x(), p.y(), p.z());
             }
             glEnd();
@@ -335,8 +370,10 @@ void ControlPoints::render(const PointClouds &point_clouds_container, bool show_
             glColor3f(0.0, 1.0, 0.0);
             glLineWidth(2.0);
             glBegin(GL_LINE_STRIP);
-            for (int i = 0; i < point_clouds_container.point_clouds[index_pose].local_trajectory.size(); i++){
-                auto pose = point_clouds_container.point_clouds[index_pose].m_pose * point_clouds_container.point_clouds[index_pose].local_trajectory[i].m_pose;
+            for (int i = 0; i < point_clouds_container.point_clouds[index_pose].local_trajectory.size(); i++)
+            {
+                auto pose = point_clouds_container.point_clouds[index_pose].m_pose *
+                    point_clouds_container.point_clouds[index_pose].local_trajectory[i].m_pose;
                 glVertex3f(pose(0, 3), pose(1, 3), pose(2, 3));
             }
 
@@ -347,7 +384,6 @@ void ControlPoints::render(const PointClouds &point_clouds_container, bool show_
 
     for (int i = 0; i < cps.size(); i++)
     {
-
         Eigen::Vector3d p(cps[i].x_source_local, cps[i].y_source_local, cps[i].z_source_local);
         Eigen::Vector3d c = point_clouds_container.point_clouds[cps[i].index_to_pose].m_pose * p;
 
@@ -414,22 +450,21 @@ void ControlPoints::render(const PointClouds &point_clouds_container, bool show_
 
         glColor3f(0, 0, 0);
         glRasterPos3f(cps[i].x_target_global, cps[i].y_target_global, cps[i].z_target_global + 0.1);
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char *)cps[i].name);
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char*)cps[i].name);
 
         glRasterPos3f(cps[i].x_target_global, cps[i].y_target_global, cps[i].z_target_global);
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)(("CP_" + std::to_string(i)).c_str()));
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char*)(("CP_" + std::to_string(i)).c_str()));
 
         glColor3f(0.7f, 0.3f, 0.5f);
         glRasterPos3f(c.x(), c.y(), c.z());
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)(("CP_" + std::to_string(i) + ": initial location").c_str()));
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char*)(("CP_" + std::to_string(i) + ": initial location").c_str()));
     }
 
     return;
 }
 
-void ControlPoints::draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd)
+void ControlPoints::draw_ellipse(const Eigen::Matrix3d& covar, Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd)
 {
-
     Eigen::LLT<Eigen::Matrix<double, 3, 3>> cholSolver(covar);
     Eigen::Matrix3d transform = cholSolver.matrixL();
 
@@ -444,7 +479,7 @@ void ControlPoints::draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vector3d &
     {
         for (double j = 0; j < 1.0; j += dj) // vertical
         {
-            double u = i * 2 * pi;     // 0     to  2pi
+            double u = i * 2 * pi; // 0     to  2pi
             double v = (j - 0.5) * pi; //-pi/2 to pi/2
 
             const Eigen::Vector3d pp0(cos(v) * cos(u), cos(v) * sin(u), sin(v));

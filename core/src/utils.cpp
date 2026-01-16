@@ -1,22 +1,22 @@
-﻿#include <imgui_impl_glut.h>
-#include <imgui_impl_opengl2.h>
+﻿#include <pch/pch.h>
+
+// clang-format off
 #include <GL/glew.h>
 #include <GL/freeglut.h>
+// clang-format on
+
+#include <imgui_impl_glut.h>
+#include <imgui_impl_opengl2.h>
+#include <imgui_internal.h>
 
 #include "utils.hpp"
 
-#include "imgui_internal.h"
-
-#include <cmath>
-#include <cstdio>
-#include <iostream>
 #include <HDMapping/Version.hpp>
-#include <filesystem>
-#include <regex>
 
 #ifdef _WIN32
-#include <windows.h>
 #include <shellapi.h>
+#include <windows.h>
+
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -71,91 +71,90 @@ double scroll_hint_lastT = 0.0;
 bool show_about = false;
 
 // General shortcuts applicable to any app
-static const std::vector<ShortcutEntry> shortcuts = {
-    {"Normal keys", "A", ""},
-    {"", "Ctrl+A", ""},
-    {"", "B", "camera Back"},
-    {"", "Ctrl+B", ""},
-    {"", "C", "Compass/ruler"},
-    {"", "Ctrl+C", ""},
-    {"", "D", ""},
-    {"", "Ctrl+D", ""},
-    {"", "E", ""},
-    {"", "Ctrl+E", ""},
-    {"", "F", "camera Front"},
-    {"", "Ctrl+F", ""},
-    {"", "G", ""},
-    {"", "Ctrl+G", ""},
-    {"", "H", ""},
-    {"", "Ctrl+H", ""},
-    {"", "I", "camera Isometric"},
-    {"", "Ctrl+I", ""},
-    {"", "J", ""},
-    {"", "Ctrl+J", ""},
-    {"", "K", ""},
-    {"", "Ctrl+K", ""},
-    {"", "L", "camera Left"},
-    {"", "Ctrl+L", ""},
-    {"", "M", ""},
-    {"", "Ctrl+M", ""},
-    {"", "N", ""},
-    {"", "Ctrl+N", ""},
-    {"", "O", "Ortographic view"},
-    {"", "Ctrl+O", "Open/load session/data"},
-    {"", "P", ""},
-    {"", "Ctrl+P", ""},
-    {"", "Q", ""},
-    {"", "Ctrl+Q", ""},
-    {"", "R", "camera Right"},
-    {"", "Ctrl+R", ""},
-    {"", "Shift+R", "Rotation center"},
-    {"", "S", ""},
-    {"", "Ctrl+S", ""},
-    {"", "Ctrl+Shift+S", ""},
-    {"", "T", "camera Top"},
-    {"", "Ctrl+T", ""},
-    {"", "U", "camera bottom (Under)"},
-    {"", "Ctrl+U", ""},
-    {"", "V", ""},
-    {"", "Ctrl+V", ""},
-    {"", "W", ""},
-    {"", "Ctrl+W", ""},
-    {"", "X", "show aXes"},
-    {"", "Ctrl+X", ""},
-    {"", "Y", ""},
-    {"", "Ctrl+Y", ""},
-    {"", "Z", "camera reset"},
-    {"", "Ctrl+Z", ""},
-    {"", "Shift+Z", "Lock Z"},
-    {"", "1-9", "point size"},
-    {"Special keys", "Up arrow", ""},
-    {"", "Shift + up arrow", "camera translate Up"},
-    {"", "Ctrl + up arrow", ""},
-    {"", "Down arrow", ""},
-    {"", "Shift + down arrow", "camera translate Down"},
-    {"", "Ctrl + down arrow", ""},
-    {"", "Left arrow", ""},
-    {"", "Shift + left arrow", "camera translate Left"},
-    {"", "Ctrl + left arrow", ""},
-    {"", "Right arrow", ""},
-    {"", "Shift + right arrow", "camera translate Right"},
-    {"", "Ctrl + right arrow", ""},
-    {"", "Pg down", ""},
-    {"", "Pg up", ""},
-    {"", "- key", ""},
-    {"", "+ key", ""},
-    {"Mouse related", "Left click + drag", "camera rotate"},
-    {"", "Right click + drag", "camera pan"},
-    {"", "Scroll", "camera zoom"},
-    {"", "Shift + scroll", "camera 5x zoom"},
-    {"", "Shift + drag", "Dock window to screen edges"},
-    {"", "Ctrl + left click", ""},
-    {"", "Ctrl + right click", "change center of rotation"},
-    {"", "Ctrl + middle click", "change center of rotation (if no CP GUI active)"}};
+static const std::vector<ShortcutEntry> shortcuts = { { "Normal keys", "A", "" },
+                                                      { "", "Ctrl+A", "" },
+                                                      { "", "B", "camera Back" },
+                                                      { "", "Ctrl+B", "" },
+                                                      { "", "C", "Compass/ruler" },
+                                                      { "", "Ctrl+C", "" },
+                                                      { "", "D", "" },
+                                                      { "", "Ctrl+D", "" },
+                                                      { "", "E", "" },
+                                                      { "", "Ctrl+E", "" },
+                                                      { "", "F", "camera Front" },
+                                                      { "", "Ctrl+F", "" },
+                                                      { "", "G", "" },
+                                                      { "", "Ctrl+G", "" },
+                                                      { "", "H", "" },
+                                                      { "", "Ctrl+H", "" },
+                                                      { "", "I", "camera Isometric" },
+                                                      { "", "Ctrl+I", "" },
+                                                      { "", "J", "" },
+                                                      { "", "Ctrl+J", "" },
+                                                      { "", "K", "" },
+                                                      { "", "Ctrl+K", "" },
+                                                      { "", "L", "camera Left" },
+                                                      { "", "Ctrl+L", "" },
+                                                      { "", "M", "" },
+                                                      { "", "Ctrl+M", "" },
+                                                      { "", "N", "" },
+                                                      { "", "Ctrl+N", "" },
+                                                      { "", "O", "Ortographic view" },
+                                                      { "", "Ctrl+O", "Open/load session/data" },
+                                                      { "", "P", "" },
+                                                      { "", "Ctrl+P", "" },
+                                                      { "", "Q", "" },
+                                                      { "", "Ctrl+Q", "" },
+                                                      { "", "R", "camera Right" },
+                                                      { "", "Ctrl+R", "" },
+                                                      { "", "Shift+R", "Rotation center" },
+                                                      { "", "S", "" },
+                                                      { "", "Ctrl+S", "" },
+                                                      { "", "Ctrl+Shift+S", "" },
+                                                      { "", "T", "camera Top" },
+                                                      { "", "Ctrl+T", "" },
+                                                      { "", "U", "camera bottom (Under)" },
+                                                      { "", "Ctrl+U", "" },
+                                                      { "", "V", "" },
+                                                      { "", "Ctrl+V", "" },
+                                                      { "", "W", "" },
+                                                      { "", "Ctrl+W", "" },
+                                                      { "", "X", "show aXes" },
+                                                      { "", "Ctrl+X", "" },
+                                                      { "", "Y", "" },
+                                                      { "", "Ctrl+Y", "" },
+                                                      { "", "Z", "camera reset" },
+                                                      { "", "Ctrl+Z", "" },
+                                                      { "", "Shift+Z", "Lock Z" },
+                                                      { "", "1-9", "point size" },
+                                                      { "Special keys", "Up arrow", "" },
+                                                      { "", "Shift + up arrow", "camera translate Up" },
+                                                      { "", "Ctrl + up arrow", "" },
+                                                      { "", "Down arrow", "" },
+                                                      { "", "Shift + down arrow", "camera translate Down" },
+                                                      { "", "Ctrl + down arrow", "" },
+                                                      { "", "Left arrow", "" },
+                                                      { "", "Shift + left arrow", "camera translate Left" },
+                                                      { "", "Ctrl + left arrow", "" },
+                                                      { "", "Right arrow", "" },
+                                                      { "", "Shift + right arrow", "camera translate Right" },
+                                                      { "", "Ctrl + right arrow", "" },
+                                                      { "", "Pg down", "" },
+                                                      { "", "Pg up", "" },
+                                                      { "", "- key", "" },
+                                                      { "", "+ key", "" },
+                                                      { "Mouse related", "Left click + drag", "camera rotate" },
+                                                      { "", "Right click + drag", "camera pan" },
+                                                      { "", "Scroll", "camera zoom" },
+                                                      { "", "Shift + scroll", "camera 5x zoom" },
+                                                      { "", "Shift + drag", "Dock window to screen edges" },
+                                                      { "", "Ctrl + left click", "" },
+                                                      { "", "Ctrl + right click", "change center of rotation" },
+                                                      { "", "Ctrl + middle click", "change center of rotation (if no CP GUI active)" } };
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-std::string truncPath(const std::string &fullPath)
+std::string truncPath(const std::string& fullPath)
 {
     namespace fs = std::filesystem;
     fs::path path(fullPath);
@@ -166,11 +165,9 @@ std::string truncPath(const std::string &fullPath)
     return "..\\" + parent + "\\..\\" + filename;
 }
 
-
-
 void wheel(int button, int dir, int x, int y)
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     io.MouseWheel += dir; // or direction * 1.0f depending on your setup
 
     if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
@@ -248,12 +245,16 @@ void reshape(int w, int h)
     }
     else
     {
-        ImGuiIO &io = ImGui::GetIO();
+        ImGuiIO& io = ImGui::GetIO();
         float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+        glOrtho(
+            -camera_ortho_xy_view_zoom,
+            camera_ortho_xy_view_zoom,
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio,
+            -100000,
+            100000);
         // glOrtho(-translate_z, translate_z, -translate_z * (float)h / float(w), translate_z * float(h) / float(w), -10000, 10000);
     }
     glMatrixMode(GL_MODELVIEW);
@@ -262,7 +263,7 @@ void reshape(int w, int h)
 
 void motion(int x, int y)
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     io.MousePos = ImVec2((float)x, (float)y);
 
     if (!io.WantCaptureMouse)
@@ -276,8 +277,10 @@ void motion(int x, int y)
             if (mouse_buttons & 1)
             {
                 float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-                Eigen::Vector3d v(dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
-                                  dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio), 0);
+                Eigen::Vector3d v(
+                    dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
+                    dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio),
+                    0);
                 TaitBryanPose pose_tb;
                 pose_tb.px = 0.0;
                 pose_tb.py = 0.0;
@@ -338,7 +341,7 @@ ImGuiKey keyToImGuiKey(unsigned char key)
 
 void keyboardDown(unsigned char key, int x, int y)
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
 
     int mods = glutGetModifiers();
     // Update modifier keys using the new API
@@ -360,7 +363,7 @@ void keyboardDown(unsigned char key, int x, int y)
 
 void keyboardUp(unsigned char key, int x, int y)
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
 
     int mods = glutGetModifiers();
     // Update modifier keys using the new API
@@ -383,9 +386,11 @@ static bool first_time = true;
 
 void ShowMainDockSpace()
 {
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs;
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
+        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs;
 
-    ImGuiViewport *viewport = ImGui::GetMainViewport();
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
     ImGui::SetNextWindowViewport(viewport->ID);
@@ -416,7 +421,7 @@ void ShowMainDockSpace()
     ImGui::End();
 }
 
-bool initGL(int *argc, char **argv, const std::string &winTitle, void (*display)(), void (*mouse)(int, int, int, int))
+bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)(), void (*mouse)(int, int, int, int))
 {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
@@ -451,10 +456,10 @@ bool initGL(int *argc, char **argv, const std::string &winTitle, void (*display)
     glutReshapeFunc(reshape);
 
     ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard // Enable Keyboard Controls
-                      | ImGuiConfigFlags_NavEnableGamepad | ImGuiConfigFlags_DockingEnable;
+        | ImGuiConfigFlags_NavEnableGamepad | ImGuiConfigFlags_DockingEnable;
     io.ConfigDockingWithShift = true;
     io.MouseDrawCursor = false; // use OS cursor (for future ImGUI update to 1.93+)
 
@@ -492,7 +497,7 @@ void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eig
     {
         for (double j = 0; j < 1.0; j += dj) // vertical
         {
-            double u = i * 2 * pi;     // 0     to  2pi
+            double u = i * 2 * pi; // 0     to  2pi
             double v = (j - 0.5) * pi; //-pi/2 to pi/2
 
             const Eigen::Vector3d pp0(cos(v) * cos(u), cos(v) * sin(u), sin(v));
@@ -785,7 +790,7 @@ void camMenu()
 
 void view_kbd_shortcuts()
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
 
     if (io.WantCaptureKeyboard)
         return;
@@ -941,7 +946,7 @@ void cor_window()
     }
 }
 
-void ImGuiHyperlink(const char *url, ImVec4 color)
+void ImGuiHyperlink(const char* url, ImVec4 color)
 {
     ImGui::PushStyleColor(ImGuiCol_Text, color);
     ImGui::TextUnformatted(url);
@@ -958,11 +963,8 @@ void ImGuiHyperlink(const char *url, ImVec4 color)
     // Draw underline on hover
     if (ImGui::IsItemHovered())
     {
-        ImDrawList *draw_list = ImGui::GetWindowDrawList();
-        draw_list->AddLine(
-            ImVec2(pos.x, pos.y + size.y),
-            ImVec2(pos.x + size.x, pos.y + size.y),
-            ImColor(color));
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddLine(ImVec2(pos.x, pos.y + size.y), ImVec2(pos.x + size.x, pos.y + size.y), ImColor(color));
     }
 
     // Open URL on click
@@ -982,8 +984,8 @@ void ImGuiHyperlink(const char *url, ImVec4 color)
 
 void ShowShortcutsTable(const std::vector<ShortcutEntry> appShortcuts)
 {
-    if (ImGui::BeginTable("ShortcutsTable", 2,
-                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY, ImVec2(-FLT_MIN, 200)))
+    if (ImGui::BeginTable(
+            "ShortcutsTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY, ImVec2(-FLT_MIN, 200)))
     {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthFixed, 120);
@@ -994,7 +996,7 @@ void ShowShortcutsTable(const std::vector<ShortcutEntry> appShortcuts)
 
         for (size_t i = 0; i < shortcuts.size(); ++i)
         {
-            const auto &s = shortcuts[i];
+            const auto& s = shortcuts[i];
 
             // Insert a "fake" type row when type changes
             if (!s.type.empty() && s.type != lastType)
@@ -1030,15 +1032,18 @@ void ShowShortcutsTable(const std::vector<ShortcutEntry> appShortcuts)
     }
 }
 
-void info_window(const std::vector<std::string> &infoLines, const std::vector<ShortcutEntry> &appShortcuts)
+void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts)
 {
     if (!info_gui)
         return;
 
-    if (ImGui::Begin("Info", &info_gui, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse))
+    if (ImGui::Begin(
+            "Info",
+            &info_gui,
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse))
     {
         bool firstLine = true;
-        for (const auto &line : infoLines)
+        for (const auto& line : infoLines)
         {
             if (line.empty())
                 ImGui::NewLine();
@@ -1049,16 +1054,18 @@ void info_window(const std::vector<std::string> &infoLines, const std::vector<Sh
 
             if (firstLine)
             {
-                ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("ImGui").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
+                ImGui::SameLine(
+                    ImGui::GetWindowWidth() - ImGui::CalcTextSize("ImGui").x - ImGui::GetStyle().ItemSpacing.x * 2 -
+                    ImGui::GetStyle().FramePadding.x * 2);
                 if (ImGui::Button("ImGui"))
                     show_about = true;
                 if (ImGui::IsItemHovered())
                 {
                     ImGui::BeginTooltip();
                     // Query versions info
-                    const GLubyte *renderer = glGetString(GL_RENDERER);
-                    const GLubyte *version = glGetString(GL_VERSION);
-                    const GLubyte *glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
+                    const GLubyte* renderer = glGetString(GL_RENDERER);
+                    const GLubyte* version = glGetString(GL_VERSION);
+                    const GLubyte* glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
 
                     ImGui::Text("Renderer: %s", renderer);
                     ImGui::Text("OpenGL version supported: %s", version);
@@ -1096,15 +1103,15 @@ void drawMiniCompassWithRuler()
 {
     const ImVec2 compassSize = ImVec2(200, 200);
 
-    auto drawLabel = [](float x, float y, float z, const char *text, float r, float g, float b)
+    auto drawLabel = [](float x, float y, float z, const char* text, float r, float g, float b)
     {
         glColor3f(r, g, b);
         glRasterPos3f(x, y, z);
-        for (const char *c = text; *c; ++c)
+        for (const char* c = text; *c; ++c)
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
     };
 
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
 
     // Save viewport
     GLint prevViewport[4];
@@ -1153,7 +1160,7 @@ void drawMiniCompassWithRuler()
         niceUnit = 5.0f;
     float worldLength = niceUnit * base;
 
-    float scale = miniAxisLength / rawUnit;     // convert scroll units to visual units
+    float scale = miniAxisLength / rawUnit; // convert scroll units to visual units
     float axisDrawLength = worldLength * scale; // final axis length in mini compass
 
     // Draw axes
@@ -1209,12 +1216,12 @@ void drawMiniCompassWithRuler()
     glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
 }
 
-float distanceToPlane(const RegistrationPlaneFeature::Plane &plane, const Eigen::Vector3d &p)
+float distanceToPlane(const RegistrationPlaneFeature::Plane& plane, const Eigen::Vector3d& p)
 {
     return (plane.a * p.x() + plane.b * p.y() + plane.c * p.z() + plane.d);
 }
 
-Eigen::Vector3d rayIntersection(const LaserBeam &laser_beam, const RegistrationPlaneFeature::Plane &plane)
+Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane)
 {
     float TOLERANCE = 0.0001;
     Eigen::Vector3d out_point;
@@ -1269,7 +1276,7 @@ LaserBeam GetLaserBeam(int x, int y)
     return laser_beam;
 }
 
-double distance_point_to_line(const Eigen::Vector3d &point, const LaserBeam &line)
+double distance_point_to_line(const Eigen::Vector3d& point, const LaserBeam& line)
 {
     Eigen::Vector3d AP = point - line.position;
 
@@ -1277,7 +1284,7 @@ double distance_point_to_line(const Eigen::Vector3d &point, const LaserBeam &lin
     return dist;
 }
 
-void getClosestTrajectoryPoint(Session &session, int x, int y, bool gcpPicking, int &picked_index)
+void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking, int& picked_index)
 {
     picked_index = -1;
 
@@ -1290,7 +1297,7 @@ void getClosestTrajectoryPoint(Session &session, int x, int y, bool gcpPicking, 
     {
         for (int j = 0; j < session.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
         {
-            const auto &p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+            const auto& p = session.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
             Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
 
             double dist = distance_point_to_line(vp, laser_beam);
@@ -1328,7 +1335,16 @@ void getClosestTrajectoryPoint(Session &session, int x, int y, bool gcpPicking, 
     camera_transition_active = true;
 }
 
-void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, const int first_session_index, const int second_session_index, const int number_visible_sessions, int &index_loop_closure_source, int &index_loop_closure_target, bool KeyShift)
+void getClosestTrajectoriesPoint(
+    std::vector<Session>& sessions,
+    int x,
+    int y,
+    const int first_session_index,
+    const int second_session_index,
+    const int number_visible_sessions,
+    int& index_loop_closure_source,
+    int& index_loop_closure_target,
+    bool KeyShift)
 {
     const auto laser_beam = GetLaserBeam(x, y);
     double min_distance = std::numeric_limits<double>::max();
@@ -1340,7 +1356,8 @@ void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, c
         {
             for (size_t j = 0; j < sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
             {
-                const auto &p = sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+                const auto& p =
+                    sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
                 Eigen::Vector3d vp = sessions[first_session_index].point_clouds_container.point_clouds[i].m_pose * p;
 
                 double dist = distance_point_to_line(vp, laser_beam);
@@ -1358,7 +1375,7 @@ void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, c
                             new_rotation_center.z() = static_cast<float>(vp.z());
                             index_loop_closure_source = i;
                         }
-						else // io.KeyShift
+                        else // io.KeyShift
                         {
                             index_loop_closure_target = i;
                         }
@@ -1370,11 +1387,11 @@ void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, c
     else if (number_visible_sessions == 2)
     {
         int index = -1;
-		if (!KeyShift) // io.KeyCtrl
+        if (!KeyShift) // io.KeyCtrl
         {
             index = first_session_index;
         }
-		else // io.KeyShift
+        else // io.KeyShift
         {
             index = second_session_index;
         }
@@ -1383,7 +1400,7 @@ void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, c
         {
             for (size_t j = 0; j < sessions[index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
             {
-                const auto &p = sessions[index].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+                const auto& p = sessions[index].point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
                 Eigen::Vector3d vp = sessions[index].point_clouds_container.point_clouds[i].m_pose * p;
 
                 double dist = distance_point_to_line(vp, laser_beam);
@@ -1392,17 +1409,17 @@ void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, c
                 {
                     min_distance = dist;
 
-					if (!KeyShift) // io.KeyCtrl
+                    if (!KeyShift) // io.KeyCtrl
                     {
                         index_loop_closure_source = i;
                         new_rotation_center.x() = static_cast<float>(vp.x());
                         new_rotation_center.y() = static_cast<float>(vp.y());
                         new_rotation_center.z() = static_cast<float>(vp.z());
                     }
-					else // io.KeyShift
+                    else // io.KeyShift
                     {
                         index_loop_closure_target = i;
-                    } 
+                    }
                 }
             }
         }
@@ -1410,9 +1427,10 @@ void getClosestTrajectoriesPoint(std::vector<Session> &sessions, int x, int y, c
     else // (number_visible_sessions > 2)
     {
         // std::cout << "first_session_index " << first_session_index << std::endl;
-        for (size_t s = 0; s < sessions.size(); s++) {
-            if (sessions[s].visible) {
-
+        for (size_t s = 0; s < sessions.size(); s++)
+        {
+            if (sessions[s].visible)
+            {
                 for (size_t i = 0; i < sessions[s].point_clouds_container.point_clouds.size(); i++)
                 {
                     for (size_t j = 0; j < sessions[s].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
@@ -1456,8 +1474,7 @@ void setNewRotationCenter(int x, int y)
     pl.d = 0;
     new_rotation_center = rayIntersection(laser_beam, pl).cast<float>();
 
-    std::cout << "Setting new rotation center to:\n"
-              << new_rotation_center << std::endl;
+    std::cout << "Setting new rotation center to:\n" << new_rotation_center << std::endl;
 
     new_rotate_x = rotate_x;
     new_rotate_y = rotate_y;

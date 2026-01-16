@@ -1,7 +1,6 @@
+#include <pch/pch.h>
+
 #include <icp.h>
-#include <iostream>
-#include <fstream>
-#include <thread>
 
 #include <transformations.h>
 #include <m_estimators.h>

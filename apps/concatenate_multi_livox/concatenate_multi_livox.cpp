@@ -1,8 +1,9 @@
-#include <iostream>
-#include <filesystem>
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include "export_laz.h"
-int main(int argc, char *argv[])
+#include <filesystem>
+#include <iostream>
+
+int main(int argc, char* argv[])
 {
     if (argc < 3)
     {
@@ -21,7 +22,7 @@ int main(int argc, char *argv[])
     std::vector<std::string> csv_files;
     std::vector<std::string> sn_files;
     std::vector<std::string> all_file_names;
-    for (const auto &entry : std::filesystem::directory_iterator(input_dir))
+    for (const auto& entry : std::filesystem::directory_iterator(input_dir))
     {
         if (entry.is_regular_file())
         {
@@ -43,7 +44,8 @@ int main(int argc, char *argv[])
     }
     // check if number of laz files is equal to number of csv files and sn files
     const auto scan_number = laz_files.size();
-    if (scan_number != csv_files.size() || scan_number != sn_files.size()) {
+    if (scan_number != csv_files.size() || scan_number != sn_files.size())
+    {
         std::cerr << "Number of laz files, csv files and sn files is not equal!" << std::endl;
         std::cerr << "laz files: " << laz_files.size() << std::endl;
         std::cerr << "csv files: " << csv_files.size() << std::endl;
@@ -55,18 +57,21 @@ int main(int argc, char *argv[])
     const auto calibrationFile = (std::filesystem::path(input_dir) / "calibration.json").string();
     std::cout << "Loading calibration file: " << calibrationFile << std::endl;
     auto preloadedCalibration = MLvxCalib::GetCalibrationFromFile(calibrationFile);
-    if (preloadedCalibration.empty()) {
+    if (preloadedCalibration.empty())
+    {
         std::cerr << "No calibration data found in file: " << calibrationFile << std::endl;
         std::cerr << "Please check the file format and content." << std::endl;
         return 1;
     }
     std::cout << "Loaded calibration for " << preloadedCalibration.size() << " sensors." << std::endl;
-    for (const auto &[sn, _] : preloadedCalibration) {
+    for (const auto& [sn, _] : preloadedCalibration)
+    {
         std::cout << " -> " << sn << std::endl;
     }
     // Get Id of Imu to use
     const std::string imuSnToUse = MLvxCalib::GetImuSnToUse(calibrationFile);
-    if (imuSnToUse.empty()) {
+    if (imuSnToUse.empty())
+    {
         std::cerr << "No IMU serial number found in calibration file: " << calibrationFile << std::endl;
         std::cerr << "Please check the file format and content.";
         return 1;
@@ -74,9 +79,9 @@ int main(int argc, char *argv[])
     std::cout << "IMU to use: " << imuSnToUse << std::endl;
     // get id to serial number mapping
 
-
-    if (!std::filesystem::exists(output_dir)) {
-        //create output directory if it does not exist
+    if (!std::filesystem::exists(output_dir))
+    {
+        // create output directory if it does not exist
         std::filesystem::create_directory(output_dir);
     }
 
@@ -85,12 +90,12 @@ int main(int argc, char *argv[])
     std::sort(std::begin(csv_files), std::end(csv_files));
     std::sort(std::begin(sn_files), std::end(sn_files));
 
-
     // process laz
-    for (int i = 0; i < scan_number; i++){
-        const std::string &laz_file = laz_files[i];
-        const std::string &csv_file = csv_files[i];
-        const std::string &fnSn = sn_files[i];
+    for (int i = 0; i < scan_number; i++)
+    {
+        const std::string& laz_file = laz_files[i];
+        const std::string& csv_file = csv_files[i];
+        const std::string& fnSn = sn_files[i];
 
         const auto imuBaseName = std::filesystem::path(csv_file).filename().string();
 
@@ -112,10 +117,11 @@ int main(int argc, char *argv[])
         intensity.reserve(data.size());
         timestamps.reserve(data.size());
         int counter = 0;
-        for (const auto &point : data) {
+        for (const auto& point : data)
+        {
             pointcloud.push_back(point.point);
             intensity.push_back(point.intensity);
-            timestamps.push_back(double(point.timestamp)/1e9);
+            timestamps.push_back(double(point.timestamp) / 1e9);
         }
         exportLaz(output_path.string(), pointcloud, intensity, timestamps, 0, 0, 0);
         std::cout << "Saved processed points to: " << output_path.string() << std::endl;
@@ -124,22 +130,18 @@ int main(int argc, char *argv[])
         auto imu = load_imu(csv_file.c_str(), imuNumberToUse);
 
         std::ofstream out(output_path_csv.string());
-        if (!out.is_open()) {
+        if (!out.is_open())
+        {
             std::cerr << "Failed to open output file: " << output_path_csv.string() << std::endl;
             continue;
         }
         out << "timestamp timestampUnix accX accY accZ gyroX gyroY gyroZ\n";
-        for (const auto &[timestamp,  gyro, accel] : imu) {
-            out << static_cast<uint64_t>(1e9 * timestamp.first) << " "
-                << static_cast<uint64_t>(1e9 * timestamp.second) << " "
-                << accel.axis.x << " "
-                << accel.axis.y << " "
-                << accel.axis.z << " "
-                << gyro.axis.x << " "
-                << gyro.axis.y << " "
+        for (const auto& [timestamp, gyro, accel] : imu)
+        {
+            out << static_cast<uint64_t>(1e9 * timestamp.first) << " " << static_cast<uint64_t>(1e9 * timestamp.second) << " "
+                << accel.axis.x << " " << accel.axis.y << " " << accel.axis.z << " " << gyro.axis.x << " " << gyro.axis.y << " "
                 << gyro.axis.z << "\n";
         }
         std::cout << "Saved IMU data to: " << output_path_csv.string() << std::endl;
     }
-
 }

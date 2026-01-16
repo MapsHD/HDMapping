@@ -1,14 +1,15 @@
-#ifndef _GNSS_H_
-#define _GNSS_H_
+#pragma once
+
+#include <point_clouds.h>
 
 #include <string>
 #include <vector>
-#include <point_clouds.h>
 
-class GNSS{
-    public:
-
-    struct GlobalPose{
+class GNSS
+{
+public:
+    struct GlobalPose
+    {
         double timestamp;
         double lat;
         double lon;
@@ -24,27 +25,31 @@ class GNSS{
         double dist_xy_along;
     };
 
-    GNSS(){;};
-    ~GNSS(){;};
+    GNSS()
+    {
+        ;
+    };
+    ~GNSS()
+    {
+        ;
+    };
 
     //! \brief Load GNSS data from file and converts to PUWG92
     //! \param input_file_names - vector of file names
     //! \param localize - if true, the data is moved to the first point
-    bool load(const std::vector<std::string> &input_file_names, Eigen::Vector3d &out_offset, bool localize = false);
-    bool load_mercator_projection(const std::vector<std::string> &input_file_names);
-    bool load_nmea_mercator_projection(const std::vector<std::string> &input_file_names);
-    void render(const PointClouds &point_clouds_container);
-    bool save_to_laz(const std::string &output_file_names, double offset_x, double offset_y, double offset_alt);
+    bool load(const std::vector<std::string>& input_file_names, Eigen::Vector3d& out_offset, bool localize = false);
+    bool load_mercator_projection(const std::vector<std::string>& input_file_names);
+    bool load_nmea_mercator_projection(const std::vector<std::string>& input_file_names);
+    void render(const PointClouds& point_clouds_container);
+    bool save_to_laz(const std::string& output_file_names, double offset_x, double offset_y, double offset_alt);
 
     std::vector<GlobalPose> gnss_poses;
-    //double offset_x = 0;
-    //double offset_y = 0;
-    //double offset_alt = 0;
+    // double offset_x = 0;
+    // double offset_y = 0;
+    // double offset_alt = 0;
     bool show_correspondences = false;
 
     double WGS84ReferenceLatitude = 0;
     double WGS84ReferenceLongitude = 0;
     bool setWGS84ReferenceFromFirstPose = true;
 };
-
-#endif

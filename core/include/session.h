@@ -1,13 +1,14 @@
-#ifndef _SESSION_H_
-#define _SESSION_H_
+#pragma once
 
+#include <point_clouds.h>
 #include <string>
 #include <vector>
-#include <point_clouds.h>
+
 #if WITH_GUI == 1
-#include <manual_pose_graph_loop_closure.h>
-#include <ground_control_points.h>
 #include <control_points.h>
+#include <ground_control_points.h>
+#include <manual_pose_graph_loop_closure.h>
+
 #else
 #include <pose_graph_loop_closure.h>
 #endif
@@ -15,8 +16,8 @@
 class Session
 {
 public:
-    Session() { ; };
-    ~Session() { ; };
+    Session() = default;
+    ~Session() = default;
 
     PointClouds point_clouds_container;
     std::string working_directory = "";
@@ -36,12 +37,13 @@ public:
     PoseGraphLoopClosure pose_graph_loop_closure;
 #endif
 
-    bool load(const std::string &file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset);
-    bool save(const std::string &file_name, const std::string &poses_file_name, const std::string &initial_poses_file_name, bool is_subsession);
+    bool load(const std::string& file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset);
+    bool save(
+        const std::string& file_name, const std::string& poses_file_name, const std::string& initial_poses_file_name, bool is_subsession);
     void fill_session_from_worker_data(
-        const std::vector<WorkerData> &worker_data, bool save_selected, 
-        bool filter_on_export, bool apply_pose, double threshould_output_filter
-    );
+        const std::vector<WorkerData>& worker_data,
+        bool save_selected,
+        bool filter_on_export,
+        bool apply_pose,
+        double threshould_output_filter);
 };
-
-#endif

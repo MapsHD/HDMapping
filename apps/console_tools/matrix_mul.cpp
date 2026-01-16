@@ -1,10 +1,10 @@
-#include <iostream>
-#include <fstream>
 #include <Eigen/Eigen>
+#include <fstream>
+#include <iostream>
 #include <structures.h>
 #include <transformations.h>
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     TaitBryanPose pose;
     pose.px = 0;

@@ -1,0 +1,9 @@
+# Git blame can ignore selected commits (e.g. formatting or other mechanical changes)
+# when used with the --ignore-revs-file option or when configured via:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# This works with the git CLI. Some visual tools may ignore this setting.
+# GitHub's blame view applies this file automatically.
+
+# clang-format mass reformat
+7c667fce790efe905c8f825246c8e3ad417d9890

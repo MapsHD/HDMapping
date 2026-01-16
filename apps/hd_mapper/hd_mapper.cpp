@@ -12,11 +12,11 @@
 
 #include <Eigen/Eigen>
 
-#include <project_settings.h>
-#include <odo_with_gnss_fusion.h>
-#include <single_trajectory_viewer.h>
-#include <roi_exporter.h>
 #include <laz_wrapper.h>
+#include <odo_with_gnss_fusion.h>
+#include <project_settings.h>
+#include <roi_exporter.h>
+#include <single_trajectory_viewer.h>
 #include <transformations.h>
 
 #include <HDMapping/Version.hpp>
@@ -288,7 +288,7 @@ void reshape(int w, int h)
             -common_data.translate_z,
             common_data.translate_z,
             -common_data.translate_z * (float)h / float(w),
-            common_data.translate_z* float(h) / float(w),
+            common_data.translate_z * float(h) / float(w),
             -100000,
             100000);
     }

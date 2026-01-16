@@ -480,7 +480,7 @@ bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)
     // glutSpecialFunc(specialDown);
     // glutSpecialUpFunc(specialUp);
 
-    //check line width range support
+    // check line width range support
     GLfloat range[2];
     glGetFloatv(GL_LINE_WIDTH_RANGE, range);
     if (range[0] == range[1])

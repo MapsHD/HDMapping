@@ -18,14 +18,14 @@
 #include "pfd_wrapper.hpp"
 
 #include <HDMapping/Version.hpp>
-#include <session.h>
-#include <transformations.h>
 #include <local_shape_features.h>
+#include <session.h>
 #include <surface.h>
+#include <transformations.h>
 
-#include <iostream>
-#include <fstream>
 #include <filesystem>
+#include <fstream>
+#include <iostream>
 
 const unsigned int window_width = 800;
 const unsigned int window_height = 600;

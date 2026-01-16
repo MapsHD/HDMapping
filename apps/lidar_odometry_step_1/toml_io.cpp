@@ -95,7 +95,7 @@ bool TomlIO::SaveParametersToTomlFile(const std::string& filepath, LidarOdometry
 }
 
 template<typename T>
-void TomlIO::set_if_exists(NDT::GridParameters& grid, const toml::table* tbl, const std::string& key, T NDT::GridParameters::*member)
+void TomlIO::set_if_exists(NDT::GridParameters& grid, const toml::table* tbl, const std::string& key, T NDT::GridParameters::* member)
 {
     if (!tbl)
         return;

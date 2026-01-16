@@ -201,14 +201,15 @@ void RoiExporter::imgui(CommonData& common_data, const ProjectSettings& project_
 
         for (size_t i = 0; i < jobs.size(); i++)
         {
-            threads.push_back(std::thread(
-                get_point_cloud_for_roi_job,
-                i,
-                &jobs[i],
-                &(roi_point_clouds_per_job[i]),
-                project_setings,
-                common_data.roi,
-                common_data.roi_size));
+            threads.push_back(
+                std::thread(
+                    get_point_cloud_for_roi_job,
+                    i,
+                    &jobs[i],
+                    &(roi_point_clouds_per_job[i]),
+                    project_setings,
+                    common_data.roi,
+                    common_data.roi_size));
         }
 
         for (size_t j = 0; j < threads.size(); j++)

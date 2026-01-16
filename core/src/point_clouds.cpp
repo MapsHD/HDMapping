@@ -216,7 +216,8 @@ bool PointClouds::update_poses_from_RESSO(const std::string& folder_with_point_c
                 } // else{
                   //	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string() != pcs[j].file_name" <<
                   // std::endl; 	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string(): "<<
-                  // std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl; 	std::cout << "pcs[j].file_name:
+                  // std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl; 	std::cout <<
+                  // "pcs[j].file_name:
                   // "<< pcs[j].file_name << std::endl; 	std::cout << "j: " << j << std::endl;
                   // return false;
                   //}
@@ -331,7 +332,8 @@ bool PointClouds::update_poses_from_RESSO_inverse(const std::string& folder_with
                 } // else{
                   //	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string() != pcs[j].file_name" <<
                   // std::endl; 	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string(): "<<
-                  // std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl; 	std::cout << "pcs[j].file_name:
+                  // std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl; 	std::cout <<
+                  // "pcs[j].file_name:
                   // "<< pcs[j].file_name << std::endl; 	std::cout << "j: " << j << std::endl;
                   // return false;
                   //}
@@ -803,22 +805,37 @@ void PointClouds::draw_grids(
     }
 }
 
-void PointClouds::render(const ObservationPicking &observation_picking, int viewer_decimate_point_cloud, PointClouds::PointCloudDimensions dims)
+void PointClouds::render(
+    const ObservationPicking& observation_picking, int viewer_decimate_point_cloud, PointClouds::PointCloudDimensions dims)
 {
-	// Draw grids once for the scene
-	if (xz_grid_10x10 || xz_grid_1x1 || xz_grid_01x01 ||
-		yz_grid_10x10 || yz_grid_1x1 || yz_grid_01x01 ||
-		xy_grid_10x10 || xy_grid_1x1 || xy_grid_01x01)
-		draw_grids(xz_grid_10x10, xz_grid_1x1, xz_grid_01x01,
-				   yz_grid_10x10, yz_grid_1x1, yz_grid_01x01,
-				   xy_grid_10x10, xy_grid_1x1, xy_grid_01x01, dims);
+    // Draw grids once for the scene
+    if (xz_grid_10x10 || xz_grid_1x1 || xz_grid_01x01 || yz_grid_10x10 || yz_grid_1x1 || yz_grid_01x01 || xy_grid_10x10 || xy_grid_1x1 ||
+        xy_grid_01x01)
+        draw_grids(
+            xz_grid_10x10,
+            xz_grid_1x1,
+            xz_grid_01x01,
+            yz_grid_10x10,
+            yz_grid_1x1,
+            yz_grid_01x01,
+            xy_grid_10x10,
+            xy_grid_1x1,
+            xy_grid_01x01,
+            dims);
 
-	// Render each point cloud (points + trajectories)
-	for (auto &p : point_clouds)
-	{
-		p.render(this->show_with_initial_pose, observation_picking, viewer_decimate_point_cloud,
-				 xz_intersection, yz_intersection, xy_intersection, intersection_width, show_imu_to_lio_diff);
-	}
+    // Render each point cloud (points + trajectories)
+    for (auto& p : point_clouds)
+    {
+        p.render(
+            this->show_with_initial_pose,
+            observation_picking,
+            viewer_decimate_point_cloud,
+            xz_intersection,
+            yz_intersection,
+            xy_intersection,
+            intersection_width,
+            show_imu_to_lio_diff);
+    }
 }
 #endif
 

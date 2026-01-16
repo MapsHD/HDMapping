@@ -167,22 +167,23 @@ bool ICP::optimize_source_to_target_wc(PointClouds& point_clouds_container, bool
 
                 for (size_t k = 0; k < jobs.size(); k++)
                 {
-                    threads.push_back(std::thread(
-                        alpha_point_to_point_job,
-                        &jobs[k],
-                        &alphas,
-                        barron_c,
-                        &all_nns,
-                        &point_clouds_container.point_clouds,
-                        &j_indexes,
-                        pose_s,
-                        scale_factor_x,
-                        scale_factor_y,
-                        scale_factor_z,
-                        &sums_x,
-                        &sums_y,
-                        &sums_z,
-                        i));
+                    threads.push_back(
+                        std::thread(
+                            alpha_point_to_point_job,
+                            &jobs[k],
+                            &alphas,
+                            barron_c,
+                            &all_nns,
+                            &point_clouds_container.point_clouds,
+                            &j_indexes,
+                            pose_s,
+                            scale_factor_x,
+                            scale_factor_y,
+                            scale_factor_z,
+                            &sums_x,
+                            &sums_y,
+                            &sums_z,
+                            i));
                 }
 
                 for (size_t j = 0; j < threads.size(); j++)
@@ -528,22 +529,23 @@ bool ICP::optimize_source_to_target_lie_algebra_left_jacobian(PointClouds& point
 
                 for (size_t k = 0; k < jobs.size(); k++)
                 {
-                    threads.push_back(std::thread(
-                        alpha_point_to_point_job,
-                        &jobs[k],
-                        &alphas,
-                        barron_c,
-                        &all_nns,
-                        &point_clouds_container.point_clouds,
-                        &j_indexes,
-                        pose_s,
-                        scale_factor_x,
-                        scale_factor_y,
-                        scale_factor_z,
-                        &sums_x,
-                        &sums_y,
-                        &sums_z,
-                        i));
+                    threads.push_back(
+                        std::thread(
+                            alpha_point_to_point_job,
+                            &jobs[k],
+                            &alphas,
+                            barron_c,
+                            &all_nns,
+                            &point_clouds_container.point_clouds,
+                            &j_indexes,
+                            pose_s,
+                            scale_factor_x,
+                            scale_factor_y,
+                            scale_factor_z,
+                            &sums_x,
+                            &sums_y,
+                            &sums_z,
+                            i));
                 }
 
                 for (size_t j = 0; j < threads.size(); j++)
@@ -892,22 +894,23 @@ bool ICP::optimize_source_to_target_lie_algebra_right_jacobian(PointClouds& poin
 
                 for (size_t k = 0; k < jobs.size(); k++)
                 {
-                    threads.push_back(std::thread(
-                        alpha_point_to_point_job,
-                        &jobs[k],
-                        &alphas,
-                        barron_c,
-                        &all_nns,
-                        &point_clouds_container.point_clouds,
-                        &j_indexes,
-                        pose_s,
-                        scale_factor_x,
-                        scale_factor_y,
-                        scale_factor_z,
-                        &sums_x,
-                        &sums_y,
-                        &sums_z,
-                        i));
+                    threads.push_back(
+                        std::thread(
+                            alpha_point_to_point_job,
+                            &jobs[k],
+                            &alphas,
+                            barron_c,
+                            &all_nns,
+                            &point_clouds_container.point_clouds,
+                            &j_indexes,
+                            pose_s,
+                            scale_factor_x,
+                            scale_factor_y,
+                            scale_factor_z,
+                            &sums_x,
+                            &sums_y,
+                            &sums_z,
+                            i));
                 }
 
                 for (size_t j = 0; j < threads.size(); j++)

@@ -3,7 +3,6 @@
 #include <Eigen/Eigen>
 #include <vector>
 
-
 inline unsigned long long int get_index_2D(const int16_t x, const int16_t y /*, const int16_t z*/)
 {
     // return ((static_cast<unsigned long long int>(x) << 32) & (0x0000FFFF00000000ull)) |

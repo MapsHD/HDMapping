@@ -6,8 +6,8 @@
 #include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
-#include <implot/implot.h>
 #include <imgui_internal.h>
+#include <implot/implot.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -20,9 +20,9 @@
 
 #include "pfd_wrapper.hpp"
 
-#include <filesystem>
-#include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include "../lidar_odometry_step_1/lidar_odometry.h"
+#include "../lidar_odometry_step_1/lidar_odometry_utils.h"
+#include <filesystem>
 
 #include <HDMapping/Version.hpp>
 
@@ -34,9 +34,9 @@
 #include <opencv2/opencv.hpp>
 
 #ifdef _WIN32
-#include <windows.h>
-#include <shellapi.h> // <-- Required for ShellExecuteA
 #include "resource.h"
+#include <shellapi.h> // <-- Required for ShellExecuteA
+#include <windows.h>
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////

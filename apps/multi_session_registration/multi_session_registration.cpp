@@ -1991,7 +1991,7 @@ void loadSessions()
         Session session;
         session.load(fs::path(ps).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
 
-        //making sure irelevant session specific settings that could affect rendering are off
+        // making sure irelevant session specific settings that could affect rendering are off
         session.point_clouds_container.xz_intersection = false;
         session.point_clouds_container.yz_intersection = false;
         session.point_clouds_container.xy_intersection = false;
@@ -2184,8 +2184,9 @@ void settings_gui()
                         ImGui::EndDisabled();
 
                         ImGui::SameLine();
-                        ImGui::ColorEdit3(("Color##" + std::to_string(i)).c_str(), (float *)&sessions[i].render_color, ImGuiColorEditFlags_NoInputs);
-                        for (auto &pc : sessions[i].point_clouds_container.point_clouds)
+                        ImGui::ColorEdit3(
+                            ("Color##" + std::to_string(i)).c_str(), (float*)&sessions[i].render_color, ImGuiColorEditFlags_NoInputs);
+                        for (auto& pc : sessions[i].point_clouds_container.point_clouds)
                         {
                             pc.render_color[0] = sessions[i].render_color[0];
                             pc.render_color[1] = sessions[i].render_color[1];
@@ -3637,12 +3638,14 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
             {
                 ImGui::BeginTooltip();
                 ImGui::Text("Point cloud alignment (registration) algorithm");
-                ImGui::Text("Probabilistic alternative to ICP that models one cloud (the target)\nas a set of Gaussian distributions "
-                            "rather than raw points");
+                ImGui::Text(
+                    "Probabilistic alternative to ICP that models one cloud (the target)\nas a set of Gaussian distributions "
+                    "rather than raw points");
                 ImGui::Text(
                     "Robust for rough initial poses but can converge to a local optimum\nif the initial misalignment is very large");
-                ImGui::Text("Known for being faster and smoother in optimization because\nit replaces discrete point-point correspondences "
-                            "with continuous probability density functions.");
+                ImGui::Text(
+                    "Known for being faster and smoother in optimization because\nit replaces discrete point-point correspondences "
+                    "with continuous probability density functions.");
                 ImGui::EndTooltip();
             }
 

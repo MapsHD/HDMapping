@@ -48,8 +48,8 @@ public:
     double motion_model_w_fi_1_sigma_deg = 1.0 / 100.0 * 180.0 / M_PI;
     double motion_model_w_ka_1_sigma_deg = 1.0 / 100.0 * 180.0 / M_PI;
 
-    PoseGraphLoopClosure(){};
-    ~PoseGraphLoopClosure(){};
+    PoseGraphLoopClosure() {};
+    ~PoseGraphLoopClosure() {};
 
     void add_edge(PointClouds& point_clouds_container, int index_loop_closure_source, int index_loop_closure_target);
     void set_initial_poses_as_motion_model(PointClouds& point_clouds_container);

@@ -207,10 +207,7 @@ int index_end = 0;
 ColorScheme csPointCloud = CS_SOLID;
 ColorScheme csTrajectory = CS_SOLID;
 
-float m_gizmo[] = {1, 0, 0, 0,
-                   0, 1, 0, 0,
-                   0, 0, 1, 0,
-                   0, 0, 0, 1};
+float m_gizmo[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
@@ -348,8 +345,9 @@ void ndt_gui()
         ImGui::BeginTooltip();
         ImGui::Text(
             "Average of all Mahalanobis distances between transformed source points\nand their corresponding Gaussian cells, where:");
-        ImGui::Text("Mahalanobis distance measures how far a point is from the mean of a multivariate Gaussian distribution,\ntaking into "
-                    "account the covariance (shape and orientation) of that distribution");
+        ImGui::Text(
+            "Mahalanobis distance measures how far a point is from the mean of a multivariate Gaussian distribution,\ntaking into "
+            "account the covariance (shape and orientation) of that distribution");
         ImGui::EndTooltip();
     }
 
@@ -596,12 +594,14 @@ void pca_gui()
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Probabilistic alternative to ICP that models one cloud (the target)\nas a set of Gaussian distributions "
-                            "rather than raw points");
+                ImGui::Text(
+                    "Probabilistic alternative to ICP that models one cloud (the target)\nas a set of Gaussian distributions "
+                    "rather than raw points");
                 ImGui::Text(
                     "Robust for rough initial poses but can converge to a local optimum\nif the initial misalignment is very large");
-                ImGui::Text("Known for being faster and smoother in optimization because\nit replaces discrete point-point correspondences "
-                            "with continuous probability density functions.");
+                ImGui::Text(
+                    "Known for being faster and smoother in optimization because\nit replaces discrete point-point correspondences "
+                    "with continuous probability density functions.");
                 ImGui::EndTooltip();
             }
 
@@ -624,10 +624,12 @@ void pca_gui()
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Geometric registration algorithm that aligns two point clouds\nby minimizing the Euclidean distances between "
-                            "corresponding points");
-                ImGui::Text("Very precise at local refinement, especially point-to-plane ICP,\nbut it struggles if the starting alignment "
-                            "is too far off");
+                ImGui::Text(
+                    "Geometric registration algorithm that aligns two point clouds\nby minimizing the Euclidean distances between "
+                    "corresponding points");
+                ImGui::Text(
+                    "Very precise at local refinement, especially point-to-plane ICP,\nbut it struggles if the starting alignment "
+                    "is too far off");
                 ImGui::EndTooltip();
             }
 
@@ -650,10 +652,12 @@ void pca_gui()
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Feature based registration technique that uses detected\nplanar surfaces in the environment (walls, floors, "
-                            "ceilings, etc.) as constraints for alignment");
-                ImGui::Text("Can be much more robust to noise and partial overlap,\nrequire far fewer correspondences (just a few planes "
-                            "can define a full 6 DOF pose),\nhandle low texture regions better than ICP");
+                ImGui::Text(
+                    "Feature based registration technique that uses detected\nplanar surfaces in the environment (walls, floors, "
+                    "ceilings, etc.) as constraints for alignment");
+                ImGui::Text(
+                    "Can be much more robust to noise and partial overlap,\nrequire far fewer correspondences (just a few planes "
+                    "can define a full 6 DOF pose),\nhandle low texture regions better than ICP");
                 ImGui::EndTooltip();
             }
 
@@ -1300,7 +1304,10 @@ void lio_segments_gui()
                 if (session.point_clouds_container.point_clouds[i].visible)
                 {
                     ImGui::SameLine();
-                    ImGui::ColorEdit3(("color##" + std::to_string(i)).c_str(), session.point_clouds_container.point_clouds[i].render_color, ImGuiColorEditFlags_NoInputs);
+                    ImGui::ColorEdit3(
+                        ("color##" + std::to_string(i)).c_str(),
+                        session.point_clouds_container.point_clouds[i].render_color,
+                        ImGuiColorEditFlags_NoInputs);
 
 #if 0
                     ImGui::SameLine();
@@ -2451,7 +2458,8 @@ void display()
 
             session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, session_dims);
 
-            // std::cout << "session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 << std::endl;
+            // std::cout << "session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 <<
+            // std::endl;
 
             observation_picking.render();
 
@@ -2658,7 +2666,7 @@ void display()
             pc.render_color[0] = float(rand() % 255) / 255.0f;
             pc.render_color[1] = float(rand() % 255) / 255.0f;
             pc.render_color[2] = float(rand() % 255) / 255.0f;
-            
+
             if (csTrajectory == CS_FOLLOW)
             {
                 pc.traj_color[0] = pc.render_color[0];
@@ -2760,8 +2768,9 @@ void display()
                             save_all_to_las(session, output_file_name, false, true);
                     }
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("To export in full resolution, close the program and open again and unmark 'downsample during "
-                                          "load' before loading session");
+                        ImGui::SetTooltip(
+                            "To export in full resolution, close the program and open again and unmark 'downsample during "
+                            "load' before loading session");
 
                     if (ImGui::MenuItem("Separate global scans (laz)"))
                     {
@@ -3191,8 +3200,9 @@ void display()
                 {
                     ImGui::BeginTooltip();
                     ImGui::Text("Point cloud alignment (registration) algorithms:");
-                    ImGui::Text("(aligning two 3D point sets from LiDAR scans, by estimating\nthe relative pose(translation and rotation) "
-                                "between them)");
+                    ImGui::Text(
+                        "(aligning two 3D point sets from LiDAR scans, by estimating\nthe relative pose(translation and rotation) "
+                        "between them)");
                     ImGui::Text("- Normal Distributions Transform");
                     ImGui::Text("- Iterative Closest Point");
                     ImGui::Text("- Registration Plane Feature");

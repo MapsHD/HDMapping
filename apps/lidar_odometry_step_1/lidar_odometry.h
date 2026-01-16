@@ -11,7 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <session.h>
 
-//#define SAMPLE_PERIOD (1.0 / 200.0)
+// #define SAMPLE_PERIOD (1.0 / 200.0)
 
 using Trajectory = std::map<double, std::pair<Eigen::Matrix4d, double>>;
 using Imu = std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>>;

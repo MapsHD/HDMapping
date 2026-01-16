@@ -26,7 +26,7 @@ public:
     float render_color[3];
     std::string session_file_name = "";
     bool is_ground_truth = false;
-    //bool show_rgb = true;
+    // bool show_rgb = true;
     bool load_cache_mode = false;
 
 #if WITH_GUI == 1

@@ -2252,32 +2252,33 @@ bool NDT::optimize(std::vector<PointCloud>& point_clouds, bool compute_only_maha
             std::cout << "computing AtPA AtPB start" << std::endl;
             for (size_t k = 0; k < jobs.size(); k++)
             {
-                threads.push_back(std::thread(
-                    ndt_job,
-                    k,
-                    &jobs[k],
-                    &buckets,
-                    &(AtPAtmp[k]),
-                    &(AtPBtmp[k]),
-                    &index_pair,
-                    &points_global,
-                    &mposes,
-                    &mposes_inv,
-                    point_clouds.size(),
-                    pose_convention,
-                    rotation_matrix_parametrization,
-                    number_of_unknowns,
-                    &(sumrmss[k]),
-                    &(sums[k]),
-                    is_generalized,
-                    sigma_r,
-                    sigma_polar_angle,
-                    sigma_azimuthal_angle,
-                    num_extended_points,
-                    &(md_out[k]),
-                    &(md_count_out[k]),
-                    false,
-                    compute_mean_and_cov_for_bucket));
+                threads.push_back(
+                    std::thread(
+                        ndt_job,
+                        k,
+                        &jobs[k],
+                        &buckets,
+                        &(AtPAtmp[k]),
+                        &(AtPBtmp[k]),
+                        &index_pair,
+                        &points_global,
+                        &mposes,
+                        &mposes_inv,
+                        point_clouds.size(),
+                        pose_convention,
+                        rotation_matrix_parametrization,
+                        number_of_unknowns,
+                        &(sumrmss[k]),
+                        &(sums[k]),
+                        is_generalized,
+                        sigma_r,
+                        sigma_polar_angle,
+                        sigma_azimuthal_angle,
+                        num_extended_points,
+                        &(md_out[k]),
+                        &(md_count_out[k]),
+                        false,
+                        compute_mean_and_cov_for_bucket));
             }
 
             for (size_t j = 0; j < threads.size(); j++)
@@ -2388,28 +2389,29 @@ bool NDT::optimize(std::vector<PointCloud>& point_clouds, bool compute_only_maha
 
         for (size_t k = 0; k < jobs.size(); k++)
         {
-            threads.push_back(std::thread(
-                ndt_job,
-                k,
-                &jobs[k],
-                &buckets,
-                &(AtPAtmp[k]),
-                &(AtPBtmp[k]),
-                &index_pair,
-                &points_global,
-                &mposes,
-                &mposes_inv,
-                point_clouds.size(),
-                pose_convention,
-                rotation_matrix_parametrization,
-                number_of_unknowns,
-                &(sumrmss[k]),
-                &(sums[k]),
-                is_generalized,
-                sigma_r,
-                sigma_polar_angle,
-                sigma_azimuthal_angle,
-                num_extended_points));
+            threads.push_back(
+                std::thread(
+                    ndt_job,
+                    k,
+                    &jobs[k],
+                    &buckets,
+                    &(AtPAtmp[k]),
+                    &(AtPBtmp[k]),
+                    &index_pair,
+                    &points_global,
+                    &mposes,
+                    &mposes_inv,
+                    point_clouds.size(),
+                    pose_convention,
+                    rotation_matrix_parametrization,
+                    number_of_unknowns,
+                    &(sumrmss[k]),
+                    &(sums[k]),
+                    is_generalized,
+                    sigma_r,
+                    sigma_polar_angle,
+                    sigma_azimuthal_angle,
+                    num_extended_points));
         }
 
         for (size_t j = 0; j < threads.size(); j++)
@@ -3061,32 +3063,33 @@ bool NDT::optimize(std::vector<Session>& sessions, bool compute_only_mahalanobis
             std::cout << "computing AtPA AtPB start" << std::endl;
             for (size_t k = 0; k < jobs.size(); k++)
             {
-                threads.push_back(std::thread(
-                    ndt_job,
-                    k,
-                    &jobs[k],
-                    &buckets,
-                    &(AtPAtmp[k]),
-                    &(AtPBtmp[k]),
-                    &index_pair,
-                    &points_global,
-                    &mposes,
-                    &mposes_inv,
-                    num_point_clouds,
-                    pose_convention,
-                    rotation_matrix_parametrization,
-                    number_of_unknowns,
-                    &(sumrmss[k]),
-                    &(sums[k]),
-                    is_generalized,
-                    sigma_r,
-                    sigma_polar_angle,
-                    sigma_azimuthal_angle,
-                    num_extended_points,
-                    &(md_out[k]),
-                    &(md_count_out[k]),
-                    false,
-                    compute_mean_and_cov_for_bucket));
+                threads.push_back(
+                    std::thread(
+                        ndt_job,
+                        k,
+                        &jobs[k],
+                        &buckets,
+                        &(AtPAtmp[k]),
+                        &(AtPBtmp[k]),
+                        &index_pair,
+                        &points_global,
+                        &mposes,
+                        &mposes_inv,
+                        num_point_clouds,
+                        pose_convention,
+                        rotation_matrix_parametrization,
+                        number_of_unknowns,
+                        &(sumrmss[k]),
+                        &(sums[k]),
+                        is_generalized,
+                        sigma_r,
+                        sigma_polar_angle,
+                        sigma_azimuthal_angle,
+                        num_extended_points,
+                        &(md_out[k]),
+                        &(md_count_out[k]),
+                        false,
+                        compute_mean_and_cov_for_bucket));
             }
 
             for (size_t j = 0; j < threads.size(); j++)
@@ -3638,32 +3641,33 @@ std::vector<Eigen::SparseMatrix<double>> NDT::compute_covariance_matrices_and_rm
 
     for (size_t k = 0; k < jobs.size(); k++)
     {
-        threads.push_back(std::thread(
-            ndt_job,
-            k,
-            &jobs[k],
-            &buckets,
-            &(AtPAtmp[k]),
-            &(AtPBtmp[k]),
-            &index_pair,
-            &points_global,
-            &mposes,
-            &mposes_inv,
-            point_clouds.size(),
-            pose_convention,
-            rotation_matrix_parametrization,
-            number_of_unknowns,
-            &(sumrmss[k]),
-            &(sums[k]),
-            is_generalized,
-            sigma_r,
-            sigma_polar_angle,
-            sigma_azimuthal_angle,
-            num_extended_points,
-            &(md_out[k]),
-            &(md_count_out[k]),
-            false,
-            false));
+        threads.push_back(
+            std::thread(
+                ndt_job,
+                k,
+                &jobs[k],
+                &buckets,
+                &(AtPAtmp[k]),
+                &(AtPBtmp[k]),
+                &index_pair,
+                &points_global,
+                &mposes,
+                &mposes_inv,
+                point_clouds.size(),
+                pose_convention,
+                rotation_matrix_parametrization,
+                number_of_unknowns,
+                &(sumrmss[k]),
+                &(sums[k]),
+                is_generalized,
+                sigma_r,
+                sigma_polar_angle,
+                sigma_azimuthal_angle,
+                num_extended_points,
+                &(md_out[k]),
+                &(md_count_out[k]),
+                false,
+                false));
     }
 
     for (size_t j = 0; j < threads.size(); j++)
@@ -3841,32 +3845,33 @@ bool NDT::compute_cov_mean(
     std::cout << "computing cov mean start" << std::endl;
     for (size_t k = 0; k < jobs.size(); k++)
     {
-        threads.push_back(std::thread(
-            ndt_job,
-            k,
-            &jobs[k],
-            &buckets,
-            &(AtPAtmp[k]),
-            &(AtPBtmp[k]),
-            &index_pair,
-            &points,
-            &mposes,
-            &mposes_inv,
-            points.size(),
-            PoseConvention::wc,
-            RotationMatrixParametrization::tait_bryan_xyz,
-            number_of_unknowns,
-            &(sumrmss[k]),
-            &(sums[k]),
-            is_generalized,
-            sigma_r,
-            sigma_polar_angle,
-            sigma_azimuthal_angle,
-            num_extended_points,
-            &(md_out[k]),
-            &(md_count_out[k]),
-            true,
-            false));
+        threads.push_back(
+            std::thread(
+                ndt_job,
+                k,
+                &jobs[k],
+                &buckets,
+                &(AtPAtmp[k]),
+                &(AtPBtmp[k]),
+                &index_pair,
+                &points,
+                &mposes,
+                &mposes_inv,
+                points.size(),
+                PoseConvention::wc,
+                RotationMatrixParametrization::tait_bryan_xyz,
+                number_of_unknowns,
+                &(sumrmss[k]),
+                &(sums[k]),
+                is_generalized,
+                sigma_r,
+                sigma_polar_angle,
+                sigma_azimuthal_angle,
+                num_extended_points,
+                &(md_out[k]),
+                &(md_count_out[k]),
+                true,
+                false));
     }
 
     for (size_t j = 0; j < threads.size(); j++)
@@ -3962,31 +3967,32 @@ bool NDT::compute_cov_mean(
     std::cout << "computing cov mean ndt_jobi start" << std::endl;
     for (size_t k = 0; k < jobs.size(); k++)
     {
-        threads.push_back(std::thread(
-            ndt_jobi,
-            k,
-            &jobs[k],
-            &buckets,
-            &(AtPAtmp[k]),
-            &(AtPBtmp[k]),
-            &index_pair,
-            &points,
-            &mposes,
-            &mposes_inv,
-            points.size(),
-            PoseConvention::wc,
-            RotationMatrixParametrization::tait_bryan_xyz,
-            number_of_unknowns,
-            &(sumrmss[k]),
-            &(sums[k]),
-            is_generalized,
-            sigma_r,
-            sigma_polar_angle,
-            sigma_azimuthal_angle,
-            num_extended_points,
-            &(md_out[k]),
-            &(md_count_out[k]),
-            true));
+        threads.push_back(
+            std::thread(
+                ndt_jobi,
+                k,
+                &jobs[k],
+                &buckets,
+                &(AtPAtmp[k]),
+                &(AtPBtmp[k]),
+                &index_pair,
+                &points,
+                &mposes,
+                &mposes_inv,
+                points.size(),
+                PoseConvention::wc,
+                RotationMatrixParametrization::tait_bryan_xyz,
+                number_of_unknowns,
+                &(sumrmss[k]),
+                &(sums[k]),
+                is_generalized,
+                sigma_r,
+                sigma_polar_angle,
+                sigma_azimuthal_angle,
+                num_extended_points,
+                &(md_out[k]),
+                &(md_count_out[k]),
+                true));
     }
 
     for (size_t j = 0; j < threads.size(); j++)

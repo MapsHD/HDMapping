@@ -17,20 +17,20 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <ndt.h>
 #include <icp.h>
+#include <ndt.h>
+#include <observation_picking.h>
+#include <pose_graph_slam.h>
 #include <registration_plane_feature.h>
 #include <transformations.h>
-#include <pose_graph_slam.h>
-#include <observation_picking.h>
 
 #include <portable-file-dialogs.h>
 
 #include <laszip/laszip_api.h>
 
-#include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 
 #include <manual_pose_graph_loop_closure.h>
 

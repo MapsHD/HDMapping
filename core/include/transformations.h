@@ -1,7 +1,7 @@
 #pragma once
 
 #include "structures.h"
-//#include <opencv2/opencv.hpp>
+// #include <opencv2/opencv.hpp>
 
 #ifndef MAX
 #define MAX(a, b) a > b ? a : b

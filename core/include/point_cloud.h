@@ -1,16 +1,17 @@
-#ifndef _POINT_CLOUD_H_
-#define _POINT_CLOUD_H_
+#pragma once
 
-#include <string>
-#include <vector>
 #include <Eigen/Eigen>
+#include <string>
 #include <structures.h>
+#include <vector>
+
 #if WITH_GUI == 1
 #include <GL/freeglut.h>
 #include <observation_picking.h>
 #endif
 
-class PointCloud {
+class PointCloud
+{
 public:
 	struct GridParameters {
 		double bounding_box_min_X = 0.0;
@@ -137,16 +138,21 @@ public:
 	void decimate(double bucket_x, double bucket_y, double bucket_z);
 	void shift_to_center();
 #if WITH_GUI == 1
-	//void render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud,
-	//			bool xz_intersection, bool yz_intersection, bool xy_intersection,
-	//			bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_01x01,
-	//			bool yz_grid_10x10, bool yz_grid_1x1, bool yz_grid_01x01,
-	//			bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01, 
-	//			double intersection_width);
-	void render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud,
-				bool xz_intersection, bool yz_intersection, bool xy_intersection, double intersection_width, bool visible_imu_diff);
-	void render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud);
+    // void render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud,
+    //			bool xz_intersection, bool yz_intersection, bool xy_intersection,
+    //			bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_01x01,
+    //			bool yz_grid_10x10, bool yz_grid_1x1, bool yz_grid_01x01,
+    //			bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01,
+    //			double intersection_width);
+    void render(
+        bool show_with_initial_pose,
+        const ObservationPicking& observation_picking,
+        int viewer_decmiate_point_cloud,
+        bool xz_intersection,
+        bool yz_intersection,
+        bool xy_intersection,
+        double intersection_width,
+        bool visible_imu_diff);
+    void render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud);
 #endif
 };
-
-#endif

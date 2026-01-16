@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 4.0.0)
 # Set minimum policy version to avoid compatibility issues with subprojects
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
+# Export compile commands for static analysis and tools
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 project(hd-mapping)
 
 set (HDMAPPING_VERSION_MAJOR 0)
@@ -12,6 +15,16 @@ set (HDMAPPING_VERSION_PATCH 0)
 add_definitions(-DHDMAPPING_VERSION_MAJOR=${HDMAPPING_VERSION_MAJOR})
 add_definitions(-DHDMAPPING_VERSION_MINOR=${HDMAPPING_VERSION_MINOR})
 add_definitions(-DHDMAPPING_VERSION_PATCH=${HDMAPPING_VERSION_PATCH})
+
+if (MSVC)
+    add_definitions(-DNOMINMAX)
+    add_definitions(-DWIN32_LEAN_AND_MEAN)
+endif()
+
+get_filename_component(REPOSITORY_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} ABSOLUTE)
+set(THIRDPARTY_DIRECTORY ${REPOSITORY_DIRECTORY}/3rdparty)
+set(THIRDPARTY_DIRECTORY_BINARY ${REPOSITORY_DIRECTORY}/3rdpartyBinary)
+set(EXTERNAL_LIBRARIES_DIRECTORY ${REPOSITORY_DIRECTORY}/external)
 
 
 # CPU Architecture optimization options
@@ -248,14 +261,12 @@ else()
     endif()
 endif()
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 find_package(OpenGL REQUIRED)
 
 add_definitions(-D_USE_MATH_DEFINES)
-
-get_filename_component(REPOSITORY_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} ABSOLUTE)
-set(EXTERNAL_LIBRARIES_DIRECTORY ${REPOSITORY_DIRECTORY}/3rdparty)
-set(EXTERNAL_LIBRARIES_DIRECTORY_BINARY ${REPOSITORY_DIRECTORY}/3rdpartyBinary)
-
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -266,8 +277,8 @@ include(cmake/imgui.cmake)
 include(cmake/imguizmo.cmake)
 include(cmake/implot.cmake)
 
-add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)
-set(EIGEN3_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY}/eigen)
+add_subdirectory(${THIRDPARTY_DIRECTORY}/eigen)
+set(EIGEN3_INCLUDE_DIR ${THIRDPARTY_DIRECTORY}/eigen)
 MESSAGE(STATUS "Using bundled Eigen3 : ${EIGEN3_INCLUDE_DIR}")
 
 
@@ -276,8 +287,8 @@ if (BUILD_WITH_BUNDLED_FREEGLUT)
     set(FREEGLUT_BUILD_DEMOS
             OFF
             CACHE BOOL "" FORCE)
-    add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut)
-    set(FREEGLUT_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut/include)
+    add_subdirectory(${THIRDPARTY_DIRECTORY}/freeglut)
+    set(FREEGLUT_INCLUDE_DIR ${THIRDPARTY_DIRECTORY}/freeglut/include)
     set(FREEGLUT_LIBRARY freeglut)
     # Suppress unused variable warnings from FreeGlut
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -293,8 +304,8 @@ endif ()
 
 option (BUILD_WITH_BUNDLED_GLEW "Build with bundled GLEW" ON)
 if (BUILD_WITH_BUNDLED_GLEW)
-    add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/glew-cmake)
-    set(GLEW_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-cmake/include)
+    add_subdirectory(${THIRDPARTY_DIRECTORY}/glew-cmake)
+    set(GLEW_INCLUDE_DIR ${THIRDPARTY_DIRECTORY}/glew-cmake/include)
     set(GLEW_LIBRARY libglew_static)
 
     MESSAGE(STATUS "Using bundled GLEW")
@@ -307,8 +318,8 @@ endif()
 
 option(BUILD_WITH_BUNDLED_LIBLASZIP "Build with bundled Lib LASZIP" ON)
 if (BUILD_WITH_BUNDLED_LIBLASZIP)
-    add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/LASzip)
-    set(LASZIP_INCLUDE_DIR ${EXTERNAL_LIBRARIES_DIRECTORY})
+    add_subdirectory(${THIRDPARTY_DIRECTORY}/LASzip)
+    set(LASZIP_INCLUDE_DIR ${THIRDPARTY_DIRECTORY})
     set(LASZIP_LIBRARY laszip)
     MESSAGE(STATUS "Using bundled LASzip")
     #suppress warnings from LASzip
@@ -329,7 +340,7 @@ else()
 endif ()
 
 # Download or Search for OpenCV
-include(${EXTERNAL_LIBRARIES_DIRECTORY_BINARY}/OpenCV/CMakeLists.txt)
+include(${THIRDPARTY_DIRECTORY_BINARY}/OpenCV/CMakeLists.txt)
 find_package(OpenCV REQUIRED)
 MESSAGE(STATUS "OpenCV include dir: ${OpenCV_INCLUDE_DIRS}, OpenCV librarys: ${OpenCV_LIBS}")
 
@@ -343,8 +354,8 @@ if (BUILD_WITH_BUNDLED_ONETBB)
     set(TBBMALLOC_BUILD OFF CACHE BOOL "" FORCE)
     set(TBB_CPF OFF CACHE BOOL "" FORCE)
     
-    add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/oneTBB)
-    MESSAGE(STATUS "Using bundled oneTBB from: ${EXTERNAL_LIBRARIES_DIRECTORY}/oneTBB")
+    add_subdirectory(${THIRDPARTY_DIRECTORY}/oneTBB)
+    MESSAGE(STATUS "Using bundled oneTBB from: ${THIRDPARTY_DIRECTORY}/oneTBB")
 else()
     # Find TBB from system
     find_package(TBB REQUIRED)
@@ -374,7 +385,7 @@ else()
 endif()
 
 
-add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion)
+add_subdirectory(${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
 
 add_subdirectory(core)
 add_subdirectory(core_hd_mapping)

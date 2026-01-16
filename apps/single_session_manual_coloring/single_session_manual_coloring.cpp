@@ -1,5 +1,4 @@
 
-#include <iostream>
 #include <GL/freeglut.h>
 
 #include "imgui.h"
@@ -13,14 +12,13 @@
 
 #include "color_las_loader.h"
 #include "pfd_wrapper.hpp"
-#include <execution>
 
-#include <structures.h>
-#include <transformations.h>
-#include <observation_equations/codes/python-scripts/camera-metrics/equirectangular_camera_colinearity_tait_bryan_wc_jacobian.h>
 #include <Eigen/Eigen>
 #include <observation_equations/codes/common/include/cauchy.h>
+#include <observation_equations/codes/python-scripts/camera-metrics/equirectangular_camera_colinearity_tait_bryan_wc_jacobian.h>
 #include <observation_equations/codes/python-scripts/camera-metrics/fisheye_camera_calibRT_tait_bryan_wc_jacobian.h>
+#include <structures.h>
+#include <transformations.h>
 
 #include <HDMapping/Version.hpp>
 
@@ -28,9 +26,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <session.h>
-#include <filesystem>
 
 #include <observation_picking.h>
+
+#include <execution>
+#include <filesystem>
+#include <iostream>
 
 const unsigned int window_width = 800;
 const unsigned int window_height = 600;
@@ -51,18 +52,12 @@ float translate_z = -20.0;
 float rotate_x = 0.0, rotate_y = 0.0;
 int mouse_old_x, mouse_old_y;
 int mouse_buttons = 0;
-bool gui_mouse_down{false};
+bool gui_mouse_down{ false };
 float mouse_sensitivity = 1.0;
 
-float m_ortho_projection[] = {1, 0, 0, 0,
-                              0, 1, 0, 0,
-                              0, 0, 1, 0,
-                              0, 0, 0, 1};
+float m_ortho_projection[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
-float m_ortho_gizmo_view[] = {1, 0, 0, 0,
-                              0, 1, 0, 0,
-                              0, 0, 1, 0,
-                              0, 0, 0, 1};
+float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 int decimation_step = 1000;
 Session session;
@@ -77,17 +72,17 @@ namespace SystemData
 {
     std::vector<mandeye::PointRGB> points;
     std::pair<Eigen::Vector3d, Eigen::Vector3d> clickedRay;
-    int closestPointIndex{-1};
+    int closestPointIndex{ -1 };
     std::vector<ImVec2> pointPickedImage;
     std::vector<Eigen::Vector3d> pointPickedPointCloud;
 
-    unsigned char *imageData;
+    unsigned char* imageData;
     int imageWidth, imageHeight, imageNrChannels;
 
     Eigen::Affine3d camera_pose = Eigen::Affine3d::Identity();
 
     int point_size = 1;
-}
+} // namespace SystemData
 
 void reshape(int w, int h)
 {
@@ -100,12 +95,16 @@ void reshape(int w, int h)
     }
     else
     {
-        ImGuiIO &io = ImGui::GetIO();
+        ImGuiIO& io = ImGui::GetIO();
         float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+        glOrtho(
+            -camera_ortho_xy_view_zoom,
+            camera_ortho_xy_view_zoom,
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio,
+            -100000,
+            100000);
         // glOrtho(-translate_z, translate_z, -translate_z * (float)h / float(w), translate_z * float(h) / float(w), -10000, 10000);
     }
     glMatrixMode(GL_MODELVIEW);
@@ -114,7 +113,7 @@ void reshape(int w, int h)
 
 void motion(int x, int y)
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     io.MousePos = ImVec2((float)x, (float)y);
 
     if (!io.WantCaptureMouse)
@@ -128,8 +127,10 @@ void motion(int x, int y)
             if (mouse_buttons & 1)
             {
                 float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-                Eigen::Vector3d v(dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
-                                  dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio), 0);
+                Eigen::Vector3d v(
+                    dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
+                    dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio),
+                    0);
                 TaitBryanPose pose_tb;
                 pose_tb.px = 0.0;
                 pose_tb.py = 0.0;
@@ -164,15 +165,36 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
-std::vector<mandeye::PointRGB> ApplyColorToPointcloud(const std::vector<mandeye::PointRGB> &pointsRGB, const unsigned char *imageData, int imageWidth, int imageHeight, int nrChannels, const Eigen::Affine3d &transfom)
+std::vector<mandeye::PointRGB> ApplyColorToPointcloud(
+    const std::vector<mandeye::PointRGB>& pointsRGB,
+    const unsigned char* imageData,
+    int imageWidth,
+    int imageHeight,
+    int nrChannels,
+    const Eigen::Affine3d& transfom)
 {
     std::vector<mandeye::PointRGB> newCloud(pointsRGB.size());
-    std::transform(std::execution::par_unseq, pointsRGB.begin(), pointsRGB.end(), newCloud.begin(), [&](mandeye::PointRGB p)
-                   {
+    std::transform(
+        std::execution::par_unseq,
+        pointsRGB.begin(),
+        pointsRGB.end(),
+        newCloud.begin(),
+        [&](mandeye::PointRGB p)
+        {
             TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(transfom);
             double du, dv;
-            equrectangular_camera_colinearity_tait_bryan_wc(du,dv, imageHeight, imageWidth,
-                M_PI, pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka,
+            equrectangular_camera_colinearity_tait_bryan_wc(
+                du,
+                dv,
+                imageHeight,
+                imageWidth,
+                M_PI,
+                pose.px,
+                pose.py,
+                pose.pz,
+                pose.om,
+                pose.fi,
+                pose.ka,
                 p.point.x(),
                 p.point.y(),
                 p.point.z());
@@ -184,11 +206,14 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloud(const std::vector<mandeye:
                 unsigned char red = imageData[index];
                 unsigned char green = imageData[index + 1];
                 unsigned char blue = imageData[index + 2];
-                p.rgb = { 1.f * red / 256.f,1.f * green / 256.f, 1.f * blue / 256.f, 1.f };
-            }else{
-                p.rgb = {0.f, 0.f, 0.f, 1.f};
+                p.rgb = { 1.f * red / 256.f, 1.f * green / 256.f, 1.f * blue / 256.f, 1.f };
             }
-        return p; });
+            else
+            {
+                p.rgb = { 0.f, 0.f, 0.f, 1.f };
+            }
+            return p;
+        });
     return newCloud;
 }
 
@@ -196,7 +221,7 @@ void project_gui()
 {
     if (ImGui::Begin("single_session_manual_coloring"))
     {
-        ImGui::ColorEdit3("clear color", (float *)&clear_color);
+        ImGui::ColorEdit3("clear color", (float*)&clear_color);
         ImGui::Checkbox("show_axes", &show_axes);
         ImGui::InputInt("point cloud decimation_step", &decimation_step);
         if (decimation_step < 1)
@@ -235,15 +260,17 @@ void project_gui()
         ImGui::SameLine();
         if (ImGui::Button("save colored pointcloud"))
         {
-            
             const auto input_file_names = mandeye::fd::SaveFileDialog("Colored point cloud", mandeye::fd::LazFilter);
             if (!input_file_names.empty())
             {
                 std::vector<mandeye::PointRGB> pointsRGB;
 
-                for (const auto &p : session.point_clouds_container.point_clouds){
-                    if(p.visible){
-                        for (int index = 0; index < p.points_local.size(); index++){
+                for (const auto& p : session.point_clouds_container.point_clouds)
+                {
+                    if (p.visible)
+                    {
+                        for (int index = 0; index < p.points_local.size(); index++)
+                        {
                             mandeye::PointRGB out;
                             out.point = p.m_pose * p.points_local[index];
                             out.intensity = p.intensities[index];
@@ -269,7 +296,7 @@ void project_gui()
 
             std::cout << "input_images list begin" << std::endl;
             std::cout << "----------------------" << std::endl;
-            for (const auto &fn : input_file_names)
+            for (const auto& fn : input_file_names)
             {
                 std::cout << "'" << fn << "'" << std::endl;
                 images_file_names.push_back(fn);
@@ -344,7 +371,7 @@ void project_gui()
 
         if (ImGui::Button("select all"))
         {
-            for (auto &pc : session.point_clouds_container.point_clouds)
+            for (auto& pc : session.point_clouds_container.point_clouds)
             {
                 pc.visible = true;
             }
@@ -354,15 +381,16 @@ void project_gui()
 
         if (ImGui::Button("unselect all"))
         {
-            for (auto &pc : session.point_clouds_container.point_clouds)
+            for (auto& pc : session.point_clouds_container.point_clouds)
             {
                 pc.visible = false;
             }
         }
 
-        for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++ /*auto &pc : session.point_clouds_container.point_clouds*/)
+        for (int i = 0; i < session.point_clouds_container.point_clouds.size();
+             i++ /*auto &pc : session.point_clouds_container.point_clouds*/)
         {
-            auto &pc = session.point_clouds_container.point_clouds[i];
+            auto& pc = session.point_clouds_container.point_clouds[i];
 
             ImGui::Text("----------------------------");
             ImGui::Checkbox(pc.file_name.c_str(), &pc.visible);
@@ -372,7 +400,7 @@ void project_gui()
                 if (session.point_clouds_container.point_clouds.size() == corresponding_images.size() && images_file_names.size() > 0)
                 {
                     int prev = corresponding_images[i];
-                    
+
                     ImGui::InputInt((std::string("image[") + std::to_string(i) + std::string("]")).c_str(), &corresponding_images[i]);
                     if (corresponding_images[i] < 0)
                     {
@@ -383,9 +411,11 @@ void project_gui()
                         corresponding_images[i] = images_file_names.size() - 1;
                     }
 
-                    if (prev != corresponding_images[i]){
+                    if (prev != corresponding_images[i])
+                    {
                         namespace SD = SystemData;
-                        SD::imageData = stbi_load(images_file_names[corresponding_images[i]].c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
+                        SD::imageData = stbi_load(
+                            images_file_names[corresponding_images[i]].c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
                         std::cout << "imageWidth: " << SD::imageWidth << std::endl;
                         std::cout << "imageHeight: " << SD::imageHeight << std::endl;
                         std::cout << "imageNrChannels: " << SD::imageNrChannels << std::endl;
@@ -393,8 +423,9 @@ void project_gui()
                         ///////////////
                         // std::vector<mandeye::PointRGB> newCloud(session.point_clouds_container.point_clouds[i]..size());
 
-                        session.point_clouds_container.point_clouds[i].colors.resize(session.point_clouds_container.point_clouds[i].points_local.size());
-                        for (auto &c : session.point_clouds_container.point_clouds[i].colors)
+                        session.point_clouds_container.point_clouds[i].colors.resize(
+                            session.point_clouds_container.point_clouds[i].points_local.size());
+                        for (auto& c : session.point_clouds_container.point_clouds[i].colors)
                         {
                             c.x() = c.y() = c.z() = 0.0;
                         }
@@ -409,12 +440,12 @@ void project_gui()
                             point.point = session.point_clouds_container.point_clouds[i].points_local[p];
                             // point.point = pc.local_trajectory[0].m_pose.inverse() * point.point;
                             // point.point = pc.local_trajectory[offsets[i]].m_pose * point.point;
-                            point.rgb = {0.f, 0.f, 0.f, 1.f};
+                            point.rgb = { 0.f, 0.f, 0.f, 1.f };
                             pointsRGB.push_back(point);
                         }
 
-                        std::vector<mandeye::PointRGB>
-                            pc = ApplyColorToPointcloud(pointsRGB, SD::imageData, SD::imageWidth, SD::imageHeight, SD::imageNrChannels, transfom);
+                        std::vector<mandeye::PointRGB> pc = ApplyColorToPointcloud(
+                            pointsRGB, SD::imageData, SD::imageWidth, SD::imageHeight, SD::imageNrChannels, transfom);
 
                         for (int color_idx = 0; color_idx < pc.size(); color_idx++)
                         {
@@ -426,17 +457,15 @@ void project_gui()
                         session.point_clouds_container.point_clouds[i].show_color = true;
                     }
 
-                    //ImGui::InputInt((std::string("trajectory offset[") + std::to_string(i) + std::string("]")).c_str(), &offsets[i]);
-                    //if (offsets[i] < 0)
+                    // ImGui::InputInt((std::string("trajectory offset[") + std::to_string(i) + std::string("]")).c_str(), &offsets[i]);
+                    // if (offsets[i] < 0)
                     //{
                     //    offsets[i] = 0;
                     //}
-                    //if (offsets[i] >= pc.local_trajectory.size() - 1)
+                    // if (offsets[i] >= pc.local_trajectory.size() - 1)
                     //{
                     //    offsets[i] = pc.local_trajectory.size() - 1;
                     //}
-
-
 
                     /*
                     if (ImGui::Button(("colorize with '" + images_file_names[corresponding_images[i]] + "'").c_str()))
@@ -448,10 +477,9 @@ void project_gui()
                         //
 
                         namespace SD = SystemData;
-                        SD::imageData = stbi_load(images_file_names[corresponding_images[i]].c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
-                        std::cout << "imageWidth: " << SD::imageWidth << std::endl;
-                        std::cout << "imageHeight: " << SD::imageHeight << std::endl;
-                        std::cout << "imageNrChannels: " << SD::imageNrChannels << std::endl;
+                        SD::imageData = stbi_load(images_file_names[corresponding_images[i]].c_str(), &SD::imageWidth, &SD::imageHeight,
+                    &SD::imageNrChannels, 0); std::cout << "imageWidth: " << SD::imageWidth << std::endl; std::cout << "imageHeight: " <<
+                    SD::imageHeight << std::endl; std::cout << "imageNrChannels: " << SD::imageNrChannels << std::endl;
 
                         ///////////////
                         // std::vector<mandeye::PointRGB> newCloud(session.point_clouds_container.point_clouds[i]..size());
@@ -477,7 +505,8 @@ void project_gui()
                         }
 
                         std::vector<mandeye::PointRGB>
-                            pc = ApplyColorToPointcloud(pointsRGB, SD::imageData, SD::imageWidth, SD::imageHeight, SD::imageNrChannels, transfom);
+                            pc = ApplyColorToPointcloud(pointsRGB, SD::imageData, SD::imageWidth, SD::imageHeight, SD::imageNrChannels,
+                    transfom);
 
                         for (int color_idx = 0; color_idx < pc.size(); color_idx++)
                         {
@@ -493,7 +522,8 @@ void project_gui()
                 }
             }
 
-            // ImGui::Checkbox(session.point_clouds_container.point_clouds[i].file_name.c_str(), &session.point_clouds_container.point_clouds[i].visible);
+            // ImGui::Checkbox(session.point_clouds_container.point_clouds[i].file_name.c_str(),
+            // &session.point_clouds_container.point_clouds[i].visible);
 #if 0 
         for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
         {
@@ -725,7 +755,7 @@ void project_gui()
 
 void display()
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -733,14 +763,21 @@ void display()
 
     if (is_ortho)
     {
+        glOrtho(
+            -camera_ortho_xy_view_zoom,
+            camera_ortho_xy_view_zoom,
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio,
+            -100000,
+            100000);
 
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
-
-        glm::mat4 proj = glm::orthoLH_ZO<float>(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                                                -camera_ortho_xy_view_zoom / ratio,
-                                                camera_ortho_xy_view_zoom / ratio, -100, 100);
+        glm::mat4 proj = glm::orthoLH_ZO<float>(
+            -camera_ortho_xy_view_zoom,
+            camera_ortho_xy_view_zoom,
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio,
+            -100,
+            100);
 
         std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
 
@@ -759,12 +796,11 @@ void display()
 
         Eigen::Vector3d v_t = m * v;
 
-        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
-                  v_center_t.x(), v_center_t.y(), v_center_t.z(),
-                  v_t.x(), v_t.y(), v_t.z());
-        glm::mat4 lookat = glm::lookAt(glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
-                                       glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
-                                       glm::vec3(v_t.x(), v_t.y(), v_t.z()));
+        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(), v_center_t.x(), v_center_t.y(), v_center_t.z(), v_t.x(), v_t.y(), v_t.z());
+        glm::mat4 lookat = glm::lookAt(
+            glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
+            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
+            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
     }
 
@@ -827,12 +863,13 @@ void display()
     session.point_clouds_container.render(observation_picking, decimation_step);
     // session.ground_control_points.render(session.point_clouds_container);
 
-    /*session.point_clouds_container.render({}, {}, session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection,
-                                          session.point_clouds_container.xy_intersection,
-                                          session.point_clouds_container.xz_grid_10x10, session.point_clouds_container.xz_grid_1x1, session.point_clouds_container.xz_grid_01x01,
-                                          session.point_clouds_container.yz_grid_10x10, session.point_clouds_container.yz_grid_1x1, session.point_clouds_container.yz_grid_01x01,
-                                          session.point_clouds_container.xy_grid_10x10, session.point_clouds_container.xy_grid_1x1, session.point_clouds_container.xy_grid_01x01,
-                                          session.point_clouds_container.intersection_width);*/
+    /*session.point_clouds_container.render({}, {}, session.point_clouds_container.xz_intersection,
+       session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
+                                          session.point_clouds_container.xz_grid_10x10, session.point_clouds_container.xz_grid_1x1,
+       session.point_clouds_container.xz_grid_01x01, session.point_clouds_container.yz_grid_10x10,
+       session.point_clouds_container.yz_grid_1x1, session.point_clouds_container.yz_grid_01x01,
+                                          session.point_clouds_container.xy_grid_10x10, session.point_clouds_container.xy_grid_1x1,
+       session.point_clouds_container.xy_grid_01x01, session.point_clouds_container.intersection_width);*/
 
     /*if (ImGui::GetIO().KeyCtrl)
     {
@@ -923,7 +960,7 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
-	ImGui::NewFrame();
+    ImGui::NewFrame();
 
     project_gui();
 
@@ -969,7 +1006,7 @@ void wheel(int button, int dir, int x, int y)
 
 void mouse(int glut_button, int state, int x, int y)
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     io.MousePos = ImVec2((float)x, (float)y);
     int button = -1;
     if (glut_button == GLUT_LEFT_BUTTON)
@@ -984,8 +1021,7 @@ void mouse(int glut_button, int state, int x, int y)
         io.MouseDown[button] = false;
 
     static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
-    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
-        glutMajorVersion < 3)
+    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) && glutMajorVersion < 3)
     {
         wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
     }
@@ -1009,7 +1045,7 @@ void mouse(int glut_button, int state, int x, int y)
     }
 }
 
-bool initGL(int *argc, char **argv)
+bool initGL(int* argc, char** argv)
 {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
@@ -1031,7 +1067,7 @@ bool initGL(int *argc, char **argv)
     gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01, 10000.0);
     glutReshapeFunc(reshape);
     ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     (void)io;
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
@@ -1042,7 +1078,7 @@ bool initGL(int *argc, char **argv)
     return true;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     initGL(&argc, argv);
     glutDisplayFunc(display);

@@ -1,8 +1,7 @@
+#include <pch/pch.h>
+
 #include <observation_picking.h>
 #include <GL/freeglut.h>
-
-#include <iostream>
-#include <fstream>
 
 #include <nlohmann/json.hpp>
 

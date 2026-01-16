@@ -1,30 +1,25 @@
-#ifndef _USE_MATH_DEFINES
-#define _USE_MATH_DEFINES
-#endif
 #include <cmath>
+
+#include <GL/freeglut.h>
 
 #include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
-#include <ImGuizmo.h>
 #include <imgui_internal.h>
 
-//#define GLEW_STATIC
-//#include <GL/glew.h>
-#include <GL/freeglut.h>
+#include <ImGuizmo.h>
 
 #include <Eigen/Eigen>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <ndt.h>
 #include <icp.h>
+#include <ndt.h>
+#include <observation_picking.h>
+#include <pose_graph_slam.h>
 #include <registration_plane_feature.h>
 #include <transformations.h>
-#include <pose_graph_slam.h>
-#include <pcl_wrapper.h>
-#include <observation_picking.h>
 
 #include <utils.hpp>
 
@@ -32,27 +27,28 @@
 
 #include <laszip/laszip_api.h>
 
-#include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 
-#include <manual_pose_graph_loop_closure.h>
-#include "multi_view_tls_registration.h"
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
+#include "multi_view_tls_registration.h"
+#include <manual_pose_graph_loop_closure.h>
 
 #include <gnss.h>
-#include <session.h>
 #include <pfd_wrapper.hpp>
+#include <session.h>
 
 #include <HDMapping/Version.hpp>
 
-#include <export_laz.h>
-#include "wgs84_do_puwg92.h"
 #include "WGS84toCartesian.hpp"
+#include "wgs84_do_puwg92.h"
+#include <export_laz.h>
 
 #ifdef _WIN32
-#include <windows.h>
 #include "resource.h"
+#include <windows.h>
+
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -73,89 +69,87 @@ std::vector<std::string> infoLines = {
     "LAZ files are the product of MANDEYE process (open them with Cloud Compare)",
 };
 
-//App specific shortcuts (Type and Shortcut are just for easy reference)
-static const std::vector<ShortcutEntry> appShortcuts = {
-    {"Normal keys", "A", ""},
-    {"", "Ctrl+A", "point cloud Alignment"},
-    {"", "B", ""},
-    {"", "Ctrl+B", ""},
-    {"", "C", ""},
-    {"", "Ctrl+C", "Control points"},
-    {"", "D", ""},
-    {"", "Ctrl+D", ""},
-    {"", "E", ""},
-    {"", "Ctrl+E", "lio segments Editor"},
-    {"", "F", ""},
-    {"", "Ctrl+F", ""},
-    {"", "G", ""},
-    {"", "Ctrl+G", "Ground control points"},
-    {"", "H", ""},
-    {"", "Ctrl+H", ""},
-    {"", "I", ""},
-    {"", "Ctrl+I", ""},
-    {"", "J", ""},
-    {"", "Ctrl+K", ""},
-    {"", "K", ""},
-    {"", "Ctrl+K", ""},
-    {"", "L", ""},
-    {"", "Ctrl+L", "manual Loop closure"},
-    {"", "M", ""},
-    {"", "Ctrl+M", ""},
-    {"", "N", ""},
-    {"", "Ctrl+N", ""},
-    {"", "O", ""},
-    {"", "Ctrl+O", "Open session"},
-    {"", "P", ""},
-    {"", "Ctrl+P", "Pose graph slam"},
-    {"", "Q", ""},
-    {"", "Ctrl+Q", ""},
-    {"", "R", ""},
-    {"", "Ctrl+R", "Random cloud colors"},
-    {"", "Shift+R", ""},
-    {"", "S", ""},
-    {"", "Ctrl+S", "Save session"},
-    {"", "Ctrl+Shift+S", "Save subsession"},
-    {"", "T", ""},
-    {"", "Ctrl+T", ""},
-    {"", "U", ""},
-    {"", "Ctrl+U", ""},
-    {"", "V", ""},
-    {"", "Ctrl+V", ""},
-    {"", "W", ""},
-    {"", "Ctrl+W", ""},
-    {"", "X", ""},
-    {"", "Ctrl+X", ""},
-    {"", "Y", ""},
-    {"", "Ctrl+Y", ""},
-    {"", "Z", ""},
-    {"", "Ctrl+Z", ""},
-    {"", "Shift+Z", ""},
-    {"", "1-9", ""},
-    {"Special keys", "Up arrow", ""},
-    {"", "Shift + up arrow", ""},
-    {"", "Ctrl + up arrow", ""},
-    {"", "Down arrow", ""},
-    {"", "Shift + down arrow", ""},
-    {"", "Ctrl + down arrow", ""},
-    {"", "Left arrow", ""},
-    {"", "Shift + left arrow", ""},
-    {"", "Ctrl + left arrow", ""},
-    {"", "Right arrow", ""},
-    {"", "Shift + right arrow", ""},
-    {"", "Ctrl + right arrow", ""},
-    {"", "Pg down", ""},
-    {"", "Pg up", ""},
-    {"", "- key", ""},
-    {"", "+ key", ""},
-    {"Mouse related", "Left click + drag", ""},
-    {"", "Right click + drag", "n"},
-    {"", "Scroll", ""},
-    {"", "Shift + scroll", ""},
-    {"", "Shift + drag", ""},
-    {"", "Ctrl + left click", ""},
-    {"", "Ctrl + right click", ""},
-    {"", "Ctrl + middle click", ""}
-};
+// App specific shortcuts (Type and Shortcut are just for easy reference)
+static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "" },
+                                                         { "", "Ctrl+A", "point cloud Alignment" },
+                                                         { "", "B", "" },
+                                                         { "", "Ctrl+B", "" },
+                                                         { "", "C", "" },
+                                                         { "", "Ctrl+C", "Control points" },
+                                                         { "", "D", "" },
+                                                         { "", "Ctrl+D", "" },
+                                                         { "", "E", "" },
+                                                         { "", "Ctrl+E", "lio segments Editor" },
+                                                         { "", "F", "" },
+                                                         { "", "Ctrl+F", "" },
+                                                         { "", "G", "" },
+                                                         { "", "Ctrl+G", "Ground control points" },
+                                                         { "", "H", "" },
+                                                         { "", "Ctrl+H", "" },
+                                                         { "", "I", "" },
+                                                         { "", "Ctrl+I", "" },
+                                                         { "", "J", "" },
+                                                         { "", "Ctrl+K", "" },
+                                                         { "", "K", "" },
+                                                         { "", "Ctrl+K", "" },
+                                                         { "", "L", "" },
+                                                         { "", "Ctrl+L", "manual Loop closure" },
+                                                         { "", "M", "" },
+                                                         { "", "Ctrl+M", "" },
+                                                         { "", "N", "" },
+                                                         { "", "Ctrl+N", "" },
+                                                         { "", "O", "" },
+                                                         { "", "Ctrl+O", "Open session" },
+                                                         { "", "P", "" },
+                                                         { "", "Ctrl+P", "Pose graph slam" },
+                                                         { "", "Q", "" },
+                                                         { "", "Ctrl+Q", "" },
+                                                         { "", "R", "" },
+                                                         { "", "Ctrl+R", "Random cloud colors" },
+                                                         { "", "Shift+R", "" },
+                                                         { "", "S", "" },
+                                                         { "", "Ctrl+S", "Save session" },
+                                                         { "", "Ctrl+Shift+S", "Save subsession" },
+                                                         { "", "T", "" },
+                                                         { "", "Ctrl+T", "" },
+                                                         { "", "U", "" },
+                                                         { "", "Ctrl+U", "" },
+                                                         { "", "V", "" },
+                                                         { "", "Ctrl+V", "" },
+                                                         { "", "W", "" },
+                                                         { "", "Ctrl+W", "" },
+                                                         { "", "X", "" },
+                                                         { "", "Ctrl+X", "" },
+                                                         { "", "Y", "" },
+                                                         { "", "Ctrl+Y", "" },
+                                                         { "", "Z", "" },
+                                                         { "", "Ctrl+Z", "" },
+                                                         { "", "Shift+Z", "" },
+                                                         { "", "1-9", "" },
+                                                         { "Special keys", "Up arrow", "" },
+                                                         { "", "Shift + up arrow", "" },
+                                                         { "", "Ctrl + up arrow", "" },
+                                                         { "", "Down arrow", "" },
+                                                         { "", "Shift + down arrow", "" },
+                                                         { "", "Ctrl + down arrow", "" },
+                                                         { "", "Left arrow", "" },
+                                                         { "", "Shift + left arrow", "" },
+                                                         { "", "Ctrl + left arrow", "" },
+                                                         { "", "Right arrow", "" },
+                                                         { "", "Shift + right arrow", "" },
+                                                         { "", "Ctrl + right arrow", "" },
+                                                         { "", "Pg down", "" },
+                                                         { "", "Pg up", "" },
+                                                         { "", "- key", "" },
+                                                         { "", "+ key", "" },
+                                                         { "Mouse related", "Left click + drag", "" },
+                                                         { "", "Right click + drag", "n" },
+                                                         { "", "Scroll", "" },
+                                                         { "", "Shift + scroll", "" },
+                                                         { "", "Shift + drag", "" },
+                                                         { "", "Ctrl + left click", "" },
+                                                         { "", "Ctrl + right click", "" },
+                                                         { "", "Ctrl + middle click", "" } };
 
 namespace fs = std::filesystem;
 
@@ -164,7 +158,7 @@ static bool show_another_window = false;
 
 bool gnssWithOffset = false;
 
-//radio button selectors
+// radio button selectors
 static int NDTnomSelection = 0;
 static int NDTpeSelection = 0;
 static int NDT3dSelection = 0;
@@ -181,10 +175,10 @@ static int PGSpwmtSelection = 0;
 
 std::string session_file_name = "";
 int session_total_number_of_points = 0;
-//bool dynamicSubsampling = true;
-//static double lastAdjustTime = 0.0;  // last time we changed subsampling
-//const double cooldownSeconds = 1;  // wait between auto adjustments
-//static float fps_avg = 60.0f;
+// bool dynamicSubsampling = true;
+// static double lastAdjustTime = 0.0;  // last time we changed subsampling
+// const double cooldownSeconds = 1;  // wait between auto adjustments
+// static float fps_avg = 60.0f;
 
 bool is_pca_gui = false;
 bool is_ndt_gui = true;
@@ -218,15 +212,9 @@ float m_gizmo[] = {1, 0, 0, 0,
                    0, 0, 1, 0,
                    0, 0, 0, 1};
 
-float m_ortho_gizmo_view[] = {1, 0, 0, 0,
-                              0, 1, 0, 0,
-                              0, 0, 1, 0,
-                              0, 0, 0, 1};
+float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
-float m_ortho_projection[] = {1, 0, 0, 0,
-                              0, 1, 0, 0,
-                              0, 0, 1, 0,
-                              0, 0, 0, 1};
+float m_ortho_projection[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 bool manipulate_only_marked_gizmo = false;
 
@@ -245,17 +233,44 @@ bool session_loaded = false;
 //      doi = {https://doi.org/10.1016/j.measurement.2023.113199},
 //      url = {https://www.sciencedirect.com/science/article/pii/S0263224123007637},
 //      author = {Janusz Będkowski},
-//      keywords = {TLS, Point cloud, Open-source, Multi-view data registration, LiDAR data metrics, Robust loss function, Tait-bryan angles, Quaternions, Rodrigues’ formula, Lie algebra, Rotation matrix parameterization},
-//      abstract = {This study addresses multi-view Terrestrial Laser Scanning Point Cloud data registration methods. Multiple rigid point cloud data registration is mandatory for aligning all scans into a common reference frame and it is still considered a challenge looking from a large-scale surveys point of view. The goal of this work is to support the development of cutting-edge registration methods in geoscience and mobile robotics domains. This work evaluates 3 data sets of total 20 scenes available in the literature. This paper provides a novel open-source framework for multi-view Terrestrial Laser Scanning Point Cloud data registration benchmarks. The goal was to verify experimentally which registration variant can improve the open-source data looking from the quantitative and qualitative points of view. In particular, the following scanners provided measurement data: Z+F TLS Imager 5006i, Z+F TLS Imager 5010C, Leica ScanStation C5, Leica ScanStation C10, Leica P40 and Riegl VZ-400. The benchmark shows an impact of the metric e.g. point to point, point to projection onto a plane, plane to plane etc..., rotation matrix parameterization (Tait-Bryan, quaternion, Rodrigues) and other implementation variations (e.g. multi-view Normal Distributions Transform, Pose Graph SLAM approach) onto the multi-view data registration accuracy and performance. An open-source project is created and it can be used for improving existing data sets reported in the literature, it is the added value of the presented research. The combination of metrics, rotation matrix parameterization and optimization algorithms creates hundreds of possible approaches. It is shown that chosen metric is a dominant factor in data registration. The rotation parameterization and other degrees of freedom of proposed variants are rather negligible compared with chosen metric. Most of the proposed approaches improve registered reference data provided by other researchers. Only for 2 from 20 scenes it was not possible to provide significant improvement. The largest improvements are evident for large-scale scenes. The project is available and maintained at https://github.com/MapsHD/HDMapping.}
+//      keywords = {TLS, Point cloud, Open-source, Multi-view data registration, LiDAR data metrics, Robust loss function, Tait-bryan
+//      angles, Quaternions, Rodrigues’ formula, Lie algebra, Rotation matrix parameterization}, abstract = {This study addresses multi-view
+//      Terrestrial Laser Scanning Point Cloud data registration methods. Multiple rigid point cloud data registration is mandatory for
+//      aligning all scans into a common reference frame and it is still considered a challenge looking from a large-scale surveys point of
+//      view. The goal of this work is to support the development of cutting-edge registration methods in geoscience and mobile robotics
+//      domains. This work evaluates 3 data sets of total 20 scenes available in the literature. This paper provides a novel open-source
+//      framework for multi-view Terrestrial Laser Scanning Point Cloud data registration benchmarks. The goal was to verify experimentally
+//      which registration variant can improve the open-source data looking from the quantitative and qualitative points of view. In
+//      particular, the following scanners provided measurement data: Z+F TLS Imager 5006i, Z+F TLS Imager 5010C, Leica ScanStation C5,
+//      Leica ScanStation C10, Leica P40 and Riegl VZ-400. The benchmark shows an impact of the metric e.g. point to point, point to
+//      projection onto a plane, plane to plane etc..., rotation matrix parameterization (Tait-Bryan, quaternion, Rodrigues) and other
+//      implementation variations (e.g. multi-view Normal Distributions Transform, Pose Graph SLAM approach) onto the multi-view data
+//      registration accuracy and performance. An open-source project is created and it can be used for improving existing data sets
+//      reported in the literature, it is the added value of the presented research. The combination of metrics, rotation matrix
+//      parameterization and optimization algorithms creates hundreds of possible approaches. It is shown that chosen metric is a dominant
+//      factor in data registration. The rotation parameterization and other degrees of freedom of proposed variants are rather negligible
+//      compared with chosen metric. Most of the proposed approaches improve registered reference data provided by other researchers. Only
+//      for 2 from 20 scenes it was not possible to provide significant improvement. The largest improvements are evident for large-scale
+//      scenes. The project is available and maintained at https://github.com/MapsHD/HDMapping.}
 // }
 
-void export_result_to_folder(std::string output_folder_name, ObservationPicking &observation_picking, Session &session);
-void perform_experiment_on_windows(Session &session, ObservationPicking &observation_picking, ICP &icp, NDT &ndt,
-                                   RegistrationPlaneFeature &registration_plane_feature, PoseGraphSLAM &pose_graph_slam);
-void perform_experiment_on_linux(Session &session, ObservationPicking &observation_picking, ICP &icp, NDT &ndt,
-                                 RegistrationPlaneFeature &registration_plane_feature, PoseGraphSLAM &pose_graph_slam);
-double compute_rms(bool initial, Session &session, ObservationPicking &observation_picking);
-void reset_poses(Session &session);
+void export_result_to_folder(std::string output_folder_name, ObservationPicking& observation_picking, Session& session);
+void perform_experiment_on_windows(
+    Session& session,
+    ObservationPicking& observation_picking,
+    ICP& icp,
+    NDT& ndt,
+    RegistrationPlaneFeature& registration_plane_feature,
+    PoseGraphSLAM& pose_graph_slam);
+void perform_experiment_on_linux(
+    Session& session,
+    ObservationPicking& observation_picking,
+    ICP& icp,
+    NDT& ndt,
+    RegistrationPlaneFeature& registration_plane_feature,
+    PoseGraphSLAM& pose_graph_slam);
+double compute_rms(bool initial, Session& session, ObservationPicking& observation_picking);
+void reset_poses(Session& session);
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -310,7 +325,6 @@ void ndt_gui()
     tls_registration.ndt.is_quaternion = (NDT3dSelection == 1);
     tls_registration.ndt.is_rodrigues = (NDT3dSelection == 2);
 
-
     if (ImGui::Button("Optimization"))
     {
         double rms_initial = 0.0;
@@ -320,7 +334,7 @@ void ndt_gui()
         // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
         tls_registration.ndt.optimize(session.point_clouds_container.point_clouds, false, tls_registration.compute_mean_and_cov_for_bucket);
     }
-        
+
     if (ImGui::Button("Compute mean Mahalanobis distance"))
     {
         double rms_initial = 0.0;
@@ -332,8 +346,10 @@ void ndt_gui()
     if (ImGui::IsItemHovered())
     {
         ImGui::BeginTooltip();
-        ImGui::Text("Average of all Mahalanobis distances between transformed source points\nand their corresponding Gaussian cells, where:");
-        ImGui::Text("Mahalanobis distance measures how far a point is from the mean of a multivariate Gaussian distribution,\ntaking into account the covariance (shape and orientation) of that distribution");
+        ImGui::Text(
+            "Average of all Mahalanobis distances between transformed source points\nand their corresponding Gaussian cells, where:");
+        ImGui::Text("Mahalanobis distance measures how far a point is from the mean of a multivariate Gaussian distribution,\ntaking into "
+                    "account the covariance (shape and orientation) of that distribution");
         ImGui::EndTooltip();
     }
 
@@ -343,14 +359,14 @@ void ndt_gui()
     ImGui::SameLine();
     if (ImGui::Button("left Jacobian"))
     {
-
-        tls_registration.ndt.optimize_lie_algebra_left_jacobian(session.point_clouds_container.point_clouds, tls_registration.compute_mean_and_cov_for_bucket);
+        tls_registration.ndt.optimize_lie_algebra_left_jacobian(
+            session.point_clouds_container.point_clouds, tls_registration.compute_mean_and_cov_for_bucket);
     }
     ImGui::SameLine();
     if (ImGui::Button("right Jacobian"))
     {
-
-        tls_registration.ndt.optimize_lie_algebra_right_jacobian(session.point_clouds_container.point_clouds, tls_registration.compute_mean_and_cov_for_bucket);
+        tls_registration.ndt.optimize_lie_algebra_right_jacobian(
+            session.point_clouds_container.point_clouds, tls_registration.compute_mean_and_cov_for_bucket);
     }
 
     ImGui::Separator();
@@ -372,26 +388,34 @@ void ndt_gui()
     ImGui::Text("Set error presets:");
     ImGui::Text("Zoller+Fröhlich TLS Imager");
     ImGui::SameLine();
-    if (ImGui::Button("5006i")) tls_registration.set_zoller_frohlich_tls_imager_5006i_errors();
+    if (ImGui::Button("5006i"))
+        tls_registration.set_zoller_frohlich_tls_imager_5006i_errors();
     ImGui::SameLine();
-    if (ImGui::Button("5010C")) tls_registration.set_zoller_frohlich_tls_imager_5010c_errors();
+    if (ImGui::Button("5010C"))
+        tls_registration.set_zoller_frohlich_tls_imager_5010c_errors();
     ImGui::SameLine();
-    if (ImGui::Button("5016")) tls_registration.set_zoller_frohlich_tls_imager_5016_errors();
-
+    if (ImGui::Button("5016"))
+        tls_registration.set_zoller_frohlich_tls_imager_5016_errors();
 
     ImGui::Text("Leica");
     ImGui::SameLine();
-    if (ImGui::Button("ScanStation C5 C10")) tls_registration.set_leica_scanstation_c5_c10_errors();
+    if (ImGui::Button("ScanStation C5 C10"))
+        tls_registration.set_leica_scanstation_c5_c10_errors();
     ImGui::SameLine();
-    if (ImGui::Button("Leica HDS6100")) tls_registration.set_leica_hds6100_errors();
+    if (ImGui::Button("Leica HDS6100"))
+        tls_registration.set_leica_hds6100_errors();
     ImGui::SameLine();
-    if (ImGui::Button("Leica P40")) tls_registration.set_leica_p40_errors();
+    if (ImGui::Button("Leica P40"))
+        tls_registration.set_leica_p40_errors();
 
-    if (ImGui::Button("Faro Focus3D")) tls_registration.set_faro_focus3d_errors();
+    if (ImGui::Button("Faro Focus3D"))
+        tls_registration.set_faro_focus3d_errors();
     ImGui::SameLine();
-    if (ImGui::Button("Riegl VZ400")) tls_registration.set_riegl_vz400_errors();
+    if (ImGui::Button("Riegl VZ400"))
+        tls_registration.set_riegl_vz400_errors();
     ImGui::SameLine();
-    if (ImGui::Button("Livox mid360")) tls_registration.set_livox_mid360_errors();
+    if (ImGui::Button("Livox mid360"))
+        tls_registration.set_livox_mid360_errors();
 }
 
 void icp_gui()
@@ -523,13 +547,16 @@ void rpf_gui()
     ImGui::Separator();
     ImGui::Text("Optimize point to projection onto plane source to target:");
     if (ImGui::Button("Basic Jacobian"))
-        tls_registration.registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(session.point_clouds_container);
+        tls_registration.registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target(
+            session.point_clouds_container);
     ImGui::SameLine();
     if (ImGui::Button("Lie-algebra left Jacobian"))
-        tls_registration.registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(session.point_clouds_container);
+        tls_registration.registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian(
+            session.point_clouds_container);
     ImGui::SameLine();
     if (ImGui::Button("Lie-algebra right Jacobian"))
-        tls_registration.registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(session.point_clouds_container);
+        tls_registration.registration_plane_feature.optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian(
+            session.point_clouds_container);
 
     ImGui::Separator();
 
@@ -544,7 +571,6 @@ void rpf_gui()
         tls_registration.registration_plane_feature.optimize_plane_to_plane_source_to_target(session.point_clouds_container);
 }
 
-
 void pca_gui()
 {
     ImGui::Begin("Point cloud alignment", &is_pca_gui, ImGuiWindowFlags_MenuBar);
@@ -553,7 +579,8 @@ void pca_gui()
         {
             bool justPushed = false;
 
-            if (is_ndt_gui) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (is_ndt_gui)
+                ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
             if (ImGui::Button("Normal Distributions Transform"))
             {
                 if (!is_ndt_gui)
@@ -564,19 +591,24 @@ void pca_gui()
                     justPushed = true;
                 }
             }
-            if (is_ndt_gui && !justPushed) ImGui::PopStyleColor();
+            if (is_ndt_gui && !justPushed)
+                ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Probabilistic alternative to ICP that models one cloud (the target)\nas a set of Gaussian distributions rather than raw points");
-                ImGui::Text("Robust for rough initial poses but can converge to a local optimum\nif the initial misalignment is very large");
-                ImGui::Text("Known for being faster and smoother in optimization because\nit replaces discrete point-point correspondences with continuous probability density functions.");
+                ImGui::Text("Probabilistic alternative to ICP that models one cloud (the target)\nas a set of Gaussian distributions "
+                            "rather than raw points");
+                ImGui::Text(
+                    "Robust for rough initial poses but can converge to a local optimum\nif the initial misalignment is very large");
+                ImGui::Text("Known for being faster and smoother in optimization because\nit replaces discrete point-point correspondences "
+                            "with continuous probability density functions.");
                 ImGui::EndTooltip();
             }
 
             ImGui::SameLine();
 
-            if (is_icp_gui) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (is_icp_gui)
+                ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
             if (ImGui::Button("Iterative Closest Point"))
             {
                 if (!is_icp_gui)
@@ -587,18 +619,22 @@ void pca_gui()
                     justPushed = true;
                 }
             }
-            if (is_icp_gui && !justPushed) ImGui::PopStyleColor();
+            if (is_icp_gui && !justPushed)
+                ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Geometric registration algorithm that aligns two point clouds\nby minimizing the Euclidean distances between corresponding points");
-                ImGui::Text("Very precise at local refinement, especially point-to-plane ICP,\nbut it struggles if the starting alignment is too far off");
+                ImGui::Text("Geometric registration algorithm that aligns two point clouds\nby minimizing the Euclidean distances between "
+                            "corresponding points");
+                ImGui::Text("Very precise at local refinement, especially point-to-plane ICP,\nbut it struggles if the starting alignment "
+                            "is too far off");
                 ImGui::EndTooltip();
             }
 
             ImGui::SameLine();
 
-            if (is_rpf_gui) ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
+            if (is_rpf_gui)
+                ImGui::PushStyleColor(ImGuiCol_Button, orangeBorder);
             if (ImGui::Button("Registration Plane Feature"))
             {
                 if (!is_rpf_gui)
@@ -609,12 +645,15 @@ void pca_gui()
                     justPushed = true;
                 }
             }
-            if (is_rpf_gui && !justPushed) ImGui::PopStyleColor();
+            if (is_rpf_gui && !justPushed)
+                ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Feature based registration technique that uses detected\nplanar surfaces in the environment (walls, floors, ceilings, etc.) as constraints for alignment");
-                ImGui::Text("Can be much more robust to noise and partial overlap,\nrequire far fewer correspondences (just a few planes can define a full 6 DOF pose),\nhandle low texture regions better than ICP");
+                ImGui::Text("Feature based registration technique that uses detected\nplanar surfaces in the environment (walls, floors, "
+                            "ceilings, etc.) as constraints for alignment");
+                ImGui::Text("Can be much more robust to noise and partial overlap,\nrequire far fewer correspondences (just a few planes "
+                            "can define a full 6 DOF pose),\nhandle low texture regions better than ICP");
                 ImGui::EndTooltip();
             }
 
@@ -645,7 +684,8 @@ void pose_graph_slam_gui()
         if (tls_registration.pose_graph_slam.number_of_threads < 1)
             tls_registration.pose_graph_slam.number_of_threads = 1;
 
-        ImGui::InputInt("Number of iterations (pair wise matching)", &tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching);
+        ImGui::InputInt(
+            "Number of iterations (pair wise matching)", &tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching);
         if (tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching < 1)
             tls_registration.pose_graph_slam.number_of_iterations_pair_wise_matching = 1;
 
@@ -717,7 +757,7 @@ void pose_graph_slam_gui()
         ImGui::RadioButton("Optimize with PCL (ICP based pair wise matching)", &PGSpwmtSelection, 13);
 #endif
 
-        //tls_registration.pose_graph_slam.set_all_to_false();
+        // tls_registration.pose_graph_slam.set_all_to_false();
         tls_registration.pose_graph_slam.is_ndt = (PGSpwmtSelection == 0);
         tls_registration.pose_graph_slam.is_optimization_point_to_point_source_to_target = (PGSpwmtSelection == 1);
         tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target = (PGSpwmtSelection == 2);
@@ -729,8 +769,10 @@ void pose_graph_slam_gui()
         tls_registration.pose_graph_slam.is_ndt_lie_algebra_right_jacobian = (PGSpwmtSelection == 7);
         tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_left_jacobian = (PGSpwmtSelection == 8);
         tls_registration.pose_graph_slam.is_optimize_point_to_point_source_to_target_lie_algebra_right_jacobian = (PGSpwmtSelection == 9);
-        tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian = (PGSpwmtSelection == 10);
-        tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian = (PGSpwmtSelection == 11);
+        tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_left_jacobian =
+            (PGSpwmtSelection == 10);
+        tls_registration.pose_graph_slam.is_optimize_point_to_projection_onto_plane_source_to_target_lie_algebra_right_jacobian =
+            (PGSpwmtSelection == 11);
 
         tls_registration.pose_graph_slam.is_optimize_pcl_ndt = (PGSpwmtSelection == 12);
         tls_registration.pose_graph_slam.is_optimize_pcl_icp = (PGSpwmtSelection == 13);
@@ -753,7 +795,8 @@ void pose_graph_slam_gui()
             // double mui = 0.0;
             tls_registration.pose_graph_slam.optimize(session.point_clouds_container);
             // pose_graph_slam.optimize(point_clouds_container, rms_initial, rms_final, mui);
-            // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
+            // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final <<
+            // std::endl;
         }
 
 #if WITH_GTSAM
@@ -768,7 +811,8 @@ void pose_graph_slam_gui()
             double rms_final = 0.0;
             double mui = 0.0;
             tls_registration.pose_graph_slam.optimize_with_GTSAM(session.point_clouds_container);
-            // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
+            // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final <<
+            // std::endl;
         }
 #endif
 
@@ -907,14 +951,20 @@ void observation_picking_gui()
             ImGui::Text("Intersection %zu", i);
             ImGui::SetWindowFontScale(1.0f);
             ImGui::SameLine();
-            ImGui::ColorEdit3(std::string("Color##" + std::to_string(i)).c_str(), observation_picking.intersections[i].color, ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit3(
+                std::string("Color##" + std::to_string(i)).c_str(),
+                observation_picking.intersections[i].color,
+                ImGuiColorEditFlags_NoInputs);
             ImGui::SameLine();
             if (ImGui::Button(std::string("Remove##" + std::to_string(i)).c_str()))
                 index_intersection_to_remove = i;
 
-            ImGui::InputFloat3(std::string("Translation [m]##" + std::to_string(i)).c_str(), observation_picking.intersections[i].translation);
+            ImGui::InputFloat3(
+                std::string("Translation [m]##" + std::to_string(i)).c_str(), observation_picking.intersections[i].translation);
             ImGui::InputFloat3(std::string("Rotation [deg]##" + std::to_string(i)).c_str(), observation_picking.intersections[i].rotation);
-            ImGui::InputFloat3(std::string("Width length height [m]##" + std::to_string(i)).c_str(), observation_picking.intersections[i].width_length_height);
+            ImGui::InputFloat3(
+                std::string("Width length height [m]##" + std::to_string(i)).c_str(),
+                observation_picking.intersections[i].width_length_height);
         }
 
         if (index_intersection_to_remove != -1)
@@ -992,7 +1042,8 @@ void loop_closure_gui()
         ImGui::PopItemWidth();
 
         int prev_index_active_edge = session.pose_graph_loop_closure.index_active_edge;
-        session.pose_graph_loop_closure.Gui(session.point_clouds_container,
+        session.pose_graph_loop_closure.Gui(
+            session.point_clouds_container,
             index_loop_closure_source,
             index_loop_closure_target,
             m_gizmo,
@@ -1096,9 +1147,10 @@ void lio_segments_gui()
 
         ImGui::SameLine();
 
-        if(ImGui::Button("Set fuse IMU inclination for picked trajectory node")){
-
-            if (index_loop_closure_target >= 0 && index_loop_closure_target < session.point_clouds_container.point_clouds.size()){
+        if (ImGui::Button("Set fuse IMU inclination for picked trajectory node"))
+        {
+            if (index_loop_closure_target >= 0 && index_loop_closure_target < session.point_clouds_container.point_clouds.size())
+            {
                 session.point_clouds_container.point_clouds[index_loop_closure_target].fuse_inclination_from_IMU = true;
             }
 
@@ -1119,7 +1171,6 @@ void lio_segments_gui()
 
             januszjanusz*/
         }
-
 
         ImGui::Text("Fuse IMU inclination: ");
         ImGui::SameLine();
@@ -1153,18 +1204,18 @@ void lio_segments_gui()
         ImGui::InputDouble("acceptable angle [deg]", &angle_diff);
 
         ImGui::Separator();
-        //ImGui::Text("motion model");
+        // ImGui::Text("motion model");
 
-        //session.pose_graph_loop_closure.edges.
+        // session.pose_graph_loop_closure.edges.
 
-        //ImGui::InputDouble("motion_model_w_px_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_px_1_sigma_m);
-        //ImGui::InputDouble("motion_model_w_py_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_py_1_sigma_m);
-        //ImGui::InputDouble("motion_model_w_pz_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_pz_1_sigma_m);
-        //ImGui::InputDouble("motion_model_w_om_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_om_1_sigma_deg);
-        //ImGui::InputDouble("motion_model_w_fi_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_fi_1_sigma_deg);
-        //ImGui::InputDouble("motion_model_w_ka_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_ka_1_sigma_deg);
+        // ImGui::InputDouble("motion_model_w_px_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_px_1_sigma_m);
+        // ImGui::InputDouble("motion_model_w_py_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_py_1_sigma_m);
+        // ImGui::InputDouble("motion_model_w_pz_1_sigma_m", &session.pose_graph_loop_closure.motion_model_w_pz_1_sigma_m);
+        // ImGui::InputDouble("motion_model_w_om_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_om_1_sigma_deg);
+        // ImGui::InputDouble("motion_model_w_fi_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_fi_1_sigma_deg);
+        // ImGui::InputDouble("motion_model_w_ka_1_sigma_deg", &session.pose_graph_loop_closure.motion_model_w_ka_1_sigma_deg);
 
-        //ImGui::Separator();
+        // ImGui::Separator();
 
         ImGui::BeginChild("LIO segments", ImVec2(0, 0), true);
         {
@@ -1173,7 +1224,9 @@ void lio_segments_gui()
                 if (i > 0)
                     ImGui::Separator();
                 ImGui::SetWindowFontScale(1.25f);
-                ImGui::Checkbox(std::filesystem::path(session.point_clouds_container.point_clouds[i].file_name).filename().string().c_str(), &session.point_clouds_container.point_clouds[i].visible);
+                ImGui::Checkbox(
+                    std::filesystem::path(session.point_clouds_container.point_clouds[i].file_name).filename().string().c_str(),
+                    &session.point_clouds_container.point_clouds[i].visible);
                 ImGui::SetWindowFontScale(1.0f);
                 ImGui::SameLine();
                 ImGui::Checkbox(("gizmo##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].gizmo);
@@ -1332,7 +1385,9 @@ void lio_segments_gui()
 #endif
 
                     ImGui::SameLine();
-                    ImGui::Checkbox(("fuse IMU inclination##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU);
+                    ImGui::Checkbox(
+                        ("fuse IMU inclination##" + std::to_string(i)).c_str(),
+                        &session.point_clouds_container.point_clouds[i].fuse_inclination_from_IMU);
 
                     ImGui::SameLine();
                     ImGui::Checkbox(("show IMU##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].show_IMU);
@@ -1347,7 +1402,8 @@ void lio_segments_gui()
                         //session.point_clouds_container.point_clouds[i].m_pose
                         //session.point_clouds_container.point_clouds[i].m_pose_temp
 
-                        TaitBryanPose target_pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
+                        TaitBryanPose target_pose =
+                    pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
 
                         target_pose.om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x();
                         target_pose.fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y();
@@ -1359,13 +1415,20 @@ void lio_segments_gui()
                         session.point_clouds_container.point_clouds[i].m_pose_temp = m_pose;
 
                         //session.point_clouds_container.point_clouds[i].m_pose = m_pose;
-                        //session.point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
-                        //session.point_clouds_container.point_clouds[i].gui_translation[0] = session.point_clouds_container.point_clouds[i].pose.px;
-                        //session.point_clouds_container.point_clouds[i].gui_translation[1] = session.point_clouds_container.point_clouds[i].pose.py;
-                        //session.point_clouds_container.point_clouds[i].gui_translation[2] = session.point_clouds_container.point_clouds[i].pose.pz;
-                        //session.point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(session.point_clouds_container.point_clouds[i].pose.om);
-                        //session.point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(session.point_clouds_container.point_clouds[i].pose.fi);
-                        //session.point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(session.point_clouds_container.point_clouds[i].pose.ka);
+                        //session.point_clouds_container.point_clouds[i].pose =
+                    pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
+                        //session.point_clouds_container.point_clouds[i].gui_translation[0] =
+                    session.point_clouds_container.point_clouds[i].pose.px;
+                        //session.point_clouds_container.point_clouds[i].gui_translation[1] =
+                    session.point_clouds_container.point_clouds[i].pose.py;
+                        //session.point_clouds_container.point_clouds[i].gui_translation[2] =
+                    session.point_clouds_container.point_clouds[i].pose.pz;
+                        //session.point_clouds_container.point_clouds[i].gui_rotation[0] =
+                    rad2deg(session.point_clouds_container.point_clouds[i].pose.om);
+                        //session.point_clouds_container.point_clouds[i].gui_rotation[1] =
+                    rad2deg(session.point_clouds_container.point_clouds[i].pose.fi);
+                        //session.point_clouds_container.point_clouds[i].gui_rotation[2] =
+                    rad2deg(session.point_clouds_container.point_clouds[i].pose.ka);
                     }*/
 
                     ImGui::Text("fixed: ");
@@ -1399,7 +1462,6 @@ void lio_segments_gui()
                     ImGui::Checkbox(("ka##" + std::to_string(i)).c_str(), &session.point_clouds_container.point_clouds[i].fixed_ka);
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip(kaText);
-
                 }
 #if 0
                 ImGui::SameLine();
@@ -1409,7 +1471,6 @@ void lio_segments_gui()
                 }
 #endif
             }
-
         }
         ImGui::EndChild();
     }
@@ -1425,7 +1486,13 @@ void openSession()
     {
         std::cout << "Session file: '" << session_file_name << "'" << std::endl;
 
-        if (session.load(fs::path(session_file_name).string(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset))
+        if (session.load(
+                fs::path(session_file_name).string(),
+                tls_registration.is_decimate,
+                tls_registration.bucket_x,
+                tls_registration.bucket_y,
+                tls_registration.bucket_z,
+                tls_registration.calculate_offset))
         {
             session_loaded = true;
             index_begin = 0;
@@ -1444,13 +1511,14 @@ void openSession()
 
 std::string saveSession()
 {
-    const std::string output_file_name = mandeye::fd::SaveFileDialog("Save session as", mandeye::fd::Session_filter, ".mjs", session_file_name);
+    const std::string output_file_name =
+        mandeye::fd::SaveFileDialog("Save session as", mandeye::fd::Session_filter, ".mjs", session_file_name);
 
     if (output_file_name.size() > 0)
     {
         std::cout << "Session file to save: '" << output_file_name << "'" << std::endl;
 
-        //creating filenames proposal based on current selection
+        // creating filenames proposal based on current selection
         std::filesystem::path path(output_file_name);
         // Extract parts
         const auto dir = path.parent_path();
@@ -1471,10 +1539,12 @@ std::string saveSession()
                 "Follow guidlines available here : "
                 "https://github.com/MapsHD/HDMapping/tree/main/doc/, "
                 "You can do this using button 'update initial poses from RESSO file'",
-                pfd::choice::ok, pfd::icon::error);
+                pfd::choice::ok,
+                pfd::icon::error);
             message.result();
 
-            initial_poses_file_name = mandeye::fd::SaveFileDialog("Initial poses file name", mandeye::fd::IniPoses_filter, initial_poses_file_name);
+            initial_poses_file_name =
+                mandeye::fd::SaveFileDialog("Initial poses file name", mandeye::fd::IniPoses_filter, initial_poses_file_name);
             std::cout << "Resso file to save: '" << initial_poses_file_name << "'" << std::endl;
 
             if (initial_poses_file_name.size() > 0)
@@ -1495,7 +1565,8 @@ std::string saveSession()
                 "Follow guidlines available here : "
                 "https://github.com/MapsHD/HDMapping/tree/main/doc/,"
                 "You can do this using button 'update poses from RESSO file'",
-                pfd::choice::ok, pfd::icon::error);
+                pfd::choice::ok,
+                pfd::icon::error);
             message.result();
 
             poses_file_name = mandeye::fd::SaveFileDialog("Poses file name", mandeye::fd::Poses_filter, poses_file_name);
@@ -1511,16 +1582,18 @@ std::string saveSession()
         std::cout << "saving result to: " << poses_file_name << std::endl;
         session.point_clouds_container.save_poses(poses_file_name, false);
 
-        try {
+        try
+        {
             fs::copy_file(poses_file_name, initial_poses_file_name, fs::copy_options::overwrite_existing);
-        }
-        catch (const fs::filesystem_error& e) {
+        } catch (const fs::filesystem_error& e)
+        {
             std::cerr << "Error copying poses file: " << e.what() << '\n';
         }
 
-		return output_file_name;
+        return output_file_name;
     }
-    else{
+    else
+    {
         std::cout << "saving canceled" << std::endl;
 
         return "";
@@ -1540,7 +1613,14 @@ void openLaz(bool fillInSession)
         for (size_t i = 0; i < input_file_names.size(); i++)
             std::cout << input_file_names[i] << std::endl;
 
-        if (!session.point_clouds_container.load_whu_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, tls_registration.calculate_offset, session.load_cache_mode))
+        if (!session.point_clouds_container.load_whu_tls(
+                input_file_names,
+                tls_registration.is_decimate,
+                tls_registration.bucket_x,
+                tls_registration.bucket_y,
+                tls_registration.bucket_z,
+                tls_registration.calculate_offset,
+                session.load_cache_mode))
             std::cout << "Problem creating! Check input files laz/las" << std::endl;
         else
             std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
@@ -1552,14 +1632,14 @@ void openLaz(bool fillInSession)
         std::string newTitle = winTitle + " - " + fs::path(input_file_names[0]).parent_path().string();
         glutSetWindowTitle(newTitle.c_str());
 
-        for (const auto &pc : session.point_clouds_container.point_clouds)
+        for (const auto& pc : session.point_clouds_container.point_clouds)
             session_total_number_of_points += pc.points_local.size();
 
         session_dims = session.point_clouds_container.compute_point_cloud_dimension();
 
         if (fillInSession)
         {
-            for (auto &pc : session.point_clouds_container.point_clouds)
+            for (auto& pc : session.point_clouds_container.point_clouds)
             {
                 Eigen::Affine3d m = Eigen::Affine3d::Identity();
                 if (pc.points_local.size() > 100)
@@ -1577,14 +1657,14 @@ void openLaz(bool fillInSession)
                     m.translation() = mean;
 
                     PointCloud::LocalTrajectoryNode node;
-                    node.imu_diff_angle_om_fi_ka_deg = {0, 0, 0};
-                    node.imu_om_fi_ka = {0, 0, 0};
+                    node.imu_diff_angle_om_fi_ka_deg = { 0, 0, 0 };
+                    node.imu_om_fi_ka = { 0, 0, 0 };
                     node.m_pose = Eigen::Affine3d::Identity();
-                    node.timestamps = {0, 0};
+                    node.timestamps = { 0, 0 };
 
                     pc.local_trajectory.push_back(node);
 
-                    for (auto &p : pc.points_local)
+                    for (auto& p : pc.points_local)
                     {
                         p -= mean;
                     }
@@ -1601,14 +1681,16 @@ void openLaz(bool fillInSession)
             std::filesystem::create_directory(session_fn);
 
             session_file_name = (fs::path(session_fn) / "newSession.mjs").string();
-			session.point_clouds_container.initial_poses_file_name = "dummy"; //non empty file names signal poses present, new file names will be created on save
-            session.point_clouds_container.poses_file_name = "dummy"; //non empty file names signal poses present, new file names will be created on save
+            session.point_clouds_container.initial_poses_file_name =
+                "dummy"; // non empty file names signal poses present, new file names will be created on save
+            session.point_clouds_container.poses_file_name =
+                "dummy"; // non empty file names signal poses present, new file names will be created on save
 
             std::string output_file_name = saveSession();
 
             if (output_file_name.size() > 0)
             {
-                //creating filenames proposal based on current selection
+                // creating filenames proposal based on current selection
                 std::filesystem::path path(output_file_name);
                 // Extract parts
                 const auto dir = path.parent_path();
@@ -1623,7 +1705,7 @@ void openLaz(bool fillInSession)
                     session.point_clouds_container.point_clouds[i].file_name = fpath.string();
                     exportLaz(fpath.string(), pc.points_local, pc.intensities, pc.timestamps);
 
-                    //saving terajectory file
+                    // saving terajectory file
                     auto pathtrj = dir / ("trajectory_lio_" + std::to_string(i) + ".csv");
                     std::cout << "Saving trajectory: " << pathtrj << std::endl;
 
@@ -1635,47 +1717,36 @@ void openLaz(bool fillInSession)
                         return;
                     }
 
-                    outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 timestampUnix_nanoseconds om_rad fi_rad ka_rad" << std::endl;
+                    outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 "
+                               "timestampUnix_nanoseconds om_rad fi_rad ka_rad"
+                            << std::endl;
                     for (int j = 0; j < 1; j++)
                     {
                         auto pose = Eigen::Affine3d::Identity();
 
-                        outfile
-                            << std::setprecision(20) << 0.0 << " " << std::setprecision(10)
-                            << pose(0, 0) << " "
-                            << pose(0, 1) << " "
-                            << pose(0, 2) << " "
-                            << pose(0, 3) << " "
-                            << pose(1, 0) << " "
-                            << pose(1, 1) << " "
-                            << pose(1, 2) << " "
-                            << pose(1, 3) << " "
-                            << pose(2, 0) << " "
-                            << pose(2, 1) << " "
-                            << pose(2, 2) << " "
-                            << pose(2, 3) << " "
-                            << std::setprecision(20) << 0.0 << " "
-                            << 0.0 << " "
-                            << 0.0 << " "
-                            << 0.0 << " "
-                            << std::endl;
+                        outfile << std::setprecision(20) << 0.0 << " " << std::setprecision(10) << pose(0, 0) << " " << pose(0, 1) << " "
+                                << pose(0, 2) << " " << pose(0, 3) << " " << pose(1, 0) << " " << pose(1, 1) << " " << pose(1, 2) << " "
+                                << pose(1, 3) << " " << pose(2, 0) << " " << pose(2, 1) << " " << pose(2, 2) << " " << pose(2, 3) << " "
+                                << std::setprecision(20) << 0.0 << " " << 0.0 << " " << 0.0 << " " << 0.0 << " " << std::endl;
                     }
                     outfile.close();
                 }
             }
 
-            [[maybe_unused]]
-            pfd::message message(
+            [[maybe_unused]] pfd::message message(
                 "Information",
-                "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on You can change offset directly in session json file.",
-                pfd::choice::ok, pfd::icon::info);
+                "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be "
+                "small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on "
+                "You can change offset directly in session json file.",
+                pfd::choice::ok,
+                pfd::icon::info);
             message.result();
 
-            //std::string mes = "Session saved to folder '" + path_ground_truth_session_folder.string() + "'";
+            // std::string mes = "Session saved to folder '" + path_ground_truth_session_folder.string() + "'";
             //[[maybe_unused]] pfd::message message(
             //    "Ground truth session info", mes,
             //    pfd::choice::ok, pfd::icon::info);
-            //message.result();
+            // message.result();
         }
     }
 }
@@ -1685,8 +1756,10 @@ void saveSubsession()
     int inx_begin = 0;
     int inx_end = 0;
 
-    for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++){
-        if (session.point_clouds_container.point_clouds[i].visible){
+    for (size_t i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+    {
+        if (session.point_clouds_container.point_clouds[i].visible)
+        {
             inx_begin = i;
             break;
         }
@@ -1701,7 +1774,7 @@ void saveSubsession()
     // Extract parts
     fs::path dir = path.parent_path();
     std::string stem = path.stem().string();
-	const auto ext = ".mjs"; //forcing new extension even if original session was .json
+    const auto ext = ".mjs"; // forcing new extension even if original session was .json
     const std::string indexpart = " " + std::to_string(inx_begin) + "-" + std::to_string(inx_end);
 
     // Build new name
@@ -1724,10 +1797,11 @@ void saveSubsession()
         std::cout << "Saving poses to: " << poses_file_name << std::endl;
         session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), true);
 
-        try {
+        try
+        {
             fs::copy_file(poses_file_name, initial_poses_file_name, fs::copy_options::overwrite_existing);
-        }
-        catch (const fs::filesystem_error& e) {
+        } catch (const fs::filesystem_error& e)
+        {
             std::cerr << "Error copying poses file: " << e.what() << '\n';
         }
     }
@@ -1780,10 +1854,16 @@ void settings_gui()
 
             if (input_file_name.size() > 0)
             {
-
                 session.working_directory = fs::path(input_file_name).parent_path().string();
 
-                if (!session.point_clouds_container.load(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z, session.load_cache_mode))
+                if (!session.point_clouds_container.load(
+                        session.working_directory.c_str(),
+                        input_file_name.c_str(),
+                        tls_registration.is_decimate,
+                        tls_registration.bucket_x,
+                        tls_registration.bucket_y,
+                        tls_registration.bucket_z,
+                        session.load_cache_mode))
                 {
                     std::cout << "check input files" << std::endl;
                     return;
@@ -1814,7 +1894,13 @@ void settings_gui()
             {
                 session.working_directory = fs::path(input_file_name).parent_path().string();
 
-                if (!session.point_clouds_container.load_eth(session.working_directory.c_str(), input_file_name.c_str(), tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z))
+                if (!session.point_clouds_container.load_eth(
+                        session.working_directory.c_str(),
+                        input_file_name.c_str(),
+                        tls_registration.is_decimate,
+                        tls_registration.bucket_x,
+                        tls_registration.bucket_y,
+                        tls_registration.bucket_z))
                 {
                     std::cout << "check input files" << std::endl;
                     return;
@@ -1843,7 +1929,12 @@ void settings_gui()
                 for (size_t i = 0; i < input_file_names.size(); i++)
                     std::cout << input_file_names[i] << std::endl;
 
-                if (!session.point_clouds_container.load_3DTK_tls(input_file_names, tls_registration.is_decimate, tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z))
+                if (!session.point_clouds_container.load_3DTK_tls(
+                        input_file_names,
+                        tls_registration.is_decimate,
+                        tls_registration.bucket_x,
+                        tls_registration.bucket_y,
+                        tls_registration.bucket_z))
                 {
                     std::cout << "Check input files" << std::endl;
                     return;
@@ -1864,10 +1955,10 @@ void settings_gui()
             input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO file", {});
             if (input_file_name.size() > 0)
             {
-
                 session.working_directory = fs::path(input_file_name).parent_path().string();
 
-                if (!session.point_clouds_container.update_initial_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
+                if (!session.point_clouds_container.update_initial_poses_from_RESSO(
+                        session.working_directory.c_str(), input_file_name.c_str()))
                 {
                     std::cout << "Check input files" << std::endl;
                     return;
@@ -1914,7 +2005,8 @@ void settings_gui()
             {
                 session.working_directory = fs::path(input_file_name).parent_path().string();
 
-                if (!session.point_clouds_container.update_poses_from_RESSO_inverse(session.working_directory.c_str(), input_file_name.c_str()))
+                if (!session.point_clouds_container.update_poses_from_RESSO_inverse(
+                        session.working_directory.c_str(), input_file_name.c_str()))
                 {
                     std::cout << "Check input files" << std::endl;
                     return;
@@ -1967,15 +2059,22 @@ void settings_gui()
                     session.point_clouds_container.point_clouds[0].m_pose(1, 3) = y_origin;
                     session.point_clouds_container.point_clouds[0].m_pose(2, 3) = z_origin;
 
-                    session.point_clouds_container.point_clouds[0].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[0].m_pose);
+                    session.point_clouds_container.point_clouds[0].pose =
+                        pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[0].m_pose);
 
-                    session.point_clouds_container.point_clouds[0].gui_translation[0] = (float)session.point_clouds_container.point_clouds[0].pose.px;
-                    session.point_clouds_container.point_clouds[0].gui_translation[1] = (float)session.point_clouds_container.point_clouds[0].pose.py;
-                    session.point_clouds_container.point_clouds[0].gui_translation[2] = (float)session.point_clouds_container.point_clouds[0].pose.pz;
+                    session.point_clouds_container.point_clouds[0].gui_translation[0] =
+                        (float)session.point_clouds_container.point_clouds[0].pose.px;
+                    session.point_clouds_container.point_clouds[0].gui_translation[1] =
+                        (float)session.point_clouds_container.point_clouds[0].pose.py;
+                    session.point_clouds_container.point_clouds[0].gui_translation[2] =
+                        (float)session.point_clouds_container.point_clouds[0].pose.pz;
 
-                    session.point_clouds_container.point_clouds[0].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[0].pose.om * RAD_TO_DEG);
-                    session.point_clouds_container.point_clouds[0].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[0].pose.fi * RAD_TO_DEG);
-                    session.point_clouds_container.point_clouds[0].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[0].gui_rotation[0] =
+                        (float)(session.point_clouds_container.point_clouds[0].pose.om * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[0].gui_rotation[1] =
+                        (float)(session.point_clouds_container.point_clouds[0].pose.fi * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[0].gui_rotation[2] =
+                        (float)(session.point_clouds_container.point_clouds[0].pose.ka * RAD_TO_DEG);
 
                     Eigen::Affine3d curr_m_pose2 = session.point_clouds_container.point_clouds[0].m_pose;
                     for (size_t j = 1; j < session.point_clouds_container.point_clouds.size(); j++)
@@ -1984,15 +2083,22 @@ void settings_gui()
 
                         // std::cout << curr_m_pose2.matrix() << std::endl;
                         session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose2;
-                        session.point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
+                        session.point_clouds_container.point_clouds[j].pose =
+                            pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
 
-                        session.point_clouds_container.point_clouds[j].gui_translation[0] = (float)session.point_clouds_container.point_clouds[j].pose.px;
-                        session.point_clouds_container.point_clouds[j].gui_translation[1] = (float)session.point_clouds_container.point_clouds[j].pose.py;
-                        session.point_clouds_container.point_clouds[j].gui_translation[2] = (float)session.point_clouds_container.point_clouds[j].pose.pz;
+                        session.point_clouds_container.point_clouds[j].gui_translation[0] =
+                            (float)session.point_clouds_container.point_clouds[j].pose.px;
+                        session.point_clouds_container.point_clouds[j].gui_translation[1] =
+                            (float)session.point_clouds_container.point_clouds[j].pose.py;
+                        session.point_clouds_container.point_clouds[j].gui_translation[2] =
+                            (float)session.point_clouds_container.point_clouds[j].pose.pz;
 
-                        session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
-                        session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
-                        session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[0] =
+                            (float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[1] =
+                            (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
+                        session.point_clouds_container.point_clouds[j].gui_rotation[2] =
+                            (float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
                     }
                 }
             }
@@ -2031,10 +2137,10 @@ void settings_gui()
                 ImGui::SetTooltip("Experiments to compare methods and approaches for multi-view TLS registration");
             ImGui::SameLine();
             if (ImGui::Button("WINDOWS"))
-                perform_experiment_on_windows(session, observation_picking, tls_registration.icp, tls_registration.ndt, tls_registration.registration_plane_feature, tls_registration.pose_graph_slam);
-            ImGui::SameLine();
-            if (ImGui::Button("LINUX"))
-                perform_experiment_on_linux(session, observation_picking, tls_registration.icp, tls_registration.ndt, tls_registration.registration_plane_feature, tls_registration.pose_graph_slam);
+                perform_experiment_on_windows(session, observation_picking, tls_registration.icp, tls_registration.ndt,
+            tls_registration.registration_plane_feature, tls_registration.pose_graph_slam); ImGui::SameLine(); if (ImGui::Button("LINUX"))
+                perform_experiment_on_linux(session, observation_picking, tls_registration.icp, tls_registration.ndt,
+            tls_registration.registration_plane_feature, tls_registration.pose_graph_slam);
             */
         }
     }
@@ -2068,25 +2174,44 @@ void display()
         {
             if (new_loop_closure_index)
             {
-                //if (index_loop_closure_source < session.point_clouds_container.point_clouds.size())
+                // if (index_loop_closure_source < session.point_clouds_container.point_clouds.size())
                 //{
-                //    new_rotation_center.x() = session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().x();
-                //    new_rotation_center.y() = session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().y();
-                //    new_rotation_center.z() = session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().z();
+                //    new_rotation_center.x() =
+                //    session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().x();
+                //    new_rotation_center.y() =
+                //    session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().y();
+                //    new_rotation_center.z() =
+                //    session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().z();
                 //
                 //    new_translate_x = -new_rotation_center.x();
                 //    new_translate_y = -new_rotation_center.y();
                 //    camera_transition_active = true;
                 //}
 
-                if (session.pose_graph_loop_closure.manipulate_active_edge) {
+                if (session.pose_graph_loop_closure.manipulate_active_edge)
+                {
                     if (session.pose_graph_loop_closure.edges.size() > 0)
                     {
                         if (session.pose_graph_loop_closure.index_active_edge < session.pose_graph_loop_closure.edges.size())
                         {
-                            new_rotation_center.x() = session.point_clouds_container.point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from].m_pose.translation().x();
-                            new_rotation_center.y() = session.point_clouds_container.point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from].m_pose.translation().y();
-                            new_rotation_center.z() = session.point_clouds_container.point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from].m_pose.translation().z();
+                            new_rotation_center.x() =
+                                session.point_clouds_container
+                                    .point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge]
+                                                      .index_from]
+                                    .m_pose.translation()
+                                    .x();
+                            new_rotation_center.y() =
+                                session.point_clouds_container
+                                    .point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge]
+                                                      .index_from]
+                                    .m_pose.translation()
+                                    .y();
+                            new_rotation_center.z() =
+                                session.point_clouds_container
+                                    .point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge]
+                                                      .index_from]
+                                    .m_pose.translation()
+                                    .z();
                         }
                     }
 
@@ -2117,13 +2242,21 @@ void display()
     }
     else
     {
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
+        glOrtho(
+            -camera_ortho_xy_view_zoom,
+            camera_ortho_xy_view_zoom,
             -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+            camera_ortho_xy_view_zoom / ratio,
+            -100000,
+            100000);
 
-        glm::mat4 proj = glm::orthoLH_ZO<float>(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
+        glm::mat4 proj = glm::orthoLH_ZO<float>(
+            -camera_ortho_xy_view_zoom,
+            camera_ortho_xy_view_zoom,
             -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio, -100, 100);
+            camera_ortho_xy_view_zoom / ratio,
+            -100,
+            100);
 
         std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
 
@@ -2142,10 +2275,9 @@ void display()
 
         Eigen::Vector3d v_t = m * v;
 
-        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
-            v_center_t.x(), v_center_t.y(), v_center_t.z(),
-            v_t.x(), v_t.y(), v_t.z());
-        glm::mat4 lookat = glm::lookAt(glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
+        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(), v_center_t.x(), v_center_t.y(), v_center_t.z(), v_t.x(), v_t.y(), v_t.z());
+        glm::mat4 lookat = glm::lookAt(
+            glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
             glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
             glm::vec3(v_t.x(), v_t.y(), v_t.z()));
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
@@ -2161,8 +2293,12 @@ void display()
     else
     {
         if (is_loop_closure_gui)
-            session.pose_graph_loop_closure.Render(session.point_clouds_container, index_loop_closure_source, index_loop_closure_target,
-                                                   num_edge_extended_before, num_edge_extended_after);
+            session.pose_graph_loop_closure.Render(
+                session.point_clouds_container,
+                index_loop_closure_source,
+                index_loop_closure_target,
+                num_edge_extended_before,
+                num_edge_extended_after);
 
         tls_registration.gnss.render(session.point_clouds_container);
         session.ground_control_points.render(session.point_clouds_container);
@@ -2235,10 +2371,22 @@ void display()
                         GLfloat modelview[16];
                         glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-                        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                        ImGuizmo::Manipulate(
+                            &modelview[0],
+                            &projection[0],
+                            ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y,
+                            ImGuizmo::WORLD,
+                            m_gizmo,
+                            NULL);
                     }
                     else
-                        ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                        ImGuizmo::Manipulate(
+                            m_ortho_gizmo_view,
+                            m_ortho_projection,
+                            ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
+                            ImGuizmo::WORLD,
+                            m_gizmo,
+                            NULL);
 
                     session.point_clouds_container.point_clouds[i].m_pose(0, 0) = m_gizmo[0];
                     session.point_clouds_container.point_clouds[i].m_pose(1, 0) = m_gizmo[1];
@@ -2256,15 +2404,22 @@ void display()
                     session.point_clouds_container.point_clouds[i].m_pose(1, 3) = m_gizmo[13];
                     session.point_clouds_container.point_clouds[i].m_pose(2, 3) = m_gizmo[14];
                     session.point_clouds_container.point_clouds[i].m_pose(3, 3) = m_gizmo[15];
-                    session.point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
+                    session.point_clouds_container.point_clouds[i].pose =
+                        pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[i].m_pose);
 
-                    session.point_clouds_container.point_clouds[i].gui_translation[0] = (float)session.point_clouds_container.point_clouds[i].pose.px;
-                    session.point_clouds_container.point_clouds[i].gui_translation[1] = (float)session.point_clouds_container.point_clouds[i].pose.py;
-                    session.point_clouds_container.point_clouds[i].gui_translation[2] = (float)session.point_clouds_container.point_clouds[i].pose.pz;
+                    session.point_clouds_container.point_clouds[i].gui_translation[0] =
+                        (float)session.point_clouds_container.point_clouds[i].pose.px;
+                    session.point_clouds_container.point_clouds[i].gui_translation[1] =
+                        (float)session.point_clouds_container.point_clouds[i].pose.py;
+                    session.point_clouds_container.point_clouds[i].gui_translation[2] =
+                        (float)session.point_clouds_container.point_clouds[i].pose.pz;
 
-                    session.point_clouds_container.point_clouds[i].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[i].pose.om * RAD_TO_DEG);
-                    session.point_clouds_container.point_clouds[i].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[i].pose.fi * RAD_TO_DEG);
-                    session.point_clouds_container.point_clouds[i].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[i].pose.ka * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[i].gui_rotation[0] =
+                        (float)(session.point_clouds_container.point_clouds[i].pose.om * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[i].gui_rotation[1] =
+                        (float)(session.point_clouds_container.point_clouds[i].pose.fi * RAD_TO_DEG);
+                    session.point_clouds_container.point_clouds[i].gui_rotation[2] =
+                        (float)(session.point_clouds_container.point_clouds[i].pose.ka * RAD_TO_DEG);
 
                     if (!manipulate_only_marked_gizmo)
                     {
@@ -2273,15 +2428,22 @@ void display()
                         {
                             curr_m_pose = curr_m_pose * (all_m_poses[j - 1].inverse() * all_m_poses[j]);
                             session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose;
-                            session.point_clouds_container.point_clouds[j].pose = pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
+                            session.point_clouds_container.point_clouds[j].pose =
+                                pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
 
-                            session.point_clouds_container.point_clouds[j].gui_translation[0] = (float)session.point_clouds_container.point_clouds[j].pose.px;
-                            session.point_clouds_container.point_clouds[j].gui_translation[1] = (float)session.point_clouds_container.point_clouds[j].pose.py;
-                            session.point_clouds_container.point_clouds[j].gui_translation[2] = (float)session.point_clouds_container.point_clouds[j].pose.pz;
+                            session.point_clouds_container.point_clouds[j].gui_translation[0] =
+                                (float)session.point_clouds_container.point_clouds[j].pose.px;
+                            session.point_clouds_container.point_clouds[j].gui_translation[1] =
+                                (float)session.point_clouds_container.point_clouds[j].pose.py;
+                            session.point_clouds_container.point_clouds[j].gui_translation[2] =
+                                (float)session.point_clouds_container.point_clouds[j].pose.pz;
 
-                            session.point_clouds_container.point_clouds[j].gui_rotation[0] = (float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
-                            session.point_clouds_container.point_clouds[j].gui_rotation[1] = (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
-                            session.point_clouds_container.point_clouds[j].gui_rotation[2] = (float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
+                            session.point_clouds_container.point_clouds[j].gui_rotation[0] =
+                                (float)(session.point_clouds_container.point_clouds[j].pose.om * RAD_TO_DEG);
+                            session.point_clouds_container.point_clouds[j].gui_rotation[1] =
+                                (float)(session.point_clouds_container.point_clouds[j].pose.fi * RAD_TO_DEG);
+                            session.point_clouds_container.point_clouds[j].gui_rotation[2] =
+                                (float)(session.point_clouds_container.point_clouds[j].pose.ka * RAD_TO_DEG);
                         }
                     }
                 }
@@ -2379,10 +2541,22 @@ void display()
                     GLfloat modelview[16];
                     glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-                    ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+                    ImGuizmo::Manipulate(
+                        &modelview[0],
+                        &projection[0],
+                        ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y,
+                        ImGuizmo::WORLD,
+                        m_gizmo,
+                        NULL);
                 }
                 else
-                    ImGuizmo::Manipulate(m_ortho_gizmo_view, m_ortho_projection, ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::WORLD, m_gizmo, NULL);
+                    ImGuizmo::Manipulate(
+                        m_ortho_gizmo_view,
+                        m_ortho_projection,
+                        ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
+                        ImGuizmo::WORLD,
+                        m_gizmo,
+                        NULL);
 
                 Eigen::Affine3d m_g = Eigen::Affine3d::Identity();
 
@@ -2406,7 +2580,8 @@ void display()
                 const int& index_src = session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].index_from;
 
                 const Eigen::Affine3d& m_src = session.point_clouds_container.point_clouds.at(index_src).m_pose;
-                session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
+                session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge].relative_pose_tb =
+                    pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
             }
         }
     }
@@ -2417,7 +2592,7 @@ void display()
     {
         is_pca_gui = !is_pca_gui;
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_A, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
@@ -2426,7 +2601,7 @@ void display()
     {
         session.control_points.is_imgui = !session.control_points.is_imgui;
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_C, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
@@ -2435,7 +2610,7 @@ void display()
     {
         is_lio_segments_gui = !is_lio_segments_gui;
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_E, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
@@ -2444,7 +2619,7 @@ void display()
     {
         session.ground_control_points.is_imgui = !session.ground_control_points.is_imgui;
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_G, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
@@ -2453,7 +2628,7 @@ void display()
     {
         is_loop_closure_gui = !is_loop_closure_gui;
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_L, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
@@ -2462,22 +2637,21 @@ void display()
     {
         openSession();
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_O, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
-
 
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_P, false))
     {
         is_pose_graph_slam = !is_pose_graph_slam;
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_P, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
 
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R)) //random colors
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R)) // random colors
     {
         for (auto& pc : session.point_clouds_container.point_clouds)
         {
@@ -2493,19 +2667,19 @@ void display()
             }
         }
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_R, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
 
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false))
     {
-		if (io.KeyShift)
+        if (io.KeyShift)
             saveSubsession();
-		else
+        else
             saveSession();
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_S, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
@@ -2537,7 +2711,7 @@ void display()
                     ImGui::SetTooltip("Create session from las/laz file(s)");
 
                 ImGui::EndPopup();
-			}
+            }
 
             ImGui::SameLine();
             ImGui::Dummy(ImVec2(20, 0));
@@ -2545,20 +2719,22 @@ void display()
         }
         else
         {
-            if (ImGui::BeginMenu("File")) {
+            if (ImGui::BeginMenu("File"))
+            {
                 if (ImGui::MenuItem("Save session as", "Ctrl+S"))
                     saveSession();
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Save changes of full session with posibility to change filename");
 
-                //ImGui::BeginDisabled(!((index_begin > 0) || (index_end < static_cast<int>(session.point_clouds_container.point_clouds.size() - 1))));
+                // ImGui::BeginDisabled(!((index_begin > 0) || (index_end <
+                // static_cast<int>(session.point_clouds_container.point_clouds.size() - 1))));
                 //{
                 if (ImGui::MenuItem("Save subsession", "Ctrl+Shift+S"))
                     saveSubsession();
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Save session according to selections from 'LIO segments editor' window");
                 //}
-                //ImGui::EndDisabled();
+                // ImGui::EndDisabled();
 
                 ImGui::Separator();
 
@@ -2584,7 +2760,8 @@ void display()
                             save_all_to_las(session, output_file_name, false, true);
                     }
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("To export in full resolution, close the program and open again and unmark 'downsample during load' before loading session");
+                        ImGui::SetTooltip("To export in full resolution, close the program and open again and unmark 'downsample during "
+                                          "load' before loading session");
 
                     if (ImGui::MenuItem("Separate global scans (laz)"))
                     {
@@ -2618,7 +2795,12 @@ void display()
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
                         std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
                         if (output_file_name.size() > 0)
-                            save_trajectories_to_laz(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling);
+                            save_trajectories_to_laz(
+                                session,
+                                output_file_name,
+                                tls_registration.curve_consecutive_distance_meters,
+                                tls_registration.not_curve_consecutive_distance_meters,
+                                tls_registration.is_trajectory_export_downsampling);
                     }
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("As one global scan");
@@ -2632,7 +2814,16 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, false, false, false);
+                            save_trajectories(
+                                session,
+                                output_file_name,
+                                tls_registration.curve_consecutive_distance_meters,
+                                tls_registration.not_curve_consecutive_distance_meters,
+                                tls_registration.is_trajectory_export_downsampling,
+                                true,
+                                false,
+                                false,
+                                false);
                     }
                     if (ImGui::MenuItem("Save all as csv (timestamp Unix)##1"))
                     {
@@ -2640,7 +2831,16 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, true, false, false);
+                            save_trajectories(
+                                session,
+                                output_file_name,
+                                tls_registration.curve_consecutive_distance_meters,
+                                tls_registration.not_curve_consecutive_distance_meters,
+                                tls_registration.is_trajectory_export_downsampling,
+                                false,
+                                true,
+                                false,
+                                false);
                     }
                     if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)##1"))
                     {
@@ -2648,7 +2848,16 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, true, false, false);
+                            save_trajectories(
+                                session,
+                                output_file_name,
+                                tls_registration.curve_consecutive_distance_meters,
+                                tls_registration.not_curve_consecutive_distance_meters,
+                                tls_registration.is_trajectory_export_downsampling,
+                                true,
+                                true,
+                                false,
+                                false);
                     }
 
                     ImGui::Separator();
@@ -2660,7 +2869,16 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, false, true, false);
+                            save_trajectories(
+                                session,
+                                output_file_name,
+                                tls_registration.curve_consecutive_distance_meters,
+                                tls_registration.not_curve_consecutive_distance_meters,
+                                tls_registration.is_trajectory_export_downsampling,
+                                true,
+                                false,
+                                true,
+                                false);
                     }
                     if (ImGui::MenuItem("Save all as csv (timestamp Unix)##2"))
                     {
@@ -2668,7 +2886,16 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, true, true, false);
+                            save_trajectories(
+                                session,
+                                output_file_name,
+                                tls_registration.curve_consecutive_distance_meters,
+                                tls_registration.not_curve_consecutive_distance_meters,
+                                tls_registration.is_trajectory_export_downsampling,
+                                false,
+                                true,
+                                true,
+                                false);
                     }
                     if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)##2"))
                     {
@@ -2676,7 +2903,16 @@ void display()
                         std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, true, true, true, false);
+                            save_trajectories(
+                                session,
+                                output_file_name,
+                                tls_registration.curve_consecutive_distance_meters,
+                                tls_registration.not_curve_consecutive_distance_meters,
+                                tls_registration.is_trajectory_export_downsampling,
+                                true,
+                                true,
+                                true,
+                                false);
                     }
 
                     ImGui::Separator();
@@ -2687,7 +2923,16 @@ void display()
                         std::cout << "dxf file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                            save_trajectories(session, output_file_name, tls_registration.curve_consecutive_distance_meters, tls_registration.not_curve_consecutive_distance_meters, tls_registration.is_trajectory_export_downsampling, false, false, false, true);
+                            save_trajectories(
+                                session,
+                                output_file_name,
+                                tls_registration.curve_consecutive_distance_meters,
+                                tls_registration.not_curve_consecutive_distance_meters,
+                                tls_registration.is_trajectory_export_downsampling,
+                                false,
+                                false,
+                                false,
+                                true);
                     }
 
                     ImGui::EndMenu();
@@ -2818,11 +3063,16 @@ void display()
 
                     if (ImGui::MenuItem("Save GNSS data to las/laz file"))
                     {
-                        const auto output_file_name = mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
+                        const auto output_file_name =
+                            mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
                         std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
 
                         if (output_file_name.size() > 0)
-                            tls_registration.gnss.save_to_laz(output_file_name, session.point_clouds_container.offset.x(), session.point_clouds_container.offset.y(), session.point_clouds_container.offset.z());
+                            tls_registration.gnss.save_to_laz(
+                                output_file_name,
+                                session.point_clouds_container.offset.x(),
+                                session.point_clouds_container.offset.y(),
+                                session.point_clouds_container.offset.z());
                     }
 
                     if (ImGui::MenuItem("Save metascan points in PUWG92"))
@@ -2890,7 +3140,6 @@ void display()
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
 
-                    
                     std::string text = "X";
                     float centered = ImGui::GetColumnWidth() - ImGui::CalcTextSize(text.c_str()).x;
                     // Set cursor so text is centered
@@ -2934,7 +3183,6 @@ void display()
 
                 ImGui::EndTooltip();
             }
-            
 
             if (ImGui::BeginMenu("Tools"))
             {
@@ -2943,7 +3191,8 @@ void display()
                 {
                     ImGui::BeginTooltip();
                     ImGui::Text("Point cloud alignment (registration) algorithms:");
-                    ImGui::Text("(aligning two 3D point sets from LiDAR scans, by estimating\nthe relative pose(translation and rotation) between them)");
+                    ImGui::Text("(aligning two 3D point sets from LiDAR scans, by estimating\nthe relative pose(translation and rotation) "
+                                "between them)");
                     ImGui::Text("- Normal Distributions Transform");
                     ImGui::Text("- Iterative Closest Point");
                     ImGui::Text("- Registration Plane Feature");
@@ -2953,14 +3202,14 @@ void display()
                 ImGui::MenuItem("Pose Graph SLAM", "Ctrl+P", &is_pose_graph_slam);
                 ImGui::MenuItem("Observations", nullptr, &is_manual_analisys);
 
-
                 ImGui::Separator();
 
                 ImGui::MenuItem("Control Points", "Ctrl+C", &session.control_points.is_imgui, !session.ground_control_points.is_imgui);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Known reference points used to align or verify the scan");
 
-                ImGui::MenuItem("Ground Control Points", "Ctrl+G", &session.ground_control_points.is_imgui, !session.control_points.is_imgui);
+                ImGui::MenuItem(
+                    "Ground Control Points", "Ctrl+G", &session.ground_control_points.is_imgui, !session.control_points.is_imgui);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Accurate real-world points used to georeference the scan");
 
@@ -2976,7 +3225,8 @@ void display()
                 ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu("Intersections")) {
+            if (ImGui::BeginMenu("Intersections"))
+            {
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputDouble("Intersection width [m]", &session.point_clouds_container.intersection_width, 0.0, 0.0, "%.2f");
                 if (session.point_clouds_container.intersection_width < 0.001)
@@ -2996,8 +3246,12 @@ void display()
 
                     if (output_file_name.size() > 0)
                     {
-                        save_intersection(session, output_file_name,
-                            session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
+                        save_intersection(
+                            session,
+                            output_file_name,
+                            session.point_clouds_container.xz_intersection,
+                            session.point_clouds_container.yz_intersection,
+                            session.point_clouds_container.xy_intersection,
                             session.point_clouds_container.intersection_width);
                     }
                 }
@@ -3016,8 +3270,12 @@ void display()
 
                     if (output_file_name.size() > 0)
                     {
-                        save_intersection(session, output_file_name,
-                            session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
+                        save_intersection(
+                            session,
+                            output_file_name,
+                            session.point_clouds_container.xz_intersection,
+                            session.point_clouds_container.yz_intersection,
+                            session.point_clouds_container.xy_intersection,
                             session.point_clouds_container.intersection_width);
                     }
                 }
@@ -3036,8 +3294,12 @@ void display()
 
                     if (output_file_name.size() > 0)
                     {
-                        save_intersection(session, output_file_name,
-                            session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection, session.point_clouds_container.xy_intersection,
+                        save_intersection(
+                            session,
+                            output_file_name,
+                            session.point_clouds_container.xz_intersection,
+                            session.point_clouds_container.yz_intersection,
+                            session.point_clouds_container.xy_intersection,
                             session.point_clouds_container.intersection_width);
                     }
                 }
@@ -3260,8 +3522,8 @@ void display()
                     ImGui::EndTooltip();
                 }
 #endif
-                //ImGui::MenuItem("Subwindow", nullptr, &consImGui);
-                //if (ImGui::IsItemHovered())
+                // ImGui::MenuItem("Subwindow", nullptr, &consImGui);
+                // if (ImGui::IsItemHovered())
                 //    ImGui::SetTooltip("Show/hide console output as GUI window");
 
                 ImGui::EndMenu();
@@ -3288,20 +3550,20 @@ void display()
                 ImGui::SetTooltip("increase for better performance, decrease for rendering more points");
             ImGui::SameLine();
 
-            //fps_avg = fps_avg * 0.7f + ImGui::GetIO().Framerate * 0.3f;  // exponential smoothing
+            // fps_avg = fps_avg * 0.7f + ImGui::GetIO().Framerate * 0.3f;  // exponential smoothing
 
-            //double now = ImGui::GetTime();  // ImGui’s built-in timer (in seconds)
+            // double now = ImGui::GetTime();  // ImGui’s built-in timer (in seconds)
 
-            //ImGui::Checkbox("dynamic", &dynamicSubsampling);
-            //if (ImGui::IsItemHovered())
+            // ImGui::Checkbox("dynamic", &dynamicSubsampling);
+            // if (ImGui::IsItemHovered())
             //    ImGui::SetTooltip("automatically control subsampling vs FPS: increase bellow 10, decrease above 60");
-            //if (dynamicSubsampling && (fps_avg < 15) && (now - lastAdjustTime > cooldownSeconds))
+            // if (dynamicSubsampling && (fps_avg < 15) && (now - lastAdjustTime > cooldownSeconds))
             //{
             //    viewer_decimate_point_cloud += 1;
             //    lastAdjustTime = now;
             //}
-            //ImGui::SameLine();
-            //ImGui::Text("(avg %.1f)", fps_avg);
+            // ImGui::SameLine();
+            // ImGui::Text("(avg %.1f)", fps_avg);
 
             if (viewer_decimate_point_cloud < 1)
                 viewer_decimate_point_cloud = 1;
@@ -3311,7 +3573,9 @@ void display()
         }
         ImGui::EndDisabled();
 
-        ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
+        ImGui::SameLine(
+            ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 -
+            ImGui::GetStyle().FramePadding.x * 2);
 
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 2));
@@ -3325,14 +3589,13 @@ void display()
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(3);
 
-
         ImGui::EndMainMenuBar();
     }
 
     if (is_settings_gui)
         settings_gui();
 
-    // my_display_code(); 
+    // my_display_code();
 
     if (is_pca_gui)
         pca_gui();
@@ -3381,10 +3644,9 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observ
     return pos;
 }
 
-
 void mouse(int glut_button, int state, int x, int y)
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     io.MousePos = ImVec2((float)x, (float)y);
 
     int button = -1;
@@ -3405,7 +3667,6 @@ void mouse(int glut_button, int state, int x, int y)
 
     if (!io.WantCaptureMouse)
     {
-
         if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_LEFT_BUTTON) && state == GLUT_DOWN && (io.KeyCtrl || io.KeyShift))
         {
             if (session.ground_control_points.is_imgui)
@@ -3423,11 +3684,12 @@ void mouse(int glut_button, int state, int x, int y)
                 session.control_points.index_picked_point = -1;
 
                 int i = session.control_points.index_pose;
-                if (session.control_points.index_pose >= 0 && session.control_points.index_pose < session.point_clouds_container.point_clouds.size())
+                if (session.control_points.index_pose >= 0 &&
+                    session.control_points.index_pose < session.point_clouds_container.point_clouds.size())
                 {
                     for (size_t j = 0; j < session.point_clouds_container.point_clouds[i].points_local.size(); j++)
                     {
-                        const auto &p = session.point_clouds_container.point_clouds[i].points_local[j];
+                        const auto& p = session.point_clouds_container.point_clouds[i].points_local[j];
                         Eigen::Vector3d vp = session.point_clouds_container.point_clouds[i].m_pose * p;
 
                         double dist = distance_point_to_line(vp, laser_beam);
@@ -3514,7 +3776,7 @@ void mouse(int glut_button, int state, int x, int y)
     }
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     try
     {
@@ -3525,17 +3787,14 @@ int main(int argc, char *argv[])
         ImGui_ImplOpenGL2_Shutdown();
         ImGui_ImplGLUT_Shutdown();
         ImGui::DestroyContext();
-    }
-    catch (const std::bad_alloc& e)
+    } catch (const std::bad_alloc& e)
     {
         std::cerr << "System is out of memory : " << e.what() << std::endl;
         mandeye::fd::OutOfMemMessage();
-    }
-    catch (const std::exception& e)
+    } catch (const std::exception& e)
     {
         std::cout << e.what();
-    }
-    catch (...)
+    } catch (...)
     {
         std::cerr << "Unknown fatal error occurred." << std::endl;
     }

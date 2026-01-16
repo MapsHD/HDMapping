@@ -1,19 +1,22 @@
 #include <single_trajectory_viewer.h>
-#include "pfd_wrapper.hpp"
-#include <GL/freeglut.h>
-#include <transformations.h>
 
-#include <filesystem>
+#include <pch/pch.h>
+
+#include <GL/freeglut.h>
+#include <pfd_wrapper.hpp>
+#include <transformations.h>
 
 namespace fs = std::filesystem;
 
-bool SingleTrajectoryViewer::load_fused_trajectory(const std::string &file_name)
+bool SingleTrajectoryViewer::load_fused_trajectory(const std::string& file_name)
 {
     trajectory_filename = file_name;
     trajectory_container.fused_trajectory = trajectory_container.load_trajectory(trajectory_filename);
-    if (trajectory_container.fused_trajectory.size() > 0) {
+    if (trajectory_container.fused_trajectory.size() > 0)
+    {
         current_time_stamp = (trajectory_container.fused_trajectory[0].timestamp +
-            trajectory_container.fused_trajectory[trajectory_container.fused_trajectory.size() - 1].timestamp) * 0.5;
+                              trajectory_container.fused_trajectory[trajectory_container.fused_trajectory.size() - 1].timestamp) *
+            0.5;
     }
 
     working_directory = fs::path(trajectory_filename).parent_path().string();
@@ -23,7 +26,8 @@ bool SingleTrajectoryViewer::load_fused_trajectory(const std::string &file_name)
 bool SingleTrajectoryViewer::load_fused_trajectory()
 {
     auto selectedFile = mandeye::fd::OpenFileDialogOneFile("Choose folder", {});
-    if (!selectedFile.empty()) {
+    if (!selectedFile.empty())
+    {
         return load_fused_trajectory(selectedFile);
     }
     return false;
@@ -34,32 +38,48 @@ std::vector<Point> SingleTrajectoryViewer::load_points_and_transform_to_global(d
     std::vector<Point> pp;
     int index_pc = -1;
 
-    for (size_t i = 0; i < chunk_files.size(); i++) {
-        if ((chunk_files[i].time_begin_inclusive <= ts && chunk_files[i].time_end_inclusive >= ts)) {
+    for (size_t i = 0; i < chunk_files.size(); i++)
+    {
+        if ((chunk_files[i].time_begin_inclusive <= ts && chunk_files[i].time_end_inclusive >= ts))
+        {
             index_pc = i;
         }
     }
 
-    if (index_pc != -1) {
+    if (index_pc != -1)
+    {
         points.clear();
-        for (int ind = index_pc - ext; ind <= index_pc + ext; ind++) {
-            if (ind >= 0 && ind < chunk_files.size()) {
+        for (int ind = index_pc - ext; ind <= index_pc + ext; ind++)
+        {
+            if (ind >= 0 && ind < chunk_files.size())
+            {
                 std::vector<Point> points_tmp;
-                load_vector_data(working_directory.c_str() + std::string("/") + std::to_string(chunk_files[ind].filename) + ".bin", points_tmp);
+                load_vector_data(
+                    working_directory.c_str() + std::string("/") + std::to_string(chunk_files[ind].filename) + ".bin", points_tmp);
 
-                for (size_t ii = 0; ii < points_tmp.size(); ii++) {
-                    auto it = std::lower_bound(trajectory_container.fused_trajectory.begin(), trajectory_container.fused_trajectory.end(),
-                        points_tmp[ii].time, [](Node lhs, double time) -> bool { return lhs.timestamp < time; });
+                for (size_t ii = 0; ii < points_tmp.size(); ii++)
+                {
+                    auto it = std::lower_bound(
+                        trajectory_container.fused_trajectory.begin(),
+                        trajectory_container.fused_trajectory.end(),
+                        points_tmp[ii].time,
+                        [](Node lhs, double time) -> bool
+                        {
+                            return lhs.timestamp < time;
+                        });
 
                     int index1 = it - trajectory_container.fused_trajectory.begin() - 1;
-                    if (index1 < 0) {
+                    if (index1 < 0)
+                    {
                         index1 = 0;
                     }
 
                     int index2 = index1 + 1;
-                    if (index2 >= trajectory_container.fused_trajectory.size()) index2 = index1;
+                    if (index2 >= trajectory_container.fused_trajectory.size())
+                        index2 = index1;
 
-                    Eigen::Affine3d pi = pose_interpolation(points_tmp[ii].time,
+                    Eigen::Affine3d pi = pose_interpolation(
+                        points_tmp[ii].time,
                         trajectory_container.fused_trajectory[index1].timestamp,
                         trajectory_container.fused_trajectory[index2].timestamp,
                         trajectory_container.fused_trajectory[index1].m_pose,
@@ -68,23 +88,28 @@ std::vector<Point> SingleTrajectoryViewer::load_points_and_transform_to_global(d
                     Eigen::Vector3d p(points_tmp[ii].x, points_tmp[ii].y, points_tmp[ii].z);
                     Eigen::Vector3d pt = pi * p;
 
-                    if (p.norm() > 10 && p.norm() < 50) {
+                    if (p.norm() > 10 && p.norm() < 50)
+                    {
                         points_tmp[ii].x = pt.x();
                         points_tmp[ii].y = pt.y();
                         points_tmp[ii].z = pt.z();
 
-                        if (pt.x() >= (roi.x() - roi_size) && pt.x() <= (roi.x() + roi_size)) {
-                            if (pt.y() >= (roi.y() - roi_size) && pt.y() <= (roi.y() + roi_size)) {
+                        if (pt.x() >= (roi.x() - roi_size) && pt.x() <= (roi.x() + roi_size))
+                        {
+                            if (pt.y() >= (roi.y() - roi_size) && pt.y() <= (roi.y() + roi_size))
+                            {
                                 pp.emplace_back(points_tmp[ii]);
                             }
                         }
                     }
 
-                    if ((trajectory_container.fused_trajectory[index1].m_pose.translation() - trajectory_container.fused_trajectory[index2].m_pose.translation()).norm() < 0.1) {
+                    if ((trajectory_container.fused_trajectory[index1].m_pose.translation() -
+                         trajectory_container.fused_trajectory[index2].m_pose.translation())
+                            .norm() < 0.1)
+                    {
                         ii += 10000;
-                        //std::cout << "pp " << ii << " ";
+                        // std::cout << "pp " << ii << " ";
                     }
-
                 }
             }
         }
@@ -92,96 +117,114 @@ std::vector<Point> SingleTrajectoryViewer::load_points_and_transform_to_global(d
     return pp;
 }
 
-void SingleTrajectoryViewer::imgui(const CommonData& common_data){
-	ImGui::Begin("single trajectory viewer");
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+void SingleTrajectoryViewer::imgui(const CommonData& common_data)
+{
+    ImGui::Begin("single trajectory viewer");
+    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-    if (ImGui::Button("load fused trajectory")) {
+    if (ImGui::Button("load fused trajectory"))
+    {
         load_fused_trajectory();
     }
 
-    if (trajectory_container.fused_trajectory.size() > 0) {
+    if (trajectory_container.fused_trajectory.size() > 0)
+    {
         double cts = current_time_stamp;
-      
+
         ImGui::InputDouble("input current_time_stamp", &current_time_stamp, 1, 10, "%.3f");
 
-        if (current_time_stamp < trajectory_container.fused_trajectory[0].timestamp) {
+        if (current_time_stamp < trajectory_container.fused_trajectory[0].timestamp)
+        {
             current_time_stamp = trajectory_container.fused_trajectory[0].timestamp;
         }
 
-        if (current_time_stamp >= trajectory_container.fused_trajectory[trajectory_container.fused_trajectory.size() - 1].timestamp) {
+        if (current_time_stamp >= trajectory_container.fused_trajectory[trajectory_container.fused_trajectory.size() - 1].timestamp)
+        {
             current_time_stamp = trajectory_container.fused_trajectory[trajectory_container.fused_trajectory.size() - 1].timestamp;
         }
 
-        if (cts != current_time_stamp) {
+        if (cts != current_time_stamp)
+        {
             points = load_points_and_transform_to_global(current_time_stamp, common_data.roi, common_data.roi_size * 100000, 5);
         }
 
-        if (ImGui::Button("get point clouds for roi")) {
+        if (ImGui::Button("get point clouds for roi"))
+        {
             point_clouds = get_point_cloud_for_roi(common_data.roi, common_data.roi_size);
         }
     }
 
-	ImGui::End();
+    ImGui::End();
 }
 
-void SingleTrajectoryViewer::render() {
+void SingleTrajectoryViewer::render()
+{
     glColor3d(0.4, 0, 1);
     glBegin(GL_POINTS);
-    for (size_t i = 0; i < trajectory_container.fused_trajectory.size(); i++) {
-        glVertex3f(trajectory_container.fused_trajectory[i].m_pose(0, 3), trajectory_container.fused_trajectory[i].m_pose(1, 3), trajectory_container.fused_trajectory[i].m_pose(2, 3));
+    for (size_t i = 0; i < trajectory_container.fused_trajectory.size(); i++)
+    {
+        glVertex3f(
+            trajectory_container.fused_trajectory[i].m_pose(0, 3),
+            trajectory_container.fused_trajectory[i].m_pose(1, 3),
+            trajectory_container.fused_trajectory[i].m_pose(2, 3));
     }
     glEnd();
 
     glBegin(GL_POINTS);
-    for (const auto& p : points) {
+    for (const auto& p : points)
+    {
         glColor3f((float(p.intensity) + 100) / 256.0, (float(p.intensity) + 100) / 256.0, (float(p.intensity) + 100) / 256.0);
         glVertex3f(p.x, p.y, p.z);
     }
     glEnd();
 
-    for (const auto& pc : point_clouds) {
+    for (const auto& pc : point_clouds)
+    {
         glBegin(GL_LINES);
-            glColor3f(1.0f, 0.0f, 0.0f);
-            glVertex3f(pc.m_pose(0,3), pc.m_pose(1, 3), pc.m_pose(2, 3));
-            glVertex3f(pc.m_pose(0, 3) + pc.m_pose(0, 0), pc.m_pose(1, 3) + pc.m_pose(1, 0), pc.m_pose(2, 3) + pc.m_pose(2, 0));
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
+        glVertex3f(pc.m_pose(0, 3) + pc.m_pose(0, 0), pc.m_pose(1, 3) + pc.m_pose(1, 0), pc.m_pose(2, 3) + pc.m_pose(2, 0));
 
-            glColor3f(0.0f, 1.0f, 0.0f);
-            glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
-            glVertex3f(pc.m_pose(0, 3) + pc.m_pose(0, 1), pc.m_pose(1, 3) + pc.m_pose(1, 1), pc.m_pose(2, 3) + pc.m_pose(2, 1));
+        glColor3f(0.0f, 1.0f, 0.0f);
+        glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
+        glVertex3f(pc.m_pose(0, 3) + pc.m_pose(0, 1), pc.m_pose(1, 3) + pc.m_pose(1, 1), pc.m_pose(2, 3) + pc.m_pose(2, 1));
 
-            glColor3f(0.0f, 0.0f, 1.0f);
-            glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
-            glVertex3f(pc.m_pose(0, 3) + pc.m_pose(0, 2), pc.m_pose(1, 3) + pc.m_pose(1, 2), pc.m_pose(2, 3) + pc.m_pose(2, 2));
+        glColor3f(0.0f, 0.0f, 1.0f);
+        glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
+        glVertex3f(pc.m_pose(0, 3) + pc.m_pose(0, 2), pc.m_pose(1, 3) + pc.m_pose(1, 2), pc.m_pose(2, 3) + pc.m_pose(2, 2));
         glEnd();
 
         glBegin(GL_POINTS);
-        for (const auto& p : pc.points_global) {
+        for (const auto& p : pc.points_global)
+        {
             glColor3f((float(p.intensity) + 100) / 256.0, (float(p.intensity) + 100) / 256.0, (float(p.intensity) + 100) / 256.0);
             glVertex3f(p.x, p.y, p.z);
         }
         glEnd();
-        
     }
 }
 
-
-bool inside_roi(const Eigen::Affine3d& m_pose, const Eigen::Vector3d& roi, const float& roi_size) {
-    if (m_pose.translation().x() >= (roi.x() - roi_size) && m_pose.translation().x() <= (roi.x() + roi_size)) {
-        if (m_pose.translation().y() >= (roi.y() - roi_size) && m_pose.translation().y() <= (roi.y() + roi_size)) {
+bool inside_roi(const Eigen::Affine3d& m_pose, const Eigen::Vector3d& roi, const float& roi_size)
+{
+    if (m_pose.translation().x() >= (roi.x() - roi_size) && m_pose.translation().x() <= (roi.x() + roi_size))
+    {
+        if (m_pose.translation().y() >= (roi.y() - roi_size) && m_pose.translation().y() <= (roi.y() + roi_size))
+        {
             return true;
         }
     }
     return false;
 }
 
-
 std::vector<PointCloudWithPose> SingleTrajectoryViewer::get_point_cloud_for_roi(Eigen::Vector3d roi, float roi_size)
 {
     std::vector<PointCloudWithPose> pcs;
 
-    for (size_t i = 1; i < trajectory_container.fused_trajectory.size(); i++) {
-        if (!inside_roi(trajectory_container.fused_trajectory[i - 1].m_pose, roi, roi_size) && inside_roi(trajectory_container.fused_trajectory[i].m_pose, roi, roi_size)) {
+    for (size_t i = 1; i < trajectory_container.fused_trajectory.size(); i++)
+    {
+        if (!inside_roi(trajectory_container.fused_trajectory[i - 1].m_pose, roi, roi_size) &&
+            inside_roi(trajectory_container.fused_trajectory[i].m_pose, roi, roi_size))
+        {
             PointCloudWithPose pc;
             pc.m_pose = trajectory_container.fused_trajectory[i].m_pose;
             pc.timestamp = trajectory_container.fused_trajectory[i].timestamp;
@@ -190,7 +233,8 @@ std::vector<PointCloudWithPose> SingleTrajectoryViewer::get_point_cloud_for_roi(
         }
     }
 
-    for (auto& pc : pcs) {
+    for (auto& pc : pcs)
+    {
         pc.points_global = load_points_and_transform_to_global(pc.timestamp, roi, roi_size, 5);
     }
 

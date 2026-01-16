@@ -1,8 +1,7 @@
+#include <pch/pch.h>
+
 #include <registration_plane_feature.h>
 #include <icp.h>
-#include <iostream>
-#include <fstream>
-#include <thread>
 
 #include <transformations.h>
 #include <m_estimators.h>

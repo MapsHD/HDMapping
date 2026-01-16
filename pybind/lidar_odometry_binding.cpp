@@ -1,16 +1,17 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl/filesystem.h>
-#include <pybind11/stl.h>
-#include <pybind11/eigen.h>
+#include <export_laz.h>
 #include <lidar_odometry.h>
 #include <lidar_odometry_utils.h>
-#include <structures.h>
+#include <pybind11/eigen.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/stl/filesystem.h>
 #include <session.h>
-#include <export_laz.h>
+#include <structures.h>
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(lidar_odometry_py, m) {
+PYBIND11_MODULE(lidar_odometry_py, m)
+{
     m.doc() = "Python bindings for lidar odometry";
 
     // Bind GridParameters
@@ -80,7 +81,9 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         .def_readwrite("distance_bucket_rigid_sf", &LidarOdometryParams::distance_bucket_rigid_sf)
         .def_readwrite("polar_angle_deg_rigid_sf", &LidarOdometryParams::polar_angle_deg_rigid_sf)
         .def_readwrite("azimutal_angle_deg_rigid_sf", &LidarOdometryParams::azimutal_angle_deg_rigid_sf)
-        .def_readwrite("robust_and_accurate_lidar_odometry_rigid_sf_iterations", &LidarOdometryParams::robust_and_accurate_lidar_odometry_rigid_sf_iterations)
+        .def_readwrite(
+            "robust_and_accurate_lidar_odometry_rigid_sf_iterations",
+            &LidarOdometryParams::robust_and_accurate_lidar_odometry_rigid_sf_iterations)
         .def_readwrite("max_distance_lidar_rigid_sf", &LidarOdometryParams::max_distance_lidar_rigid_sf)
         .def_readwrite("rgd_sf_sigma_x_m", &LidarOdometryParams::rgd_sf_sigma_x_m)
         .def_readwrite("rgd_sf_sigma_y_m", &LidarOdometryParams::rgd_sf_sigma_y_m)
@@ -106,28 +109,32 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         .def_readwrite("lidar_odometry_motion_model_om_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_om_1_sigma_deg)
         .def_readwrite("lidar_odometry_motion_model_fi_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_fi_1_sigma_deg)
         .def_readwrite("lidar_odometry_motion_model_ka_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_ka_1_sigma_deg)
-        .def_readwrite("lidar_odometry_motion_model_fix_origin_x_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_x_1_sigma_m)
-        .def_readwrite("lidar_odometry_motion_model_fix_origin_y_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_y_1_sigma_m)
-        .def_readwrite("lidar_odometry_motion_model_fix_origin_z_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_z_1_sigma_m)
-        .def_readwrite("lidar_odometry_motion_model_fix_origin_om_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_om_1_sigma_deg)
-        .def_readwrite("lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg)
-        .def_readwrite("lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg)
-        ;
+        .def_readwrite(
+            "lidar_odometry_motion_model_fix_origin_x_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_x_1_sigma_m)
+        .def_readwrite(
+            "lidar_odometry_motion_model_fix_origin_y_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_y_1_sigma_m)
+        .def_readwrite(
+            "lidar_odometry_motion_model_fix_origin_z_1_sigma_m", &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_z_1_sigma_m)
+        .def_readwrite(
+            "lidar_odometry_motion_model_fix_origin_om_1_sigma_deg",
+            &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_om_1_sigma_deg)
+        .def_readwrite(
+            "lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg",
+            &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_fi_1_sigma_deg)
+        .def_readwrite(
+            "lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg",
+            &LidarOdometryParams::lidar_odometry_motion_model_fix_origin_ka_1_sigma_deg);
 
     // Bind run_lidar_odometry function
-    m.def("run_lidar_odometry", &run_lidar_odometry,
-        py::arg("input_dir"),
-        py::arg("params"),
-        "Run lidar odometry with given parameters");
+    m.def("run_lidar_odometry", &run_lidar_odometry, py::arg("input_dir"), py::arg("params"), "Run lidar odometry with given parameters");
 
     // Bind run_consistency function
-    m.def("run_consistency", &run_consistency,
-        py::arg("worker_data"),
-        py::arg("params"),
-        "Run trajectory consistency.");
-    
+    m.def("run_consistency", &run_consistency, py::arg("worker_data"), py::arg("params"), "Run trajectory consistency.");
+
     // Bind save_results_automatic function
-    m.def("save_results_automatic", &save_results_automatic,
+    m.def(
+        "save_results_automatic",
+        &save_results_automatic,
         py::arg("params"),
         py::arg("worker_data"),
         py::arg("working_directory"),
@@ -135,20 +142,21 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         "Save output results from lidar odometry pipeline.");
 
     // Bind functions from utils
-    m.def("loadLaz", &loadLaz,
+    m.def(
+        "loadLaz",
+        &loadLaz,
         py::arg("filename"),
         py::arg("points_out"),
         py::arg("index_poses_wd"),
         py::arg("intermediate_trajectory"),
         py::arg("inverse_pose"),
         "Load .laz file to reconstruct WorkerData points");
-    
-    m.def("load_poses", &load_poses,
-        py::arg("poses_file"),
-        py::arg("out_poses"),
-        "Load poses from file");
 
-    m.def("load_trajectory_csv", &load_trajectory_csv,
+    m.def("load_poses", &load_poses, py::arg("poses_file"), py::arg("out_poses"), "Load poses from file");
+
+    m.def(
+        "load_trajectory_csv",
+        &load_trajectory_csv,
         py::arg("filename"),
         py::arg("m_pose"),
         py::arg("intermediate_trajectory_timestamps"),
@@ -156,20 +164,17 @@ PYBIND11_MODULE(lidar_odometry_py, m) {
         py::arg("imu_om_fi_ka"),
         "Load trajectory CSV file");
 
-    m.def("load_point_sizes", &load_point_sizes,
-        py::arg("path"),
-        py::arg("vector"),
-        "Load original point sizes from JSON file");
+    m.def("load_point_sizes", &load_point_sizes, py::arg("path"), py::arg("vector"), "Load original point sizes from JSON file");
 
-    m.def("load_index_poses", &load_index_poses,
-        py::arg("path"),
-        py::arg("vector"),
-        "Load index poses from JSON file");
+    m.def("load_index_poses", &load_index_poses, py::arg("path"), py::arg("vector"), "Load index poses from JSON file");
 
-    m.def("load_worker_data_from_results",
-        [](const fs::path& session_file) {
+    m.def(
+        "load_worker_data_from_results",
+        [](const fs::path& session_file)
+        {
             std::vector<WorkerData> worker_data_out;
-            if (!load_worker_data_from_results(session_file, worker_data_out)) {
+            if (!load_worker_data_from_results(session_file, worker_data_out))
+            {
                 throw std::runtime_error("Failed to load worker data from session file: " + session_file.string());
             }
             return worker_data_out;

@@ -1,3 +1,5 @@
+#include <pch/pch.h>
+
 #include <ground_control_points.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 #if WITH_GUI == 1
@@ -11,7 +13,7 @@ static constexpr const char* xText = "Longitudinal (forward/backward)";
 static constexpr const char* yText = "Lateral (left/right)";
 static constexpr const char* zText = "Vertical (up/down)";
 
-void GroundControlPoints::imgui(PointClouds &point_clouds_container)
+void GroundControlPoints::imgui(PointClouds& point_clouds_container)
 {
     if (ImGui::Begin("Ground Control Point", &is_imgui))
     {
@@ -19,7 +21,7 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
         ImGui::SetNextItemWidth(ImGuiNumberWidth);
         ImGui::InputDouble("Default lidar height above ground [m]", &default_lidar_height_above_ground, 0.0, 10.0, "%.3f");
 
-        //ImGui::Text("To show Ground Control Point (GCP) candidate please press 'CTRL'");
+        // ImGui::Text("To show Ground Control Point (GCP) candidate please press 'CTRL'");
         ImGui::Text("To pick trajectory node please press 'CTRL + left/middle mouse'");
         ImGui::Text("At least 3 GCPs needed!");
 
@@ -34,7 +36,9 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
                 gcp.sigma_x = 0.1;
                 gcp.sigma_y = 0.1;
                 gcp.sigma_z = 0.1;
-                const auto &p = point_clouds_container.point_clouds[gcp.index_to_node_inner].local_trajectory[gcp.index_to_node_outer].m_pose.translation();
+                const auto& p = point_clouds_container.point_clouds[gcp.index_to_node_inner]
+                                    .local_trajectory[gcp.index_to_node_outer]
+                                    .m_pose.translation();
                 Eigen::Vector3d position_global = point_clouds_container.point_clouds[gcp.index_to_node_inner].m_pose * p;
 
                 gcp.x = position_global.x();
@@ -48,7 +52,7 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
             // int picking_mode_index_to_node_outer = -1;
         }
 
-		ImGui::NewLine();   
+        ImGui::NewLine();
         ImGui::Separator();
         ImGui::NewLine();
 
@@ -65,7 +69,7 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
             ImGui::PushItemWidth(ImGuiNumberWidth);
             ImGui::InputText(("GCP name##" + std::to_string(i)).c_str(), gpcs[i].name, IM_ARRAYSIZE(gpcs[i].name));
 
-			ImGui::Text("sigma [m]:");
+            ImGui::Text("sigma [m]:");
             ImGui::InputDouble(("X##" + std::to_string(i)).c_str(), &gpcs[i].sigma_x, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(xText);
@@ -90,9 +94,9 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
             ImGui::InputDouble(("Z##c" + std::to_string(i)).c_str(), &gpcs[i].z);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(zText);
-            
+
             ImGui::InputDouble(("lidar_height_above_ground [m]##" + std::to_string(i)).c_str(), &gpcs[i].lidar_height_above_ground);
-			ImGui::PopItemWidth();
+            ImGui::PopItemWidth();
 
             ImGui::NewLine();
         }
@@ -130,24 +134,36 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
                 // GCPs
                 for (int i = 0; i < gpcs.size(); i++)
                 {
-                    Eigen::Vector3d p_s =
-                        point_clouds_container.point_clouds[gpcs[i].index_to_node_inner].m_pose *
+                    Eigen::Vector3d p_s = point_clouds_container.point_clouds[gpcs[i].index_to_node_inner].m_pose *
                         point_clouds_container.point_clouds[gpcs[i].index_to_node_inner]
                             .local_trajectory[gpcs[i].index_to_node_outer]
                             .m_pose.translation();
 
                     Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
 
-                    point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                           p_s.x(), p_s.y(), p_s.z());
+                    point_to_point_source_to_target_tait_bryan_wc_jacobian(
+                        jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z());
 
                     double delta_x;
                     double delta_y;
                     double delta_z;
                     Eigen::Vector3d p_t(gpcs[i].x, gpcs[i].y, gpcs[i].z + gpcs[i].lidar_height_above_ground);
-                    point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                                                                  pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                  p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+                    point_to_point_source_to_target_tait_bryan_wc(
+                        delta_x,
+                        delta_y,
+                        delta_z,
+                        pose_s.px,
+                        pose_s.py,
+                        pose_s.pz,
+                        pose_s.om,
+                        pose_s.fi,
+                        pose_s.ka,
+                        p_s.x(),
+                        p_s.y(),
+                        p_s.z(),
+                        p_t.x(),
+                        p_t.y(),
+                        p_t.z());
 
                     int ir = tripletListB.size();
                     int ic = 0;
@@ -230,7 +246,8 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
                     for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
                     {
                         point_clouds_container.point_clouds[i].m_pose = m_pose * point_clouds_container.point_clouds[i].m_pose;
-                        point_clouds_container.point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+                        point_clouds_container.point_clouds[i].pose =
+                            pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
                         point_clouds_container.point_clouds[i].gui_translation[0] = point_clouds_container.point_clouds[i].pose.px;
                         point_clouds_container.point_clouds[i].gui_translation[1] = point_clouds_container.point_clouds[i].pose.py;
                         point_clouds_container.point_clouds[i].gui_translation[2] = point_clouds_container.point_clouds[i].pose.pz;
@@ -244,7 +261,8 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
                     std::cout << "AtPA=AtPB FAILED" << std::endl;
                 }
             }
-            if (ImGui::IsItemHovered()){
+            if (ImGui::IsItemHovered())
+            {
                 ImGui::SetTooltip("trajectory is rigid");
             }
         }
@@ -255,11 +273,13 @@ void GroundControlPoints::imgui(PointClouds &point_clouds_container)
     return;
 }
 
-void GroundControlPoints::render(const PointClouds &point_clouds_container)
+void GroundControlPoints::render(const PointClouds& point_clouds_container)
 {
     for (int i = 0; i < gpcs.size(); i++)
     {
-        const auto &p = point_clouds_container.point_clouds[gpcs[i].index_to_node_inner].local_trajectory[gpcs[i].index_to_node_outer].m_pose.translation();
+        const auto& p = point_clouds_container.point_clouds[gpcs[i].index_to_node_inner]
+                            .local_trajectory[gpcs[i].index_to_node_outer]
+                            .m_pose.translation();
         Eigen::Vector3d c = point_clouds_container.point_clouds[gpcs[i].index_to_node_inner].m_pose * p;
         Eigen::Vector3d g(gpcs[i].x, gpcs[i].y, gpcs[i].z);
 
@@ -308,25 +328,26 @@ void GroundControlPoints::render(const PointClouds &point_clouds_container)
 
         glColor3f(0.7f, 0.3f, 0.5f);
         glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z + gpcs[i].lidar_height_above_ground);
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)(("GCP_" + std::to_string(i) + ": LiDAR center").c_str()));
+        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char*)(("GCP_" + std::to_string(i) + ": LiDAR center").c_str()));
 
         glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z);
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)(("GCP_" + std::to_string(i) + ": 'plane on the ground'").c_str()));
+        glutBitmapString(
+            GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char*)(("GCP_" + std::to_string(i) + ": 'plane on the ground'").c_str()));
 
         glColor3f(0, 0, 0);
         glRasterPos3f(gpcs[i].x, gpcs[i].y, gpcs[i].z + gpcs[i].lidar_height_above_ground + 0.1);
         glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char*)gpcs[i].name);
 
         glRasterPos3f(c.x(), c.y(), c.z());
-        glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char *)(("GCP_" + std::to_string(i) + ": assigned trajectory node").c_str()));
+        glutBitmapString(
+            GLUT_BITMAP_TIMES_ROMAN_10, (const unsigned char*)(("GCP_" + std::to_string(i) + ": assigned trajectory node").c_str()));
     }
 
     return;
 }
 
-void GroundControlPoints::draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vector3d &mean, Eigen::Vector3f color, float nstd)
+void GroundControlPoints::draw_ellipse(const Eigen::Matrix3d& covar, Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd)
 {
-
     Eigen::LLT<Eigen::Matrix<double, 3, 3>> cholSolver(covar);
     Eigen::Matrix3d transform = cholSolver.matrixL();
 
@@ -341,7 +362,7 @@ void GroundControlPoints::draw_ellipse(const Eigen::Matrix3d &covar, Eigen::Vect
     {
         for (double j = 0; j < 1.0; j += dj) // vertical
         {
-            double u = i * 2 * pi;     // 0     to  2pi
+            double u = i * 2 * pi; // 0     to  2pi
             double v = (j - 0.5) * pi; //-pi/2 to pi/2
 
             const Eigen::Vector3d pp0(cos(v) * cos(u), cos(v) * sin(u), sin(v));

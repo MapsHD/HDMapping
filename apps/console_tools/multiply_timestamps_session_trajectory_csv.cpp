@@ -1,12 +1,12 @@
-#include <iostream>
-#include <fstream>
 #include <Eigen/Eigen>
+#include <fstream>
+#include <iostream>
 #include <structures.h>
 #include <transformations.h>
 
 #include <point_clouds.h>
 
-inline void split(std::string &str, char delim, std::vector<std::string> &out)
+inline void split(std::string& str, char delim, std::vector<std::string>& out)
 {
     size_t start;
     size_t end = 0;
@@ -18,7 +18,7 @@ inline void split(std::string &str, char delim, std::vector<std::string> &out)
     }
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     if (argc != 4)
     {
@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
 
     std::filesystem::path trj_path = argv[1];
 
-    if(std::filesystem::exists(trj_path))
+    if (std::filesystem::exists(trj_path))
     {
         std::cout << " loading.. ";
 
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
                 std::istringstream(strs[12]) >> ltn.m_pose(2, 3);
 
                 ltn.timestamps.second = 0.0;
-                ltn.imu_om_fi_ka = {0, 0, 0};
+                ltn.imu_om_fi_ka = { 0, 0, 0 };
                 local_trajectory.push_back(ltn);
             }
 
@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
                 std::istringstream(strs[11]) >> ltn.m_pose(2, 2);
                 std::istringstream(strs[12]) >> ltn.m_pose(2, 3);
                 std::istringstream(strs[13]) >> ltn.timestamps.second;
-                ltn.imu_om_fi_ka = {0, 0, 0};
+                ltn.imu_om_fi_ka = { 0, 0, 0 };
 
                 ltn.timestamps.first *= atof(argv[3]);
 
@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
                 std::istringstream(strs[16]) >> ltn.imu_om_fi_ka.z();
 
                 ltn.timestamps.first *= atof(argv[3]);
-               
+
                 local_trajectory.push_back(ltn);
             }
         }
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
         std::cout << local_trajectory.size() << " local nodes" << std::endl;
         infile.close();
 
-        //save trajectory
+        // save trajectory
         std::ofstream outfile;
         outfile.open(argv[2]);
         if (!outfile.good())
@@ -134,28 +134,20 @@ int main(int argc, char *argv[])
             return 3;
         }
 
-        outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 timestampUnix_nanoseconds om_rad fi_rad ka_rad" << std::endl;
+        outfile << "timestamp_nanoseconds pose00 pose01 pose02 pose03 pose10 pose11 pose12 pose13 pose20 pose21 pose22 pose23 "
+                   "timestampUnix_nanoseconds om_rad fi_rad ka_rad"
+                << std::endl;
         for (int j = 0; j < local_trajectory.size(); j++)
         {
-            outfile
-                << std::setprecision(20) << local_trajectory[j].timestamps.first << " " << std::setprecision(10)
-                << local_trajectory[j].m_pose(0, 0) << " "
-                << local_trajectory[j].m_pose(0, 1) << " "
-                << local_trajectory[j].m_pose(0, 2) << " "
-                << local_trajectory[j].m_pose(0, 3) << " "
-                << local_trajectory[j].m_pose(1, 0) << " "
-                << local_trajectory[j].m_pose(1, 1) << " "
-                << local_trajectory[j].m_pose(1, 2) << " "
-                << local_trajectory[j].m_pose(1, 3) << " "
-                << local_trajectory[j].m_pose(2, 0) << " "
-                << local_trajectory[j].m_pose(2, 1) << " "
-                << local_trajectory[j].m_pose(2, 2) << " "
-                << local_trajectory[j].m_pose(2, 3) << " "
-                << std::setprecision(20) << local_trajectory[j].timestamps.second << " "
-                << local_trajectory[j].imu_om_fi_ka.x() << " "
-                << local_trajectory[j].imu_om_fi_ka.y() << " "
-                << local_trajectory[j].imu_om_fi_ka.z() << " "
-                << std::endl;
+            outfile << std::setprecision(20) << local_trajectory[j].timestamps.first << " " << std::setprecision(10)
+                    << local_trajectory[j].m_pose(0, 0) << " " << local_trajectory[j].m_pose(0, 1) << " "
+                    << local_trajectory[j].m_pose(0, 2) << " " << local_trajectory[j].m_pose(0, 3) << " "
+                    << local_trajectory[j].m_pose(1, 0) << " " << local_trajectory[j].m_pose(1, 1) << " "
+                    << local_trajectory[j].m_pose(1, 2) << " " << local_trajectory[j].m_pose(1, 3) << " "
+                    << local_trajectory[j].m_pose(2, 0) << " " << local_trajectory[j].m_pose(2, 1) << " "
+                    << local_trajectory[j].m_pose(2, 2) << " " << local_trajectory[j].m_pose(2, 3) << " " << std::setprecision(20)
+                    << local_trajectory[j].timestamps.second << " " << local_trajectory[j].imu_om_fi_ka.x() << " "
+                    << local_trajectory[j].imu_om_fi_ka.y() << " " << local_trajectory[j].imu_om_fi_ka.z() << " " << std::endl;
         }
         outfile.close();
     }

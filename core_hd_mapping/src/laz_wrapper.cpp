@@ -1,93 +1,117 @@
+#include <pch/pch.h>
+
 #include <laz_wrapper.h>
 
-#include <iostream>
-#include <fstream>
-#include <thread>
-
+#include <GL/freeglut.h>
+#include <laszip/laszip_api.h>
 #include <portable-file-dialogs.h>
 
-#include <laszip/laszip_api.h>
+#include <fstream>
+#include <iostream>
+#include <thread>
 
-#include <GL/freeglut.h>
-#include "pfd_wrapper.hpp"
+#include <pfd_wrapper.hpp>
 
-void LazWrapper::imgui(CommonData& common_data, const ProjectSettings& project_setings) {
-	ImGui::Begin("LazWrapper");
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+void LazWrapper::imgui(const CommonData& common_data, const ProjectSettings& project_setings)
+{
+    ImGui::Begin("LazWrapper");
+    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-	if (ImGui::Button("Add point cloud from LAZ file")) {
+    if (ImGui::Button("Add point cloud from LAZ file"))
+    {
+        auto input_file_names = mandeye::fd::OpenFileDialog("Choose folder", { "LAZ files, *.laz" }, true);
 
-        auto input_file_names = mandeye::fd::OpenFileDialog("Choose folder", {"LAZ files, *.laz"}, true);
-
-        for(int i = 0 ; i < input_file_names.size(); i++){
+        for (int i = 0; i < input_file_names.size(); i++)
+        {
             std::cout << "loading progers: " << i + 1 << " of " << input_file_names.size() << std::endl;
             const auto& fn = input_file_names[i];
             LAZSector sector = load_sector(fn, common_data.shift_x, common_data.shift_y);
-            if (sector.point_cloud.size() > 0) {
+            if (sector.point_cloud.size() > 0)
+            {
                 sectors.push_back(sector);
                 std::cout << "sector loaded from file '" << fn << "'" << std::endl;
             }
         }
-	}
+    }
 
-    if (ImGui::Button("LAZ hide all files")) {
-        for (size_t i = 0; i < sectors.size(); i++) {
+    if (ImGui::Button("LAZ hide all files"))
+    {
+        for (size_t i = 0; i < sectors.size(); i++)
+        {
             sectors[i].visible = false;
         }
     }
 
     bool can_show = false;
-    for (size_t i = 0; i < sectors.size(); i++) {
-        if (sectors[i].point_cloud.size() > 0) {
+    for (size_t i = 0; i < sectors.size(); i++)
+    {
+        if (sectors[i].point_cloud.size() > 0)
+        {
             can_show = true;
         }
     }
 
-    if (can_show) {
+    if (can_show)
+    {
         ImGui::SameLine();
-        if (ImGui::Button("LAZ show all files")) {
+        if (ImGui::Button("LAZ show all files"))
+        {
             decimation = 100;
-            for (size_t i = 0; i < sectors.size(); i++) {
-                if (sectors[i].point_cloud.size() == 0) {
+            for (size_t i = 0; i < sectors.size(); i++)
+            {
+                if (sectors[i].point_cloud.size() == 0)
+                {
                     LazWrapper lw;
                     LAZSector sector = lw.load_sector(sectors[i].file_name, common_data.shift_x, common_data.shift_y);
                     sectors[i].point_cloud = sector.point_cloud;
-
                 }
                 sectors[i].visible = true;
             }
         }
     }
 
-    if (ImGui::Button("LAZ reload all files")) {
+    if (ImGui::Button("LAZ reload all files"))
+    {
         decimation = 100;
         reload_all_LAZ_files(common_data.shift_x, common_data.shift_y);
 
-        for (size_t i = 0; i < sectors.size(); i++) {
+        for (size_t i = 0; i < sectors.size(); i++)
+        {
             sectors[i].visible = true;
         }
     }
     ImGui::SliderInt("LAZ loader threads", &num_threads, 1, 128);
 
     ImGui::SliderInt("LAZ decimation", &decimation, 1, 1000);
-        
-    for (size_t i = 0; i < sectors.size(); i++) {
+
+    for (size_t i = 0; i < sectors.size(); i++)
+    {
         bool previous_visibility = sectors[i].visible;
-        ImGui::Checkbox(("LAZ[" + std::to_string(i) +  "]: " + sectors[i].file_name).c_str(), &sectors[i].visible);
+        ImGui::Checkbox(("LAZ[" + std::to_string(i) + "]: " + sectors[i].file_name).c_str(), &sectors[i].visible);
         ImGui::SameLine();
         ImGui::PushButtonRepeat(true);
         float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
-        if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##sector_left").c_str(), ImGuiDir_Left)) { (sectors[i].point_size)--; }
+        if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##sector_left").c_str(), ImGuiDir_Left))
+        {
+            (sectors[i].point_size)--;
+        }
         ImGui::SameLine(0.0f, spacing);
-        if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##sector_right").c_str(), ImGuiDir_Right)) { (sectors[i].point_size)++; }
+        if (ImGui::ArrowButton(("[" + std::to_string(i) + "] ##sector_right").c_str(), ImGuiDir_Right))
+        {
+            (sectors[i].point_size)++;
+        }
         ImGui::PopButtonRepeat();
         ImGui::SameLine();
         ImGui::Text("point size %d", sectors[i].point_size);
-        if (sectors[i].point_size < 1) sectors[i].point_size = 1;
+        if (sectors[i].point_size < 1)
+            sectors[i].point_size = 1;
 
-        if (sectors[i].visible != previous_visibility) {
-            if (sectors[i].visible) {
-                if (sectors[i].point_cloud.size() == 0) {
+        if (sectors[i].visible != previous_visibility)
+        {
+            if (sectors[i].visible)
+            {
+                if (sectors[i].point_cloud.size() == 0)
+                {
                     LAZSector sector = load_sector(sectors[i].file_name, common_data.shift_x, common_data.shift_y);
                     sectors[i].point_cloud = sector.point_cloud;
                 }
@@ -95,19 +119,22 @@ void LazWrapper::imgui(CommonData& common_data, const ProjectSettings& project_s
         }
     }
 
-	ImGui::End();
+    ImGui::End();
 }
 
-void LazWrapper::render(const CommonData& common_data) {
-
+void LazWrapper::render(const CommonData& common_data)
+{
     glColor3f(0.5, 0.5, 0.5);
-    for (const auto& s : sectors) {
-        if (s.visible) {
+    for (const auto& s : sectors)
+    {
+        if (s.visible)
+        {
             glPointSize(s.point_size);
             glBegin(GL_POINTS);
-            //for (const auto& p : s.point_cloud) {
-            for(int i = 0 ; i < s.point_cloud.size(); i+= decimation){
-                const auto &p = s.point_cloud[i];
+            // for (const auto& p : s.point_cloud) {
+            for (int i = 0; i < s.point_cloud.size(); i += decimation)
+            {
+                const auto& p = s.point_cloud[i];
                 glColor3f(p.r, p.g, p.b);
                 glVertex3f(p.x, p.y, p.z);
             }
@@ -117,10 +144,10 @@ void LazWrapper::render(const CommonData& common_data) {
     }
 }
 
-LAZSector LazWrapper::load_sector(const std::string& filename, double shift_x, double shift_y)
+LAZSector LazWrapper::load_sector(const std::string& filename, const double shift_x, const double shift_y)
 {
-	LAZSector sector;
-	sector.file_name = filename;
+    LAZSector sector;
+    sector.file_name = filename;
 
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))
@@ -151,7 +178,7 @@ LAZSector LazWrapper::load_sector(const std::string& filename, double shift_x, d
         std::abort();
     }
     //    int64_t point_count;
-   
+
     sector.point_cloud.reserve(header->number_of_point_records);
 
     sector.min_x = 1000000000000;
@@ -178,40 +205,46 @@ LAZSector LazWrapper::load_sector(const std::string& filename, double shift_x, d
 
         sector.point_cloud.push_back(p);
 
-        if (p.x < sector.min_x) {
+        if (p.x < sector.min_x)
+        {
             sector.min_x = p.x;
         }
-        if (p.x > sector.max_x) {
+        if (p.x > sector.max_x)
+        {
             sector.max_x = p.x;
         }
-        if (p.y < sector.min_y) {
+        if (p.y < sector.min_y)
+        {
             sector.min_y = p.y;
         }
-        if (p.y > sector.max_y) {
+        if (p.y > sector.max_y)
+        {
             sector.max_y = p.y;
         }
     }
-   
-	return sector;
+
+    return sector;
 }
 
-void reload_all_LAZ_files_job(int i, Job* job, LAZSector* s, double shift_x, double shift_y) {
+void reload_all_LAZ_files_job(int i, Job* job, LAZSector* s, double shift_x, double shift_y)
+{
     LazWrapper lw;
     LAZSector sector = lw.load_sector((*s).file_name, shift_x, shift_y);
     (*s).point_cloud = sector.point_cloud;
 }
 
-
-void LazWrapper::reload_all_LAZ_files(double shift_x, double shift_y)
+void LazWrapper::reload_all_LAZ_files(const double shift_x, const double shift_y)
 {
     std::vector<Job> jobs = get_jobs(sectors.size(), num_threads);
     std::vector<std::thread> threads;
 
-    for (size_t i = 0; i < jobs.size(); i++) {
+    for (size_t i = 0; i < jobs.size(); i++)
+    {
         threads.push_back(std::thread(reload_all_LAZ_files_job, i, &jobs[i], &(sectors[i]), shift_x, shift_y));
     }
 
-    for (size_t j = 0; j < threads.size(); j++) {
+    for (size_t j = 0; j < threads.size(); j++)
+    {
         threads[j].join();
     }
     threads.clear();

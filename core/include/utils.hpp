@@ -2,9 +2,9 @@
 
 #include <Eigen/Geometry>
 #include <imgui.h>
-#include <structures.h>
 #include <registration_plane_feature.h>
 #include <session.h>
+#include <structures.h>
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -28,7 +28,8 @@ const unsigned int window_height = 600;
 
 const float camera_transition_speed = 1.0f; // higher = faster
 
-enum CameraPreset {
+enum CameraPreset
+{
     CAMERA_FRONT,
     CAMERA_BACK,
     CAMERA_LEFT,
@@ -97,7 +98,7 @@ struct ShortcutEntry {
     std::string description;
 };
 
-#define IDI_ICON1                        101 //application icon (double defined in resource.h)
+#define IDI_ICON1 101 // application icon (double defined in resource.h)
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -125,9 +126,15 @@ Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationP
 LaserBeam GetLaserBeam(int x, int y);
 double distance_point_to_line(const Eigen::Vector3d& point, const LaserBeam& line);
 void getClosestTrajectoryPoint(Session& session, int x, int y, bool gcpPicking, int& picked_index);
-void getClosestTrajectoriesPoint(std::vector<Session>& sessions, int x, int y,
-    const int first_session_index, const int second_session_index, const int number_visible_sessions,
-    int& index_loop_closure_source, int& index_loop_closure_target, bool KeyShift);
-
+void getClosestTrajectoriesPoint(
+    std::vector<Session>& sessions,
+    int x,
+    int y,
+    const int first_session_index,
+    const int second_session_index,
+    const int number_visible_sessions,
+    int& index_loop_closure_source,
+    int& index_loop_closure_target,
+    bool KeyShift);
 
 void setNewRotationCenter(int x, int y);

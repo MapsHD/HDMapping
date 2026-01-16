@@ -1,8 +1,8 @@
-#ifndef _SURFACE_H_
-#define _SURFACE_H_
+#pragma once
 
-#include <vector>
 #include <Eigen/Eigen>
+#include <vector>
+
 
 inline unsigned long long int get_index_2D(const int16_t x, const int16_t y /*, const int16_t z*/)
 {
@@ -10,7 +10,7 @@ inline unsigned long long int get_index_2D(const int16_t x, const int16_t y /*, 
     //        ((static_cast<unsigned long long int>(y) << 16) & (0x00000000FFFF0000ull)) |
     //        ((static_cast<unsigned long long int>(z) << 0) & (0x000000000000FFFFull));
     return ((static_cast<unsigned long long int>(x) << 16) & (0x00000000FFFF0000ull)) |
-           ((static_cast<unsigned long long int>(y) << 0) & (0x000000000000FFFFull));
+        ((static_cast<unsigned long long int>(y) << 0) & (0x000000000000FFFFull));
 }
 
 inline unsigned long long int get_rgd_index_2D(const Eigen::Vector3d p, const Eigen::Vector2d b)
@@ -31,8 +31,14 @@ public:
     //     int index_after;
     // };
 
-    Surface() { ; };
-    ~Surface() { ; };
+    Surface()
+    {
+        ;
+    };
+    ~Surface()
+    {
+        ;
+    };
 
     std::vector<Eigen::Affine3d> vertices;
     std::vector<Eigen::Affine3d> vertices_odo;
@@ -46,13 +52,15 @@ public:
     double lowest_points_filter_resolution = 0.3;
     bool robust_kernel = false;
 
-    void generate_initial_surface(const std::vector<Eigen::Vector3d> &point_cloud);
+    void generate_initial_surface(const std::vector<Eigen::Vector3d>& point_cloud);
     void render();
-    void align_surface_to_ground_points(const std::vector<Eigen::Vector3d> &point_cloud);
-    bool find_nearest_neighbour(Eigen::Vector3d &p_t, Eigen::Affine3d vertex, const std::vector<Eigen::Vector3d> &reference_points);
-    std::vector<int> get_filtered_indexes(const std::vector<Eigen::Vector3d> &pc, const std::vector<int> &lowest_points_indexes, Eigen::Vector2d bucket_dim_xy);
-    std::vector<Eigen::Vector3d> get_points_without_surface(const std::vector<Eigen::Vector3d> &points, double distance_to_ground_threshold_bottom,
-                                                            double distance_to_ground_threshold_up, Eigen::Vector2d bucket_dim_xy);
+    void align_surface_to_ground_points(const std::vector<Eigen::Vector3d>& point_cloud);
+    bool find_nearest_neighbour(Eigen::Vector3d& p_t, Eigen::Affine3d vertex, const std::vector<Eigen::Vector3d>& reference_points);
+    std::vector<int> get_filtered_indexes(
+        const std::vector<Eigen::Vector3d>& pc, const std::vector<int>& lowest_points_indexes, Eigen::Vector2d bucket_dim_xy);
+    std::vector<Eigen::Vector3d> get_points_without_surface(
+        const std::vector<Eigen::Vector3d>& points,
+        double distance_to_ground_threshold_bottom,
+        double distance_to_ground_threshold_up,
+        Eigen::Vector2d bucket_dim_xy);
 };
-
-#endif

@@ -1,11 +1,11 @@
+#include <Eigen/Dense>
+#include <HDMapping/Version.hpp>
+#include <export_laz.h>
+#include <filesystem>
+#include <iostream>
+#include <laszip/laszip_api.h>
 #include <string>
 #include <vector>
-#include <laszip/laszip_api.h>
-#include <Eigen/Dense>
-#include <iostream>
-#include <filesystem>
-#include <export_laz.h>
-#include <HDMapping/Version.hpp>
 
 struct Point3Dis
 {
@@ -22,7 +22,7 @@ struct Point3Dil
     int livoxId;
 };
 
-std::vector<Point3Dil> load_point_cloud(const std::string &lazFile, bool ommit_points_with_timestamp_equals_zero)
+std::vector<Point3Dil> load_point_cloud(const std::string& lazFile, bool ommit_points_with_timestamp_equals_zero)
 {
     std::vector<Point3Dil> points;
     laszip_POINTER laszip_reader;
@@ -39,7 +39,7 @@ std::vector<Point3Dil> load_point_cloud(const std::string &lazFile, bool ommit_p
         std::abort();
     }
     std::cout << "compressed : " << is_compressed << std::endl;
-    laszip_header *header;
+    laszip_header* header;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
@@ -47,7 +47,7 @@ std::vector<Point3Dil> load_point_cloud(const std::string &lazFile, bool ommit_p
         std::abort();
     }
     fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
-    laszip_point *point;
+    laszip_point* point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
         fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
@@ -67,7 +67,10 @@ std::vector<Point3Dil> load_point_cloud(const std::string &lazFile, bool ommit_p
         }
         Point3Dil p;
 
-        Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
+        Eigen::Vector3d pf(
+            header->x_offset + header->x_scale_factor * static_cast<double>(point->X),
+            header->y_offset + header->y_scale_factor * static_cast<double>(point->Y),
+            header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
         p.point.x() = pf.x();
         p.point.y() = pf.y();
         p.point.z() = pf.z();
@@ -92,7 +95,7 @@ std::vector<Point3Dil> load_point_cloud(const std::string &lazFile, bool ommit_p
     return points;
 }
 
-std::unordered_map<int, std::string> GetIdToStringMapping(const std::string &filename)
+std::unordered_map<int, std::string> GetIdToStringMapping(const std::string& filename)
 {
     std::unordered_map<int, std::string> dataMap;
     std::ifstream fst(filename);
@@ -115,7 +118,7 @@ std::unordered_map<int, std::string> GetIdToStringMapping(const std::string &fil
     return dataMap;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     std::cout << "Version " HDMAPPING_VERSION_STRING << std::endl;
     std::vector<std::string> arguments;
@@ -129,9 +132,9 @@ int main(int argc, char *argv[])
         std::cout << " " << argv[0] << " <input_file_from_mandeye> <output>\n";
         return 0;
     }
-    const std::filesystem::path inputLazFile{arguments[0]};
+    const std::filesystem::path inputLazFile{ arguments[0] };
     const std::filesystem::path inputSnFile = inputLazFile.parent_path() / inputLazFile.stem().concat(".sn");
-    const std::filesystem::path outputFile{arguments[1]};
+    const std::filesystem::path outputFile{ arguments[1] };
     std::cout << "Input Laz file " << inputLazFile << std::endl;
     std::cout << "Input Sn file " << inputSnFile << std::endl;
 
@@ -150,7 +153,7 @@ int main(int argc, char *argv[])
 
     std::unordered_map<int, std::vector<Point3Dis>> data_separated;
 
-    for (const auto &pInput : data)
+    for (const auto& pInput : data)
     {
         const int id = pInput.livoxId;
 
@@ -161,14 +164,14 @@ int main(int argc, char *argv[])
         data_separated[id].push_back(pOutput);
     }
 
-    for (const auto &[id, sn] : mapping)
+    for (const auto& [id, sn] : mapping)
     {
         const std::filesystem::path outputFileSn = outputFile.parent_path() / outputFile.stem().concat("_" + sn + ".laz");
-        const auto &lidarData = data_separated[id];
+        const auto& lidarData = data_separated[id];
         std::vector<Eigen::Vector3d> global_pointcloud;
-        std::vector<unsigned short> intensity; 
+        std::vector<unsigned short> intensity;
         std::vector<double> timestamps;
-        for (const auto &p : lidarData)
+        for (const auto& p : lidarData)
         {
             global_pointcloud.push_back(p.point);
             intensity.push_back(p.intensity);

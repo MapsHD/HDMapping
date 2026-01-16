@@ -1,5 +1,4 @@
-#ifndef _LOCAL_SHAPE_FEATURES_H_
-#define _LOCAL_SHAPE_FEATURES_H_
+#pragma once
 
 #include <Eigen/Eigen>
 #include <vector>
@@ -24,16 +23,15 @@ public:
         double verticality;
     };
 
-    struct Params{
-        Eigen::Vector3d search_radious = {0.5, 0.5, 0.5};
+    struct Params
+    {
+        Eigen::Vector3d search_radious = { 0.5, 0.5, 0.5 };
         double radious = 0.5;
         bool multithread = true;
     };
 
-    LocalShapeFeatures(){;};
-    ~LocalShapeFeatures(){;};
+    LocalShapeFeatures() = default;
+    ~LocalShapeFeatures() = default;
 
-    bool calculate_local_shape_features(std::vector<PointWithLocalShapeFeatures> &points, const Params &params);
+    bool calculate_local_shape_features(std::vector<PointWithLocalShapeFeatures>& points, const Params& params);
 };
-
-#endif

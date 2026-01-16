@@ -1,11 +1,15 @@
+// clang-format off
+#include <GL/glew.h>
+#include <GL/freeglut.h>
+// clang-format on
+
 #include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
-#include <ImGuizmo.h>
 #include <imgui_internal.h>
 
-#include <GL/glew.h>
-#include <GL/freeglut.h>
+#include <ImGuizmo.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -15,8 +19,8 @@
 
 #include "pfd_wrapper.hpp"
 
-#include <filesystem>
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
+#include <filesystem>
 
 #include <HDMapping/Version.hpp>
 
@@ -55,18 +59,12 @@ float translate_z = -50.0;
 float rotate_x = 0.0, rotate_y = 0.0;
 int mouse_old_x, mouse_old_y;
 int mouse_buttons = 0;
-bool gui_mouse_down{false};
+bool gui_mouse_down{ false };
 float mouse_sensitivity = 1.0;
 
-float m_ortho_projection[] = {1, 0, 0, 0,
-                              0, 1, 0, 0,
-                              0, 0, 1, 0,
-                              0, 0, 0, 1};
+float m_ortho_projection[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
-float m_ortho_gizmo_view[] = {1, 0, 0, 0,
-                              0, 1, 0, 0,
-                              0, 0, 1, 0,
-                              0, 0, 0, 1};
+float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 bool show_pc = true;
 bool show_single_point_and_ray = false;
@@ -115,12 +113,16 @@ void reshape(int w, int h)
     }
     else
     {
-        ImGuiIO &io = ImGui::GetIO();
+        ImGuiIO& io = ImGui::GetIO();
         float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+        glOrtho(
+            -camera_ortho_xy_view_zoom,
+            camera_ortho_xy_view_zoom,
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio,
+            -100000,
+            100000);
         // glOrtho(-translate_z, translate_z, -translate_z * (float)h / float(w), translate_z * float(h) / float(w), -10000, 10000);
     }
     glMatrixMode(GL_MODELVIEW);
@@ -129,7 +131,7 @@ void reshape(int w, int h)
 
 void motion(int x, int y)
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     io.MousePos = ImVec2((float)x, (float)y);
 
     if (!io.WantCaptureMouse)
@@ -143,8 +145,10 @@ void motion(int x, int y)
             if (mouse_buttons & 1)
             {
                 float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-                Eigen::Vector3d v(dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
-                                  dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio), 0);
+                Eigen::Vector3d v(
+                    dx * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.x * 2),
+                    dy * (camera_ortho_xy_view_zoom / (GLsizei)io.DisplaySize.y * 2 / ratio),
+                    0);
                 TaitBryanPose pose_tb;
                 pose_tb.px = 0.0;
                 pose_tb.py = 0.0;
@@ -179,7 +183,7 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
-std::vector<Point3Di> load_pc(const std::string &lazFile)
+std::vector<Point3Di> load_pc(const std::string& lazFile)
 {
     std::vector<Point3Di> points;
     laszip_POINTER laszip_reader;
@@ -196,7 +200,7 @@ std::vector<Point3Di> load_pc(const std::string &lazFile)
         std::abort();
     }
     std::cout << "compressed : " << is_compressed << std::endl;
-    laszip_header *header;
+    laszip_header* header;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
@@ -204,7 +208,7 @@ std::vector<Point3Di> load_pc(const std::string &lazFile)
         std::abort();
     }
     fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
-    laszip_point *point;
+    laszip_point* point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
         fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
@@ -218,7 +222,6 @@ std::vector<Point3Di> load_pc(const std::string &lazFile)
 
     for (laszip_U32 j = 0; j < header->number_of_point_records; j++)
     {
-
         if (laszip_read_point(laszip_reader))
         {
             fprintf(stderr, "DLL ERROR: reading point %u\n", j);
@@ -231,7 +234,10 @@ std::vector<Point3Di> load_pc(const std::string &lazFile)
         int id = point->user_data;
 
         // Eigen::Affine3d calibration = calibrations.empty() ? Eigen::Affine3d::Identity() : calibrations.at(id);
-        const Eigen::Vector3d pf(header->x_offset + header->x_scale_factor * static_cast<double>(point->X), header->y_offset + header->y_scale_factor * static_cast<double>(point->Y), header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
+        const Eigen::Vector3d pf(
+            header->x_offset + header->x_scale_factor * static_cast<double>(point->X),
+            header->y_offset + header->y_scale_factor * static_cast<double>(point->Y),
+            header->z_offset + header->z_scale_factor * static_cast<double>(point->Z));
 
         p.point = pf;
         p.lidarid = id;
@@ -250,11 +256,11 @@ void project_gui()
 {
     if (ImGui::Begin("main gui window"))
     {
-        ImGui::ColorEdit3("clear color", (float *)&clear_color);
+        ImGui::ColorEdit3("clear color", (float*)&clear_color);
 
         if (show_pc)
         {
-            ImGui::ColorEdit3("pc_color", (float *)&pc_color);
+            ImGui::ColorEdit3("pc_color", (float*)&pc_color);
         }
 
         if (ImGui::Button("Load pointcloud (lidar****.laz) (step 1)"))
@@ -268,7 +274,7 @@ void project_gui()
                 {
                     auto pc = load_pc(input_file_names[i].c_str());
 
-                    for (const auto &p : pc)
+                    for (const auto& p : pc)
                     {
                         point_cloud.emplace_back(p);
                     }
@@ -287,8 +293,8 @@ void project_gui()
 
         if (show_single_point_and_ray)
         {
-            ImGui::ColorEdit3("pc_color_point", (float *)&pc_color_point);
-            ImGui::ColorEdit3("pc_color_ray", (float *)&pc_color_ray);
+            ImGui::ColorEdit3("pc_color_point", (float*)&pc_color_point);
+            ImGui::ColorEdit3("pc_color_ray", (float*)&pc_color_ray);
 
             ImGui::InputInt("single_point_size", &single_point_size);
             if (single_point_size < 1)
@@ -312,8 +318,8 @@ void project_gui()
             intrinsic_path.push_back(intrinsics[index_rendered_point_and_ray].translation());
         }
 
-        ImGui::ColorEdit3("pc_color_point_cloud_path", (float *)&pc_color_point_cloud_path);
-        ImGui::ColorEdit3("intrinsic_path_color", (float *)&intrinsic_path_color);
+        ImGui::ColorEdit3("pc_color_point_cloud_path", (float*)&pc_color_point_cloud_path);
+        ImGui::ColorEdit3("intrinsic_path_color", (float*)&intrinsic_path_color);
 
         if (ImGui::Button("clear point_cloud_path and intrinsic path"))
         {
@@ -329,11 +335,11 @@ void project_gui()
         }
         if (ImGui::Button("calibrate_intrinsics x 10"))
         {
-            for(int i = 0; i < 10; i++){
-                std::cout << "iteration: " << i + 1 << " of 10" << std::endl; 
+            for (int i = 0; i < 10; i++)
+            {
+                std::cout << "iteration: " << i + 1 << " of 10" << std::endl;
                 calibrate_intrinsics();
             }
-            
         }
         if (ImGui::Button("calibrate_intrinsics x 100"))
         {
@@ -344,7 +350,7 @@ void project_gui()
             }
         }
 
-        ImGui::ColorEdit3("intrinsics_color", (float *)&intrinsics_color);
+        ImGui::ColorEdit3("intrinsics_color", (float*)&intrinsics_color);
 
         ImGui::Checkbox("show_intrinsics", &show_intrinsics);
         ImGui::Checkbox("apply_intrinsics_in_render", &apply_intrinsics_in_render);
@@ -381,7 +387,8 @@ void project_gui()
         {
             point_intrinsic_correspondances.clear();
 
-            Eigen::Vector3d current_point = intrinsics[point_cloud[index_rendered_point_and_ray].index_pose] * point_cloud[index_rendered_point_and_ray].point;
+            Eigen::Vector3d current_point =
+                intrinsics[point_cloud[index_rendered_point_and_ray].index_pose] * point_cloud[index_rendered_point_and_ray].point;
 
             for (int i = 0; i < point_cloud.size(); i++)
             {
@@ -894,7 +901,7 @@ void project_gui()
 
 void display()
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -902,13 +909,21 @@ void display()
 
     if (is_ortho)
     {
-        glOrtho(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                -camera_ortho_xy_view_zoom / ratio,
-                camera_ortho_xy_view_zoom / ratio, -100000, 100000);
+        glOrtho(
+            -camera_ortho_xy_view_zoom,
+            camera_ortho_xy_view_zoom,
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio,
+            -100000,
+            100000);
 
-        glm::mat4 proj = glm::orthoLH_ZO<float>(-camera_ortho_xy_view_zoom, camera_ortho_xy_view_zoom,
-                                                -camera_ortho_xy_view_zoom / ratio,
-                                                camera_ortho_xy_view_zoom / ratio, -100, 100);
+        glm::mat4 proj = glm::orthoLH_ZO<float>(
+            -camera_ortho_xy_view_zoom,
+            camera_ortho_xy_view_zoom,
+            -camera_ortho_xy_view_zoom / ratio,
+            camera_ortho_xy_view_zoom / ratio,
+            -100,
+            100);
 
         std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
 
@@ -927,12 +942,11 @@ void display()
 
         Eigen::Vector3d v_t = m * v;
 
-        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(),
-                  v_center_t.x(), v_center_t.y(), v_center_t.z(),
-                  v_t.x(), v_t.y(), v_t.z());
-        glm::mat4 lookat = glm::lookAt(glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
-                                       glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
-                                       glm::vec3(v_t.x(), v_t.y(), v_t.z()));
+        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(), v_center_t.x(), v_center_t.y(), v_center_t.z(), v_t.x(), v_t.y(), v_t.z());
+        glm::mat4 lookat = glm::lookAt(
+            glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
+            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
+            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
         std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
     }
 
@@ -1031,14 +1045,23 @@ void display()
         glPointSize(single_point_size);
         glColor3f(pc_color_point.x, pc_color_point.y, pc_color_point.z);
         glBegin(GL_POINTS);
-        glVertex3f(point_cloud[index_rendered_point_and_ray].point.x(), point_cloud[index_rendered_point_and_ray].point.y(), point_cloud[index_rendered_point_and_ray].point.z());
+        glVertex3f(
+            point_cloud[index_rendered_point_and_ray].point.x(),
+            point_cloud[index_rendered_point_and_ray].point.y(),
+            point_cloud[index_rendered_point_and_ray].point.z());
         glEnd();
         glPointSize(1);
 
         glColor3f(pc_color_ray.x, pc_color_ray.y, pc_color_ray.z);
         glBegin(GL_LINES);
-        glVertex3f(intrinsics[index_rendered_point_and_ray](0, 3), intrinsics[index_rendered_point_and_ray](1, 3), intrinsics[index_rendered_point_and_ray](2, 3));
-        glVertex3f(point_cloud[index_rendered_point_and_ray].point.x(), point_cloud[index_rendered_point_and_ray].point.y(), point_cloud[index_rendered_point_and_ray].point.z());
+        glVertex3f(
+            intrinsics[index_rendered_point_and_ray](0, 3),
+            intrinsics[index_rendered_point_and_ray](1, 3),
+            intrinsics[index_rendered_point_and_ray](2, 3));
+        glVertex3f(
+            point_cloud[index_rendered_point_and_ray].point.x(),
+            point_cloud[index_rendered_point_and_ray].point.y(),
+            point_cloud[index_rendered_point_and_ray].point.z());
         glEnd();
     }
 
@@ -1110,7 +1133,7 @@ void display()
 
     glColor3f(0, 0, 0);
     glBegin(GL_LINES);
-    for (const auto &p : point_intrinsic_correspondances)
+    for (const auto& p : point_intrinsic_correspondances)
     {
         glVertex3f(p.first.x(), p.first.y(), p.first.z());
         glVertex3f(p.second.x(), p.second.y(), p.second.z());
@@ -1238,7 +1261,7 @@ void display()
 #endif
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
-	ImGui::NewFrame();
+    ImGui::NewFrame();
 
     project_gui();
 
@@ -1249,7 +1272,7 @@ void display()
     glutPostRedisplay();
 }
 
-bool initGL(int *argc, char **argv)
+bool initGL(int* argc, char** argv)
 {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
@@ -1271,7 +1294,7 @@ bool initGL(int *argc, char **argv)
     gluPerspective(60.0, (GLfloat)window_width / (GLfloat)window_height, 0.01, 10000.0);
     glutReshapeFunc(reshape);
     ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     (void)io;
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
@@ -1286,7 +1309,7 @@ void wheel(int button, int dir, int x, int y);
 
 void mouse(int glut_button, int state, int x, int y)
 {
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     io.MousePos = ImVec2((float)x, (float)y);
     int button = -1;
     if (glut_button == GLUT_LEFT_BUTTON)
@@ -1301,8 +1324,7 @@ void mouse(int glut_button, int state, int x, int y)
         io.MouseDown[button] = false;
 
     static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
-    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) &&
-        glutMajorVersion < 3)
+    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) && glutMajorVersion < 3)
     {
         wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
     }
@@ -1359,7 +1381,7 @@ void wheel(int button, int dir, int x, int y)
     return;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     // params.decimation = 0.03;
 
@@ -1382,8 +1404,7 @@ void calibrate_intrinsics()
 {
     bool multithread = false;
 
-    std::cout
-        << "calibrate_intrinsics" << std::endl;
+    std::cout << "calibrate_intrinsics" << std::endl;
 
     // step 1 build rgd
     std::cout << "build rgd" << std::endl;
@@ -1410,7 +1431,7 @@ void calibrate_intrinsics()
 
     NDTBucketMapType buckets;
 
-    update_rgd(rgd_params, buckets, point_cloud_global, {0, 0, 0});
+    update_rgd(rgd_params, buckets, point_cloud_global, { 0, 0, 0 });
 
     std::cout << "buckets.size(): " << buckets.size() << std::endl;
 
@@ -1428,7 +1449,7 @@ void calibrate_intrinsics()
     // std::vector<std::mutex> mutexes(intrinsics.size());
 
     // std::cout << "jojo" << std::endl;
-    const auto hessian_fun = [&](const Point3Di &intermediate_points_i)
+    const auto hessian_fun = [&](const Point3Di& intermediate_points_i)
     {
         int ir = tripletListB.size();
         double delta_x;
@@ -1447,20 +1468,32 @@ void calibrate_intrinsics()
         {
             return;
         }
-        auto &this_bucket = bucket_it->second;
+        auto& this_bucket = bucket_it->second;
 
         Eigen::Vector3d mean(this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
 
         Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
         TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
 
-        point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                                                      pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                      point_local.x(), point_local.y(), point_local.z(), mean.x(), mean.y(), mean.z());
+        point_to_point_source_to_target_tait_bryan_wc(
+            delta_x,
+            delta_y,
+            delta_z,
+            pose_s.px,
+            pose_s.py,
+            pose_s.pz,
+            pose_s.om,
+            pose_s.fi,
+            pose_s.ka,
+            point_local.x(),
+            point_local.y(),
+            point_local.z(),
+            mean.x(),
+            mean.y(),
+            mean.z());
 
-        point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian,
-                                                               pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                               point_local.x(), point_local.y(), point_local.z());
+        point_to_point_source_to_target_tait_bryan_wc_jacobian(
+            jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, point_local.x(), point_local.y(), point_local.z());
 
         int c = intermediate_points_i.index_pose * 6;
         for (int row = 0; row < 3; row++)
@@ -1545,19 +1578,20 @@ void calibrate_intrinsics()
             0);
 
         Eigen::Matrix<double, 6, 12, Eigen::RowMajor> jacobian;
-        relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(jacobian,
-                                                          poses[odo_edges[i].first].px,
-                                                          poses[odo_edges[i].first].py,
-                                                          poses[odo_edges[i].first].pz,
-                                                          poses[odo_edges[i].first].om,
-                                                          poses[odo_edges[i].first].fi,
-                                                          poses[odo_edges[i].first].ka,
-                                                          poses[odo_edges[i].second].px,
-                                                          poses[odo_edges[i].second].py,
-                                                          poses[odo_edges[i].second].pz,
-                                                          poses[odo_edges[i].second].om,
-                                                          poses[odo_edges[i].second].fi,
-                                                          poses[odo_edges[i].second].ka);
+        relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(
+            jacobian,
+            poses[odo_edges[i].first].px,
+            poses[odo_edges[i].first].py,
+            poses[odo_edges[i].first].pz,
+            poses[odo_edges[i].first].om,
+            poses[odo_edges[i].first].fi,
+            poses[odo_edges[i].first].ka,
+            poses[odo_edges[i].second].px,
+            poses[odo_edges[i].second].py,
+            poses[odo_edges[i].second].pz,
+            poses[odo_edges[i].second].om,
+            poses[odo_edges[i].second].fi,
+            poses[odo_edges[i].second].ka);
 
         int ir = tripletListB.size();
 
@@ -1627,19 +1661,20 @@ void calibrate_intrinsics()
             0);
 
         Eigen::Matrix<double, 6, 12, Eigen::RowMajor> jacobian;
-        relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(jacobian,
-                                                          poses[odo_edges_to_0[i].first].px,
-                                                          poses[odo_edges_to_0[i].first].py,
-                                                          poses[odo_edges_to_0[i].first].pz,
-                                                          poses[odo_edges_to_0[i].first].om,
-                                                          poses[odo_edges_to_0[i].first].fi,
-                                                          poses[odo_edges_to_0[i].first].ka,
-                                                          poses[odo_edges_to_0[i].second].px,
-                                                          poses[odo_edges_to_0[i].second].py,
-                                                          poses[odo_edges_to_0[i].second].pz,
-                                                          poses[odo_edges_to_0[i].second].om,
-                                                          poses[odo_edges_to_0[i].second].fi,
-                                                          poses[odo_edges_to_0[i].second].ka);
+        relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(
+            jacobian,
+            poses[odo_edges_to_0[i].first].px,
+            poses[odo_edges_to_0[i].first].py,
+            poses[odo_edges_to_0[i].first].pz,
+            poses[odo_edges_to_0[i].first].om,
+            poses[odo_edges_to_0[i].first].fi,
+            poses[odo_edges_to_0[i].first].ka,
+            poses[odo_edges_to_0[i].second].px,
+            poses[odo_edges_to_0[i].second].py,
+            poses[odo_edges_to_0[i].second].pz,
+            poses[odo_edges_to_0[i].second].om,
+            poses[odo_edges_to_0[i].second].fi,
+            poses[odo_edges_to_0[i].second].ka);
 
         int ir = tripletListB.size();
 
@@ -1730,8 +1765,7 @@ void calibrate_intrinsics()
     // AtPA_I *= 1;
     // AtPA += AtPA_I;
 
-    Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>>
-        solver(AtPA);
+    Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
     std::cout << "start solving" << std::endl;
     Eigen::SparseMatrix<double> x = solver.solve(AtPB);
     std::cout << "start finished" << std::endl;

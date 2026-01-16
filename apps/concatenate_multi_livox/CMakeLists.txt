@@ -9,18 +9,18 @@ target_include_directories(
   PRIVATE include
           ${REPOSITORY_DIRECTORY}/core/include
           ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
-          ${EXTERNAL_LIBRARIES_DIRECTORY}
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/glm
+          ${THIRDPARTY_DIRECTORY}
+          ${THIRDPARTY_DIRECTORY}/glm
           ${EIGEN3_INCLUDE_DIR}
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui/backends
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/ImGuizmo
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/json/include
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/portable-file-dialogs-master
+          ${THIRDPARTY_DIRECTORY}/imgui
+          ${THIRDPARTY_DIRECTORY}/imgui/backends
+          ${THIRDPARTY_DIRECTORY}/ImGuizmo
+          ${THIRDPARTY_DIRECTORY}/json/include
+          ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
           ${LASZIP_INCLUDE_DIR}/LASzip/include
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/glew-cmake/include
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/observation_equations/codes
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/Fusion/Fusion
+          ${THIRDPARTY_DIRECTORY}/glew-cmake/include
+          ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+          ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
           ${FREEGLUT_INCLUDE_DIR})
 
 target_link_libraries(concatenate_multi_livox PRIVATE core ${PLATFORM_LASZIP_LIB}

@@ -1,6 +1,6 @@
 include_guard()
 
-set(IMGUI_LIBRARY_DIRECTORY ${EXTERNAL_LIBRARIES_DIRECTORY}/imgui)
+set(IMGUI_LIBRARY_DIRECTORY ${THIRDPARTY_DIRECTORY}/imgui)
 set(IMGUI_LIBRARY_BACKEND_DIRECTORY ${IMGUI_LIBRARY_DIRECTORY}/backends)
 
 set(IMGUI_SOURCE_FILES
@@ -22,4 +22,4 @@ add_definitions(-DImDrawIdx=unsigned\ int)
 add_library(imgui STATIC ${IMGUI_FILES})
 target_include_directories(
     imgui PRIVATE ${IMGUI_LIBRARY_DIRECTORY} ${IMGUI_LIBRARY_BACKEND_DIRECTORY}
-    ${EXTERNAL_LIBRARIES_DIRECTORY}/freeglut/include)
+    ${THIRDPARTY_DIRECTORY}/freeglut/include)

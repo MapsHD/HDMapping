@@ -1,9 +1,9 @@
-#include <local_shape_features.h>
-#include <hash_utils.h>
-#include <iostream>
-#include <execution>
+#include <pch/pch.h>
 
-bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLocalShapeFeatures> &points, const Params &params)
+#include <hash_utils.h>
+#include <local_shape_features.h>
+
+bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLocalShapeFeatures>& points, const Params& params)
 {
     std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
 
@@ -13,9 +13,13 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
         indexes.emplace_back(index, i);
     }
 
-    std::sort(indexes.begin(), indexes.end(),
-              [](const std::pair<unsigned long long int, unsigned int> &a, const std::pair<unsigned long long int, unsigned int> &b)
-              { return a.first < b.first; });
+    std::sort(
+        indexes.begin(),
+        indexes.end(),
+        [](const std::pair<unsigned long long int, unsigned int>& a, const std::pair<unsigned long long int, unsigned int>& b)
+        {
+            return a.first < b.first;
+        });
 
     std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
 
@@ -33,9 +37,9 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
         }
     }
 
-    const auto hessian_fun = [&](const std::pair<unsigned long long int, unsigned int> &index)
+    const auto hessian_fun = [&](const std::pair<unsigned long long int, unsigned int>& index)
     {
-        int index_element_source = index.second; 
+        int index_element_source = index.second;
         Eigen::Vector3d source = points[index_element_source].coordinates_global;
         Eigen::Vector3d mean(0.0, 0.0, 0.0);
         Eigen::Matrix3d cov;
@@ -48,7 +52,6 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
             {
                 for (double z = -params.search_radious.z(); z <= params.search_radious.z(); z += params.search_radious.z())
                 {
-
                     Eigen::Vector3d position_global = source + Eigen::Vector3d(x, y, z);
                     unsigned long long int index_of_bucket = get_rgd_index(position_global, params.search_radious);
 
@@ -70,7 +73,7 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
                 }
             }
         }
-  
+
         if (number_of_points_nn >= 3)
         {
             points[index_element_source].valid = true;
@@ -96,7 +99,10 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
             points[index_element_source].eigen_values = eigen_solver.eigenvalues();
             points[index_element_source].eigen_vectors = eigen_solver.eigenvectors();
 
-            points[index_element_source].normal_vector = Eigen::Vector3d(points[index_element_source].eigen_vectors(0, 0), points[index_element_source].eigen_vectors(1, 0), points[index_element_source].eigen_vectors(2, 0));
+            points[index_element_source].normal_vector = Eigen::Vector3d(
+                points[index_element_source].eigen_vectors(0, 0),
+                points[index_element_source].eigen_vectors(1, 0),
+                points[index_element_source].eigen_vectors(2, 0));
 
             double ev1 = points[index_element_source].eigen_values.x();
             double ev2 = points[index_element_source].eigen_values.y();
@@ -114,8 +120,7 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
 
             points[index_element_source].eigen_entropy = -ev1 * log(ev1) - ev2 * log(ev2) - ev3 * log(ev3);
 
-            points[index_element_source]
-                .verticality = 1.0 - fabs(points[index_element_source].normal_vector.z());
+            points[index_element_source].verticality = 1.0 - fabs(points[index_element_source].normal_vector.z());
         }
         else
         {

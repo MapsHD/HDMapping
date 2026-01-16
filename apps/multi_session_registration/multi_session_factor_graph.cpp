@@ -1,19 +1,20 @@
 #include "multi_session_factor_graph.h"
 #include <utils.hpp>
 
-#include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
-#include <python-scripts/constraints/relative_pose_tait_bryan_cw_jacobian.h>
-#include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
-#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 #include <m_estimators.h>
-#include <python-scripts/point-to-feature-metrics/point_to_plane_tait_bryan_wc_jacobian.h>
 
-bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
+#include <python-scripts/constraints/relative_pose_tait_bryan_cw_jacobian.h>
+#include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
+#include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
+#include <python-scripts/point-to-feature-metrics/point_to_plane_tait_bryan_wc_jacobian.h>
+#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
+
+bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
 {
-    for (auto &session : sessions)
+    for (auto& session : sessions)
     {
         // std::cout << session.point_clouds_container.point_clouds.size() << std::endl;
-        for (auto &pc : session.point_clouds_container.point_clouds)
+        for (auto& pc : session.point_clouds_container.point_clouds)
             pc.m_pose_temp = pc.m_pose;
     }
 
@@ -174,19 +175,20 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                     normalize_angle(all_edges[i].relative_pose_tb.om),
                     normalize_angle(all_edges[i].relative_pose_tb.fi),
                     normalize_angle(all_edges[i].relative_pose_tb.ka));
-                relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(jacobian,
-                                                                  poses[all_edges[i].index_from].px,
-                                                                  poses[all_edges[i].index_from].py,
-                                                                  poses[all_edges[i].index_from].pz,
-                                                                  normalize_angle(poses[all_edges[i].index_from].om),
-                                                                  normalize_angle(poses[all_edges[i].index_from].fi),
-                                                                  normalize_angle(poses[all_edges[i].index_from].ka),
-                                                                  poses[all_edges[i].index_to].px,
-                                                                  poses[all_edges[i].index_to].py,
-                                                                  poses[all_edges[i].index_to].pz,
-                                                                  normalize_angle(poses[all_edges[i].index_to].om),
-                                                                  normalize_angle(poses[all_edges[i].index_to].fi),
-                                                                  normalize_angle(poses[all_edges[i].index_to].ka));
+                relative_pose_obs_eq_tait_bryan_wc_case1_jacobian(
+                    jacobian,
+                    poses[all_edges[i].index_from].px,
+                    poses[all_edges[i].index_from].py,
+                    poses[all_edges[i].index_from].pz,
+                    normalize_angle(poses[all_edges[i].index_from].om),
+                    normalize_angle(poses[all_edges[i].index_from].fi),
+                    normalize_angle(poses[all_edges[i].index_from].ka),
+                    poses[all_edges[i].index_to].px,
+                    poses[all_edges[i].index_to].py,
+                    poses[all_edges[i].index_to].pz,
+                    normalize_angle(poses[all_edges[i].index_to].om),
+                    normalize_angle(poses[all_edges[i].index_to].fi),
+                    normalize_angle(poses[all_edges[i].index_to].ka));
             }
             else if (is_cw)
             {
@@ -210,19 +212,20 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                     normalize_angle(all_edges[i].relative_pose_tb.om),
                     normalize_angle(all_edges[i].relative_pose_tb.fi),
                     normalize_angle(all_edges[i].relative_pose_tb.ka));
-                relative_pose_obs_eq_tait_bryan_cw_case1_jacobian(jacobian,
-                                                                  poses[all_edges[i].index_from].px,
-                                                                  poses[all_edges[i].index_from].py,
-                                                                  poses[all_edges[i].index_from].pz,
-                                                                  normalize_angle(poses[all_edges[i].index_from].om),
-                                                                  normalize_angle(poses[all_edges[i].index_from].fi),
-                                                                  normalize_angle(poses[all_edges[i].index_from].ka),
-                                                                  poses[all_edges[i].index_to].px,
-                                                                  poses[all_edges[i].index_to].py,
-                                                                  poses[all_edges[i].index_to].pz,
-                                                                  normalize_angle(poses[all_edges[i].index_to].om),
-                                                                  normalize_angle(poses[all_edges[i].index_to].fi),
-                                                                  normalize_angle(poses[all_edges[i].index_to].ka));
+                relative_pose_obs_eq_tait_bryan_cw_case1_jacobian(
+                    jacobian,
+                    poses[all_edges[i].index_from].px,
+                    poses[all_edges[i].index_from].py,
+                    poses[all_edges[i].index_from].pz,
+                    normalize_angle(poses[all_edges[i].index_from].om),
+                    normalize_angle(poses[all_edges[i].index_from].fi),
+                    normalize_angle(poses[all_edges[i].index_from].ka),
+                    poses[all_edges[i].index_to].px,
+                    poses[all_edges[i].index_to].py,
+                    poses[all_edges[i].index_to].pz,
+                    normalize_angle(poses[all_edges[i].index_to].om),
+                    normalize_angle(poses[all_edges[i].index_to].fi),
+                    normalize_angle(poses[all_edges[i].index_to].ka));
             }
 
             int ir = tripletListB.size();
@@ -408,16 +411,15 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                         TaitBryanPose pose_s;
                         pose_s = pose_tait_bryan_from_affine_matrix(m_poses[index_pose]);
                         Eigen::Vector3d p_s = pc.local_trajectory[index].m_pose.translation();
-                        point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                               p_s.x(), p_s.y(), p_s.z());
+                        point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om,
+        pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z());
 
                         double delta_x;
                         double delta_y;
                         double delta_z;
-                        Eigen::Vector3d p_t(gnss.gnss_poses[i].x - gnss.offset_x, gnss.gnss_poses[i].y - gnss.offset_y, gnss.gnss_poses[i].alt - gnss.offset_alt);
-                        point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                                                                      pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                      p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+                        Eigen::Vector3d p_t(gnss.gnss_poses[i].x - gnss.offset_x, gnss.gnss_poses[i].y - gnss.offset_y,
+        gnss.gnss_poses[i].alt - gnss.offset_alt); point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z, pose_s.px,
+        pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
 
                         std::cout << " delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
 
@@ -441,7 +443,8 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                         tripletListB.emplace_back(ir + 1, 0, delta_y);
                         tripletListB.emplace_back(ir + 2, 0, delta_z);
 
-                        // jacobian3x6 = get_point_to_point_jacobian_tait_bryan(pose_convention, point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
+                        // jacobian3x6 = get_point_to_point_jacobian_tait_bryan(pose_convention,
+        point_clouds_container.point_clouds[i].m_pose, p_s, p_t);
 
                         // auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
                         // glVertex3f(m(0, 3), m(1, 3), m(2, 3));
@@ -456,20 +459,41 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
         {
             for (size_t jj = 0; jj < sessions[j].ground_control_points.gpcs.size(); jj++)
             {
-                Eigen::Vector3d p_s = sessions[j].point_clouds_container.point_clouds[sessions[j].ground_control_points.gpcs[jj].index_to_node_inner].local_trajectory[sessions[j].ground_control_points.gpcs[jj].index_to_node_outer].m_pose.translation();
+                Eigen::Vector3d p_s =
+                    sessions[j]
+                        .point_clouds_container.point_clouds[sessions[j].ground_control_points.gpcs[jj].index_to_node_inner]
+                        .local_trajectory[sessions[j].ground_control_points.gpcs[jj].index_to_node_outer]
+                        .m_pose.translation();
                 Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
                 TaitBryanPose pose_s;
-                pose_s = pose_tait_bryan_from_affine_matrix(sessions[j].point_clouds_container.point_clouds[sessions[j].ground_control_points.gpcs[jj].index_to_node_inner].m_pose);
-                point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                       p_s.x(), p_s.y(), p_s.z());
+                pose_s = pose_tait_bryan_from_affine_matrix(
+                    sessions[j].point_clouds_container.point_clouds[sessions[j].ground_control_points.gpcs[jj].index_to_node_inner].m_pose);
+                point_to_point_source_to_target_tait_bryan_wc_jacobian(
+                    jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z());
 
                 double delta_x;
                 double delta_y;
                 double delta_z;
-                Eigen::Vector3d p_t(sessions[j].ground_control_points.gpcs[jj].x, sessions[j].ground_control_points.gpcs[jj].y, sessions[j].ground_control_points.gpcs[jj].z + sessions[j].ground_control_points.gpcs[jj].lidar_height_above_ground);
-                point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                                                              pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                              p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+                Eigen::Vector3d p_t(
+                    sessions[j].ground_control_points.gpcs[jj].x,
+                    sessions[j].ground_control_points.gpcs[jj].y,
+                    sessions[j].ground_control_points.gpcs[jj].z + sessions[j].ground_control_points.gpcs[jj].lidar_height_above_ground);
+                point_to_point_source_to_target_tait_bryan_wc(
+                    delta_x,
+                    delta_y,
+                    delta_z,
+                    pose_s.px,
+                    pose_s.py,
+                    pose_s.pz,
+                    pose_s.om,
+                    pose_s.fi,
+                    pose_s.ka,
+                    p_s.x(),
+                    p_s.y(),
+                    p_s.z(),
+                    p_t.x(),
+                    p_t.y(),
+                    p_t.z());
 
                 int ir = tripletListB.size();
                 int ic = sessions[j].ground_control_points.gpcs[jj].index_to_node_inner * 6 + sums[j] * 6;
@@ -484,9 +508,21 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                         }
                     }
                 }
-                tripletListP.emplace_back(ir + 0, ir + 0, (1.0 / (sessions[j].ground_control_points.gpcs[jj].sigma_x * sessions[j].ground_control_points.gpcs[jj].sigma_x)) * get_cauchy_w(delta_x, 1));
-                tripletListP.emplace_back(ir + 1, ir + 1, (1.0 / (sessions[j].ground_control_points.gpcs[jj].sigma_y * sessions[j].ground_control_points.gpcs[jj].sigma_y)) * get_cauchy_w(delta_y, 1));
-                tripletListP.emplace_back(ir + 2, ir + 2, (1.0 / (sessions[j].ground_control_points.gpcs[jj].sigma_z * sessions[j].ground_control_points.gpcs[jj].sigma_z)) * get_cauchy_w(delta_z, 1));
+                tripletListP.emplace_back(
+                    ir + 0,
+                    ir + 0,
+                    (1.0 / (sessions[j].ground_control_points.gpcs[jj].sigma_x * sessions[j].ground_control_points.gpcs[jj].sigma_x)) *
+                        get_cauchy_w(delta_x, 1));
+                tripletListP.emplace_back(
+                    ir + 1,
+                    ir + 1,
+                    (1.0 / (sessions[j].ground_control_points.gpcs[jj].sigma_y * sessions[j].ground_control_points.gpcs[jj].sigma_y)) *
+                        get_cauchy_w(delta_y, 1));
+                tripletListP.emplace_back(
+                    ir + 2,
+                    ir + 2,
+                    (1.0 / (sessions[j].ground_control_points.gpcs[jj].sigma_z * sessions[j].ground_control_points.gpcs[jj].sigma_z)) *
+                        get_cauchy_w(delta_z, 1));
 
                 tripletListB.emplace_back(ir, 0, delta_x);
                 tripletListB.emplace_back(ir + 1, 0, delta_y);
@@ -573,10 +609,9 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
 
         for (size_t j = 0; j < sessions.size(); j++)
         {
-
             for (size_t index_pose = 0; index_pose < sessions[j].point_clouds_container.point_clouds.size(); index_pose++)
             {
-                const auto &pc = sessions[j].point_clouds_container.point_clouds[index_pose];
+                const auto& pc = sessions[j].point_clouds_container.point_clouds[index_pose];
                 if (!pc.fuse_inclination_from_IMU)
                 {
                     continue;
@@ -606,16 +641,42 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                 TaitBryanPose current_pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
 
                 Eigen::Matrix<double, 1, 1> delta;
-                point_to_plane_tait_bryan_wc(delta,
-                                             current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
-                                             1, 0, 0, // add 0,1,0
-                                             xtg, ytg, ztg, vzx, vzy, vzz);
+                point_to_plane_tait_bryan_wc(
+                    delta,
+                    current_pose.px,
+                    current_pose.py,
+                    current_pose.pz,
+                    current_pose.om,
+                    current_pose.fi,
+                    current_pose.ka,
+                    1,
+                    0,
+                    0, // add 0,1,0
+                    xtg,
+                    ytg,
+                    ztg,
+                    vzx,
+                    vzy,
+                    vzz);
 
                 Eigen::Matrix<double, 1, 6> delta_jacobian;
-                point_to_plane_tait_bryan_wc_jacobian(delta_jacobian,
-                                                      current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
-                                                      1, 0, 0,
-                                                      xtg, ytg, ztg, vzx, vzy, vzz);
+                point_to_plane_tait_bryan_wc_jacobian(
+                    delta_jacobian,
+                    current_pose.px,
+                    current_pose.py,
+                    current_pose.pz,
+                    current_pose.om,
+                    current_pose.fi,
+                    current_pose.ka,
+                    1,
+                    0,
+                    0,
+                    xtg,
+                    ytg,
+                    ztg,
+                    vzx,
+                    vzy,
+                    vzz);
 
                 int ir = tripletListB.size();
                 int ic = (index_pose + sums[j]) * 6;
@@ -627,15 +688,41 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                 tripletListB.emplace_back(ir, 0, delta(0, 0));
 
                 ///////////////////////////////
-                point_to_plane_tait_bryan_wc(delta,
-                                             current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
-                                             0, 1, 0,
-                                             xtg, ytg, ztg, vzx, vzy, vzz);
+                point_to_plane_tait_bryan_wc(
+                    delta,
+                    current_pose.px,
+                    current_pose.py,
+                    current_pose.pz,
+                    current_pose.om,
+                    current_pose.fi,
+                    current_pose.ka,
+                    0,
+                    1,
+                    0,
+                    xtg,
+                    ytg,
+                    ztg,
+                    vzx,
+                    vzy,
+                    vzz);
 
-                point_to_plane_tait_bryan_wc_jacobian(delta_jacobian,
-                                                      current_pose.px, current_pose.py, current_pose.pz, current_pose.om, current_pose.fi, current_pose.ka,
-                                                      0, 1, 0,
-                                                      xtg, ytg, ztg, vzx, vzy, vzz);
+                point_to_plane_tait_bryan_wc_jacobian(
+                    delta_jacobian,
+                    current_pose.px,
+                    current_pose.py,
+                    current_pose.pz,
+                    current_pose.om,
+                    current_pose.fi,
+                    current_pose.ka,
+                    0,
+                    1,
+                    0,
+                    xtg,
+                    ytg,
+                    ztg,
+                    vzx,
+                    vzy,
+                    vzz);
 
                 ir = tripletListB.size();
                 // ic = index_pose * 6;
@@ -654,31 +741,42 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
         for (size_t j = 0; j < sessions.size(); j++)
         {
             // CPs
-            auto &cps = sessions[j].control_points;
-            auto &point_clouds_container = sessions[j].point_clouds_container;
+            auto& cps = sessions[j].control_points;
+            auto& point_clouds_container = sessions[j].point_clouds_container;
 
             for (int i = 0; i < cps.cps.size(); i++)
             {
                 if (!cps.cps[i].is_z_0)
                 {
-                    Eigen::Vector3d p_s(cps.cps[i].x_source_local,
-                                        cps.cps[i].y_source_local, cps.cps[i].z_source_local);
+                    Eigen::Vector3d p_s(cps.cps[i].x_source_local, cps.cps[i].y_source_local, cps.cps[i].z_source_local);
 
                     Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
                     TaitBryanPose pose_s;
                     pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[cps.cps[i].index_to_pose].m_pose);
 
-                    point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                           p_s.x(), p_s.y(), p_s.z());
+                    point_to_point_source_to_target_tait_bryan_wc_jacobian(
+                        jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z());
 
                     double delta_x;
                     double delta_y;
                     double delta_z;
-                    Eigen::Vector3d p_t(cps.cps[i].x_target_global,
-                                        cps.cps[i].y_target_global, cps.cps[i].z_target_global);
-                    point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                                                                  pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                  p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+                    Eigen::Vector3d p_t(cps.cps[i].x_target_global, cps.cps[i].y_target_global, cps.cps[i].z_target_global);
+                    point_to_point_source_to_target_tait_bryan_wc(
+                        delta_x,
+                        delta_y,
+                        delta_z,
+                        pose_s.px,
+                        pose_s.py,
+                        pose_s.pz,
+                        pose_s.om,
+                        pose_s.fi,
+                        pose_s.ka,
+                        p_s.x(),
+                        p_s.y(),
+                        p_s.z(),
+                        p_t.x(),
+                        p_t.y(),
+                        p_t.z());
 
                     int ir = tripletListB.size();
 
@@ -707,30 +805,40 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                 }
                 else
                 {
-
-                    Eigen::Vector3d p_s(cps.cps[i].x_source_local,
-                                        cps.cps[i].y_source_local, cps.cps[i].z_source_local);
+                    Eigen::Vector3d p_s(cps.cps[i].x_source_local, cps.cps[i].y_source_local, cps.cps[i].z_source_local);
 
                     Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
                     TaitBryanPose pose_s;
                     pose_s = pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[cps.cps[i].index_to_pose].m_pose);
 
-                    point_to_point_source_to_target_tait_bryan_wc_jacobian(jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                           p_s.x(), p_s.y(), p_s.z());
+                    point_to_point_source_to_target_tait_bryan_wc_jacobian(
+                        jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z());
 
                     double delta_x;
                     double delta_y;
                     double delta_z;
-                    Eigen::Vector3d p_t(cps.cps[i].x_target_global,
-                                        cps.cps[i].y_target_global, 0.0 /*cps.cps[i].z_target_global*/);
-                    point_to_point_source_to_target_tait_bryan_wc(delta_x, delta_y, delta_z,
-                                                                  pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
-                                                                  p_s.x(), p_s.y(), p_s.z(), p_t.x(), p_t.y(), p_t.z());
+                    Eigen::Vector3d p_t(cps.cps[i].x_target_global, cps.cps[i].y_target_global, 0.0 /*cps.cps[i].z_target_global*/);
+                    point_to_point_source_to_target_tait_bryan_wc(
+                        delta_x,
+                        delta_y,
+                        delta_z,
+                        pose_s.px,
+                        pose_s.py,
+                        pose_s.pz,
+                        pose_s.om,
+                        pose_s.fi,
+                        pose_s.ka,
+                        p_s.x(),
+                        p_s.y(),
+                        p_s.z(),
+                        p_t.x(),
+                        p_t.y(),
+                        p_t.z());
 
                     int ir = tripletListB.size();
-                    //int ic = cps.cps[i].index_to_pose * 6;
+                    // int ic = cps.cps[i].index_to_pose * 6;
                     int ic = (cps.cps[i].index_to_pose + sums[j]) * 6;
-                    
+
                     for (int row = 2; row < 3; row++)
                     {
                         for (int col = 0; col < 6; col++)
@@ -741,8 +849,9 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                             }
                         }
                     }
-                    // tripletListP.emplace_back(ir + 0, ir + 0, (1.0 / (cps.cps[i].sigma_x * cps.cps[i].sigma_x)) * get_cauchy_w(delta_x, 1));
-                    // tripletListP.emplace_back(ir + 1, ir + 1, (1.0 / (cps.cps[i].sigma_y * cps.cps[i].sigma_y)) * get_cauchy_w(delta_y, 1));
+                    // tripletListP.emplace_back(ir + 0, ir + 0, (1.0 / (cps.cps[i].sigma_x * cps.cps[i].sigma_x)) * get_cauchy_w(delta_x,
+                    // 1)); tripletListP.emplace_back(ir + 1, ir + 1, (1.0 / (cps.cps[i].sigma_y * cps.cps[i].sigma_y)) *
+                    // get_cauchy_w(delta_y, 1));
                     tripletListP.emplace_back(ir, ir, (1.0 / (cps.cps[i].sigma_z * cps.cps[i].sigma_z)));
 
                     // tripletListB.emplace_back(ir, 0, delta_x);
@@ -804,7 +913,8 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
         //  std::cout << "updates:" << std::endl;
         //  for (size_t i = 0; i < h_x.size(); i += 6)
         //{
-        //      std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5] << std::endl;
+        //      std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5]
+        //      << std::endl;
         //  }
 
         if (h_x.size() == 6 * poses.size())
@@ -813,7 +923,6 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
 
             for (size_t i = 0; i < poses.size(); i++)
             {
-
                 TaitBryanPose pose = poses[i];
                 pose.px += h_x[counter++] * 0.1;
                 pose.py += h_x[counter++] * 0.1;
@@ -879,13 +988,20 @@ bool optimize(std::vector<Session> &sessions, const std::vector<Edge> &edges)
                 // if (!sessions[index_trajectory[i]].is_ground_truth)
                 //{
                 sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].m_pose = m_poses[i];
-                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose = pose_tait_bryan_from_affine_matrix(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].m_pose);
-                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_translation[0] = sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.px;
-                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_translation[1] = sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.py;
-                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_translation[2] = sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.pz;
-                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[0] = rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.om);
-                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[1] = rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.fi);
-                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[2] = rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.ka);
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose =
+                    pose_tait_bryan_from_affine_matrix(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].m_pose);
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_translation[0] =
+                    sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.px;
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_translation[1] =
+                    sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.py;
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_translation[2] =
+                    sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.pz;
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[0] =
+                    rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.om);
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[1] =
+                    rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.fi);
+                sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].gui_rotation[2] =
+                    rad2deg(sessions[index_trajectory[i]].point_clouds_container.point_clouds[index].pose.ka);
                 //}
                 index++;
             }

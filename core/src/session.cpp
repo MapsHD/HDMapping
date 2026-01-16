@@ -1,11 +1,12 @@
-#include <session.h>
-#include <nlohmann/json.hpp>
-#include <filesystem>
+#include <pch/pch.h>
+
 #include "../../shared/include/HDMapping/Version.hpp"
+#include <nlohmann/json.hpp>
+#include <session.h>
 
 namespace fs = std::filesystem;
 
-bool Session::load(const std::string &file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
+bool Session::load(const std::string& file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset)
 {
     this->session_file_name = file_name;
     std::cout << "Loading file: '" << file_name << "'" << std::endl;
@@ -31,7 +32,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
     std::string directory = fs::path(file_name).parent_path().string();
 
     // Local pathUpdater lambda (keep directories unchanged, update files to be in session directory)
-    auto getNewPath = [&](const std::string &path) -> std::string
+    auto getNewPath = [&](const std::string& path) -> std::string
     {
         fs::path p(path);
         if (is_directory(p))
@@ -47,7 +48,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         nlohmann::json data = nlohmann::json::parse(fs);
         fs.close();
 
-        const auto &project_settings_json = data["Session Settings"];
+        const auto& project_settings_json = data["Session Settings"];
         point_clouds_container.offset.x() = project_settings_json.value("offset_x", 0.0);
         point_clouds_container.offset.y() = project_settings_json.value("offset_y", 0.0);
         point_clouds_container.offset.z() = project_settings_json.value("offset_z", 0.0);
@@ -63,7 +64,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
 
         is_ground_truth = project_settings_json.value("ground_truth", false);
 
-        for (const auto &edge_json : data["loop_closure_edges"])
+        for (const auto& edge_json : data["loop_closure_edges"])
         {
             PoseGraphLoopClosure::Edge edge;
             edge.index_from = edge_json["index_from"];
@@ -89,7 +90,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             loop_closure_edges.push_back(edge);
         }
 
-        for (const auto &fn_json : data["laz_file_names"])
+        for (const auto& fn_json : data["laz_file_names"])
         {
             const std::string fn = getNewPath(fn_json["file_name"]);
             laz_file_names.push_back(fn);
@@ -104,10 +105,8 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         }
 
         std::cout << "Loaded: "
-                  << "offset_x: " << point_clouds_container.offset.x()
-                  << ", offset_y: " << point_clouds_container.offset.y()
-                  << ", offset_z: " << point_clouds_container.offset.z()
-                  << " [m]\n";
+                  << "offset_x: " << point_clouds_container.offset.x() << ", offset_y: " << point_clouds_container.offset.y()
+                  << ", offset_z: " << point_clouds_container.offset.z() << " [m]\n";
         std::cout << "Folder_name: '" << folder_name << "'\n";
         std::cout << "Out_folder_name: '" << out_folder_name << "'\n";
         std::cout << "Initial_poses_file_name: '" << initial_poses_file_name << "'\n";
@@ -118,29 +117,22 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         {
             std::cout << "Loop closure edges:" << std::endl;
 
-            for (const auto &edge : loop_closure_edges)
+            for (const auto& edge : loop_closure_edges)
             {
                 std::cout << "<<<<<<<<<<<<<<<<<<<" << std::endl;
-                std::cout << "index_from: " << edge.index_from
-                          << ", index_to: " << edge.index_to << std::endl;
-                std::cout << "is_fixed fi: " << edge.is_fixed_fi
-                          << ", ka: " << edge.is_fixed_ka
-                          << ", om: " << edge.is_fixed_om << std::endl;
-                std::cout << "is_fixed px: " << edge.is_fixed_px
-                          << ", py: " << edge.is_fixed_py
-                          << ", pz: " << edge.is_fixed_pz << std::endl;
-                std::cout << "relative_pose_tb fi: " << edge.relative_pose_tb.fi
-                          << ", ka: " << edge.relative_pose_tb.ka
+                std::cout << "index_from: " << edge.index_from << ", index_to: " << edge.index_to << std::endl;
+                std::cout << "is_fixed fi: " << edge.is_fixed_fi << ", ka: " << edge.is_fixed_ka << ", om: " << edge.is_fixed_om
+                          << std::endl;
+                std::cout << "is_fixed px: " << edge.is_fixed_px << ", py: " << edge.is_fixed_py << ", pz: " << edge.is_fixed_pz
+                          << std::endl;
+                std::cout << "relative_pose_tb fi: " << edge.relative_pose_tb.fi << ", ka: " << edge.relative_pose_tb.ka
                           << ", om: " << edge.relative_pose_tb.om << std::endl;
-                std::cout << "relative_pose_tb px: " << edge.relative_pose_tb.px
-                          << ", py: " << edge.relative_pose_tb.py
+                std::cout << "relative_pose_tb px: " << edge.relative_pose_tb.px << ", py: " << edge.relative_pose_tb.py
                           << ", pz: " << edge.relative_pose_tb.pz << std::endl;
                 std::cout << "relative_pose_tb_weights fi: " << edge.relative_pose_tb_weights.fi
-                          << ", ka: " << edge.relative_pose_tb_weights.ka
-                          << ", om: " << edge.relative_pose_tb_weights.om << std::endl;
+                          << ", ka: " << edge.relative_pose_tb_weights.ka << ", om: " << edge.relative_pose_tb_weights.om << std::endl;
                 std::cout << "relative_pose_tb_weights px: " << edge.relative_pose_tb_weights.px
-                          << ", py: " << edge.relative_pose_tb_weights.py
-                          << ", pz: " << edge.relative_pose_tb_weights.pz << std::endl;
+                          << ", py: " << edge.relative_pose_tb_weights.py << ", pz: " << edge.relative_pose_tb_weights.pz << std::endl;
             }
         }
 
@@ -150,7 +142,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         //     std::cout << "'" << fn << "'" << std::endl;
         // }
 #if WITH_GUI == 1
-        for (const auto &gcp_json : data["ground_control_points"])
+        for (const auto& gcp_json : data["ground_control_points"])
         {
             GroundControlPoint gcp;
             std::string name = gcp_json.value("name", "");
@@ -169,7 +161,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
             std::cout << "adding gcp[" << name << "]" << std::endl;
         };
 
-        for (const auto &cp_json : data["control_points"])
+        for (const auto& cp_json : data["control_points"])
         {
             ControlPoint cp;
             std::string name = cp_json.value("name", "");
@@ -194,7 +186,8 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         std::cout << "-----------------------------" << std::endl;
 
         // loading all data
-        point_clouds_container.load_whu_tls(laz_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset, this->load_cache_mode);
+        point_clouds_container.load_whu_tls(
+            laz_file_names, is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset, this->load_cache_mode);
 
         if (laz_file_names.size() > 0)
         {
@@ -237,7 +230,7 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
         render_color[2] = float(rand() % 255) / 255.0;
 
         int index = 0;
-        for (auto &pc : point_clouds_container.point_clouds)
+        for (auto& pc : point_clouds_container.point_clouds)
         {
             pc.render_color[0] = render_color[0];
             pc.render_color[1] = render_color[1];
@@ -256,11 +249,12 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
 
         std::cout << std::setprecision(10);
         for (int i = 0; i < point_clouds_container.point_clouds.size(); i++)
-            //auto &pc : point_clouds_container.point_clouds)
+        // auto &pc : point_clouds_container.point_clouds)
         {
             for (int j = 1; j < point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
             {
-                Eigen::Affine3d m = point_clouds_container.point_clouds[i].local_trajectory[j - 1].m_pose.inverse() * point_clouds_container.point_clouds[i].local_trajectory[j].m_pose;
+                Eigen::Affine3d m = point_clouds_container.point_clouds[i].local_trajectory[j - 1].m_pose.inverse() *
+                    point_clouds_container.point_clouds[i].local_trajectory[j].m_pose;
 
                 TaitBryanPose tb_pose = pose_tait_bryan_from_affine_matrix(m);
 
@@ -288,37 +282,37 @@ bool Session::load(const std::string &file_name, bool is_decimate, double bucket
 
                 TaitBryanPose tb_pose_mm = pose_tait_bryan_from_affine_matrix(mm);
 
-                Eigen::Vector3d diff (fabs(tb_pose_mm.om - tb_pose.om), fabs(tb_pose_mm.fi - tb_pose.fi), fabs(tb_pose_mm.ka - tb_pose.ka));
+                Eigen::Vector3d diff(fabs(tb_pose_mm.om - tb_pose.om), fabs(tb_pose_mm.fi - tb_pose.fi), fabs(tb_pose_mm.ka - tb_pose.ka));
 
                 point_clouds_container.point_clouds[i].local_trajectory[j].imu_diff_angle_om_fi_ka_deg = diff;
 
                 // TaitBryanPose tb_pose2;
-                //tb_pose2.om = point_clouds_container.point_clouds[i].local_trajectory[j-1].imu_om_fi_ka.x()
+                // tb_pose2.om = point_clouds_container.point_clouds[i].local_trajectory[j-1].imu_om_fi_ka.x()
 
-                //std::cout << tb_pose.om << " " << tb_pose.fi << " " << tb_pose.ka << " "
+                // std::cout << tb_pose.om << " " << tb_pose.fi << " " << tb_pose.ka << " "
                 //          << point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.x() << " " <<
-                //    point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.y() << " " 
+                //    point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.y() << " "
                 //    << point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.z() <<  std::endl;
             }
-            //struct LocalTrajectoryNode{
+            // struct LocalTrajectoryNode{
             //    std::pair<double, double> timestamps;
             //    Eigen::Affine3d m_pose;
             //    Eigen::Vector3d imu_om_fi_ka;
             //    Eigen::Vector3d imu_diff_angle_om_fi_ka_deg;
-	        //};
-            //pc.local_trajectory
+            //};
+            // pc.local_trajectory
         }
 
         return true;
-    }
-    catch (const std::exception &e)
+    } catch (const std::exception& e)
     {
         std::cout << "can't load session: " << e.what() << std::endl;
         return false;
     }
 }
 
-bool Session::save(const std::string &file_name, const std::string &poses_file_name, const std::string &initial_poses_file_name, bool is_subsession)
+bool Session::save(
+    const std::string& file_name, const std::string& poses_file_name, const std::string& initial_poses_file_name, bool is_subsession)
 {
     std::cout << "saving file: '" << file_name << "'" << std::endl;
 
@@ -333,7 +327,7 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
     j["offset_to_apply_z"] = point_clouds_container.offset_to_apply.z();
     j["folder_name"] = point_clouds_container.folder_name;
     j["out_folder_name"] = point_clouds_container.out_folder_name;
-    j["poses_file_name"] = poses_file_name;                 // point_clouds_container.poses_file_name;
+    j["poses_file_name"] = poses_file_name; // point_clouds_container.poses_file_name;
     j["initial_poses_file_name"] = initial_poses_file_name; // point_clouds_container.initial_poses_file_name;
     j["out_poses_file_name"] = point_clouds_container.out_poses_file_name;
     j["ground_truth"] = is_ground_truth;
@@ -343,83 +337,71 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
     nlohmann::json jloop_closure_edges;
     if (!is_subsession)
     {
-        for (const auto &edge : pose_graph_loop_closure.edges)
+        for (const auto& edge : pose_graph_loop_closure.edges)
         {
-            nlohmann::json jloop_closure_edge{
-                {"px", edge.relative_pose_tb.px},
-                {"py", edge.relative_pose_tb.py},
-                {"pz", edge.relative_pose_tb.pz},
-                {"om", edge.relative_pose_tb.om},
-                {"fi", edge.relative_pose_tb.fi},
-                {"ka", edge.relative_pose_tb.ka},
-                {"w_px", edge.relative_pose_tb_weights.px},
-                {"w_py", edge.relative_pose_tb_weights.py},
-                {"w_pz", edge.relative_pose_tb_weights.pz},
-                {"w_om", edge.relative_pose_tb_weights.om},
-                {"w_fi", edge.relative_pose_tb_weights.fi},
-                {"w_ka", edge.relative_pose_tb_weights.ka},
-                {"index_from", edge.index_from},
-                {"index_to", edge.index_to},
-                {"is_fixed_px", edge.is_fixed_px},
-                {"is_fixed_py", edge.is_fixed_py},
-                {"is_fixed_pz", edge.is_fixed_pz},
-                {"is_fixed_om", edge.is_fixed_om},
-                {"is_fixed_fi", edge.is_fixed_fi},
-                {"is_fixed_ka", edge.is_fixed_ka}};
+            nlohmann::json jloop_closure_edge{ { "px", edge.relative_pose_tb.px },
+                                               { "py", edge.relative_pose_tb.py },
+                                               { "pz", edge.relative_pose_tb.pz },
+                                               { "om", edge.relative_pose_tb.om },
+                                               { "fi", edge.relative_pose_tb.fi },
+                                               { "ka", edge.relative_pose_tb.ka },
+                                               { "w_px", edge.relative_pose_tb_weights.px },
+                                               { "w_py", edge.relative_pose_tb_weights.py },
+                                               { "w_pz", edge.relative_pose_tb_weights.pz },
+                                               { "w_om", edge.relative_pose_tb_weights.om },
+                                               { "w_fi", edge.relative_pose_tb_weights.fi },
+                                               { "w_ka", edge.relative_pose_tb_weights.ka },
+                                               { "index_from", edge.index_from },
+                                               { "index_to", edge.index_to },
+                                               { "is_fixed_px", edge.is_fixed_px },
+                                               { "is_fixed_py", edge.is_fixed_py },
+                                               { "is_fixed_pz", edge.is_fixed_pz },
+                                               { "is_fixed_om", edge.is_fixed_om },
+                                               { "is_fixed_fi", edge.is_fixed_fi },
+                                               { "is_fixed_ka", edge.is_fixed_ka } };
             jloop_closure_edges.push_back(jloop_closure_edge);
         }
     }
     jj["loop_closure_edges"] = jloop_closure_edges;
 
     nlohmann::json jlaz_file_names;
-    for (const auto &pc : point_clouds_container.point_clouds)
+    for (const auto& pc : point_clouds_container.point_clouds)
     {
         if (is_subsession)
         {
             if (pc.visible)
             {
-                nlohmann::json jfn{
-                    {"file_name", pc.file_name},
-                    {"fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU},
-                    {"fixed_x", pc.fixed_x},
-                    {"fixed_y", pc.fixed_y},
-                    {"fixed_z", pc.fixed_z},
-                    {"fixed_om", pc.fixed_om},
-                    {"fixed_fi", pc.fixed_fi},
-                    {"fixed_ka", pc.fixed_ka}};
+                nlohmann::json jfn{ { "file_name", pc.file_name }, { "fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU },
+                                    { "fixed_x", pc.fixed_x },     { "fixed_y", pc.fixed_y },
+                                    { "fixed_z", pc.fixed_z },     { "fixed_om", pc.fixed_om },
+                                    { "fixed_fi", pc.fixed_fi },   { "fixed_ka", pc.fixed_ka } };
                 jlaz_file_names.push_back(jfn);
             }
         }
         else
         {
-            nlohmann::json jfn{
-                {"file_name", pc.file_name},
-                {"fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU},
-                {"fixed_x", pc.fixed_x},
-                {"fixed_y", pc.fixed_y},
-                {"fixed_z", pc.fixed_z},
-                {"fixed_om", pc.fixed_om},
-                {"fixed_fi", pc.fixed_fi},
-                {"fixed_ka", pc.fixed_ka}};
+            nlohmann::json jfn{ { "file_name", pc.file_name }, { "fuse_inclination_from_IMU", pc.fuse_inclination_from_IMU },
+                                { "fixed_x", pc.fixed_x },     { "fixed_y", pc.fixed_y },
+                                { "fixed_z", pc.fixed_z },     { "fixed_om", pc.fixed_om },
+                                { "fixed_fi", pc.fixed_fi },   { "fixed_ka", pc.fixed_ka } };
             jlaz_file_names.push_back(jfn);
         }
     }
     jj["laz_file_names"] = jlaz_file_names;
 #if WITH_GUI == 1
     nlohmann::json jgcps;
-    for (const auto &gcp : ground_control_points.gpcs)
+    for (const auto& gcp : ground_control_points.gpcs)
     {
-        nlohmann::json jgcp{
-            {"name", gcp.name},
-            {"x", gcp.x},
-            {"y", gcp.y},
-            {"z", gcp.z},
-            {"sigma_x", gcp.sigma_x},
-            {"sigma_y", gcp.sigma_y},
-            {"sigma_z", gcp.sigma_z},
-            {"lidar_height_above_ground", gcp.lidar_height_above_ground},
-            {"index_to_node_inner", gcp.index_to_node_inner},
-            {"index_to_node_outer", gcp.index_to_node_outer}};
+        nlohmann::json jgcp{ { "name", gcp.name },
+                             { "x", gcp.x },
+                             { "y", gcp.y },
+                             { "z", gcp.z },
+                             { "sigma_x", gcp.sigma_x },
+                             { "sigma_y", gcp.sigma_y },
+                             { "sigma_z", gcp.sigma_z },
+                             { "lidar_height_above_ground", gcp.lidar_height_above_ground },
+                             { "index_to_node_inner", gcp.index_to_node_inner },
+                             { "index_to_node_outer", gcp.index_to_node_outer } };
         jgcps.push_back(jgcp);
     }
     jj["ground_control_points"] = jgcps;
@@ -427,21 +409,20 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
 
 #if WITH_GUI == 1
     nlohmann::json jcps;
-    for (const auto &cp : control_points.cps)
+    for (const auto& cp : control_points.cps)
     {
-        nlohmann::json jcp{
-            {"name", cp.name},
-            {"x_source_local", cp.x_source_local},
-            {"y_source_local", cp.y_source_local},
-            {"z_source_local", cp.z_source_local},
-            {"x_target_global", cp.x_target_global},
-            {"y_target_global", cp.y_target_global},
-            {"z_target_global", cp.z_target_global},
-            {"sigma_x", cp.sigma_x},
-            {"sigma_y", cp.sigma_y},
-            {"sigma_z", cp.sigma_z},
-            {"index_to_pose", cp.index_to_pose},
-            {"is_z_0", cp.is_z_0}};
+        nlohmann::json jcp{ { "name", cp.name },
+                            { "x_source_local", cp.x_source_local },
+                            { "y_source_local", cp.y_source_local },
+                            { "z_source_local", cp.z_source_local },
+                            { "x_target_global", cp.x_target_global },
+                            { "y_target_global", cp.y_target_global },
+                            { "z_target_global", cp.z_target_global },
+                            { "sigma_x", cp.sigma_x },
+                            { "sigma_y", cp.sigma_y },
+                            { "sigma_z", cp.sigma_z },
+                            { "index_to_pose", cp.index_to_pose },
+                            { "is_z_0", cp.is_z_0 } };
         jcps.push_back(jcp);
     }
     jj["control_points"] = jcps;
@@ -456,8 +437,7 @@ bool Session::save(const std::string &file_name, const std::string &poses_file_n
 }
 
 void Session::fill_session_from_worker_data(
-    const std::vector<WorkerData> &worker_data, bool save_selected,
-    bool filter_on_export, bool apply_pose, double threshould_output_filter)
+    const std::vector<WorkerData>& worker_data, bool save_selected, bool filter_on_export, bool apply_pose, double threshould_output_filter)
 {
     this->point_clouds_container.point_clouds.clear(); // clear whatever was there
     for (int i = 0; i < worker_data.size(); i++)
@@ -466,13 +446,14 @@ void Session::fill_session_from_worker_data(
         std::vector<Point3Di> intermediate_points;
         if (!load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points))
         {
-            std::cout << "problem with load_vector_data '" << worker_data[i].intermediate_points_cache_file_name.string() << "'" << std::endl;
+            std::cout << "problem with load_vector_data '" << worker_data[i].intermediate_points_cache_file_name.string() << "'"
+                      << std::endl;
         }
 
         if (!save_selected || worker_data[i].show)
         {
             PointCloud pc;
-            for (const auto &p : intermediate_points)
+            for (const auto& p : intermediate_points)
             {
                 if (!filter_on_export || (p.point.norm() > threshould_output_filter))
                 {

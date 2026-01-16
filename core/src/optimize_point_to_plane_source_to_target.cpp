@@ -1,10 +1,8 @@
-#include <iostream>
-#include <thread>
+#include <pch/pch.h>
 
 #include <registration_plane_feature.h>
 #include <transformations.h>
 #include <m_estimators.h>
-
 
 #include <python-scripts/point-to-feature-metrics/point_to_plane_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-feature-metrics/point_to_plane_tait_bryan_cw_jacobian.h>

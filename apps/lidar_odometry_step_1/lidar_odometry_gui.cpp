@@ -1,40 +1,43 @@
 ﻿#include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
-#include <ImGuizmo.h>
 #include <imgui_internal.h>
+
+#include <ImGuizmo.h>
 
 //#define GLEW_STATIC
 //#include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <portable-file-dialogs.h>
 
-#include "lidar_odometry_utils.h"
 #include "lidar_odometry.h"
-#include <registration_plane_feature.h>
+#include "lidar_odometry_utils.h"
 #include <export_laz.h>
+#include <registration_plane_feature.h>
 
 #include <utils.hpp>
 
-#include <mutex>
-#include <HDMapping/Version.hpp>
-#include <session.h>
-#include <pfd_wrapper.hpp>
-#include <export_laz.h>
-#include <ctime>
-#include <chrono>
 #include "toml_io.h"
+#include <HDMapping/Version.hpp>
+#include <chrono>
+#include <ctime>
+#include <export_laz.h>
+#include <mutex>
+#include <pfd_wrapper.hpp>
+#include <session.h>
 
 #ifdef _WIN32
-#include <windows.h>
 #include "resource.h"
+#include <windows.h>
+
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
 
 // This is LiDAR odometry (step 1)
-// This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system https://github.com/JanuszBedkowski/mandeye_controller
-// The output is a session proving trajekctory and point clouds that can be  further processed by "multi_view_tls_registration" program.
+// This program calculates trajectory based on IMU and LiDAR data provided by MANDEYE mobile mapping system
+// https://github.com/JanuszBedkowski/mandeye_controller The output is a session proving trajekctory and point clouds that can be  further
+// processed by "multi_view_tls_registration" program.
 
 // #define SAMPLE_PERIOD (1.0 / 200.0)
 
@@ -45,90 +48,90 @@ std::vector<std::string> infoLines = {
     "",
     "It results trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program.",
     "",
-    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program."};
+    "Next step will be to load session.json file with 'multi_view_tls_registration_step_2' program."
+};
 
 // App specific shortcuts (Type and Shortcut are just for easy reference)
-static const std::vector<ShortcutEntry> appShortcuts = {
-    {"Normal keys", "A", ""},
-    {"", "Ctrl+A", ""},
-    {"", "B", ""},
-    {"", "Ctrl+B", ""},
-    {"", "C", ""},
-    {"", "Ctrl+C", ""},
-    {"", "D", ""},
-    {"", "Ctrl+D", ""},
-    {"", "E", ""},
-    {"", "Ctrl+E", ""},
-    {"", "F", ""},
-    {"", "Ctrl+F", ""},
-    {"", "G", ""},
-    {"", "Ctrl+G", ""},
-    {"", "H", ""},
-    {"", "Ctrl+H", ""},
-    {"", "I", ""},
-    {"", "Ctrl+I", ""},
-    {"", "J", ""},
-    {"", "Ctrl+K", ""},
-    {"", "K", ""},
-    {"", "Ctrl+K", ""},
-    {"", "L", ""},
-    {"", "Ctrl+L", ""},
-    {"", "M", ""},
-    {"", "Ctrl+M", ""},
-    {"", "N", ""},
-    {"", "Ctrl+N", ""},
-    {"", "O", ""},
-    {"", "Ctrl+O", "Open data"},
-    {"", "P", ""},
-    {"", "Ctrl+P", ""},
-    {"", "Q", ""},
-    {"", "Ctrl+Q", ""},
-    {"", "R", ""},
-    {"", "Ctrl+R", ""},
-    {"", "Shift+R", ""},
-    {"", "S", ""},
-    {"", "Ctrl+S", ""},
-    {"", "Ctrl+Shift+S", ""},
-    {"", "T", ""},
-    {"", "Ctrl+T", ""},
-    {"", "U", ""},
-    {"", "Ctrl+U", ""},
-    {"", "V", ""},
-    {"", "Ctrl+V", ""},
-    {"", "W", ""},
-    {"", "Ctrl+W", ""},
-    {"", "X", ""},
-    {"", "Ctrl+X", ""},
-    {"", "Y", ""},
-    {"", "Ctrl+Y", ""},
-    {"", "Z", ""},
-    {"", "Ctrl+Z", ""},
-    {"", "Shift+Z", ""},
-    {"", "1-9", ""},
-    {"Special keys", "Up arrow", ""},
-    {"", "Shift + up arrow", ""},
-    {"", "Ctrl + up arrow", ""},
-    {"", "Down arrow", ""},
-    {"", "Shift + down arrow", ""},
-    {"", "Ctrl + down arrow", ""},
-    {"", "Left arrow", ""},
-    {"", "Shift + left arrow", ""},
-    {"", "Ctrl + left arrow", ""},
-    {"", "Right arrow", ""},
-    {"", "Shift + right arrow", ""},
-    {"", "Ctrl + right arrow", ""},
-    {"", "Pg down", ""},
-    {"", "Pg up", ""},
-    {"", "- key", ""},
-    {"", "+ key", ""},
-    {"Mouse related", "Left click + drag", ""},
-    {"", "Right click + drag", "n"},
-    {"", "Scroll", ""},
-    {"", "Shift + scroll", ""},
-    {"", "Shift + drag", ""},
-    {"", "Ctrl + left click", ""},
-    {"", "Ctrl + right click", ""},
-    {"", "Ctrl + middle click", ""} };
+static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "" },
+                                                         { "", "Ctrl+A", "" },
+                                                         { "", "B", "" },
+                                                         { "", "Ctrl+B", "" },
+                                                         { "", "C", "" },
+                                                         { "", "Ctrl+C", "" },
+                                                         { "", "D", "" },
+                                                         { "", "Ctrl+D", "" },
+                                                         { "", "E", "" },
+                                                         { "", "Ctrl+E", "" },
+                                                         { "", "F", "" },
+                                                         { "", "Ctrl+F", "" },
+                                                         { "", "G", "" },
+                                                         { "", "Ctrl+G", "" },
+                                                         { "", "H", "" },
+                                                         { "", "Ctrl+H", "" },
+                                                         { "", "I", "" },
+                                                         { "", "Ctrl+I", "" },
+                                                         { "", "J", "" },
+                                                         { "", "Ctrl+K", "" },
+                                                         { "", "K", "" },
+                                                         { "", "Ctrl+K", "" },
+                                                         { "", "L", "" },
+                                                         { "", "Ctrl+L", "" },
+                                                         { "", "M", "" },
+                                                         { "", "Ctrl+M", "" },
+                                                         { "", "N", "" },
+                                                         { "", "Ctrl+N", "" },
+                                                         { "", "O", "" },
+                                                         { "", "Ctrl+O", "Open data" },
+                                                         { "", "P", "" },
+                                                         { "", "Ctrl+P", "" },
+                                                         { "", "Q", "" },
+                                                         { "", "Ctrl+Q", "" },
+                                                         { "", "R", "" },
+                                                         { "", "Ctrl+R", "" },
+                                                         { "", "Shift+R", "" },
+                                                         { "", "S", "" },
+                                                         { "", "Ctrl+S", "" },
+                                                         { "", "Ctrl+Shift+S", "" },
+                                                         { "", "T", "" },
+                                                         { "", "Ctrl+T", "" },
+                                                         { "", "U", "" },
+                                                         { "", "Ctrl+U", "" },
+                                                         { "", "V", "" },
+                                                         { "", "Ctrl+V", "" },
+                                                         { "", "W", "" },
+                                                         { "", "Ctrl+W", "" },
+                                                         { "", "X", "" },
+                                                         { "", "Ctrl+X", "" },
+                                                         { "", "Y", "" },
+                                                         { "", "Ctrl+Y", "" },
+                                                         { "", "Z", "" },
+                                                         { "", "Ctrl+Z", "" },
+                                                         { "", "Shift+Z", "" },
+                                                         { "", "1-9", "" },
+                                                         { "Special keys", "Up arrow", "" },
+                                                         { "", "Shift + up arrow", "" },
+                                                         { "", "Ctrl + up arrow", "" },
+                                                         { "", "Down arrow", "" },
+                                                         { "", "Shift + down arrow", "" },
+                                                         { "", "Ctrl + down arrow", "" },
+                                                         { "", "Left arrow", "" },
+                                                         { "", "Shift + left arrow", "" },
+                                                         { "", "Ctrl + left arrow", "" },
+                                                         { "", "Right arrow", "" },
+                                                         { "", "Shift + right arrow", "" },
+                                                         { "", "Ctrl + right arrow", "" },
+                                                         { "", "Pg down", "" },
+                                                         { "", "Pg up", "" },
+                                                         { "", "- key", "" },
+                                                         { "", "+ key", "" },
+                                                         { "Mouse related", "Left click + drag", "" },
+                                                         { "", "Right click + drag", "n" },
+                                                         { "", "Scroll", "" },
+                                                         { "", "Shift + scroll", "" },
+                                                         { "", "Shift + drag", "" },
+                                                         { "", "Ctrl + left click", "" },
+                                                         { "", "Ctrl + right click", "" },
+                                                         { "", "Ctrl + middle click", "" } };
 
 namespace fs = std::filesystem;
 
@@ -156,10 +159,7 @@ std::vector<WorkerData> worker_data;
 std::string working_directory = "";
 bool initial_transformation_gizmo = false;
 
-float m_gizmo[] = {1, 0, 0, 0,
-                   0, 1, 0, 0,
-                   0, 0, 1, 0,
-                   0, 0, 0, 1};
+float m_gizmo[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 float x_displacement = 0.01;
 
@@ -177,12 +177,12 @@ Session session;
 std::vector<std::vector<Point3Di>> pointsPerFile;
 Imu imu_data;
 Trajectory trajectory;
-std::atomic<bool> loRunning{false};
-std::atomic<float> loProgress{0.0};
-std::atomic<bool> loPause{false};
+std::atomic<bool> loRunning{ false };
+std::atomic<float> loProgress{ 0.0 };
+std::atomic<bool> loPause{ false };
 std::chrono::time_point<std::chrono::system_clock> loStartTime;
-std::atomic<double> loElapsedSeconds{0.0};
-std::atomic<double> loEstimatedTimeRemaining{0.0};
+std::atomic<double> loElapsedSeconds{ 0.0 };
+std::atomic<double> loEstimatedTimeRemaining{ 0.0 };
 
 fs::path outwd;
 
@@ -194,7 +194,7 @@ fs::path outwd;
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-void set_lidar_odometry_default_params(LidarOdometryParams &params)
+void set_lidar_odometry_default_params(LidarOdometryParams& params)
 {
     params.decimation = 0.01;
     params.in_out_params_indoor.resolution_X = 0.1;
@@ -311,7 +311,8 @@ int get_index(set<int> s, int k)
     return -1;
 }
 
-void find_best_stretch(std::vector<Point3Di> points, std::vector<double> timestamps, std::vector<Eigen::Affine3d> poses, std::string fn1, std::string fn2)
+void find_best_stretch(
+    std::vector<Point3Di> points, std::vector<double> timestamps, std::vector<Eigen::Affine3d> poses, std::string fn1, std::string fn2)
 {
     for (size_t i = 0; i < points.size(); i++)
     {
@@ -597,7 +598,7 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observ
     return pos;
 }
 
-void step1(const std::atomic<bool> &loPause)
+void step1(const std::atomic<bool>& loPause)
 {
     std::string input_folder_name;
     std::vector<std::string> input_file_names;
@@ -610,26 +611,31 @@ void step1(const std::atomic<bool> &loPause)
         std::string newTitle = winTitle + " - ..\\" + std::filesystem::path(input_folder_name).filename().string();
         glutSetWindowTitle(newTitle.c_str());
 
-        for (const auto &entry : fs::directory_iterator(input_folder_name))
+        for (const auto& entry : fs::directory_iterator(input_folder_name))
             if (entry.is_regular_file())
                 input_file_names.push_back(entry.path().string());
 
         if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
         {
             working_directory = fs::path(input_file_names[0]).parent_path().string();
-            calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages, params.use_removie_imu_bias_from_first_stationary_scan);
+            calculate_trajectory(
+                trajectory,
+                imu_data,
+                params.fusionConventionNwu,
+                params.fusionConventionEnu,
+                params.fusionConventionNed,
+                params.ahrs_gain,
+                full_debug_messages,
+                params.use_removie_imu_bias_from_first_stationary_scan);
             compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
             step_1_done = true;
         }
         else
         {
-            std::string message_info = "Problem with loading data from folder '" + input_folder_name + "' (Pease check if folder exists). Program will close once You click OK!!!";
+            std::string message_info = "Problem with loading data from folder '" + input_folder_name +
+                "' (Pease check if folder exists). Program will close once You click OK!!!";
             std::cout << message_info << std::endl;
-            [[maybe_unused]]
-            pfd::message message(
-                "Information",
-                message_info.c_str(),
-                pfd::choice::ok, pfd::icon::info);
+            [[maybe_unused]] pfd::message message("Information", message_info.c_str(), pfd::choice::ok, pfd::icon::info);
             message.result();
 
             exit(1);
@@ -637,7 +643,7 @@ void step1(const std::atomic<bool> &loPause)
     }
 }
 
-void step2(const std::atomic<bool> &loPause)
+void step2(const std::atomic<bool>& loPause)
 {
     double ts_failure = 0.0;
     if (compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages))
@@ -646,7 +652,7 @@ void step2(const std::atomic<bool> &loPause)
     {
         for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
         {
-            const std::string &imufn = csv_files.at(fileNo);
+            const std::string& imufn = csv_files.at(fileNo);
             const std::string snFn = (fileNo >= sn_files.size()) ? ("") : (sn_files.at(fileNo));
             const auto idToSn = MLvxCalib::GetIdToSnMapping(snFn);
             // GetId of Imu to use
@@ -672,11 +678,7 @@ void save_results(bool info, double elapsed_seconds)
     {
         std::string message_info = "Results saved to folder: '" + outwd.string() + "'";
         std::cout << message_info << std::endl;
-        [[maybe_unused]]
-        pfd::message message(
-            "Information",
-            message_info.c_str(),
-            pfd::choice::ok, pfd::icon::info);
+        [[maybe_unused]] pfd::message message("Information", message_info.c_str(), pfd::choice::ok, pfd::icon::info);
         message.result();
     }
 }
@@ -783,7 +785,7 @@ void settings_gui()
 
         if (!simple_gui)
         {
-			ImGui::SetNextItemWidth(ImGuiNumberWidth);
+            ImGui::SetNextItemWidth(ImGuiNumberWidth);
             ImGui::InputInt("Threshold nr poses", &params.threshold_nr_poses);
             if (params.threshold_nr_poses < 1)
             {
@@ -892,7 +894,8 @@ void settings_gui()
                 ImGui::SetTooltip("Local LiDAR coordinates");
 
             ImGui::InputInt("Number of iterations", &params.nr_iter);
-            ImGui::InputDouble("Sliding window trajectory length threshold [m]", &params.sliding_window_trajectory_length_threshold, 0.0, 0.0, "%.2f");
+            ImGui::InputDouble(
+                "Sliding window trajectory length threshold [m]", &params.sliding_window_trajectory_length_threshold, 0.0, 0.0, "%.2f");
             ImGui::InputInt("Threshold initial points", &params.threshold_initial_points);
 
             ImGui::NewLine();
@@ -904,7 +907,8 @@ void settings_gui()
 
             ImGui::Text("Fusion convention: ");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");
+                ImGui::SetTooltip(
+                    "Coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");
 
             ImGui::SameLine();
             ImGui::RadioButton("NWU", &fusionConvention, 0);
@@ -932,7 +936,8 @@ void settings_gui()
             {
                 ImGui::BeginTooltip();
                 ImGui::Text("Attitude and Heading Reference System gain:");
-                ImGui::Text("How strongly the accelerometer/magnetometer corrections influence the orientation estimate versus gyroscope integration");
+                ImGui::Text("How strongly the accelerometer/magnetometer corrections influence the orientation estimate versus gyroscope "
+                            "integration");
                 ImGui::Text("Larger value means faster response to changes in orientation, but more noise");
                 ImGui::EndTooltip();
             }
@@ -945,7 +950,7 @@ void settings_gui()
             if (ImGui::Button("Load data"))
             {
                 loStartTime = std::chrono::system_clock::now();
-                
+
                 step1(loPause);
                 std::cout << "Load data done please click 'Compute all' to continue calculations" << std::endl;
 
@@ -953,10 +958,10 @@ void settings_gui()
                 double elapsedSeconds = elapsed.count();
 
                 std::cout << "Elapsed time: " << formatTime(elapsedSeconds).c_str() << std::endl;
-
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Select folder containing IMU *.csv and LiDAR *.laz files produced by MANDEYE (e.g.: 'continousScanning_*')");
+                ImGui::SetTooltip(
+                    "Select folder containing IMU *.csv and LiDAR *.laz files produced by MANDEYE (e.g.: 'continousScanning_*')");
         }
         if (step_1_done && !step_2_done)
         {
@@ -974,11 +979,11 @@ void settings_gui()
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-				ImGui::Text("This process makes trajectory smooth, point cloud will be more consistent");
+                ImGui::Text("This process makes trajectory smooth, point cloud will be more consistent");
                 ImGui::SetTooltip("Press optionally before pressing 'Save result'");
                 ImGui::EndTooltip();
             }
-                
+
             ImGui::SameLine();
             ImGui::Checkbox("Use multiple Gaussians for each bucket", &params.use_mutliple_gaussian);
             if (ImGui::IsItemHovered())
@@ -988,11 +993,11 @@ void settings_gui()
                 save_results(true, 0.0);
 
             ImGui::SameLine();
-            ImGui::Text("Press this button for saving resulting trajectory and point clouds as single session for 'multi_view_tls_registration_step_2' program");
+            ImGui::Text("Press this button for saving resulting trajectory and point clouds as single session for "
+                        "'multi_view_tls_registration_step_2' program");
         }
         if (step_1_done && step_2_done)
         {
-
             if (ImGui::Button("Save all point clouds to single las/laz file"))
             {
                 const auto output_file_name = mandeye::fd::SaveFileDialog("Save las/laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
@@ -1277,7 +1282,8 @@ void settings_gui()
                               << "scan_0.laz" << std::endl
                               << "0.999775 0.000552479 -0.0212158 -0.0251188" << std::endl
                               << "0.000834612 0.997864 0.0653156 -0.0381429" << std::endl
-                              << "0.0212066 - 0.0653186 0.997639 -0.000757752" << "0 0 0 1" << std::endl
+                              << "0.0212066 - 0.0653186 0.997639 -0.000757752"
+                              << "0 0 0 1" << std::endl
                               << "scan_1.laz" << std::endl
                               << "0.999783 0.00178963 -0.0207603 -0.0309683" << std::endl
                               << "-0.000467341 0.99798 0.0635239 -0.0517512" << std::endl
@@ -1391,9 +1397,12 @@ void settings_gui()
                                     {
                                         TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(worker_data[i].intermediate_trajectory[j]);
 
-                                        pose.px = first_pose.translation().x() + translation.x() * (counter / number_all_nodes_inside_interval);
-                                        pose.py = first_pose.translation().y() + translation.y() * (counter / number_all_nodes_inside_interval);
-                                        pose.pz = first_pose.translation().z() + translation.z() * (counter / number_all_nodes_inside_interval);
+                                        pose.px =
+                                            first_pose.translation().x() + translation.x() * (counter / number_all_nodes_inside_interval);
+                                        pose.py =
+                                            first_pose.translation().y() + translation.y() * (counter / number_all_nodes_inside_interval);
+                                        pose.pz =
+                                            first_pose.translation().z() + translation.z() * (counter / number_all_nodes_inside_interval);
 
                                         counter += 1.0f;
 
@@ -1457,8 +1466,8 @@ void progress_window()
 {
     ImGui::Begin("Progress", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
-    ImGui::Text(("Working directory:\n'" + working_directory +  "'").c_str());
-        
+    ImGui::Text(("Working directory:\n'" + working_directory + "'").c_str());
+
     // Calculate elapsed time and ETA
     auto currentTime = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed = currentTime - loStartTime;
@@ -1483,18 +1492,18 @@ void progress_window()
     {
         std::string completionTime = formatCompletionTime(estimatedTimeRemaining);
         snprintf(progressText, sizeof(progressText), "Processing: %.1f%%", progress * 100.0f);
-        snprintf(timeInfo, sizeof(timeInfo),
-                 "Elapsed: %s | Remaining: %s | Estimated finish: ~%s",
-                 formatTime(elapsedSeconds).c_str(),
-                 formatTime(estimatedTimeRemaining).c_str(),
-                 completionTime.c_str());
+        snprintf(
+            timeInfo,
+            sizeof(timeInfo),
+            "Elapsed: %s | Remaining: %s | Estimated finish: ~%s",
+            formatTime(elapsedSeconds).c_str(),
+            formatTime(estimatedTimeRemaining).c_str(),
+            completionTime.c_str());
     }
     else
     {
         snprintf(progressText, sizeof(progressText), "Processing: %.1f%%", progress * 100.0f);
-        snprintf(timeInfo, sizeof(timeInfo),
-                 "Elapsed: %s | Calculating completion time...",
-                 formatTime(elapsedSeconds).c_str());
+        snprintf(timeInfo, sizeof(timeInfo), "Elapsed: %s | Calculating completion time...", formatTime(elapsedSeconds).c_str());
     }
 
     ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), progressText);
@@ -1562,33 +1571,29 @@ void openData()
                     << std::fixed << std::setprecision(1) << params.total_length_of_calculated_trajectory << "[m]\n"
                     << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str();
 
-                [[maybe_unused]]
-                pfd::message message(
-                    "Information",
-                    oss.str(),
-                    pfd::choice::ok, pfd::icon::info);
+                [[maybe_unused]] pfd::message message("Information", oss.str(), pfd::choice::ok, pfd::icon::info);
                 message.result();
-
             });
 
         loThread.detach();
     }
-    else //no data loaded
+    else // no data loaded
         loRunning = false;
 }
 
-void step1(const std::string &folder,
-           LidarOdometryParams &params,
-           std::vector<std::vector<Point3Di>> &pointsPerFile,
-           Imu &imu_data,
-           std::string &working_directory,
-           Trajectory &trajectory,
-           std::vector<WorkerData> &worker_data,
-           const std::atomic<bool> &loPause)
+void step1(
+    const std::string& folder,
+    LidarOdometryParams& params,
+    std::vector<std::vector<Point3Di>>& pointsPerFile,
+    Imu& imu_data,
+    std::string& working_directory,
+    Trajectory& trajectory,
+    std::vector<WorkerData>& worker_data,
+    const std::atomic<bool>& loPause)
 {
     std::vector<std::string> input_file_names;
 
-    for (const auto &entry : fs::directory_iterator(folder))
+    for (const auto& entry : fs::directory_iterator(folder))
     {
         if (!entry.is_directory())
         {
@@ -1600,27 +1605,40 @@ void step1(const std::string &folder,
     if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
-        calculate_trajectory(trajectory, imu_data, params.fusionConventionNwu, params.fusionConventionEnu, params.fusionConventionNed, params.ahrs_gain, full_debug_messages, params.use_removie_imu_bias_from_first_stationary_scan);
+        calculate_trajectory(
+            trajectory,
+            imu_data,
+            params.fusionConventionNwu,
+            params.fusionConventionEnu,
+            params.fusionConventionNed,
+            params.ahrs_gain,
+            full_debug_messages,
+            params.use_removie_imu_bias_from_first_stationary_scan);
         compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
         std::cout << "step_1_done" << std::endl;
     }
 }
 
-void step2(std::vector<WorkerData> &worker_data, LidarOdometryParams &params, const std::atomic<bool> &loPause)
+void step2(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, const std::atomic<bool>& loPause)
 {
     double ts_failure = 0.0;
     std::atomic<float> loProgress;
     compute_step_2(worker_data, params, ts_failure, loProgress, loPause, full_debug_messages);
 }
 
-void save_results(bool info, double elapsed_seconds, std::string &working_directory,
-                  std::vector<WorkerData> &worker_data, LidarOdometryParams &params, fs::path outwd)
+void save_results(
+    bool info,
+    double elapsed_seconds,
+    std::string& working_directory,
+    std::vector<WorkerData>& worker_data,
+    LidarOdometryParams& params,
+    fs::path outwd)
 {
     save_result(worker_data, params, outwd, elapsed_seconds);
 }
 
 void display()
-{ 
+{
     ImGuiIO& io = ImGui::GetIO();
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
 
@@ -1659,7 +1677,7 @@ void display()
         glColor3d(0.0, 1.0, 0.0);
         glPointSize(point_size);
         glBegin(GL_POINTS);
-        for (const auto &p : params.initial_points)
+        for (const auto& p : params.initial_points)
         {
             auto pp = params.m_g * p.point;
             glVertex3d(pp.x(), pp.y(), pp.z());
@@ -1669,7 +1687,7 @@ void display()
 
     if (show_covs)
     {
-        for (const auto &b : params.buckets_indoor)
+        for (const auto& b : params.buckets_indoor)
             draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
     }
 
@@ -1720,9 +1738,9 @@ void display()
     {
         // glBegin(GL_LINE_STRIP);
         glBegin(GL_LINES);
-        for (const auto &wd : worker_data)
+        for (const auto& wd : worker_data)
         {
-            for (const auto &it : wd.intermediate_trajectory)
+            for (const auto& it : wd.intermediate_trajectory)
             {
                 glColor3f(1, 0, 0);
                 glVertex3f(it(0, 3), it(1, 3), it(2, 3));
@@ -1745,9 +1763,9 @@ void display()
         glPointSize(3);
         glColor3f(0, 1, 1);
         glBegin(GL_POINTS);
-        for (const auto &wd : worker_data)
+        for (const auto& wd : worker_data)
         {
-            for (const auto &it : wd.intermediate_trajectory)
+            for (const auto& it : wd.intermediate_trajectory)
                 glVertex3f(it(0, 3), it(1, 3), it(2, 3));
         }
         glEnd();
@@ -1757,10 +1775,10 @@ void display()
         glBegin(GL_LINES);
         if (worker_data.size() > 0)
         {
-            const auto &wd = worker_data[worker_data.size() - 1];
+            const auto& wd = worker_data[worker_data.size() - 1];
             if (wd.intermediate_trajectory.size() > 0)
             {
-                const auto &it = wd.intermediate_trajectory[wd.intermediate_trajectory.size() - 1];
+                const auto& it = wd.intermediate_trajectory[wd.intermediate_trajectory.size() - 1];
 
                 glVertex3f(it(0, 3) - 1, it(1, 3), it(2, 3));
                 glVertex3f(it(0, 3) + 1, it(1, 3), it(2, 3));
@@ -1779,7 +1797,7 @@ void display()
     {
         glColor3f(1, 0, 0);
         glBegin(GL_POINTS);
-        for (const auto &b : params.reference_buckets)
+        for (const auto& b : params.reference_buckets)
             glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
         glEnd();
     }
@@ -1828,7 +1846,7 @@ void display()
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
-	ImGui::NewFrame();
+    ImGui::NewFrame();
 
     ShowMainDockSpace();
 
@@ -1838,7 +1856,7 @@ void display()
     {
         openData();
 
-        //workaround
+        // workaround
         io.AddKeyEvent(ImGuiKey_O, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
@@ -1955,8 +1973,8 @@ void display()
 
             if (ImGui::BeginMenu("Parameters"))
             {
-
-                ImGui::MenuItem("Remove IMU bias from first stationary scan", nullptr, &params.use_removie_imu_bias_from_first_stationary_scan);
+                ImGui::MenuItem(
+                    "Remove IMU bias from first stationary scan", nullptr, &params.use_removie_imu_bias_from_first_stationary_scan);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("IMU bias will be removed given there's a stationary period at the start of the recording");
 
@@ -1972,8 +1990,8 @@ void display()
                     ImGui::Text("0.3 [s] will make processing time aprox equal to 3x scan time");
                     ImGui::EndTooltip();
                 }
-                
-                if(ImGui::MenuItem("Set real time performance"))
+
+                if (ImGui::MenuItem("Set real time performance"))
                     params.real_time_threshold_seconds = 0.1;
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("For IMU 200Hz, 20 nodes in optimization window");
@@ -2020,8 +2038,7 @@ void display()
                             TomlIO toml_io;
                             toml_io.LoadParametersFromTomlFile(input_file_names[0], params);
                             std::cout << "Parameters loaded from: " << input_file_names[0] << std::endl;
-                        }
-                        catch (const std::exception& e)
+                        } catch (const std::exception& e)
                         {
                             std::cerr << "Error loading TOML file: " << e.what() << std::endl;
                         }
@@ -2044,7 +2061,7 @@ void display()
                             std::cerr << "Failed to save parameters." << std::endl;
                     }
                 }
-               
+
                 ImGui::EndMenu();
             }
             if (ImGui::IsItemHovered())
@@ -2098,7 +2115,7 @@ void display()
 
                 ImGui::Text("Colors:");
 
-                ImGui::ColorEdit3("Background", (float *)&params.clear_color, ImGuiColorEditFlags_NoInputs);
+                ImGui::ColorEdit3("Background", (float*)&params.clear_color, ImGuiColorEditFlags_NoInputs);
 
                 bg_color = params.clear_color;
 
@@ -2115,7 +2132,9 @@ void display()
 
             camMenu();
 
-            ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 - ImGui::GetStyle().FramePadding.x * 2);
+            ImGui::SameLine(
+                ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 -
+                ImGui::GetStyle().FramePadding.x * 2);
 
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 2));
@@ -2134,7 +2153,7 @@ void display()
 
     if (initial_transformation_gizmo)
     {
-        ImGuiIO &io = ImGui::GetIO();
+        ImGuiIO& io = ImGui::GetIO();
         // ImGuizmo -----------------------------------------------
         ImGuizmo::BeginFrame();
         ImGuizmo::Enable(true);
@@ -2146,7 +2165,13 @@ void display()
         GLfloat modelview[16];
         glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+        ImGuizmo::Manipulate(
+            &modelview[0],
+            &projection[0],
+            ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y,
+            ImGuizmo::WORLD,
+            m_gizmo,
+            NULL);
 
         params.m_g(0, 0) = m_gizmo[0];
         params.m_g(1, 0) = m_gizmo[1];
@@ -2168,7 +2193,7 @@ void display()
 
     if (gizmo_stretch_interval)
     {
-        ImGuiIO &io = ImGui::GetIO();
+        ImGuiIO& io = ImGui::GetIO();
         // ImGuizmo -----------------------------------------------
         ImGuizmo::BeginFrame();
         ImGuizmo::Enable(true);
@@ -2180,7 +2205,13 @@ void display()
         GLfloat modelview[16];
         glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
-        ImGuizmo::Manipulate(&modelview[0], &projection[0], ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::WORLD, m_gizmo, NULL);
+        ImGuizmo::Manipulate(
+            &modelview[0],
+            &projection[0],
+            ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y,
+            ImGuizmo::WORLD,
+            m_gizmo,
+            NULL);
 
         stretch_gizmo_m(0, 0) = m_gizmo[0];
         stretch_gizmo_m(1, 0) = m_gizmo[1];
@@ -2228,7 +2259,8 @@ void display()
     glutPostRedisplay();
 }
 
-void on_exit(){
+void on_exit()
+{
     // remove cache
     std::cout << "remove cache: '" << params.working_directory_cache << "' START" << std::endl;
     std::filesystem::remove_all(params.working_directory_cache);
@@ -2265,19 +2297,19 @@ void mouse(int glut_button, int state, int x, int y)
             mouse_buttons |= 1 << glut_button;
         else if (state == GLUT_UP)
             mouse_buttons = 0;
-        
+
         mouse_old_x = x;
         mouse_old_y = y;
     }
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     set_lidar_odometry_default_params(params);
 
     try
     {
-		if (argc == 4) //runnning from command line
+        if (argc == 4) // runnning from command line
         {
             // Load parameters from file using original TomlIO class
             TomlIO toml_io;
@@ -2290,28 +2322,20 @@ int main(int argc, char *argv[])
             std::chrono::time_point<std::chrono::system_clock> start, end;
             start = std::chrono::system_clock::now();
 
-            std::atomic<bool> loPause{false};
-            step1(argv[1],
-                  params,
-                  pointsPerFile,
-                  imu_data,
-                  working_directory,
-                  trajectory,
-                  worker_data,
-                  loPause);
+            std::atomic<bool> loPause{ false };
+            step1(argv[1], params, pointsPerFile, imu_data, working_directory, trajectory, worker_data, loPause);
 
             step2(worker_data, params, loPause);
 
             end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds = end - start;
             std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-            std::cout << "calculations finished computation at "
-                      << std::ctime(&end_time)
+            std::cout << "calculations finished computation at " << std::ctime(&end_time)
                       << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "s\n";
 
             save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);
         }
-        else //full GUI mode
+        else // full GUI mode
         {
             std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
 
@@ -2324,17 +2348,14 @@ int main(int argc, char *argv[])
             ImGui_ImplGLUT_Shutdown();
             ImGui::DestroyContext();
         }
-    }
-    catch (const std::bad_alloc& e)
+    } catch (const std::bad_alloc& e)
     {
         std::cerr << "System is out of memory : " << e.what() << std::endl;
         mandeye::fd::OutOfMemMessage();
-    }
-    catch (const std::exception& e)
+    } catch (const std::exception& e)
     {
         std::cout << e.what();
-    }
-    catch (...)
+    } catch (...)
     {
         std::cerr << "Unknown fatal error occurred." << std::endl;
     }

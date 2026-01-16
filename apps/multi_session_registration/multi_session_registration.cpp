@@ -137,8 +137,6 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "Ctrl + right click", "" },
                                                          { "", "Ctrl + middle click", "" } };
 
-float m_ortho_projection[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
-float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 float m_gizmo[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 bool is_decimate = true;
@@ -1869,7 +1867,7 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observ
     return pos;
 }
 
-bool load_project_settings(const std::string& file_name, ProjectSettings& _project_settings)
+bool loadProject(const std::string& file_name, ProjectSettings& _project_settings)
 {
     std::cout << "Opening project file: '" << file_name << "'\n";
 
@@ -1933,6 +1931,12 @@ bool load_project_settings(const std::string& file_name, ProjectSettings& _proje
         return false;
     }
 
+    std::string newTitle = winTitle + " - " + truncPath(file_name);
+    glutSetWindowTitle(newTitle.c_str());
+
+    loaded_sessions = false;
+    time_stamp_offset = 0.0;
+
     return true;
 }
 
@@ -1943,13 +1947,7 @@ void openProject()
 
     if (input_file_name.size() > 0)
     {
-        load_project_settings(fs::path(input_file_name).string(), project_settings);
-
-        std::string newTitle = winTitle + " - " + truncPath(input_file_name);
-        glutSetWindowTitle(newTitle.c_str());
-
-        loaded_sessions = false;
-        time_stamp_offset = 0.0;
+        loadProject(fs::path(input_file_name).string(), project_settings);
     }
 }
 
@@ -2423,50 +2421,7 @@ void display()
         glLoadMatrixf(viewLocal.matrix().data());
     }
     else
-    {
-        glOrtho(
-            -camera_ortho_xy_view_zoom,
-            camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio,
-            -100000,
-            100000);
-
-        glm::mat4 proj = glm::orthoLH_ZO<float>(
-            -camera_ortho_xy_view_zoom,
-            camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio,
-            -100,
-            100);
-
-        std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
-
-        Eigen::Vector3d v_eye_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h + 10);
-        Eigen::Vector3d v_center_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h);
-        Eigen::Vector3d v(0, 1, 0);
-
-        TaitBryanPose pose_tb;
-        pose_tb.px = 0.0;
-        pose_tb.py = 0.0;
-        pose_tb.pz = 0.0;
-        pose_tb.om = 0.0;
-        pose_tb.fi = 0.0;
-        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * DEG_TO_RAD;
-        auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
-
-        Eigen::Vector3d v_t = m * v;
-
-        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(), v_center_t.x(), v_center_t.y(), v_center_t.z(), v_t.x(), v_t.y(), v_t.z());
-        glm::mat4 lookat = glm::lookAt(
-            glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
-            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
-            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
-        std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
-
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-    }
+        updateOrthoView();
 
     showAxes();
 
@@ -3681,16 +3636,18 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
             }
             ImGui::EndDisabled();
 
-            ImGui::MenuItem("Orthographic", "key O", &is_ortho);
-            if (is_ortho)
+            if (ImGui::MenuItem("Orthographic", "key O", &is_ortho))
             {
-                new_rotation_center = rotation_center;
-                new_rotate_x = 0.0;
-                new_rotate_y = 0.0;
-                new_translate_x = translate_x;
-                new_translate_y = translate_y;
-                new_translate_z = translate_z;
-                camera_transition_active = true;
+                if (is_ortho)
+                {
+                    new_rotation_center = rotation_center;
+                    new_rotate_x = 0.0;
+                    new_rotate_y = 0.0;
+                    new_translate_x = translate_x;
+                    new_translate_y = translate_y;
+                    new_translate_z = translate_z;
+                    camera_transition_active = true;
+                }
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
@@ -3941,7 +3898,35 @@ int main(int argc, char* argv[])
 {
     try
     {
+        if (checkClHelp(argc, argv))
+        {
+            std::cout << winTitle << "\n\n"
+                      << "USAGE:\n"
+                      << std::filesystem::path(argv[0]).stem().string() << " <input_file> /?\n\n"
+                      << "where\n"
+                      << "   <input_file>         Path to Mandeye JSON Project file (*.mjp)\n"
+                      << "   -h, /h, --help, /?   Show this help and exit\n\n";
+
+            return 0;
+        }
+
         initGL(&argc, argv, winTitle, display, mouse);
+
+        if (argc > 1)
+        {
+            for (int i = 1; i < argc; i++)
+            {
+                std::string ext = fs::path(argv[i]).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+                if (ext == ".mjp")
+                {
+                    loadProject(argv[i], project_settings);
+
+                    break;
+                }
+            }
+        }
 
         glutMainLoop();
 

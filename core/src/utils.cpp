@@ -9,6 +9,9 @@
 #include <imgui_impl_opengl2.h>
 #include <imgui_internal.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "utils.hpp"
 
 #include <HDMapping/Version.hpp>
@@ -16,7 +19,6 @@
 #ifdef _WIN32
 #include <shellapi.h>
 #include <windows.h>
-
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -46,7 +48,6 @@ float translate_z = -50.0;
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
 double camera_ortho_xy_view_shift_y = 0.0;
-double camera_ortho_xy_view_rotation_angle_deg = 0;
 double camera_mode_ortho_z_center_h = 0.0;
 
 // Target camera state for smooth transitions
@@ -71,6 +72,9 @@ double scroll_hint_lastT = 0.0;
 bool show_about = false;
 
 bool glLineWidthSupport = true;
+
+float m_ortho_projection[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 // General shortcuts applicable to any app
 static const std::vector<ShortcutEntry> shortcuts = { { "Normal keys", "A", "" },
@@ -274,9 +278,16 @@ void motion(int x, int y)
         dx = (float)(x - mouse_old_x);
         dy = (float)(y - mouse_old_y);
 
-        if (is_ortho)
+        if (mouse_buttons & 1) // left button
         {
-            if (mouse_buttons & 1)
+            rotate_x += dy * 0.2f;
+            rotate_y += dx * 0.2f;
+            breakCameraTransition();
+        }
+
+        if (mouse_buttons & 4) // right button
+        {
+            if (is_ortho)
             {
                 float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
                 Eigen::Vector3d v(
@@ -289,28 +300,17 @@ void motion(int x, int y)
                 pose_tb.pz = 0.0;
                 pose_tb.om = 0.0;
                 pose_tb.fi = 0.0;
-                pose_tb.ka = camera_ortho_xy_view_rotation_angle_deg * M_PI / 180.0;
+                pose_tb.ka = (rotate_x + rotate_y)*M_PI / 180.0;
                 auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
                 Eigen::Vector3d v_t = m * v;
                 camera_ortho_xy_view_shift_x += v_t.x();
                 camera_ortho_xy_view_shift_y += v_t.y();
             }
-        }
-        else
-        {
-            if (mouse_buttons & 1) // left button
-            {
-                rotate_x += dy * 0.2f; // * mouse_sensitivity;
-                rotate_y += dx * 0.2f; // * mouse_sensitivity;
-                breakCameraTransition();
-                // camera_transition_active = false;
-            }
-            if (mouse_buttons & 4) // right button
+            else
             {
                 translate_x += dx * 0.1f * mouse_sensitivity;
                 translate_y -= dy * 0.1f * mouse_sensitivity;
                 breakCameraTransition();
-                // camera_transition_active = false;
             }
         }
 
@@ -683,7 +683,6 @@ void setCameraPreset(CameraPreset preset)
         camera_ortho_xy_view_zoom = 10;
         camera_ortho_xy_view_shift_x = 0.0;
         camera_ortho_xy_view_shift_y = 0.0;
-        camera_ortho_xy_view_rotation_angle_deg = 0;
         camera_mode_ortho_z_center_h = 0.0;
 
         viewer_decimate_point_cloud = 1000;
@@ -809,46 +808,46 @@ void view_kbd_shortcuts()
     // translate camera
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
     {
-        translate_x += 0.2f * mouse_sensitivity;
+        translate_x += 0.5f * mouse_sensitivity;
         breakCameraTransition();
     }
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
     {
-        translate_x -= 0.2f * mouse_sensitivity;
+        translate_x -= 0.5f * mouse_sensitivity;
         breakCameraTransition();
     }
 
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
     {
-        translate_y += 0.2f * mouse_sensitivity;
+        translate_y += 0.5f * mouse_sensitivity;
         breakCameraTransition();
     }
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
     {
-        translate_y -= 0.2f * mouse_sensitivity;
+        translate_y -= 0.5f * mouse_sensitivity;
         breakCameraTransition();
     }
 
     // rotate camera
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
     {
-        rotate_y -= mouse_sensitivity;
+        rotate_y -= 0.6;
         breakCameraTransition();
     }
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
     {
-        rotate_y += mouse_sensitivity;
+        rotate_y += 0.6;
         breakCameraTransition();
     }
 
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
     {
-        rotate_x -= mouse_sensitivity;
+        rotate_x -= 0.6;
         breakCameraTransition();
     }
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
     {
-        rotate_x += mouse_sensitivity;
+        rotate_x += 0.6;
         breakCameraTransition();
     }
 
@@ -1494,4 +1493,76 @@ void setNewRotationCenter(int x, int y)
     new_translate_z = translate_z;
 
     camera_transition_active = true;
+}
+
+
+
+bool checkClHelp(int argc, char** argv)
+{
+    for (int i = 1; i < argc; ++i)
+    {
+        std::string arg(argv[i]);
+
+        if (arg == "-h" || arg == "/h" || arg == "--help" || arg == "/?")
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+
+void updateOrthoView()
+{
+    // still updating viewLocal for compass
+    viewLocal.rotate(Eigen::AngleAxisf((rotate_x + rotate_y) * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+
+    ImGuiIO& io = ImGui::GetIO();
+    float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+
+    
+
+    glOrtho(
+        -camera_ortho_xy_view_zoom,
+        camera_ortho_xy_view_zoom,
+        -camera_ortho_xy_view_zoom / ratio,
+        camera_ortho_xy_view_zoom / ratio,
+        -100000,
+        100000);
+
+    glm::mat4 proj = glm::orthoLH_ZO<float>(
+        -camera_ortho_xy_view_zoom,
+        camera_ortho_xy_view_zoom,
+        -camera_ortho_xy_view_zoom / ratio,
+        camera_ortho_xy_view_zoom / ratio,
+        -100,
+        100);
+
+    std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
+
+    Eigen::Vector3d v_eye_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h + 10);
+    Eigen::Vector3d v_center_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h);
+    Eigen::Vector3d v(0, 1, 0);
+
+    TaitBryanPose pose_tb;
+    pose_tb.px = 0.0;
+    pose_tb.py = 0.0;
+    pose_tb.pz = 0.0;
+    pose_tb.om = 0.0;
+    pose_tb.fi = 0.0;
+    pose_tb.ka = -(rotate_x + rotate_y) * DEG_TO_RAD;
+    auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
+
+    Eigen::Vector3d v_t = m * v;
+
+    gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(), v_center_t.x(), v_center_t.y(), v_center_t.z(), v_t.x(), v_t.y(), v_t.z());
+    glm::mat4 lookat = glm::lookAt(
+        glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
+        glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
+        glm::vec3(v_t.x(), v_t.y(), v_t.z()));
+    std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
 }

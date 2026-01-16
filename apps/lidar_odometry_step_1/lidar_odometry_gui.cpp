@@ -2311,6 +2311,20 @@ int main(int argc, char* argv[])
 
     try
     {
+        if (checkClHelp(argc, argv))
+        {
+            std::cout << winTitle << "\n\n"
+                      << "USAGE:\n"
+                      << std::filesystem::path(argv[0]).stem().string() << " <input_folder> <parameter_file> <output_folder> /?\n\n"
+                      << "where\n"
+                      << "   <input_folder>       Path where scan files are located (*.csv, *.laz, *.sn)\n"
+                      << "   <parameter_file>     Path to TOML parameter file (*.toml)\n"
+                      << "   <output_folder>      Path where processed session should be stored\n"
+                      << "   -h, /h, --help, /?   Show this help and exit\n\n";
+
+            return 0;
+        }
+
         if (argc == 4) // runnning from command line
         {
             // Load parameters from file using original TomlIO class

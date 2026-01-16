@@ -60,7 +60,6 @@ extern float mouse_sensitivity;
 
 extern bool is_ortho;
 extern bool lock_z;
-void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd);
 extern bool show_axes;
 extern ImVec4 bg_color;
 extern int point_size;
@@ -77,7 +76,6 @@ extern float translate_x, translate_y, translate_z;
 extern double camera_ortho_xy_view_zoom;
 extern double camera_ortho_xy_view_shift_x;
 extern double camera_ortho_xy_view_shift_y;
-extern double camera_ortho_xy_view_rotation_angle_deg;
 extern double camera_mode_ortho_z_center_h;
 
 // Target camera state for smooth transitions
@@ -93,8 +91,10 @@ extern bool camera_transition_active;
 
 extern bool glLineWidthSupport;
 
-struct ShortcutEntry
-{
+extern float m_ortho_projection[];
+extern float m_ortho_gizmo_view[];
+
+struct ShortcutEntry {
     std::string type;
     std::string shortcut;
     std::string description;
@@ -110,6 +110,8 @@ void wheel(int button, int dir, int x, int y);
 void reshape(int w, int h);
 void ShowMainDockSpace();
 bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)(), void (*mouse)(int, int, int, int));
+
+void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd);
 
 void showAxes();
 void updateCameraTransition();
@@ -140,3 +142,7 @@ void getClosestTrajectoriesPoint(
     bool KeyShift);
 
 void setNewRotationCenter(int x, int y);
+
+bool checkClHelp(int argc, char** argv);
+
+void updateOrthoView();

@@ -184,6 +184,8 @@ std::chrono::time_point<std::chrono::system_clock> loStartTime;
 std::atomic<double> loElapsedSeconds{ 0.0 };
 std::atomic<double> loEstimatedTimeRemaining{ 0.0 };
 
+fs::path outwd;
+
 #if _WIN32
 #define DEFAULT_PATH "C:\\"
 #else
@@ -670,7 +672,7 @@ void step2(const std::atomic<bool>& loPause)
 
 void save_results(bool info, double elapsed_seconds)
 {
-    fs::path outwd = get_next_result_path(working_directory);
+    outwd = get_next_result_path(working_directory);
     save_result(worker_data, params, outwd, elapsed_seconds);
     if (info)
     {
@@ -883,9 +885,9 @@ void settings_gui()
 
             ImGui::NewLine();
 
-            ImGui::InputDouble("Decimation", &params.decimation, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("Downsampling", &params.decimation, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Larger value of decimation better performance, but worse accuracy");
+                ImGui::SetTooltip("Larger value of downsampling better performance, but worse accuracy");
 
             ImGui::InputDouble("Max distance of processed points [m]", &params.max_distance_lidar, 0.0, 0.0, "%.2f");
             if (ImGui::IsItemHovered())
@@ -1100,7 +1102,7 @@ void settings_gui()
                 ImGui::SameLine();
                 ImGui::Checkbox("Show buckets", &show_reference_buckets);
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
-                ImGui::InputInt("Decimation###ref", &dec_reference_points);
+                ImGui::InputInt("Downsamplingn###ref", &dec_reference_points);
 
                 if (ImGui::Button("Filter reference buckets"))
                 {
@@ -1564,9 +1566,9 @@ void openData()
                 loRunning = false;
 
                 std::ostringstream oss;
-                oss << "Data saved to folder:\n'" << working_directory << "\\lio_result_*'\n"
-                    << "Calculated trajectory length: " << std::fixed << std::setprecision(1)
-                    << params.total_length_of_calculated_trajectory << "[m]\n"
+                oss << "Data saved to folder:\n'" << outwd.string() << "'\n"
+                    << "Calculated trajectory length: "
+                    << std::fixed << std::setprecision(1) << params.total_length_of_calculated_trajectory << "[m]\n"
                     << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str();
 
                 [[maybe_unused]] pfd::message message("Information", oss.str(), pfd::choice::ok, pfd::icon::info);

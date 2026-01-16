@@ -26,6 +26,7 @@ void ObservationPicking::render()
 			}
 			glEnd();
 		}
+
 		if (grid1x1m) {
 			glColor3f(0.3, 0.3, 0.3);
 			glBegin(GL_LINES);
@@ -39,6 +40,7 @@ void ObservationPicking::render()
 			}
 			glEnd();
 		}
+
 		if (grid01x01m) {
 			glColor3f(0.1, 0.1, 0.1);
 			glBegin(GL_LINES);
@@ -52,6 +54,7 @@ void ObservationPicking::render()
 			}
 			glEnd();
 		}
+
 		if (grid001x001m) {
 			glColor3f(0.8, 0.8, 0.8);
 			glBegin(GL_LINES);

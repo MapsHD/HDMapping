@@ -40,6 +40,15 @@ enum CameraPreset
     CAMERA_RESET
 };
 
+enum ColorScheme {
+    CS_SOLID,       // fixed color
+    CS_RANDOM,      // random
+    CS_GRAD_INTENS, // gradient based on intensity
+    CS_GRAD_ELEV,   // gradient based on elevation
+    CS_GRAD_DIST,   // gradient based on distance from rotation center
+    CS_FOLLOW       // valid for trajectory
+};
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 extern int viewer_decimate_point_cloud;
@@ -81,8 +90,9 @@ extern float new_translate_z;
 // Transition timing
 extern bool camera_transition_active;
 
-struct ShortcutEntry
-{
+extern bool glLineWidthSupport;
+
+struct ShortcutEntry {
     std::string type;
     std::string shortcut;
     std::string description;

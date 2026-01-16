@@ -204,7 +204,13 @@ int index_loop_closure_target = 0;
 int index_begin = 0;
 int index_end = 0;
 
-float m_gizmo[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+ColorScheme csPointCloud = CS_SOLID;
+ColorScheme csTrajectory = CS_SOLID;
+
+float m_gizmo[] = {1, 0, 0, 0,
+                   0, 1, 0, 0,
+                   0, 0, 1, 0,
+                   0, 0, 0, 1};
 
 float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
@@ -1294,10 +1300,7 @@ void lio_segments_gui()
                 if (session.point_clouds_container.point_clouds[i].visible)
                 {
                     ImGui::SameLine();
-                    ImGui::ColorEdit3(
-                        ("pc_color##" + std::to_string(i)).c_str(),
-                        session.point_clouds_container.point_clouds[i].render_color,
-                        ImGuiColorEditFlags_NoInputs);
+                    ImGui::ColorEdit3(("color##" + std::to_string(i)).c_str(), session.point_clouds_container.point_clouds[i].render_color, ImGuiColorEditFlags_NoInputs);
 
 #if 0
                     ImGui::SameLine();
@@ -2446,26 +2449,9 @@ void display()
                 }
             }
 
-            session.point_clouds_container.render(
-                observation_picking,
-                viewer_decimate_point_cloud,
-                session.point_clouds_container.xz_intersection,
-                session.point_clouds_container.yz_intersection,
-                session.point_clouds_container.xy_intersection,
-                session.point_clouds_container.xz_grid_10x10,
-                session.point_clouds_container.xz_grid_1x1,
-                session.point_clouds_container.xz_grid_01x01,
-                session.point_clouds_container.yz_grid_10x10,
-                session.point_clouds_container.yz_grid_1x1,
-                session.point_clouds_container.yz_grid_01x01,
-                session.point_clouds_container.xy_grid_10x10,
-                session.point_clouds_container.xy_grid_1x1,
-                session.point_clouds_container.xy_grid_01x01,
-                session.point_clouds_container.intersection_width,
-                session_dims);
+            session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, session_dims);
 
-            // std::cout << "session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 <<
-            // std::endl;
+            // std::cout << "session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 << std::endl;
 
             observation_picking.render();
 
@@ -2672,7 +2658,13 @@ void display()
             pc.render_color[0] = float(rand() % 255) / 255.0f;
             pc.render_color[1] = float(rand() % 255) / 255.0f;
             pc.render_color[2] = float(rand() % 255) / 255.0f;
-            pc.show_color = false;
+            
+            if (csTrajectory == CS_FOLLOW)
+            {
+                pc.traj_color[0] = pc.render_color[0];
+                pc.traj_color[1] = pc.render_color[1];
+                pc.traj_color[2] = pc.render_color[2];
+            }
         }
 
         // workaround
@@ -3322,27 +3314,159 @@ void display()
         {
             ImGui::BeginDisabled(!session_loaded);
             {
-                auto tmp = point_size;
-                ImGui::SetNextItemWidth(ImGuiNumberWidth);
-                ImGui::InputInt("Points size", &point_size);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("keyboard 1-9 keys");
-                if (point_size < 1)
-                    point_size = 1;
-                else if (point_size > 10)
-                    point_size = 10;
+                if (ImGui::BeginMenu("Point cloud"))
+                {
+                    auto tmp = point_size;
+                    ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                    ImGui::InputInt("Points size", &point_size);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("keyboard 1-9 keys");
+                    if (point_size < 1)
+                        point_size = 1;
+                    else if (point_size > 10)
+                        point_size = 10;
 
-                if (tmp != point_size)
-                    for (auto& point_cloud : session.point_clouds_container.point_clouds)
-                        point_cloud.point_size = point_size;
+                    if (tmp != point_size)
+                        for (auto& point_cloud : session.point_clouds_container.point_clouds)
+                            point_cloud.point_size = point_size;
+
+                    ImGui::Separator();
+
+                    ImGui::Text("Color:");
+
+                    float color[3];
+                    if (session_loaded)
+                    {
+                        color[0] = session.point_clouds_container.point_clouds[0].render_color[0];
+                        color[1] = session.point_clouds_container.point_clouds[0].render_color[1];
+                        color[2] = session.point_clouds_container.point_clouds[0].render_color[2];
+                    }
+
+                    if (ImGui::ColorEdit3("", (float*)&color, ImGuiColorEditFlags_NoInputs))
+                    {
+                        csPointCloud = CS_SOLID;
+
+                        for (auto& pc : session.point_clouds_container.point_clouds)
+                        {
+                            pc.render_color[0] = color[0];
+                            pc.render_color[1] = color[1];
+                            pc.render_color[2] = color[2];
+
+                            if (csTrajectory == CS_FOLLOW)
+                            {
+                                pc.traj_color[0] = pc.render_color[0];
+                                pc.traj_color[1] = pc.render_color[1];
+                                pc.traj_color[2] = pc.render_color[2];
+                            }
+                        }
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::MenuItem("> Solid", nullptr, (csPointCloud == CS_SOLID)))
+                        csPointCloud = CS_SOLID;
+
+                    if (ImGui::MenuItem("> Random per segment", "Ctrl+R", (csPointCloud == CS_RANDOM)))
+                    {
+                        csPointCloud = CS_RANDOM;
+
+                        for (auto& pc : session.point_clouds_container.point_clouds)
+                        {
+                            pc.render_color[0] = float(rand() % 255) / 255.0f;
+                            pc.render_color[1] = float(rand() % 255) / 255.0f;
+                            pc.render_color[2] = float(rand() % 255) / 255.0f;
+
+                            if (csTrajectory == CS_FOLLOW)
+                            {
+                                pc.traj_color[0] = pc.render_color[0];
+                                pc.traj_color[1] = pc.render_color[1];
+                                pc.traj_color[2] = pc.render_color[2];
+                            }
+                        }
+                    }
+
+                    ImGui::EndMenu();
+                }
+
+                if (ImGui::BeginMenu("Trajectory"))
+                {
+                    ImGui::BeginDisabled(!glLineWidthSupport);
+                    {
+                        auto tmp = session.point_clouds_container.point_clouds[0].line_width;
+                        ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                        ImGui::InputInt("Line width", &tmp);
+                        if (tmp < 0)
+                            tmp = 0;
+                        else if (tmp > 5)
+                            tmp = 5;
+
+                        if (tmp != session.point_clouds_container.point_clouds[0].line_width)
+                            for (auto& point_cloud : session.point_clouds_container.point_clouds)
+                                point_cloud.line_width = tmp;
+                    }
+                    ImGui::EndDisabled();
+
+                    ImGui::MenuItem("Show IMU to LIO difference", nullptr, &session.point_clouds_container.show_imu_to_lio_diff);
+
+                    ImGui::Separator();
+
+                    ImGui::Text("Color:");
+
+                    float color[3];
+                    if (session_loaded)
+                    {
+                        color[0] = session.point_clouds_container.point_clouds[0].traj_color[0];
+                        color[1] = session.point_clouds_container.point_clouds[0].traj_color[1];
+                        color[2] = session.point_clouds_container.point_clouds[0].traj_color[2];
+                    }
+
+                    if (ImGui::ColorEdit3("", (float*)&color, ImGuiColorEditFlags_NoInputs))
+                    {
+                        csTrajectory = CS_SOLID;
+
+                        for (auto& pc : session.point_clouds_container.point_clouds)
+                        {
+                            pc.traj_color[0] = color[0];
+                            pc.traj_color[1] = color[1];
+                            pc.traj_color[2] = color[2];
+                        }
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::MenuItem("> Solid", nullptr, (csTrajectory == CS_SOLID)))
+                        csTrajectory = CS_SOLID;
+
+                    if (ImGui::MenuItem("> Random per segment", nullptr, (csTrajectory == CS_RANDOM)))
+                    {
+                        csTrajectory = CS_RANDOM;
+
+                        for (auto& pc : session.point_clouds_container.point_clouds)
+                        {
+                            pc.traj_color[0] = float(rand() % 255) / 255.0f;
+                            pc.traj_color[1] = float(rand() % 255) / 255.0f;
+                            pc.traj_color[2] = float(rand() % 255) / 255.0f;
+                        }
+                    }
+
+                    if (ImGui::MenuItem("> Follow cloud color", nullptr, (csTrajectory == CS_FOLLOW)))
+                    {
+                        csTrajectory = CS_FOLLOW;
+
+                        for (auto& pc : session.point_clouds_container.point_clouds)
+                        {
+                            pc.traj_color[0] = pc.render_color[0];
+                            pc.traj_color[1] = pc.render_color[1];
+                            pc.traj_color[2] = pc.render_color[2];
+                        }
+                    }
+
+                    ImGui::EndMenu();
+                }
+
+                ImGui::ColorEdit3("Background color", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
 
                 ImGui::BeginDisabled(tls_registration.gnss.gnss_poses.size() <= 0);
                 {
                     ImGui::MenuItem("Show GNSS correspondences", nullptr, &tls_registration.gnss.show_correspondences);
                 }
                 ImGui::EndDisabled();
-
-                ImGui::MenuItem("Show IMU to LIO difference", nullptr, &session.point_clouds_container.show_imu_to_lio_diff);
 
                 ImGui::Separator();
             }
@@ -3366,46 +3490,6 @@ void display()
             ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
             ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);
-
-            ImGui::Separator();
-
-            ImGui::Text("Colors:");
-
-            ImGui::ColorEdit3("Background", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
-
-            ImGui::BeginDisabled(!session_loaded);
-            {
-                float color[3];
-                if (session_loaded)
-                {
-                    color[0] = session.point_clouds_container.point_clouds[0].render_color[0];
-                    color[1] = session.point_clouds_container.point_clouds[0].render_color[1];
-                    color[2] = session.point_clouds_container.point_clouds[0].render_color[2];
-                }
-
-                if (ImGui::ColorEdit3("Point cloud", (float*)&color, ImGuiColorEditFlags_NoInputs))
-                {
-                    for (auto& pc : session.point_clouds_container.point_clouds)
-                    {
-                        pc.render_color[0] = color[0];
-                        pc.render_color[1] = color[1];
-                        pc.render_color[2] = color[2];
-                        pc.show_color = false;
-                    }
-                }
-
-                if (ImGui::MenuItem("Random segments colors", "Ctrl+R"))
-                {
-                    for (auto& pc : session.point_clouds_container.point_clouds)
-                    {
-                        pc.render_color[0] = float(rand() % 255) / 255.0f;
-                        pc.render_color[1] = float(rand() % 255) / 255.0f;
-                        pc.render_color[2] = float(rand() % 255) / 255.0f;
-                        pc.show_color = false;
-                    }
-                }
-            }
-            ImGui::EndDisabled();
 
             ImGui::Separator();
 
@@ -3461,7 +3545,7 @@ void display()
             ImGui::SameLine();
 
             ImGui::SetNextItemWidth(ImGuiNumberWidth);
-            ImGui::InputInt("Points render subsampling", &viewer_decimate_point_cloud, 10, 100);
+            ImGui::InputInt("Points render downsampling", &viewer_decimate_point_cloud, 10, 100);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("increase for better performance, decrease for rendering more points");
             ImGui::SameLine();

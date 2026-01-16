@@ -803,52 +803,22 @@ void PointClouds::draw_grids(
     }
 }
 
-void PointClouds::render(
-    const ObservationPicking& observation_picking,
-    int viewer_decmiate_point_cloud,
-    bool xz_intersection,
-    bool yz_intersection,
-    bool xy_intersection,
-    bool xz_grid_10x10,
-    bool xz_grid_1x1,
-    bool xz_grid_01x01,
-    bool yz_grid_10x10,
-    bool yz_grid_1x1,
-    bool yz_grid_01x01,
-    bool xy_grid_10x10,
-    bool xy_grid_1x1,
-    bool xy_grid_01x01,
-    double intersection_width,
-    PointClouds::PointCloudDimensions dims)
+void PointClouds::render(const ObservationPicking &observation_picking, int viewer_decimate_point_cloud, PointClouds::PointCloudDimensions dims)
 {
-    // Draw grids once for the scene
-    if (xz_grid_10x10 || xz_grid_1x1 || xz_grid_01x01 || yz_grid_10x10 || yz_grid_1x1 || yz_grid_01x01 || xy_grid_10x10 || xy_grid_1x1 ||
-        xy_grid_01x01)
-        draw_grids(
-            xz_grid_10x10,
-            xz_grid_1x1,
-            xz_grid_01x01,
-            yz_grid_10x10,
-            yz_grid_1x1,
-            yz_grid_01x01,
-            xy_grid_10x10,
-            xy_grid_1x1,
-            xy_grid_01x01,
-            dims);
+	// Draw grids once for the scene
+	if (xz_grid_10x10 || xz_grid_1x1 || xz_grid_01x01 ||
+		yz_grid_10x10 || yz_grid_1x1 || yz_grid_01x01 ||
+		xy_grid_10x10 || xy_grid_1x1 || xy_grid_01x01)
+		draw_grids(xz_grid_10x10, xz_grid_1x1, xz_grid_01x01,
+				   yz_grid_10x10, yz_grid_1x1, yz_grid_01x01,
+				   xy_grid_10x10, xy_grid_1x1, xy_grid_01x01, dims);
 
-    // Render each point cloud (points + trajectories)
-    for (auto& p : point_clouds)
-    {
-        p.render(
-            this->show_with_initial_pose,
-            observation_picking,
-            viewer_decmiate_point_cloud,
-            xz_intersection,
-            yz_intersection,
-            xy_intersection,
-            intersection_width,
-            show_imu_to_lio_diff);
-    }
+	// Render each point cloud (points + trajectories)
+	for (auto &p : point_clouds)
+	{
+		p.render(this->show_with_initial_pose, observation_picking, viewer_decimate_point_cloud,
+				 xz_intersection, yz_intersection, xy_intersection, intersection_width, show_imu_to_lio_diff);
+	}
 }
 #endif
 

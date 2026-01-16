@@ -13,9 +13,9 @@ endif()
 
 if (WIN32)
     # Download OpenCV precompiled self-extractig 
-    set(OPENCV_DOWNLOAD_EXE_URL "https://github.com/opencv/opencv/releases/download/4.12.0/opencv-4.12.0-windows.exe")
-    set(OPENCV_DOWNLOAD_EXE_SHA256 "b753b14d880b9bc8d89d6acd3b665c040baec0211078435432fcae117db707af")
-    set(OPENCV_DOWNLOAD_EXE "${CMAKE_BINARY_DIR}/opencv-4.12.0-windows.exe")
+    set(OPENCV_DOWNLOAD_EXE_URL "https://github.com/opencv/opencv/releases/download/4.13.0/opencv-4.13.0-windows.exe")
+    set(OPENCV_DOWNLOAD_EXE_SHA256 "f0e98c302464d6860777a7015065e11b9b271b5394e6ba92663f0cf1fc303f2c")
+    set(OPENCV_DOWNLOAD_EXE "${CMAKE_BINARY_DIR}/opencv-4.13.0-windows.exe")
 
 
     if(NOT EXISTS ${OPENCV_DOWNLOAD_EXE})

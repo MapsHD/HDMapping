@@ -45,8 +45,6 @@ public:
 		float &y_width = width_length_height[1];
 		float &z_height = width_length_height[2];
 
-		glColor3f(color[0], color[1], color[2]);
-
 		Eigen::Vector3d v000(-x_length * 0.5, -y_width * 0.5, -z_height * 0.5);
 		Eigen::Vector3d v100(x_length * 0.5, -y_width * 0.5, -z_height * 0.5);
 		Eigen::Vector3d v110(x_length * 0.5, y_width * 0.5, -z_height * 0.5);
@@ -66,6 +64,8 @@ public:
 		Eigen::Vector3d v101t = m_pose * v101;
 		Eigen::Vector3d v111t = m_pose * v111;
 		Eigen::Vector3d v011t = m_pose * v011;
+
+		glColor3f(color[0], color[1], color[2]);
 
 		glBegin(GL_LINES);
 

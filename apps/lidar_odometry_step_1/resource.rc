@@ -20,8 +20,8 @@ IDI_ICON1               ICON                    "icon.ico"
 //
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 0, 0, 9, 5
-PRODUCTVERSION 0, 0, 9, 5
+FILEVERSION 0, 0, 9, 6
+PRODUCTVERSION 0, 0, 9, 6
 FILEFLAGSMASK 0x3fL
 FILEOS 0x40004
 FILETYPE 0x1
@@ -32,11 +32,11 @@ BLOCK "040904B0"
 BEGIN
 VALUE "CompanyName", "Mandeye\0"
 VALUE "FileDescription", "HDMapping Step 1\0"
-VALUE "FileVersion", "0.9.5\0"
+VALUE "FileVersion", "0.9.6\0"
 VALUE "InternalName", "Odometry\0"
-VALUE "LegalCopyright", "(c) 2025 github.com/MapsHD/HDMapping\0"
+VALUE "LegalCopyright", "(c) 2026 github.com/MapsHD/HDMapping\0"
 VALUE "OriginalFilename", "lidar_odometry_step_1.exe\0"
-VALUE "ProductVersion", "0.9.5\0"
+VALUE "ProductVersion", "0.9.6\0"
 VALUE "ProgramID", "github.com/MapsHD/HDMapping\0"
 VALUE "ProductName", "HDMapping\0"
 END

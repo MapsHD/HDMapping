@@ -148,8 +148,8 @@ int index_rendered_points_local = -1;
 float offset_intensity = 0.0;
 bool show_neighbouring_scans = false;
 
-int colorScheme = 0; //0=solid color; gradients:1=intensity, 2=cloud height
-int oldcolorScheme = 0;
+ColorScheme colorScheme = CS_SOLID;
+ColorScheme oldcolorScheme = CS_SOLID;
 bool usePose = false;
 
 bool is_properties_gui = false;
@@ -322,7 +322,7 @@ void ImGuiConsole(bool* p_open)
     };
  
     struct Cloud {         //order matters for std430 layout
-        int colorScheme;   // 0=solid,1=intensity gradient, etc.
+        int colorScheme;   // 0=solid,1=random,2=intensity gradient, etc.
         vec3 fixedColor;   // fixed color
         mat4 pose;         // cloud transformation
     };
@@ -378,7 +378,7 @@ void ImGuiConsole(bool* p_open)
 
         if (vColorScheme == 0)
             endColor = vFixedColor;                 // solid color
-        else if (vColorScheme == 1)
+        else if (vColorScheme == 2)
             endColor = vec3(norm, 0.0, 1.0 - norm); // blue–red gradient by intensity
         else
             endColor = vec3(0.5);                   // default gray
@@ -616,23 +616,23 @@ void ImGuiConsole(bool* p_open)
 
         if (oldcolorScheme != colorScheme)
         {
-            if (colorScheme == 0)
+            if (colorScheme == CS_SOLID)
                 for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
                 {
-                    gl_cloudsSSBO[i].colorScheme = 0;
+                    gl_cloudsSSBO[i].colorScheme = CS_SOLID;
                     gl_cloudsSSBO[i].fixedColor[0] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
                     gl_cloudsSSBO[i].fixedColor[1] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
                     gl_cloudsSSBO[i].fixedColor[2] = session.point_clouds_container.point_clouds[0].render_color[0] + 0.1;
                 }
 
-            else if (colorScheme == 1)
+            else if (colorScheme == CS_GRAD_INTENS)
                 for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
                     gl_cloudsSSBO[i].colorScheme = 1;
 
-            else if (colorScheme == 2)
+            else if (colorScheme == CS_RANDOM)
                 for (size_t i = 0; i < gl_cloudsSSBO.size(); ++i)
                 {
-                    gl_cloudsSSBO[i].colorScheme = 0;
+                    gl_cloudsSSBO[i].colorScheme = CS_SOLID;
                     gl_cloudsSSBO[i].fixedColor[0] = float(rand() % 255) / 255.0f;
                     gl_cloudsSSBO[i].fixedColor[1] = float(rand() % 255) / 255.0f;
                     gl_cloudsSSBO[i].fixedColor[2] = float(rand() % 255) / 255.0f;
@@ -759,7 +759,7 @@ void openSession()
                 //gcSSBO.fixedColor[0] = pc.render_color[0];
                 //gcSSBO.fixedColor[1] = pc.render_color[1];
                 //gcSSBO.fixedColor[2] = pc.render_color[2];
-				oldcolorScheme = -1; //force update
+				oldcolorScheme = CS_FOLLOW; //force update with non-sense value
                 gl_cloudsSSBO.push_back(gcSSBO);
 
                 offset += static_cast<GLint>(pc.points_local.size());
@@ -1057,11 +1057,11 @@ void display()
         glBegin(GL_POINTS);
         for (size_t i = 0; i < cloud.points_local.size(); i++)
         {
-            if (colorScheme == 0) //solid color
+            if (colorScheme == CS_SOLID) //solid color
             {
                 glColor3f(cloud.render_color[0], cloud.render_color[1], cloud.render_color[2]);
             }
-            else if (colorScheme == 1) //intensity gradient
+            else if (colorScheme == CS_GRAD_INTENS) //intensity gradient
             {
                 const double norm = cloud.intensities[i] * inv_max_intensity + offset_intensity;
                 glColor3f(norm, 0.0, 1.0 - norm);
@@ -1278,20 +1278,21 @@ void display()
 
                     if (ImGui::ColorEdit3("", (float*)&color, ImGuiColorEditFlags_NoInputs))
                     {
+                        colorScheme = CS_SOLID;
+
                         for (auto& pc : session.point_clouds_container.point_clouds)
                         {
                             pc.render_color[0] = color[0];
                             pc.render_color[1] = color[1];
                             pc.render_color[2] = color[2];
-                            pc.show_color = false;
                         }
                     }
 					ImGui::SameLine();
-					if (ImGui::MenuItem("> Solid color", nullptr, (colorScheme == 0)))
-						colorScheme = 0;
+                    if (ImGui::MenuItem("> Solid color", nullptr, (colorScheme == CS_SOLID)))
+						colorScheme = CS_SOLID;
 
-                    if (ImGui::MenuItem("> Intensity gradient", nullptr, (colorScheme == 1)))
-                        colorScheme = 1;                    
+                    if (ImGui::MenuItem("> Intensity gradient", nullptr, (colorScheme == CS_GRAD_INTENS)))
+                        colorScheme = CS_GRAD_INTENS;                    
                     ImGui::SetNextItemWidth(ImGuiNumberWidth);
                     ImGui::InputFloat("Offset intensity", &offset_intensity, 0.01, 0.1, "%.2f");
                     if (offset_intensity < 0)
@@ -1301,8 +1302,8 @@ void display()
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("keyboard up/down arrows");
 
-                    if (ImGui::MenuItem("> Random colors per segment", nullptr, (colorScheme == 2)))
-                        colorScheme = 2;
+                    if (ImGui::MenuItem("> Random color per segment", nullptr, (colorScheme == CS_RANDOM)))
+                        colorScheme = CS_RANDOM;
 
                 }
                 ImGui::EndDisabled();

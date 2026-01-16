@@ -92,6 +92,7 @@ public:
 	int number_points_vertical = 0;
 	int number_points_horizontal = 0;
 	int point_size = 1;
+	int line_width = 1;
 	//std::vector<GeoPoint> available_geo_points;
 	bool choosing_geo = false;
 	std::vector<LocalTrajectoryNode> local_trajectory;
@@ -106,6 +107,7 @@ public:
 	float gui_translation[3];
 	float gui_rotation[3];
 	float render_color[3];
+    float traj_color[3];
 	bool visible;
 	//bool visible_imu_diff = false;
 	bool gizmo;

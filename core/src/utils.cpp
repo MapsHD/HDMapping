@@ -70,6 +70,8 @@ double scroll_hint_lastT = 0.0;
 
 bool show_about = false;
 
+bool glLineWidthSupport = true;
+
 // General shortcuts applicable to any app
 static const std::vector<ShortcutEntry> shortcuts = {
     {"Normal keys", "A", ""},
@@ -472,6 +474,15 @@ bool initGL(int *argc, char **argv, const std::string &winTitle, void (*display)
     glutKeyboardUpFunc(keyboardUp);
     // glutSpecialFunc(specialDown);
     // glutSpecialUpFunc(specialUp);
+
+    //check line width range support
+    GLfloat range[2];
+    glGetFloatv(GL_LINE_WIDTH_RANGE, range);
+    if (range[0] == range[1])
+    {
+        std::cerr << "No line width support in this GPU/driver configuration, range: " << range[0] << " - " << range[1] << std::endl;
+        glLineWidthSupport = false;
+    }
 
     return (glGetError() == GL_NO_ERROR);
 }

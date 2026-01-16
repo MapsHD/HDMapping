@@ -55,9 +55,7 @@ public:
 	void draw_grids(bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_01x01,
 		bool yz_grid_10x10, bool yz_grid_1x1, bool yz_grid_01x01,
 		bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01, PointClouds::PointCloudDimensions dims);
-	void render(const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud, bool xz_intersection, bool yz_intersection, bool xy_intersection,
-				bool xz_grid_10x10, bool xz_grid_1x1, bool xz_grid_01x01, bool yz_grid_10x10,
-				bool yz_grid_1x1, bool yz_grid_01x01, bool xy_grid_10x10, bool xy_grid_1x1, bool xy_grid_01x01, double intersection_width, PointClouds::PointCloudDimensions dims = {});
+	void render(const ObservationPicking &observation_picking, int viewer_decimate_point_cloud, PointClouds::PointCloudDimensions dims = {});
 #endif
 	//bool save_poses();
 	bool save_poses(const std::string file_name, bool is_subsession);

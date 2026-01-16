@@ -1930,6 +1930,21 @@ void loadSessions()
     {
         Session session;
         session.load(fs::path(ps).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
+
+        //making sure irelevant session specific settings that could affect rendering are off
+        session.point_clouds_container.xz_intersection = false;
+        session.point_clouds_container.yz_intersection = false;
+        session.point_clouds_container.xy_intersection = false;
+        session.point_clouds_container.xz_grid_10x10 = false;
+        session.point_clouds_container.xz_grid_1x1 = false;
+        session.point_clouds_container.xz_grid_01x01 = false;
+        session.point_clouds_container.yz_grid_10x10 = false;
+        session.point_clouds_container.yz_grid_1x1 = false;
+        session.point_clouds_container.yz_grid_01x01 = false;
+        session.point_clouds_container.xy_grid_10x10 = false;
+        session.point_clouds_container.xy_grid_1x1 = false;
+        session.point_clouds_container.xy_grid_01x01 = false;
+
         sessions.push_back(session);
         if (session.is_ground_truth)
 			index_gt = sessions.size() - 1;
@@ -2107,24 +2122,12 @@ void settings_gui()
                         ImGui::EndDisabled();
 
                         ImGui::SameLine();
-                        ImGui::Checkbox(("Show RGB##" + std::to_string(i)).c_str(), &sessions[i].show_rgb);
-
-                        if (!sessions[i].show_rgb)
+                        ImGui::ColorEdit3(("Color##" + std::to_string(i)).c_str(), (float *)&sessions[i].render_color, ImGuiColorEditFlags_NoInputs);
+                        for (auto &pc : sessions[i].point_clouds_container.point_clouds)
                         {
-                            ImGui::SameLine();
-                            ImGui::ColorEdit3(("Color##" + std::to_string(i)).c_str(), (float *)&sessions[i].render_color, ImGuiColorEditFlags_NoInputs);
-                            for (auto &pc : sessions[i].point_clouds_container.point_clouds)
-                            {
-                                pc.render_color[0] = sessions[i].render_color[0];
-                                pc.render_color[1] = sessions[i].render_color[1];
-                                pc.render_color[2] = sessions[i].render_color[2];
-                                pc.show_color = sessions[i].show_rgb;
-                            }
-                        }
-                        else
-                        {
-                            for (auto &pc : sessions[i].point_clouds_container.point_clouds)
-                                pc.show_color = sessions[i].show_rgb;
+                            pc.render_color[0] = sessions[i].render_color[0];
+                            pc.render_color[1] = sessions[i].render_color[1];
+                            pc.render_color[2] = sessions[i].render_color[2];
                         }
                     }
                     ImGui::EndDisabled();
@@ -2494,7 +2497,7 @@ void display()
         {
             if (session.visible)
             {
-                session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, false, false, false, false, false, false, false, false, false, false, false, false, 10000);
+                session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud);
                 session.ground_control_points.render(session.point_clouds_container);
                 session.control_points.render(session.point_clouds_container, false);
 
@@ -3581,7 +3584,7 @@ else
             ImGui::SameLine();
 
             ImGui::SetNextItemWidth(ImGuiNumberWidth);
-            ImGui::InputInt("Points render subsampling", &viewer_decimate_point_cloud, 10, 100);
+            ImGui::InputInt("Points render downsampling", &viewer_decimate_point_cloud, 10, 100);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("increase for better performance, decrease for rendering more points");
             ImGui::SameLine();

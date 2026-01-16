@@ -336,6 +336,39 @@ cmake --version
 - Run the installer and follow the instructions
 - Ensure CMake is added to your system PATH
 
+### clang-format
+
+**Instalation on Linux:**
+``` bash
+sudo apt install clang-format
+```
+
+**Installation on Windows**
+
+1. Go to offical llvm-project GitHub [releases page](https://github.com/llvm/llvm-project/releases)
+2. Download Windows x64 installer (for example version [21.1.8](https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-win64.exe)) - browser might flag exe file malware in that case mark it as "Keep it"
+3. Run installer exe
+4. In installation program mark "Add LLVM to the system PATH for all users" or "Add LLVM to the system PATH for all current user"
+5. Restart any terminal or IDE that you want to use clang-format in so it reloads paths from ENV
+
+**Verification**
+
+To verify that clang-format is installed run:
+Verify installation by running:
+``` bash
+clang-format --version
+```
+
+**Formating codebase**
+
+In order to format code base run:
+``` bash
+python3 run_clang_fromat.py
+```
+
+*Note that PRs without formatting might be rejected from merging*
+
+
 ## Quick Start (Ubuntu / Ubuntu 24.04 @ WSL2)
 ``` bash
 git clone --recursive https://github.com/MapsHD/HDMapping.git

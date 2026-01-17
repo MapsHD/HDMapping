@@ -663,9 +663,6 @@ void gl_init()
 }
 ///////////////////////////////////////////////////////////////////////////////////
 
-
-
-
 void loadSession(const std::string& session_file_name)
 {
     session_loaded = session.load(fs::path(session_file_name).string(), false, 0.0, 0.0, 0.0, false);

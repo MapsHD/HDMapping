@@ -94,7 +94,8 @@ extern bool glLineWidthSupport;
 extern float m_ortho_projection[];
 extern float m_ortho_gizmo_view[];
 
-struct ShortcutEntry {
+struct ShortcutEntry
+{
     std::string type;
     std::string shortcut;
     std::string description;

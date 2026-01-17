@@ -300,7 +300,7 @@ void motion(int x, int y)
                 pose_tb.pz = 0.0;
                 pose_tb.om = 0.0;
                 pose_tb.fi = 0.0;
-                pose_tb.ka = (rotate_x + rotate_y)*M_PI / 180.0;
+                pose_tb.ka = (rotate_x + rotate_y) * M_PI / 180.0;
                 auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
                 Eigen::Vector3d v_t = m * v;
                 camera_ortho_xy_view_shift_x += v_t.x();
@@ -1495,8 +1495,6 @@ void setNewRotationCenter(int x, int y)
     camera_transition_active = true;
 }
 
-
-
 bool checkClHelp(int argc, char** argv)
 {
     for (int i = 1; i < argc; ++i)
@@ -1511,8 +1509,6 @@ bool checkClHelp(int argc, char** argv)
     return false;
 }
 
-
-
 void updateOrthoView()
 {
     // still updating viewLocal for compass
@@ -1520,8 +1516,6 @@ void updateOrthoView()
 
     ImGuiIO& io = ImGui::GetIO();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-
-    
 
     glOrtho(
         -camera_ortho_xy_view_zoom,

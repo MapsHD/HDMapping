@@ -29,7 +29,7 @@ namespace
         }
     };
 } // namespace
-std::vector<std::pair<int, int>> nns(std::vector<Point3Di> points_global, const std::vector<int>& indexes_for_nn)
+std::vector<std::pair<int, int>> nns(const std::vector<Point3Di>& points_global, const std::vector<int>& indexes_for_nn)
 {
     Eigen::Vector3d search_radious = { 0.1, 0.1, 0.1 };
 
@@ -127,7 +127,7 @@ void optimize_icp(
     std::vector<Eigen::Affine3d>& intermediate_trajectory,
     std::vector<Eigen::Affine3d>& intermediate_trajectory_motion_model,
     NDT::GridParameters& rgd_params,
-    /*NDTBucketMapType &buckets*/ std::vector<Point3Di> points_global,
+    /*NDTBucketMapType &buckets*/ const std::vector<Point3Di>& points_global,
     bool useMultithread /*,
 bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
 )

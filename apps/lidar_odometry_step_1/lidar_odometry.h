@@ -39,13 +39,13 @@ bool compute_step_1(
     const std::atomic<bool>& pause);
 void run_consistency(std::vector<WorkerData>& worker_data, LidarOdometryParams& params);
 void filter_reference_buckets(LidarOdometryParams& params);
-void load_reference_point_clouds(std::vector<std::string> input_file_names, LidarOdometryParams& params);
+void load_reference_point_clouds(const std::vector<std::string>& input_file_names, LidarOdometryParams& params);
 void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, fs::path outwd, double elapsed_seconds);
 void save_parameters_toml(const LidarOdometryParams& params, const fs::path& outwd, double elapsed_seconds);
 void save_processing_results_json(const LidarOdometryParams& params, const fs::path& outwd, double elapsed_seconds);
 void save_trajectory_to_ascii(std::vector<WorkerData>& worker_data, std::string output_file_name);
 std::string save_results_automatic(
     LidarOdometryParams& params, std::vector<WorkerData>& worker_data, std::string working_directory, double elapsed_seconds);
-std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryParams& params);
+std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOdometryParams& params);
 // bool SaveParametersToTomlFile(const std::string &filepath, const LidarOdometryParams &params);
 // bool LoadParametersFromTomlFile(const std::string &filepath, LidarOdometryParams &params);

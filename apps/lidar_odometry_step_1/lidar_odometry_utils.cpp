@@ -315,7 +315,7 @@ void update_rgd_spherical_coordinates(
     }
 }
 
-bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_poses, std::vector<std::string> filenames)
+bool save_poses(const std::string file_name, const std::vector<Eigen::Affine3d>& m_poses, const std::vector<std::string>& filenames)
 {
     std::ofstream outfile;
     outfile.open(file_name);
@@ -821,8 +821,8 @@ fs::path get_next_result_path(const std::string working_directory)
 bool loadLaz(
     const std::string& filename,
     std::vector<Point3Di>& points_out,
-    std::vector<int> index_poses_i,
-    std::vector<Eigen::Affine3d>& intermediate_trajectory,
+    const std::vector<int>& index_poses_i,
+    const std::vector<Eigen::Affine3d>& intermediate_trajectory,
     const Eigen::Affine3d& m_pose)
 {
     if (!std::filesystem::exists(filename))

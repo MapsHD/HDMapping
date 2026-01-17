@@ -453,13 +453,8 @@ void calculate_trajectory(
             counter++;
             if (counter % 100 == 0)
             {
-                printf(
-                    "Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n",
-                    euler.angle.roll,
-                    euler.angle.pitch,
-                    euler.angle.yaw,
-                    counter++,
-                    (int)imu_data.size());
+                std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw << " ["
+                          << counter++ << " of " << imu_data.size() << "]" << std::endl;
             }
         }
 
@@ -731,7 +726,7 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
 
         if (i % 1000 == 0)
         {
-            printf("processing worker_data %d/%d \n", i + 1, (int)worker_data.size());
+            std::cout << "processing worker_data " << (i + 1) << "/" << static_cast<int>(worker_data.size()) << " \n";
         }
         auto tmp_data = original_points;
         point_sizes_per_chunk.push_back(tmp_data.size());
@@ -1030,7 +1025,7 @@ void save_trajectory_to_ascii(std::vector<WorkerData>& worker_data, std::string 
     file.close();
 }
 
-void load_reference_point_clouds(std::vector<std::string> input_file_names, LidarOdometryParams& params)
+void load_reference_point_clouds(const std::vector<std::string>& input_file_names, LidarOdometryParams& params)
 {
     params.reference_buckets.clear();
     params.reference_points.clear();
@@ -1055,7 +1050,7 @@ std::string save_results_automatic(
     return outwd.string();
 }
 
-std::vector<WorkerData> run_lidar_odometry(std::string input_dir, LidarOdometryParams& params)
+std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOdometryParams& params)
 {
     Session session;
     std::vector<WorkerData> worker_data;

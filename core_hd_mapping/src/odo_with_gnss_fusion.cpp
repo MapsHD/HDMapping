@@ -274,7 +274,7 @@ std::vector<Node> OdoWithGnssFusion::load_trajectory(const std::string& file_nam
     }
     else
     {
-        printf("Can't read trajectory from file %s\n", file_name.c_str());
+        std::cout << "Can't read trajectory from file " << file_name << std::endl;
         fflush(stdout);
         return trajectory;
     }

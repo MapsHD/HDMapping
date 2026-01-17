@@ -1221,7 +1221,7 @@ bool PointClouds::load_pc(PointCloud& pc, std::string input_file_name, bool load
 }
 
 bool PointClouds::load_whu_tls(
-    std::vector<std::string> input_file_names,
+    const std::vector<std::string>& input_file_names,
     bool is_decimate,
     double bucket_x,
     double bucket_y,

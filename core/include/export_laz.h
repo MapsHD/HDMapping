@@ -25,38 +25,14 @@ inline bool exportLaz(
     int number_of_points_with_timestamp_eq_0 = 0;
 
     constexpr float scale = 0.0001f; // one tenth of milimeter
-    // find max
-    Eigen::Vector3d _max(
-        std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest());
-    Eigen::Vector3d _min(std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
 
-    for (auto& p : pointcloud)
+    Eigen::Vector3d _min = Eigen::Vector3d::Constant(std::numeric_limits<double>::max());
+    Eigen::Vector3d _max = Eigen::Vector3d::Constant(std::numeric_limits<double>::lowest());
+
+    for (const auto& p : pointcloud)
     {
-        if (p.x() < _min.x())
-        {
-            _min.x() = p.x();
-        }
-        if (p.y() < _min.y())
-        {
-            _min.y() = p.y();
-        }
-        if (p.z() < _min.z())
-        {
-            _min.z() = p.z();
-        }
-
-        if (p.x() > _max.x())
-        {
-            _max.x() = p.x();
-        }
-        if (p.y() > _max.y())
-        {
-            _max.y() = p.y();
-        }
-        if (p.z() > _max.z())
-        {
-            _max.z() = p.z();
-        }
+        _min = _min.cwiseMin(p);
+        _max = _max.cwiseMax(p);
     }
 
     // create the writer
@@ -136,15 +112,8 @@ inline bool exportLaz(
         point->intensity = intensity[i];
         point->gps_time = timestamps[i] * 1e9;
 
-        if (point->gps_time < min_ts)
-        {
-            min_ts = point->gps_time;
-        }
-
-        if (point->gps_time > max_ts)
-        {
-            max_ts = point->gps_time;
-        }
+        min_ts = std::min(min_ts, point->gps_time);
+        max_ts = std::max(max_ts, point->gps_time);
 
         if (point->gps_time == 0.0)
         {

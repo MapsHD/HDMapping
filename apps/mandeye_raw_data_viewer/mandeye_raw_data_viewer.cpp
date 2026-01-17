@@ -1043,13 +1043,10 @@ void loadFiles(std::vector<std::string> input_file_names)
             const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
             counter++;
             if (counter % 100 == 0)
-                printf(
-                    "Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %zu]\n",
-                    euler.angle.roll,
-                    euler.angle.pitch,
-                    euler.angle.yaw,
-                    counter++,
-                    imu_data.size());
+            {
+                std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw << " ["
+                          << counter++ << " of " << imu_data.size() << "]" << std::endl;
+            }
 
             // log it for implot
             imu_data_plot.timestampLidar.push_back(timestamp_pair.first);

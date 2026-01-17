@@ -140,7 +140,7 @@ public:
     bool grid001x001m = false;
     void render();
     void add_picked_to_current_observation(int index_picked, Eigen::Vector3d p);
-    void accept_current_observation(std::vector<Eigen::Affine3d> m_poses);
+    void accept_current_observation(const std::vector<Eigen::Affine3d>& m_poses);
     void import_observations(const std::string& filename);
     void export_observation(const std::string& filename);
     void add_intersection(Eigen::Vector3d translation);

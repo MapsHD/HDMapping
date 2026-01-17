@@ -1,0 +1,41 @@
+name: Clang-Format 21 Check
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install clang-format 21 via LLVM APT repo
+      run: |
+        # Import LLVM GPG key properly
+        wget -qO - https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/llvm-snapshot.gpg > /dev/null
+
+        # Add LLVM repo for clang-format 21 (Debian bullseye repo works on Ubuntu 22.04)
+        echo "deb http://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-21 main" | sudo tee /etc/apt/sources.list.d/llvm-21.list
+
+        # Update package lists
+        sudo apt-get update --allow-releaseinfo-change
+
+        # Install clang-format 21
+        sudo apt-get install -y clang-format-21
+
+        # Set clang-format 21 as default
+        sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-21 210
+        sudo update-alternatives --set clang-format /usr/bin/clang-format-21
+
+        # Verify
+        clang-format --version
+
+    - name: Run clang-format check
+      run: python3 check_clang_format.py

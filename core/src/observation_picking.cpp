@@ -144,7 +144,7 @@ void ObservationPicking::add_picked_to_current_observation(int index_picked, Eig
     }
 }
 
-void ObservationPicking::accept_current_observation(std::vector<Eigen::Affine3d> m_poses)
+void ObservationPicking::accept_current_observation(const std::vector<Eigen::Affine3d>& m_poses)
 {
     for (auto& [key, value] : current_observation)
     {

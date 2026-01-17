@@ -160,7 +160,8 @@ int main(int argc, char* argv[])
     glutMainLoop();
 }
 
-void imagePicker(const std::string& name, ImTextureID tex1, std::vector<ImVec2>& point_picked, std::vector<ImVec2> point_pickedInPointcloud)
+void imagePicker(
+    const std::string& name, ImTextureID tex1, std::vector<ImVec2>& point_picked, const std::vector<ImVec2>& point_pickedInPointcloud)
 {
     ImGuiIO& io = ImGui::GetIO();
     static float zoom = 0.1f;

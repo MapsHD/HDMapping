@@ -10,7 +10,7 @@
 
 #include <export_laz.h>
 
-bool load_pc(PointCloud& pc, std::string input_file_name)
+bool load_pc(PointCloud& pc, const std::string& input_file_name)
 {
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))

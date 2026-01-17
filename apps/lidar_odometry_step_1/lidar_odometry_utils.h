@@ -199,7 +199,7 @@ std::vector<Point3Di> load_point_cloud(
     double filter_threshold_xy_outer,
     const std::unordered_map<int, Eigen::Affine3d>& calibrations);
 
-bool save_poses(const std::string file_name, std::vector<Eigen::Affine3d> m_poses, std::vector<std::string> filenames);
+bool save_poses(const std::string file_name, const std::vector<Eigen::Affine3d>& m_poses, const std::vector<std::string>& filenames);
 
 fs::path get_next_result_path(const std::string working_directory);
 
@@ -261,7 +261,7 @@ void optimize_icp(
     std::vector<Eigen::Affine3d>& intermediate_trajectory,
     std::vector<Eigen::Affine3d>& intermediate_trajectory_motion_model,
     NDT::GridParameters& rgd_params,
-    /*NDTBucketMapType &buckets*/ std::vector<Point3Di> points_global,
+    /*NDTBucketMapType &buckets*/ const std::vector<Point3Di>& points_global,
     bool useMultithread /*,
 bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
 );
@@ -286,8 +286,8 @@ void compute_step_2_fast_forward_motion(std::vector<WorkerData>& worker_data, Li
 bool loadLaz(
     const std::string& filename,
     std::vector<Point3Di>& points_out,
-    std::vector<int> index_poses_i,
-    std::vector<Eigen::Affine3d>& intermediate_trajectory,
+    const std::vector<int>& index_poses_i,
+    const std::vector<Eigen::Affine3d>& intermediate_trajectory,
     const Eigen::Affine3d& inverse_pose);
 bool load_poses(const fs::path& poses_file, std::vector<Eigen::Affine3d>& out_poses);
 bool load_trajectory_csv(

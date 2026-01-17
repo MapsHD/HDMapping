@@ -945,7 +945,7 @@ int main(int argc, char *argv[])
             counter++;
             if (counter % 100 == 0)
             {
-                printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+                std::cout << "Roll " << euler.angle.roll<< ", Pitch " << euler.angle.pitch<< ", Yaw " << euler.angle.yaw<< " [" << counter++ << " of " << imu_data.size() << "]"<< std::endl;
             }
         }
 

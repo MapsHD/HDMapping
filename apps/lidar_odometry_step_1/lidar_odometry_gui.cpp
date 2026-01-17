@@ -271,7 +271,8 @@ std::string formatCompletionTime(double remainingSeconds)
     return std::string(timeStr);
 }
 
-std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, int point_count_threshold, std::vector<Point3Di> prev_points)
+#if 0
+std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, int point_count_threshold, conststd::vector<Point3Di>& prev_points)
 {
     std::vector<std::vector<Point3Di>> res_points;
     std::vector<Point3Di> points = load_point_cloud(laz_file, false, 0, 10000, {});
@@ -296,6 +297,7 @@ std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, i
     }
     return res_points;
 }
+#endif
 
 int get_index(set<int> s, int k)
 {
@@ -528,7 +530,7 @@ void alternative_approach()
                 counter++;
                 if (counter % 100 == 0)
                 {
-                    printf("Roll %0.1f, Pitch %0.1f, Yaw %0.1f [%d of %d]\n", euler.angle.roll, euler.angle.pitch, euler.angle.yaw, counter++, imu_data.size());
+                    std::cout << << "Roll " << euler.angle.roll<< ", Pitch " << euler.angle.pitch<< ", Yaw " << euler.angle.yaw<< " [" << counter++ << " of " << imu_data.size() << "]"<< std::endl;
                 }
             }
 

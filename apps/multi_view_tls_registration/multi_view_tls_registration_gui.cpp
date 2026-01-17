@@ -209,10 +209,6 @@ ColorScheme csTrajectory = CS_SOLID;
 
 float m_gizmo[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
-float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
-
-float m_ortho_projection[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
-
 bool manipulate_only_marked_gizmo = false;
 
 Session session;
@@ -1485,34 +1481,39 @@ void lio_segments_gui()
     ImGui::End();
 }
 
+void loadSession(const std::string& session_file_name)
+{
+    std::cout << "Session file: '" << session_file_name << "'" << std::endl;
+
+    if (session.load(
+            fs::path(session_file_name).string(),
+            tls_registration.is_decimate,
+            tls_registration.bucket_x,
+            tls_registration.bucket_y,
+            tls_registration.bucket_z,
+            tls_registration.calculate_offset))
+    {
+        session_loaded = true;
+        index_begin = 0;
+        index_end = session.point_clouds_container.point_clouds.size() - 1;
+
+        std::string newTitle = winTitle + " - " + truncPath(session_file_name);
+        glutSetWindowTitle(newTitle.c_str());
+
+        for (const auto& pc : session.point_clouds_container.point_clouds)
+            session_total_number_of_points += pc.points_local.size();
+
+        session_dims = session.point_clouds_container.compute_point_cloud_dimension();
+    }
+}
+
 void openSession()
 {
     session_file_name = mandeye::fd::OpenFileDialogOneFile("Open session", mandeye::fd::Session_filter);
 
     if (session_file_name.size() > 0)
     {
-        std::cout << "Session file: '" << session_file_name << "'" << std::endl;
-
-        if (session.load(
-                fs::path(session_file_name).string(),
-                tls_registration.is_decimate,
-                tls_registration.bucket_x,
-                tls_registration.bucket_y,
-                tls_registration.bucket_z,
-                tls_registration.calculate_offset))
-        {
-            session_loaded = true;
-            index_begin = 0;
-            index_end = session.point_clouds_container.point_clouds.size() - 1;
-
-            std::string newTitle = winTitle + " - " + truncPath(session_file_name);
-            glutSetWindowTitle(newTitle.c_str());
-
-            for (const auto& pc : session.point_clouds_container.point_clouds)
-                session_total_number_of_points += pc.points_local.size();
-
-            session_dims = session.point_clouds_container.compute_point_cloud_dimension();
-        }
+        loadSession(session_file_name);
     }
 }
 
@@ -2248,50 +2249,7 @@ void display()
         glLoadMatrixf(viewLocal.matrix().data());
     }
     else
-    {
-        glOrtho(
-            -camera_ortho_xy_view_zoom,
-            camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio,
-            -100000,
-            100000);
-
-        glm::mat4 proj = glm::orthoLH_ZO<float>(
-            -camera_ortho_xy_view_zoom,
-            camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio,
-            -100,
-            100);
-
-        std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
-
-        Eigen::Vector3d v_eye_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h + 10);
-        Eigen::Vector3d v_center_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h);
-        Eigen::Vector3d v(0, 1, 0);
-
-        TaitBryanPose pose_tb;
-        pose_tb.px = 0.0;
-        pose_tb.py = 0.0;
-        pose_tb.pz = 0.0;
-        pose_tb.om = 0.0;
-        pose_tb.fi = 0.0;
-        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * DEG_TO_RAD;
-        auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
-
-        Eigen::Vector3d v_t = m * v;
-
-        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(), v_center_t.x(), v_center_t.y(), v_center_t.z(), v_t.x(), v_t.y(), v_t.z());
-        glm::mat4 lookat = glm::lookAt(
-            glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
-            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
-            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
-        std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
-
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-    }
+        updateOrthoView();
 
     showAxes();
 
@@ -3482,16 +3440,18 @@ void display()
             }
             ImGui::EndDisabled();
 
-            ImGui::MenuItem("Orthographic", "key O", &is_ortho);
-            if (is_ortho)
+            if (ImGui::MenuItem("Orthographic", "key O", &is_ortho))
             {
-                new_rotation_center = rotation_center;
-                new_rotate_x = 0.0;
-                new_rotate_y = 0.0;
-                new_translate_x = translate_x;
-                new_translate_y = translate_y;
-                new_translate_z = translate_z;
-                camera_transition_active = true;
+                if (is_ortho)
+                {
+                    new_rotation_center = rotation_center;
+                    new_rotate_x = 0.0;
+                    new_rotate_y = 0.0;
+                    new_translate_x = translate_x;
+                    new_translate_y = translate_y;
+                    new_translate_z = translate_z;
+                    camera_transition_active = true;
+                }
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
@@ -3790,7 +3750,35 @@ int main(int argc, char* argv[])
 {
     try
     {
+        if (checkClHelp(argc, argv))
+        {
+            std::cout << winTitle << "\n\n"
+                      << "USAGE:\n"
+                      << std::filesystem::path(argv[0]).stem().string() << " <input_file> /?\n\n"
+                      << "where\n"
+                      << "   <input_file>         Path to Mandeye JSON Session file (*.mjs)\n"
+                      << "   -h, /h, --help, /?   Show this help and exit\n\n";
+
+            return 0;
+        }
+
         initGL(&argc, argv, winTitle, display, mouse);
+
+        if (argc > 1)
+        {
+            for (int i = 1; i < argc; i++)
+            {
+                std::string ext = fs::path(argv[i]).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+                if (ext == ".mjs")
+                {
+                    loadSession(argv[i]);
+
+                    break;
+                }
+            }
+        }
 
         glutMainLoop();
 

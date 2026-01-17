@@ -53,10 +53,6 @@ namespace fs = std::filesystem;
 ImVec4 pc_color = ImVec4(1.0f, 0.0f, 0.0f, 1.00f);
 ImVec4 pc_color2 = ImVec4(0.0f, 0.0f, 1.0f, 1.00f);
 
-float m_ortho_projection[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
-
-float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
-
 std::vector<std::string> laz_files;
 std::vector<std::string> csv_files;
 std::vector<std::string> sn_files;
@@ -659,50 +655,7 @@ void display()
         glLoadMatrixf(viewLocal.matrix().data());
     }
     else
-    {
-        glOrtho(
-            -camera_ortho_xy_view_zoom,
-            camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio,
-            -100000,
-            100000);
-
-        glm::mat4 proj = glm::orthoLH_ZO<float>(
-            -camera_ortho_xy_view_zoom,
-            camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio,
-            -100,
-            100);
-
-        std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
-
-        Eigen::Vector3d v_eye_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h + 10);
-        Eigen::Vector3d v_center_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h);
-        Eigen::Vector3d v(0, 1, 0);
-
-        TaitBryanPose pose_tb;
-        pose_tb.px = 0.0;
-        pose_tb.py = 0.0;
-        pose_tb.pz = 0.0;
-        pose_tb.om = 0.0;
-        pose_tb.fi = 0.0;
-        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * DEG_TO_RAD;
-        auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
-
-        Eigen::Vector3d v_t = m * v;
-
-        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(), v_center_t.x(), v_center_t.y(), v_center_t.z(), v_t.x(), v_t.y(), v_t.z());
-        glm::mat4 lookat = glm::lookAt(
-            glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
-            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
-            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
-        std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
-
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-    }
+        updateOrthoView();
 
     showAxes();
 
@@ -833,16 +786,18 @@ void display()
             }
             ImGui::EndDisabled();
 
-            ImGui::MenuItem("Orthographic", "key O", &is_ortho);
-            if (is_ortho)
+            if (ImGui::MenuItem("Orthographic", "key O", &is_ortho))
             {
-                new_rotation_center = rotation_center;
-                new_rotate_x = 0.0;
-                new_rotate_y = 0.0;
-                new_translate_x = translate_x;
-                new_translate_y = translate_y;
-                new_translate_z = translate_z;
-                camera_transition_active = true;
+                if (is_ortho)
+                {
+                    new_rotation_center = rotation_center;
+                    new_rotate_x = 0.0;
+                    new_rotate_y = 0.0;
+                    new_translate_x = translate_x;
+                    new_translate_y = translate_y;
+                    new_translate_z = translate_z;
+                    camera_transition_active = true;
+                }
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");

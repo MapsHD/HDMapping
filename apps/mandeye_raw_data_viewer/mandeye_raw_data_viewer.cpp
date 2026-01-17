@@ -57,10 +57,6 @@ namespace fs = std::filesystem;
 ImVec4 pc_color = ImVec4(1.0f, 0.0f, 0.0f, 1.00f);
 ImVec4 pc_color2 = ImVec4(0.0f, 0.0f, 1.0f, 1.00f);
 
-float m_ortho_projection[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
-
-float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
-
 struct AllData
 {
     std::vector<std::pair<double, double>> timestamps;
@@ -885,14 +881,8 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov()
     return mc;
 }
 
-void loadData()
+void loadFiles(std::vector<std::string> input_file_names)
 {
-    std::vector<std::string> input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
-
-    // no files selected, quit loading
-    if (input_file_names.empty())
-        return;
-
     LidarOdometryParams params; // dummy for load_data function
     params.save_calibration_validation = false;
     params.filter_threshold_xy_inner = filter_threshold_xy_inner;
@@ -900,6 +890,10 @@ void loadData()
 
     std::vector<std::vector<Point3Di>> pointsPerFile;
     std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
+
+    // no files selected, quit loading
+    if (input_file_names.empty())
+        return;
 
     if (load_data(input_file_names, params, pointsPerFile, imu_data, false))
     {
@@ -1209,6 +1203,31 @@ void loadData()
     }
 }
 
+void openFolder()
+{
+    std::string input_folder_name;
+    std::vector<std::string> input_file_names;
+    input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
+
+    std::cout << "Selected folder: '" << input_folder_name << std::endl;
+
+    if (fs::exists(input_folder_name))
+    {
+        for (const auto& entry : fs::directory_iterator(input_folder_name))
+            if (entry.is_regular_file())
+                input_file_names.push_back(entry.path().string());
+
+        loadFiles(input_file_names);
+    }
+}
+
+void openFiles()
+{
+    std::vector<std::string> input_file_names = mandeye::fd::OpenFileDialog("Load all files", mandeye::fd::All_Filter, true);
+
+    loadFiles(input_file_names);
+}
+
 void imu_data_gui()
 {
     ImGui::Begin("IMU data");
@@ -1463,7 +1482,6 @@ void display()
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
     updateCameraTransition();
 
@@ -1487,50 +1505,7 @@ void display()
         glLoadMatrixf(viewLocal.matrix().data());
     }
     else
-    {
-        glOrtho(
-            -camera_ortho_xy_view_zoom,
-            camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio,
-            -100000,
-            100000);
-
-        glm::mat4 proj = glm::orthoLH_ZO<float>(
-            -camera_ortho_xy_view_zoom,
-            camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio,
-            -100,
-            100);
-
-        std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
-
-        Eigen::Vector3d v_eye_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h + 10);
-        Eigen::Vector3d v_center_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h);
-        Eigen::Vector3d v(0, 1, 0);
-
-        TaitBryanPose pose_tb;
-        pose_tb.px = 0.0;
-        pose_tb.py = 0.0;
-        pose_tb.pz = 0.0;
-        pose_tb.om = 0.0;
-        pose_tb.fi = 0.0;
-        pose_tb.ka = -camera_ortho_xy_view_rotation_angle_deg * DEG_TO_RAD;
-        auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
-
-        Eigen::Vector3d v_t = m * v;
-
-        gluLookAt(v_eye_t.x(), v_eye_t.y(), v_eye_t.z(), v_center_t.x(), v_center_t.y(), v_center_t.z(), v_t.x(), v_t.y(), v_t.z());
-        glm::mat4 lookat = glm::lookAt(
-            glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
-            glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
-            glm::vec3(v_t.x(), v_t.y(), v_t.z()));
-        std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
-
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-    }
+        updateOrthoView();
 
     //
     /* glPointSize(point_size);
@@ -1722,10 +1697,25 @@ void display()
     {
         // if (!is_init)
         {
-            if (ImGui::Button("Load data"))
-                loadData();
+            if (ImGui::Button("Open folder"))
+                openFolder();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Select session to open for analyze (Ctrl+O)");
+                ImGui::SetTooltip("Select folder containing files for analyze (Ctrl+O)");
+
+            ImGui::SameLine();
+
+            if (ImGui::ArrowButton("##menuArrow", ImGuiDir_Down))
+                ImGui::OpenPopup("OpenMenu");
+
+            if (ImGui::BeginPopup("OpenMenu"))
+            {
+                if (ImGui::MenuItem("Open files"))
+                    openFiles();
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Select files for analyze");
+
+                ImGui::EndPopup();
+            }
 
             ImGui::SameLine();
             ImGui::Dummy(ImVec2(20, 0));
@@ -1745,17 +1735,20 @@ void display()
 
             ImGui::Separator();
 
-            ImGui::MenuItem("Orthographic", "key O", &is_ortho);
-            if (is_ortho)
+            if (ImGui::MenuItem("Orthographic", "key O", &is_ortho))
             {
-                new_rotation_center = rotation_center;
-                new_rotate_x = 0.0;
-                new_rotate_y = 0.0;
-                new_translate_x = translate_x;
-                new_translate_y = translate_y;
-                new_translate_z = translate_z;
-                camera_transition_active = true;
+                if (is_ortho)
+                {
+                    new_rotation_center = rotation_center;
+                    new_rotate_x = 0.0;
+                    new_rotate_y = 0.0;
+                    new_translate_x = translate_x;
+                    new_translate_y = translate_y;
+                    new_translate_z = translate_z;
+                    camera_transition_active = true;
+                }
             }
+
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
 
@@ -1953,7 +1946,33 @@ int main(int argc, char* argv[])
 {
     try
     {
+        if (checkClHelp(argc, argv))
+        {
+            std::cout << winTitle << "\n\n"
+                      << "USAGE:\n"
+                      << std::filesystem::path(argv[0]).stem().string() << " <input_folder> /?\n\n"
+                      << "where\n"
+                      << "   <input_folder>       Path where scan files are located (*.csv, *.laz, *.sn)\n"
+                      << "   -h, /h, --help, /?   Show this help and exit\n\n";
+
+            return 0;
+        }
+
         initGL(&argc, argv, winTitle, display, mouse);
+
+        if (argc == 2)
+        {
+            std::vector<std::string> input_file_names;
+
+            if (fs::exists(argv[1]))
+            {
+                for (const auto& entry : fs::directory_iterator(argv[1]))
+                    if (entry.is_regular_file())
+                        input_file_names.push_back(entry.path().string());
+
+                loadFiles(input_file_names);
+            }
+        }
 
         glutMainLoop();
 

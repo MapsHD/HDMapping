@@ -20,7 +20,7 @@ public:
         int number_of_buckets_X;
         int number_of_buckets_Y;
         int number_of_buckets_Z;
-        long long unsigned int number_of_buckets;
+        uint64_t number_of_buckets;
         double resolution_X;
         double resolution_Y;
         double resolution_Z;
@@ -29,15 +29,15 @@ public:
     struct PointBucketIndexPair
     {
         int index_of_point;
-        long long unsigned int index_of_bucket;
+        uint64_t index_of_bucket;
         int index_pose;
     };
 
     struct Bucket
     {
-        long long unsigned int index_begin;
-        long long unsigned int index_end;
-        long long unsigned int number_of_points;
+        uint64_t index_begin;
+        uint64_t index_end;
+        uint64_t number_of_points;
         Eigen::Vector3d mean;
         Eigen::Matrix3d cov;
         Eigen::Vector3d normal_vector;
@@ -48,23 +48,23 @@ public:
         Eigen::Vector3d mean;
         Eigen::Matrix3d cov;
         Eigen::Vector3d normal_vector;
-        std::vector<long long unsigned int> point_indexes;
+        std::vector<uint64_t> point_indexes;
         bool valid = false;
     };
 
     struct Bucket2
     {
         int classification = 0; // 1 - ceiling, 2 - floor
-        long long unsigned int index_begin_inclusive;
-        long long unsigned int index_end_exclusive;
-        // long long unsigned int number_of_points;
-        std::unordered_map<long long unsigned int, BucketCoef> buckets;
+        uint64_t index_begin_inclusive;
+        uint64_t index_end_exclusive;
+        // uint64_t number_of_points;
+        std::unordered_map<uint64_t, BucketCoef> buckets;
     };
 
     struct Job
     {
-        long long unsigned int index_begin_inclusive;
-        long long unsigned int index_end_exclusive;
+        uint64_t index_begin_inclusive;
+        uint64_t index_end_exclusive;
     };
 
     enum PoseConvention
@@ -117,7 +117,7 @@ public:
         std::vector<Bucket>& buckets,
         GridParameters& rgd_params,
         int num_threads = std::thread::hardware_concurrency());
-    std::vector<Job> get_jobs(long long unsigned int size, int num_threads = std::thread::hardware_concurrency());
+    std::vector<Job> get_jobs(uint64_t size, int num_threads = std::thread::hardware_concurrency());
     void reindex(
         std::vector<Point3D>& points, std::vector<NDT::PointBucketIndexPair>& index_pair, NDT::GridParameters& rgd_params, int num_threads);
     void reindex(
@@ -163,14 +163,14 @@ public:
     bool compute_cov_mean(
         std::vector<Point3Di>& points,
         std::vector<PointBucketIndexPair>& index_pair,
-        std::map<unsigned long long int, NDT::Bucket>& buckets,
+        std::map<uint64_t, NDT::Bucket>& buckets,
         GridParameters& rgd_params,
         int num_threads = std::thread::hardware_concurrency());
 
     void build_rgd(
         std::vector<Point3Di>& points,
         std::vector<PointBucketIndexPair>& index_pair,
-        std::map<unsigned long long int, NDT::Bucket>& buckets,
+        std::map<uint64_t, NDT::Bucket>& buckets,
         GridParameters& rgd_params,
         int num_threads = std::thread::hardware_concurrency());
 

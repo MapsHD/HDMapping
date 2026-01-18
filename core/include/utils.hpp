@@ -23,8 +23,8 @@ constexpr const char* xText = "Longitudinal (forward/backward)";
 constexpr const char* yText = "Lateral (left/right)";
 constexpr const char* zText = "Vertical (up/down)";
 
-const unsigned int window_width = 800;
-const unsigned int window_height = 600;
+const uint32_t window_width = 800;
+const uint32_t window_height = 600;
 
 const float camera_transition_speed = 1.0f; // higher = faster
 

@@ -98,8 +98,8 @@ GLuint make_tex(const std::string& fn)
 float rot = 0;
 float width = 34;
 float height = 71;
-const unsigned int window_width = 500;
-const unsigned int window_height = 400;
+const uint32_t window_width = 500;
+const uint32_t window_height = 400;
 int mouse_old_x, mouse_old_y;
 int mouse_buttons = 0;
 float rotate_x = 0.0, rotate_y = 0.0;

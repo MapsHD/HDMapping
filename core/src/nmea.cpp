@@ -48,7 +48,7 @@ namespace hd_mapping::nmea
         {
             checksum ^= nmea[i];
         }
-        unsigned int expected;
+        uint32_t expected;
         std::istringstream iss(nmea.substr(asterisk + 1, 2));
         iss >> std::hex >> expected;
         return checksum == expected;

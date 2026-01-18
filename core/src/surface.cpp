@@ -442,27 +442,27 @@ std::vector<int> Surface::get_filtered_indexes(
         lowest_points.emplace_back(pc[lowest_points_indexes[i]], false);
     }
 
-    std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
+    std::vector<std::pair<uint64_t, uint32_t>> indexes;
 
     for (int i = 0; i < lowest_points.size(); i++)
     {
-        unsigned long long int index = get_rgd_index_2D(lowest_points[i].first, bucket_dim_xy);
+        uint64_t index = get_rgd_index_2D(lowest_points[i].first, bucket_dim_xy);
         indexes.emplace_back(index, i);
     }
 
     std::sort(
         indexes.begin(),
         indexes.end(),
-        [](const std::pair<unsigned long long int, unsigned int>& a, const std::pair<unsigned long long int, unsigned int>& b)
+        [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
         {
             return a.first < b.first;
         });
 
-    std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
+    std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
 
-    for (unsigned int i = 0; i < indexes.size(); i++)
+    for (uint32_t i = 0; i < indexes.size(); i++)
     {
-        unsigned long long int index_of_bucket = indexes[i].first;
+        uint64_t index_of_bucket = indexes[i].first;
         if (buckets.contains(index_of_bucket))
         {
             buckets[index_of_bucket].second = i;
@@ -474,7 +474,7 @@ std::vector<int> Surface::get_filtered_indexes(
         }
     }
 
-    const auto hessian_fun = [&](const std::pair<unsigned long long int, unsigned int>& index)
+    const auto hessian_fun = [&](const std::pair<uint64_t, uint32_t>& index)
     {
         int index_element_source = index.second;
         Eigen::Vector3d source = lowest_points[index_element_source].first;
@@ -491,7 +491,7 @@ std::vector<int> Surface::get_filtered_indexes(
                 //{
 
                 Eigen::Vector3d position_global = source + Eigen::Vector3d(x, y, 0);
-                unsigned long long int index_of_bucket = get_rgd_index_2D(position_global, bucket_dim_xy);
+                uint64_t index_of_bucket = get_rgd_index_2D(position_global, bucket_dim_xy);
 
                 if (buckets.contains(index_of_bucket))
                 {
@@ -595,11 +595,11 @@ std::vector<int> Surface::get_filtered_indexes(
     // std::cout << (int)p.second;
     //}
 
-    /*std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
+    /*std::vector<std::pair<uint64_t, uint32_t>> indexes;
 
     for (int i = 0; i < lowest_points.size(); i++)
     {
-        unsigned long long int index = get_rgd_index_2D(lowest_points[i], bucket_dim_xy);
+        uint64_t index = get_rgd_index_2D(lowest_points[i], bucket_dim_xy);
         indexes.emplace_back(index, i);
     }*/
 
@@ -626,27 +626,27 @@ std::vector<Eigen::Vector3d> Surface::get_points_without_surface(
 
     // std::vector<int> out_indexes;
 
-    std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
+    std::vector<std::pair<uint64_t, uint32_t>> indexes;
 
     for (int i = 0; i < vertices.size(); i++)
     {
-        unsigned long long int index = get_rgd_index_2D(vertices[i].translation(), bucket_dim_xy);
+        uint64_t index = get_rgd_index_2D(vertices[i].translation(), bucket_dim_xy);
         indexes.emplace_back(index, i);
     }
 
     std::sort(
         indexes.begin(),
         indexes.end(),
-        [](const std::pair<unsigned long long int, unsigned int>& a, const std::pair<unsigned long long int, unsigned int>& b)
+        [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
         {
             return a.first < b.first;
         });
 
-    std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
+    std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
 
-    for (unsigned int i = 0; i < indexes.size(); i++)
+    for (uint32_t i = 0; i < indexes.size(); i++)
     {
-        unsigned long long int index_of_bucket = indexes[i].first;
+        uint64_t index_of_bucket = indexes[i].first;
         if (buckets.contains(index_of_bucket))
         {
             buckets[index_of_bucket].second = i;
@@ -660,7 +660,7 @@ std::vector<Eigen::Vector3d> Surface::get_points_without_surface(
 
     for (int i = 0; i < points.size(); i++)
     {
-        unsigned long long int index_of_bucket = get_rgd_index_2D(points[i], bucket_dim_xy);
+        uint64_t index_of_bucket = get_rgd_index_2D(points[i], bucket_dim_xy);
         if (buckets.contains(index_of_bucket))
         {
             int index = buckets[index_of_bucket].first;

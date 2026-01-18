@@ -35,27 +35,27 @@ std::vector<std::pair<int, int>> nns(const std::vector<Point3Di>& points_global,
 
     std::vector<std::pair<int, int>> nn;
 
-    std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
+    std::vector<std::pair<uint64_t, uint32_t>> indexes;
 
     for (int i = 0; i < points_global.size(); i++)
     {
-        unsigned long long int index = get_rgd_index(points_global[i].point, search_radious);
+        uint64_t index = get_rgd_index(points_global[i].point, search_radious);
         indexes.emplace_back(index, i);
     }
 
     std::sort(
         indexes.begin(),
         indexes.end(),
-        [](const std::pair<unsigned long long int, unsigned int>& a, const std::pair<unsigned long long int, unsigned int>& b)
+        [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
         {
             return a.first < b.first;
         });
 
-    std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
+    std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
 
-    for (unsigned int i = 0; i < indexes.size(); i++)
+    for (uint32_t i = 0; i < indexes.size(); i++)
     {
-        unsigned long long int index_of_bucket = indexes[i].first;
+        uint64_t index_of_bucket = indexes[i].first;
         if (buckets.contains(index_of_bucket))
             buckets[index_of_bucket].second = i;
         else
@@ -85,7 +85,7 @@ std::vector<std::pair<int, int>> nns(const std::vector<Point3Di>& points_global,
                 for (double z = -search_radious.z(); z <= search_radious.z(); z += search_radious.z())
                 {
                     Eigen::Vector3d position_global = source.point + Eigen::Vector3d(x, y, z);
-                    unsigned long long int index_of_bucket = get_rgd_index(position_global, search_radious);
+                    uint64_t index_of_bucket = get_rgd_index(position_global, search_radious);
 
                     if (buckets.contains(index_of_bucket))
                     {
@@ -2420,8 +2420,8 @@ bool compute_step_2(
                 acc_distance = acc_distance_tmp;
                 std::cout << "please split data set into subsets" << std::endl;
                 ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
-                std::cout << "calculations canceled for TIMESTAMP: "
-                          << (long long int)worker_data[i].intermediate_trajectory_timestamps[0].first << std::endl;
+                std::cout << "calculations canceled for TIMESTAMP: " << (int64_t)worker_data[i].intermediate_trajectory_timestamps[0].first
+                          << std::endl;
                 return false;
             }
 
@@ -2549,7 +2549,7 @@ void compute_step_2_fast_forward_motion(std::vector<WorkerData>& worker_data, Li
 {
 }
 
-void Consistency(std::vector<WorkerData>& worker_data, LidarOdometryParams& params)
+void Consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams& params)
 {
     std::vector<Eigen::Affine3d> trajectory;
     std::vector<Eigen::Affine3d> trajectory_motion_model;
@@ -2916,7 +2916,7 @@ void Consistency(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
         worker_data[indexes[i].first].intermediate_trajectory[indexes[i].second] = trajectory[i];
 }
 
-void Consistency2(std::vector<WorkerData>& worker_data, LidarOdometryParams& params)
+void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParams& params)
 {
     // global_tmp.clear();
 
@@ -3160,7 +3160,7 @@ void Consistency2(std::vector<WorkerData>& worker_data, LidarOdometryParams& par
 
     // update_rgd2(params.in_out_params, buckets, points_global, trajectory[points_global[0].index_pose].translation());
 
-    std::vector<std::pair<unsigned long long int, unsigned int>> index_pairs;
+    std::vector<std::pair<uint64_t, uint32_t>> index_pairs;
     for (int i = 0; i < points_global.size(); i++)
     {
         auto index_of_bucket = get_rgd_index(points_global[i].point, b);
@@ -3169,16 +3169,16 @@ void Consistency2(std::vector<WorkerData>& worker_data, LidarOdometryParams& par
     std::sort(
         index_pairs.begin(),
         index_pairs.end(),
-        [](const std::pair<unsigned long long int, unsigned int>& a, const std::pair<unsigned long long int, unsigned int>& b)
+        [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
         {
             return a.first < b.first;
         });
 
     NDTBucketMapType2 buckets;
 
-    for (unsigned int i = 0; i < index_pairs.size(); i++)
+    for (uint32_t i = 0; i < index_pairs.size(); i++)
     {
-        unsigned long long int index_of_bucket = index_pairs[i].first;
+        uint64_t index_of_bucket = index_pairs[i].first;
         if (buckets.contains(index_of_bucket))
             buckets[index_of_bucket].index_end_exclusive = i;
         else
@@ -3192,7 +3192,7 @@ void Consistency2(std::vector<WorkerData>& worker_data, LidarOdometryParams& par
     {
         for (int i = b.second.index_begin_inclusive; i < b.second.index_end_exclusive; i++)
         {
-            long long unsigned int index_point_segment = points_global[index_pairs[i].second].index_point;
+            uint64_t index_point_segment = points_global[index_pairs[i].second].index_point;
 
             if (b.second.buckets.contains(index_point_segment))
                 b.second.buckets[index_point_segment].point_indexes.push_back(index_pairs[i].second);

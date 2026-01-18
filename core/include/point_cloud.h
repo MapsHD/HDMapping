@@ -25,7 +25,7 @@ public:
         int number_of_buckets_X = 0;
         int number_of_buckets_Y = 0;
         int number_of_buckets_Z = 0;
-        long long unsigned int number_of_buckets = 0;
+        uint64_t number_of_buckets = 0;
         double resolution_X = 2.0;
         double resolution_Y = 2.0;
         double resolution_Z = 2.0;
@@ -34,21 +34,21 @@ public:
     struct PointBucketIndexPair
     {
         int index_of_point = 0;
-        long long unsigned int index_of_bucket = 0;
+        uint64_t index_of_bucket = 0;
         // int index_pose;
     };
 
     struct Bucket
     {
-        long long unsigned int index_begin = 0;
-        long long unsigned int index_end = 0;
-        long long unsigned int number_of_points = 0;
+        uint64_t index_begin = 0;
+        uint64_t index_end = 0;
+        uint64_t number_of_points = 0;
     };
 
     struct Job
     {
-        long long unsigned int index_begin_inclusive = 0;
-        long long unsigned int index_end_exclusive = 0;
+        uint64_t index_begin_inclusive = 0;
+        uint64_t index_end_exclusive = 0;
     };
 
     struct NearestNeighbour
@@ -79,11 +79,9 @@ public:
 
         visible = true;
         gizmo = false;
-    };
-    ~PointCloud()
-    {
-        ;
-    };
+    }
+
+    ~PointCloud() = default;
 
     GridParameters rgd_params;
     std::vector<PointBucketIndexPair> index_pairs;
@@ -133,14 +131,14 @@ public:
     bool fixed_ka = false;
 
     bool load(const std::string& file_name);
-    bool load_pc(std::string input_file_name, bool load_cache_mode);
+    bool load_pc(const std::string& input_file_name, bool load_cache_mode);
     void update_from_gui();
-    bool save_as_global(std::string file_name);
+    bool save_as_global(const std::string& file_name);
     // rgd
     bool build_rgd();
     void grid_calculate_params(std::vector<Eigen::Vector3d>& points, GridParameters& params);
     void reindex(std::vector<PointBucketIndexPair>& ip, std::vector<Eigen::Vector3d>& points, GridParameters rgd_params);
-    std::vector<PointCloud::Job> get_jobs(long long unsigned int size, int num_threads);
+    std::vector<PointCloud::Job> get_jobs(uint64_t size, int num_threads);
     void cout_rgd();
     std::vector<std::pair<int, int>> nns(PointCloud& pc_target, double search_radious);
     void clean();

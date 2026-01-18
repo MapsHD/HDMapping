@@ -5,27 +5,27 @@
 
 bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLocalShapeFeatures>& points, const Params& params)
 {
-    std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
+    std::vector<std::pair<uint64_t, uint32_t>> indexes;
 
     for (int i = 0; i < points.size(); i++)
     {
-        unsigned long long int index = get_rgd_index(points[i].coordinates_global, params.search_radious);
+        uint64_t index = get_rgd_index(points[i].coordinates_global, params.search_radious);
         indexes.emplace_back(index, i);
     }
 
     std::sort(
         indexes.begin(),
         indexes.end(),
-        [](const std::pair<unsigned long long int, unsigned int>& a, const std::pair<unsigned long long int, unsigned int>& b)
+        [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
         {
             return a.first < b.first;
         });
 
-    std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
+    std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
 
-    for (unsigned int i = 0; i < indexes.size(); i++)
+    for (uint32_t i = 0; i < indexes.size(); i++)
     {
-        unsigned long long int index_of_bucket = indexes[i].first;
+        uint64_t index_of_bucket = indexes[i].first;
         if (buckets.contains(index_of_bucket))
         {
             buckets[index_of_bucket].second = i;
@@ -37,7 +37,7 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
         }
     }
 
-    const auto hessian_fun = [&](const std::pair<unsigned long long int, unsigned int>& index)
+    const auto hessian_fun = [&](const std::pair<uint64_t, uint32_t>& index)
     {
         int index_element_source = index.second;
         Eigen::Vector3d source = points[index_element_source].coordinates_global;
@@ -53,7 +53,7 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
                 for (double z = -params.search_radious.z(); z <= params.search_radious.z(); z += params.search_radious.z())
                 {
                     Eigen::Vector3d position_global = source + Eigen::Vector3d(x, y, z);
-                    unsigned long long int index_of_bucket = get_rgd_index(position_global, params.search_radious);
+                    uint64_t index_of_bucket = get_rgd_index(position_global, params.search_radious);
 
                     if (buckets.contains(index_of_bucket))
                     {

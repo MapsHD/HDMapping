@@ -33,8 +33,8 @@
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
-const unsigned int window_width = 800;
-const unsigned int window_height = 600;
+const uint32_t window_width = 800;
+const uint32_t window_height = 600;
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
 double camera_ortho_xy_view_shift_y = 0.0;

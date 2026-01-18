@@ -145,27 +145,27 @@ bool PairWiseICP::compute(
 
     for (int iter = 0; iter < number_of_iterations; iter++)
     {
-        std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
+        std::vector<std::pair<uint64_t, uint32_t>> indexes;
 
         for (int i = 0; i < target.size(); i++)
         {
-            unsigned long long int index = get_rgd_index(target[i], { search_radious, search_radious, search_radious });
+            uint64_t index = get_rgd_index(target[i], { search_radious, search_radious, search_radious });
             indexes.emplace_back(index, i);
         }
 
         std::sort(
             indexes.begin(),
             indexes.end(),
-            [](const std::pair<unsigned long long int, unsigned int>& a, const std::pair<unsigned long long int, unsigned int>& b)
+            [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
             {
                 return a.first < b.first;
             });
 
-        std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
+        std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
 
-        for (unsigned int i = 0; i < indexes.size(); i++)
+        for (uint32_t i = 0; i < indexes.size(); i++)
         {
-            unsigned long long int index_of_bucket = indexes[i].first;
+            uint64_t index_of_bucket = indexes[i].first;
             if (buckets.contains(index_of_bucket))
             {
                 buckets[index_of_bucket].second = i;
@@ -207,7 +207,7 @@ bool PairWiseICP::compute(
                     for (double z = -search_radious; z <= search_radious; z += search_radious)
                     {
                         Eigen::Vector3d source_point_global_ext = source_point_global + Eigen::Vector3d(x, y, z);
-                        unsigned long long int index_of_bucket =
+                        uint64_t index_of_bucket =
                             get_rgd_index(source_point_global_ext, { search_radious, search_radious, search_radious });
 
                         if (buckets.contains(index_of_bucket))
@@ -381,27 +381,27 @@ bool PairWiseICP::compute_fast(
     // std::cout << "PairWiseICP::compute" << std::endl;
     bool multithread = true;
 
-    std::vector<std::pair<unsigned long long int, unsigned int>> indexes;
+    std::vector<std::pair<uint64_t, uint32_t>> indexes;
 
     for (int i = 0; i < target.size(); i++)
     {
-        unsigned long long int index = get_rgd_index(target[i], { search_radious, search_radious, search_radious });
+        uint64_t index = get_rgd_index(target[i], { search_radious, search_radious, search_radious });
         indexes.emplace_back(index, i);
     }
 
     std::sort(
         indexes.begin(),
         indexes.end(),
-        [](const std::pair<unsigned long long int, unsigned int>& a, const std::pair<unsigned long long int, unsigned int>& b)
+        [](const std::pair<uint64_t, uint32_t>& a, const std::pair<uint64_t, uint32_t>& b)
         {
             return a.first < b.first;
         });
 
-    std::unordered_map<unsigned long long int, std::pair<unsigned int, unsigned int>> buckets;
+    std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> buckets;
 
-    for (unsigned int i = 0; i < indexes.size(); i++)
+    for (uint32_t i = 0; i < indexes.size(); i++)
     {
-        unsigned long long int index_of_bucket = indexes[i].first;
+        uint64_t index_of_bucket = indexes[i].first;
         if (buckets.contains(index_of_bucket))
         {
             buckets[index_of_bucket].second = i;
@@ -444,7 +444,7 @@ bool PairWiseICP::compute_fast(
                     for (double z = -search_radious; z <= search_radious; z += search_radious)
                     {
                         Eigen::Vector3d source_point_global_ext = source_point_global + Eigen::Vector3d(x, y, z);
-                        unsigned long long int index_of_bucket =
+                        uint64_t index_of_bucket =
                             get_rgd_index(source_point_global_ext, { search_radious, search_radious, search_radious });
 
                         if (buckets.contains(index_of_bucket))

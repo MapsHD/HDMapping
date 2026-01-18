@@ -254,7 +254,7 @@ std::string formatCompletionTime(double remainingSeconds)
         return "Calculating...";
 
     auto now = std::chrono::system_clock::now();
-    auto estimatedCompletion = now + std::chrono::seconds(static_cast<long long>(remainingSeconds));
+    auto estimatedCompletion = now + std::chrono::seconds(static_cast<int64_t>(remainingSeconds));
     auto completion_time_t = std::chrono::system_clock::to_time_t(estimatedCompletion);
 
     // Format as HH:MM:SS - Cross-platform time formatting
@@ -299,7 +299,7 @@ std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, i
 }
 #endif
 
-int get_index(set<int> s, int k)
+int get_index(const set<int>& s, int k)
 {
     int index = 0;
     for (auto u : s)
@@ -349,7 +349,7 @@ void find_best_stretch(
     }
     ///
     std::vector<Eigen::Affine3d> best_trajectory = trajectory;
-    unsigned long long min_buckets = ULLONG_MAX;
+    uint64_t min_buckets = ULLONG_MAX;
 
     for (double x = 0.0; x < 0.2; x += 0.0005)
     {

@@ -54,15 +54,15 @@ void NDT::grid_calculate_params(const std::vector<Point3D>& point_cloud_global, 
     max_z += in_out_params.bounding_box_extension;
     min_z -= in_out_params.bounding_box_extension;
 
-    long long unsigned int number_of_buckets_X = ((max_x - min_x) / in_out_params.resolution_X) + 1;
-    long long unsigned int number_of_buckets_Y = ((max_y - min_y) / in_out_params.resolution_Y) + 1;
-    long long unsigned int number_of_buckets_Z = ((max_z - min_z) / in_out_params.resolution_Z) + 1;
+    uint64_t number_of_buckets_X = ((max_x - min_x) / in_out_params.resolution_X) + 1;
+    uint64_t number_of_buckets_Y = ((max_y - min_y) / in_out_params.resolution_Y) + 1;
+    uint64_t number_of_buckets_Z = ((max_z - min_z) / in_out_params.resolution_Z) + 1;
 
     in_out_params.number_of_buckets_X = number_of_buckets_X;
     in_out_params.number_of_buckets_Y = number_of_buckets_Y;
     in_out_params.number_of_buckets_Z = number_of_buckets_Z;
-    in_out_params.number_of_buckets = static_cast<long long unsigned int>(number_of_buckets_X) *
-        static_cast<long long unsigned int>(number_of_buckets_Y) * static_cast<long long unsigned int>(number_of_buckets_Z);
+    in_out_params.number_of_buckets = static_cast<uint64_t>(number_of_buckets_X) * static_cast<uint64_t>(number_of_buckets_Y) *
+        static_cast<uint64_t>(number_of_buckets_Z);
 
     in_out_params.bounding_box_max_X = max_x;
     in_out_params.bounding_box_min_X = min_x;
@@ -110,15 +110,15 @@ void NDT::grid_calculate_params(const std::vector<Point3Di>& point_cloud_global,
     max_z += in_out_params.bounding_box_extension;
     min_z -= in_out_params.bounding_box_extension;
 
-    long long unsigned int number_of_buckets_X = ((max_x - min_x) / in_out_params.resolution_X) + 1;
-    long long unsigned int number_of_buckets_Y = ((max_y - min_y) / in_out_params.resolution_Y) + 1;
-    long long unsigned int number_of_buckets_Z = ((max_z - min_z) / in_out_params.resolution_Z) + 1;
+    uint64_t number_of_buckets_X = ((max_x - min_x) / in_out_params.resolution_X) + 1;
+    uint64_t number_of_buckets_Y = ((max_y - min_y) / in_out_params.resolution_Y) + 1;
+    uint64_t number_of_buckets_Z = ((max_z - min_z) / in_out_params.resolution_Z) + 1;
 
     in_out_params.number_of_buckets_X = number_of_buckets_X;
     in_out_params.number_of_buckets_Y = number_of_buckets_Y;
     in_out_params.number_of_buckets_Z = number_of_buckets_Z;
-    in_out_params.number_of_buckets = static_cast<long long unsigned int>(number_of_buckets_X) *
-        static_cast<long long unsigned int>(number_of_buckets_Y) * static_cast<long long unsigned int>(number_of_buckets_Z);
+    in_out_params.number_of_buckets = static_cast<uint64_t>(number_of_buckets_X) * static_cast<uint64_t>(number_of_buckets_Y) *
+        static_cast<uint64_t>(number_of_buckets_Z);
 
     in_out_params.bounding_box_max_X = max_x;
     in_out_params.bounding_box_min_X = min_x;
@@ -131,15 +131,15 @@ void NDT::grid_calculate_params(const std::vector<Point3Di>& point_cloud_global,
 void NDT::grid_calculate_params(
     GridParameters& in_out_params, double min_x, double max_x, double min_y, double max_y, double min_z, double max_z)
 {
-    long long unsigned int number_of_buckets_X = ((max_x - min_x) / in_out_params.resolution_X) + 1;
-    long long unsigned int number_of_buckets_Y = ((max_y - min_y) / in_out_params.resolution_Y) + 1;
-    long long unsigned int number_of_buckets_Z = ((max_z - min_z) / in_out_params.resolution_Z) + 1;
+    uint64_t number_of_buckets_X = ((max_x - min_x) / in_out_params.resolution_X) + 1;
+    uint64_t number_of_buckets_Y = ((max_y - min_y) / in_out_params.resolution_Y) + 1;
+    uint64_t number_of_buckets_Z = ((max_z - min_z) / in_out_params.resolution_Z) + 1;
 
     in_out_params.number_of_buckets_X = number_of_buckets_X;
     in_out_params.number_of_buckets_Y = number_of_buckets_Y;
     in_out_params.number_of_buckets_Z = number_of_buckets_Z;
-    in_out_params.number_of_buckets = static_cast<long long unsigned int>(number_of_buckets_X) *
-        static_cast<long long unsigned int>(number_of_buckets_Y) * static_cast<long long unsigned int>(number_of_buckets_Z);
+    in_out_params.number_of_buckets = static_cast<uint64_t>(number_of_buckets_X) * static_cast<uint64_t>(number_of_buckets_Y) *
+        static_cast<uint64_t>(number_of_buckets_Z);
 
     in_out_params.bounding_box_max_X = max_x;
     in_out_params.bounding_box_min_X = min_x;
@@ -149,16 +149,16 @@ void NDT::grid_calculate_params(
     in_out_params.bounding_box_min_Z = min_z;
 }
 
-std::vector<NDT::Job> NDT::get_jobs(long long unsigned int size, int num_threads)
+std::vector<NDT::Job> NDT::get_jobs(uint64_t size, int num_threads)
 {
     int hc = size / num_threads;
     if (hc < 1)
         hc = 1;
 
     std::vector<Job> jobs;
-    for (long long unsigned int i = 0; i < size; i += hc)
+    for (uint64_t i = 0; i < size; i += hc)
     {
-        long long unsigned int sequence_length = hc;
+        uint64_t sequence_length = hc;
         if (i + hc >= size)
         {
             sequence_length = size - i;
@@ -211,13 +211,13 @@ void reindex_job(
             continue;
         }
 
-        long long unsigned int ix = (p.x - rgd_params.bounding_box_min_X) / rgd_params.resolution_X;
-        long long unsigned int iy = (p.y - rgd_params.bounding_box_min_Y) / rgd_params.resolution_Y;
-        long long unsigned int iz = (p.z - rgd_params.bounding_box_min_Z) / rgd_params.resolution_Z;
+        uint64_t ix = (p.x - rgd_params.bounding_box_min_X) / rgd_params.resolution_X;
+        uint64_t iy = (p.y - rgd_params.bounding_box_min_Y) / rgd_params.resolution_Y;
+        uint64_t iz = (p.z - rgd_params.bounding_box_min_Z) / rgd_params.resolution_Z;
 
-        (*pairs)[ii].index_of_bucket = ix * static_cast<long long unsigned int>(rgd_params.number_of_buckets_Y) *
-                static_cast<long long unsigned int>(rgd_params.number_of_buckets_Z) +
-            iy * static_cast<long long unsigned int>(rgd_params.number_of_buckets_Z) + iz;
+        (*pairs)[ii].index_of_bucket =
+            ix * static_cast<uint64_t>(rgd_params.number_of_buckets_Y) * static_cast<uint64_t>(rgd_params.number_of_buckets_Z) +
+            iy * static_cast<uint64_t>(rgd_params.number_of_buckets_Z) + iz;
     }
 }
 
@@ -257,13 +257,13 @@ void reindex_jobi(
             continue;
         }
 
-        long long unsigned int ix = (p.point.x() - rgd_params.bounding_box_min_X) / rgd_params.resolution_X;
-        long long unsigned int iy = (p.point.y() - rgd_params.bounding_box_min_Y) / rgd_params.resolution_Y;
-        long long unsigned int iz = (p.point.z() - rgd_params.bounding_box_min_Z) / rgd_params.resolution_Z;
+        uint64_t ix = (p.point.x() - rgd_params.bounding_box_min_X) / rgd_params.resolution_X;
+        uint64_t iy = (p.point.y() - rgd_params.bounding_box_min_Y) / rgd_params.resolution_Y;
+        uint64_t iz = (p.point.z() - rgd_params.bounding_box_min_Z) / rgd_params.resolution_Z;
 
-        (*pairs)[ii].index_of_bucket = ix * static_cast<long long unsigned int>(rgd_params.number_of_buckets_Y) *
-                static_cast<long long unsigned int>(rgd_params.number_of_buckets_Z) +
-            iy * static_cast<long long unsigned int>(rgd_params.number_of_buckets_Z) + iz;
+        (*pairs)[ii].index_of_bucket =
+            ix * static_cast<uint64_t>(rgd_params.number_of_buckets_Y) * static_cast<uint64_t>(rgd_params.number_of_buckets_Z) +
+            iy * static_cast<uint64_t>(rgd_params.number_of_buckets_Z) + iz;
     }
 }
 
@@ -342,8 +342,8 @@ void build_rgd_job(int i, NDT::Job* job, std::vector<NDT::PointBucketIndexPair>*
         int ind = ii;
         if (ind == 0)
         {
-            long long unsigned int index_of_bucket = (*index_pair)[ind].index_of_bucket;
-            long long unsigned int index_of_bucket_1 = (*index_pair)[ind + 1].index_of_bucket;
+            uint64_t index_of_bucket = (*index_pair)[ind].index_of_bucket;
+            uint64_t index_of_bucket_1 = (*index_pair)[ind + 1].index_of_bucket;
 
             (*buckets)[index_of_bucket].index_begin = ind;
             if (index_of_bucket != index_of_bucket_1)
@@ -361,8 +361,8 @@ void build_rgd_job(int i, NDT::Job* job, std::vector<NDT::PointBucketIndexPair>*
         }
         else if (ind + 1 < (*index_pair).size())
         {
-            long long unsigned int index_of_bucket = (*index_pair)[ind].index_of_bucket;
-            long long unsigned int index_of_bucket_1 = (*index_pair)[ind + 1].index_of_bucket;
+            uint64_t index_of_bucket = (*index_pair)[ind].index_of_bucket;
+            uint64_t index_of_bucket_1 = (*index_pair)[ind + 1].index_of_bucket;
 
             if (index_of_bucket != index_of_bucket_1)
             {
@@ -377,8 +377,8 @@ void build_rgd_final_job(int i, NDT::Job* job, std::vector<NDT::Bucket>* buckets
 {
     for (size_t ii = job->index_begin_inclusive; ii < job->index_end_exclusive; ii++)
     {
-        long long unsigned int index_begin = (*buckets)[ii].index_begin;
-        long long unsigned int index_end = (*buckets)[ii].index_end;
+        uint64_t index_begin = (*buckets)[ii].index_begin;
+        uint64_t index_end = (*buckets)[ii].index_end;
         if (index_end > index_begin)
         {
             (*buckets)[ii].number_of_points = index_end - index_begin;
@@ -4027,7 +4027,7 @@ bool NDT::compute_cov_mean(
 bool NDT::compute_cov_mean(
     std::vector<Point3Di>& points,
     std::vector<PointBucketIndexPair>& index_pair,
-    std::map<unsigned long long int, NDT::Bucket>& buckets,
+    std::map<uint64_t, NDT::Bucket>& buckets,
     GridParameters& rgd_params,
     int num_threads)
 {
@@ -4145,7 +4145,7 @@ bool NDT::compute_cov_mean(
 void NDT::build_rgd(
     std::vector<Point3Di>& points,
     std::vector<NDT::PointBucketIndexPair>& index_pair,
-    std::map<unsigned long long int, NDT::Bucket>& buckets,
+    std::map<uint64_t, NDT::Bucket>& buckets,
     NDT::GridParameters& rgd_params,
     int num_threads)
 {

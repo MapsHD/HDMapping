@@ -310,20 +310,20 @@ struct PointCloudWithPose
 
 struct Job
 {
-    long long unsigned int index_begin_inclusive;
-    long long unsigned int index_end_exclusive;
+    uint64_t index_begin_inclusive;
+    uint64_t index_end_exclusive;
 };
 
-inline std::vector<Job> get_jobs(long long unsigned int size, int num_threads)
+inline std::vector<Job> get_jobs(uint64_t size, int num_threads)
 {
     int hc = size / num_threads;
     if (hc < 1)
         hc = 1;
 
     std::vector<Job> jobs;
-    for (long long unsigned int i = 0; i < size; i += hc)
+    for (uint64_t i = 0; i < size; i += hc)
     {
-        long long unsigned int sequence_length = hc;
+        uint64_t sequence_length = hc;
         if (i + hc >= size)
         {
             sequence_length = size - i;

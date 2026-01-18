@@ -676,11 +676,11 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                std::vector<Eigen::Vector3d> source =
+                                const std::vector<Eigen::Vector3d>& source =
                                     sessions[edges[index_active_edge].index_session_to]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
                                         .points_local;
-                                std::vector<Eigen::Vector3d> target =
+                                const std::vector<Eigen::Vector3d>& target =
                                     sessions[edges[index_active_edge].index_session_from]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
                                         .points_local;
@@ -962,11 +962,11 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                std::vector<Eigen::Vector3d> source =
+                                const std::vector<Eigen::Vector3d>& source =
                                     sessions[edges[index_active_edge].index_session_to]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
                                         .points_local;
-                                std::vector<Eigen::Vector3d> target =
+                                const std::vector<Eigen::Vector3d>& target =
                                     ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
 
                                 if (icp.compute(source, target, sr, number_of_iterations, m_pose))
@@ -978,11 +978,11 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                std::vector<Eigen::Vector3d> source =
+                                const std::vector<Eigen::Vector3d>& source =
                                     sessions[edges[index_active_edge].index_session_to]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
                                         .points_local;
-                                std::vector<Eigen::Vector3d> target =
+                                const std::vector<Eigen::Vector3d>& target =
                                     sessions[edges[index_active_edge].index_session_from]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
                                         .points_local;
@@ -1079,11 +1079,11 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                std::vector<Eigen::Vector3d> source =
+                                const std::vector<Eigen::Vector3d>& source =
                                     sessions[edges[index_active_edge].index_session_to]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
                                         .points_local;
-                                std::vector<Eigen::Vector3d> target =
+                                const std::vector<Eigen::Vector3d>& target =
                                     ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
 
                                 if (icp.compute(source, target, sr, number_of_iterations, m_pose))
@@ -1095,11 +1095,11 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                std::vector<Eigen::Vector3d> source =
+                                const std::vector<Eigen::Vector3d>& source =
                                     sessions[edges[index_active_edge].index_session_to]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
                                         .points_local;
-                                std::vector<Eigen::Vector3d> target =
+                                const std::vector<Eigen::Vector3d>& target =
                                     sessions[edges[index_active_edge].index_session_from]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
                                         .points_local;
@@ -1195,11 +1195,11 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                std::vector<Eigen::Vector3d> source =
+                                const std::vector<Eigen::Vector3d>& source =
                                     sessions[edges[index_active_edge].index_session_to]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
                                         .points_local;
-                                std::vector<Eigen::Vector3d> target =
+                                const std::vector<Eigen::Vector3d>& target =
                                     ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
 
                                 if (icp.compute(source, target, sr, number_of_iterations, m_pose))
@@ -1213,11 +1213,11 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                std::vector<Eigen::Vector3d> source =
+                                const std::vector<Eigen::Vector3d>& source =
                                     sessions[edges[index_active_edge].index_session_to]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
                                         .points_local;
-                                std::vector<Eigen::Vector3d> target =
+                                const std::vector<Eigen::Vector3d>& target =
                                     sessions[edges[index_active_edge].index_session_from]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
                                         .points_local;
@@ -1315,11 +1315,11 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                std::vector<Eigen::Vector3d> source =
+                                const std::vector<Eigen::Vector3d>& source =
                                     sessions[edges[index_active_edge].index_session_to]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
                                         .points_local;
-                                std::vector<Eigen::Vector3d> target =
+                                const std::vector<Eigen::Vector3d>& target =
                                     ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
 
                                 if (icp.compute(source, target, sr, number_of_iterations, m_pose))
@@ -1333,11 +1333,11 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                std::vector<Eigen::Vector3d> source =
+                                const std::vector<Eigen::Vector3d>& source =
                                     sessions[edges[index_active_edge].index_session_to]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
                                         .points_local;
-                                std::vector<Eigen::Vector3d> target =
+                                const std::vector<Eigen::Vector3d>& target =
                                     sessions[edges[index_active_edge].index_session_from]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
                                         .points_local;
@@ -1435,11 +1435,11 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                std::vector<Eigen::Vector3d> source =
+                                const std::vector<Eigen::Vector3d>& source =
                                     sessions[edges[index_active_edge].index_session_to]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
                                         .points_local;
-                                std::vector<Eigen::Vector3d> target =
+                                const std::vector<Eigen::Vector3d>& target =
                                     ground_truth; // sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from].points_local;
 
                                 if (icp.compute(source, target, sr, number_of_iterations, m_pose))
@@ -1453,11 +1453,11 @@ void loop_closure_gui()
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                std::vector<Eigen::Vector3d> source =
+                                const std::vector<Eigen::Vector3d>& source =
                                     sessions[edges[index_active_edge].index_session_to]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
                                         .points_local;
-                                std::vector<Eigen::Vector3d> target =
+                                const std::vector<Eigen::Vector3d>& target =
                                     sessions[edges[index_active_edge].index_session_from]
                                         .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
                                         .points_local;
@@ -1525,7 +1525,7 @@ void loop_closure_gui()
 
 void save_trajectories_to_laz(
     const Session& session,
-    std::string output_file_name,
+    const std::string& output_file_name,
     float curve_consecutive_distance_meters,
     float not_curve_consecutive_distance_meters,
     bool is_trajectory_export_downsampling)
@@ -1660,7 +1660,7 @@ void createDXFPolyline(const std::string& filename, const std::vector<Eigen::Vec
 
 void save_trajectories(
     Session& session,
-    std::string output_file_name,
+    const std::string& output_file_name,
     float curve_consecutive_distance_meters,
     float not_curve_consecutive_distance_meters,
     bool is_trajectory_export_downsampling,
@@ -1885,7 +1885,7 @@ bool loadProject(const std::string& file_name, ProjectSettings& _project_setting
 
         for (const auto& fn_json : data["session_file_names"])
         {
-            std::string fn = fn_json["session_file_name"];
+            const std::string fn = fn_json["session_file_name"];
             _project_settings.session_file_names.push_back(fn);
             std::cout << "'" << fn << "'";
             if (!fs::exists(fn))

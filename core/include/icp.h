@@ -25,10 +25,10 @@ public:
 
     struct Job
     {
-        long long unsigned int index_begin_inclusive;
-        long long unsigned int index_end_exclusive;
+        uint64_t index_begin_inclusive;
+        uint64_t index_end_exclusive;
     };
-    std::vector<Job> get_jobs(long long unsigned int size, int num_threads = 8);
+    std::vector<Job> get_jobs(uint64_t size, int num_threads = 8);
 
     ICP()
     {

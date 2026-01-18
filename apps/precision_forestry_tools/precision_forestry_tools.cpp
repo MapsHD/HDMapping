@@ -27,8 +27,8 @@
 #include <fstream>
 #include <iostream>
 
-const unsigned int window_width = 800;
-const unsigned int window_height = 600;
+const uint32_t window_width = 800;
+const uint32_t window_height = 600;
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
 double camera_ortho_xy_view_shift_y = 0.0;
@@ -72,19 +72,18 @@ std::vector<int> get_lowest_points_indexes(const PointCloud& pc, Eigen::Vector2d
 {
     std::vector<int> indexes;
 
-    std::vector<std::tuple<unsigned long long int, unsigned int, double>> indexes_tuple;
+    std::vector<std::tuple<uint64_t, uint32_t, double>> indexes_tuple;
 
     for (size_t i = 0; i < pc.points_local.size(); i++)
     {
-        unsigned long long int index = get_rgd_index_2D(pc.points_local[i], bucket_dim_xy);
+        uint64_t index = get_rgd_index_2D(pc.points_local[i], bucket_dim_xy);
         indexes_tuple.emplace_back(index, i, pc.points_local[i].z());
     }
 
     std::sort(
         indexes_tuple.begin(),
         indexes_tuple.end(),
-        [](const std::tuple<unsigned long long int, unsigned int, unsigned int>& a,
-           const std::tuple<unsigned long long int, unsigned int, unsigned int>& b)
+        [](const std::tuple<uint64_t, uint32_t, uint32_t>& a, const std::tuple<uint64_t, uint32_t, uint32_t>& b)
         {
             return (std::get<0>(a) == std::get<0>(b)) ? (std::get<2>(a) < std::get<2>(b)) : (std::get<0>(a) < std::get<0>(b));
         });

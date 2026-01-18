@@ -29,8 +29,8 @@
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
-const unsigned int window_width = 800;
-const unsigned int window_height = 600;
+const uint32_t window_width = 800;
+const uint32_t window_height = 600;
 double camera_ortho_xy_view_zoom = 10;
 double camera_ortho_xy_view_shift_x = 0.0;
 double camera_ortho_xy_view_shift_y = 0.0;
@@ -599,7 +599,7 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
                 acc_distance = acc_distance_tmp;
                 std::cout << "please split data set into subsets" << std::endl;
                 ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
-                // std::cout << "calculations canceled for TIMESTAMP: " << (long long int)worker_data[i].intermediate_trajectory_timestamps[0].first << std::endl;
+                // std::cout << "calculations canceled for TIMESTAMP: " << (int64_t)worker_data[i].intermediate_trajectory_timestamps[0].first << std::endl;
                 return false;
             }
 
@@ -1061,7 +1061,7 @@ int main(int argc, char *argv[])
             }
 
             wd.original_points = points;
-            for (unsigned long long int k = 0; k < wd.original_points.size(); k++)
+            for (uint64_t k = 0; k < wd.original_points.size(); k++)
             {
                 Point3Di &p = wd.original_points[k];
                 auto lower = std::lower_bound(wd.intermediate_trajectory_timestamps.begin(), wd.intermediate_trajectory_timestamps.end(), p.timestamp,

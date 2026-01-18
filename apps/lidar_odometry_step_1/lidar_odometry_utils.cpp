@@ -11,15 +11,14 @@ namespace fs = std::filesystem;
 // TODO(m.wlasiuk) : these 2 functions - core/utils
 
 // this function provides unique index
-unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z)
+uint64_t get_index(const int16_t x, const int16_t y, const int16_t z)
 {
-    return ((static_cast<unsigned long long int>(x) << 32) & (0x0000FFFF00000000ull)) |
-        ((static_cast<unsigned long long int>(y) << 16) & (0x00000000FFFF0000ull)) |
-        ((static_cast<unsigned long long int>(z) << 0) & (0x000000000000FFFFull));
+    return ((static_cast<uint64_t>(x) << 32) & (0x0000FFFF00000000ull)) | ((static_cast<uint64_t>(y) << 16) & (0x00000000FFFF0000ull)) |
+        ((static_cast<uint64_t>(z) << 0) & (0x000000000000FFFFull));
 }
 
 // this function provides unique index for input point p and 3D space decomposition into buckets b
-unsigned long long int get_rgd_index(const Eigen::Vector3d p, const Eigen::Vector3d b)
+uint64_t get_rgd_index(const Eigen::Vector3d p, const Eigen::Vector3d b)
 {
     int16_t x = static_cast<int16_t>(p.x() / b.x());
     int16_t y = static_cast<int16_t>(p.y() / b.y());
@@ -153,7 +152,11 @@ void limit_covariance(Eigen::Matrix3d& io_cov)
     // std::cout << io_cov << std::endl;
 }
 
-void update_rgd(NDT::GridParameters& rgd_params, NDTBucketMapType& buckets, std::vector<Point3Di>& points_global, Eigen::Vector3d viewport)
+void update_rgd(
+    const NDT::GridParameters& rgd_params,
+    NDTBucketMapType& buckets,
+    const std::vector<Point3Di>& points_global,
+    const Eigen::Vector3d& viewport)
 {
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
@@ -233,10 +236,10 @@ void update_rgd(NDT::GridParameters& rgd_params, NDTBucketMapType& buckets, std:
 }
 
 void update_rgd_spherical_coordinates(
-    NDT::GridParameters& rgd_params,
+    const NDT::GridParameters& rgd_params,
     NDTBucketMapType& buckets,
-    std::vector<Point3Di>& points_global,
-    std::vector<Eigen::Vector3d>& points_global_spherical)
+    const std::vector<Point3Di>& points_global,
+    const std::vector<Eigen::Vector3d>& points_global_spherical)
 {
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
@@ -315,7 +318,7 @@ void update_rgd_spherical_coordinates(
     }
 }
 
-bool save_poses(const std::string file_name, const std::vector<Eigen::Affine3d>& m_poses, const std::vector<std::string>& filenames)
+bool save_poses(const std::string& file_name, const std::vector<Eigen::Affine3d>& m_poses, const std::vector<std::string>& filenames)
 {
     std::ofstream outfile;
     outfile.open(file_name);
@@ -797,7 +800,7 @@ int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string>& idToSn,
     return 0;
 }
 
-fs::path get_next_result_path(const std::string working_directory)
+fs::path get_next_result_path(const std::string& working_directory)
 {
     std::regex pattern(R"(lio_result_(\d+))");
     int max_number = -1;

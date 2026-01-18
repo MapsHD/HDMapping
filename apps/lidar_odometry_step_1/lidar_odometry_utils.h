@@ -151,8 +151,8 @@ struct LidarOdometryParams
     bool save_index_pose = false;
 };
 
-unsigned long long int get_index(const int16_t x, const int16_t y, const int16_t z);
-unsigned long long int get_rgd_index(const Eigen::Vector3d p, const Eigen::Vector3d b);
+uint64_t get_index(const int16_t x, const int16_t y, const int16_t z);
+uint64_t get_rgd_index(const Eigen::Vector3d p, const Eigen::Vector3d b);
 
 // this function finds interpolated pose between two poses according to query_time
 Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& trajectory, double query_time);
@@ -162,16 +162,16 @@ std::vector<Point3Di> decimate(const std::vector<Point3Di>& points, double bucke
 
 // this function updates each bucket (mean value, covariance) in regular grid decomposition
 void update_rgd(
-    NDT::GridParameters& rgd_params,
+    const NDT::GridParameters& rgd_params,
     NDTBucketMapType& buckets,
-    std::vector<Point3Di>& points_global,
-    Eigen::Vector3d viewport = Eigen::Vector3d(0, 0, 0));
+    const std::vector<Point3Di>& points_global,
+    const Eigen::Vector3d& viewport = Eigen::Vector3d(0, 0, 0));
 
 void update_rgd_spherical_coordinates(
-    NDT::GridParameters& rgd_params,
+    const NDT::GridParameters& rgd_params,
     NDTBucketMapType& buckets,
-    std::vector<Point3Di>& points_global,
-    std::vector<Eigen::Vector3d>& points_global_spherical);
+    const std::vector<Point3Di>& points_global,
+    const std::vector<Eigen::Vector3d>& points_global_spherical);
 
 //! This function load inertial measurement unit data.
 //! This function expects a file with the following format:
@@ -199,9 +199,9 @@ std::vector<Point3Di> load_point_cloud(
     double filter_threshold_xy_outer,
     const std::unordered_map<int, Eigen::Affine3d>& calibrations);
 
-bool save_poses(const std::string file_name, const std::vector<Eigen::Affine3d>& m_poses, const std::vector<std::string>& filenames);
+bool save_poses(const std::string& file_name, const std::vector<Eigen::Affine3d>& m_poses, const std::vector<std::string>& filenames);
 
-fs::path get_next_result_path(const std::string working_directory);
+fs::path get_next_result_path(const std::string& working_directory);
 
 // this function performs main LiDAR odometry calculations
 void optimize_lidar_odometry(
@@ -376,5 +376,5 @@ namespace MLvxCalib
     int GetImuIdToUse(const std::unordered_map<int, std::string>& idToSn, const std::string& snToUse);
 } // namespace MLvxCalib
 
-void Consistency(std::vector<WorkerData>& worker_data, LidarOdometryParams& params);
-void Consistency2(std::vector<WorkerData>& worker_data, LidarOdometryParams& params);
+void Consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams& params);
+void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParams& params);

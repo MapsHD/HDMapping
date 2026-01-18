@@ -463,7 +463,7 @@ void calculate_trajectory(
 }
 
 bool compute_step_1(
-    std::vector<std::vector<Point3Di>>& pointsPerFile,
+    const std::vector<std::vector<Point3Di>>& pointsPerFile,
     LidarOdometryParams& params,
     Trajectory& trajectory,
     std::vector<WorkerData>& worker_data,
@@ -681,7 +681,7 @@ bool compute_step_1(
     return true;
 }
 
-void run_consistency(std::vector<WorkerData>& worker_data, LidarOdometryParams& params)
+void run_consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams& params)
 {
     std::cout << "Point cloud consistency and trajectory smoothness START" << std::endl;
     for (int i = 0; i < params.num_constistency_iter; i++)
@@ -1043,7 +1043,7 @@ void load_reference_point_clouds(const std::vector<std::string>& input_file_name
 }
 
 std::string save_results_automatic(
-    LidarOdometryParams& params, std::vector<WorkerData>& worker_data, std::string working_directory, double elapsed_seconds)
+    LidarOdometryParams& params, std::vector<WorkerData>& worker_data, const std::string& working_directory, double elapsed_seconds)
 {
     fs::path outwd = get_next_result_path(working_directory);
     save_result(worker_data, params, outwd, elapsed_seconds);
@@ -1186,7 +1186,7 @@ void save_processing_results_json(const LidarOdometryParams& params, const fs::p
         results["ndt_grid_indoor"]["resolution_X"] = params.in_out_params_indoor.resolution_X;
         results["ndt_grid_indoor"]["resolution_Y"] = params.in_out_params_indoor.resolution_Y;
         results["ndt_grid_indoor"]["resolution_Z"] = params.in_out_params_indoor.resolution_Z;
-        results["ndt_grid_indoor"]["number_of_buckets"] = static_cast<long long>(params.in_out_params_indoor.number_of_buckets);
+        results["ndt_grid_indoor"]["number_of_buckets"] = static_cast<int64_t>(params.in_out_params_indoor.number_of_buckets);
 
         results["ndt_grid_outdoor"]["bounding_box_min_X"] = params.in_out_params_outdoor.bounding_box_min_X;
         results["ndt_grid_outdoor"]["bounding_box_min_Y"] = params.in_out_params_outdoor.bounding_box_min_Y;
@@ -1197,7 +1197,7 @@ void save_processing_results_json(const LidarOdometryParams& params, const fs::p
         results["ndt_grid_outdoor"]["resolution_X"] = params.in_out_params_outdoor.resolution_X;
         results["ndt_grid_outdoor"]["resolution_Y"] = params.in_out_params_outdoor.resolution_Y;
         results["ndt_grid_outdoor"]["resolution_Z"] = params.in_out_params_outdoor.resolution_Z;
-        results["ndt_grid_outdoor"]["number_of_buckets"] = static_cast<long long>(params.in_out_params_outdoor.number_of_buckets);
+        results["ndt_grid_outdoor"]["number_of_buckets"] = static_cast<int64_t>(params.in_out_params_outdoor.number_of_buckets);
 
         // Motion model correction (complex structure)
         results["motion_model_correction"]["om"] = params.motion_model_correction.om;

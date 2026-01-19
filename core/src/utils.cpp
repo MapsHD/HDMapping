@@ -1,4 +1,7 @@
-﻿#include <pch/pch.h>
+﻿//   File created by Adrian Radulescu (github yuckinus) in order to
+//standardize and unify common functionalities duplicated before in each app
+
+#include <pch/pch.h>
 
 // clang-format off
 #include <GL/glew.h>

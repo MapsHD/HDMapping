@@ -1424,6 +1424,7 @@ void optimize_rigid_sf(
 static void compute_hessian_indoor(
     const Point3Di& intermediate_points_i,
     const std::vector<Eigen::Affine3d>& intermediate_trajectory,
+    const std::vector<TaitBryanPose>& tait_bryan_poses,
     const NDTBucketMapType& buckets_indoor,
     const Eigen::Vector3d& b_indoor,
     double max_distance,
@@ -1466,10 +1467,8 @@ static void compute_hessian_indoor(
             return;
     }
 
-    const Eigen::Affine3d& m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
     const Eigen::Vector3d& p_s = intermediate_points_i.point;
-    const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
-    //
+    const TaitBryanPose& pose_s = tait_bryan_poses[intermediate_points_i.index_pose];
 
     Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
     point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
@@ -1558,6 +1557,7 @@ static void compute_hessian_indoor(
 static void compute_hessian_outdoor(
     const Point3Di& intermediate_points_i,
     const std::vector<Eigen::Affine3d>& intermediate_trajectory,
+    const std::vector<TaitBryanPose>& tait_bryan_poses,
     const NDTBucketMapType& buckets_outdoor,
     const Eigen::Vector3d& b_outdoor,
     double max_distance,
@@ -1598,10 +1598,8 @@ static void compute_hessian_outdoor(
             return;
     }
 
-    const Eigen::Affine3d& m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
     const Eigen::Vector3d& p_s = intermediate_points_i.point;
-    const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
-    //
+    const TaitBryanPose& pose_s = tait_bryan_poses[intermediate_points_i.index_pose];
 
     Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
     point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
@@ -1735,13 +1733,30 @@ void optimize_lidar_odometry(
     AtPBndt.setZero();
     Eigen::Vector3d b_indoor(rgd_params_indoor.resolution_X, rgd_params_indoor.resolution_Y, rgd_params_indoor.resolution_Z);
 
+    // Pre-compute TaitBryanPose conversions for all trajectory poses
+    std::vector<TaitBryanPose> tait_bryan_poses;
+    tait_bryan_poses.reserve(intermediate_trajectory.size());
+    for (const auto& pose : intermediate_trajectory)
+        tait_bryan_poses.emplace_back(pose_tait_bryan_from_affine_matrix(pose));
+
     std::vector<std::mutex> mutexes(intermediate_trajectory.size());
 
-    auto hessian_fun_indoor = [&](const Point3Di& pt)
+    auto hessian_fun_indoor = [&intermediate_trajectory,
+                                &tait_bryan_poses,
+                                &buckets_indoor,
+                                &b_indoor,
+                                &mutexes,
+                                &AtPAndt,
+                                &AtPBndt,
+                                max_distance,
+                                ablation_study_use_view_point_and_normal_vectors,
+                                ablation_study_use_planarity,
+                                ablation_study_use_norm](const Point3Di& pt)
     {
         compute_hessian_indoor(
             pt,
             intermediate_trajectory,
+            tait_bryan_poses,
             buckets_indoor,
             b_indoor,
             max_distance,
@@ -1762,11 +1777,21 @@ void optimize_lidar_odometry(
     {
         Eigen::Vector3d b_outdoor(rgd_params_outdoor.resolution_X, rgd_params_outdoor.resolution_Y, rgd_params_outdoor.resolution_Z);
 
-        auto hessian_fun_outdoor = [&](const Point3Di& pt)
+        auto hessian_fun_outdoor = [&intermediate_trajectory,
+                                     &tait_bryan_poses,
+                                     &buckets_outdoor,
+                                     &b_outdoor,
+                                     &mutexes,
+                                     &AtPAndt,
+                                     &AtPBndt,
+                                     max_distance,
+                                     ablation_study_use_view_point_and_normal_vectors,
+                                     ablation_study_use_planarity](const Point3Di& pt)
         {
             compute_hessian_outdoor(
                 pt,
                 intermediate_trajectory,
+                tait_bryan_poses,
                 buckets_outdoor,
                 b_outdoor,
                 max_distance,

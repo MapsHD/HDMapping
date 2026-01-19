@@ -2349,7 +2349,7 @@ bool compute_step_2(
                     params.ablation_study_use_norm,
                     params.ablation_study_use_hierarchical_rgd,
                     params.ablation_study_use_view_point_and_normal_vectors);
-                if (delta < 1e-12)
+                if (delta < params.convergence_delta_threshold)
                 {
                     // std::cout << "finished at iteration " << iter + 1 << "/" << params.nr_iter;
                     break;
@@ -2379,12 +2379,12 @@ bool compute_step_2(
             std::cout << " optimizing worker_data " << i + 1 << "/" << worker_data.size() << " with acc_distance " << fixed
                       << std::setprecision(2) << acc_distance << "[m] in " << fixed << std::setprecision(2) << elapsed_seconds1.count()
                       << "[s], delta ";
-            if (delta > 1e-12)
-                std::cout << std::setprecision(10) << delta << "!!!";
+            if (delta > params.convergence_delta_threshold)
+                std::cout << std::scientific << std::setprecision(3) << delta << "!!!" << std::fixed << std::setprecision(3);
             else
-                std::cout << "< 1e-12";
-
-            std::cout << "\n";
+                std::cout << "< " << std::scientific << std::setprecision(1) << params.convergence_delta_threshold << " (converged)"
+                          << std::fixed << std::setprecision(3);
+            std::cout << std::endl;
 
             loProgress.store((float)(i + 1) / worker_data.size());
 

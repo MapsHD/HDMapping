@@ -1421,10 +1421,30 @@ void optimize_rigid_sf(
     intermediate_trajectory_motion_model = _intermediate_trajectory;
 }
 
+// Struct to hold pre-computed TaitBryanPose with trigonometric values
+struct TaitBryanPoseWithTrig
+{
+    TaitBryanPose pose;
+    double sin_om, cos_om;
+    double sin_fi, cos_fi;
+    double sin_ka, cos_ka;
+
+    TaitBryanPoseWithTrig(const TaitBryanPose& p)
+        : pose(p),
+          sin_om(sin(p.om)),
+          cos_om(cos(p.om)),
+          sin_fi(sin(p.fi)),
+          cos_fi(cos(p.fi)),
+          sin_ka(sin(p.ka)),
+          cos_ka(cos(p.ka))
+    {
+    }
+};
+
 static void compute_hessian_indoor(
     const Point3Di& intermediate_points_i,
     const std::vector<Eigen::Affine3d>& intermediate_trajectory,
-    const std::vector<TaitBryanPose>& tait_bryan_poses,
+    const std::vector<TaitBryanPoseWithTrig>& tait_bryan_poses,
     const NDTBucketMapType& buckets_indoor,
     const Eigen::Vector3d& b_indoor,
     double max_distance,
@@ -1468,17 +1488,21 @@ static void compute_hessian_indoor(
     }
 
     const Eigen::Vector3d& p_s = intermediate_points_i.point;
-    const TaitBryanPose& pose_s = tait_bryan_poses[intermediate_points_i.index_pose];
+    const TaitBryanPoseWithTrig& pose_trig = tait_bryan_poses[intermediate_points_i.index_pose];
+    const TaitBryanPose& pose_s = pose_trig.pose;
 
     Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
-    point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
+    point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified_precomputed_trig(
         AtPA,
         pose_s.px,
         pose_s.py,
         pose_s.pz,
-        pose_s.om,
-        pose_s.fi,
-        pose_s.ka,
+        pose_trig.sin_om,
+        pose_trig.cos_om,
+        pose_trig.sin_fi,
+        pose_trig.cos_fi,
+        pose_trig.sin_ka,
+        pose_trig.cos_ka,
         p_s.x(),
         p_s.y(),
         p_s.z(),
@@ -1493,14 +1517,17 @@ static void compute_hessian_indoor(
         infm(2, 2));
 
     Eigen::Matrix<double, 6, 1> AtPB;
-    point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
+    point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified_precomputed_trig(
         AtPB,
         pose_s.px,
         pose_s.py,
         pose_s.pz,
-        pose_s.om,
-        pose_s.fi,
-        pose_s.ka,
+        pose_trig.sin_om,
+        pose_trig.cos_om,
+        pose_trig.sin_fi,
+        pose_trig.cos_fi,
+        pose_trig.sin_ka,
+        pose_trig.cos_ka,
         p_s.x(),
         p_s.y(),
         p_s.z(),
@@ -1557,7 +1584,7 @@ static void compute_hessian_indoor(
 static void compute_hessian_outdoor(
     const Point3Di& intermediate_points_i,
     const std::vector<Eigen::Affine3d>& intermediate_trajectory,
-    const std::vector<TaitBryanPose>& tait_bryan_poses,
+    const std::vector<TaitBryanPoseWithTrig>& tait_bryan_poses,
     const NDTBucketMapType& buckets_outdoor,
     const Eigen::Vector3d& b_outdoor,
     double max_distance,
@@ -1599,17 +1626,21 @@ static void compute_hessian_outdoor(
     }
 
     const Eigen::Vector3d& p_s = intermediate_points_i.point;
-    const TaitBryanPose& pose_s = tait_bryan_poses[intermediate_points_i.index_pose];
+    const TaitBryanPoseWithTrig& pose_trig = tait_bryan_poses[intermediate_points_i.index_pose];
+    const TaitBryanPose& pose_s = pose_trig.pose;
 
     Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
-    point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
+    point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified_precomputed_trig(
         AtPA,
         pose_s.px,
         pose_s.py,
         pose_s.pz,
-        pose_s.om,
-        pose_s.fi,
-        pose_s.ka,
+        pose_trig.sin_om,
+        pose_trig.cos_om,
+        pose_trig.sin_fi,
+        pose_trig.cos_fi,
+        pose_trig.sin_ka,
+        pose_trig.cos_ka,
         p_s.x(),
         p_s.y(),
         p_s.z(),
@@ -1624,14 +1655,17 @@ static void compute_hessian_outdoor(
         infm(2, 2));
 
     Eigen::Matrix<double, 6, 1> AtPB;
-    point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
+    point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified_precomputed_trig(
         AtPB,
         pose_s.px,
         pose_s.py,
         pose_s.pz,
-        pose_s.om,
-        pose_s.fi,
-        pose_s.ka,
+        pose_trig.sin_om,
+        pose_trig.cos_om,
+        pose_trig.sin_fi,
+        pose_trig.cos_fi,
+        pose_trig.sin_ka,
+        pose_trig.cos_ka,
         p_s.x(),
         p_s.y(),
         p_s.z(),
@@ -1733,8 +1767,8 @@ void optimize_lidar_odometry(
     AtPBndt.setZero();
     Eigen::Vector3d b_indoor(rgd_params_indoor.resolution_X, rgd_params_indoor.resolution_Y, rgd_params_indoor.resolution_Z);
 
-    // Pre-compute TaitBryanPose conversions for all trajectory poses
-    std::vector<TaitBryanPose> tait_bryan_poses;
+    // Pre-compute TaitBryanPose conversions with sin/cos for all trajectory poses
+    std::vector<TaitBryanPoseWithTrig> tait_bryan_poses;
     tait_bryan_poses.reserve(intermediate_trajectory.size());
     for (const auto& pose : intermediate_trajectory)
         tait_bryan_poses.emplace_back(pose_tait_bryan_from_affine_matrix(pose));

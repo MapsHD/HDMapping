@@ -1,6 +1,8 @@
 #include "lidar_odometry_utils.h"
 #include <hash_utils.h>
-#include <mutex>
+#include <tbb/blocked_range.h>
+#include <tbb/combinable.h>
+#include <tbb/parallel_for.h>
 
 #include <export_laz.h>
 
@@ -1451,7 +1453,6 @@ static void compute_hessian_indoor(
     bool ablation_study_use_view_point_and_normal_vectors,
     bool ablation_study_use_planarity,
     bool ablation_study_use_norm,
-    std::vector<std::mutex>& mutexes,
     Eigen::MatrixXd& AtPAndt,
     Eigen::MatrixXd& AtPBndt)
 {
@@ -1577,8 +1578,6 @@ static void compute_hessian_indoor(
         AtPB *= w;
     }
 
-    std::mutex& m = mutexes[intermediate_points_i.index_pose];
-    std::unique_lock lck(m);
     AtPAndt.block<6, 6>(c, c) += AtPA;
     AtPBndt.block<6, 1>(c, 0) -= AtPB;
 }
@@ -1592,7 +1591,6 @@ static void compute_hessian_outdoor(
     double max_distance,
     bool ablation_study_use_view_point_and_normal_vectors,
     bool ablation_study_use_planarity,
-    std::vector<std::mutex>& mutexes,
     Eigen::MatrixXd& AtPAndt,
     Eigen::MatrixXd& AtPBndt)
 {
@@ -1713,8 +1711,6 @@ static void compute_hessian_outdoor(
         AtPB *= planarity;
     }
 
-    std::mutex& m = mutexes[intermediate_points_i.index_pose];
-    std::unique_lock lck(m);
     AtPAndt.block<6, 6>(c, c) += AtPA;
     AtPBndt.block<6, 1>(c, 0) -= AtPB;
 }
@@ -1777,73 +1773,142 @@ void optimize_lidar_odometry(
     for (const auto& pose : intermediate_trajectory)
         tait_bryan_poses.emplace_back(pose_tait_bryan_from_affine_matrix(pose));
 
-    std::vector<std::mutex> mutexes(intermediate_trajectory.size());
-
-    auto hessian_fun_indoor = [&intermediate_trajectory,
-                               &tait_bryan_poses,
-                               &buckets_indoor,
-                               &b_indoor,
-                               &mutexes,
-                               &AtPAndt,
-                               &AtPBndt,
-                               max_distance,
-                               ablation_study_use_view_point_and_normal_vectors,
-                               ablation_study_use_planarity,
-                               ablation_study_use_norm](const Point3Di& pt)
-    {
-        compute_hessian_indoor(
-            pt,
-            intermediate_trajectory,
-            tait_bryan_poses,
-            buckets_indoor,
-            b_indoor,
-            max_distance,
-            ablation_study_use_view_point_and_normal_vectors,
-            ablation_study_use_planarity,
-            ablation_study_use_norm,
-            mutexes,
-            AtPAndt,
-            AtPBndt);
-    };
-
     if (multithread)
-        std::for_each(std::execution::par_unseq, std::begin(intermediate_points), std::end(intermediate_points), hessian_fun_indoor);
+    {
+        using MatrixPair = std::pair<Eigen::MatrixXd, Eigen::MatrixXd>;
+        tbb::combinable<MatrixPair> thread_local_matrices(
+            [&intermediate_trajectory]()
+            {
+                return std::make_pair(
+                    Eigen::MatrixXd::Zero(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6),
+                    Eigen::MatrixXd::Zero(intermediate_trajectory.size() * 6, 1));
+            });
+
+        tbb::parallel_for(
+            tbb::blocked_range<size_t>(0, intermediate_points.size()),
+            [&intermediate_trajectory,
+             &intermediate_points,
+             &tait_bryan_poses,
+             &buckets_indoor,
+             &b_indoor,
+             &thread_local_matrices,
+             max_distance,
+             ablation_study_use_view_point_and_normal_vectors,
+             ablation_study_use_planarity,
+             ablation_study_use_norm](const tbb::blocked_range<size_t>& range)
+            {
+                auto& [local_AtPA, local_AtPB] = thread_local_matrices.local();
+                for (size_t i = range.begin(); i != range.end(); ++i)
+                {
+                    compute_hessian_indoor(
+                        intermediate_points[i],
+                        intermediate_trajectory,
+                        tait_bryan_poses,
+                        buckets_indoor,
+                        b_indoor,
+                        max_distance,
+                        ablation_study_use_view_point_and_normal_vectors,
+                        ablation_study_use_planarity,
+                        ablation_study_use_norm,
+                        local_AtPA,
+                        local_AtPB);
+                }
+            });
+
+        thread_local_matrices.combine_each(
+            [&AtPAndt, &AtPBndt](const MatrixPair& local)
+            {
+                AtPAndt += local.first;
+                AtPBndt += local.second;
+            });
+    }
     else
-        std::for_each(std::begin(intermediate_points), std::end(intermediate_points), hessian_fun_indoor);
+    {
+        for (const auto& pt : intermediate_points)
+        {
+            compute_hessian_indoor(
+                pt,
+                intermediate_trajectory,
+                tait_bryan_poses,
+                buckets_indoor,
+                b_indoor,
+                max_distance,
+                ablation_study_use_view_point_and_normal_vectors,
+                ablation_study_use_planarity,
+                ablation_study_use_norm,
+                AtPAndt,
+                AtPBndt);
+        }
+    }
 
     if (ablation_study_use_hierarchical_rgd)
     {
         Eigen::Vector3d b_outdoor(rgd_params_outdoor.resolution_X, rgd_params_outdoor.resolution_Y, rgd_params_outdoor.resolution_Z);
 
-        auto hessian_fun_outdoor = [&intermediate_trajectory,
-                                    &tait_bryan_poses,
-                                    &buckets_outdoor,
-                                    &b_outdoor,
-                                    &mutexes,
-                                    &AtPAndt,
-                                    &AtPBndt,
-                                    max_distance,
-                                    ablation_study_use_view_point_and_normal_vectors,
-                                    ablation_study_use_planarity](const Point3Di& pt)
-        {
-            compute_hessian_outdoor(
-                pt,
-                intermediate_trajectory,
-                tait_bryan_poses,
-                buckets_outdoor,
-                b_outdoor,
-                max_distance,
-                ablation_study_use_view_point_and_normal_vectors,
-                ablation_study_use_planarity,
-                mutexes,
-                AtPAndt,
-                AtPBndt);
-        };
-
         if (multithread)
-            std::for_each(std::execution::par_unseq, std::begin(intermediate_points), std::end(intermediate_points), hessian_fun_outdoor);
+        {
+            using MatrixPair = std::pair<Eigen::MatrixXd, Eigen::MatrixXd>;
+            tbb::combinable<MatrixPair> thread_local_matrices(
+                [&intermediate_trajectory]()
+                {
+                    return std::make_pair(
+                        Eigen::MatrixXd::Zero(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6),
+                        Eigen::MatrixXd::Zero(intermediate_trajectory.size() * 6, 1));
+                });
+
+            tbb::parallel_for(
+                tbb::blocked_range<size_t>(0, intermediate_points.size()),
+                [&intermediate_trajectory,
+                 &intermediate_points,
+                 &tait_bryan_poses,
+                 &buckets_outdoor,
+                 &b_outdoor,
+                 &thread_local_matrices,
+                 max_distance,
+                 ablation_study_use_view_point_and_normal_vectors,
+                 ablation_study_use_planarity](const tbb::blocked_range<size_t>& range)
+                {
+                    auto& [local_AtPA, local_AtPB] = thread_local_matrices.local();
+                    for (size_t i = range.begin(); i != range.end(); ++i)
+                    {
+                        compute_hessian_outdoor(
+                            intermediate_points[i],
+                            intermediate_trajectory,
+                            tait_bryan_poses,
+                            buckets_outdoor,
+                            b_outdoor,
+                            max_distance,
+                            ablation_study_use_view_point_and_normal_vectors,
+                            ablation_study_use_planarity,
+                            local_AtPA,
+                            local_AtPB);
+                    }
+                });
+
+            thread_local_matrices.combine_each(
+                [&AtPAndt, &AtPBndt](const MatrixPair& local)
+                {
+                    AtPAndt += local.first;
+                    AtPBndt += local.second;
+                });
+        }
         else
-            std::for_each(std::begin(intermediate_points), std::end(intermediate_points), hessian_fun_outdoor);
+        {
+            for (const auto& pt : intermediate_points)
+            {
+                compute_hessian_outdoor(
+                    pt,
+                    intermediate_trajectory,
+                    tait_bryan_poses,
+                    buckets_outdoor,
+                    b_outdoor,
+                    max_distance,
+                    ablation_study_use_view_point_and_normal_vectors,
+                    ablation_study_use_planarity,
+                    AtPAndt,
+                    AtPBndt);
+            }
+        }
     }
 
     std::vector<std::pair<int, int>> odo_edges;

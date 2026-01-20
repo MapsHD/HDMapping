@@ -1227,7 +1227,7 @@ void openFiles()
 
 void imu_data_gui()
 {
-    ImGui::Begin("IMU data");
+    ImGui::Begin("IMU data", &show_imu_data);
     {
         if (imu_data_plot.timestampLidar.size() > 0)
         {
@@ -1339,7 +1339,7 @@ void settings_gui()
         if (ImGui::IsItemHovered())
         {
             ImGui::BeginTooltip();
-            ImGui::Text("Parameter for AHRS(Attitude and Heading Reference System) filter");
+            ImGui::Text("Parameter for AHRS (Attitude and Heading Reference System) filter");
             ImGui::Text("Controls how strongly the filter corrects its orientation estimate");
             ImGui::Text("using accelerometer and magnetometer data, relative to the gyroscope integration");
             ImGui::EndTooltip();
@@ -1398,18 +1398,41 @@ void settings_gui()
         ImGui::Separator();
 
         ImGui::PushItemWidth(ImGuiNumberWidth);
-        ImGui::InputDouble("distance_bucket", &distance_bucket);
-        ImGui::InputDouble("polar_angle_deg", &polar_angle_deg);
-        ImGui::InputDouble("azimutal_angle_deg", &azimutal_angle_deg);
-        ImGui::InputDouble("max_distance_lidar", &max_distance_lidar);
+        ImGui::InputDouble("Distance bucket [m]", &distance_bucket);
+        ImGui::InputDouble("Polar angle [deg]", &polar_angle_deg);
+        ImGui::InputDouble("Azimutal angle [deg]", &azimutal_angle_deg);
+        ImGui::InputDouble("Max distance LiDAR", &max_distance_lidar);
         ImGui::InputInt("robust_and_accurate_lidar_odometry_iterations", &robust_and_accurate_lidar_odometry_iterations);
-        ImGui::Checkbox("useMultithread", &useMultithread);
+        ImGui::Checkbox("Use multithread", &useMultithread);
+        ImGui::Text("Pose component weights for optimization:");
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::BeginTooltip();
+            ImGui::Text("Value guideline:");
+            ImGui::Text("1e6: almost rigid motion, prior dominates (default)");
+            ImGui::Text("1e4: small corrections allowed");
+            ImGui::Text("1e2: free alignment");
+            ImGui::Text("  0: motion model ignored");
+            ImGui::EndTooltip();
+        }
         ImGui::InputDouble("wx", &wx);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Translation penaltie for %s", xText);
         ImGui::InputDouble("wy", &wy);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Translation penaltie for %s", yText);
         ImGui::InputDouble("wz", &wz);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Translation penaltie for %s", zText);
         ImGui::InputDouble("wom", &wom);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(omText);
         ImGui::InputDouble("wfi", &wfi);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(fiText);
         ImGui::InputDouble("wka", &wka);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(kaText);
         ImGui::PopItemWidth();
 
         ImGui::NewLine();
@@ -1692,7 +1715,6 @@ void display()
 
     if (ImGui::BeginMainMenuBar())
     {
-        // if (!is_init)
         {
             if (ImGui::Button("Open folder"))
                 openFolder();
@@ -1756,19 +1778,25 @@ void display()
 
             ImGui::Separator();
 
-            if (ImGui::MenuItem("Show rgd_nn", nullptr, &show_rgd_nn))
+            ImGui::BeginDisabled(!is_init);
+            if (ImGui::MenuItem("Show RGD / NN", nullptr, &show_rgd_nn))
             {
                 if (show_rgd_nn)
                     rgd_nn = get_nn();
             }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Show Regular/Range Grid Data / Nearest Neighbors");
 
             if (ImGui::MenuItem("Show mean covs", nullptr, &show_mean_cov))
             {
                 if (show_mean_cov)
                     mean_cov = get_mean_cov();
             }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Show the mean and covariance ellipsoid representation");
 
             ImGui::MenuItem("Show IMU data", nullptr, &show_imu_data);
+            ImGui::EndDisabled();
 
             ImGui::Separator();
 
@@ -1956,6 +1984,7 @@ int main(int argc, char* argv[])
         }
 
         initGL(&argc, argv, winTitle, display, mouse);
+        ImPlot::CreateContext();
 
         if (argc == 2)
         {

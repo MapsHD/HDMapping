@@ -1,3 +1,6 @@
+//   File created by Adrian Radulescu (github yuckinus) in order to
+// standardize and unify common functionalities duplicated before in each app
+
 #pragma once
 
 #include <Eigen/Geometry>

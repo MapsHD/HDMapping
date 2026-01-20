@@ -20,15 +20,17 @@
 #include "pfd_wrapper.hpp"
 
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
-#include <filesystem>
 
 #include <HDMapping/Version.hpp>
-
-#include <mutex>
 
 #include <pair_wise_iterative_closest_point.h>
 
 #include <export_laz.h>
+
+#include <hash_utils.h>
+
+#include <filesystem>
+#include <mutex>
 
 #define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
@@ -1460,7 +1462,7 @@ void calibrate_intrinsics()
         Eigen::Vector3d point_local(intermediate_points_i.point.x(), intermediate_points_i.point.y(), intermediate_points_i.point.z());
         Eigen::Vector3d point_global = m_pose * point_local;
 
-        auto index_of_bucket = get_rgd_index(point_global, b);
+        auto index_of_bucket = get_rgd_index_3d(point_global, b);
 
         auto bucket_it = buckets.find(index_of_bucket);
         // no bucket found

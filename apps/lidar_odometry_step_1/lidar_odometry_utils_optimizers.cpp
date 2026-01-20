@@ -39,7 +39,7 @@ std::vector<std::pair<int, int>> nns(const std::vector<Point3Di>& points_global,
 
     for (int i = 0; i < points_global.size(); i++)
     {
-        uint64_t index = get_rgd_index(points_global[i].point, search_radious);
+        uint64_t index = get_rgd_index_3d(points_global[i].point, search_radious);
         indexes.emplace_back(index, i);
     }
 
@@ -85,7 +85,7 @@ std::vector<std::pair<int, int>> nns(const std::vector<Point3Di>& points_global,
                 for (double z = -search_radious.z(); z <= search_radious.z(); z += search_radious.z())
                 {
                     Eigen::Vector3d position_global = source.point + Eigen::Vector3d(x, y, z);
-                    uint64_t index_of_bucket = get_rgd_index(position_global, search_radious);
+                    uint64_t index_of_bucket = get_rgd_index_3d(position_global, search_radious);
 
                     if (buckets.contains(index_of_bucket))
                     {
@@ -529,8 +529,8 @@ void optimize_sf(
         double azimutal_angle_deg = acos(point_global.z() / r) * RAD_TO_DEG;
         ///////////////
 
-        auto index_of_bucket = get_rgd_index({ r, polar_angle_deg, azimutal_angle_deg }, b);
-        // auto index_of_bucket = get_rgd_index(point_global, b);
+        auto index_of_bucket = get_rgd_index_3d({ r, polar_angle_deg, azimutal_angle_deg }, b);
+        // auto index_of_bucket = get_rgd_index_3d(point_global, b);
 
         auto bucket_it = buckets.find(index_of_bucket);
         // no bucket found
@@ -812,7 +812,7 @@ void optimize_sf2(
     const auto hessian_fun = [&](const int& indexes_i) -> Blocks
     {
         int c = intermediate_points[indexes_i].index_pose * 6;
-        auto index_of_bucket = get_rgd_index(point_cloud_global_sc[indexes_i], b);
+        auto index_of_bucket = get_rgd_index_3d(point_cloud_global_sc[indexes_i], b);
         auto bucket_it = buckets.find(index_of_bucket);
         // no bucket found
         if (bucket_it == buckets.end())
@@ -1199,7 +1199,7 @@ void optimize_rigid_sf(
             double polar_angle_deg_l = atan2(point_global.y(), point_global.x()) * RAD_TO_DEG;
             double azimutal_angle_deg_l = acos(point_global.z() / r_l) * RAD_TO_DEG;
 
-            auto index_of_bucket = get_rgd_index(
+            auto index_of_bucket = get_rgd_index_3d(
                 { r_l, polar_angle_deg_l, azimutal_angle_deg_l },
                 { rgd_params_sc.resolution_X, rgd_params_sc.resolution_Y, rgd_params_sc.resolution_Z });
 
@@ -1459,7 +1459,7 @@ static void compute_hessian_indoor(
         return;
 
     Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
-    auto index_of_bucket = get_rgd_index(point_global, b_indoor);
+    auto index_of_bucket = get_rgd_index_3d(point_global, b_indoor);
 
     auto bucket_it = buckets_indoor.find(index_of_bucket);
     // no bucket found
@@ -1600,7 +1600,7 @@ static void compute_hessian_outdoor(
         return;
 
     Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
-    auto index_of_bucket = get_rgd_index(point_global, b_outdoor);
+    auto index_of_bucket = get_rgd_index_3d(point_global, b_outdoor);
 
     auto bucket_it = buckets_outdoor.find(index_of_bucket);
     // no bucket found
@@ -2080,7 +2080,7 @@ void align_to_reference(
     for (int i = 0; i < initial_points.size(); i += 1)
     {
         Eigen::Vector3d point_global = m_g * initial_points[i].point;
-        auto index_of_bucket = get_rgd_index(point_global, b);
+        auto index_of_bucket = get_rgd_index_3d(point_global, b);
 
         if (!reference_buckets.contains(index_of_bucket))
             continue;
@@ -2898,7 +2898,7 @@ void Consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams
                     return;
 
                 Eigen::Vector3d point_global = trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
-                auto index_of_bucket = get_rgd_index(point_global, b);
+                auto index_of_bucket = get_rgd_index_3d(point_global, b);
 
                 auto bucket_it = buckets.find(index_of_bucket);
                 // no bucket found
@@ -3278,7 +3278,7 @@ void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParam
     std::vector<std::pair<uint64_t, uint32_t>> index_pairs;
     for (int i = 0; i < points_global.size(); i++)
     {
-        auto index_of_bucket = get_rgd_index(points_global[i].point, b);
+        auto index_of_bucket = get_rgd_index_3d(points_global[i].point, b);
         index_pairs.emplace_back(index_of_bucket, i);
     }
     std::sort(
@@ -3390,7 +3390,7 @@ void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParam
         if (points_local[i].point.norm() < 1.0)
             continue;
 
-        auto index_of_bucket = get_rgd_index(points_global[i].point, b);
+        auto index_of_bucket = get_rgd_index_3d(points_global[i].point, b);
         auto bucket_it = buckets.find(index_of_bucket);
         // no bucket found
         if (bucket_it == buckets.end())

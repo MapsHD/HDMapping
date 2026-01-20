@@ -299,7 +299,7 @@ std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, i
 }
 #endif
 
-int get_index_3d(const set<int>& s, int k)
+int get_index(const set<int>& s, int k)
 {
     int index = 0;
     for (auto u : s)
@@ -345,7 +345,7 @@ void find_best_stretch(
     std::vector<Point3Di> points_reindexed = points;
     for (size_t i = 0; i < points_reindexed.size(); i++)
     {
-        points_reindexed[i].index_pose = get_index_3d(indexes, points[i].index_pose);
+        points_reindexed[i].index_pose = get_index(indexes, points[i].index_pose);
     }
     ///
     std::vector<Eigen::Affine3d> best_trajectory = trajectory;

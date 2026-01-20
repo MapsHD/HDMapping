@@ -3,7 +3,21 @@
 #include <Eigen/Eigen>
 #include <vector>
 
-#include <hash_utils.h>
+inline uint64_t get_index_2D(const int16_t x, const int16_t y /*, const int16_t z*/)
+{
+    // return ((static_cast<uint64_t>(x) << 32) & (0x0000FFFF00000000ull)) |
+    //        ((static_cast<uint64_t>(y) << 16) & (0x00000000FFFF0000ull)) |
+    //        ((static_cast<uint64_t>(z) << 0) & (0x000000000000FFFFull));
+    return ((static_cast<uint64_t>(x) << 16) & (0x00000000FFFF0000ull)) | ((static_cast<uint64_t>(y) << 0) & (0x000000000000FFFFull));
+}
+
+inline uint64_t get_rgd_index_2D(const Eigen::Vector3d p, const Eigen::Vector2d b)
+{
+    int16_t x = static_cast<int16_t>(p.x() / b.x());
+    int16_t y = static_cast<int16_t>(p.y() / b.y());
+    // int16_t z = static_cast<int16_t>(p.z() / b.z());
+    return get_index_2D(x, y);
+}
 
 class Surface
 {

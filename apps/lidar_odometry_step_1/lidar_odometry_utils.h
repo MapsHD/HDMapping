@@ -152,6 +152,9 @@ struct LidarOdometryParams
     bool save_index_pose = false;
 };
 
+uint64_t get_index(const int16_t x, const int16_t y, const int16_t z);
+uint64_t get_rgd_index(const Eigen::Vector3d p, const Eigen::Vector3d b);
+
 // this function finds interpolated pose between two poses according to query_time
 Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& trajectory, double query_time);
 

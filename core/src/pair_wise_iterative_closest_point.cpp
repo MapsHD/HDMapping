@@ -149,7 +149,7 @@ bool PairWiseICP::compute(
 
         for (int i = 0; i < target.size(); i++)
         {
-            uint64_t index = get_rgd_index_3d(target[i], { search_radious, search_radious, search_radious });
+            uint64_t index = get_rgd_index(target[i], { search_radious, search_radious, search_radious });
             indexes.emplace_back(index, i);
         }
 
@@ -208,7 +208,7 @@ bool PairWiseICP::compute(
                     {
                         Eigen::Vector3d source_point_global_ext = source_point_global + Eigen::Vector3d(x, y, z);
                         uint64_t index_of_bucket =
-                            get_rgd_index_3d(source_point_global_ext, { search_radious, search_radious, search_radious });
+                            get_rgd_index(source_point_global_ext, { search_radious, search_radious, search_radious });
 
                         if (buckets.contains(index_of_bucket))
                         {
@@ -385,7 +385,7 @@ bool PairWiseICP::compute_fast(
 
     for (int i = 0; i < target.size(); i++)
     {
-        uint64_t index = get_rgd_index_3d(target[i], { search_radious, search_radious, search_radious });
+        uint64_t index = get_rgd_index(target[i], { search_radious, search_radious, search_radious });
         indexes.emplace_back(index, i);
     }
 
@@ -445,7 +445,7 @@ bool PairWiseICP::compute_fast(
                     {
                         Eigen::Vector3d source_point_global_ext = source_point_global + Eigen::Vector3d(x, y, z);
                         uint64_t index_of_bucket =
-                            get_rgd_index_3d(source_point_global_ext, { search_radious, search_radious, search_radious });
+                            get_rgd_index(source_point_global_ext, { search_radious, search_radious, search_radious });
 
                         if (buckets.contains(index_of_bucket))
                         {

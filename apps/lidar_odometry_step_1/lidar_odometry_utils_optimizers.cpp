@@ -1550,6 +1550,8 @@ static void compute_hessian_indoor(
 
     if (ablation_study_use_planarity)
     {
+        // TODO: this can be precalculated during RGD update (and it's better to use closed-form solver)
+        
         // planarity
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
         auto eigen_values = eigen_solver.eigenvalues();
@@ -1688,6 +1690,8 @@ static void compute_hessian_outdoor(
 
     if (ablation_study_use_planarity)
     {
+        // TODO: this can be precalculated during RGD update (and it's better to use closed-form solver)
+
         // planarity
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
         auto eigen_values = eigen_solver.eigenvalues();

@@ -33,6 +33,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <hash_utils.h>
+
 #ifdef _WIN32
 #include "resource.h"
 #include <shellapi.h> // <-- Required for ShellExecuteA
@@ -284,8 +286,8 @@ void optimize()
         for (size_t i = 0; i < point_cloud_global.size(); i++)
         {
 
-            auto index_of_bucket = get_rgd_index(point_cloud_global_sc[i], b);
-            //auto index_of_bucket = get_rgd_index(point_cloud_global[i].point, b);
+            auto index_of_bucket = get_rgd_index_3d(point_cloud_global_sc[i], b);
+            //auto index_of_bucket = get_rgd_index_3d(point_cloud_global[i].point, b);
             auto bucket_it = buckets.find(index_of_bucket);
             // no bucket found
             if (bucket_it == buckets.end())
@@ -752,7 +754,7 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> get_nn()
 
         for (size_t i = 0; i < point_cloud_global_sc.size(); i++)
         {
-            auto index_of_bucket = get_rgd_index(point_cloud_global_sc[i], b);
+            auto index_of_bucket = get_rgd_index_3d(point_cloud_global_sc[i], b);
 
             auto bucket_it = buckets.find(index_of_bucket);
 

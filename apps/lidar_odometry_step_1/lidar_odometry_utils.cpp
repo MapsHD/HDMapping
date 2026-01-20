@@ -2,29 +2,12 @@
 #include "csv.hpp"
 #include <algorithm>
 #include <filesystem>
+#include <hash_utils.h>
 #include <regex>
 
 // #include <toml.hpp>
 
 namespace fs = std::filesystem;
-
-// TODO(m.wlasiuk) : these 2 functions - core/utils
-
-// this function provides unique index
-uint64_t get_index(const int16_t x, const int16_t y, const int16_t z)
-{
-    return ((static_cast<uint64_t>(x) << 32) & (0x0000FFFF00000000ull)) | ((static_cast<uint64_t>(y) << 16) & (0x00000000FFFF0000ull)) |
-        ((static_cast<uint64_t>(z) << 0) & (0x000000000000FFFFull));
-}
-
-// this function provides unique index for input point p and 3D space decomposition into buckets b
-uint64_t get_rgd_index(const Eigen::Vector3d p, const Eigen::Vector3d b)
-{
-    int16_t x = static_cast<int16_t>(p.x() / b.x());
-    int16_t y = static_cast<int16_t>(p.y() / b.y());
-    int16_t z = static_cast<int16_t>(p.z() / b.z());
-    return get_index(x, y, z);
-}
 
 std::vector<Point3Di> decimate(const std::vector<Point3Di>& points, double bucket_x, double bucket_y, double bucket_z)
 {
@@ -39,7 +22,7 @@ std::vector<Point3Di> decimate(const std::vector<Point3Di>& points, double bucke
     for (int i = 0; i < points.size(); i++)
     {
         ip[i].index_of_point = i;
-        ip[i].index_of_bucket = get_rgd_index(points[i].point, b);
+        ip[i].index_of_bucket = get_rgd_index_3d(points[i].point, b);
     }
     std::sort(
         ip.begin(),
@@ -162,7 +145,7 @@ void update_rgd(
 
     for (int i = 0; i < points_global.size(); i++)
     {
-        auto index_of_bucket = get_rgd_index(points_global[i].point, b);
+        auto index_of_bucket = get_rgd_index_3d(points_global[i].point, b);
 
         auto bucket_it = buckets.find(index_of_bucket);
 
@@ -245,7 +228,7 @@ void update_rgd_spherical_coordinates(
 
     for (int i = 0; i < points_global.size(); i++)
     {
-        auto index_of_bucket = get_rgd_index(points_global_spherical[i], b);
+        auto index_of_bucket = get_rgd_index_3d(points_global_spherical[i], b);
 
         auto bucket_it = buckets.find(index_of_bucket);
 

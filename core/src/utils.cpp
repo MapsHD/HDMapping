@@ -1,5 +1,5 @@
 ﻿//   File created by Adrian Radulescu (github yuckinus) in order to
-//standardize and unify common functionalities duplicated before in each app
+// standardize and unify common functionalities duplicated before in each app
 
 #include <pch/pch.h>
 

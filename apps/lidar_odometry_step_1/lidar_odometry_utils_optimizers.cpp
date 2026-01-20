@@ -1430,13 +1430,13 @@ struct TaitBryanPoseWithTrig
     double sin_ka, cos_ka;
 
     TaitBryanPoseWithTrig(const TaitBryanPose& p)
-        : pose(p),
-          sin_om(sin(p.om)),
-          cos_om(cos(p.om)),
-          sin_fi(sin(p.fi)),
-          cos_fi(cos(p.fi)),
-          sin_ka(sin(p.ka)),
-          cos_ka(cos(p.ka))
+        : pose(p)
+        , sin_om(sin(p.om))
+        , cos_om(cos(p.om))
+        , sin_fi(sin(p.fi))
+        , cos_fi(cos(p.fi))
+        , sin_ka(sin(p.ka))
+        , cos_ka(cos(p.ka))
     {
     }
 };
@@ -1551,7 +1551,7 @@ static void compute_hessian_indoor(
     if (ablation_study_use_planarity)
     {
         // TODO: this can be precalculated during RGD update (and it's better to use closed-form solver)
-        
+
         // planarity
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
         auto eigen_values = eigen_solver.eigenvalues();
@@ -1780,16 +1780,16 @@ void optimize_lidar_odometry(
     std::vector<std::mutex> mutexes(intermediate_trajectory.size());
 
     auto hessian_fun_indoor = [&intermediate_trajectory,
-                                &tait_bryan_poses,
-                                &buckets_indoor,
-                                &b_indoor,
-                                &mutexes,
-                                &AtPAndt,
-                                &AtPBndt,
-                                max_distance,
-                                ablation_study_use_view_point_and_normal_vectors,
-                                ablation_study_use_planarity,
-                                ablation_study_use_norm](const Point3Di& pt)
+                               &tait_bryan_poses,
+                               &buckets_indoor,
+                               &b_indoor,
+                               &mutexes,
+                               &AtPAndt,
+                               &AtPBndt,
+                               max_distance,
+                               ablation_study_use_view_point_and_normal_vectors,
+                               ablation_study_use_planarity,
+                               ablation_study_use_norm](const Point3Di& pt)
     {
         compute_hessian_indoor(
             pt,
@@ -1816,15 +1816,15 @@ void optimize_lidar_odometry(
         Eigen::Vector3d b_outdoor(rgd_params_outdoor.resolution_X, rgd_params_outdoor.resolution_Y, rgd_params_outdoor.resolution_Z);
 
         auto hessian_fun_outdoor = [&intermediate_trajectory,
-                                     &tait_bryan_poses,
-                                     &buckets_outdoor,
-                                     &b_outdoor,
-                                     &mutexes,
-                                     &AtPAndt,
-                                     &AtPBndt,
-                                     max_distance,
-                                     ablation_study_use_view_point_and_normal_vectors,
-                                     ablation_study_use_planarity](const Point3Di& pt)
+                                    &tait_bryan_poses,
+                                    &buckets_outdoor,
+                                    &b_outdoor,
+                                    &mutexes,
+                                    &AtPAndt,
+                                    &AtPBndt,
+                                    max_distance,
+                                    ablation_study_use_view_point_and_normal_vectors,
+                                    ablation_study_use_planarity](const Point3Di& pt)
         {
             compute_hessian_outdoor(
                 pt,

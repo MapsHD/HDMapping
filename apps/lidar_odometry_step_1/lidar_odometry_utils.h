@@ -76,6 +76,7 @@ struct LidarOdometryParams
     double max_distance_lidar = 70.0; // I am not processing data above dist distance in lidar odometry
     int threshold_initial_points = 10000;
     int threshold_nr_poses = 20;
+    double convergence_delta_threshold = 1e-12; // convergence threshold for optimization
 
     // lidar odometry debug info
     bool save_calibration_validation = false;

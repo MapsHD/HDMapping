@@ -22,7 +22,7 @@ inline double rad2deg(double rad)
     return (rad * 180.0) / M_PI;
 }
 
-inline TaitBryanPose pose_tait_bryan_from_affine_matrix(Eigen::Affine3d m)
+inline TaitBryanPose pose_tait_bryan_from_affine_matrix(const Eigen::Affine3d& m)
 {
     TaitBryanPose pose;
 

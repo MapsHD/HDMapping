@@ -1421,6 +1421,304 @@ void optimize_rigid_sf(
     intermediate_trajectory_motion_model = _intermediate_trajectory;
 }
 
+// Struct to hold pre-computed TaitBryanPose with trigonometric values
+struct TaitBryanPoseWithTrig
+{
+    TaitBryanPose pose;
+    double sin_om, cos_om;
+    double sin_fi, cos_fi;
+    double sin_ka, cos_ka;
+
+    TaitBryanPoseWithTrig(const TaitBryanPose& p)
+        : pose(p)
+        , sin_om(sin(p.om))
+        , cos_om(cos(p.om))
+        , sin_fi(sin(p.fi))
+        , cos_fi(cos(p.fi))
+        , sin_ka(sin(p.ka))
+        , cos_ka(cos(p.ka))
+    {
+    }
+};
+
+static void compute_hessian_indoor(
+    const Point3Di& intermediate_points_i,
+    const std::vector<Eigen::Affine3d>& intermediate_trajectory,
+    const std::vector<TaitBryanPoseWithTrig>& tait_bryan_poses,
+    const NDTBucketMapType& buckets_indoor,
+    const Eigen::Vector3d& b_indoor,
+    double max_distance,
+    bool ablation_study_use_view_point_and_normal_vectors,
+    bool ablation_study_use_planarity,
+    bool ablation_study_use_norm,
+    std::vector<std::mutex>& mutexes,
+    Eigen::MatrixXd& AtPAndt,
+    Eigen::MatrixXd& AtPBndt)
+{
+    if (intermediate_points_i.point.norm() < 0.1 || intermediate_points_i.point.norm() > max_distance) // ToDo
+        return;
+
+    Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
+    auto index_of_bucket = get_rgd_index(point_global, b_indoor);
+
+    auto bucket_it = buckets_indoor.find(index_of_bucket);
+    // no bucket found
+    if (bucket_it == buckets_indoor.end())
+        return;
+
+    auto& this_bucket = bucket_it->second;
+
+    // if(buckets[index_of_bucket].number_of_points >= 5){
+    const Eigen::Matrix3d& infm = this_bucket.cov.inverse();
+    const double threshold = 100000.0;
+
+    if ((infm.array() > threshold).any())
+        return;
+
+    if ((infm.array() < -threshold).any())
+        return;
+
+    if (ablation_study_use_view_point_and_normal_vectors)
+    {
+        // check nv
+        const Eigen::Vector3d& nv = this_bucket.normal_vector;
+        Eigen::Vector3d viewport = intermediate_trajectory[intermediate_points_i.index_pose].translation();
+        if (nv.dot(viewport - this_bucket.mean) < 0)
+            return;
+    }
+
+    const Eigen::Vector3d& p_s = intermediate_points_i.point;
+    const TaitBryanPoseWithTrig& pose_trig = tait_bryan_poses[intermediate_points_i.index_pose];
+    const TaitBryanPose& pose_s = pose_trig.pose;
+
+    Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
+    point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified_precomputed_trig(
+        AtPA,
+        pose_s.px,
+        pose_s.py,
+        pose_s.pz,
+        pose_trig.sin_om,
+        pose_trig.cos_om,
+        pose_trig.sin_fi,
+        pose_trig.cos_fi,
+        pose_trig.sin_ka,
+        pose_trig.cos_ka,
+        p_s.x(),
+        p_s.y(),
+        p_s.z(),
+        infm(0, 0),
+        infm(0, 1),
+        infm(0, 2),
+        infm(1, 0),
+        infm(1, 1),
+        infm(1, 2),
+        infm(2, 0),
+        infm(2, 1),
+        infm(2, 2));
+
+    Eigen::Matrix<double, 6, 1> AtPB;
+    point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified_precomputed_trig(
+        AtPB,
+        pose_s.px,
+        pose_s.py,
+        pose_s.pz,
+        pose_trig.sin_om,
+        pose_trig.cos_om,
+        pose_trig.sin_fi,
+        pose_trig.cos_fi,
+        pose_trig.sin_ka,
+        pose_trig.cos_ka,
+        p_s.x(),
+        p_s.y(),
+        p_s.z(),
+        infm(0, 0),
+        infm(0, 1),
+        infm(0, 2),
+        infm(1, 0),
+        infm(1, 1),
+        infm(1, 2),
+        infm(2, 0),
+        infm(2, 1),
+        infm(2, 2),
+        this_bucket.mean.x(),
+        this_bucket.mean.y(),
+        this_bucket.mean.z());
+
+    int c = intermediate_points_i.index_pose * 6;
+
+    double planarity = 1.0;
+
+    if (ablation_study_use_planarity)
+    {
+        // TODO: this can be precalculated during RGD update (and it's better to use closed-form solver)
+
+        // planarity
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+        auto eigen_values = eigen_solver.eigenvalues();
+        auto eigen_vectors = eigen_solver.eigenvectors();
+        double ev1 = eigen_values.x();
+        double ev2 = eigen_values.y();
+        double ev3 = eigen_values.z();
+        double sum_ev = ev1 + ev2 + ev3;
+        planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
+    }
+
+    double norm = 1.0;
+    if (ablation_study_use_norm)
+        norm = p_s.norm();
+
+    double w = planarity * norm;
+    if (w > 10.0)
+        w = 10.0;
+
+    if (ablation_study_use_planarity || ablation_study_use_norm)
+    {
+        AtPA *= w;
+        AtPB *= w;
+    }
+
+    std::mutex& m = mutexes[intermediate_points_i.index_pose];
+    std::unique_lock lck(m);
+    AtPAndt.block<6, 6>(c, c) += AtPA;
+    AtPBndt.block<6, 1>(c, 0) -= AtPB;
+}
+
+static void compute_hessian_outdoor(
+    const Point3Di& intermediate_points_i,
+    const std::vector<Eigen::Affine3d>& intermediate_trajectory,
+    const std::vector<TaitBryanPoseWithTrig>& tait_bryan_poses,
+    const NDTBucketMapType& buckets_outdoor,
+    const Eigen::Vector3d& b_outdoor,
+    double max_distance,
+    bool ablation_study_use_view_point_and_normal_vectors,
+    bool ablation_study_use_planarity,
+    std::vector<std::mutex>& mutexes,
+    Eigen::MatrixXd& AtPAndt,
+    Eigen::MatrixXd& AtPBndt)
+{
+    if (intermediate_points_i.point.norm() < 5.0 || intermediate_points_i.point.norm() > max_distance) // ToDo
+        return;
+
+    Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
+    auto index_of_bucket = get_rgd_index(point_global, b_outdoor);
+
+    auto bucket_it = buckets_outdoor.find(index_of_bucket);
+    // no bucket found
+    if (bucket_it == buckets_outdoor.end())
+        return;
+
+    auto& this_bucket = bucket_it->second;
+
+    const Eigen::Matrix3d& infm = this_bucket.cov.inverse();
+    const double threshold = 100000.0;
+
+    if ((infm.array() > threshold).any())
+        return;
+
+    if ((infm.array() < -threshold).any())
+        return;
+
+    if (ablation_study_use_view_point_and_normal_vectors)
+    {
+        // check nv
+        const Eigen::Vector3d& nv = this_bucket.normal_vector;
+        Eigen::Vector3d viewport = intermediate_trajectory[intermediate_points_i.index_pose].translation();
+        if (nv.dot(viewport - this_bucket.mean) < 0)
+            return;
+    }
+
+    const Eigen::Vector3d& p_s = intermediate_points_i.point;
+    const TaitBryanPoseWithTrig& pose_trig = tait_bryan_poses[intermediate_points_i.index_pose];
+    const TaitBryanPose& pose_s = pose_trig.pose;
+
+    Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
+    point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified_precomputed_trig(
+        AtPA,
+        pose_s.px,
+        pose_s.py,
+        pose_s.pz,
+        pose_trig.sin_om,
+        pose_trig.cos_om,
+        pose_trig.sin_fi,
+        pose_trig.cos_fi,
+        pose_trig.sin_ka,
+        pose_trig.cos_ka,
+        p_s.x(),
+        p_s.y(),
+        p_s.z(),
+        infm(0, 0),
+        infm(0, 1),
+        infm(0, 2),
+        infm(1, 0),
+        infm(1, 1),
+        infm(1, 2),
+        infm(2, 0),
+        infm(2, 1),
+        infm(2, 2));
+
+    Eigen::Matrix<double, 6, 1> AtPB;
+    point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified_precomputed_trig(
+        AtPB,
+        pose_s.px,
+        pose_s.py,
+        pose_s.pz,
+        pose_trig.sin_om,
+        pose_trig.cos_om,
+        pose_trig.sin_fi,
+        pose_trig.cos_fi,
+        pose_trig.sin_ka,
+        pose_trig.cos_ka,
+        p_s.x(),
+        p_s.y(),
+        p_s.z(),
+        infm(0, 0),
+        infm(0, 1),
+        infm(0, 2),
+        infm(1, 0),
+        infm(1, 1),
+        infm(1, 2),
+        infm(2, 0),
+        infm(2, 1),
+        infm(2, 2),
+        this_bucket.mean.x(),
+        this_bucket.mean.y(),
+        this_bucket.mean.z());
+
+    int c = intermediate_points_i.index_pose * 6;
+
+    double planarity = 1.0;
+
+    if (ablation_study_use_planarity)
+    {
+        // TODO: this can be precalculated during RGD update (and it's better to use closed-form solver)
+
+        // planarity
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+        auto eigen_values = eigen_solver.eigenvalues();
+        auto eigen_vectors = eigen_solver.eigenvectors();
+        double ev1 = eigen_values.x();
+        double ev2 = eigen_values.y();
+        double ev3 = eigen_values.z();
+        double sum_ev = ev1 + ev2 + ev3;
+        planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
+
+        // double norm = p_s.norm();
+
+        // if (norm < 5.0)
+        //{
+        //     return;
+        // }
+
+        AtPA *= planarity;
+        AtPB *= planarity;
+    }
+
+    std::mutex& m = mutexes[intermediate_points_i.index_pose];
+    std::unique_lock lck(m);
+    AtPAndt.block<6, 6>(c, c) += AtPA;
+    AtPBndt.block<6, 1>(c, 0) -= AtPB;
+}
+
 void optimize_lidar_odometry(
     std::vector<Point3Di>& intermediate_points,
     std::vector<Eigen::Affine3d>& intermediate_trajectory,
@@ -1473,129 +1771,39 @@ void optimize_lidar_odometry(
     AtPBndt.setZero();
     Eigen::Vector3d b_indoor(rgd_params_indoor.resolution_X, rgd_params_indoor.resolution_Y, rgd_params_indoor.resolution_Z);
 
+    // Pre-compute TaitBryanPose conversions with sin/cos for all trajectory poses
+    std::vector<TaitBryanPoseWithTrig> tait_bryan_poses;
+    tait_bryan_poses.reserve(intermediate_trajectory.size());
+    for (const auto& pose : intermediate_trajectory)
+        tait_bryan_poses.emplace_back(pose_tait_bryan_from_affine_matrix(pose));
+
     std::vector<std::mutex> mutexes(intermediate_trajectory.size());
 
-    const auto hessian_fun_indoor = [&](const Point3Di& intermediate_points_i)
+    auto hessian_fun_indoor = [&intermediate_trajectory,
+                               &tait_bryan_poses,
+                               &buckets_indoor,
+                               &b_indoor,
+                               &mutexes,
+                               &AtPAndt,
+                               &AtPBndt,
+                               max_distance,
+                               ablation_study_use_view_point_and_normal_vectors,
+                               ablation_study_use_planarity,
+                               ablation_study_use_norm](const Point3Di& pt)
     {
-        if (intermediate_points_i.point.norm() < 0.1 || intermediate_points_i.point.norm() > max_distance) // ToDo
-            return;
-
-        Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
-        auto index_of_bucket = get_rgd_index(point_global, b_indoor);
-
-        auto bucket_it = buckets_indoor.find(index_of_bucket);
-        // no bucket found
-        if (bucket_it == buckets_indoor.end())
-            return;
-
-        auto& this_bucket = bucket_it->second;
-
-        // if(buckets[index_of_bucket].number_of_points >= 5){
-        const Eigen::Matrix3d& infm = this_bucket.cov.inverse();
-        const double threshold = 100000.0;
-
-        if ((infm.array() > threshold).any())
-            return;
-
-        if ((infm.array() < -threshold).any())
-            return;
-
-        if (ablation_study_use_view_point_and_normal_vectors)
-        {
-            // check nv
-            Eigen::Vector3d& nv = this_bucket.normal_vector;
-            Eigen::Vector3d viewport = intermediate_trajectory[intermediate_points_i.index_pose].translation();
-            if (nv.dot(viewport - this_bucket.mean) < 0)
-                return;
-        }
-
-        const Eigen::Affine3d& m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
-        const Eigen::Vector3d& p_s = intermediate_points_i.point;
-        const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
-        //
-
-        Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
-        point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
-            AtPA,
-            pose_s.px,
-            pose_s.py,
-            pose_s.pz,
-            pose_s.om,
-            pose_s.fi,
-            pose_s.ka,
-            p_s.x(),
-            p_s.y(),
-            p_s.z(),
-            infm(0, 0),
-            infm(0, 1),
-            infm(0, 2),
-            infm(1, 0),
-            infm(1, 1),
-            infm(1, 2),
-            infm(2, 0),
-            infm(2, 1),
-            infm(2, 2));
-
-        Eigen::Matrix<double, 6, 1> AtPB;
-        point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
-            AtPB,
-            pose_s.px,
-            pose_s.py,
-            pose_s.pz,
-            pose_s.om,
-            pose_s.fi,
-            pose_s.ka,
-            p_s.x(),
-            p_s.y(),
-            p_s.z(),
-            infm(0, 0),
-            infm(0, 1),
-            infm(0, 2),
-            infm(1, 0),
-            infm(1, 1),
-            infm(1, 2),
-            infm(2, 0),
-            infm(2, 1),
-            infm(2, 2),
-            this_bucket.mean.x(),
-            this_bucket.mean.y(),
-            this_bucket.mean.z());
-
-        int c = intermediate_points_i.index_pose * 6;
-
-        double planarity = 1.0;
-
-        if (ablation_study_use_planarity)
-        {
-            // planarity
-            Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
-            auto eigen_values = eigen_solver.eigenvalues();
-            auto eigen_vectors = eigen_solver.eigenvectors();
-            double ev1 = eigen_values.x();
-            double ev2 = eigen_values.y();
-            double ev3 = eigen_values.z();
-            double sum_ev = ev1 + ev2 + ev3;
-            planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
-        }
-
-        double norm = 1.0;
-        if (ablation_study_use_norm)
-            norm = p_s.norm();
-
-        double w = planarity * norm;
-        if (w > 10.0)
-            w = 10.0;
-
-        if (ablation_study_use_planarity || ablation_study_use_norm)
-        {
-            AtPA *= w;
-            AtPB *= w;
-        }
-
-        std::mutex& m = mutexes[intermediate_points_i.index_pose];
-        std::unique_lock lck(m);
-        AtPAndt.block<6, 6>(c, c) += AtPA;
-        AtPBndt.block<6, 1>(c, 0) -= AtPB;
+        compute_hessian_indoor(
+            pt,
+            intermediate_trajectory,
+            tait_bryan_poses,
+            buckets_indoor,
+            b_indoor,
+            max_distance,
+            ablation_study_use_view_point_and_normal_vectors,
+            ablation_study_use_planarity,
+            ablation_study_use_norm,
+            mutexes,
+            AtPAndt,
+            AtPBndt);
     };
 
     if (multithread)
@@ -1607,122 +1815,29 @@ void optimize_lidar_odometry(
     {
         Eigen::Vector3d b_outdoor(rgd_params_outdoor.resolution_X, rgd_params_outdoor.resolution_Y, rgd_params_outdoor.resolution_Z);
 
-        const auto hessian_fun_outdoor = [&](const Point3Di& intermediate_points_i)
+        auto hessian_fun_outdoor = [&intermediate_trajectory,
+                                    &tait_bryan_poses,
+                                    &buckets_outdoor,
+                                    &b_outdoor,
+                                    &mutexes,
+                                    &AtPAndt,
+                                    &AtPBndt,
+                                    max_distance,
+                                    ablation_study_use_view_point_and_normal_vectors,
+                                    ablation_study_use_planarity](const Point3Di& pt)
         {
-            if (intermediate_points_i.point.norm() < 5.0 || intermediate_points_i.point.norm() > max_distance) // ToDo
-                return;
-
-            Eigen::Vector3d point_global = intermediate_trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
-            auto index_of_bucket = get_rgd_index(point_global, b_outdoor);
-
-            auto bucket_it = buckets_outdoor.find(index_of_bucket);
-            // no bucket found
-            if (bucket_it == buckets_outdoor.end())
-                return;
-
-            auto& this_bucket = bucket_it->second;
-
-            const Eigen::Matrix3d& infm = this_bucket.cov.inverse();
-            const double threshold = 100000.0;
-
-            if ((infm.array() > threshold).any())
-                return;
-
-            if ((infm.array() < -threshold).any())
-                return;
-
-            if (ablation_study_use_view_point_and_normal_vectors)
-            {
-                // check nv
-                Eigen::Vector3d& nv = this_bucket.normal_vector;
-                Eigen::Vector3d viewport = intermediate_trajectory[intermediate_points_i.index_pose].translation();
-                if (nv.dot(viewport - this_bucket.mean) < 0)
-                    return;
-            }
-
-            const Eigen::Affine3d& m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
-            const Eigen::Vector3d& p_s = intermediate_points_i.point;
-            const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
-            //
-
-            Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
-            point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
-                AtPA,
-                pose_s.px,
-                pose_s.py,
-                pose_s.pz,
-                pose_s.om,
-                pose_s.fi,
-                pose_s.ka,
-                p_s.x(),
-                p_s.y(),
-                p_s.z(),
-                infm(0, 0),
-                infm(0, 1),
-                infm(0, 2),
-                infm(1, 0),
-                infm(1, 1),
-                infm(1, 2),
-                infm(2, 0),
-                infm(2, 1),
-                infm(2, 2));
-
-            Eigen::Matrix<double, 6, 1> AtPB;
-            point_to_point_source_to_target_tait_bryan_wc_AtPB_simplified(
-                AtPB,
-                pose_s.px,
-                pose_s.py,
-                pose_s.pz,
-                pose_s.om,
-                pose_s.fi,
-                pose_s.ka,
-                p_s.x(),
-                p_s.y(),
-                p_s.z(),
-                infm(0, 0),
-                infm(0, 1),
-                infm(0, 2),
-                infm(1, 0),
-                infm(1, 1),
-                infm(1, 2),
-                infm(2, 0),
-                infm(2, 1),
-                infm(2, 2),
-                this_bucket.mean.x(),
-                this_bucket.mean.y(),
-                this_bucket.mean.z());
-
-            int c = intermediate_points_i.index_pose * 6;
-
-            double planarity = 1.0;
-
-            if (ablation_study_use_planarity)
-            {
-                // planarity
-                Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
-                auto eigen_values = eigen_solver.eigenvalues();
-                auto eigen_vectors = eigen_solver.eigenvectors();
-                double ev1 = eigen_values.x();
-                double ev2 = eigen_values.y();
-                double ev3 = eigen_values.z();
-                double sum_ev = ev1 + ev2 + ev3;
-                planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
-
-                // double norm = p_s.norm();
-
-                // if (norm < 5.0)
-                //{
-                //     return;
-                // }
-
-                AtPA *= planarity;
-                AtPB *= planarity;
-            }
-
-            std::mutex& m = mutexes[intermediate_points_i.index_pose];
-            std::unique_lock lck(m);
-            AtPAndt.block<6, 6>(c, c) += AtPA;
-            AtPBndt.block<6, 1>(c, 0) -= AtPB;
+            compute_hessian_outdoor(
+                pt,
+                intermediate_trajectory,
+                tait_bryan_poses,
+                buckets_outdoor,
+                b_outdoor,
+                max_distance,
+                ablation_study_use_view_point_and_normal_vectors,
+                ablation_study_use_planarity,
+                mutexes,
+                AtPAndt,
+                AtPBndt);
         };
 
         if (multithread)
@@ -2349,7 +2464,7 @@ bool compute_step_2(
                     params.ablation_study_use_norm,
                     params.ablation_study_use_hierarchical_rgd,
                     params.ablation_study_use_view_point_and_normal_vectors);
-                if (delta < 1e-12)
+                if (delta < params.convergence_delta_threshold)
                 {
                     // std::cout << "finished at iteration " << iter + 1 << "/" << params.nr_iter;
                     break;
@@ -2379,12 +2494,12 @@ bool compute_step_2(
             std::cout << " optimizing worker_data " << i + 1 << "/" << worker_data.size() << " with acc_distance " << fixed
                       << std::setprecision(2) << acc_distance << "[m] in " << fixed << std::setprecision(2) << elapsed_seconds1.count()
                       << "[s], delta ";
-            if (delta > 1e-12)
-                std::cout << std::setprecision(10) << delta << "!!!";
+            if (delta > params.convergence_delta_threshold)
+                std::cout << std::scientific << std::setprecision(3) << delta << "!!!" << std::fixed << std::setprecision(3);
             else
-                std::cout << "< 1e-12";
-
-            std::cout << "\n";
+                std::cout << "< " << std::scientific << std::setprecision(1) << params.convergence_delta_threshold << " (converged)"
+                          << std::fixed << std::setprecision(3);
+            std::cout << std::endl;
 
             loProgress.store((float)(i + 1) / worker_data.size());
 

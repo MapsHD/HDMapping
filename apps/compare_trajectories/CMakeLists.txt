@@ -30,6 +30,7 @@ target_include_directories(
 target_link_libraries(
   mandeye_compare_trajectories
   PRIVATE Fusion
+  unordered_dense::unordered_dense
   ${FREEGLUT_LIBRARY}
   ${OPENGL_gl_LIBRARY}
   OpenGL::GLU

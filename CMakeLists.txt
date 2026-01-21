@@ -353,7 +353,7 @@ if (BUILD_WITH_BUNDLED_ONETBB)
     set(TBB_STRICT OFF CACHE BOOL "" FORCE)
     set(TBBMALLOC_BUILD OFF CACHE BOOL "" FORCE)
     set(TBB_CPF OFF CACHE BOOL "" FORCE)
-    
+
     add_subdirectory(${THIRDPARTY_DIRECTORY}/oneTBB)
     MESSAGE(STATUS "Using bundled oneTBB from: ${THIRDPARTY_DIRECTORY}/oneTBB")
 else()
@@ -361,6 +361,10 @@ else()
     find_package(TBB REQUIRED)
     MESSAGE(STATUS "Found system TBB")
 endif()
+
+# Add unordered_dense header-only library
+add_subdirectory(${THIRDPARTY_DIRECTORY}/unordered_dense)
+MESSAGE(STATUS "Using bundled unordered_dense from: ${THIRDPARTY_DIRECTORY}/unordered_dense")
 
 option(PYBIND "Enable pybind11 bindings" OFF)
 if(PYBIND)

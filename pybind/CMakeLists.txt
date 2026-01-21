@@ -120,9 +120,10 @@ target_link_libraries(core_py
 
 
 target_link_libraries(lidar_odometry_py
-    PRIVATE pybind11::module 
+    PRIVATE pybind11::module
             core_no_gui
-            ${PLATFORM_LASZIP_LIB} 
+            unordered_dense::unordered_dense
+            ${PLATFORM_LASZIP_LIB}
             Fusion
             ${PLATFORM_MISCELLANEOUS_LIBS}
 )

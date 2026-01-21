@@ -44,3 +44,6 @@
 [submodule "3rdparty/tomlplusplus"]
 	path = 3rdparty/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
+[submodule "3rdparty/unordered_dense"]
+	path = 3rdparty/unordered_dense
+	url = https://github.com/martinus/unordered_dense.git

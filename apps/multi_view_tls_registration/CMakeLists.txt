@@ -44,6 +44,7 @@ target_include_directories(
           multi_view_tls_registration_step_2
           # PRIVATE ${THIRDPARTY_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
           PRIVATE ${FREEGLUT_LIBRARY}
+          unordered_dense::unordered_dense
           ${OPENGL_gl_LIBRARY}
           OpenGL::GLU
           ${PLATFORM_LASZIP_LIB}

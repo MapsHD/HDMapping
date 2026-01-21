@@ -7,6 +7,8 @@
 #include <map>
 #include <vector>
 
+#include <ankerl/unordered_dense.h>
+
 #include <Eigen/Dense>
 #include <Fusion.h>
 #include <common/include/cauchy.h>
@@ -29,8 +31,8 @@
 
 namespace fs = std::filesystem;
 
-using NDTBucketMapType = std::unordered_map<uint64_t, NDT::Bucket>;
-using NDTBucketMapType2 = std::unordered_map<uint64_t, NDT::Bucket2>;
+using NDTBucketMapType = ankerl::unordered_dense::map<uint64_t, NDT::Bucket>;
+using NDTBucketMapType2 = ankerl::unordered_dense::map<uint64_t, NDT::Bucket2>;
 
 // Helper function for getting software version from CMake macros
 inline std::string get_software_version()

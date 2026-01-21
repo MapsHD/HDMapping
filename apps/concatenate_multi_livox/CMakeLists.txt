@@ -23,7 +23,9 @@ target_include_directories(
           ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
           ${FREEGLUT_INCLUDE_DIR})
 
-target_link_libraries(concatenate_multi_livox PRIVATE core ${PLATFORM_LASZIP_LIB}
+target_link_libraries(concatenate_multi_livox PRIVATE core
+                                                unordered_dense::unordered_dense
+                                                ${PLATFORM_LASZIP_LIB}
                                                 ${PLATFORM_MISCELLANEOUS_LIBS})
 
 if(WIN32)

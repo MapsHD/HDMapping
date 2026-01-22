@@ -9,7 +9,7 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
 
     for (int i = 0; i < points.size(); i++)
     {
-        uint64_t index = get_rgd_index(points[i].coordinates_global, params.search_radious);
+        uint64_t index = get_rgd_index_3d(points[i].coordinates_global, params.search_radious);
         indexes.emplace_back(index, i);
     }
 
@@ -53,7 +53,7 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
                 for (double z = -params.search_radious.z(); z <= params.search_radious.z(); z += params.search_radious.z())
                 {
                     Eigen::Vector3d position_global = source + Eigen::Vector3d(x, y, z);
-                    uint64_t index_of_bucket = get_rgd_index(position_global, params.search_radious);
+                    uint64_t index_of_bucket = get_rgd_index_3d(position_global, params.search_radious);
 
                     if (buckets.contains(index_of_bucket))
                     {

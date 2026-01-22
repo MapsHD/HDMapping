@@ -76,7 +76,7 @@ std::vector<int> get_lowest_points_indexes(const PointCloud& pc, Eigen::Vector2d
 
     for (size_t i = 0; i < pc.points_local.size(); i++)
     {
-        uint64_t index = get_rgd_index_2D(pc.points_local[i], bucket_dim_xy);
+        uint64_t index = get_rgd_index_2d(pc.points_local[i], bucket_dim_xy);
         indexes_tuple.emplace_back(index, i, pc.points_local[i].z());
     }
 

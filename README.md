@@ -9,6 +9,7 @@ If You are looking for end-to-end mobile mapping framework You can start from th
 **Our goal is to find/develop/discover best end-to-end mobile mapping framework.**
 
 ## Quick Start (Ubuntu / Ubuntu 24.04 @ WSL2)
+<<<<<<< HEAD
 
 ### CMake 4.0.0 or Higher
 
@@ -25,19 +26,27 @@ sudo sh cmake-4.0.0-linux-x86_64.sh --skip-license --prefix=/usr/local
 cmake --version
 ```
 
+=======
+>>>>>>> a28d2eaf3b9108368c25784dde738e02fc38c34b
 ``` bash
 git clone --recursive https://github.com/MapsHD/HDMapping.git
 cd HDMapping
 ./ubuntu-24.04-apt-requirements.sh
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> a28d2eaf3b9108368c25784dde738e02fc38c34b
 # Auto-optimized build (detects your CPU automatically)
 cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release -j
 ```
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> a28d2eaf3b9108368c25784dde738e02fc38c34b
 # Supported LiDARs
 ![lidars](images/IMG_2561.jpeg)
 We support LIVOX AVIA, HAP, MID360, Ouster OS0, OS1, OS2, OSDome, SICK multiScan100, HESAI JT16, HESAI JT128, HESAI XT, Robosense AIRY.

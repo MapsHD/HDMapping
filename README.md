@@ -8,6 +8,36 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches: LeGO-LOAM, LOAM, FAST-LIO, LIO-SAM, CT-ICP, DLO, VoxelMap, Faster-LIO, KISS-ICP, SLICT, DLIO, Point-LIO, GLIM, MAD-ICP, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE, 93won/lidar_odometry, KISS-SLAM. We work on integration: mola_lidar_odometry, rko_lio, lio_gvm, sr_lio, Light-LOAM, LIO-SEGMOT, GLIO, floam, A-LOAM, LOG-LIO, LOG-LIO2, VOX-LIO.
 **Our goal is to find/develop/discover best end-to-end mobile mapping framework.**
 
+## Quick Start (Ubuntu / Ubuntu 24.04 @ WSL2)
+
+### CMake 4.0.0 or Higher
+
+This project requires **CMake 4.0.0** or higher. If you don't have it installed, you can download it from:
+
+**Official CMake Downloads:**
+- **Linux/macOS/Windows:** https://cmake.org/download/
+- **GitHub Releases (Linux binaries):** https://github.com/Kitware/CMake/releases/tag/v4.0.0
+
+**Installation on Linux:**
+```bash
+wget https://github.com/Kitware/CMake/releases/download/v4.0.0/cmake-4.0.0-linux-x86_64.sh
+sudo sh cmake-4.0.0-linux-x86_64.sh --skip-license --prefix=/usr/local
+cmake --version
+```
+
+``` bash
+git clone --recursive https://github.com/MapsHD/HDMapping.git
+cd HDMapping
+./ubuntu-24.04-apt-requirements.sh
+
+
+# Auto-optimized build (detects your CPU automatically)
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j
+```
+
+
+
 # Supported LiDARs
 ![lidars](images/IMG_2561.jpeg)
 We support LIVOX AVIA, HAP, MID360, Ouster OS0, OS1, OS2, OSDome, SICK multiScan100, HESAI JT16, HESAI JT128, HESAI XT, Robosense AIRY.
@@ -310,26 +340,11 @@ Manual coloring
 
 ------------------------------------------
 
-
-
 # Building commands
 
 ## Requirements
 
-### CMake 4.0.0 or Higher
 
-This project requires **CMake 4.0.0** or higher. If you don't have it installed, you can download it from:
-
-**Official CMake Downloads:**
-- **Linux/macOS/Windows:** https://cmake.org/download/
-- **GitHub Releases (Linux binaries):** https://github.com/Kitware/CMake/releases/tag/v4.0.0
-
-**Installation on Linux:**
-```bash
-wget https://github.com/Kitware/CMake/releases/download/v4.0.0/cmake-4.0.0-linux-x86_64.sh
-sudo sh cmake-4.0.0-linux-x86_64.sh --skip-license --prefix=/usr/local
-cmake --version
-```
 
 **Installation on Windows:**
 - Download the installer from https://cmake.org/download/
@@ -369,16 +384,7 @@ python3 run_clang_fromat.py
 *Note that PRs without formatting might be rejected from merging*
 
 
-## Quick Start (Ubuntu / Ubuntu 24.04 @ WSL2)
-``` bash
-git clone --recursive https://github.com/MapsHD/HDMapping.git
-cd HDMapping
-./ubuntu-24.04-apt-requirements.sh
 
-# Auto-optimized build (detects your CPU automatically)
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release -j
-```
 
 ## Quick Start (Windows)
 ```bash

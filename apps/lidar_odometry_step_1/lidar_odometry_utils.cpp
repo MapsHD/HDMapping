@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <hash_utils.h>
 #include <regex>
+#include <tbb/parallel_for_each.h>
+#include <tbb/parallel_invoke.h>
 
 // #include <toml.hpp>
 
@@ -135,11 +137,27 @@ void limit_covariance(Eigen::Matrix3d& io_cov)
     // std::cout << io_cov << std::endl;
 }
 
+// Check if ratio is close to an integer: |ratio - round(ratio)| < tolerance
+static bool is_close_to_integer(const double ratio, const double tolerance = 1e-6)
+{
+    return std::fabs(ratio - std::round(ratio)) < tolerance;
+}
+
+bool is_integer_bucket_ratio(const NDT::GridParameters& rgd_params_indoor, const NDT::GridParameters& rgd_params_outdoor)
+{
+    const double ratio_x = rgd_params_outdoor.resolution_X / rgd_params_indoor.resolution_X;
+    const double ratio_y = rgd_params_outdoor.resolution_Y / rgd_params_indoor.resolution_Y;
+    const double ratio_z = rgd_params_outdoor.resolution_Z / rgd_params_indoor.resolution_Z;
+
+    return is_close_to_integer(ratio_x) && is_close_to_integer(ratio_y) && is_close_to_integer(ratio_z);
+}
+
 void update_rgd(
     const NDT::GridParameters& rgd_params,
     NDTBucketMapType& buckets,
     const std::vector<Point3Di>& points_global,
-    const Eigen::Vector3d& viewport)
+    const Eigen::Vector3d& viewport,
+    size_t* lookup_count)
 {
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
@@ -148,6 +166,8 @@ void update_rgd(
         auto index_of_bucket = get_rgd_index_3d(points_global[i].point, b);
 
         auto bucket_it = buckets.find(index_of_bucket);
+        if (lookup_count)
+            ++(*lookup_count);
 
         if (bucket_it != buckets.end())
         {
@@ -171,6 +191,7 @@ void update_rgd(
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                     cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+                this_bucket.cov_inverse = this_bucket.cov.inverse();
 
                 // limit_covariance(this_bucket.cov);
             }
@@ -179,6 +200,7 @@ void update_rgd(
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                     cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+                this_bucket.cov_inverse = this_bucket.cov.inverse();
                 // limit_covariance(this_bucket.cov);
                 //  calculate normal vector
                 Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
@@ -203,6 +225,7 @@ void update_rgd(
                 {
                     this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                         cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+                    this_bucket.cov_inverse = this_bucket.cov.inverse();
                     // limit_covariance(this_bucket.cov);
                 }
             }
@@ -212,10 +235,61 @@ void update_rgd(
             NDT::Bucket bucket_to_add;
             bucket_to_add.mean = points_global[i].point;
             bucket_to_add.cov = Eigen::Matrix3d::Identity() * 0.03 * 0.03; // ToDo move to params
+            bucket_to_add.cov_inverse = bucket_to_add.cov.inverse();
             bucket_to_add.number_of_points = 1;
             buckets.emplace(index_of_bucket, bucket_to_add);
         }
     }
+}
+
+void link_buckets_to_coarser(
+    const NDT::GridParameters& rgd_params_indoor,
+    NDTBucketMapType& buckets_indoor,
+    const NDT::GridParameters& rgd_params_outdoor,
+    const NDTBucketMapType& buckets_outdoor)
+{
+    if (!is_integer_bucket_ratio(rgd_params_indoor, rgd_params_outdoor))
+        return;
+
+    const Eigen::Vector3d bucket_size_outdoor{ rgd_params_outdoor.resolution_X,
+                                               rgd_params_outdoor.resolution_Y,
+                                               rgd_params_outdoor.resolution_Z };
+
+    for (auto& [key, bucket] : buckets_indoor)
+    {
+        // Skip if already linked
+        if (bucket.coarser_bucket != nullptr)
+            continue;
+
+        const auto outdoor_key = get_rgd_index_3d(bucket.mean, bucket_size_outdoor);
+        const auto outdoor_it = buckets_outdoor.find(outdoor_key);
+        bucket.coarser_bucket = (outdoor_it != buckets_outdoor.end()) ? &outdoor_it->second : nullptr;
+    }
+}
+
+void update_rgd_hierarchy(
+    const NDT::GridParameters& rgd_params_indoor,
+    NDTBucketMapType& buckets_indoor,
+    const std::vector<Point3Di>& points_global,
+    const Eigen::Vector3d& viewport,
+    const NDT::GridParameters& rgd_params_outdoor,
+    NDTBucketMapType& buckets_outdoor,
+    LookupStats& stats)
+{
+    tbb::parallel_invoke(
+        [&]()
+        {
+            update_rgd(rgd_params_indoor, buckets_indoor, points_global, viewport, &stats.indoor_lookups);
+        },
+        [&]()
+        {
+            update_rgd(rgd_params_outdoor, buckets_outdoor, points_global, viewport, &stats.outdoor_lookups);
+        });
+
+    const auto link_start = std::chrono::high_resolution_clock::now();
+    link_buckets_to_coarser(rgd_params_indoor, buckets_indoor, rgd_params_outdoor, buckets_outdoor);
+    const auto link_end = std::chrono::high_resolution_clock::now();
+    stats.link_time_seconds += std::chrono::duration<double>(link_end - link_start).count();
 }
 
 void update_rgd_spherical_coordinates(
@@ -254,6 +328,7 @@ void update_rgd_spherical_coordinates(
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                     cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+                this_bucket.cov_inverse = this_bucket.cov.inverse();
                 // limit_covariance(this_bucket.cov);
             }
 
@@ -261,6 +336,7 @@ void update_rgd_spherical_coordinates(
             {
                 this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                     cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+                this_bucket.cov_inverse = this_bucket.cov.inverse();
                 // limit_covariance(this_bucket.cov);
                 //  calculate normal vector
                 // Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
@@ -295,6 +371,7 @@ void update_rgd_spherical_coordinates(
             NDT::Bucket bucket_to_add;
             bucket_to_add.mean = points_global[i].point;
             bucket_to_add.cov = Eigen::Matrix3d::Identity() * 0.03 * 0.03;
+            bucket_to_add.cov_inverse = bucket_to_add.cov.inverse();
             bucket_to_add.number_of_points = 1;
             buckets.emplace(index_of_bucket, bucket_to_add);
         }

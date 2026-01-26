@@ -47,3 +47,6 @@
 [submodule "3rdparty/unordered_dense"]
 	path = 3rdparty/unordered_dense
 	url = https://github.com/martinus/unordered_dense.git
+[submodule "3rdparty/spdlog"]
+	path = 3rdparty/spdlog
+	url = https://github.com/gabime/spdlog.git

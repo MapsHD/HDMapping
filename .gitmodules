@@ -50,3 +50,6 @@
 [submodule "3rdparty/spdlog"]
 	path = 3rdparty/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "3rdparty/UTL"]
+	path = 3rdparty/UTL
+	url = https://github.com/DmitriBogdanov/UTL.git

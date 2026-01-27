@@ -2624,6 +2624,7 @@ bool compute_step_2(
                 ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
                 spdlog::warn(
                     "calculations canceled for TIMESTAMP: {}", (int64_t)worker_data[i].intermediate_trajectory_timestamps[0].first);
+                UTL_PROFILER_END(after_iter);
                 return false;
             }
 

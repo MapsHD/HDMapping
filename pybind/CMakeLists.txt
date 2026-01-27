@@ -34,7 +34,9 @@ if (MSVC)
 endif()
 
 add_library(lidar_odometry_py MODULE lidar_odometry_binding.cpp)
-target_compile_definitions(lidar_odometry_py PRIVATE -DWITH_GUI=0)
+target_compile_definitions(lidar_odometry_py PRIVATE
+    WITH_GUI=0
+    $<$<BOOL:${UTL_PROFILER_DISABLE}>:UTL_PROFILER_DISABLE>)
 if (MSVC)
     target_compile_options(lidar_odometry_py PRIVATE /bigobj)
 endif()
@@ -124,6 +126,7 @@ target_link_libraries(lidar_odometry_py
             core_no_gui
             unordered_dense::unordered_dense
             spdlog::spdlog
+            UTL::include
             ${PLATFORM_LASZIP_LIB}
             Fusion
             ${PLATFORM_MISCELLANEOUS_LIBS}

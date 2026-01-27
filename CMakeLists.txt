@@ -370,6 +370,10 @@ MESSAGE(STATUS "Using bundled unordered_dense from: ${THIRDPARTY_DIRECTORY}/unor
 add_subdirectory(${THIRDPARTY_DIRECTORY}/spdlog)
 MESSAGE(STATUS "Using bundled spdlog from: ${THIRDPARTY_DIRECTORY}/spdlog")
 
+# Add UTL header-only utility library
+add_subdirectory(${THIRDPARTY_DIRECTORY}/UTL)
+MESSAGE(STATUS "Using bundled UTL from: ${THIRDPARTY_DIRECTORY}/UTL")
+
 option(PYBIND "Enable pybind11 bindings" OFF)
 if(PYBIND)
     message(STATUS "PYBIND is enabled: fetching pybind.")

@@ -1,7 +1,8 @@
 #include "lidar_odometry_utils.h"
+#include <UTL/profiler.hpp>
+#include <hash_utils.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
-#include <hash_utils.h>
 #include <tbb/blocked_range.h>
 #include <tbb/combinable.h>
 #include <tbb/parallel_for.h>
@@ -1774,6 +1775,8 @@ void optimize_lidar_odometry(
     bool ablation_study_use_view_point_and_normal_vectors,
     LookupStats& lookup_stats)
 {
+    UTL_PROFILER_SCOPE("optimize_lidar_odometry");
+    UTL_PROFILER_BEGIN(pre_hessian, "pre_hessian");
     double sigma_motion_model_om = lidar_odometry_motion_model_om_1_sigma_deg * DEG_TO_RAD;
     double sigma_motion_model_fi = lidar_odometry_motion_model_fi_1_sigma_deg * DEG_TO_RAD;
     double sigma_motion_model_ka = lidar_odometry_motion_model_ka_1_sigma_deg * DEG_TO_RAD;
@@ -1805,6 +1808,9 @@ void optimize_lidar_odometry(
     for (const auto& pose : intermediate_trajectory)
         tait_bryan_poses.emplace_back(pose_tait_bryan_from_affine_matrix(pose));
 
+    UTL_PROFILER_END(pre_hessian);
+
+    UTL_PROFILER_BEGIN(hessian_compute, "hessian_compute");
     if (multithread)
     {
         using MatrixPair = std::pair<Eigen::MatrixXd, Eigen::MatrixXd>;
@@ -1880,7 +1886,9 @@ void optimize_lidar_odometry(
                 lookup_stats);
         }
     }
+    UTL_PROFILER_END(hessian_compute);
 
+    UTL_PROFILER_BEGIN(post_hessian, "post_hessian");
     std::vector<std::pair<int, int>> odo_edges;
     for (size_t i = 1; i < intermediate_trajectory.size(); i++)
         odo_edges.emplace_back(i - 1, i);
@@ -2101,6 +2109,7 @@ void optimize_lidar_odometry(
         for (int i = 0; i < h_x.size(); i++)
             delta += sqrt(h_x[i] * h_x[i]);
     }
+    UTL_PROFILER_END(post_hessian);
     return;
 }
 
@@ -2233,6 +2242,8 @@ bool compute_step_2(
     bool debug = false;
     bool debug2 = true;
 
+    UTL_PROFILER_SCOPE("compute_step_2");
+
     if (params.ablation_study_use_hierarchical_rgd)
     {
         if (is_integer_bucket_ratio(params.in_out_params_indoor, params.in_out_params_outdoor))
@@ -2296,6 +2307,7 @@ bool compute_step_2(
 
         for (int i = 0; i < worker_data.size(); i++)
         {
+            UTL_PROFILER_BEGIN(before_iter, "before_iterations");
             std::vector<Point3Di> intermediate_points;
             // = worker_data[i].load_points(worker_data[i].intermediate_points_cache_file_name);
             load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points);
@@ -2489,6 +2501,9 @@ bool compute_step_2(
 
             int iter_end = 0;
 
+            UTL_PROFILER_END(before_iter);
+            UTL_PROFILER_BEGIN(iter_loop, "iteration_loop");
+
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
                 iter_end = iter;
@@ -2540,22 +2555,40 @@ bool compute_step_2(
                 if (stopwatch_realtime.elapsed().count() > params.real_time_threshold_seconds)
                     break;
             }
+            UTL_PROFILER_END(iter_loop);
 
+            UTL_PROFILER_BEGIN(after_iter, "after_iterations");
             const double elapsed_seconds1 = stopwatch_worker.elapsed().count();
 
             total_iterations += iter_end + 1;
             total_optimization_time_seconds += elapsed_seconds1;
 
             if (delta > params.convergence_delta_threshold)
-                spdlog::info("finished at iteration {}/{} optimizing worker_data {}/{} with acc_distance {:.3f}[m] in {:.3f}[s], delta {:e}!!!",
-                    iter_end + 1, params.nr_iter, i + 1, worker_data.size(), acc_distance, elapsed_seconds1, delta);
+                spdlog::info(
+                    "finished at iteration {}/{} optimizing worker_data {}/{} with acc_distance {:.3f}[m] in {:.3f}[s], delta {:e}!!!",
+                    iter_end + 1,
+                    params.nr_iter,
+                    i + 1,
+                    worker_data.size(),
+                    acc_distance,
+                    elapsed_seconds1,
+                    delta);
             else
-                spdlog::info("finished at iteration {}/{} optimizing worker_data {}/{} with acc_distance {:.3f}[m] in {:.3f}[s], delta < {:.1e} (converged)",
-                    iter_end + 1, params.nr_iter, i + 1, worker_data.size(), acc_distance, elapsed_seconds1, params.convergence_delta_threshold);
+                spdlog::info(
+                    "finished at iteration {}/{} optimizing worker_data {}/{} with acc_distance {:.3f}[m] in {:.3f}[s], delta < {:.1e} "
+                    "(converged)",
+                    iter_end + 1,
+                    params.nr_iter,
+                    i + 1,
+                    worker_data.size(),
+                    acc_distance,
+                    elapsed_seconds1,
+                    params.convergence_delta_threshold);
 
             loProgress.store((float)(i + 1) / worker_data.size());
 
             // temp save
+            UTL_PROFILER_BEGIN(temp_save, "temp_save_laz");
             if (i % 100 == 0)
             {
                 std::vector<Eigen::Vector3d> global_pointcloud;
@@ -2574,6 +2607,8 @@ bool compute_step_2(
                 std::string fn = params.working_directory_preview + "/temp_point_cloud_" + std::to_string(i) + ".laz";
                 exportLaz(fn.c_str(), global_pointcloud, intensity, timestamps);
             }
+            UTL_PROFILER_END(temp_save);
+
             auto acc_distance_tmp = acc_distance;
             acc_distance += ((worker_data[i].intermediate_trajectory[0].inverse()) *
                              worker_data[i].intermediate_trajectory[worker_data[i].intermediate_trajectory.size() - 1])
@@ -2587,10 +2622,12 @@ bool compute_step_2(
                 acc_distance = acc_distance_tmp;
                 spdlog::warn("please split data set into subsets");
                 ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
-                spdlog::warn("calculations canceled for TIMESTAMP: {}", (int64_t)worker_data[i].intermediate_trajectory_timestamps[0].first);
+                spdlog::warn(
+                    "calculations canceled for TIMESTAMP: {}", (int64_t)worker_data[i].intermediate_trajectory_timestamps[0].first);
                 return false;
             }
 
+            UTL_PROFILER_BEGIN(propagate_traj, "propagate_trajectory");
             for (int j = i + 1; j < worker_data.size(); j++)
             {
                 Eigen::Affine3d m_last = worker_data[j - 1].intermediate_trajectory[worker_data[j - 1].intermediate_trajectory.size() - 1];
@@ -2605,15 +2642,19 @@ bool compute_step_2(
                     worker_data[j].intermediate_trajectory[k] = m_last;
                 }
             }
+            UTL_PROFILER_END(propagate_traj);
 
+            UTL_PROFILER_BEGIN(transform_pts, "transform_points_global");
             for (int j = 0; j < intermediate_points.size(); j++)
             {
                 Point3Di pp = intermediate_points[j];
                 pp.point = worker_data[i].intermediate_trajectory[intermediate_points[j].index_pose] * pp.point;
                 points_global.push_back(pp);
             }
+            UTL_PROFILER_END(transform_pts);
 
             // if(reference_points.size() == 0){
+            UTL_PROFILER_BEGIN(update_rgd_after, "update_rgd");
             if (acc_distance > params.sliding_window_trajectory_length_threshold)
             {
                 spdlog::stopwatch stopwatch_update;
@@ -2691,6 +2732,7 @@ bool compute_step_2(
                         &lookup_stats.indoor_lookups);
                 }
             }
+            UTL_PROFILER_END(update_rgd_after);
 
             if (i > 1)
             {
@@ -2699,6 +2741,7 @@ bool compute_step_2(
                                          .norm();
                 params.consecutive_distance += translation;
             }
+            UTL_PROFILER_END(after_iter);
         }
 
         for (int i = 0; i < worker_data.size(); i++)
@@ -2717,8 +2760,12 @@ bool compute_step_2(
         spdlog::info("total_optimization_time: {:.2f}s", total_optimization_time_seconds);
         const double avg_iteration_ms = (total_iterations > 0) ? (total_optimization_time_seconds * 1000.0 / total_iterations) : 0.0;
         spdlog::info("avg_iteration_time: {:.3f}ms", avg_iteration_ms);
-        spdlog::debug("lookup_stats: indoor={} outdoor_lookups={} outdoor_pointer_hits={} link_time={:.3f}s",
-            lookup_stats.indoor_lookups, lookup_stats.outdoor_lookups, lookup_stats.outdoor_pointer_hits, lookup_stats.link_time_seconds);
+        spdlog::debug(
+            "lookup_stats: indoor={} outdoor_lookups={} outdoor_pointer_hits={} link_time={:.3f}s",
+            lookup_stats.indoor_lookups,
+            lookup_stats.outdoor_lookups,
+            lookup_stats.outdoor_pointer_hits,
+            lookup_stats.link_time_seconds);
     }
 
     return true;

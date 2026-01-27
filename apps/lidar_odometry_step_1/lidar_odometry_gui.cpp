@@ -25,8 +25,8 @@
 #include <mutex>
 #include <pfd_wrapper.hpp>
 #include <session.h>
-#include <spdlog/spdlog.h>
 #include <spdlog/cfg/env.h>
+#include <spdlog/spdlog.h>
 
 #ifdef _WIN32
 #include "resource.h"

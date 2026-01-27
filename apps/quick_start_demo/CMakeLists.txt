@@ -28,9 +28,13 @@ target_include_directories(
   ${THIRDPARTY_DIRECTORY}/observation_equations/codes
   ${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
 
+target_compile_definitions(quick_start_demo PRIVATE UTL_PROFILER_DISABLE)
+
 target_link_libraries(
   quick_start_demo
   PRIVATE Fusion
+  spdlog::spdlog
+  UTL::include
   ${FREEGLUT_LIBRARY}
   ${OPENGL_gl_LIBRARY}
   OpenGL::GLU

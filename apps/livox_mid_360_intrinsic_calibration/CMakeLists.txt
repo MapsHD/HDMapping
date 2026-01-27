@@ -28,10 +28,14 @@ target_include_directories(
   ${THIRDPARTY_DIRECTORY}/observation_equations/codes
   ${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
 
+target_compile_definitions(livox_mid_360_intrinsic_calibration PRIVATE UTL_PROFILER_DISABLE)
+
 target_link_libraries(
   livox_mid_360_intrinsic_calibration
   PRIVATE Fusion
   unordered_dense::unordered_dense
+  spdlog::spdlog
+  UTL::include
   ${FREEGLUT_LIBRARY}
   ${OPENGL_gl_LIBRARY}
   OpenGL::GLU

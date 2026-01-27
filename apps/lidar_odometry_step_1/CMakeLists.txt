@@ -20,7 +20,9 @@ add_executable(
   lidar_odometry_step_1 ${SOURCES}
   )
 
-target_compile_definitions(lidar_odometry_step_1 PRIVATE -DWITH_GUI=1)
+target_compile_definitions(lidar_odometry_step_1 PRIVATE
+    WITH_GUI=1
+    $<$<BOOL:${UTL_PROFILER_DISABLE}>:UTL_PROFILER_DISABLE>)
 
 target_include_directories(
   lidar_odometry_step_1
@@ -46,6 +48,8 @@ target_link_libraries(
           lidar_odometry_step_1
           PRIVATE Fusion
           unordered_dense::unordered_dense
+          spdlog::spdlog
+          UTL::include
           # PRIVATE ${THIRDPARTY_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
           ${FREEGLUT_LIBRARY}
           ${OPENGL_gl_LIBRARY}

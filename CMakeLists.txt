@@ -21,6 +21,8 @@ if (MSVC)
     add_definitions(-DWIN32_LEAN_AND_MEAN)
 endif()
 
+option(UTL_PROFILER_DISABLE "Disable UTL profiler (zero overhead when ON)" ON)
+
 get_filename_component(REPOSITORY_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} ABSOLUTE)
 set(THIRDPARTY_DIRECTORY ${REPOSITORY_DIRECTORY}/3rdparty)
 set(THIRDPARTY_DIRECTORY_BINARY ${REPOSITORY_DIRECTORY}/3rdpartyBinary)
@@ -365,6 +367,15 @@ endif()
 # Add unordered_dense header-only library
 add_subdirectory(${THIRDPARTY_DIRECTORY}/unordered_dense)
 MESSAGE(STATUS "Using bundled unordered_dense from: ${THIRDPARTY_DIRECTORY}/unordered_dense")
+
+# Add spdlog logging library
+set(SPDLOG_BUILD_PIC ON CACHE BOOL "Build spdlog with position-independent code")
+add_subdirectory(${THIRDPARTY_DIRECTORY}/spdlog)
+MESSAGE(STATUS "Using bundled spdlog from: ${THIRDPARTY_DIRECTORY}/spdlog")
+
+# Add UTL header-only utility library
+add_subdirectory(${THIRDPARTY_DIRECTORY}/UTL)
+MESSAGE(STATUS "Using bundled UTL from: ${THIRDPARTY_DIRECTORY}/UTL")
 
 option(PYBIND "Enable pybind11 bindings" OFF)
 if(PYBIND)

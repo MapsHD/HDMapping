@@ -41,10 +41,14 @@ target_include_directories(
   ${THIRDPARTY_DIRECTORY}/observation_equations/codes
   ${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
 
+target_compile_definitions(mandeye_raw_data_viewer PRIVATE UTL_PROFILER_DISABLE)
+
 target_link_libraries(
   mandeye_raw_data_viewer
   PRIVATE Fusion
   unordered_dense::unordered_dense
+  spdlog::spdlog
+  UTL::include
   ${FREEGLUT_LIBRARY}
   ${OPENGL_gl_LIBRARY}
   OpenGL::GLU

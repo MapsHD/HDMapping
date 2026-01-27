@@ -25,6 +25,7 @@ target_include_directories(
 
 target_link_libraries(concatenate_multi_livox PRIVATE core
                                                 unordered_dense::unordered_dense
+                                                spdlog::spdlog
                                                 ${PLATFORM_LASZIP_LIB}
                                                 ${PLATFORM_MISCELLANEOUS_LIBS})
 

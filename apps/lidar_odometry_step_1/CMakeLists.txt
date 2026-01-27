@@ -20,8 +20,6 @@ add_executable(
   lidar_odometry_step_1 ${SOURCES}
   )
 
-option(UTL_PROFILER_DISABLE "Disable UTL profiler (zero overhead when ON)" ON)
-
 target_compile_definitions(lidar_odometry_step_1 PRIVATE
     WITH_GUI=1
     $<$<BOOL:${UTL_PROFILER_DISABLE}>:UTL_PROFILER_DISABLE>)

@@ -21,6 +21,8 @@ if (MSVC)
     add_definitions(-DWIN32_LEAN_AND_MEAN)
 endif()
 
+option(UTL_PROFILER_DISABLE "Disable UTL profiler (zero overhead when ON)" ON)
+
 get_filename_component(REPOSITORY_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} ABSOLUTE)
 set(THIRDPARTY_DIRECTORY ${REPOSITORY_DIRECTORY}/3rdparty)
 set(THIRDPARTY_DIRECTORY_BINARY ${REPOSITORY_DIRECTORY}/3rdpartyBinary)

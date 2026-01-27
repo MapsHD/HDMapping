@@ -369,6 +369,7 @@ add_subdirectory(${THIRDPARTY_DIRECTORY}/unordered_dense)
 MESSAGE(STATUS "Using bundled unordered_dense from: ${THIRDPARTY_DIRECTORY}/unordered_dense")
 
 # Add spdlog logging library
+set(SPDLOG_BUILD_PIC ON CACHE BOOL "Build spdlog with position-independent code")
 add_subdirectory(${THIRDPARTY_DIRECTORY}/spdlog)
 MESSAGE(STATUS "Using bundled spdlog from: ${THIRDPARTY_DIRECTORY}/spdlog")
 

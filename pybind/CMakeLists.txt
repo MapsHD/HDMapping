@@ -123,6 +123,7 @@ target_link_libraries(lidar_odometry_py
     PRIVATE pybind11::module
             core_no_gui
             unordered_dense::unordered_dense
+            spdlog::spdlog
             ${PLATFORM_LASZIP_LIB}
             Fusion
             ${PLATFORM_MISCELLANEOUS_LIBS}

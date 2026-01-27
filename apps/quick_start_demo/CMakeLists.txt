@@ -31,6 +31,7 @@ target_include_directories(
 target_link_libraries(
   quick_start_demo
   PRIVATE Fusion
+  spdlog::spdlog
   ${FREEGLUT_LIBRARY}
   ${OPENGL_gl_LIBRARY}
   OpenGL::GLU

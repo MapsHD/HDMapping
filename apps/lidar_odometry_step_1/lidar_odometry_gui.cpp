@@ -25,6 +25,8 @@
 #include <mutex>
 #include <pfd_wrapper.hpp>
 #include <session.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/cfg/env.h>
 
 #ifdef _WIN32
 #include "resource.h"
@@ -2309,6 +2311,8 @@ void mouse(int glut_button, int state, int x, int y)
 
 int main(int argc, char* argv[])
 {
+    spdlog::cfg::load_env_levels();
+    spdlog::flush_on(spdlog::level::warn);
     set_lidar_odometry_default_params(params);
 
     try

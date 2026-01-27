@@ -45,6 +45,7 @@ target_link_libraries(
   mandeye_raw_data_viewer
   PRIVATE Fusion
   unordered_dense::unordered_dense
+  spdlog::spdlog
   ${FREEGLUT_LIBRARY}
   ${OPENGL_gl_LIBRARY}
   OpenGL::GLU

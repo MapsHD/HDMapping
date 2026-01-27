@@ -45,6 +45,7 @@ target_include_directories(
           # PRIVATE ${THIRDPARTY_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
           PRIVATE ${FREEGLUT_LIBRARY}
           unordered_dense::unordered_dense
+          spdlog::spdlog
           ${OPENGL_gl_LIBRARY}
           OpenGL::GLU
           ${PLATFORM_LASZIP_LIB}

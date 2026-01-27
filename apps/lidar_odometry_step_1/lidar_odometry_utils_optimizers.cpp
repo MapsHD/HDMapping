@@ -1,4 +1,6 @@
 #include "lidar_odometry_utils.h"
+#include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 #include <hash_utils.h>
 #include <tbb/blocked_range.h>
 #include <tbb/combinable.h>
@@ -774,7 +776,7 @@ void optimize_sf(
         intermediate_trajectory_motion_model = int_tr;
     }
     else
-        std::cout << "optimization failed" << std::endl;
+        spdlog::warn("optimization failed");
 }
 
 void optimize_sf2(
@@ -2093,7 +2095,7 @@ void optimize_lidar_odometry(
             if ((p1 - p2).norm() < 1.0)
                 intermediate_trajectory[i] = affine_matrix_from_pose_tait_bryan(pose);
             else
-                std::cout << "big jump on trajectory: " << (p1 - p2).norm() << std::endl;
+                spdlog::warn("big jump on trajectory: {}", (p1 - p2).norm());
         }
         delta = 0.0;
         for (int i = 0; i < h_x.size(); i++)
@@ -2216,7 +2218,7 @@ void align_to_reference(
         m_g = affine_matrix_from_pose_tait_bryan(pose);
     }
     else
-        std::cout << "align_to_reference FAILED" << std::endl;
+        spdlog::warn("align_to_reference FAILED");
 }
 
 bool compute_step_2(
@@ -2235,18 +2237,17 @@ bool compute_step_2(
     {
         if (is_integer_bucket_ratio(params.in_out_params_indoor, params.in_out_params_outdoor))
         {
-            std::cout << "hierarchical_rgd: integer bucket ratio detected, bucket linking enabled" << std::endl;
+            spdlog::info("hierarchical_rgd: integer bucket ratio detected, bucket linking enabled");
         }
         else
         {
-            std::cout << "hierarchical_rgd: non-integer bucket ratio, bucket linking disabled" << std::endl;
+            spdlog::info("hierarchical_rgd: non-integer bucket ratio, bucket linking disabled");
         }
     }
 
     if (worker_data.size() != 0)
     {
-        std::chrono::time_point<std::chrono::system_clock> start, end;
-        start = std::chrono::system_clock::now();
+        spdlog::stopwatch stopwatch_total;
         double acc_distance = 0.0;
         int64_t total_iterations = 0;
         double total_optimization_time_seconds = 0.0;
@@ -2289,7 +2290,7 @@ bool compute_step_2(
 
         if (!fs::exists(params.working_directory_preview))
         {
-            std::cout << "Creating folder: " << params.working_directory_preview << "\n";
+            spdlog::info("Creating folder: {}", params.working_directory_preview);
             fs::create_directory(params.working_directory_preview);
         }
 
@@ -2303,7 +2304,7 @@ bool compute_step_2(
             {
                 while (pause)
                 {
-                    std::cout << "pause" << std::endl;
+                    spdlog::info("pause");
                     std::this_thread::sleep_for(std::chrono::seconds(1));
                 }
             }
@@ -2325,7 +2326,7 @@ bool compute_step_2(
 
                 if (mean_shift.norm() > 1.0)
                 {
-                    std::cout << "!!!mean_shift.norm() > 1.0!!!" << std::endl;
+                    spdlog::warn("mean_shift.norm() > 1.0");
                     mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
                 }
 
@@ -2352,7 +2353,7 @@ bool compute_step_2(
 
             bool add_pitch_roll_constraint = false;
 
-            const auto start1 = std::chrono::high_resolution_clock::now();
+            spdlog::stopwatch stopwatch_worker;
 
             auto tmp_worker_data = worker_data[i].intermediate_trajectory;
 
@@ -2401,7 +2402,7 @@ bool compute_step_2(
                     }
                 }
                 ///
-                std::cout << "optimize_sf2" << std::endl;
+                spdlog::info("optimize_sf2");
 
                 std::vector<Eigen::Vector3d> pointcloud;
                 std::vector<unsigned short> intensity;
@@ -2448,7 +2449,7 @@ bool compute_step_2(
                     std::string output_file_name = "optimize_sf2_" + std::to_string(index_fn++) + ".laz";
 
                     if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
-                        std::cout << "problem with saving file: " << output_file_name << std::endl;
+                        spdlog::warn("problem with saving file: {}", output_file_name);
                 }
 
                 for (auto& t : tr)
@@ -2484,8 +2485,7 @@ bool compute_step_2(
             double delta = 100000.0;
             double lm_factor = 1.0;
 
-            std::chrono::time_point<std::chrono::system_clock> start, end;
-            start = std::chrono::system_clock::now();
+            spdlog::stopwatch stopwatch_realtime;
 
             int iter_end = 0;
 
@@ -2532,34 +2532,26 @@ bool compute_step_2(
                 if (iter % 10 == 0 && iter > 0)
                 {
                     if (debugMsg)
-                        std::cout << "\nlm_factor " << lm_factor << ", delta " << std::setprecision(10) << delta << "\n";
+                        spdlog::info("lm_factor {}, delta {:.10f}", lm_factor, delta);
 
                     lm_factor *= 10.0;
                 }
 
-                end = std::chrono::system_clock::now();
-                std::chrono::duration<double> elapsed_seconds = end - start;
-
-                if (elapsed_seconds.count() > params.real_time_threshold_seconds)
+                if (stopwatch_realtime.elapsed().count() > params.real_time_threshold_seconds)
                     break;
             }
 
-            const auto end1 = std::chrono::high_resolution_clock::now();
-            const double elapsed_seconds1 = std::chrono::duration<double>(end1 - start1).count();
+            const double elapsed_seconds1 = stopwatch_worker.elapsed().count();
 
             total_iterations += iter_end + 1;
             total_optimization_time_seconds += elapsed_seconds1;
 
-            std::cout << "finished at iteration " << iter_end + 1 << "/" << params.nr_iter;
-
-            std::cout << " optimizing worker_data " << i + 1 << "/" << worker_data.size() << " with acc_distance " << fixed
-                      << std::setprecision(3) << acc_distance << "[m] in " << fixed << elapsed_seconds1 << "[s], delta ";
             if (delta > params.convergence_delta_threshold)
-                std::cout << std::scientific << delta << "!!!" << std::fixed;
+                spdlog::info("finished at iteration {}/{} optimizing worker_data {}/{} with acc_distance {:.3f}[m] in {:.3f}[s], delta {:e}!!!",
+                    iter_end + 1, params.nr_iter, i + 1, worker_data.size(), acc_distance, elapsed_seconds1, delta);
             else
-                std::cout << "< " << std::scientific << std::setprecision(1) << params.convergence_delta_threshold << " (converged)"
-                          << std::fixed << std::setprecision(3);
-            std::cout << std::endl;
+                spdlog::info("finished at iteration {}/{} optimizing worker_data {}/{} with acc_distance {:.3f}[m] in {:.3f}[s], delta < {:.1e} (converged)",
+                    iter_end + 1, params.nr_iter, i + 1, worker_data.size(), acc_distance, elapsed_seconds1, params.convergence_delta_threshold);
 
             loProgress.store((float)(i + 1) / worker_data.size());
 
@@ -2591,12 +2583,11 @@ bool compute_step_2(
             if (!(acc_distance == acc_distance)) // NaN check
             {
                 worker_data[i].intermediate_trajectory = tmp_worker_data;
-                std::cout << "CHALLENGING DATA OCCURED!!!" << std::endl;
+                spdlog::warn("CHALLENGING DATA OCCURED!!!");
                 acc_distance = acc_distance_tmp;
-                std::cout << "please split data set into subsets" << std::endl;
+                spdlog::warn("please split data set into subsets");
                 ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
-                std::cout << "calculations canceled for TIMESTAMP: " << (int64_t)worker_data[i].intermediate_trajectory_timestamps[0].first
-                          << std::endl;
+                spdlog::warn("calculations canceled for TIMESTAMP: {}", (int64_t)worker_data[i].intermediate_trajectory_timestamps[0].first);
                 return false;
             }
 
@@ -2625,8 +2616,7 @@ bool compute_step_2(
             // if(reference_points.size() == 0){
             if (acc_distance > params.sliding_window_trajectory_length_threshold)
             {
-                std::chrono::time_point<std::chrono::system_clock> startu, endu;
-                startu = std::chrono::system_clock::now();
+                spdlog::stopwatch stopwatch_update;
 
                 if (params.reference_points.size() == 0)
                 {
@@ -2668,14 +2658,8 @@ bool compute_step_2(
                         worker_data[i].intermediate_trajectory[0].translation(),
                         &lookup_stats.indoor_lookups);
                 }
-                //
-                endu = std::chrono::system_clock::now();
-
-                std::chrono::duration<double> elapsed_secondsu = endu - startu;
-                std::time_t end_timeu = std::chrono::system_clock::to_time_t(endu);
-
-                // std::cout << "finished computation at " << std::ctime(&end_timeu)
-                //           << "elapsed time update: " << std::setprecision(0) << elapsed_secondsu.count() << "s\n";
+                // elapsed_secondsu previously commented out, now using stopwatch
+                // spdlog::info("elapsed time update: {:.0f}s", stopwatch_update);
             }
             else
             {
@@ -2720,14 +2704,7 @@ bool compute_step_2(
         for (int i = 0; i < worker_data.size(); i++)
             worker_data[i].intermediate_trajectory_motion_model = worker_data[i].intermediate_trajectory;
 
-        end = std::chrono::system_clock::now();
-
-        std::chrono::duration<double> elapsed_seconds = end - start;
-        std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-
-        std::tm local_tm = *std::localtime(&end_time);
-        std::cout << "finished computation at " << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S")
-                  << ", elapsed time: " << std::setprecision(2) << elapsed_seconds.count() << "s\n";
+        spdlog::info("finished computation, elapsed time: {:.2f}s", stopwatch_total);
 
         params.total_length_of_calculated_trajectory = 0;
         for (int i = 1; i < worker_data.size(); i++)
@@ -2735,14 +2712,13 @@ bool compute_step_2(
                 (worker_data[i].intermediate_trajectory[0].translation() - worker_data[i - 1].intermediate_trajectory[0].translation())
                     .norm();
 
-        std::cout << "total_length_of_calculated_trajectory: " << params.total_length_of_calculated_trajectory << " [m]" << std::endl;
-        std::cout << "total_iterations: " << total_iterations << std::endl;
-        std::cout << "total_optimization_time: " << std::setprecision(2) << total_optimization_time_seconds << "s" << std::endl;
+        spdlog::info("total_length_of_calculated_trajectory: {} [m]", params.total_length_of_calculated_trajectory);
+        spdlog::info("total_iterations: {}", total_iterations);
+        spdlog::info("total_optimization_time: {:.2f}s", total_optimization_time_seconds);
         const double avg_iteration_ms = (total_iterations > 0) ? (total_optimization_time_seconds * 1000.0 / total_iterations) : 0.0;
-        std::cout << "avg_iteration_time: " << std::setprecision(3) << avg_iteration_ms << "ms" << std::endl;
-        std::cout << "lookup_stats: indoor=" << lookup_stats.indoor_lookups << " outdoor_lookups=" << lookup_stats.outdoor_lookups
-                  << " outdoor_pointer_hits=" << lookup_stats.outdoor_pointer_hits << " link_time=" << lookup_stats.link_time_seconds << "s"
-                  << std::endl;
+        spdlog::info("avg_iteration_time: {:.3f}ms", avg_iteration_ms);
+        spdlog::debug("lookup_stats: indoor={} outdoor_lookups={} outdoor_pointer_hits={} link_time={:.3f}s",
+            lookup_stats.indoor_lookups, lookup_stats.outdoor_lookups, lookup_stats.outdoor_pointer_hits, lookup_stats.link_time_seconds);
     }
 
     return true;
@@ -2762,7 +2738,7 @@ void Consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams
     std::vector<std::pair<int, int>> indexes;
     bool multithread = false;
 
-    std::cout << "preparing data START" << std::endl;
+    spdlog::info("preparing data START");
     for (int i = 0; i < worker_data.size(); i++)
     {
         for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
@@ -2773,14 +2749,13 @@ void Consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams
             indexes.emplace_back(i, j);
         }
     }
-    std::cout << "preparing data FINISHED" << std::endl;
+    spdlog::info("preparing data FINISHED");
 
     for (int i = 0; i < worker_data.size(); i++)
     {
         std::vector<Point3Di> intermediate_points;
         if (!load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points))
-            std::cout << "problem with load_vector_data file '" << worker_data[i].intermediate_points_cache_file_name.string() << "'"
-                      << std::endl;
+            spdlog::warn("problem with load_vector_data file '{}'", worker_data[i].intermediate_points_cache_file_name.string());
 
         for (int j = 0; j < intermediate_points.size(); j++)
             all_points_local.push_back(intermediate_points[j]);
@@ -2944,7 +2919,7 @@ void Consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams
 
     // ndt
 
-    std::cout << "NDT observations START" << std::endl;
+    spdlog::info("NDT observations START");
     for (size_t index_point_begin = 0; index_point_begin < all_points_local.size(); index_point_begin += 1000000)
     {
         NDTBucketMapType buckets;
@@ -3089,7 +3064,7 @@ void Consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams
             AtPB += AtPBndt;
         }
     }
-    std::cout << "NDT observations FINISHED" << std::endl;
+    spdlog::info("NDT observations FINISHED");
 
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
     Eigen::SparseMatrix<double> x = solver.solve(AtPB);
@@ -3131,7 +3106,7 @@ void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParam
     std::vector<std::pair<int, int>> indexes;
     bool multithread = true;
 
-    std::cout << "preparing data START" << std::endl;
+    spdlog::info("preparing data START");
     for (int i = 0; i < worker_data.size(); i++)
     {
         for (int j = 0; j < worker_data[i].intermediate_trajectory.size(); j++)
@@ -3142,14 +3117,13 @@ void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParam
             indexes.emplace_back(i, j);
         }
     }
-    std::cout << "preparing data FINISHED" << std::endl;
+    spdlog::info("preparing data FINISHED");
 
     for (int i = 0; i < worker_data.size(); i++)
     {
         std::vector<Point3Di> intermediate_points;
         if (!load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points))
-            std::cout << "problem with load_vector_data for file '" << worker_data[i].intermediate_points_cache_file_name.string() << "'"
-                      << std::endl;
+            spdlog::warn("problem with load_vector_data for file '{}'", worker_data[i].intermediate_points_cache_file_name.string());
 
         for (int j = 0; j < intermediate_points.size(); j++)
             all_points_local.push_back(intermediate_points[j]);
@@ -3310,7 +3284,7 @@ void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParam
     tripletListP.clear();
     tripletListB.clear();
 
-    std::cout << "reindex data START" << std::endl;
+    spdlog::info("reindex data START");
 
     std::vector<Point3Di> points_local;
     std::vector<Point3Di> points_global;
@@ -3357,9 +3331,9 @@ void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParam
         counter++;
     }
 
-    std::cout << "reindex data FINISHED" << std::endl;
+    spdlog::info("reindex data FINISHED");
 
-    std::cout << "build regular grid decomposition START" << std::endl;
+    spdlog::info("build regular grid decomposition START");
 
     // update_rgd2(params.in_out_params, buckets, points_global, trajectory[points_global[0].index_pose].translation());
 
@@ -3464,16 +3438,16 @@ void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParam
                 bb.second.valid = false;
         }
     }
-    std::cout << "build regular grid decomposition FINISHED" << std::endl;
+    spdlog::info("build regular grid decomposition FINISHED");
 
-    std::cout << "ndt observations start START" << std::endl;
+    spdlog::info("ndt observations start START");
 
     counter = 0;
 
     for (int i = 0; i < points_global.size(); i++)
     {
         if (i % 10000 == 0)
-            std::cout << "computing " << i << " of " << points_global.size() << std::endl;
+            spdlog::info("computing {} of {}", i, points_global.size());
 
         if (points_local[i].point.norm() < 1.0)
             continue;
@@ -3621,7 +3595,7 @@ void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParam
         AtPB += AtPBndt;
     }
 
-    std::cout << "ndt observations start FINISHED" << std::endl;
+    spdlog::info("ndt observations start FINISHED");
 
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
     Eigen::SparseMatrix<double> x = solver.solve(AtPB);

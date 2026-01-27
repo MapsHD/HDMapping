@@ -46,6 +46,7 @@ target_link_libraries(
           lidar_odometry_step_1
           PRIVATE Fusion
           unordered_dense::unordered_dense
+          spdlog::spdlog
           # PRIVATE ${THIRDPARTY_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
           ${FREEGLUT_LIBRARY}
           ${OPENGL_gl_LIBRARY}

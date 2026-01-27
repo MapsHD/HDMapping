@@ -366,6 +366,10 @@ endif()
 add_subdirectory(${THIRDPARTY_DIRECTORY}/unordered_dense)
 MESSAGE(STATUS "Using bundled unordered_dense from: ${THIRDPARTY_DIRECTORY}/unordered_dense")
 
+# Add spdlog logging library
+add_subdirectory(${THIRDPARTY_DIRECTORY}/spdlog)
+MESSAGE(STATUS "Using bundled spdlog from: ${THIRDPARTY_DIRECTORY}/spdlog")
+
 option(PYBIND "Enable pybind11 bindings" OFF)
 if(PYBIND)
     message(STATUS "PYBIND is enabled: fetching pybind.")

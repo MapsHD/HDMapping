@@ -32,6 +32,7 @@ target_link_libraries(
   livox_mid_360_intrinsic_calibration
   PRIVATE Fusion
   unordered_dense::unordered_dense
+  spdlog::spdlog
   ${FREEGLUT_LIBRARY}
   ${OPENGL_gl_LIBRARY}
   OpenGL::GLU

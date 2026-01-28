@@ -294,9 +294,6 @@ bool load_data(
                 pointsPerFile[i] = std::move(data);
             });
 
-        if (pointsPerFile.size() > 0)
-            pointsPerFile.front().clear();
-
         // --- Summary
         size_t totalPoints = 0;
         for (const auto& pp : pointsPerFile)

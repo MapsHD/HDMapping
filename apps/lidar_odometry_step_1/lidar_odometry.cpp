@@ -14,7 +14,6 @@ bool load_data(
     bool debugMsg)
 {
     std::sort(input_file_names.begin(), input_file_names.end());
-
     std::vector<std::string> csv_files, laz_files;
     std::string sn_file;
     std::string calibrationFile;
@@ -81,11 +80,6 @@ bool load_data(
         {
             std::cout << "\n!!! there is no CSV file for: " << laz_files[i] << " !!! \n\n";
 
-            if (i < (laz_files.size() - 1))
-            {
-                std::cout << "!!! can't continue with missmatched middle file pairs.. !!!\n\n";
-                return false;
-            }
         }
     }
 
@@ -107,12 +101,6 @@ bool load_data(
         if (!found)
         {
             std::cout << "\n!!! there is no LAZ file for: " << csv_files[i] << " !!! \n\n";
-
-            if (i < (csv_files.size() - 1))
-            {
-                std::cout << "!!! can't continue with missmatched middle file pairs.. !!!\n\n";
-                return false;
-            }
         }
     }
 
@@ -121,7 +109,7 @@ bool load_data(
         std::string working_directory = fs::path(input_file_names.front()).parent_path().string();
 
         if (laz_files.size() != csv_files.size())
-            std::cout << "!!! file number issue. continuing but ignoring missmatched last file pair.. !!!\n" << std::endl;
+            std::cout << "!!! file number issue. continuing can lead to incomplete data!!!\n" << std::endl;
 
         // check if folder exists!
         if (!fs::exists(working_directory))

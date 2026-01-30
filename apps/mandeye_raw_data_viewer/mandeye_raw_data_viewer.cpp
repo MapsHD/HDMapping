@@ -120,7 +120,7 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> mean_cov;
 bool show_mean_cov = false;
 bool show_rgd_nn = false;
 bool show_imu_data = false;
-
+bool show_cameras_data = false;
 bool is_settings_gui = false;
 
 namespace photos
@@ -1351,21 +1351,6 @@ void settings_gui()
 
         ImGui::PopItemWidth();
 
-        if (index_rendered_points_local < 0)
-            index_rendered_points_local = 0;
-
-        if (index_rendered_points_local >= all_data.size())
-            index_rendered_points_local = all_data.size() - 1;
-
-        if (laz_files.size() > 0)
-        {
-            if (index_rendered_points_local >= 0 && index_rendered_points_local < indexes_to_filename.size())
-            {
-                double ts = all_data[index_rendered_points_local].points_local[0].timestamp; // * 1e9;
-                render_nearest_photo(ts);
-            }
-        }
-
         ImGui::BeginDisabled(!is_init);
         if (ImGui::Button("Save point cloud"))
         {
@@ -1715,6 +1700,14 @@ void display()
             index_rendered_points_local = all_data.size() - 1;
     }
 
+    // ask to load the nearest photo
+    if (show_cameras_data && index_rendered_points_local >= 0 && index_rendered_points_local < indexes_to_filename.size())
+    {
+        double ts = all_data[index_rendered_points_local].points_local[0].timestamp; // * 1e9;
+        render_nearest_photo(ts);
+    }
+
+
     if (ImGui::BeginMainMenuBar())
     {
         {
@@ -1798,6 +1791,7 @@ void display()
                 ImGui::SetTooltip("Show the mean and covariance ellipsoid representation");
 
             ImGui::MenuItem("Show IMU data", nullptr, &show_imu_data);
+            ImGui::MenuItem("Show cameras data", nullptr, &show_cameras_data);
             ImGui::EndDisabled();
 
             ImGui::Separator();
@@ -1901,7 +1895,7 @@ void display()
     if (compass_ruler)
         drawMiniCompassWithRuler();
 
-    if (photos::photo_texture_cam0)
+    if (show_cameras_data && photos::photo_texture_cam0)
     {
         if (ImGui::Begin("CAM0"))
         {
@@ -1994,7 +1988,7 @@ int main(int argc, char* argv[])
 
             if (fs::exists(argv[1]))
             {
-                for (const auto& entry : fs::directory_iterator(argv[1]))
+                for (const auto& entry : fs::recursive_directory_iterator(argv[1]))
                     if (entry.is_regular_file())
                         input_file_names.push_back(entry.path().string());
 

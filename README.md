@@ -125,7 +125,6 @@ ToDo
 - https://github.com/SlamCabbage/Optimized-SC-F-LOAM
 - https://github.com/gisbi-kim/SC-LeGO-LOAM
 
-
 # Quick DEMO (Windows OS, installation is not required):
 - dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z
 - unpack `quick_start_demo.7z` with 7-Zip (https://7-zip.org/)
@@ -133,19 +132,6 @@ ToDo
 - once calculations are finished open `out_demo_point_cloud.laz` with CloudCompare (https://cloudcompare.org/)
 ![DEMO (point cloud and trajectory)](images/quick_start_demo.png)
 ![DEMO result in CloudCompare](images/demo-cc.png)
-
-# Main algorithms:
-- LiDAR odometry
-- Pose Graph SLAM (Simultaneous Localisation and Mapping)
-- NDT (Normal Distributions Transform)
-- ICP (Iterative Closest Point)
-
-# Main tools:
-- Initial trajectory estimation (lidar_odometry_step_1)
-- Single trajectory refinement (multi_view_tls_registration_step_2)
-- Multiple trajectory refinement (multi_session_registration_step_3)
-- Georeferencing (georeferenced point cloud [e.g. from ALS Airborne Laser Scanning], ground control points, control points, GNSS data)
-- Multi-view terrestrial laser scanning registration (all available methods from literature and more)
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.) 
 - Janusz Będkowski et al., "A Novel Approach to Global Positioning System Accuracy Assessment, Verified on LiDAR Alignment of One Million Kilometers at a Continent Scale, as a Foundation for Autonomous DRIVING Safety Analysis." (2021, MDPI-Sensors, [[PDF]](https://www.mdpi.com/1424-8220/21/17/5691), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sensors-v21-i17_20260104.bib))
@@ -402,40 +388,6 @@ For example on WSL2 Ubuntu-24.04 following package is required to run GUI applic
 sudo apt install zenity
 ```
 
-## Advanced CPU Optimization Options
-
-HDMapping includes automatic CPU optimization that detects your processor and applies the best compilation flags:
-
-```bash
-# Auto-detect CPU and optimize (default, recommended)
-cmake -DCMAKE_BUILD_TYPE=Release ..
-
-# Force AMD optimizations (AVX2, aggressive performance)
-cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=AMD ..
-
-# Force AMD AVX-512 (Ryzen 7000+ only, maximum performance)
-cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=AMD_AVX512 ..
-
-# Force Intel optimizations (AVX2, stable)  
-cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=INTEL ..
-
-# Force Intel AVX-512 (may throttle, use with caution)
-cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=INTEL_AVX512 ..
-
-# Generic optimizations (maximum compatibility)
-cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=GENERIC ..
-```
-
-**CPU Optimization Options:**
-- `AUTO` (default) - Automatically detects and optimizes for your CPU
-- `AMD` - Aggressive optimizations for AMD Ryzen/EPYC (AVX2, /Oi /Ot /Oy)
-- `AMD_AVX512` - Maximum performance for AMD Zen 4+ (Ryzen 7000+, AVX-512)
-- `INTEL` - Optimizations for Intel Core/Xeon (AVX2, /Qpar, /favor:INTEL64)
-- `INTEL_AVX512` - AVX-512 for Intel (may cause frequency throttling)
-- `GENERIC` - Safe universal optimizations for any x86-64 CPU
-
-📖 **For detailed optimization information, see:** [`docs/CPU_OPTIMIZATION_GUIDE.md`](docs/CPU_OPTIMIZATION_GUIDE.md)
-
 # Building Debian package.
 
 The standard build contains all necessary libraries compiled with project. 
@@ -470,21 +422,7 @@ Specification is available at https://www.livoxtech.com/mid-360/specs. Important
 - Range Precision (1 $\sigma$): up to 2cm (@ 10m),
 - Integrated IMU (Inertial Measurement Unit).
 
-This work is dedicated to educational and research purposes.
-The core of the software is composed of three components: 
-
-- LiDAR odometry,
-- single-session refinement,
-- multi-session refinement,
-- georeferencing.
-
-Data refinement uses a pose-graph loop closure technique and an Iterative Closest Point algorithm to minimize the error of the edge. 
-The results are 3D point clouds in LAZ data format (compressed LAS - LIDAR Aerial Survey).
-It was tested in many real-world scenarios/applications: city-level 3D mapping, culture heritage, creating ground truth data for mobile robots, precise forestry, and large-scale indoor 3D mapping.
-This software can run on Linux and Windows machines, it does not incorporate GPU computing.
-It is advised to use at least 32 GB of RAM to cope with large data sets.
-
-Possible applications:
+# Possible applications:
 - culture heritage
 - environmental management
 - geology
@@ -522,50 +460,3 @@ Construction site augmented with MANDEYE 3D data.
 ![largescalemapping2](images/change.jpg)
 Construction progress monitoring, scale blue - smallest changes, red - largest changes.
 
-
-Tested on the following datasets:
-
-![datasets](images/datasets.jpg)
-
-Figure: Three publicly available data sets are incorporated into the benchmark.
-
-First row: **ETH**, second row: **RESSO**, third and fourth rows: **WHU_TLS**.
-
-```
-ETH:
-@article{THEILER2014149,
-     title = {Keypoint-based 4-Points Congruent Sets – Automated marker-less registration of laser scans},
-     author = {Pascal Willy Theiler and Jan Dirk Wegner and Konrad Schindler},
-     journal = {ISPRS Journal of Photogrammetry and Remote Sensing},
-     volume = {96},
-     pages = {149-163},
-     year = {2014},
-     issn = {0924-2716},
-     doi = {https://doi.org/10.1016/j.isprsjprs.2014.06.015},
-     url = {https://www.sciencedirect.com/science/article/pii/S0924271614001701}
-}
-
-RESSO:
-@article{chen2017plade,    
-     title = {PLADE: A Plane-based Descriptor for Point Cloud Registration with Small Overlap},    
-     author = {Chen, Songlin and Nan, Liangliang and Xia, Renbo and Zhao, Jibin and Wonka, Peter},    
-     booktitle = {IEEE Transactions on Geoscience and Remote Sensing}, 
-     volume={58},
-     number={4},
-     pages={2530-2540},     
-     year = {2020} 
-}
-
-WHU_TLS:
-@article{DONG2020327,
-     title = {Registration of large-scale terrestrial laser scanner point clouds: A review and benchmark},
-     author = {Zhen Dong and Fuxun Liang and Bisheng Yang and Yusheng Xu and Yufu Zang and Jianping Li and Yuan Wang and Wenxia Dai and Hongchao Fan and Juha Hyyppä and Uwe Stilla},
-     journal = {ISPRS Journal of Photogrammetry and Remote Sensing},
-     volume = {163},
-     pages = {327-342},
-     year = {2020},
-     issn = {0924-2716},
-     doi = {https://doi.org/10.1016/j.isprsjprs.2020.03.013},
-     url = {https://www.sciencedirect.com/science/article/pii/S0924271620300836}
-}
-```

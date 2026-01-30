@@ -43,7 +43,7 @@
 
 // #define SAMPLE_PERIOD (1.0 / 200.0)
 
-std::string winTitle = std::string("Step 1 (Lidar odometry) ") + HDMAPPING_VERSION_STRING;
+std::string winTitle = std::string("drag_folder_with_mandeye_data_and_drop_here-precision_forestry ") + HDMAPPING_VERSION_STRING;
 
 std::vector<std::string> infoLines = {
     "This program is first step in MANDEYE process.",
@@ -273,34 +273,6 @@ std::string formatCompletionTime(double remainingSeconds)
     return std::string(timeStr);
 }
 
-#if 0
-std::vector<std::vector<Point3Di>> get_batches_of_points(std::string laz_file, int point_count_threshold, conststd::vector<Point3Di>& prev_points)
-{
-    std::vector<std::vector<Point3Di>> res_points;
-    std::vector<Point3Di> points = load_point_cloud(laz_file, false, 0, 10000, {});
-
-    std::vector<Point3Di> tmp_points = prev_points;
-    int counter = tmp_points.size();
-    for (size_t i = 0; i < points.size(); i++)
-    {
-        counter++;
-        tmp_points.push_back(points[i]);
-        if (counter > point_count_threshold)
-        {
-            res_points.push_back(tmp_points);
-            tmp_points.clear();
-            counter = 0;
-        }
-    }
-
-    if (tmp_points.size() > 0)
-    {
-        res_points.push_back(tmp_points);
-    }
-    return res_points;
-}
-#endif
-
 int get_index_3d(const set<int>& s, int k)
 {
     int index = 0;
@@ -433,157 +405,6 @@ void find_best_stretch(
     exportLaz(fn2, pointcloud_global, intensity, timestamps_);
 }
 
-#if 0
-void alternative_approach()
-{
-    int point_count_threshold = 10000;
-
-    std::cout << "aternative_approach" << std::endl;
-
-    std::vector<std::string> input_file_names;
-    input_file_names = mandeye::fd::OpenFileDialog("Load las files", {}, true);
-    std::sort(std::begin(input_file_names), std::end(input_file_names));
-
-    std::vector<std::string> csv_files;
-    std::vector<std::string> laz_files;
-    std::for_each(std::begin(input_file_names), std::end(input_file_names), [&](const std::string& fileName)
-        {
-            if (fileName.ends_with(".laz") || fileName.ends_with(".las"))
-            {
-                laz_files.push_back(fileName);
-            }
-            if (fileName.ends_with(".csv"))
-            {
-                csv_files.push_back(fileName);
-            } });
-
-            std::cout << "imu files: " << std::endl;
-            for (const auto& fn : csv_files)
-            {
-                std::cout << fn << std::endl;
-            }
-
-            std::cout << "loading imu" << std::endl;
-            std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
-
-            std::for_each(std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string& fn)
-                {
-                    auto imu = load_imu(fn.c_str(), 0);
-                    std::cout << fn << std::endl;
-                    imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu)); });
-
-            FusionAhrs ahrs;
-            FusionAhrsInitialise(&ahrs);
-
-            if (params.fusionConventionNwu)
-            {
-                ahrs.settings.convention = FusionConventionNwu;
-            }
-            if (params.fusionConventionEnu)
-            {
-                ahrs.settings.convention = FusionConventionEnu;
-            }
-            if (params.fusionConventionNed)
-            {
-                ahrs.settings.convention = FusionConventionNed;
-            }
-
-            std::map<double, Eigen::Matrix4d> trajectory;
-
-            int counter = 1;
-            static bool first = true;
-            static double last_ts;
-
-            for (const auto& [timestamp_pair, gyr, acc] : imu_data)
-            {
-                const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * RAD_TO_DEG), static_cast<float>(gyr.axis.y * RAD_TO_DEG), static_cast<float>(gyr.axis.z * RAD_TO_DEG) };
-                const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
-
-                //FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-                if (first)
-                {
-                    FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
-                    first = false;
-                }
-                else
-                {
-                    double curr_ts = timestamp_pair.first;
-                    double ts_diff = curr_ts - last_ts;
-                    if (ts_diff < 0.01)
-                    {
-                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
-                    }
-                    else
-                    {
-                        std::cout << "IMU TS jump!!!" << std::endl;
-                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
-                    }
-                }
-                last_ts = timestamp_pair.first;
-
-                FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-                Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
-                Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
-                t.rotate(d);
-
-                trajectory[timestamp_pair.first] = t.matrix();
-                const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
-                counter++;
-                if (counter % 100 == 0)
-                {
-                    std::cout << << "Roll " << euler.angle.roll<< ", Pitch " << euler.angle.pitch<< ", Yaw " << euler.angle.yaw<< " [" << counter++ << " of " << imu_data.size() << "]"<< std::endl;
-                }
-            }
-
-            ///////////////////////////////////////////////////////////////////////////////
-            std::cout << "point cloud file names" << std::endl;
-            for (const auto& fn : laz_files)
-            {
-                std::cout << fn << std::endl;
-            }
-
-            std::vector<Point3Di> prev_points;
-            std::vector<std::vector<Point3Di>> all_points;
-            std::vector<std::vector<Point3Di>> tmp_points = get_batches_of_points(laz_files[0], point_count_threshold, prev_points);
-
-            for (size_t i = 0; i < tmp_points.size() - 1; i++)
-            {
-                all_points.push_back(tmp_points[i]);
-            }
-
-            for (size_t i = 1; i < laz_files.size(); i++)
-            {
-                prev_points = tmp_points[tmp_points.size() - 1];
-                tmp_points = get_batches_of_points(laz_files[i], point_count_threshold, prev_points);
-                for (size_t j = 0; j < tmp_points.size() - 1; j++)
-                {
-                    all_points.push_back(tmp_points[j]);
-                }
-            }
-
-            //////////
-            std::vector<double> timestamps;
-            std::vector<Eigen::Affine3d> poses;
-            for (const auto& t : trajectory)
-            {
-                timestamps.push_back(t.first);
-                Eigen::Affine3d m;
-                m.matrix() = t.second;
-                poses.push_back(m);
-            }
-
-            for (size_t i = 0; i < all_points.size(); i++)
-            {
-                std::cout << all_points[i].size() << std::endl;
-                std::string fn1 = "C:/data/tmp/" + std::to_string(i) + "_best.laz";
-                std::string fn2 = "C:/data/tmp/" + std::to_string(i) + "_original.laz";
-
-                find_best_stretch(all_points[i], timestamps, poses, fn1, fn2);
-            }
-}
-#endif
-
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observation_picking)
 {
     const auto laser_beam = GetLaserBeam(x, y);
@@ -602,17 +423,17 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observ
     return pos;
 }
 
-void step1(const std::atomic<bool>& loPause)
+void step1(const std::atomic<bool>& loPause, std::string input_folder_name)
 {
-    std::string input_folder_name;
+    // std::string input_folder_name;
     std::vector<std::string> input_file_names;
-    input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
+    // input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
 
     std::cout << "Selected folder: '" << input_folder_name << std::endl;
 
     if (fs::exists(input_folder_name))
     {
-        std::string newTitle = winTitle + " - ..\\" + std::filesystem::path(input_folder_name).filename().string();
+        std::string newTitle = winTitle + ": '" + std::filesystem::path(input_folder_name).string() + "'";
         glutSetWindowTitle(newTitle.c_str());
 
         for (const auto& entry : fs::directory_iterator(input_folder_name))
@@ -956,7 +777,7 @@ void settings_gui()
             {
                 loStartTime = std::chrono::system_clock::now();
 
-                step1(loPause);
+                // step1(loPause);
                 std::cout << "Load data done please click 'Compute all' to continue calculations" << std::endl;
 
                 std::chrono::duration<double> elapsed = std::chrono::system_clock::now() - loStartTime;
@@ -1552,7 +1373,7 @@ void openData()
     loEstimatedTimeRemaining.store(0.0);
     loStartTime = std::chrono::system_clock::now();
 
-    step1(loPause);
+    // step1(loPause);
 
     if (step_1_done)
     {
@@ -2336,44 +2157,140 @@ int main(int argc, char* argv[])
             return 0;
         }
 
-        if (argc == 4) // runnning from command line
+        // if (argc == 2) // runnning from command line
+        //{
+
+        /*// Load parameters from file using original TomlIO class
+        TomlIO toml_io;
+        toml_io.LoadParametersFromTomlFile(argv[2], params);
+        std::cout << "Parameters loaded OK from: " << argv[2] << std::endl;
+
+        std::string working_directory;
+        std::vector<WorkerData> worker_data;
+
+        std::chrono::time_point<std::chrono::system_clock> start, end;
+        start = std::chrono::system_clock::now();
+
+        std::atomic<bool> loPause{ false };
+        step1(argv[1], params, pointsPerFile, imu_data, working_directory, trajectory, worker_data, loPause);
+
+        step2(worker_data, params, loPause);
+
+        end = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_seconds = end - start;
+        std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+        std::cout << "calculations finished computation at " << std::ctime(&end_time)
+                  << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "s\n";
+
+        save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);*/
+
+        //}
+        // else // full GUI mode
+        if (argc == 2)
         {
-            // Load parameters from file using original TomlIO class
-            TomlIO toml_io;
-            toml_io.LoadParametersFromTomlFile(argv[2], params);
-            std::cout << "Parameters loaded OK from: " << argv[2] << std::endl;
-
-            std::string working_directory;
-            std::vector<WorkerData> worker_data;
-
-            std::chrono::time_point<std::chrono::system_clock> start, end;
-            start = std::chrono::system_clock::now();
-
-            std::atomic<bool> loPause{ false };
-            step1(argv[1], params, pointsPerFile, imu_data, working_directory, trajectory, worker_data, loPause);
-
-            step2(worker_data, params, loPause);
-
-            end = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_seconds = end - start;
-            std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-            std::cout << "calculations finished computation at " << std::ctime(&end_time)
-                      << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "s\n";
-
-            save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);
-        }
-        else // full GUI mode
-        {
-            std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
-
             initGL(&argc, argv, winTitle, display, mouse);
             glutCloseFunc(on_exit);
+            // std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
+            std::cout << "processed folder with mandeye data: '" << argv[1] << "'" << std::endl;
+
+            lastPar = 4;
+
+            params.decimation = 0.01;
+            params.in_out_params_indoor.resolution_X = 0.1;
+            params.in_out_params_indoor.resolution_Y = 0.1;
+            params.in_out_params_indoor.resolution_Z = 0.1;
+
+            params.in_out_params_outdoor.resolution_X = 0.3;
+            params.in_out_params_outdoor.resolution_Y = 0.3;
+            params.in_out_params_outdoor.resolution_Z = 0.3;
+
+            params.filter_threshold_xy_inner = 1.0;
+            params.filter_threshold_xy_outer = 70.0;
+            params.threshould_output_filter = 1.5;
+
+            params.use_robust_and_accurate_lidar_odometry = false;
+            params.distance_bucket = 0.2;
+            params.polar_angle_deg = 10.0;
+            params.azimutal_angle_deg = 10.0;
+            params.robust_and_accurate_lidar_odometry_iterations = 20;
+
+            params.max_distance_lidar = 70.0;
+            params.nr_iter = 500;
+            params.sliding_window_trajectory_length_threshold = 10000;
+            params.real_time_threshold_seconds = 10;
+
+            std::cout << "Set parameters for velocity < 8km/h, precise forestry" << std::endl;
+
+            //
+            is_settings_gui = false;
+            info_gui = false;
+
+            loRunning.store(true);
+            loProgress.store(0.0f);
+            loElapsedSeconds.store(0.0);
+            loEstimatedTimeRemaining.store(0.0);
+            loStartTime = std::chrono::system_clock::now();
+
+            step1(loPause, argv[1]);
+
+            if (step_1_done)
+            {
+                std::thread loThread(
+                    []()
+                    {
+                        std::chrono::time_point<std::chrono::system_clock> start, end;
+                        start = std::chrono::system_clock::now();
+
+                        step2(loPause);
+
+                        end = std::chrono::system_clock::now();
+                        std::chrono::duration<double> elapsed_seconds = end - start;
+
+                        save_results(false, elapsed_seconds.count());
+
+                        // save point cloud
+
+                        std::filesystem::path outwd_pc = outwd;
+                        outwd_pc /= "point_cloud_lio.laz";
+
+                        session.fill_session_from_worker_data(worker_data, false, true, true, params.threshould_output_filter);
+                        // save_all_to_las(session, output_file_name, false);
+                        save_all_to_las(session, outwd_pc.string(), true, true);
+
+                        // loRunning = false;
+
+                        std::ostringstream oss;
+                        oss << "Data (for multi_view_tls_registration_step_2) saved to folder:\n'" << outwd.string() << "'\n"
+                            << "--" << "'\n"
+                            << "Point Cloud saved to file:\n'" << outwd_pc.string() << "'\n"
+                            << "--" << "\n"
+                            << "Calculated trajectory length: " << std::fixed << std::setprecision(1)
+                            << params.total_length_of_calculated_trajectory << "[m]\n"
+                            << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "\n"
+                            << "--" << "\n"
+                            << "PROGRAM WILL CLOSE ONCE YOU CLICK 'OK' \n";
+
+                        [[maybe_unused]] pfd::message message("Information", oss.str(), pfd::choice::ok, pfd::icon::info);
+                        message.result();
+
+                        on_exit();
+                        exit(0);
+                    });
+
+                loThread.detach();
+            }
+            else // no data loaded
+                loRunning = false;
+            //
 
             glutMainLoop();
 
             ImGui_ImplOpenGL2_Shutdown();
             ImGui_ImplGLUT_Shutdown();
             ImGui::DestroyContext();
+        }
+        else
+        {
         }
     } catch (const std::bad_alloc& e)
     {

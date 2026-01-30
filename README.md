@@ -5,6 +5,9 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 - **HDMapping_Pose_GRAPH_SLAM** to create city-level maps.
 - **HDMapping_Georeferencing** (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
 
+# DOWNLOAD SOFTWARE USING THIS LINK -> [v0.96](https://github.com/MapsHD/HDMapping/releases/tag/v0.96)
+# DOWNLOAD DEMO FROM THIS LINK -> [DEMO](https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z)
+
 If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches: LeGO-LOAM, LOAM, FAST-LIO, LIO-SAM, CT-ICP, DLO, VoxelMap, Faster-LIO, KISS-ICP, SLICT, DLIO, Point-LIO, GLIM, MAD-ICP, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE, 93won/lidar_odometry, KISS-SLAM. We work on integration: mola_lidar_odometry, rko_lio, lio_gvm, sr_lio, Light-LOAM, LIO-SEGMOT, GLIO, floam, A-LOAM, LOG-LIO, LOG-LIO2, VOX-LIO.
 **Our goal is to find/develop/discover best end-to-end mobile mapping framework.**
 
@@ -124,14 +127,6 @@ ToDo
 - https://www.sciencedirect.com/science/article/abs/pii/S1566253525002052
 - https://github.com/SlamCabbage/Optimized-SC-F-LOAM
 - https://github.com/gisbi-kim/SC-LeGO-LOAM
-
-# Quick DEMO (Windows OS, installation is not required):
-- dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z
-- unpack `quick_start_demo.7z` with 7-Zip (https://7-zip.org/)
-- double click `quick_start_demo.exe` and observe DEMO (point cloud and trajectory)
-- once calculations are finished open `out_demo_point_cloud.laz` with CloudCompare (https://cloudcompare.org/)
-![DEMO (point cloud and trajectory)](images/quick_start_demo.png)
-![DEMO result in CloudCompare](images/demo-cc.png)
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.) 
 - Janusz Będkowski et al., "A Novel Approach to Global Positioning System Accuracy Assessment, Verified on LiDAR Alignment of One Million Kilometers at a Continent Scale, as a Foundation for Autonomous DRIVING Safety Analysis." (2021, MDPI-Sensors, [[PDF]](https://www.mdpi.com/1424-8220/21/17/5691), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sensors-v21-i17_20260104.bib))

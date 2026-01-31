@@ -1,3 +1,8 @@
+# PROJECT ONBOARDING VIDEOS - OPENING MEASUREMENT SEASON 2026
+[![MANDEYE-D](https://img.youtube.com/vi/ntF8kO8r8MM/default.jpg)](https://youtu.be/ntF8kO8r8MM)
+[![MANDEYE-PRO](https://img.youtube.com/vi/Is4IvLiTCyw/default.jpg)](https://youtu.be/Is4IvLiTCyw)
+[![USER FREINDLY SOFTWARE](https://img.youtube.com/vi/rJST0zhNVwc/default.jpg)](https://youtu.be/rJST0zhNVwc) 
+
 # Open-source (Windows and Linux), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
 This is open-source software for large-scale 3D mapping using an open-hardware hand-held/wearable/mountable measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
 We provide an end-to-end mobile mapping framework that does not require any installation, including:

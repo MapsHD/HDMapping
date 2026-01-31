@@ -1,6 +1,7 @@
 #include "lidar_odometry.h"
 #include "tbb/tbb.h"
 #include <mutex>
+#include <system_info.hpp>
 
 namespace fs = std::filesystem;
 
@@ -1168,6 +1169,9 @@ void save_processing_results_json(const LidarOdometryParams& params, const fs::p
         results["processing_info"]["build_date"] = params.build_date;
         results["processing_info"]["processing_date"] = datetime_str;
         results["processing_info"]["elapsed_time_seconds"] = elapsed_seconds;
+        results["processing_info"]["OS"] = system_info::getOSName();
+        results["processing_info"]["CPU"] = system_info::getCPUName();
+        results["processing_info"]["RAM"] = system_info::getTotalRAM();
 
         // Processing results and computed values
         results["trajectory_results"]["total_length_calculated"] = params.total_length_of_calculated_trajectory;

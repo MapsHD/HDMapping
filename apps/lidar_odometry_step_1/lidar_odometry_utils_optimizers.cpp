@@ -1710,28 +1710,14 @@ static void compute_hessian(
     // Outdoor contribution (independent, only when hierarchical mode and range >= 5.0)
     if (ablation_study_use_hierarchical_rgd && range_squared >= outdoor_range_squared)
     {
-        // Get outdoor bucket: use coarser_bucket pointer if available, otherwise hash lookup
-        const NDT::Bucket* outdoor_bucket = (indoor_bucket && indoor_bucket->coarser_bucket) ? indoor_bucket->coarser_bucket : nullptr;
+        const auto outdoor_key = get_rgd_index_3d(point_global, bucket_size_outdoor);
+        const auto outdoor_it = buckets_outdoor.find(outdoor_key);
+        ++stats.outdoor_lookups;
 
-        if (outdoor_bucket != nullptr)
-        {
-            ++stats.outdoor_pointer_hits;
-        }
-        else
-        {
-            const auto outdoor_key = get_rgd_index_3d(point_global, bucket_size_outdoor);
-            const auto outdoor_it = buckets_outdoor.find(outdoor_key);
-            ++stats.outdoor_lookups;
-            if (outdoor_it != buckets_outdoor.end())
-            {
-                outdoor_bucket = &outdoor_it->second;
-            }
-        }
-
-        if (outdoor_bucket != nullptr)
+        if (outdoor_it != buckets_outdoor.end())
         {
             add_outdoor_hessian_contribution(
-                *outdoor_bucket,
+                outdoor_it->second,
                 point_source,
                 pose_trig,
                 viewport,
@@ -1861,7 +1847,6 @@ void optimize_lidar_odometry(
             {
                 lookup_stats.indoor_lookups += local.indoor_lookups;
                 lookup_stats.outdoor_lookups += local.outdoor_lookups;
-                lookup_stats.outdoor_pointer_hits += local.outdoor_pointer_hits;
             });
     }
     else
@@ -2243,18 +2228,6 @@ bool compute_step_2(
     bool debug2 = true;
 
     UTL_PROFILER_SCOPE("compute_step_2");
-
-    if (params.ablation_study_use_hierarchical_rgd)
-    {
-        if (is_integer_bucket_ratio(params.in_out_params_indoor, params.in_out_params_outdoor))
-        {
-            spdlog::info("hierarchical_rgd: integer bucket ratio detected, bucket linking enabled");
-        }
-        else
-        {
-            spdlog::info("hierarchical_rgd: non-integer bucket ratio, bucket linking disabled");
-        }
-    }
 
     if (worker_data.size() != 0)
     {
@@ -2761,12 +2734,7 @@ bool compute_step_2(
         spdlog::info("total_optimization_time: {:.2f}s", total_optimization_time_seconds);
         const double avg_iteration_ms = (total_iterations > 0) ? (total_optimization_time_seconds * 1000.0 / total_iterations) : 0.0;
         spdlog::info("avg_iteration_time: {:.3f}ms", avg_iteration_ms);
-        spdlog::debug(
-            "lookup_stats: indoor={} outdoor_lookups={} outdoor_pointer_hits={} link_time={:.3f}s",
-            lookup_stats.indoor_lookups,
-            lookup_stats.outdoor_lookups,
-            lookup_stats.outdoor_pointer_hits,
-            lookup_stats.link_time_seconds);
+        spdlog::debug("lookup_stats: indoor={} outdoor_lookups={}", lookup_stats.indoor_lookups, lookup_stats.outdoor_lookups);
     }
 
     return true;

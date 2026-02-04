@@ -32,9 +32,7 @@
 
 namespace fs = std::filesystem;
 
-// segmented_map provides pointer stability - pointers to values remain valid after insertions.
-// This is required for NDT::Bucket::coarser_bucket pointer optimization in link_buckets_to_coarser().
-using NDTBucketMapType = ankerl::unordered_dense::segmented_map<uint64_t, NDT::Bucket>;
+using NDTBucketMapType = ankerl::unordered_dense::map<uint64_t, NDT::Bucket>;
 using NDTBucketMapType2 = ankerl::unordered_dense::map<uint64_t, NDT::Bucket2>;
 
 // Helper function for getting software version from CMake macros
@@ -163,16 +161,6 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& tra
 // this function reduces number of points by preserving only first point for each bucket {bucket_x, bucket_y, bucket_z}
 std::vector<Point3Di> decimate(const std::vector<Point3Di>& points, double bucket_x, double bucket_y, double bucket_z);
 
-// Check if outdoor bucket size is integer multiple of indoor bucket size
-bool is_integer_bucket_ratio(const NDT::GridParameters& rgd_params_indoor, const NDT::GridParameters& rgd_params_outdoor);
-
-// Link indoor buckets to their corresponding outdoor buckets via coarser_bucket pointer
-void link_buckets_to_coarser(
-    const NDT::GridParameters& rgd_params_indoor,
-    NDTBucketMapType& buckets_indoor,
-    const NDT::GridParameters& rgd_params_outdoor,
-    const NDTBucketMapType& buckets_outdoor);
-
 // this function updates each bucket (mean value, covariance) in regular grid decomposition
 void update_rgd(
     const NDT::GridParameters& rgd_params,
@@ -186,8 +174,6 @@ struct LookupStats
 {
     size_t indoor_lookups = 0;
     size_t outdoor_lookups = 0;
-    size_t outdoor_pointer_hits = 0; // times coarser_bucket pointer was used instead of lookup
-    double link_time_seconds = 0.0; // cumulative time spent in link_buckets_to_coarser
 };
 
 // hierarchical version: updates both indoor and outdoor, then links buckets

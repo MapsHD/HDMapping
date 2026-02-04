@@ -137,21 +137,6 @@ void limit_covariance(Eigen::Matrix3d& io_cov)
     // std::cout << io_cov << std::endl;
 }
 
-// Check if ratio is close to an integer: |ratio - round(ratio)| < tolerance
-static bool is_close_to_integer(const double ratio, const double tolerance = 1e-6)
-{
-    return std::fabs(ratio - std::round(ratio)) < tolerance;
-}
-
-bool is_integer_bucket_ratio(const NDT::GridParameters& rgd_params_indoor, const NDT::GridParameters& rgd_params_outdoor)
-{
-    const double ratio_x = rgd_params_outdoor.resolution_X / rgd_params_indoor.resolution_X;
-    const double ratio_y = rgd_params_outdoor.resolution_Y / rgd_params_indoor.resolution_Y;
-    const double ratio_z = rgd_params_outdoor.resolution_Z / rgd_params_indoor.resolution_Z;
-
-    return is_close_to_integer(ratio_x) && is_close_to_integer(ratio_y) && is_close_to_integer(ratio_z);
-}
-
 void update_rgd(
     const NDT::GridParameters& rgd_params,
     NDTBucketMapType& buckets,
@@ -242,31 +227,6 @@ void update_rgd(
     }
 }
 
-void link_buckets_to_coarser(
-    const NDT::GridParameters& rgd_params_indoor,
-    NDTBucketMapType& buckets_indoor,
-    const NDT::GridParameters& rgd_params_outdoor,
-    const NDTBucketMapType& buckets_outdoor)
-{
-    if (!is_integer_bucket_ratio(rgd_params_indoor, rgd_params_outdoor))
-        return;
-
-    const Eigen::Vector3d bucket_size_outdoor{ rgd_params_outdoor.resolution_X,
-                                               rgd_params_outdoor.resolution_Y,
-                                               rgd_params_outdoor.resolution_Z };
-
-    for (auto& [key, bucket] : buckets_indoor)
-    {
-        // Skip if already linked
-        if (bucket.coarser_bucket != nullptr)
-            continue;
-
-        const auto outdoor_key = get_rgd_index_3d(bucket.mean, bucket_size_outdoor);
-        const auto outdoor_it = buckets_outdoor.find(outdoor_key);
-        bucket.coarser_bucket = (outdoor_it != buckets_outdoor.end()) ? &outdoor_it->second : nullptr;
-    }
-}
-
 void update_rgd_hierarchy(
     const NDT::GridParameters& rgd_params_indoor,
     NDTBucketMapType& buckets_indoor,
@@ -285,11 +245,6 @@ void update_rgd_hierarchy(
         {
             update_rgd(rgd_params_outdoor, buckets_outdoor, points_global, viewport, &stats.outdoor_lookups);
         });
-
-    const auto link_start = std::chrono::high_resolution_clock::now();
-    link_buckets_to_coarser(rgd_params_indoor, buckets_indoor, rgd_params_outdoor, buckets_outdoor);
-    const auto link_end = std::chrono::high_resolution_clock::now();
-    stats.link_time_seconds += std::chrono::duration<double>(link_end - link_start).count();
 }
 
 void update_rgd_spherical_coordinates(

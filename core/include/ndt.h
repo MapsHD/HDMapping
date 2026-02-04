@@ -39,7 +39,6 @@ public:
         Eigen::Matrix3d cov_inverse; // precomputed inverse of cov, updated in update_rgd
         Eigen::Vector3d mean;
         Eigen::Vector3d normal_vector;
-        const Bucket* coarser_bucket = nullptr; // pointer to coarser level bucket (e.g., outdoor for indoor)
 
         uint64_t number_of_points;
         uint64_t index_begin;

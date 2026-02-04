@@ -12,6 +12,7 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 
 # We start working on automatic loop closure
 We provide easy tool that will help You annotating ground truth SLAM loop closures. You mark pair of point clouds that forms edge, then use ICP like pair wise registration to generatie ground truth for AI training.
+
 [![GROUND-TRUTH-EDGE-ANNOTATION-TOOL](https://img.youtube.com/vi/tJdNNfBubeM/default.jpg)](https://youtu.be/tJdNNfBubeM)
 
 # DOWNLOAD SOFTWARE USING THIS LINK -> [v0.96](https://github.com/MapsHD/HDMapping/releases/tag/v0.96)

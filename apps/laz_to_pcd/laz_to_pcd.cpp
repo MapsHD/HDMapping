@@ -12,7 +12,6 @@
 #include <vector>
 namespace fs = std::filesystem;
 
-
 bool check_path_ext(const char* path, const char* ext)
 {
     return std::filesystem::path(path).extension() == ext;
@@ -46,14 +45,11 @@ bool convert_and_save(const char* from, const char* to)
 
     laszip_I64 point_count = header->number_of_point_records ? header->number_of_point_records : header->extended_number_of_point_records;
 
-
     const size_t PointSizeBytes = sizeof(float) * 4 + sizeof(double); // x,y,z,intensity,timestamp
 
     std::vector<uint8_t> pointsBinary(point_count * PointSizeBytes);
 
     laszip_I64 point_read_count = 0;
-
-
 
     while (point_read_count < point_count)
     {
@@ -62,7 +58,7 @@ bool convert_and_save(const char* from, const char* to)
             return false;
         }
         uint8_t* pointDataPtr = pointsBinary.data() + point_read_count * PointSizeBytes;
-        uint8_t* pointerTimstamp = pointDataPtr + sizeof(float)*4;
+        uint8_t* pointerTimstamp = pointDataPtr + sizeof(float) * 4;
         uint8_t* pointDataEndPtr = pointDataPtr + PointSizeBytes;
 
         std::span<float> xyzi(reinterpret_cast<float*>(pointDataPtr), 3);
@@ -71,11 +67,9 @@ bool convert_and_save(const char* from, const char* to)
         xyzi[2] = static_cast<float>(header->z_offset + header->x_scale_factor * static_cast<double>(point->Z));
         xyzi[3] = static_cast<float>(point->intensity);
         const double ts = point->gps_time;
-        memcpy(pointerTimstamp, &ts , sizeof(double));
+        memcpy(pointerTimstamp, &ts, sizeof(double));
         point_read_count++;
     }
-
-
 
     if (std::ofstream to_file = std::ofstream(to, std::ios::out | std::ios::binary))
     {
@@ -91,7 +85,7 @@ bool convert_and_save(const char* from, const char* to)
         to_file << "POINTS " << point_count << "\n";
         to_file << "DATA binary\n";
 
-        to_file.write((const char*)pointsBinary.data(), pointsBinary.size() );
+        to_file.write((const char*)pointsBinary.data(), pointsBinary.size());
     }
     else
     {

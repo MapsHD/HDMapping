@@ -425,6 +425,8 @@ add_subdirectory(apps/livox_mid_360_intrinsic_calibration)
 add_subdirectory(apps/single_session_manual_coloring)
 add_subdirectory(apps/concatenate_multi_livox)
 add_subdirectory(apps/laz_to_ply)
+add_subdirectory(apps/laz_to_pcd)
+
  
 # CPack configuration
 set(CPACK_PACKAGE_NAME "hd_mapping")

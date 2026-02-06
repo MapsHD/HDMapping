@@ -1582,6 +1582,13 @@ void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
     intensities = n_intensities;
     timestamps = n_timestamps;
     colors = n_colors;
+
+    points_local.shrink_to_fit();
+    normal_vectors_local.shrink_to_fit();
+    points_type.shrink_to_fit();
+    intensities.shrink_to_fit();
+    timestamps.shrink_to_fit();
+    colors.shrink_to_fit();
 }
 
 void PointCloud::shift_to_center()

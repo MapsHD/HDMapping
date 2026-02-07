@@ -117,7 +117,7 @@ std::vector<std::pair<int, int>> nns(const std::vector<Point3Di>& points_global,
             }
         }
 
-        // std::cout << "------------" << std::endl;
+        // spdlog::info("------------");
         for (size_t y = 0; y < min_distances.size(); y++)
             if (indexes_target[y] != -1)
                 nn.emplace_back(index_element_source, indexes_target[y]);
@@ -596,12 +596,12 @@ void optimize_sf(
 
     if (points_local.size() > 100)
     {
-        // std::cout << "start adding lidar observations" << std::endl;
+        // spdlog::info("start adding lidar observations");
         if (multithread)
             std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
         else
             std::for_each(std::begin(points_local), std::end(points_local), hessian_fun);
-        // std::cout << "adding lidar observations finished" << std::endl;
+        // spdlog::info("adding lidar observations finished");
     }
 
     std::vector<std::pair<int, int>> odo_edges;
@@ -1220,12 +1220,12 @@ void optimize_rigid_sf(
 
             if ((infm.array() > threshold).any())
             {
-                // std::cout << "infm.array() " << infm.array() << std::endl;
+                // spdlog::info("infm.array() {}", infm.array());
                 return { Eigen::Matrix<double, 6, 6, Eigen::RowMajor>::Zero(), Eigen::Matrix<double, 6, 1>::Zero(), c };
             }
             if ((infm.array() < -threshold).any())
             {
-                // std::cout << "infm.array() " << infm.array() << std::endl;
+                // spdlog::info("infm.array() {}", infm.array());
                 return { Eigen::Matrix<double, 6, 6, Eigen::RowMajor>::Zero(), Eigen::Matrix<double, 6, 1>::Zero(), c };
             }
 
@@ -1314,7 +1314,7 @@ void optimize_rigid_sf(
 
         SumBlocks(blocks, AtPAndt, AtPBndt);
 
-        // std::cout << "number_of_observations " << number_of_observations << std::endl;
+        // spdlog::info("number_of_observations {}", number_of_observations);
 
         std::vector<Eigen::Triplet<double>> tripletListA;
         std::vector<Eigen::Triplet<double>> tripletListP;
@@ -1387,7 +1387,7 @@ void optimize_rigid_sf(
         {
             for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
             {
-                // std::cout << "it.value() " << it.value() << std::endl;
+                // spdlog::info("it.value() {}", it.value());
                 h_x.push_back(it.value());
             }
         }
@@ -2083,7 +2083,7 @@ void optimize_lidar_odometry(
             Eigen::Vector3d p1(prev_pose.px, prev_pose.py, prev_pose.pz);
             Eigen::Vector3d p2(pose.px, pose.py, pose.pz);
 
-            // std::cout << "(p1 - p2).norm() " << (p1 - p2).norm() << std::endl;
+            // spdlog::info("(p1 - p2).norm() {}", (p1 - p2).norm());
 
             if ((p1 - p2).norm() < 1.0)
                 intermediate_trajectory[i] = affine_matrix_from_pose_tait_bryan(pose);
@@ -2513,7 +2513,7 @@ bool compute_step_2(
                     lookup_stats);
                 if (delta < params.convergence_delta_threshold)
                 {
-                    // std::cout << "finished at iteration " << iter + 1 << "/" << params.nr_iter;
+                    // spdlog::info("finished at iteration {}/{}", iter + 1, params.nr_iter);
                     break;
                 }
 
@@ -3456,7 +3456,7 @@ void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParam
     }
     spdlog::info("build regular grid decomposition FINISHED");
 
-    spdlog::info("ndt observations start START");
+    spdlog::info("NDT observations start START");
 
     counter = 0;
 
@@ -3494,7 +3494,7 @@ void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParam
                 Eigen::Vector3d viewport = trajectory[points_global[i].index_pose].translation();
                 if (nv.dot(viewport - this_bucket.mean) < 0)
                 {
-                    // std::cout << "nv!";
+                    // spdlog::warning("nv!");
                     continue;
                 }
 
@@ -3611,7 +3611,7 @@ void Consistency2(std::vector<WorkerData>& worker_data, const LidarOdometryParam
         AtPB += AtPBndt;
     }
 
-    spdlog::info("ndt observations start FINISHED");
+    spdlog::info("NDT observations start FINISHED");
 
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
     Eigen::SparseMatrix<double> x = solver.solve(AtPB);

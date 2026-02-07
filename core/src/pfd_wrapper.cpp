@@ -73,7 +73,7 @@ namespace mandeye::fd
         std::string output_folder_name = "";
 
         output_folder_name = pfd::select_folder(title, internal::lastLocationHint).result();
-        std::cout << "folder: '" << output_folder_name << "'" << std::endl;
+        // std::cout << "folder: '" << output_folder_name << "'" << std::endl;
 
         return output_folder_name;
     }

@@ -21,8 +21,8 @@
 
 #ifdef _WIN32
 #include <shellapi.h>
+#include <shobjidl.h> // ITaskbarList3
 #include <windows.h>
-#include <shobjidl.h>   // ITaskbarList3
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////

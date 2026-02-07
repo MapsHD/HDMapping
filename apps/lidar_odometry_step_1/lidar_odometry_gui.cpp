@@ -1514,17 +1514,17 @@ void progress_window()
     ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), progressText);
     ImGui::Text("%s", timeInfo);
 
-    #ifdef _WIN32
-        // Update Windows taskbar progress
-        if (progress > 0.01f && progress < 1.0f)
-        {
-            SetTaskbarProgress(progress);
-        }
-        else if (progress >= 1.0f)
-        {
-            ClearTaskbarProgress();
-        }
-    #endif
+#ifdef _WIN32
+    // Update Windows taskbar progress
+    if (progress > 0.01f && progress < 1.0f)
+    {
+        SetTaskbarProgress(progress);
+    }
+    else if (progress >= 1.0f)
+    {
+        ClearTaskbarProgress();
+    }
+#endif
 
     ImGui::NewLine();
 
@@ -2405,9 +2405,9 @@ int main(int argc, char* argv[])
             initGL(&argc, argv, winTitle, display, mouse);
             glutCloseFunc(on_exit);
 
-            #ifdef _WIN32
-                InitTaskbarProgress();
-            #endif
+#ifdef _WIN32
+            InitTaskbarProgress();
+#endif
 
             glutMainLoop();
 

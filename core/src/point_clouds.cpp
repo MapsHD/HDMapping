@@ -1236,8 +1236,8 @@ bool PointClouds::load_whu_tls(
 
     for (size_t i = 0; i < input_file_names.size(); i++)
     {
-        std::cout << "Loading file " << i + 1 << "/" << input_file_names.size() << " ("
-                  << (std::filesystem::path(input_file_names[i]).filename().string()) << "). ";
+        std::cout << "Loading " << i + 1 << "/" << input_file_names.size() << ": data ("
+                  << (std::filesystem::path(input_file_names[i]).filename().string()) << "), ";
 
         auto& pc = point_clouds_nodata[i]; // reference directly to vector slot
 
@@ -1268,12 +1268,10 @@ bool PointClouds::load_whu_tls(
 
         trj_path /= trj_fn;
 
-        std::cout << "From trajectory file (" << (std::filesystem::path(trj_path).filename().string()) << ")";
+        std::cout << "trajectory (" << (std::filesystem::path(trj_path).filename().string()) << ")";
 
         if (std::filesystem::exists(trj_path))
         {
-            std::cout << " loading.. ";
-
             std::vector<PointCloud::LocalTrajectoryNode> local_trajectory;
             //
             std::ifstream infile(trj_path.string());
@@ -1359,13 +1357,13 @@ bool PointClouds::load_whu_tls(
                 }
             }
 
-            std::cout << local_trajectory.size() << " local nodes" << std::endl;
+            std::cout << ", " << local_trajectory.size() << " local nodes" << std::endl;
             infile.close();
 
             pc.local_trajectory = local_trajectory;
         }
         else
-            std::cout << "trajectory path: '" << trj_path.string() << "' does not exist" << std::endl;
+            std::cerr << "trajectory path: '" << trj_path.string() << "' does not exist" << std::endl;
     }
 
     //// load actual pointclouds
@@ -1384,13 +1382,11 @@ bool PointClouds::load_whu_tls(
                 {
                     if (is_decimate && pc.points_local.size() > 0)
                     {
-                        std::cout << "start downsampling.." << std::endl;
-
                         size_t sum_points_before_decimation = pc.points_local.size();
                         pc.decimate(bucket_x, bucket_y, bucket_z);
                         size_t sum_points_after_decimation = pc.points_local.size();
 
-                        std::cout << "downsampling finished. sum_points before/after decimation: " << sum_points_before_decimation << " / "
+                        std::cout << "downsampling finished, sum_points before/after: " << sum_points_before_decimation << " / "
                                   << sum_points_after_decimation << std::endl;
                     }
                 }

@@ -2538,24 +2538,24 @@ bool compute_step_2(
 
             if (delta > params.convergence_delta_threshold)
                 spdlog::info(
-                    "finished at iteration {}/{} optimizing worker_data {}/{} with acc_distance {:.3f}[m] in {:.3f}[s], delta {:e}!!!",
-                    iter_end + 1,
-                    params.nr_iter,
+                    "finished optimizing worker_data {}/{} at iteration {}/{} in {:.3f}[s] with acc_distance {:.3f}[m], delta {:e}!!!",
                     i + 1,
                     worker_data.size(),
-                    acc_distance,
+                    iter_end + 1,
+                    params.nr_iter,
                     elapsed_seconds1,
+                    acc_distance,
                     delta);
             else
                 spdlog::info(
-                    "finished at iteration {}/{} optimizing worker_data {}/{} with acc_distance {:.3f}[m] in {:.3f}[s], delta < {:.1e} "
+                    "finished optimizing worker_data {}/{} at iteration {}/{} in {:.3f}[s] with acc_distance {:.3f}[m], delta<{:.1e} "
                     "(converged)",
-                    iter_end + 1,
-                    params.nr_iter,
                     i + 1,
                     worker_data.size(),
-                    acc_distance,
+                    iter_end + 1,
+                    params.nr_iter,
                     elapsed_seconds1,
+                    acc_distance,
                     params.convergence_delta_threshold);
 
             loProgress.store((float)(i + 1) / worker_data.size());

@@ -939,8 +939,9 @@ void settings_gui()
             {
                 ImGui::BeginTooltip();
                 ImGui::Text("Attitude and Heading Reference System gain:");
-                ImGui::Text("How strongly the accelerometer/magnetometer corrections influence the orientation estimate versus gyroscope "
-                            "integration");
+                ImGui::Text(
+                    "How strongly the accelerometer/magnetometer corrections influence the orientation estimate versus gyroscope "
+                    "integration");
                 ImGui::Text("Larger value means faster response to changes in orientation, but more noise");
                 ImGui::EndTooltip();
             }
@@ -983,7 +984,7 @@ void settings_gui()
             {
                 ImGui::BeginTooltip();
                 ImGui::Text("This process makes trajectory smooth, point cloud will be more consistent");
-                ImGui::SetTooltip("Press optionally before pressing 'Save result'");
+                ImGui::Text("Press optionally before pressing 'Save result'");
                 ImGui::EndTooltip();
             }
 
@@ -994,10 +995,13 @@ void settings_gui()
 
             if (ImGui::Button("Save result"))
                 save_results(true, 0.0);
-
-            ImGui::SameLine();
-            ImGui::Text("Press this button for saving resulting trajectory and point clouds as single session for "
-                        "'multi_view_tls_registration_step_2' program");
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Press this button for saving resulting trajectory and point clouds");
+                ImGui::Text("as single session for 'multi_view_tls_registration_step_2' program");
+                ImGui::EndTooltip();
+            }
         }
         if (step_1_done && step_2_done)
         {

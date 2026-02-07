@@ -21,6 +21,7 @@ if (MSVC)
     add_definitions(-DWIN32_LEAN_AND_MEAN)
 endif()
 
+option(BUILD_WITH_CLI_TOOLS "Build with command line tools" ON)
 option(UTL_PROFILER_DISABLE "Disable UTL profiler (zero overhead when ON)" ON)
 
 get_filename_component(REPOSITORY_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} ABSOLUTE)
@@ -409,9 +410,13 @@ set(CORE_LIBRARIES core core-hd-mapping)
 set(GUI_LIBRARIES imgui imguizmo implot)
 
 #add_subdirectory(apps/hd_mapper)
+
+if(BUILD_WITH_CLI_TOOLS)
+    add_subdirectory(apps/console_tools)
+endif()
+
 add_subdirectory(apps/lidar_odometry_step_1)    
 add_subdirectory(apps/manual_color)
-add_subdirectory(apps/console_tools)
 add_subdirectory(apps/multi_session_registration)
 add_subdirectory(apps/multi_view_tls_registration)
 add_subdirectory(apps/split_multi_livox)
@@ -424,10 +429,7 @@ add_subdirectory(apps/mandeye_single_session_viewer)
 add_subdirectory(apps/livox_mid_360_intrinsic_calibration)
 add_subdirectory(apps/single_session_manual_coloring)
 add_subdirectory(apps/concatenate_multi_livox)
-add_subdirectory(apps/laz_to_ply)
-add_subdirectory(apps/laz_to_pcd)
 
- 
 # CPack configuration
 set(CPACK_PACKAGE_NAME "hd_mapping")
 set(CPACK_PACKAGE_VERSION "${HDMAPPING_VERSION_MAJOR}.${HDMAPPING_VERSION_MINOR}.${HDMAPPING_VERSION_PATCH}")

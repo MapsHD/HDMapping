@@ -27,3 +27,11 @@ target_include_directories(
                      ${EIGEN3_INCLUDE_DIR})
 
 target_link_libraries(multiply_timestamps_session_trajectory_csv PRIVATE ${PLATFORM_MISCELLANEOUS_LIBS})
+
+add_executable(laz_to_ply laz_to_ply.cpp)
+target_link_libraries(laz_to_ply PRIVATE ${PLATFORM_LASZIP_LIB})
+target_include_directories(laz_to_ply PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/include ${PROJECT_BINARY_DIR}/include)
+
+add_executable(laz_to_pcd laz_to_pcd.cpp)
+target_link_libraries(laz_to_pcd PRIVATE ${PLATFORM_LASZIP_LIB})
+target_include_directories(laz_to_pcd PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/include ${PROJECT_BINARY_DIR}/include)

@@ -13,6 +13,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <spdlog/spdlog.h>
 #include <utils.hpp>
 
 #include <Eigen/Eigen>
@@ -1510,14 +1511,14 @@ int main(int argc, char* argv[])
         ImGui::DestroyContext();
     } catch (const std::bad_alloc& e)
     {
-        std::cerr << "System is out of memory : " << e.what() << std::endl;
+        spdlog::error("System is out of memory : {}", e.what());
         mandeye::fd::OutOfMemMessage();
     } catch (const std::exception& e)
     {
-        std::cout << e.what();
+        spdlog::error(e.what());
     } catch (...)
     {
-        std::cerr << "Unknown fatal error occurred." << std::endl;
+        spdlog::error("Unknown fatal error occurred!");
     }
 
     return 0;

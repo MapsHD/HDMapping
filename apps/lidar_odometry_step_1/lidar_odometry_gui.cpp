@@ -31,7 +31,6 @@
 #ifdef _WIN32
 #include "resource.h"
 #include <windows.h>
-
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -985,7 +984,7 @@ void settings_gui()
             {
                 ImGui::BeginTooltip();
                 ImGui::Text("This process makes trajectory smooth, point cloud will be more consistent");
-                ImGui::SetTooltip("Press optionally before pressing 'Save result'");
+                ImGui::Text("Press optionally before pressing 'Save result'");
                 ImGui::EndTooltip();
             }
 
@@ -996,11 +995,13 @@ void settings_gui()
 
             if (ImGui::Button("Save result"))
                 save_results(true, 0.0);
-
-            ImGui::SameLine();
-            ImGui::Text(
-                "Press this button for saving resulting trajectory and point clouds as single session for "
-                "'multi_view_tls_registration_step_2' program");
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Press this button for saving resulting trajectory and point clouds");
+                ImGui::Text("as single session for 'multi_view_tls_registration_step_2' program");
+                ImGui::EndTooltip();
+            }
         }
         if (step_1_done && step_2_done)
         {
@@ -1515,6 +1516,18 @@ void progress_window()
     ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), progressText);
     ImGui::Text("%s", timeInfo);
 
+#ifdef _WIN32
+    // Update Windows taskbar progress
+    if (progress > 0.01f && progress < 1.0f)
+    {
+        SetTaskbarProgress(progress);
+    }
+    else if (progress >= 1.0f)
+    {
+        ClearTaskbarProgress();
+    }
+#endif
+
     ImGui::NewLine();
 
     if (!loPause)
@@ -1873,7 +1886,7 @@ void display()
         {
             if (ImGui::BeginMenu("Presets"))
             {
-                if (ImGui::MenuItem("1 Velocity < 8km/h, tiny spaces", nullptr, (lastPar == 1)))
+                if (ImGui::MenuItem("1 Velocity < 8km/h, tiny spaces (default)", nullptr, (lastPar == 1)))
                 {
                     lastPar = 1;
 
@@ -2336,7 +2349,32 @@ int main(int argc, char* argv[])
             return 0;
         }
 
-        if (argc == 4) // runnning from command line
+        if (argc == 2) // running from command line
+        {
+            auto path = fs::path(argv[1]);
+            if (is_directory(path))
+            {
+                std::string working_directory;
+                std::vector<WorkerData> worker_data;
+
+                std::chrono::time_point<std::chrono::system_clock> start, end;
+                start = std::chrono::system_clock::now();
+
+                std::atomic<bool> loPause{ false };
+                step1(path.string(), params, pointsPerFile, imu_data, working_directory, trajectory, worker_data, loPause);
+
+                step2(worker_data, params, loPause);
+
+                end = std::chrono::system_clock::now();
+                std::chrono::duration<double> elapsed_seconds = end - start;
+                std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+                std::cout << "calculations finished computation at " << std::ctime(&end_time)
+                          << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "s\n";
+
+                save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);
+            }
+        }
+        else if (argc == 4) // runnning from command line with custom params
         {
             // Load parameters from file using original TomlIO class
             TomlIO toml_io;
@@ -2368,6 +2406,10 @@ int main(int argc, char* argv[])
 
             initGL(&argc, argv, winTitle, display, mouse);
             glutCloseFunc(on_exit);
+
+#ifdef _WIN32
+            InitTaskbarProgress();
+#endif
 
             glutMainLoop();
 

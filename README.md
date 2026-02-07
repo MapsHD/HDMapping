@@ -93,9 +93,9 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 [[movie]](https://youtu.be/MbKHTmUcI2w))
 - https://github.com/MapsHD/benchmark-FAST-LIO-to-HDMapping (2020, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/FAST-LIO.bib),
 [[movie]](https://youtu.be/ENlaQTtOXEM))
-- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib),
+- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib))
+- https://github.com/MapsHD/benchmark-CT-ICP-to-HDMapping (2021, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/CT-ICP.bib),
 [[movie]](https://youtu.be/swEsJHwtE50))
-- https://github.com/MapsHD/benchmark-CT-ICP-to-HDMapping (2021, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/CT-ICP.bib))
 - https://github.com/MapsHD/benchmark-DLO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLO.bib))
 - https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping (2022, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/VoxelMap.bib))
 - https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Faster-LIO.bib))

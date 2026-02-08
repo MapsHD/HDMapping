@@ -291,7 +291,8 @@ void ManualPoseGraphLoopClosure::Gui(
                 ImGui::SameLine();
                 if (ImGui::Button("Print all relative pose in console"))
                 {
-                    for (const auto& e : edges){
+                    for (const auto& e : edges)
+                    {
                         std::cout << "source: " << point_clouds_container.point_clouds[e.index_to].file_name << std::endl;
                         std::cout << "target: " << point_clouds_container.point_clouds[e.index_from].file_name << std::endl;
                         std::cout << "realtive pose: " << std::endl;
@@ -474,8 +475,7 @@ void ManualPoseGraphLoopClosure::Render(
                         color[0] = 1.0;
                         color[1] = 0.0;
                         color[2] = 0.0;
-                        point_clouds_container.point_clouds.at(index_src).render(
-                            m_src, 1,color);
+                        point_clouds_container.point_clouds.at(index_src).render(m_src, 1, color);
                     }
                     else
                     {
@@ -505,15 +505,13 @@ void ManualPoseGraphLoopClosure::Render(
                         color[0] = 0.0;
                         color[1] = 0.0;
                         color[2] = 1.0;
-                        point_clouds_container.point_clouds.at(index_trg + i)
-                            .render(m_trg, 1, color);
+                        point_clouds_container.point_clouds.at(index_trg + i).render(m_trg, 1, color);
                     }
                     else
                     {
                         point_clouds_container.point_clouds.at(index_trg + i)
                             .render(m_trg, 1, point_clouds_container.point_clouds.at(index_trg + i).render_color);
                     }
-                    
                 }
             }
         }

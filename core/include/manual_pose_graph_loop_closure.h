@@ -16,7 +16,6 @@ public:
     bool manipulate_active_edge = false;
     bool gizmo = false;
     double search_radious = 0.1;
-    
 
     ManualPoseGraphLoopClosure() = default;
     ~ManualPoseGraphLoopClosure() = default;

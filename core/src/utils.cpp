@@ -21,6 +21,7 @@
 
 #ifdef _WIN32
 #include <shellapi.h>
+#include <shobjidl.h> // ITaskbarList3
 #include <windows.h>
 #endif
 
@@ -168,10 +169,11 @@ std::string truncPath(const std::string& fullPath)
     namespace fs = std::filesystem;
     fs::path path(fullPath);
 
-    auto parent = path.parent_path().parent_path().filename().string(); // second to last folder
+    auto parent1 = path.parent_path().filename().string();
+    auto parent2 = path.parent_path().parent_path().filename().string(); // second to last folder
     auto filename = path.filename().string();
 
-    return "..\\" + parent + "\\..\\" + filename;
+    return "..\\" + parent2 + "\\" + parent1 + "\\" + filename;
 }
 
 void wheel(int button, int dir, int x, int y)
@@ -426,6 +428,40 @@ void ShowMainDockSpace()
     ImGui::End();
 }
 
+#ifdef _WIN32
+HWND hwnd;
+ITaskbarList3* g_taskbar = nullptr;
+
+void InitTaskbarProgress()
+{
+    CoInitialize(nullptr);
+
+    HRESULT hr = CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&g_taskbar));
+
+    if (SUCCEEDED(hr))
+        g_taskbar->HrInit();
+}
+
+void SetTaskbarProgress(double progress01)
+{
+    if (!g_taskbar)
+        return;
+
+    const ULONGLONG total = 1000;
+    ULONGLONG value = (ULONGLONG)(progress01 * total);
+
+    g_taskbar->SetProgressState(hwnd, TBPF_NORMAL);
+    g_taskbar->SetProgressValue(hwnd, value, total);
+}
+
+void ClearTaskbarProgress()
+{
+    if (!g_taskbar)
+        return;
+    g_taskbar->SetProgressState(hwnd, TBPF_NOPROGRESS);
+}
+#endif
+
 bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)(), void (*mouse)(int, int, int, int))
 {
     glutInit(argc, argv);
@@ -435,7 +471,7 @@ bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)
         return false; // window creation failed
 
 #ifdef _WIN32
-    HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
+    hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
     if (!hwnd)
         return false; // couldn't find window handle
     HINSTANCE hInstance = GetModuleHandle(NULL);

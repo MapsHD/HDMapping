@@ -113,6 +113,15 @@ std::string truncPath(const std::string& fullPath);
 void wheel(int button, int dir, int x, int y);
 void reshape(int w, int h);
 void ShowMainDockSpace();
+
+#ifdef _WIN32
+void InitTaskbarProgress();
+void SetTaskbarProgress(double progress01);
+void ClearTaskbarProgress();
+// g_taskbar->SetProgressState(hwnd, TBPF_ERROR);  // red
+// g_taskbar->SetProgressState(hwnd, TBPF_PAUSED); // yellow
+#endif
+
 bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)(), void (*mouse)(int, int, int, int));
 
 void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Eigen::Vector3f color, float nstd);

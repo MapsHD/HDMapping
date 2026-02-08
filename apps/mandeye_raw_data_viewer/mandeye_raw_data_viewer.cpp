@@ -12,6 +12,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <spdlog/spdlog.h>
 #include <utils.hpp>
 
 #include <Eigen/Eigen>
@@ -176,7 +177,7 @@ void render_nearest_photo(double ts)
     {
         return;
     }
-    std::cout << "render_nearest_photo: " << photo_file << std::endl;
+    spdlog::info("render_nearest_photo: {}", photo_file);
     cv::Mat img = cv::imread(photo_file);
     if (img.empty())
     {
@@ -251,7 +252,7 @@ void optimize()
             }
         }
 
-        //std::cout << "points_local.size(): " << points_local.size() << std::endl;
+        //spdlog::info("points_local.size(): {}", points_local.size());
         // points_local
         // points_local_sf
 
@@ -313,7 +314,7 @@ void optimize()
             // std::cout << infm << std::endl;
 
             const Eigen::Affine3d& m_pose = tr[points_local[i].index_pose];
-            //std::cout << "points_local[i].index_pose " << points_local[i].index_pose << std::endl;
+            //spdlog::info("points_local[i].index_pose {}", points_local[i].index_pose);
             const Eigen::Vector3d& p_s = points_local[i].point;
             const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
             double delta_x;
@@ -328,9 +329,9 @@ void optimize()
                 pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
                 p_s.x(), p_s.y(), p_s.z(), this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
 
-            // std::cout << "delta_x: " << delta_x << std::endl;
-            // std::cout << "delta_y: " << delta_y << std::endl;
-            // std::cout << "delta_z: " << delta_z << std::endl;
+            // spdlog::info("delta_x: {}", delta_x);
+            // spdlog::info("delta_y: {}", delta_y);
+            // spdlog::info("delta_z: {}", delta_z);
 
             if (sqrt(delta_x * delta_x + delta_y * delta_y + delta_z * delta_z) < 0.001)
             {
@@ -636,7 +637,7 @@ void optimize()
             }
         }
 
-        std::cout << "optimize_sf2" << std::endl;
+        spdlog::info("optimize_sf2");
         for (int iter = 0; iter < robust_and_accurate_lidar_odometry_iterations; iter++)
         {
             optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, useMultithread, wx, wy, wz, wom, wfi, wka);
@@ -948,9 +949,9 @@ void loadFiles(std::vector<std::string> input_file_names)
                 std::string cam_id = filename.substr(0, filename.find("_"));
                 std::string timestamp = filename.substr(filename.find("_") + 1, filename.size());
 
-                std::cout << "cam_id: " << cam_id << std::endl;
-                std::cout << "timestamp: " << timestamp << std::endl;
-                std::cout << "filename: " << filename << std::endl;
+                spdlog::info("cam_id: {}", cam_id);
+                spdlog::info("timestamp: {}", timestamp);
+                spdlog::info("filename: {}", filename);
 
                 if (cam_id == "cam0" && !timestamp.empty())
                 {
@@ -960,7 +961,7 @@ void loadFiles(std::vector<std::string> input_file_names)
                         photo_files_ts[ts] = fileName;
                     } catch (const std::exception& e)
                     {
-                        std::cerr << "Error parsing timestamp from filename: " << filename << " - " << e.what() << std::endl;
+                        spdlog::error("Error parsing timestamp from filename: {} - {}", filename, e.what());
                     }
                 }
             }
@@ -1014,12 +1015,12 @@ void loadFiles(std::vector<std::string> input_file_names)
 
                 /*if (ts_diff < 0)
                 {
-                    std::cout << "WARNING!!!!" << std::endl;
-                    std::cout << "WARNING!!!!" << std::endl;
-                    std::cout << "WARNING!!!!" << std::endl;
-                    std::cout << "WARNING!!!!" << std::endl;
-                    std::cout << "WARNING!!!!" << std::endl;
-                    std::cout << "WARNING!!!!" << std::endl;
+                    spdlog::warning("WARNING!!!!");
+                    spdlog::warning("WARNING!!!!");
+                    spdlog::warning("WARNING!!!!");
+                    spdlog::warning("WARNING!!!!");
+                    spdlog::warning("WARNING!!!!");
+                    spdlog::warning("WARNING!!!!");
                 }
 
                 if (ts_diff < 0.01)
@@ -1046,8 +1047,13 @@ void loadFiles(std::vector<std::string> input_file_names)
             counter++;
             if (counter % 100 == 0)
             {
-                std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw << " ["
-                          << counter++ << " of " << imu_data.size() << "]" << std::endl;
+                spdlog::info(
+                    "[{} of {}]: Roll {}, Pitch {}, Yaw {}",
+                    counter++,
+                    imu_data.size(),
+                    euler.angle.roll,
+                    euler.angle.pitch,
+                    euler.angle.yaw);
             }
 
             // log it for implot
@@ -1077,9 +1083,9 @@ void loadFiles(std::vector<std::string> input_file_names)
         for (const auto& pp : pointsPerFile)
             number_of_points += pp.size();
 
-        std::cout << "Number of points: " << number_of_points << std::endl;
+        spdlog::info("Number of points: {}", number_of_points);
 
-        std::cout << "Start indexing points" << std::endl;
+        spdlog::info("Start indexing points");
 
         // std::vector<Point3Di> points_global;
         std::vector<Point3Di> points_local;
@@ -1100,7 +1106,8 @@ void loadFiles(std::vector<std::string> input_file_names)
 
         for (size_t i = 0; i < pointsPerFile.size(); i++)
         {
-            std::cout << "Indexed: " << i + 1 << " of " << pointsPerFile.size() << " files\r";
+            std::cout << "Indexed file " << i + 1 << "/" << pointsPerFile.size() << "\r";
+
             for (const auto& pp : pointsPerFile[i])
             {
                 auto lower = std::lower_bound(
@@ -1175,9 +1182,9 @@ void loadFiles(std::vector<std::string> input_file_names)
                         double ts_step =
                             (data.timestamps[data.timestamps.size() - 1].first - data.timestamps[0].first) / data.points_local.size();
 
-                        // std::cout << "ts_begin " << ts_begin << std::endl;
-                        // std::cout << "ts_step " << ts_step << std::endl;
-                        // std::cout << "ts_end " << data.timestamps[data.timestamps.size() - 1].first << std::endl;
+                        // spdlog::info("ts_begin {}", ts_begin);
+                        // spdlog::info("ts_step {}", ts_step);
+                        // spdlog::info("ts_end {}", data.timestamps[data.timestamps.size() - 1].first);
 
                         for (size_t pp = 0; pp < data.points_local.size(); pp++)
                             data.points_local[pp].timestamp = ts_begin + pp * ts_step;
@@ -1192,7 +1199,7 @@ void loadFiles(std::vector<std::string> input_file_names)
             }
         }
 
-        std::cout << "\nIndexing points finished\n\n";
+        spdlog::info("Indexing points finished\n");
 
         if (all_data.size() > 0)
         {
@@ -1208,7 +1215,7 @@ void openFolder()
     std::vector<std::string> input_file_names;
     input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
 
-    std::cout << "Selected folder: '" << input_folder_name << std::endl;
+    spdlog::info("Selected folder: '{}'", input_folder_name);
 
     if (fs::exists(input_folder_name))
     {
@@ -1305,7 +1312,7 @@ void imu_data_gui()
         {
             std::string output_file_name = "";
             output_file_name = mandeye::fd::SaveFileDialog("Save IMU data", {}, "");
-            std::cout << "file to save: '" << output_file_name << "'" << std::endl;
+            spdlog::info("file to save: '{}'", output_file_name);
 
             ofstream file;
             file.open(output_file_name);
@@ -1374,7 +1381,7 @@ void settings_gui()
 
             if (output_file_name.size() > 0)
             {
-                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                spdlog::info("las or laz file to save: '{}'", output_file_name);
 
                 std::vector<Eigen::Vector3d> pointcloud;
                 std::vector<unsigned short> intensity;
@@ -1392,7 +1399,7 @@ void settings_gui()
                 }*/
 
                 if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
-                    std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    spdlog::error("problem with saving file: '{}'", output_file_name);
             }
         }
         ImGui::EndDisabled();
@@ -1447,7 +1454,6 @@ void settings_gui()
         if (ImGui::Button("Print to console debug text"))
         {
             double max_diff = 0;
-            std::cout << std::setprecision(20);
             if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
             {
                 for (size_t i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
@@ -1463,29 +1469,35 @@ void settings_gui()
 
                     int index_pose = std::distance(all_data[index_rendered_points_local].timestamps.begin(), lower) - 1;
 
+                    spdlog::info(
+                        "poses {}/{}: point TS [s] - pose TS [s] = ... [s]",
+                        index_pose,
+                        all_data[index_rendered_points_local].poses.size());
+
                     if (index_pose >= 0 && index_pose < all_data[index_rendered_points_local].poses.size())
                     {
-                        std::cout << index_pose << " total nr of poses: [" << all_data[index_rendered_points_local].poses.size() << "] "
-                                  << all_data[index_rendered_points_local].points_local[i].timestamp -
-                                all_data[index_rendered_points_local].timestamps[index_pose].first
-                                  << " ts point: " << all_data[index_rendered_points_local].points_local[i].timestamp
-                                  << " pose ts: " << all_data[index_rendered_points_local].timestamps[index_pose].first << std::endl;
+                        spdlog::info(
+                            "{:.20g} - {:.20g} = {:.20g}",
+                            all_data[index_rendered_points_local].points_local[i].timestamp,
+                            all_data[index_rendered_points_local].timestamps[index_pose].first,
+                            all_data[index_rendered_points_local].points_local[i].timestamp -
+                                all_data[index_rendered_points_local].timestamps[index_pose].first);
 
                         if (fabs(
                                 all_data[index_rendered_points_local].points_local[i].timestamp -
                                 all_data[index_rendered_points_local].timestamps[index_pose].first) > max_diff)
                         {
-                            // std::cout << all_data[index_rendered_points_local].points_local[i].timestamp << std::endl;
+                            // spdlog::info("{:.20g}", all_data[index_rendered_points_local].points_local[i].timestamp);
                             max_diff = fabs(
                                 all_data[index_rendered_points_local].points_local[i].timestamp -
                                 all_data[index_rendered_points_local].timestamps[index_pose].first);
                         }
                     }
                 }
-                std::cout << "max_diff " << max_diff << std::endl;
-                std::cout << "----------------" << std::endl;
+                spdlog::info("max_diff: {} [s]", max_diff);
+                spdlog::info("----------------");
                 for (size_t k = 0; k < all_data[index_rendered_points_local].timestamps.size(); k++)
-                    std::cout << all_data[index_rendered_points_local].timestamps[k].first << std::endl;
+                    spdlog::info("{:.20g}", all_data[index_rendered_points_local].timestamps[k].first);
             }
         }
     }
@@ -2010,14 +2022,14 @@ int main(int argc, char* argv[])
         ImPlot::DestroyContext();
     } catch (const std::bad_alloc& e)
     {
-        std::cerr << "System is out of memory : " << e.what() << std::endl;
+        spdlog::error("System is out of memory : {}", e.what());
         mandeye::fd::OutOfMemMessage();
     } catch (const std::exception& e)
     {
-        std::cout << e.what();
+        spdlog::error(e.what());
     } catch (...)
     {
-        std::cerr << "Unknown fatal error occurred." << std::endl;
+        spdlog::error("Unknown fatal error occurred!");
     }
 
     return 0;

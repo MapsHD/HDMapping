@@ -12,6 +12,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <spdlog/spdlog.h>
 #include <utils.hpp>
 
 #include <Eigen/Eigen>
@@ -114,32 +115,32 @@ void load_pc(
         fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", lazFile.c_str());
         std::abort();
     }
-    std::cout << "Compressed : " << is_compressed << std::endl;
+    spdlog::info("Compressed : {}", is_compressed);
     laszip_header* header;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
-        fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting header pointer from laszip reader");
         std::abort();
     }
     fprintf(stderr, "File '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
     laszip_point* point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting point pointer from laszip reader");
         std::abort();
     }
 
     int counter_ts0 = 0;
     int counter_filtered_points = 0;
 
-    std::cout << "Header -> number_of_point_records:  " << header->number_of_point_records << std::endl;
+    spdlog::info("Header number_of_point_records: {}", header->number_of_point_records);
 
     for (laszip_U32 j = 0; j < header->number_of_point_records; j++)
     {
         if (laszip_read_point(laszip_reader))
         {
-            fprintf(stderr, "DLL ERROR: reading point %u\n", j);
+            spdlog::error("DLL ERROR: reading point {}", j);
             laszip_close_reader(laszip_reader);
         }
 
@@ -213,9 +214,9 @@ void load_pc(
             }
         }
     }
-    std::cout << "Number points with timestamp == 0: " << counter_ts0 << std::endl;
-    std::cout << "Counter filtered points: " << counter_filtered_points << std::endl;
-    std::cout << "Total number of points: " << points.size() << std::endl;
+    spdlog::info("Number points with timestamp == 0: {}", counter_ts0);
+    spdlog::info("Counter filtered points: {}", counter_filtered_points);
+    spdlog::info("Total number of points: {}", points.size());
     laszip_close_reader(laszip_reader);
 }
 
@@ -258,7 +259,7 @@ void settings_gui()
                             std::string l1 = idToSn.at(0);
                             std::string l2 = idToSn.at(1);
 
-                            std::cout << "output_file_name: " << input_file_name << std::endl;
+                            spdlog::info("output_file_name: {}", input_file_name);
                             nlohmann::json j;
 
                             j["calibration"][l1.c_str()]["identity"] = "true";
@@ -297,7 +298,7 @@ void settings_gui()
                         calibration_file_name = mandeye::fd::OpenFileDialogOneFile("Calibration files", mandeye::fd::Calibration_filter);
                         if (calibration_file_name.size() > 0)
                         {
-                            std::cout << "loading file: " << calibration_file_name << std::endl;
+                            spdlog::info("loading file: {}", calibration_file_name);
 
                             calibration = MLvxCalib::GetCalibrationFromFile(calibration_file_name);
                             imuSnToUse = MLvxCalib::GetImuSnToUse(calibration_file_name);
@@ -307,12 +308,12 @@ void settings_gui()
 
                         if (!calibration.empty())
                         {
-                            std::cout << "Loaded calibration for: \n";
+                            spdlog::info("Loaded calibration for:");
                             for (const auto& [sn, _] : calibration)
                             {
-                                std::cout << " -> " << sn << std::endl;
+                                spdlog::info(" -> {}", sn);
                             }
-                            std::cout << "imuSnToUse: " << imuSnToUse << std::endl;
+                            spdlog::info("imuSnToUse: {}", imuSnToUse);
                         }
                     }
                 }
@@ -423,17 +424,15 @@ void settings_gui()
                             lidar1.emplace_back(p);
                     }
 
-                    std::cout << "Decimation: " << params.decimation << std::endl;
-                    std::cout << "Point cloud size before" << std::endl;
-                    std::cout << "LiDAR0 size: " << lidar0.size() << std::endl;
-                    std::cout << "LidDAR1 size: " << lidar1.size() << std::endl;
+                    spdlog::info("Downsampling: {}", params.decimation);
+                    spdlog::info("Point cloud size before");
+                    spdlog::info("LiDAR0: {}; LiDAR1: {}", lidar0.size(), lidar1.size());
 
                     lidar0 = decimate(lidar0, params.decimation, params.decimation, params.decimation);
                     lidar1 = decimate(lidar1, params.decimation, params.decimation, params.decimation);
 
-                    std::cout << "Point cloud size after" << std::endl;
-                    std::cout << "LiDAR0 size: " << lidar0.size() << std::endl;
-                    std::cout << "LiDAR1 size: " << lidar1.size() << std::endl;
+                    spdlog::info("Point cloud size after");
+                    spdlog::info("LiDAR0: {}, LiDAR1: {}", lidar0.size(), lidar1.size());
 
                     std::vector<Eigen::Vector3d> pc0;
                     std::vector<Eigen::Vector3d> pc1;
@@ -557,7 +556,7 @@ void settings_gui()
 
                 if (new_calibration_file_name.size() > 0)
                 {
-                    std::cout << "Output file name: " << new_calibration_file_name << std::endl;
+                    spdlog::info("Output file name: {}", new_calibration_file_name);
                     nlohmann::json j;
 
                     j["calibration"][idToSn.at(0)]["order"] = "ROW";
@@ -915,14 +914,14 @@ int main(int argc, char* argv[])
         ImGui::DestroyContext();
     } catch (const std::bad_alloc& e)
     {
-        std::cerr << "System is out of memory : " << e.what() << std::endl;
+        spdlog::error("System is out of memory : {}", e.what());
         mandeye::fd::OutOfMemMessage();
     } catch (const std::exception& e)
     {
-        std::cout << e.what();
+        spdlog::error(e.what());
     } catch (...)
     {
-        std::cerr << "Unknown fatal error occurred." << std::endl;
+        spdlog::error("Unknown fatal error occurred!");
     }
 
     return 0;

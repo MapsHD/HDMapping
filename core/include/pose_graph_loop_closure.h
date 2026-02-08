@@ -33,6 +33,7 @@ public:
     std::vector<Edge> edges;
     std::vector<Eigen::Affine3d> poses_motion_model;
 
+    bool render_source_as_red_target_as_blue = true;
     // edge.relative_pose_tb_weights.om = 10000.0;
     // edge.relative_pose_tb_weights.fi = 10000.0;
     // edge.relative_pose_tb_weights.ka = 10000.0;

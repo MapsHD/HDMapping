@@ -2439,9 +2439,9 @@ void display()
                 Eigen::Affine3d m_trg = m_src * affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
                 sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).render(
-                    m_src, viewer_decimate_point_cloud);
+                    m_src, viewer_decimate_point_cloud, sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).render_color);
                 sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_trg).render(
-                    m_trg, viewer_decimate_point_cloud);
+                    m_trg, viewer_decimate_point_cloud, sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_trg).render_color);
             }
         }
         else

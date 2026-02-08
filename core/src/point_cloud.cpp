@@ -1870,11 +1870,11 @@ void PointCloud::render(
     }
 }
 
-void PointCloud::render(Eigen::Affine3d pose, int viewer_decimate_point_cloud)
+void PointCloud::render(Eigen::Affine3d pose, int viewer_decimate_point_cloud, float _render_color[3])
 {
     if (this->visible)
     {
-        glColor3f(render_color[0], render_color[1], render_color[2]);
+        glColor3f(_render_color[0], _render_color[1], _render_color[2]);
         glPointSize(point_size);
         glBegin(GL_POINTS);
 
@@ -1888,7 +1888,7 @@ void PointCloud::render(Eigen::Affine3d pose, int viewer_decimate_point_cloud)
         glEnd();
         glPointSize(1);
 
-        glColor3f(render_color[0], render_color[1], render_color[2]);
+        glColor3f(_render_color[0], _render_color[1], _render_color[2]);
         glBegin(GL_LINE_STRIP);
         for (int i = 0; i < this->local_trajectory.size(); i++)
         {

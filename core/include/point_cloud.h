@@ -161,6 +161,6 @@ public:
         bool xy_intersection,
         double intersection_width,
         bool visible_imu_diff);
-    void render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud);
+    void render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud, float _render_color[3]);
 #endif
 };

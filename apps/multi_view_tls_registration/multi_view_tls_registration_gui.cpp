@@ -1008,6 +1008,8 @@ void loop_closure_gui()
     {
         const auto point_cloud_upper = session.point_clouds_container.point_clouds.size() - 1;
 
+        ImGui::Checkbox("Render source as red target as blue", &session.pose_graph_loop_closure.render_source_as_red_target_as_blue);
+
         ImGui::Text("Num edge extended:");
 
         ImGui::Text("before: ");

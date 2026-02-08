@@ -220,12 +220,12 @@ void ManualPoseGraphLoopClosure::Gui(
                             p = m_src_inv * p;
                         }
 
-                        auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+                        // auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                        for (auto& p : source)
-                        {
-                            p = m_pose * p;
-                        }
+                        // for (auto& p : source)
+                        //{
+                        //     p = m_pose * p;
+                        // }
 
                         std::vector<unsigned short> intensity;
                         std::vector<double> timestamps;
@@ -239,7 +239,7 @@ void ManualPoseGraphLoopClosure::Gui(
                     }
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Save target (transformed only by rotation)"))
+                if (ImGui::Button("Save target"))
                 {
                     const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
                     std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
@@ -279,6 +279,26 @@ void ManualPoseGraphLoopClosure::Gui(
                         }
 
                         exportLaz(output_file_name, target, intensity, timestamps);
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Print relative pose in console"))
+                {
+                    auto& e = edges[index_active_edge];
+                    Eigen::Affine3d m = affine_matrix_from_pose_tait_bryan(e.relative_pose_tb);
+                    std::cout << m.matrix() << std::endl;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Print all relative pose in console"))
+                {
+                    for (const auto& e : edges){
+                        std::cout << "source: " << point_clouds_container.point_clouds[e.index_to].file_name << std::endl;
+                        std::cout << "target: " << point_clouds_container.point_clouds[e.index_from].file_name << std::endl;
+                        std::cout << "realtive pose: " << std::endl;
+                        Eigen::Affine3d m = affine_matrix_from_pose_tait_bryan(e.relative_pose_tb);
+                        std::cout << m.matrix() << std::endl;
+
+                        std::cout << std::endl;
                     }
                 }
             }
@@ -447,7 +467,21 @@ void ManualPoseGraphLoopClosure::Render(
                 if (index_src >= 0 && index_src < point_clouds_container.point_clouds.size())
                 {
                     Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
-                    point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+
+                    if (render_source_as_red_target_as_blue)
+                    {
+                        float color[3];
+                        color[0] = 1.0;
+                        color[1] = 0.0;
+                        color[2] = 0.0;
+                        point_clouds_container.point_clouds.at(index_src).render(
+                            m_src, 1,color);
+                    }
+                    else
+                    {
+                        point_clouds_container.point_clouds.at(index_src).render(
+                            m_src, 1, point_clouds_container.point_clouds.at(index_src).render_color);
+                    }
                 }
             }
 
@@ -464,7 +498,22 @@ void ManualPoseGraphLoopClosure::Render(
                     Eigen::Affine3d m_rel = point_clouds_container.point_clouds.at(index_trg).m_pose.inverse() *
                         point_clouds_container.point_clouds.at(index_trg + i).m_pose;
                     m_trg = m_trg * m_rel;
-                    point_clouds_container.point_clouds.at(index_trg + i).render(m_trg, 1);
+
+                    if (render_source_as_red_target_as_blue)
+                    {
+                        float color[3];
+                        color[0] = 0.0;
+                        color[1] = 0.0;
+                        color[2] = 1.0;
+                        point_clouds_container.point_clouds.at(index_trg + i)
+                            .render(m_trg, 1, color);
+                    }
+                    else
+                    {
+                        point_clouds_container.point_clouds.at(index_trg + i)
+                            .render(m_trg, 1, point_clouds_container.point_clouds.at(index_trg + i).render_color);
+                    }
+                    
                 }
             }
         }

@@ -36,7 +36,7 @@ float mouse_sensitivity = 1.0;
 bool is_ortho = false;
 bool lock_z = false;
 bool show_axes = true;
-ImVec4 bg_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+ImVec4 bg_color = ImVec4(0.65f, 0.65f, 0.65f, 1.00f);
 int point_size = 1;
 
 bool info_gui = false;

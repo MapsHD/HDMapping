@@ -12,11 +12,15 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 
 # We start working on automatic loop closure
 We provide easy tool that will help You annotating ground truth SLAM loop closures. You mark pair of point clouds that forms edge, then use ICP like pair wise registration to generatie ground truth for AI training.
+Annotated ground truth edges for LiDAR pose graph slam are available at [ground truth edges](https://zenodo.org/records/18527593). 
+Movie how to use it is available at ... .
+
+https://zenodo.org/records/18527593
 
 [![GROUND-TRUTH-EDGE-ANNOTATION-TOOL](https://img.youtube.com/vi/tJdNNfBubeM/default.jpg)](https://youtu.be/tJdNNfBubeM)
 [![MANUAL-LOOP_CLOSURE-TOOL](https://img.youtube.com/vi/6SNvrZ2ROKg/default.jpg)](https://youtu.be/6SNvrZ2ROKg)
 
-# DOWNLOAD SOFTWARE USING THIS LINK -> [v0.96](https://github.com/MapsHD/HDMapping/releases/tag/v0.96)
+# DOWNLOAD SOFTWARE USING THIS LINK -> [v0.97](https://github.com/MapsHD/HDMapping/releases/tag/v0.97)
 # DOWNLOAD DEMO FROM THIS LINK -> [DEMO](https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z)
 
 If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches: LeGO-LOAM, LOAM, FAST-LIO, LIO-SAM, CT-ICP, DLO, VoxelMap, Faster-LIO, KISS-ICP, SLICT, DLIO, Point-LIO, GLIM, MAD-ICP, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE, 93won/lidar_odometry, KISS-SLAM. We work on integration: mola_lidar_odometry, rko_lio, lio_gvm, sr_lio, Light-LOAM, LIO-SEGMOT, GLIO, floam, A-LOAM, LOG-LIO, LOG-LIO2, VOX-LIO.

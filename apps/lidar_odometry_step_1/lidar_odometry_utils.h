@@ -2,10 +2,10 @@
 
 #include <chrono>
 #include <cmath>
-#include <execution>
 #include <filesystem>
 #include <iostream>
 #include <map>
+#include <pch/pch.h>
 #include <vector>
 
 #include <ankerl/unordered_dense.h>

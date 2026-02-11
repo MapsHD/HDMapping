@@ -325,6 +325,11 @@ if (BUILD_WITH_BUNDLED_LIBLASZIP)
     set(LASZIP_INCLUDE_DIR ${THIRDPARTY_DIRECTORY})
     set(LASZIP_LIBRARY laszip)
     MESSAGE(STATUS "Using bundled LASzip")
+    
+    if(APPLE)
+        target_compile_definitions(laszip PUBLIC off64_t=off_t)
+    endif()
+
     #suppress warnings from LASzip
 #    target_compile_options(laszip PRIVATE
 #            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-cast-qual>

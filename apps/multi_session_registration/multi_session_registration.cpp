@@ -1811,14 +1811,14 @@ bool save_project_settings(const std::string& file_name, const ProjectSettings& 
 void update_timestamp_offset()
 {
     std::cout << "update_timestamp" << std::endl;
-    time_stamp_offset = 0.0;
+    time_stamp_offset = std::numeric_limits<double>::max();
 
     for (const auto& s : sessions)
     {
         if (!s.point_clouds_container.point_clouds.empty() && !s.point_clouds_container.point_clouds[0].local_trajectory.empty())
         {
             double ts = s.point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first;
-            if (ts > time_stamp_offset)
+            if (ts < time_stamp_offset)
                 time_stamp_offset = ts;
         }
     }
@@ -2592,14 +2592,14 @@ void display()
 
                         auto v1 = (m1 * m2).translation();
 
-                        glVertex3f(v1.x() - 1.0, v1.y(), v1.z());
-                        glVertex3f(v1.x() + 1.0, v1.y(), v1.z());
+                        glVertex3f(v1.x() - 5.0, v1.y(), v1.z());
+                        glVertex3f(v1.x() + 5.0, v1.y(), v1.z());
 
-                        glVertex3f(v1.x(), v1.y() - 1.0, v1.z());
-                        glVertex3f(v1.x(), v1.y() + 1.0, v1.z());
+                        glVertex3f(v1.x(), v1.y() - 5.0, v1.z());
+                        glVertex3f(v1.x(), v1.y() + 5.0, v1.z());
 
-                        glVertex3f(v1.x(), v1.y(), v1.z() - 1.0);
-                        glVertex3f(v1.x(), v1.y(), v1.z() + 1.0);
+                        glVertex3f(v1.x(), v1.y(), v1.z() - 5.0);
+                        glVertex3f(v1.x(), v1.y(), v1.z() + 5.0);
 
                         glEnd();
                     }

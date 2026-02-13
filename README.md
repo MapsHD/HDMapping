@@ -171,6 +171,7 @@ ToDo
 - Jozef Výbošťok et al.. "An Open and Novel Low-Cost Terrestrial Laser Scanner Prototype for Forest Monitoring" (2025, MDPI-Sensors, [[PDF]](https://www.mdpi.com/1424-8220/26/1/63), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sensors-v26-i01_20260104.bib))
 - Janusz Będkowski et al., "MapsHD: A Benchmark Suite for LiDAR Odometry Frameworks" (2025, SSRN, [[PDF]](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5986422))
 - Janusz Będkowski et al., "The benchmark of LiDAR odometry algorithms utilised for a low-cost mobile mapping system" (2025, GEOBENCH, [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W6-2025/25/2025/isprs-archives-XLVIII-1-W6-2025-25-2025.pdf) [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/isprs-archives-XLVIII-1-W6-2025-25-2025.bib))
+- Andro Kokeza et al. "Comparative Performance of Handheld Personal Laser Scanning Instruments and Operator Experience in Forest Inventory of Even-Aged European Beech Stand"(2026, MDPI-Forests, [[PDF]](https://www.mdpi.com/1999-4907/17/2/216) [[BIB]]())
 
 # To cite this work please use as follows:
 Mobile mapping system: hardware and software are elaborated in the following paper:

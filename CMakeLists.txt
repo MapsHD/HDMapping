@@ -307,6 +307,12 @@ endif ()
 
 option (BUILD_WITH_BUNDLED_GLEW "Build with bundled GLEW" ON)
 if (BUILD_WITH_BUNDLED_GLEW)
+    if(APPLE)
+      # On modern macOS AGL framework is deprecated/removed.
+      # We point AGL_LIBRARY to OpenGL to trick the submodule into linking against a valid framework instead of failing.
+      find_library(AGL_LIBRARY OpenGL)
+    endif()
+
     add_subdirectory(${THIRDPARTY_DIRECTORY}/glew-cmake)
     set(GLEW_INCLUDE_DIR ${THIRDPARTY_DIRECTORY}/glew-cmake/include)
     set(GLEW_LIBRARY libglew_static)

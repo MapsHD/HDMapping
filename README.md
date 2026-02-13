@@ -112,7 +112,8 @@ All following algorithms are generating session compatible with 'multi_view_tls_
 - https://github.com/MapsHD/benchmark-GLIM-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIM.bib),
 [[movie]](https://youtu.be/zyZDJECqOG0))
 - https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MAD-ICP.bib))
-- https://github.com/MapsHD/benchmark-iG-LIO-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/iG-LIO.bib))
+- https://github.com/MapsHD/benchmark-iG-LIO-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/iG-LIO.bib), 
+[[movie]](https://youtu.be/KlZf7nHeVmI))
 - https://github.com/MapsHD/benchmark-LIO-EKF-to-HDMapping (2024, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-EKF.bib),
 [[movie]](https://youtu.be/R4Cn1LJ4U_E))
 - https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/I2EKF-LO.bib),
@@ -150,6 +151,7 @@ ToDo
 - https://www.sciencedirect.com/science/article/abs/pii/S1566253525002052
 - https://github.com/SlamCabbage/Optimized-SC-F-LOAM
 - https://github.com/gisbi-kim/SC-LeGO-LOAM
+- https://github.com/ChaoqinRobotics/LINS---LiDAR-inertial-SLAM
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.) 
 - Janusz Będkowski et al., "A Novel Approach to Global Positioning System Accuracy Assessment, Verified on LiDAR Alignment of One Million Kilometers at a Continent Scale, as a Foundation for Autonomous DRIVING Safety Analysis." (2021, MDPI-Sensors, [[PDF]](https://www.mdpi.com/1424-8220/21/17/5691), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sensors-v21-i17_20260104.bib))

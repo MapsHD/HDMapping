@@ -1824,10 +1824,23 @@ void settings_gui()
     ImGui::Begin("Settings", &is_settings_gui);
     {
         std::string wd = "Working directory: '" + session.working_directory + "'";
-
         ImGui::Text(wd.c_str());
 
         ImGui::NewLine();
+
+        ImGui::InputFloat("camera_x", &new_rotation_center.x());
+        ImGui::InputFloat("camera_y", &new_rotation_center.y());
+        ImGui::InputFloat("camera_z", &new_rotation_center.z());
+
+        if(ImGui::Button("set camera")){
+            //new_rotate_x = rotate_x;
+            //new_rotate_y = rotate_y;
+            //new_translate_x = -new_rotation_center.x();
+            //new_translate_y = -new_rotation_center.y();
+            //new_translate_z = -new_rotation_center.z();
+            camera_transition_active = true;
+        }
+
 
         if (ImGui::Button("Set initial pose to Identity and update other poses"))
             initial_pose_to_identity(session);

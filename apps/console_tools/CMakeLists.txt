@@ -35,3 +35,7 @@ target_include_directories(laz_to_ply PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/inclu
 add_executable(laz_to_pcd laz_to_pcd.cpp)
 target_link_libraries(laz_to_pcd PRIVATE ${PLATFORM_LASZIP_LIB})
 target_include_directories(laz_to_pcd PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/include ${PROJECT_BINARY_DIR}/include)
+
+add_executable(pcd_to_laz pcd_to_laz.cpp)
+target_link_libraries(pcd_to_laz PRIVATE ${PLATFORM_LASZIP_LIB})
+target_include_directories(pcd_to_laz PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/include ${PROJECT_BINARY_DIR}/include)

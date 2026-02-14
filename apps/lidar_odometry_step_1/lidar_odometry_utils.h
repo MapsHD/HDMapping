@@ -137,7 +137,7 @@ struct LidarOdometryParams
     std::vector<Point3Di> initial_points;
     double consecutive_distance = 0.0;
     std::vector<Point3Di> reference_points;
-    NDTBucketMapType reference_buckets;
+    // NDTBucketMapType reference_buckets;
     double total_length_of_calculated_trajectory = 0.0;
     NDTBucketMapType buckets_indoor;
     NDTBucketMapType buckets_outdoor;

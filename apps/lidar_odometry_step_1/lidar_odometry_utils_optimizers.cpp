@@ -2254,8 +2254,8 @@ bool compute_step_2(
         for (int i = 0; i < pp.size(); i++)
             pp[i].point = params.m_g * pp[i].point;
 
-        params.buckets_indoor.clear();
-        params.buckets_outdoor.clear();
+        // params.buckets_indoor.clear();
+        // params.buckets_outdoor.clear();
         if (params.ablation_study_use_hierarchical_rgd)
         {
             update_rgd_hierarchy(

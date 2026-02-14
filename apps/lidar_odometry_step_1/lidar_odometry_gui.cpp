@@ -1148,7 +1148,7 @@ void settings_gui()
                     {
                         for (int i = 0; i < 30; i++)
                         {
-                            align_to_reference(params.in_out_params_indoor, params.initial_points, params.m_g, params.reference_buckets);
+                            align_to_reference(params.in_out_params_indoor, params.initial_points, params.m_g, params.buckets_indoor);
                         }
                     }
                 }
@@ -1816,7 +1816,12 @@ void display()
     {
         glColor3f(1, 0, 0);
         glBegin(GL_POINTS);
-        for (const auto& b : params.reference_buckets)
+        for (const auto& b : params.buckets_indoor)
+            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+        glEnd();
+
+        glBegin(GL_POINTS);
+        for (const auto& b : params.buckets_outdoor)
             glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
         glEnd();
     }
@@ -1894,69 +1899,9 @@ void display()
 
                     std::cout << "clicked: Set parameters for velocity up to 8km/h, tiny spaces" << std::endl;
                 }
-                if (ImGui::MenuItem("2 Velocity < 8km/h, quick but less accurate/precise", nullptr, (lastPar == 2)))
+                if (ImGui::MenuItem("2 Velocity < 8km/h, larger spaces, precise forestry (generic)", nullptr, (lastPar == 2)))
                 {
                     lastPar = 2;
-
-                    params.decimation = 0.03;
-                    params.in_out_params_indoor.resolution_X = 0.1;
-                    params.in_out_params_indoor.resolution_Y = 0.1;
-                    params.in_out_params_indoor.resolution_Z = 0.1;
-
-                    params.in_out_params_outdoor.resolution_X = 0.3;
-                    params.in_out_params_outdoor.resolution_Y = 0.3;
-                    params.in_out_params_outdoor.resolution_Z = 0.3;
-
-                    params.filter_threshold_xy_inner = 0.3;
-                    params.filter_threshold_xy_outer = 70.0;
-                    params.threshould_output_filter = 0.3;
-
-                    params.use_robust_and_accurate_lidar_odometry = false;
-                    params.distance_bucket = 0.2;
-                    params.polar_angle_deg = 10.0;
-                    params.azimutal_angle_deg = 10.0;
-                    params.robust_and_accurate_lidar_odometry_iterations = 20;
-
-                    params.max_distance_lidar = 30.0;
-                    params.nr_iter = 30;
-                    params.sliding_window_trajectory_length_threshold = 200;
-                    params.real_time_threshold_seconds = 0.3;
-
-                    std::cout << "clicked: Set parameters for velocity < 8km/h, quick but less accurate/precise" << std::endl;
-                }
-                if (ImGui::MenuItem("3 Velocity < 30 km/h, fast motion, open spaces", nullptr, (lastPar == 3)))
-                {
-                    lastPar = 3;
-
-                    params.decimation = 0.03;
-                    params.in_out_params_indoor.resolution_X = 0.3;
-                    params.in_out_params_indoor.resolution_Y = 0.3;
-                    params.in_out_params_indoor.resolution_Z = 0.3;
-
-                    params.in_out_params_outdoor.resolution_X = 0.5;
-                    params.in_out_params_outdoor.resolution_Y = 0.5;
-                    params.in_out_params_outdoor.resolution_Z = 0.5;
-
-                    params.filter_threshold_xy_inner = 3.0;
-                    params.filter_threshold_xy_outer = 70.0;
-                    params.threshould_output_filter = 3.0;
-
-                    params.use_robust_and_accurate_lidar_odometry = false;
-                    params.distance_bucket = 0.2;
-                    params.polar_angle_deg = 10.0;
-                    params.azimutal_angle_deg = 10.0;
-                    params.robust_and_accurate_lidar_odometry_iterations = 20;
-
-                    params.max_distance_lidar = 70.0;
-                    params.nr_iter = 500;
-                    params.sliding_window_trajectory_length_threshold = 200;
-                    params.real_time_threshold_seconds = 10;
-
-                    std::cout << "clicked: Set parameters for velocity < 30 km/h, fast motion, open spaces" << std::endl;
-                }
-                if (ImGui::MenuItem("4 Velocity < 8km/h, precise forestry", nullptr, (lastPar == 4)))
-                {
-                    lastPar = 4;
 
                     params.decimation = 0.01;
                     params.in_out_params_indoor.resolution_X = 0.1;
@@ -1982,7 +1927,37 @@ void display()
                     params.sliding_window_trajectory_length_threshold = 10000;
                     params.real_time_threshold_seconds = 10;
 
-                    std::cout << "clicked: Set parameters for velocity < 8km/h, precise forestry" << std::endl;
+                    std::cout << "clicked: Set parameters for velocity < 8km/h, larger spaces, precise forestry (generic)" << std::endl;
+                }
+                if (ImGui::MenuItem("3 Velocity < 30 km/h, largest open spaces, fast motion", nullptr, (lastPar == 3)))
+                {
+                    lastPar = 3;
+
+                    params.decimation = 0.03;
+                    params.in_out_params_indoor.resolution_X = 0.3;
+                    params.in_out_params_indoor.resolution_Y = 0.3;
+                    params.in_out_params_indoor.resolution_Z = 0.3;
+
+                    params.in_out_params_outdoor.resolution_X = 0.5;
+                    params.in_out_params_outdoor.resolution_Y = 0.5;
+                    params.in_out_params_outdoor.resolution_Z = 0.5;
+
+                    params.filter_threshold_xy_inner = 1.0;
+                    params.filter_threshold_xy_outer = 70.0;
+                    params.threshould_output_filter = 3.0;
+
+                    params.use_robust_and_accurate_lidar_odometry = false;
+                    params.distance_bucket = 0.2;
+                    params.polar_angle_deg = 10.0;
+                    params.azimutal_angle_deg = 10.0;
+                    params.robust_and_accurate_lidar_odometry_iterations = 20;
+
+                    params.max_distance_lidar = 70.0;
+                    params.nr_iter = 500;
+                    params.sliding_window_trajectory_length_threshold = 200;
+                    params.real_time_threshold_seconds = 10;
+
+                    std::cout << "clicked: Set parameters for velocity < 30 km/h, largest open spaces, fast motion" << std::endl;
                 }
 
                 ImGui::EndMenu();

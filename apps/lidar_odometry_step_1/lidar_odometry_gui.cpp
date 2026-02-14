@@ -139,13 +139,15 @@ namespace fs = std::filesystem;
 bool is_settings_gui = false;
 bool full_debug_messages = false;
 NDT ndt;
-bool show_reference_buckets = true;
+bool show_reference_buckets_indoor = false;
+bool show_reference_buckets_outdoor = false;
 bool show_reference_points = false;
 int dec_reference_points = 100;
 bool show_initial_points = true;
 bool show_trajectory = true;
 bool show_trajectory_as_axes = false;
-bool show_covs = false;
+bool show_covs_indoor = false;
+bool show_covs_outdoor = false;
 int dec_covs = 10;
 bool simple_gui = true;
 bool step_1_done = false;
@@ -1110,7 +1112,7 @@ void settings_gui()
             {
                 ImGui::Checkbox("Show points", &show_reference_points);
                 ImGui::SameLine();
-                ImGui::Checkbox("Show buckets ", &show_reference_buckets);
+                // ImGui::Checkbox("Show buckets ", &show_reference_buckets);
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputInt("Downsamplingn###ref", &dec_reference_points);
 
@@ -1554,7 +1556,11 @@ void progress_window()
     ImGui::SameLine();
     ImGui::Text("Also check console for progress..");
 
-    ImGui::Checkbox("Show buckets", &show_reference_buckets);
+    ImGui::Checkbox("Show reference buckets indoor", &show_reference_buckets_indoor);
+    ImGui::Checkbox("Show reference buckets outdoor", &show_reference_buckets_outdoor);
+
+    //ImGui::Checkbox("Show covs indoor", &show_covs_indoor);
+    //ImGui::Checkbox("Show covs outdoor", &show_covs_outdoor);
 
     ImGui::End();
 }
@@ -1709,11 +1715,7 @@ void display()
         glEnd();
     }
 
-    if (show_covs)
-    {
-        for (const auto& b : params.buckets_indoor)
-            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
-    }
+    
 
 #if 0 // ToDo
     for (size_t i = 0; i < worker_data.size(); i++)
@@ -1817,25 +1819,38 @@ void display()
         glEnd();
     }
 
-    if (show_reference_buckets)
+    if (show_reference_buckets_indoor)
     {
-        {
-            std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
-            glColor3f(1, 0, 0);
-            glBegin(GL_POINTS);
-            for (const auto& b : params.buckets_indoor)
-                glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            glEnd();
-        }
+        std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+        glColor3f(1, 0, 0);
+        glBegin(GL_POINTS);
+        for (const auto& b : params.buckets_indoor)
+            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+        glEnd();
+    }
 
-        {
-            std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
-            glColor3f(0, 1, 0);
-            glBegin(GL_POINTS);
-            for (const auto& b : params.buckets_outdoor)
-                glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            glEnd();
-        }
+    if (show_reference_buckets_outdoor)
+    {
+        std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+        glColor3f(0, 0, 1);
+        glBegin(GL_POINTS);
+        for (const auto& b : params.buckets_outdoor)
+            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+        glEnd();
+    }
+
+    if (show_covs_indoor)
+    {
+        std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+        for (const auto& b : params.buckets_indoor)
+            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(1.0f, 0.0f, 0.0f), 3);
+    }
+
+    if (show_covs_outdoor)
+    {
+        std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+        for (const auto& b : params.buckets_outdoor)
+            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
     }
 
     //

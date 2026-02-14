@@ -390,6 +390,9 @@ void find_best_stretch(
                 // }
             }
         }
+        std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+        std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
         update_rgd(rgd_params, my_buckets, points_global2, trajectory_stretched[0].translation());
 
         std::cout << "number of buckets [" << x << "]: " << my_buckets.size() << std::endl;
@@ -1107,7 +1110,7 @@ void settings_gui()
             {
                 ImGui::Checkbox("Show points", &show_reference_points);
                 ImGui::SameLine();
-                ImGui::Checkbox("Show buckets", &show_reference_buckets);
+                ImGui::Checkbox("Show buckets ", &show_reference_buckets);
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputInt("Downsamplingn###ref", &dec_reference_points);
 
@@ -1551,6 +1554,8 @@ void progress_window()
     ImGui::SameLine();
     ImGui::Text("Also check console for progress..");
 
+    ImGui::Checkbox("Show buckets", &show_reference_buckets);
+
     ImGui::End();
 }
 
@@ -1814,16 +1819,23 @@ void display()
 
     if (show_reference_buckets)
     {
-        glColor3f(1, 0, 0);
-        glBegin(GL_POINTS);
-        for (const auto& b : params.buckets_indoor)
-            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-        glEnd();
+        {
+            std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+            glColor3f(1, 0, 0);
+            glBegin(GL_POINTS);
+            for (const auto& b : params.buckets_indoor)
+                glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            glEnd();
+        }
 
-        glBegin(GL_POINTS);
-        for (const auto& b : params.buckets_outdoor)
-            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-        glEnd();
+        {
+            std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+            glColor3f(0, 1, 0);
+            glBegin(GL_POINTS);
+            for (const auto& b : params.buckets_outdoor)
+                glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            glEnd();
+        }
     }
 
     //

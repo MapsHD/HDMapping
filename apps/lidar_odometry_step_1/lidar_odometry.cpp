@@ -1134,7 +1134,7 @@ std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOd
     return worker_data;
 }
 
-void save_parameters_toml(const LidarOdometryParams& params, const fs::path& outwd, double elapsed_seconds)
+void save_parameters_toml(const LidarOdometryParams& _params, const fs::path& outwd, double elapsed_seconds)
 {
     // Get current date and time
     auto now = std::chrono::system_clock::now();
@@ -1147,7 +1147,7 @@ void save_parameters_toml(const LidarOdometryParams& params, const fs::path& out
     std::string datetime_str = datetime_stream.str();
 
     // Create filename with version info and datetime for TOML parameters
-    std::string toml_filename = "HDMapping_params_" + params.software_version + "_" + datetime_str + ".toml";
+    std::string toml_filename = "HDMapping_params_" + _params.software_version + "_" + datetime_str + ".toml";
     fs::path toml_path = outwd / toml_filename;
 
     try
@@ -1155,10 +1155,7 @@ void save_parameters_toml(const LidarOdometryParams& params, const fs::path& out
         // Use existing TomlIO class to save loadable parameters
         TomlIO toml_io;
 
-        // Make a non-const copy for the TomlIO class (it needs non-const reference)
-        LidarOdometryParams params_copy = params;
-
-        bool success = toml_io.SaveParametersToTomlFile(toml_path.string(), params_copy);
+        bool success = toml_io.SaveParametersToTomlFile(toml_path.string(), _params);
 
         if (success)
         {

@@ -148,7 +148,7 @@ public:
         { "misc", { "clear_color" } }
     };
 
-    bool SaveParametersToTomlFile(const std::string& filepath, LidarOdometryParams& params);
+    bool SaveParametersToTomlFile(const std::string& filepath, const LidarOdometryParams& params);
 
     // Version validation and handling functions
     struct VersionInfo

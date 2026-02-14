@@ -139,8 +139,13 @@ struct LidarOdometryParams
     std::vector<Point3Di> reference_points;
     // NDTBucketMapType reference_buckets;
     double total_length_of_calculated_trajectory = 0.0;
+
+    std::mutex mutex_buckets_indoor;
     NDTBucketMapType buckets_indoor;
+
+    std::mutex mutex_buckets_outdoor;
     NDTBucketMapType buckets_outdoor;
+
 #if WITH_GUI == 1
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 #endif

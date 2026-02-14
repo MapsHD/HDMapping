@@ -2258,6 +2258,9 @@ bool compute_step_2(
         // params.buckets_outdoor.clear();
         if (params.ablation_study_use_hierarchical_rgd)
         {
+            std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+            std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
             update_rgd_hierarchy(
                 params.in_out_params_indoor,
                 params.buckets_indoor,
@@ -2269,6 +2272,9 @@ bool compute_step_2(
         }
         else
         {
+            std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+            std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
             update_rgd(params.in_out_params_indoor, params.buckets_indoor, pp, params.m_g.translation(), &lookup_stats.indoor_lookups);
         }
 
@@ -2344,6 +2350,9 @@ bool compute_step_2(
 
             if (params.use_robust_and_accurate_lidar_odometry)
             {
+                std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+                std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
                 auto tr = worker_data[i].intermediate_trajectory;
                 auto trmm = worker_data[i].intermediate_trajectory_motion_model;
 
@@ -2479,6 +2488,9 @@ bool compute_step_2(
 
             for (int iter = 0; iter < params.nr_iter; iter++)
             {
+                std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+                std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
                 iter_end = iter;
                 delta = 100000.0;
                 optimize_lidar_odometry(
@@ -2655,6 +2667,9 @@ bool compute_step_2(
 
                 if (params.ablation_study_use_hierarchical_rgd)
                 {
+                    std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+                    std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
                     update_rgd_hierarchy(
                         params.in_out_params_indoor,
                         params.buckets_indoor,
@@ -2666,6 +2681,9 @@ bool compute_step_2(
                 }
                 else
                 {
+                    std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+                    std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
                     update_rgd(
                         params.in_out_params_indoor,
                         params.buckets_indoor,
@@ -2687,6 +2705,9 @@ bool compute_step_2(
                 }
                 if (params.ablation_study_use_hierarchical_rgd)
                 {
+                    std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+                    std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
                     update_rgd_hierarchy(
                         params.in_out_params_indoor,
                         params.buckets_indoor,
@@ -2698,6 +2719,9 @@ bool compute_step_2(
                 }
                 else
                 {
+                    std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+                    std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
                     update_rgd(
                         params.in_out_params_indoor,
                         params.buckets_indoor,

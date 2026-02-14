@@ -2,7 +2,7 @@
 #include <iostream>
 #include <sstream>
 
-bool TomlIO::SaveParametersToTomlFile(const std::string& filepath, LidarOdometryParams& params)
+bool TomlIO::SaveParametersToTomlFile(const std::string& filepath, const LidarOdometryParams& params)
 {
     toml::table tbl;
     for (const auto& [category, attributes] : CATEGORIES)

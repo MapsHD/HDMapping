@@ -4,9 +4,8 @@
 [![MANDEYE-PRO](https://img.youtube.com/vi/Is4IvLiTCyw/default.jpg)](https://youtu.be/Is4IvLiTCyw)
 [![USER FREINDLY SOFTWARE](https://img.youtube.com/vi/rJST0zhNVwc/default.jpg)](https://youtu.be/rJST0zhNVwc)
 
-# Open-source (Windows and Linux), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
-
-This is open-source software for large-scale 3D mapping using an open-hardware hand-held/wearable/mountable measurement device available at https://github.com/JanuszBedkowski/mandeye_controller.
+# Open-source (Windows, Linux and macOS), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
+This is open-source software for large-scale 3D mapping using an open-hardware hand-held/wearable/mountable measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
 We provide an end-to-end mobile mapping framework that does not require any installation, including:
 
 - **HDMapping_LI0**: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art.
@@ -126,49 +125,44 @@ Download the dataset from [Bunker DVI Dataset](https://charleshamesse.github.io/
 ![hdmapping-lio](images/hdmapping-lio.png)
 We provide HDMapping-LIO: easy to run, easy to test LiDAR Inertial Odometry that is as accurate as FAST-LIO, FASTER-LIO and much more precise.
 
-All following algorithms are generating session compatible with 'multi_view_tls_registration_step_2'
 
-- https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping (2018, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/legoloam2018.bib), [[movie]](https://youtu.be/WpFBXe1zKto))
-- https://github.com/MapsHD/benchmark-LOAM-Livox-to-HDMapping (2019, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/loam_livox.bib),
-  [[movie]](https://youtu.be/MbKHTmUcI2w))
-- https://github.com/MapsHD/benchmark-FAST-LIO-to-HDMapping (2020, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/FAST-LIO.bib),
-  [[movie]](https://youtu.be/ENlaQTtOXEM))
-- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib))
-- https://github.com/MapsHD/benchmark-CT-ICP-to-HDMapping (2021, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/CT-ICP.bib),
-  [[movie]](https://youtu.be/swEsJHwtE50))
-- https://github.com/MapsHD/benchmark-DLO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLO.bib), [[movie]](https://youtu.be/-UH81mNLw8Q))
-- https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping (2022, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/VoxelMap.bib),
-  [[movie]](https://youtu.be/oRiuvJRNl-c))
-- https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Faster-LIO.bib), [[movie]](https://youtu.be/bV1jgF_m-Zo))
-- https://github.com/MapsHD/benchmark-KISS-ICP-to-HDMapping (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/KISS-ICP.bib),
-  [[movie]](https://youtu.be/GyB8UuQN0Io))
-- https://github.com/MapsHD/benchmark-SLICT-to-HDMapping (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SLICT.bib),
-  [[movie]](https://youtu.be/TUaJN7FJOFU))
-- https://github.com/MapsHD/benchmark-DLIO-to-HDMapping (2023, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLIO.bib), [[movie]](https://youtu.be/xFLqFcoAtk8))
-- https://github.com/MapsHD/benchmark-Point-LIO-to-HDMapping (2024, JAIS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Point-LIO.bib),
-  [[movie]](https://youtu.be/JlD1hDJHcrs))
-- https://github.com/MapsHD/benchmark-GLIM-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIM.bib),
-  [[movie]](https://youtu.be/zyZDJECqOG0))
+All following algorithms are generating session compatible with 'multi_view_tls_registration_step_2'.
+It is designed for a benchmark.
+
+- https://github.com/MapsHD/benchmark-HDMapping-ground-truth (2026, 'under review', [[movie]](https://youtu.be/8sHyUNC3mZs))
+- https://github.com/MapsHD/benchmark-HDMapping_LIO-to-HDMapping (2026, 'under review', [[movie]](https://youtu.be/9AUvPTLUcos))
+- https://github.com/MapsHD/benchmark-lidar_odometry_ros_wrapper-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/lidar_odometry_ros_wrapper.bib), [[movie]](https://youtu.be/w233P_MZMWk))
+- https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RESPLE.bib), [[movie]](https://youtu.be/5PAB4xJmMoo))
+- https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GenZ-ICP.bib), [[movie]](https://youtu.be/vgGkucOBVg4))
+- https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/I2EKF-LO.bib), [[movie]](https://youtu.be/B2358Gn62Ho))  
+- https://github.com/MapsHD/benchmark-LIO-EKF-to-HDMapping (2024, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-EKF.bib), [[movie]](https://youtu.be/R4Cn1LJ4U_E))
+- https://github.com/MapsHD/benchmark-iG-LIO-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/iG-LIO.bib), [[movie]](https://youtu.be/KlZf7nHeVmI))
 - https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MAD-ICP.bib))
-- https://github.com/MapsHD/benchmark-iG-LIO-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/iG-LIO.bib))
-- https://github.com/MapsHD/benchmark-LIO-EKF-to-HDMapping (2024, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-EKF.bib),
-  [[movie]](https://youtu.be/R4Cn1LJ4U_E))
-- https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/I2EKF-LO.bib),
-  [[movie]](https://youtu.be/B2358Gn62Ho))
-- https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GenZ-ICP.bib))
-- https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RESPLE.bib))
-- https://github.com/MapsHD/benchmark-lidar_odometry_ros_wrapper-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/lidar_odometry_ros_wrapper.bib))
+- https://github.com/MapsHD/benchmark-GLIM-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIM.bib), [[movie]](https://youtu.be/zyZDJECqOG0))
+- https://github.com/MapsHD/benchmark-Point-LIO-to-HDMapping (2024, JAIS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Point-LIO.bib), [[movie]](https://youtu.be/JlD1hDJHcrs))
+- https://github.com/MapsHD/benchmark-DLIO-to-HDMapping (2023, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLIO.bib), [[movie]](https://youtu.be/xFLqFcoAtk8))
+- https://github.com/MapsHD/benchmark-SLICT-to-HDMapping (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SLICT.bib), [[movie]](https://youtu.be/TUaJN7FJOFU))
+- https://github.com/MapsHD/benchmark-KISS-ICP-to-HDMapping (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/KISS-ICP.bib), [[movie]](https://youtu.be/GyB8UuQN0Io))
+- https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Faster-LIO.bib), [[movie]](https://youtu.be/bV1jgF_m-Zo))
+- https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping (2022, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/VoxelMap.bib), [[movie]](https://youtu.be/oRiuvJRNl-c))
+- https://github.com/MapsHD/benchmark-DLO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLO.bib), [[movie]](https://youtu.be/-UH81mNLw8Q))
+- https://github.com/MapsHD/benchmark-CT-ICP-to-HDMapping (2021, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/CT-ICP.bib), [[movie]](https://youtu.be/swEsJHwtE50))
+- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib))
+- https://github.com/MapsHD/benchmark-FAST-LIO-to-HDMapping (2020, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/FAST-LIO.bib), [[movie]](https://youtu.be/ENlaQTtOXEM))
+- https://github.com/MapsHD/benchmark-LOAM-Livox-to-HDMapping (2019, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/loam_livox.bib), [[movie]](https://youtu.be/MbKHTmUcI2w))
+- https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping (2018, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/legoloam2018.bib), [[movie]](https://youtu.be/WpFBXe1zKto))
+
+[[qualitative evaluation benchmark movie]](https://youtu.be/C0CcG9vAokY)
 
 ToDo
-
+- https://github.com/Liansheng-Wang/Super-LIO (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib))
 - https://robotics-upo.github.io/D-LIO/
 - https://github.com/MapsHD/benchmark-KISS-SLAM-to-HDMapping (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/kiss-slam.bib)) (not solved issue https://github.com/kpmrozowski/KISS-SLAM-to-HDMapping/issues/1)
-- https://github.com/MOLAorg/mola_lidar_odometry (2025, IJRR, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/mola-lidar-odometry.bib)) (not solved issue: https://github.com/MOLAorg/mola_lidar_odometry/issues/37)
+- https://github.com/MOLAorg/mola_lidar_odometry (2025, IJRR, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/mola-lidar-odometry.bib)) (not solved issue: https://github.com/MOLAorg/mola_lidar_odometry/issues/37 --> we have to repoen/investigate it)
 - https://github.com/Whan000/MOLA-SLAM (instruction to https://github.com/MOLAorg/mola_lidar_odometry)
 - https://github.com/MapsHD/rko_lio (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RKO-LIO.bib)) (not solved issue: https://github.com/marcinmatecki/rko-lio-to-HDMapping/issues/1)
 - https://github.com/clegenti/2fast2lamaa (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/2FAST-2LAMAA.bib))
 - https://github.com/lian-yue0515/MM-LINS (2025, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MM-LINS.bib))
-- https://github.com/Liansheng-Wang/Super-LIO (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib))
 - VOX-LIO https://www.mdpi.com/2072-4292/17/13/2214 (2025, MDPI Remote Sensing, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/VOX-LIO.bib), no code)
 - SS-LIO: Robust Tightly Coupled Solid-State LiDAR–Inertial Odometry for Indoor Degraded Environments (2025, MDPI electronics, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SS-LIO.bib), no code)
 - https://github.com/Ji1Xingyu/lio_gvm (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-GVM.bib)) (not solved issues: https://github.com/Ji1Xingyu/lio_gvm/issues/13, https://github.com/Ji1Xingyu/lio_gvm/issues/12, https://github.com/Ji1Xingyu/lio_gvm/issues/7)
@@ -188,6 +182,7 @@ ToDo
 - https://www.sciencedirect.com/science/article/abs/pii/S1566253525002052
 - https://github.com/SlamCabbage/Optimized-SC-F-LOAM
 - https://github.com/gisbi-kim/SC-LeGO-LOAM
+- https://github.com/ChaoqinRobotics/LINS---LiDAR-inertial-SLAM
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
 
@@ -210,6 +205,7 @@ ToDo
 - Jozef Výbošťok et al.. "An Open and Novel Low-Cost Terrestrial Laser Scanner Prototype for Forest Monitoring" (2025, MDPI-Sensors, [[PDF]](https://www.mdpi.com/1424-8220/26/1/63), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sensors-v26-i01_20260104.bib))
 - Janusz Będkowski et al., "MapsHD: A Benchmark Suite for LiDAR Odometry Frameworks" (2025, SSRN, [[PDF]](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5986422))
 - Janusz Będkowski et al., "The benchmark of LiDAR odometry algorithms utilised for a low-cost mobile mapping system" (2025, GEOBENCH, [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W6-2025/25/2025/isprs-archives-XLVIII-1-W6-2025-25-2025.pdf) [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/isprs-archives-XLVIII-1-W6-2025-25-2025.bib))
+- Andro Kokeza et al. "Comparative Performance of Handheld Personal Laser Scanning Instruments and Operator Experience in Forest Inventory of Even-Aged European Beech Stand"(2026, MDPI-Forests, [[PDF]](https://www.mdpi.com/1999-4907/17/2/216) [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/forests-v17-i02_20260213.bib))
 
 # To cite this work please use as follows:
 

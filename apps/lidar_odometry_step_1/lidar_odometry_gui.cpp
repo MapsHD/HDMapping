@@ -139,13 +139,15 @@ namespace fs = std::filesystem;
 bool is_settings_gui = false;
 bool full_debug_messages = false;
 NDT ndt;
-bool show_reference_buckets = true;
+bool show_reference_buckets_indoor = false;
+bool show_reference_buckets_outdoor = false;
 bool show_reference_points = false;
 int dec_reference_points = 100;
 bool show_initial_points = true;
 bool show_trajectory = true;
 bool show_trajectory_as_axes = false;
-bool show_covs = false;
+bool show_covs_indoor = false;
+bool show_covs_outdoor = false;
 int dec_covs = 10;
 bool simple_gui = true;
 bool step_1_done = false;
@@ -390,6 +392,9 @@ void find_best_stretch(
                 // }
             }
         }
+        std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+        std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
         update_rgd(rgd_params, my_buckets, points_global2, trajectory_stretched[0].translation());
 
         std::cout << "number of buckets [" << x << "]: " << my_buckets.size() << std::endl;
@@ -1107,7 +1112,7 @@ void settings_gui()
             {
                 ImGui::Checkbox("Show points", &show_reference_points);
                 ImGui::SameLine();
-                ImGui::Checkbox("Show buckets", &show_reference_buckets);
+                // ImGui::Checkbox("Show buckets ", &show_reference_buckets);
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputInt("Downsamplingn###ref", &dec_reference_points);
 
@@ -1148,7 +1153,7 @@ void settings_gui()
                     {
                         for (int i = 0; i < 30; i++)
                         {
-                            align_to_reference(params.in_out_params_indoor, params.initial_points, params.m_g, params.reference_buckets);
+                            align_to_reference(params.in_out_params_indoor, params.initial_points, params.m_g, params.buckets_indoor);
                         }
                     }
                 }
@@ -1551,6 +1556,12 @@ void progress_window()
     ImGui::SameLine();
     ImGui::Text("Also check console for progress..");
 
+    ImGui::Checkbox("Show reference buckets indoor", &show_reference_buckets_indoor);
+    ImGui::Checkbox("Show reference buckets outdoor", &show_reference_buckets_outdoor);
+
+    // ImGui::Checkbox("Show covs indoor", &show_covs_indoor);
+    // ImGui::Checkbox("Show covs outdoor", &show_covs_outdoor);
+
     ImGui::End();
 }
 
@@ -1704,12 +1715,6 @@ void display()
         glEnd();
     }
 
-    if (show_covs)
-    {
-        for (const auto& b : params.buckets_indoor)
-            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
-    }
-
 #if 0 // ToDo
     for (size_t i = 0; i < worker_data.size(); i++)
     {
@@ -1812,13 +1817,38 @@ void display()
         glEnd();
     }
 
-    if (show_reference_buckets)
+    if (show_reference_buckets_indoor)
     {
+        std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
         glColor3f(1, 0, 0);
         glBegin(GL_POINTS);
-        for (const auto& b : params.reference_buckets)
+        for (const auto& b : params.buckets_indoor)
             glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
         glEnd();
+    }
+
+    if (show_reference_buckets_outdoor)
+    {
+        std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+        glColor3f(0, 0, 1);
+        glBegin(GL_POINTS);
+        for (const auto& b : params.buckets_outdoor)
+            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+        glEnd();
+    }
+
+    if (show_covs_indoor)
+    {
+        std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+        for (const auto& b : params.buckets_indoor)
+            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(1.0f, 0.0f, 0.0f), 3);
+    }
+
+    if (show_covs_outdoor)
+    {
+        std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+        for (const auto& b : params.buckets_outdoor)
+            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
     }
 
     //
@@ -1894,69 +1924,9 @@ void display()
 
                     std::cout << "clicked: Set parameters for velocity up to 8km/h, tiny spaces" << std::endl;
                 }
-                if (ImGui::MenuItem("2 Velocity < 8km/h, quick but less accurate/precise", nullptr, (lastPar == 2)))
+                if (ImGui::MenuItem("2 Velocity < 8km/h, larger spaces, precise forestry (generic)", nullptr, (lastPar == 2)))
                 {
                     lastPar = 2;
-
-                    params.decimation = 0.03;
-                    params.in_out_params_indoor.resolution_X = 0.1;
-                    params.in_out_params_indoor.resolution_Y = 0.1;
-                    params.in_out_params_indoor.resolution_Z = 0.1;
-
-                    params.in_out_params_outdoor.resolution_X = 0.3;
-                    params.in_out_params_outdoor.resolution_Y = 0.3;
-                    params.in_out_params_outdoor.resolution_Z = 0.3;
-
-                    params.filter_threshold_xy_inner = 0.3;
-                    params.filter_threshold_xy_outer = 70.0;
-                    params.threshould_output_filter = 0.3;
-
-                    params.use_robust_and_accurate_lidar_odometry = false;
-                    params.distance_bucket = 0.2;
-                    params.polar_angle_deg = 10.0;
-                    params.azimutal_angle_deg = 10.0;
-                    params.robust_and_accurate_lidar_odometry_iterations = 20;
-
-                    params.max_distance_lidar = 30.0;
-                    params.nr_iter = 30;
-                    params.sliding_window_trajectory_length_threshold = 200;
-                    params.real_time_threshold_seconds = 0.3;
-
-                    std::cout << "clicked: Set parameters for velocity < 8km/h, quick but less accurate/precise" << std::endl;
-                }
-                if (ImGui::MenuItem("3 Velocity < 30 km/h, fast motion, open spaces", nullptr, (lastPar == 3)))
-                {
-                    lastPar = 3;
-
-                    params.decimation = 0.03;
-                    params.in_out_params_indoor.resolution_X = 0.3;
-                    params.in_out_params_indoor.resolution_Y = 0.3;
-                    params.in_out_params_indoor.resolution_Z = 0.3;
-
-                    params.in_out_params_outdoor.resolution_X = 0.5;
-                    params.in_out_params_outdoor.resolution_Y = 0.5;
-                    params.in_out_params_outdoor.resolution_Z = 0.5;
-
-                    params.filter_threshold_xy_inner = 3.0;
-                    params.filter_threshold_xy_outer = 70.0;
-                    params.threshould_output_filter = 3.0;
-
-                    params.use_robust_and_accurate_lidar_odometry = false;
-                    params.distance_bucket = 0.2;
-                    params.polar_angle_deg = 10.0;
-                    params.azimutal_angle_deg = 10.0;
-                    params.robust_and_accurate_lidar_odometry_iterations = 20;
-
-                    params.max_distance_lidar = 70.0;
-                    params.nr_iter = 500;
-                    params.sliding_window_trajectory_length_threshold = 200;
-                    params.real_time_threshold_seconds = 10;
-
-                    std::cout << "clicked: Set parameters for velocity < 30 km/h, fast motion, open spaces" << std::endl;
-                }
-                if (ImGui::MenuItem("4 Velocity < 8km/h, precise forestry", nullptr, (lastPar == 4)))
-                {
-                    lastPar = 4;
 
                     params.decimation = 0.01;
                     params.in_out_params_indoor.resolution_X = 0.1;
@@ -1982,7 +1952,37 @@ void display()
                     params.sliding_window_trajectory_length_threshold = 10000;
                     params.real_time_threshold_seconds = 10;
 
-                    std::cout << "clicked: Set parameters for velocity < 8km/h, precise forestry" << std::endl;
+                    std::cout << "clicked: Set parameters for velocity < 8km/h, larger spaces, precise forestry (generic)" << std::endl;
+                }
+                if (ImGui::MenuItem("3 Velocity < 30 km/h, largest open spaces, fast motion", nullptr, (lastPar == 3)))
+                {
+                    lastPar = 3;
+
+                    params.decimation = 0.03;
+                    params.in_out_params_indoor.resolution_X = 0.3;
+                    params.in_out_params_indoor.resolution_Y = 0.3;
+                    params.in_out_params_indoor.resolution_Z = 0.3;
+
+                    params.in_out_params_outdoor.resolution_X = 0.5;
+                    params.in_out_params_outdoor.resolution_Y = 0.5;
+                    params.in_out_params_outdoor.resolution_Z = 0.5;
+
+                    params.filter_threshold_xy_inner = 1.0;
+                    params.filter_threshold_xy_outer = 70.0;
+                    params.threshould_output_filter = 3.0;
+
+                    params.use_robust_and_accurate_lidar_odometry = false;
+                    params.distance_bucket = 0.2;
+                    params.polar_angle_deg = 10.0;
+                    params.azimutal_angle_deg = 10.0;
+                    params.robust_and_accurate_lidar_odometry_iterations = 20;
+
+                    params.max_distance_lidar = 70.0;
+                    params.nr_iter = 500;
+                    params.sliding_window_trajectory_length_threshold = 200;
+                    params.real_time_threshold_seconds = 10;
+
+                    std::cout << "clicked: Set parameters for velocity < 30 km/h, largest open spaces, fast motion" << std::endl;
                 }
 
                 ImGui::EndMenu();

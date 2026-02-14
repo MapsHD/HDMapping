@@ -995,7 +995,7 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
 void filter_reference_buckets(LidarOdometryParams& params)
 {
     NDTBucketMapType reference_buckets_out;
-    for (const auto& b : params.reference_buckets)
+    for (const auto& b : params.buckets_indoor)
     {
         if (b.second.number_of_points > 10)
         {
@@ -1014,7 +1014,29 @@ void filter_reference_buckets(LidarOdometryParams& params)
             }
         }
     }
-    params.reference_buckets = reference_buckets_out;
+    params.buckets_indoor = reference_buckets_out;
+
+    NDTBucketMapType reference_buckets_out2;
+    for (const auto& b : params.buckets_indoor)
+    {
+        if (b.second.number_of_points > 10)
+        {
+            Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(b.second.cov, Eigen::ComputeEigenvectors);
+
+            auto eigen_values = eigen_solver.eigenvalues();
+            double sum_ev = eigen_values.x() + eigen_values.y() + eigen_values.z();
+            double ev1 = eigen_values.x();
+            double ev2 = eigen_values.y();
+            double ev3 = eigen_values.z();
+
+            double planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
+            if (planarity > 0.7)
+            {
+                reference_buckets_out2[b.first] = b.second;
+            }
+        }
+    }
+    params.buckets_outdoor = reference_buckets_out2;
 }
 
 void save_trajectory_to_ascii(std::vector<WorkerData>& worker_data, std::string output_file_name)
@@ -1033,7 +1055,10 @@ void save_trajectory_to_ascii(std::vector<WorkerData>& worker_data, std::string 
 
 void load_reference_point_clouds(const std::vector<std::string>& input_file_names, LidarOdometryParams& params)
 {
-    params.reference_buckets.clear();
+    // params.reference_buckets.clear();
+    params.buckets_indoor.clear();
+    params.buckets_outdoor.clear();
+
     params.reference_points.clear();
 
     for (size_t i = 0; i < input_file_names.size(); i++)
@@ -1044,8 +1069,9 @@ void load_reference_point_clouds(const std::vector<std::string>& input_file_name
         params.reference_points.insert(std::end(params.reference_points), std::begin(pp), std::end(pp));
     }
 
-    update_rgd(params.in_out_params_indoor, params.reference_buckets, params.reference_points);
-    params.buckets_indoor = params.reference_buckets;
+    update_rgd(params.in_out_params_indoor, params.buckets_indoor, params.reference_points);
+    update_rgd(params.in_out_params_outdoor, params.buckets_outdoor, params.reference_points);
+    // params.buckets_indoor = params.reference_buckets;
 }
 
 std::string save_results_automatic(
@@ -1108,7 +1134,7 @@ std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOd
     return worker_data;
 }
 
-void save_parameters_toml(const LidarOdometryParams& params, const fs::path& outwd, double elapsed_seconds)
+void save_parameters_toml(const LidarOdometryParams& _params, const fs::path& outwd, double elapsed_seconds)
 {
     // Get current date and time
     auto now = std::chrono::system_clock::now();
@@ -1121,7 +1147,7 @@ void save_parameters_toml(const LidarOdometryParams& params, const fs::path& out
     std::string datetime_str = datetime_stream.str();
 
     // Create filename with version info and datetime for TOML parameters
-    std::string toml_filename = "HDMapping_params_" + params.software_version + "_" + datetime_str + ".toml";
+    std::string toml_filename = "HDMapping_params_" + _params.software_version + "_" + datetime_str + ".toml";
     fs::path toml_path = outwd / toml_filename;
 
     try
@@ -1129,10 +1155,7 @@ void save_parameters_toml(const LidarOdometryParams& params, const fs::path& out
         // Use existing TomlIO class to save loadable parameters
         TomlIO toml_io;
 
-        // Make a non-const copy for the TomlIO class (it needs non-const reference)
-        LidarOdometryParams params_copy = params;
-
-        bool success = toml_io.SaveParametersToTomlFile(toml_path.string(), params_copy);
+        bool success = toml_io.SaveParametersToTomlFile(toml_path.string(), _params);
 
         if (success)
         {

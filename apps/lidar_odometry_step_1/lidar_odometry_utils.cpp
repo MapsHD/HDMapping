@@ -535,6 +535,7 @@ std::vector<Point3Di> load_point_cloud(
         {
             if (!calibrations.contains(id))
             {
+                std::cout << 1;
                 continue;
             }
         }
@@ -599,6 +600,9 @@ std::vector<Point3Di> load_point_cloud(
             }
         }
     }
+
+    std::cout << "header->number_of_point_records: " << header->number_of_point_records << std::endl;
+    std::cout << "counter_filtered_points: " << counter_filtered_points << std::endl;
 
     std::cout << header->number_of_point_records << " - " << counter_filtered_points << " = " << points.size();
     if (counter_ts0 > 0)

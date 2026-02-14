@@ -128,13 +128,13 @@ inline bool exportLaz(
         coordinates[2] = p.z() + offset_alt;
         if (laszip_set_coordinates(laszip_writer, coordinates))
         {
-            fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);
+            fprintf(stderr, "DLL ERROR: setting coordinates for point %lld\n", p_count);
             return false;
         }
 
         if (laszip_write_point(laszip_writer))
         {
-            fprintf(stderr, "DLL ERROR: writing point %I64d\n", p_count);
+            fprintf(stderr, "DLL ERROR: writing point %lld\n", p_count);
             return false;
         }
     }
@@ -145,7 +145,7 @@ inline bool exportLaz(
         return false;
     }
 
-    fprintf(stderr, "successfully written %I64d points\n", p_count);
+    fprintf(stderr, "successfully written %lld points\n", p_count);
 
     // close the writer
 

@@ -12,6 +12,7 @@
 
 #include "color_las_loader.h"
 #include "pfd_wrapper.hpp"
+#include <pch/pch.h>
 
 #include <Eigen/Eigen>
 #include <observation_equations/codes/common/include/cauchy.h>

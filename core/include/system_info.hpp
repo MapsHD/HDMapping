@@ -8,6 +8,11 @@
 #ifdef _WIN32
 #include <intrin.h>
 #include <windows.h>
+#elif defined(__APPLE__)
+#include <fstream>
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
 #else
 #include <fstream>
 #include <sys/sysinfo.h>
@@ -90,6 +95,11 @@ namespace system_info
         if (start != std::string::npos)
             result = result.substr(start);
         return result;
+#elif defined(__APPLE__)
+        char buffer[128];
+        size_t bufferlen = 128;
+        sysctlbyname("machdep.cpu.brand_string", &buffer, &bufferlen, NULL, 0);
+        return std::string(buffer);
 #else
         std::ifstream cpuinfo("/proc/cpuinfo");
         std::string line;
@@ -130,6 +140,13 @@ namespace system_info
         GlobalMemoryStatusEx(&memInfo);
         // Convert bytes to GB (1 GB = 10^9 bytes, matches marketed RAM on Windows)
         int gbRam = static_cast<int>(std::round(memInfo.ullTotalPhys / 1e9));
+        return std::to_string(gbRam) + " GB";
+#elif defined(__APPLE__)
+        int64_t mem;
+        size_t len = sizeof(mem);
+        sysctlbyname("hw.memsize", &mem, &len, NULL, 0);
+        double gibRam = static_cast<double>(mem) / (1024.0 * 1024.0 * 1024.0);
+        int gbRam = roundToMarketedRAM(gibRam);
         return std::to_string(gbRam) + " GB";
 #else
         struct sysinfo info;

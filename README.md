@@ -94,7 +94,7 @@ It is designed for a benchmark.
 
 - https://github.com/MapsHD/benchmark-HDMapping-ground-truth (2026, 'under review', [[movie]](https://youtu.be/8sHyUNC3mZs))
 - https://github.com/MapsHD/benchmark-HDMapping_LIO-to-HDMapping (2026)
-- https://github.com/MapsHD/benchmark-lidar_odometry_ros_wrapper-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/lidar_odometry_ros_wrapper.bib))
+- https://github.com/MapsHD/benchmark-lidar_odometry_ros_wrapper-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/lidar_odometry_ros_wrapper.bib), [[movie]](https://youtu.be/w233P_MZMWk))
 - https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RESPLE.bib), [[movie]](https://youtu.be/5PAB4xJmMoo))
 - https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GenZ-ICP.bib), [[movie]](https://youtu.be/vgGkucOBVg4))
 - https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/I2EKF-LO.bib), [[movie]](https://youtu.be/B2358Gn62Ho))  

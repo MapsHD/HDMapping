@@ -255,7 +255,7 @@ bool convert_and_save(const char* from, const char* to)
                     else if (field.type == "F" && field.size == 4)
                     {
                         float int_val = *reinterpret_cast<float*>(pointDataPtr + intensity_offset);
-                        intensity = 0;// ToDo not compiling on linux static_cast<uint16_t>(std::clamp(int_val * 65535.0f, 0.0f, 65535.0f));
+                        intensity = 0; // ToDo not compiling on linux static_cast<uint16_t>(std::clamp(int_val * 65535.0f, 0.0f, 65535.0f));
                     }
                     break;
                 }

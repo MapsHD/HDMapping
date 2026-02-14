@@ -1559,8 +1559,8 @@ void progress_window()
     ImGui::Checkbox("Show reference buckets indoor", &show_reference_buckets_indoor);
     ImGui::Checkbox("Show reference buckets outdoor", &show_reference_buckets_outdoor);
 
-    //ImGui::Checkbox("Show covs indoor", &show_covs_indoor);
-    //ImGui::Checkbox("Show covs outdoor", &show_covs_outdoor);
+    // ImGui::Checkbox("Show covs indoor", &show_covs_indoor);
+    // ImGui::Checkbox("Show covs outdoor", &show_covs_outdoor);
 
     ImGui::End();
 }
@@ -1714,8 +1714,6 @@ void display()
         }
         glEnd();
     }
-
-    
 
 #if 0 // ToDo
     for (size_t i = 0; i < worker_data.size(); i++)

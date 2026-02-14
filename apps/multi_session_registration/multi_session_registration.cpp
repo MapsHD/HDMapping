@@ -2105,8 +2105,53 @@ void settings_gui()
         ImGui::SameLine();
         if (ImGui::Button("Set to origin"))
         {
+            bool is_first_gt = false;
+
+            if (sessions.size() > 0)
+            {
+                if (sessions[0].is_ground_truth)
+                    is_first_gt = true;
+            }
+
+            Eigen::Affine3d m_gt = Eigen::Affine3d::Identity();
+            if (sessions.size() > 0)
+            {
+                int index_point_clouds = -1;
+                int index_local_trajectory = -1;
+                bool found = false;
+                for (size_t a = 0; a < sessions[0].point_clouds_container.point_clouds.size(); a++)
+                {
+                    for (size_t b = 0; b < sessions[0].point_clouds_container.point_clouds[a].local_trajectory.size(); b++)
+                    {
+                        if (sessions[0].point_clouds_container.point_clouds[a].local_trajectory[b].timestamps.first > time_stamp_offset)
+                        {
+                            if (!found)
+                            {
+                                found = true;
+                                index_point_clouds = a;
+                                index_local_trajectory = b;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (index_point_clouds != -1 && index_local_trajectory != -1)
+                {
+                    m_gt = sessions[0].point_clouds_container.point_clouds[index_point_clouds].m_pose *
+                        sessions[0].point_clouds_container.point_clouds[index_point_clouds].local_trajectory[index_local_trajectory].m_pose;
+                }
+            }
+
+            // for (auto& session : sessions)
             for (auto& session : sessions)
             {
+                if (is_first_gt)
+                {
+                    if (session.is_ground_truth)
+                        continue;
+                }
+
                 int index_point_clouds = -1;
                 int index_local_trajectory = -1;
                 bool found = false;
@@ -2133,11 +2178,15 @@ void settings_gui()
                     auto m2 =
                         session.point_clouds_container.point_clouds[index_point_clouds].local_trajectory[index_local_trajectory].m_pose;
 
-                    auto inv = (m1 * m2).inverse();
-
+                    auto inv = Eigen::Affine3d::Identity();
+                    inv = (m1 * m2).inverse();
                     for (size_t index = 0; index < session.point_clouds_container.point_clouds.size(); index++)
                         session.point_clouds_container.point_clouds[index].m_pose =
                             inv * session.point_clouds_container.point_clouds[index].m_pose;
+
+                    for (size_t index = 0; index < session.point_clouds_container.point_clouds.size(); index++)
+                        session.point_clouds_container.point_clouds[index].m_pose =
+                            m_gt * session.point_clouds_container.point_clouds[index].m_pose;
                 }
             }
         }

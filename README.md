@@ -115,6 +115,8 @@ It is designed for a benchmark.
 - https://github.com/MapsHD/benchmark-LOAM-Livox-to-HDMapping (2019, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/loam_livox.bib), [[movie]](https://youtu.be/MbKHTmUcI2w))
 - https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping (2018, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/legoloam2018.bib), [[movie]](https://youtu.be/WpFBXe1zKto))
 
+[[qualitative evaluation benchmark movie]](https://youtu.be/C0CcG9vAokY)
+
 
 ToDo
 - https://github.com/Liansheng-Wang/Super-LIO (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib))

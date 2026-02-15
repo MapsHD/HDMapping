@@ -153,6 +153,7 @@ It is designed for a benchmark.
 - https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping (2018, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/legoloam2018.bib), [[movie]](https://youtu.be/WpFBXe1zKto))
 
 [[qualitative evaluation benchmark movie]](https://youtu.be/C0CcG9vAokY)
+[[quantitative evaluation benchmark movie]](https://youtu.be/PsJaXpWFAis)
 [[quantitative benchmark]](https://github.com/MapsHD/benchmark-HDMapping-evaluation-of-odometry-and-SLAM)
 
 ToDo

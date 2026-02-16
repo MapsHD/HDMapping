@@ -160,29 +160,6 @@ inline bool exportLaz(
     return true;
 }
 
-inline void adjustHeader(laszip_header* header, const Eigen::Affine3d& m_pose, const Eigen::Vector3d& offset_in)
-{
-    Eigen::Vector3d max{ header->max_x, header->max_y, header->max_z };
-    Eigen::Vector3d min{ header->min_x, header->min_y, header->min_z };
-
-    // max -= offset_in;
-    // min -= offset_in;
-
-    Eigen::Vector3d adj_max = m_pose * max + offset_in;
-    Eigen::Vector3d adj_min = m_pose * min + offset_in;
-
-    header->max_x = adj_max.x();
-    header->max_y = adj_max.y();
-    header->max_z = adj_max.z();
-
-    header->min_x = adj_min.x();
-    header->min_y = adj_min.y();
-    header->min_z = adj_min.z();
-
-    header->x_offset = offset_in.x();
-    header->y_offset = offset_in.y();
-    header->z_offset = offset_in.z();
-}
 
 // inline Eigen::Vector3d adjustPoint(laszip_F64 input_coordinates[3], const Eigen::Affine3d &m_pose)
 //{
@@ -249,18 +226,9 @@ inline void save_processed_pc(
     std::cout << "header before:" << std::endl;
     std::cout << header->x_offset << " " << header->y_offset << " " << header->z_offset << std::endl;
 
-    adjustHeader(header, m_pose, offset);
-
-    std::cout << "header min after:" << std::endl;
-    std::cout << header->min_x << " " << header->min_y << " " << header->min_z << std::endl;
-
-    std::cout << "header max after:" << std::endl;
-    std::cout << header->max_x << " " << header->max_y << " " << header->max_z << std::endl;
-
-    std::cout << "header after:" << std::endl;
-    std::cout << header->x_offset << " " << header->y_offset << " " << header->z_offset << std::endl;
-
-    std::cout << "m_pose: " << std::endl << m_pose.matrix() << std::endl;
+    header->x_offset = offset.x();
+    header->y_offset = offset.y();
+    header->z_offset = offset.z();
 
     if (laszip_set_header(laszip_writer, header))
     {
@@ -334,6 +302,12 @@ inline void save_processed_pc(
         if (laszip_write_point(laszip_writer))
         {
             fprintf(stderr, "DLL ERROR: writing point %u\n", i);
+            return;
+        }
+
+        if (laszip_update_inventory(laszip_writer))
+        {
+            fprintf(stderr, "DLL ERROR: updating inventory for point %u\n", i);
             return;
         }
     }

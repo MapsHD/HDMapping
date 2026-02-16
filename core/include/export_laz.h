@@ -94,7 +94,7 @@ inline bool exportLaz(
     {
         const auto& p = pointcloud[i];
         point->intensity = intensity[i];
-        point->gps_time = timestamps[i];
+        point->gps_time = timestamps[i] * 1e-9;
 
         min_ts = std::min(min_ts, point->gps_time);
         max_ts = std::max(max_ts, point->gps_time);

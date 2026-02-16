@@ -24,7 +24,7 @@ inline bool exportLaz(
     double max_ts = std::numeric_limits<double>::lowest();
     int number_of_points_with_timestamp_eq_0 = 0;
 
-    constexpr float scale = 0.0001f; // one tenth of milimeter
+    constexpr double scale = 0.0001; // one tenth of milimeter
 
     Eigen::Vector3d _min = Eigen::Vector3d::Constant(std::numeric_limits<double>::max());
     Eigen::Vector3d _max = Eigen::Vector3d::Constant(std::numeric_limits<double>::lowest());

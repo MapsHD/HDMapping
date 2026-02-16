@@ -26,15 +26,6 @@ inline bool exportLaz(
 
     constexpr double scale = 0.0001; // one tenth of milimeter
 
-    Eigen::Vector3d _min = Eigen::Vector3d::Constant(std::numeric_limits<double>::max());
-    Eigen::Vector3d _max = Eigen::Vector3d::Constant(std::numeric_limits<double>::lowest());
-
-    for (const auto& p : pointcloud)
-    {
-        _min = _min.cwiseMin(p);
-        _max = _max.cwiseMax(p);
-    }
-
     // create the writer
     laszip_POINTER laszip_writer;
     if (laszip_create(&laszip_writer))
@@ -70,13 +61,6 @@ inline bool exportLaz(
     header->x_scale_factor = scale;
     header->y_scale_factor = scale;
     header->z_scale_factor = scale;
-
-    header->max_x = _max.x() + offset_x;
-    header->min_x = _min.x() + offset_x;
-    header->max_y = _max.y() + offset_y;
-    header->min_y = _min.y() + offset_y;
-    header->max_z = _max.z() + offset_alt;
-    header->min_z = _min.z() + offset_alt;
 
     header->x_offset = offset_x;
     header->y_offset = offset_y;
@@ -135,6 +119,12 @@ inline bool exportLaz(
         if (laszip_write_point(laszip_writer))
         {
             fprintf(stderr, "DLL ERROR: writing point %lld\n", p_count);
+            return false;
+        }
+
+        if (laszip_update_inventory(laszip_writer))
+        {
+            fprintf(stderr, "DLL ERROR: updating inventory for point %lld\n", p_count);
             return false;
         }
     }

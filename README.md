@@ -137,7 +137,6 @@ It is designed for a benchmark.
 - https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/I2EKF-LO.bib), [[movie]](https://youtu.be/B2358Gn62Ho))  
 - https://github.com/MapsHD/benchmark-LIO-EKF-to-HDMapping (2024, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-EKF.bib), [[movie]](https://youtu.be/R4Cn1LJ4U_E))
 - https://github.com/MapsHD/benchmark-iG-LIO-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/iG-LIO.bib), [[movie]](https://youtu.be/KlZf7nHeVmI))
-- https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MAD-ICP.bib))
 - https://github.com/MapsHD/benchmark-GLIM-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIM.bib), [[movie]](https://youtu.be/zyZDJECqOG0))
 - https://github.com/MapsHD/benchmark-Point-LIO-to-HDMapping (2024, JAIS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Point-LIO.bib), [[movie]](https://youtu.be/JlD1hDJHcrs))
 - https://github.com/MapsHD/benchmark-DLIO-to-HDMapping (2023, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLIO.bib), [[movie]](https://youtu.be/xFLqFcoAtk8))
@@ -147,7 +146,6 @@ It is designed for a benchmark.
 - https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping (2022, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/VoxelMap.bib), [[movie]](https://youtu.be/oRiuvJRNl-c))
 - https://github.com/MapsHD/benchmark-DLO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLO.bib), [[movie]](https://youtu.be/-UH81mNLw8Q))
 - https://github.com/MapsHD/benchmark-CT-ICP-to-HDMapping (2021, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/CT-ICP.bib), [[movie]](https://youtu.be/swEsJHwtE50))
-- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib))
 - https://github.com/MapsHD/benchmark-FAST-LIO-to-HDMapping (2020, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/FAST-LIO.bib), [[movie]](https://youtu.be/ENlaQTtOXEM))
 - https://github.com/MapsHD/benchmark-LOAM-Livox-to-HDMapping (2019, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/loam_livox.bib), [[movie]](https://youtu.be/MbKHTmUcI2w))
 - https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping (2018, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/legoloam2018.bib), [[movie]](https://youtu.be/WpFBXe1zKto))
@@ -160,6 +158,8 @@ In progress
 - https://github.com/Liansheng-Wang/Super-LIO (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib))
 - https://github.com/MOLAorg/mola_lidar_odometry (2025, IJRR, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/mola-lidar-odometry.bib)) (not solved issue: https://github.com/MOLAorg/mola_lidar_odometry/issues/37 --> we have to repoen/investigate it)
 - https://github.com/superxslam/SuperOdom
+- https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MAD-ICP.bib))
+- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib))
 
 ToDo
 - https://robotics-upo.github.io/D-LIO/

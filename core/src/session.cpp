@@ -34,7 +34,11 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
     // Local pathUpdater lambda (keep directories unchanged, update files to be in session directory)
     auto getNewPath = [&](const std::string& path) -> std::string
     {
-        fs::path p(path);
+        // Normalize Windows backslashes to forward slashes so that
+        // std::filesystem::path correctly extracts the filename on Linux.
+        std::string normalized = path;
+        std::replace(normalized.begin(), normalized.end(), '\\', '/');
+        fs::path p(normalized);
         if (is_directory(p))
             return p.string();
         return (fs::path(directory) / p.filename()).string();

@@ -69,17 +69,12 @@ bool convert_and_save(const char* from, const char* to)
         point_read_count++;
     }
 
-    if (std::ofstream to_file = std::ofstream(to, std::ios::out | std::ios::binary))
+    if (std::ofstream to_file = std::ofstream(to, std::ios::out))
     {
-        to_file << "ply\n";
-        to_file << "format binary_little_endian 1.0\n";
-        to_file << "element vertex " << point_count << "\n";
-        to_file << "property float x\n";
-        to_file << "property float y\n";
-        to_file << "property float z\n";
-        to_file << "property float intensity\n";
-        to_file << "property double timestamp\n";
-        to_file << "end_header\n";
+        for (const auto& point : points)
+        {
+            to_file << point.x << ' ' << point.y << ' ' << point.z << ' ' << point.intensity << ' ' << point.timestamp << '\n';
+        }
 
         to_file.write((const char*)points.data(), points.size() * sizeof(Point));
     }
@@ -96,12 +91,12 @@ int main(const int argc, const char** argv)
     const int expected_argc = 3;
 
     const char* expected_laz_extension = ".laz";
-    const char* expected_ply_extension = ".ply";
+    const char* expected_ply_extension = ".txt";
 
     if (argc != expected_argc)
     {
         std::fprintf(stderr, "Invalid argument count. Got %d expected %d.\n", argc, expected_argc);
-        std::fprintf(stderr, "Usage : %s </PATH/FROM/POINT/CLOUD.laz> </PATH/TO/POINT/CLOUD.ply>\n", argv[0]);
+        std::fprintf(stderr, "Usage : %s </PATH/FROM/POINT/CLOUD.laz> </PATH/TO/POINT/CLOUD.txt>\n", argv[0]);
 
         return EXIT_FAILURE;
     }

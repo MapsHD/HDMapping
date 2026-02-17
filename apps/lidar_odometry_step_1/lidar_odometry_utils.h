@@ -80,6 +80,7 @@ struct LidarOdometryParams
     int threshold_initial_points = 10000;
     int threshold_nr_poses = 20;
     double convergence_delta_threshold = 1e-12; // convergence threshold for optimization
+    double convergence_delta_threshold_outer_rgd = 1e-6;
 
     // lidar odometry debug info
     bool save_calibration_validation = false;
@@ -157,6 +158,7 @@ struct LidarOdometryParams
     bool ablation_study_use_norm = false;
     bool ablation_study_use_hierarchical_rgd = true;
     bool ablation_study_use_view_point_and_normal_vectors = true;
+    bool ablation_study_use_threshold_outer_rgd = false;
     bool save_index_pose = false;
 };
 
@@ -257,7 +259,10 @@ void optimize_lidar_odometry(
     bool ablation_study_use_norm,
     bool ablation_study_use_hierarchical_rgd,
     bool ablation_study_use_view_point_and_normal_vectors,
-    LookupStats& lookup_stats);
+    LookupStats& lookup_stats,
+    const bool &ablation_study_use_threshold_outer_rgd,
+    const double &convergence_result,
+    const double &convergence_delta_threshold_outer_rgd);
 
 void optimize_sf(
     std::vector<Point3Di>& intermediate_points,

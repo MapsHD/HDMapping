@@ -3907,7 +3907,8 @@ void mouse(int glut_button, int state, int x, int y)
                     number_visible_sessions,
                     index_loop_closure_source,
                     index_loop_closure_target,
-                    io.KeyShift);
+                    io.KeyShift,
+                    time_stamp_offset);
             }
             else
             {

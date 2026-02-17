@@ -152,7 +152,8 @@ void getClosestTrajectoriesPoint(
     const int number_visible_sessions,
     int& index_loop_closure_source,
     int& index_loop_closure_target,
-    bool KeyShift);
+    bool KeyShift,
+    double& time_stamp_offset);
 
 void setNewRotationCenter(int x, int y);
 

@@ -1393,7 +1393,8 @@ void getClosestTrajectoriesPoint(
     const int number_visible_sessions,
     int& index_loop_closure_source,
     int& index_loop_closure_target,
-    bool KeyShift)
+    bool KeyShift,
+    double& time_stamp_offset)
 {
     const auto laser_beam = GetLaserBeam(x, y);
     double min_distance = std::numeric_limits<double>::max();
@@ -1423,10 +1424,15 @@ void getClosestTrajectoriesPoint(
                             new_rotation_center.y() = static_cast<float>(vp.y());
                             new_rotation_center.z() = static_cast<float>(vp.z());
                             index_loop_closure_source = i;
+
+                            time_stamp_offset =
+                                sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
                         }
                         else // io.KeyShift
                         {
                             index_loop_closure_target = i;
+                            //time_stamp_offset =
+                            //    sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
                         }
                     }
                 }
@@ -1464,6 +1470,9 @@ void getClosestTrajectoriesPoint(
                         new_rotation_center.x() = static_cast<float>(vp.x());
                         new_rotation_center.y() = static_cast<float>(vp.y());
                         new_rotation_center.z() = static_cast<float>(vp.z());
+
+                        time_stamp_offset =
+                            sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
                     }
                     else // io.KeyShift
                     {
@@ -1496,6 +1505,9 @@ void getClosestTrajectoriesPoint(
                             new_rotation_center.x() = static_cast<float>(vp.x());
                             new_rotation_center.y() = static_cast<float>(vp.y());
                             new_rotation_center.z() = static_cast<float>(vp.z());
+
+                            time_stamp_offset =
+                                sessions[s].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
                         }
                     }
                 }

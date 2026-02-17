@@ -1668,7 +1668,11 @@ static void compute_hessian(
     const bool ablation_study_use_norm,
     Eigen::MatrixXd& AtPAndt,
     Eigen::MatrixXd& AtPBndt,
-    LookupStats& stats)
+    LookupStats& stats,
+    const bool &ablation_study_use_threshold_outer_rgd,
+    const double &convergence_result,
+    const double &convergence_delta_threshold_outer_rgd
+)
 {
     const double range_squared = point.point.squaredNorm();
 
@@ -1708,7 +1712,23 @@ static void compute_hessian(
     }
 
     // Outdoor contribution (independent, only when hierarchical mode and range >= 5.0)
-    if (ablation_study_use_hierarchical_rgd && range_squared >= outdoor_range_squared)
+
+    bool check_threshold_outdoor_rgd = true;
+    if (ablation_study_use_threshold_outer_rgd)
+    {
+        //const bool ablation_study_use_threshold_outer,
+        //const double convergence_delta_threshold_outer_rgd,
+        //const double convergence_result)
+
+        //janusz
+
+        if(convergence_result > convergence_delta_threshold_outer_rgd){
+            check_threshold_outdoor_rgd = false;
+            //std::cout << "do not use out " << std::endl;
+        }
+    }
+
+    if (ablation_study_use_hierarchical_rgd && range_squared >= outdoor_range_squared && check_threshold_outdoor_rgd)
     {
         const auto outdoor_key = get_rgd_index_3d(point_global, bucket_size_outdoor);
         const auto outdoor_it = buckets_outdoor.find(outdoor_key);
@@ -1759,7 +1779,10 @@ void optimize_lidar_odometry(
     bool ablation_study_use_norm,
     bool ablation_study_use_hierarchical_rgd,
     bool ablation_study_use_view_point_and_normal_vectors,
-    LookupStats& lookup_stats)
+    LookupStats& lookup_stats,
+    const bool &ablation_study_use_threshold_outer_rgd,
+    const double &convergence_result,
+    const double &convergence_delta_threshold_outer_rgd)
 {
     UTL_PROFILER_SCOPE("optimize_lidar_odometry");
     UTL_PROFILER_BEGIN(pre_hessian, "pre_hessian");
@@ -1832,7 +1855,10 @@ void optimize_lidar_odometry(
                         ablation_study_use_norm,
                         local_AtPA,
                         local_AtPB,
-                        local_stats);
+                        local_stats,
+                        ablation_study_use_threshold_outer_rgd,
+                        convergence_result,
+                        convergence_delta_threshold_outer_rgd);
                 }
             });
 
@@ -1868,7 +1894,10 @@ void optimize_lidar_odometry(
                 ablation_study_use_norm,
                 AtPAndt,
                 AtPBndt,
-                lookup_stats);
+                lookup_stats,
+                ablation_study_use_threshold_outer_rgd,
+                convergence_result,
+                convergence_delta_threshold_outer_rgd);
         }
     }
     UTL_PROFILER_END(hessian_compute);
@@ -2522,7 +2551,10 @@ bool compute_step_2(
                     params.ablation_study_use_norm,
                     params.ablation_study_use_hierarchical_rgd,
                     params.ablation_study_use_view_point_and_normal_vectors,
-                    lookup_stats);
+                    lookup_stats,
+                    params.ablation_study_use_threshold_outer_rgd,
+                    delta,
+                    params.convergence_delta_threshold_outer_rgd);
                 if (delta < params.convergence_delta_threshold)
                 {
                     // spdlog::info("finished at iteration {}/{}", iter + 1, params.nr_iter);

@@ -2033,8 +2033,9 @@ void display()
                 {
                     ImGui::MenuItem("Use planarity", nullptr, &params.ablation_study_use_planarity);
                     ImGui::MenuItem("Use norm", nullptr, &params.ablation_study_use_norm);
-                    ImGui::MenuItem("Use hierarchical RGD", nullptr, &params.ablation_study_use_hierarchical_rgd);
+                    ImGui::MenuItem("Use hierarchical RGD (outer RGD turned on)", nullptr, &params.ablation_study_use_hierarchical_rgd);
                     ImGui::MenuItem("Use view point and normal vectors", nullptr, &params.ablation_study_use_view_point_and_normal_vectors);
+                    ImGui::MenuItem("Use threshold '1e-6' outer RGD", nullptr, &params.ablation_study_use_threshold_outer_rgd);
 
                     ImGui::EndMenu();
                 }

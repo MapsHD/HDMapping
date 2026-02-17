@@ -363,8 +363,8 @@ void find_best_stretch(
                 // }
             }
         }
-        std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
-        std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
+        std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
 
         update_rgd(rgd_params, my_buckets, points_global2, trajectory_stretched[0].translation());
 

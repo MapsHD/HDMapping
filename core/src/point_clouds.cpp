@@ -1286,6 +1286,9 @@ bool PointClouds::load_whu_tls(
             while (!infile.eof())
             {
                 getline(infile, s);
+                // Remove trailing \r from Windows CRLF line endings
+                if (!s.empty() && s.back() == '\r')
+                    s.pop_back();
                 std::vector<std::string> strs;
                 split(s, ' ', strs);
 

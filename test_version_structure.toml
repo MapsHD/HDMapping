@@ -1,4 +1,0 @@
-# Test TOML file to verify version_info structure
-
-test_parameter = "value"
-another_setting = 42.5

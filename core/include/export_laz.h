@@ -96,7 +96,7 @@ inline bool exportLaz(
         point->intensity = intensity[i];
         point->return_number = 1;
         point->number_of_returns = 1;
-        point->gps_time = timestamps[i] * 1e-9;
+        point->gps_time = timestamps[i] * 1e9;
 
         min_ts = std::min(min_ts, point->gps_time);
         max_ts = std::max(max_ts, point->gps_time);

@@ -1431,8 +1431,8 @@ void getClosestTrajectoriesPoint(
                         else // io.KeyShift
                         {
                             index_loop_closure_target = i;
-                            //time_stamp_offset =
-                            //    sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
+                            // time_stamp_offset =
+                            //     sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
                         }
                     }
                 }
@@ -1506,8 +1506,7 @@ void getClosestTrajectoriesPoint(
                             new_rotation_center.y() = static_cast<float>(vp.y());
                             new_rotation_center.z() = static_cast<float>(vp.z());
 
-                            time_stamp_offset =
-                                sessions[s].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
+                            time_stamp_offset = sessions[s].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
                         }
                     }
                 }

@@ -260,9 +260,9 @@ void optimize_lidar_odometry(
     bool ablation_study_use_hierarchical_rgd,
     bool ablation_study_use_view_point_and_normal_vectors,
     LookupStats& lookup_stats,
-    const bool &ablation_study_use_threshold_outer_rgd,
-    const double &convergence_result,
-    const double &convergence_delta_threshold_outer_rgd);
+    const bool& ablation_study_use_threshold_outer_rgd,
+    const double& convergence_result,
+    const double& convergence_delta_threshold_outer_rgd);
 
 void optimize_sf(
     std::vector<Point3Di>& intermediate_points,

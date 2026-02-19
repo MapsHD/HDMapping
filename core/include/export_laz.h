@@ -11,6 +11,140 @@
 
 namespace fs = std::filesystem;
 
+class LazWriter
+{
+public:
+    LazWriter() = default;
+    ~LazWriter()
+    {
+        if (writer_)
+            close();
+    }
+
+    LazWriter(const LazWriter&) = delete;
+    LazWriter& operator=(const LazWriter&) = delete;
+
+    bool open(const std::string& filename, double offset_x, double offset_y, double offset_z)
+    {
+        constexpr double scale = 0.0001;
+
+        if (laszip_create(&writer_))
+        {
+            fprintf(stderr, "DLL ERROR: creating laszip writer\n");
+            return false;
+        }
+
+        laszip_header* header;
+        if (laszip_get_header_pointer(writer_, &header))
+        {
+            fprintf(stderr, "DLL ERROR: getting header pointer from laszip writer\n");
+            return false;
+        }
+
+        header->file_source_ID = 4711;
+        header->global_encoding = (1 << 0);
+        header->version_major = 1;
+        header->version_minor = 2;
+        header->point_data_format = 1;
+        header->point_data_record_length = 28;
+        header->number_of_point_records = 0;
+        header->number_of_points_by_return[0] = 0;
+        header->number_of_points_by_return[1] = 0;
+        header->x_scale_factor = scale;
+        header->y_scale_factor = scale;
+        header->z_scale_factor = scale;
+        header->x_offset = offset_x;
+        header->y_offset = offset_y;
+        header->z_offset = offset_z;
+
+        laszip_BOOL compress = (strstr(filename.c_str(), ".laz") != 0);
+        if (laszip_open_writer(writer_, filename.c_str(), compress))
+        {
+            fprintf(stderr, "DLL ERROR: opening laszip writer for '%s'\n", filename.c_str());
+            return false;
+        }
+
+        fprintf(stderr, "writing %scompressed file '%s'\n", (compress ? "" : "un"), filename.c_str());
+
+        if (laszip_get_point_pointer(writer_, &point_))
+        {
+            fprintf(stderr, "DLL ERROR: getting point pointer from laszip writer\n");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool writePoint(
+        const Eigen::Vector3d& position, unsigned short intensity, double timestamp, double offset_x, double offset_y, double offset_z)
+    {
+        point_->intensity = intensity;
+        point_->return_number = 1;
+        point_->number_of_returns = 1;
+        point_->gps_time = timestamp * 1e9;
+
+        laszip_F64 coordinates[3];
+        coordinates[0] = position.x() + offset_x;
+        coordinates[1] = position.y() + offset_y;
+        coordinates[2] = position.z() + offset_z;
+
+        if (laszip_set_coordinates(writer_, coordinates))
+        {
+            fprintf(stderr, "DLL ERROR: setting coordinates\n");
+            return false;
+        }
+
+        if (laszip_write_point(writer_))
+        {
+            fprintf(stderr, "DLL ERROR: writing point\n");
+            return false;
+        }
+
+        if (laszip_update_inventory(writer_))
+        {
+            fprintf(stderr, "DLL ERROR: updating inventory\n");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool close()
+    {
+        if (!writer_)
+            return true;
+
+        laszip_I64 p_count = 0;
+        if (laszip_get_point_count(writer_, &p_count))
+        {
+            fprintf(stderr, "DLL ERROR: getting point count\n");
+            return false;
+        }
+
+        fprintf(stderr, "successfully written %lld points\n", p_count);
+
+        if (laszip_close_writer(writer_))
+        {
+            fprintf(stderr, "DLL ERROR: closing laszip writer\n");
+            return false;
+        }
+
+        if (laszip_destroy(writer_))
+        {
+            fprintf(stderr, "DLL ERROR: destroying laszip writer\n");
+            return false;
+        }
+
+        writer_ = nullptr;
+        point_ = nullptr;
+        return true;
+    }
+
+private:
+    laszip_POINTER writer_ = nullptr;
+    laszip_point* point_ = nullptr;
+};
+
 inline bool exportLaz(
     const std::string& filename,
     const std::vector<Eigen::Vector3d>& pointcloud,
@@ -20,178 +154,17 @@ inline bool exportLaz(
     double offset_y = 0.0,
     double offset_alt = 0.0)
 {
-    double min_ts = std::numeric_limits<double>::max();
-    double max_ts = std::numeric_limits<double>::lowest();
-    int number_of_points_with_timestamp_eq_0 = 0;
-
-    constexpr float scale = 0.0001f; // one tenth of milimeter
-
-    Eigen::Vector3d _min = Eigen::Vector3d::Constant(std::numeric_limits<double>::max());
-    Eigen::Vector3d _max = Eigen::Vector3d::Constant(std::numeric_limits<double>::lowest());
-
-    for (const auto& p : pointcloud)
-    {
-        _min = _min.cwiseMin(p);
-        _max = _max.cwiseMax(p);
-    }
-
-    // create the writer
-    laszip_POINTER laszip_writer;
-    if (laszip_create(&laszip_writer))
-    {
-        fprintf(stderr, "DLL ERROR: creating laszip writer\n");
+    LazWriter writer;
+    if (!writer.open(filename, offset_x, offset_y, offset_alt))
         return false;
-    }
 
-    // get a pointer to the header of the writer so we can populate it
-
-    laszip_header* header;
-
-    if (laszip_get_header_pointer(laszip_writer, &header))
+    for (size_t i = 0; i < pointcloud.size(); i++)
     {
-        fprintf(stderr, "DLL ERROR: getting header pointer from laszip writer\n");
-        return false;
-    }
-
-    // populate the header
-
-    header->file_source_ID = 4711;
-    header->global_encoding = (1 << 0); // see LAS specification for details
-    header->version_major = 1;
-    header->version_minor = 2;
-    //    header->file_creation_day = 120;
-    //    header->file_creation_year = 2013;
-    header->point_data_format = 1;
-    header->point_data_record_length = 0;
-    header->number_of_point_records = pointcloud.size();
-    header->number_of_points_by_return[0] = pointcloud.size();
-    header->number_of_points_by_return[1] = 0;
-    header->point_data_record_length = 28;
-    header->x_scale_factor = scale;
-    header->y_scale_factor = scale;
-    header->z_scale_factor = scale;
-
-    header->max_x = _max.x() + offset_x;
-    header->min_x = _min.x() + offset_x;
-    header->max_y = _max.y() + offset_y;
-    header->min_y = _min.y() + offset_y;
-    header->max_z = _max.z() + offset_alt;
-    header->min_z = _min.z() + offset_alt;
-
-    header->x_offset = offset_x;
-    header->y_offset = offset_y;
-    header->z_offset = offset_alt;
-
-    // optional: use the bounding box and the scale factor to create a "good" offset
-    // open the writer
-    laszip_BOOL compress = (strstr(filename.c_str(), ".laz") != 0);
-
-    if (laszip_open_writer(laszip_writer, filename.c_str(), compress))
-    {
-        fprintf(stderr, "DLL ERROR: opening laszip writer for '%s'\n", filename.c_str());
-        return false;
-    }
-
-    fprintf(stderr, "writing %scompressed file '%s'\n", (compress ? "" : "un"), filename.c_str());
-
-    // get a pointer to the point of the writer that we will populate and write
-
-    laszip_point* point;
-    if (laszip_get_point_pointer(laszip_writer, &point))
-    {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip writer\n");
-        return false;
-    }
-
-    laszip_I64 p_count = 0;
-    laszip_F64 coordinates[3];
-
-    for (int i = 0; i < pointcloud.size(); i++)
-    {
-        const auto& p = pointcloud[i];
-        point->intensity = intensity[i];
-        point->gps_time = timestamps[i] * 1e9;
-
-        min_ts = std::min(min_ts, point->gps_time);
-        max_ts = std::max(max_ts, point->gps_time);
-
-        if (point->gps_time == 0.0)
-        {
-            number_of_points_with_timestamp_eq_0++;
-        }
-        // std::setprecision(20);
-        // std::cout << "point->gps_time " << point->gps_time << " " << timestamps[i] << " " << timestamps[i] * 1e9 << std::endl;
-
-        p_count++;
-        coordinates[0] = p.x() + offset_x;
-        coordinates[1] = p.y() + offset_y;
-        coordinates[2] = p.z() + offset_alt;
-        if (laszip_set_coordinates(laszip_writer, coordinates))
-        {
-            fprintf(stderr, "DLL ERROR: setting coordinates for point %lld\n", p_count);
+        if (!writer.writePoint(pointcloud[i], intensity[i], timestamps[i], offset_x, offset_y, offset_alt))
             return false;
-        }
-
-        if (laszip_write_point(laszip_writer))
-        {
-            fprintf(stderr, "DLL ERROR: writing point %lld\n", p_count);
-            return false;
-        }
     }
 
-    if (laszip_get_point_count(laszip_writer, &p_count))
-    {
-        fprintf(stderr, "DLL ERROR: getting point count\n");
-        return false;
-    }
-
-    fprintf(stderr, "successfully written %lld points\n", p_count);
-
-    // close the writer
-
-    if (laszip_close_writer(laszip_writer))
-    {
-        fprintf(stderr, "DLL ERROR: closing laszip writer\n");
-        return false;
-    }
-
-    // destroy the writer
-
-    if (laszip_destroy(laszip_writer))
-    {
-        fprintf(stderr, "DLL ERROR: destroying laszip writer\n");
-        return false;
-    }
-
-    std::cout << "min_ts " << min_ts << std::endl;
-    std::cout << "max_ts " << max_ts << std::endl;
-    std::cout << "number_of_points_with_timestamp_eq_0: " << number_of_points_with_timestamp_eq_0 << std::endl;
-
-    return true;
-}
-
-inline void adjustHeader(laszip_header* header, const Eigen::Affine3d& m_pose, const Eigen::Vector3d& offset_in)
-{
-    Eigen::Vector3d max{ header->max_x, header->max_y, header->max_z };
-    Eigen::Vector3d min{ header->min_x, header->min_y, header->min_z };
-
-    // max -= offset_in;
-    // min -= offset_in;
-
-    Eigen::Vector3d adj_max = m_pose * max + offset_in;
-    Eigen::Vector3d adj_min = m_pose * min + offset_in;
-
-    header->max_x = adj_max.x();
-    header->max_y = adj_max.y();
-    header->max_z = adj_max.z();
-
-    header->min_x = adj_min.x();
-    header->min_y = adj_min.y();
-    header->min_z = adj_min.z();
-
-    header->x_offset = offset_in.x();
-    header->y_offset = offset_in.y();
-    header->z_offset = offset_in.z();
+    return writer.close();
 }
 
 // inline Eigen::Vector3d adjustPoint(laszip_F64 input_coordinates[3], const Eigen::Affine3d &m_pose)
@@ -259,18 +232,9 @@ inline void save_processed_pc(
     std::cout << "header before:" << std::endl;
     std::cout << header->x_offset << " " << header->y_offset << " " << header->z_offset << std::endl;
 
-    adjustHeader(header, m_pose, offset);
-
-    std::cout << "header min after:" << std::endl;
-    std::cout << header->min_x << " " << header->min_y << " " << header->min_z << std::endl;
-
-    std::cout << "header max after:" << std::endl;
-    std::cout << header->max_x << " " << header->max_y << " " << header->max_z << std::endl;
-
-    std::cout << "header after:" << std::endl;
-    std::cout << header->x_offset << " " << header->y_offset << " " << header->z_offset << std::endl;
-
-    std::cout << "m_pose: " << std::endl << m_pose.matrix() << std::endl;
+    header->x_offset = offset.x();
+    header->y_offset = offset.y();
+    header->z_offset = offset.z();
 
     if (laszip_set_header(laszip_writer, header))
     {
@@ -344,6 +308,12 @@ inline void save_processed_pc(
         if (laszip_write_point(laszip_writer))
         {
             fprintf(stderr, "DLL ERROR: writing point %u\n", i);
+            return;
+        }
+
+        if (laszip_update_inventory(laszip_writer))
+        {
+            fprintf(stderr, "DLL ERROR: updating inventory for point %u\n", i);
             return;
         }
     }
@@ -433,12 +403,16 @@ inline void points_to_vector(
 
 inline void save_all_to_las(const Session& session, std::string output_las_name, bool as_local, bool skip_ts_0)
 {
-    std::vector<Eigen::Vector3d> pointcloud;
-    std::vector<unsigned short> intensity;
-    std::vector<double> timestamps;
-
     Eigen::Affine3d first_pose = Eigen::Affine3d::Identity();
     bool found_first_pose = false;
+
+    const auto& offset = session.point_clouds_container.offset;
+    LazWriter writer;
+    if (!writer.open(output_las_name, offset.x(), offset.y(), offset.z()))
+    {
+        std::cout << "problem with saving file: " << output_las_name << std::endl;
+        return;
+    }
 
     for (const auto& p : session.point_clouds_container.point_clouds)
     {
@@ -447,80 +421,29 @@ inline void save_all_to_las(const Session& session, std::string output_las_name,
             if (!found_first_pose)
             {
                 found_first_pose = true;
-                first_pose = p.m_pose; //.inverse();  // valid
+                first_pose = p.m_pose;
             }
 
             for (size_t i = 0; i < p.points_local.size(); ++i)
             {
-                const auto& pp = p.points_local[i];
-                Eigen::Vector3d vp = p.m_pose * pp;
-
                 if (skip_ts_0)
                 {
-                    if (i < p.timestamps.size())
-                    {
-                        if (p.timestamps[i] != 0.0)
-                        {
-                            pointcloud.push_back(vp);
-
-                            if (i < p.intensities.size())
-                            {
-                                intensity.push_back(p.intensities[i]);
-                            }
-                            else
-                            {
-                                intensity.push_back(0);
-                            }
-                            if (i < p.timestamps.size())
-                            {
-                                timestamps.push_back(p.timestamps[i]);
-                            }
-                        }
-                    }
+                    if (i >= p.timestamps.size() || p.timestamps[i] == 0.0)
+                        continue;
                 }
-                else
-                {
-                    pointcloud.push_back(vp);
 
-                    if (i < p.intensities.size())
-                    {
-                        intensity.push_back(p.intensities[i]);
-                    }
-                    else
-                    {
-                        intensity.push_back(0);
-                    }
+                Eigen::Vector3d vp = p.m_pose * p.points_local[i];
+                if (as_local)
+                    vp = first_pose * vp;
 
-                    if (i < p.timestamps.size())
-                    {
-                        timestamps.push_back(p.timestamps[i]);
-                    }
-                    else
-                    {
-                        timestamps.push_back(0.0); // ToDo this is caused by BUG in data
-                    }
-                }
+                unsigned short inten = (i < p.intensities.size()) ? p.intensities[i] : 0;
+                double ts = (i < p.timestamps.size()) ? p.timestamps[i] : 0.0;
+
+                if (!writer.writePoint(vp, inten, ts, offset.x(), offset.y(), offset.z()))
+                    return;
             }
         }
     }
 
-    if (as_local)
-    {
-        for (auto& pt : pointcloud)
-        {
-            pt = first_pose * pt;
-        }
-    }
-
-    if (!exportLaz(
-            output_las_name,
-            pointcloud,
-            intensity,
-            timestamps,
-            session.point_clouds_container.offset.x(),
-            session.point_clouds_container.offset.y(),
-            session.point_clouds_container.offset.z()))
-    {
-        std::cout << "problem with saving file: " << output_las_name << std::endl;
-    }
+    writer.close();
 }

@@ -1669,10 +1669,9 @@ static void compute_hessian(
     Eigen::MatrixXd& AtPAndt,
     Eigen::MatrixXd& AtPBndt,
     LookupStats& stats,
-    const bool &ablation_study_use_threshold_outer_rgd,
-    const double &convergence_result,
-    const double &convergence_delta_threshold_outer_rgd
-)
+    const bool& ablation_study_use_threshold_outer_rgd,
+    const double& convergence_result,
+    const double& convergence_delta_threshold_outer_rgd)
 {
     const double range_squared = point.point.squaredNorm();
 
@@ -1716,15 +1715,16 @@ static void compute_hessian(
     bool check_threshold_outdoor_rgd = true;
     if (ablation_study_use_threshold_outer_rgd)
     {
-        //const bool ablation_study_use_threshold_outer,
-        //const double convergence_delta_threshold_outer_rgd,
-        //const double convergence_result)
+        // const bool ablation_study_use_threshold_outer,
+        // const double convergence_delta_threshold_outer_rgd,
+        // const double convergence_result)
 
-        //janusz
+        // janusz
 
-        if(convergence_result > convergence_delta_threshold_outer_rgd){
+        if (convergence_result > convergence_delta_threshold_outer_rgd)
+        {
             check_threshold_outdoor_rgd = false;
-            //std::cout << "do not use out " << std::endl;
+            // std::cout << "do not use out " << std::endl;
         }
     }
 
@@ -1780,9 +1780,9 @@ void optimize_lidar_odometry(
     bool ablation_study_use_hierarchical_rgd,
     bool ablation_study_use_view_point_and_normal_vectors,
     LookupStats& lookup_stats,
-    const bool &ablation_study_use_threshold_outer_rgd,
-    const double &convergence_result,
-    const double &convergence_delta_threshold_outer_rgd)
+    const bool& ablation_study_use_threshold_outer_rgd,
+    const double& convergence_result,
+    const double& convergence_delta_threshold_outer_rgd)
 {
     UTL_PROFILER_SCOPE("optimize_lidar_odometry");
     UTL_PROFILER_BEGIN(pre_hessian, "pre_hessian");

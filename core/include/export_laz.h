@@ -24,8 +24,7 @@ public:
     LazWriter(const LazWriter&) = delete;
     LazWriter& operator=(const LazWriter&) = delete;
 
-    bool open(const std::string& filename,
-              double offset_x, double offset_y, double offset_z)
+    bool open(const std::string& filename, double offset_x, double offset_y, double offset_z)
     {
         constexpr double scale = 0.0001;
 
@@ -76,10 +75,8 @@ public:
         return true;
     }
 
-    bool writePoint(const Eigen::Vector3d& position,
-                    unsigned short intensity,
-                    double timestamp,
-                    double offset_x, double offset_y, double offset_z)
+    bool writePoint(
+        const Eigen::Vector3d& position, unsigned short intensity, double timestamp, double offset_x, double offset_y, double offset_z)
     {
         point_->intensity = intensity;
         point_->return_number = 1;
@@ -163,14 +160,12 @@ inline bool exportLaz(
 
     for (size_t i = 0; i < pointcloud.size(); i++)
     {
-        if (!writer.writePoint(pointcloud[i], intensity[i], timestamps[i],
-                               offset_x, offset_y, offset_alt))
+        if (!writer.writePoint(pointcloud[i], intensity[i], timestamps[i], offset_x, offset_y, offset_alt))
             return false;
     }
 
     return writer.close();
 }
-
 
 // inline Eigen::Vector3d adjustPoint(laszip_F64 input_coordinates[3], const Eigen::Affine3d &m_pose)
 //{

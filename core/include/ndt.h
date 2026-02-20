@@ -35,21 +35,21 @@ public:
 
     struct Bucket
     {
-        Eigen::Matrix3d cov;
-        Eigen::Matrix3d cov_inverse; // precomputed inverse of cov, updated in update_rgd
-        Eigen::Vector3d mean;
-        Eigen::Vector3d normal_vector;
+        Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
+        Eigen::Matrix3d cov_inverse = Eigen::Matrix3d::Zero(); // precomputed inverse of cov, updated in update_rgd
+        Eigen::Vector3d mean = Eigen::Vector3d::Zero();
+        Eigen::Vector3d normal_vector = Eigen::Vector3d::Zero();
 
-        uint64_t number_of_points;
-        uint64_t index_begin;
-        uint64_t index_end;
+        uint64_t number_of_points = 0;
+        uint64_t index_begin = 0;
+        uint64_t index_end = 0;
     };
 
     struct BucketCoef
     {
-        Eigen::Vector3d mean;
-        Eigen::Matrix3d cov;
-        Eigen::Vector3d normal_vector;
+        Eigen::Vector3d mean = Eigen::Vector3d::Zero();
+        Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
+        Eigen::Vector3d normal_vector = Eigen::Vector3d::Zero();
         std::vector<uint64_t> point_indexes;
         bool valid = false;
     };
@@ -57,8 +57,8 @@ public:
     struct Bucket2
     {
         int classification = 0; // 1 - ceiling, 2 - floor
-        uint64_t index_begin_inclusive;
-        uint64_t index_end_exclusive;
+        uint64_t index_begin_inclusive = 0;
+        uint64_t index_end_exclusive = 0;
         // uint64_t number_of_points;
         std::unordered_map<uint64_t, BucketCoef> buckets;
     };

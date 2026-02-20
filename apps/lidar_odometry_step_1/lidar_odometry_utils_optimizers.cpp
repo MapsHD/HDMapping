@@ -1466,6 +1466,8 @@ static void add_indoor_hessian_contribution(
     if ((infm.array() > threshold).any() || (infm.array() < -threshold).any())
         return;
 
+    // Buckets with < 3 points have normal_vector == Zero (default-initialized),
+    // so dot product is 0 and this check passes - they still contribute to the Hessian.
     if (ablation_study_use_view_point_and_normal_vectors)
     {
         if (indoor_bucket.normal_vector.dot(viewport - indoor_bucket.mean) < 0)
@@ -1572,6 +1574,8 @@ static void add_outdoor_hessian_contribution(
     if ((infm.array() > threshold).any() || (infm.array() < -threshold).any())
         return;
 
+    // Buckets with < 3 points have normal_vector == Zero (default-initialized),
+    // so dot product is 0 and this check passes - they still contribute to the Hessian.
     if (ablation_study_use_view_point_and_normal_vectors)
     {
         if (outdoor_bucket.normal_vector.dot(viewport - outdoor_bucket.mean) < 0)

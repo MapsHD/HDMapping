@@ -10,6 +10,7 @@
 #endif
 
 #include <laszip/laszip_api.h>
+#include <proj.h>
 
 inline void split(std::string& str, char delim, std::vector<std::string>& out)
 {
@@ -138,7 +139,7 @@ bool GNSS::load(const std::vector<std::string>& input_file_names, Eigen::Vector3
     return true;
 }
 
-bool GNSS::load_mercator_projection(const std::vector<std::string>& input_file_names)
+bool GNSS::load_raw_data(const std::vector<std::string>& input_file_names)
 {
     gnss_poses.clear();
 
@@ -176,24 +177,13 @@ bool GNSS::load_mercator_projection(const std::vector<std::string>& input_file_n
                 std::istringstream(strs[7]) >> gp.age;
                 std::istringstream(strs[8]) >> gp.time;
                 std::istringstream(strs[9]) >> gp.fix_quality;
-
-                if (gp.lat == gp.lat)
+                if (std::isfinite(gp.lat) &&
+                    std::isfinite(gp.lon) &&
+                    std::isfinite(gp.alt) &&
+                    gp.lat != 0.0 &&
+                    gp.lon != 0.0)
                 {
-                    if (gp.lon == gp.lon)
-                    {
-                        if (gp.alt == gp.alt)
-                        {
-                            if (gp.lat != 0)
-                            {
-                                if (gp.lon != 0)
-                                {
-                                    gnss_poses.push_back(gp);
-                                    // std::cout << std::setprecision(20);
-                                    //  std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << " gp.alt " << gp.alt << std::endl;
-                                }
-                            }
-                        }
-                    }
+                    gnss_poses.push_back(gp);
                 }
             }
         }
@@ -208,6 +198,10 @@ bool GNSS::load_mercator_projection(const std::vector<std::string>& input_file_n
             return (a.timestamp < b.timestamp);
         });
 
+}
+
+bool GNSS::project_to_mercator_projection()
+{   
     std::array<double, 2> WGS84Reference{ 0, 0 };
 
     if (gnss_poses.size() > 0)
@@ -225,7 +219,6 @@ bool GNSS::load_mercator_projection(const std::vector<std::string>& input_file_n
             WGS84Reference[1] = WGS84ReferenceLongitude;
         }
     }
-
     for (int i = 0; i < gnss_poses.size(); i++)
     {
         std::array<double, 2> WGS84Position{ gnss_poses[i].lat, gnss_poses[i].lon };
@@ -235,6 +228,82 @@ bool GNSS::load_mercator_projection(const std::vector<std::string>& input_file_n
     }
 
     return true;
+
+}
+
+bool GNSS::project_using_proj()
+{
+    if (gnss_poses.empty())
+        return false;
+
+    // -------------------------------------------------
+    // Determine reference
+    // -------------------------------------------------
+    double refLat = 0.0;
+    double refLon = 0.0;
+    double refAlt = 0.0;   // assume 0 if you don't store altitude
+
+    if (setWGS84ReferenceFromFirstPose)
+    {
+        refLat = gnss_poses[0].lat;
+        refLon = gnss_poses[0].lon;
+        refAlt = gnss_poses[0].alt;
+
+        WGS84ReferenceLatitude  = refLat;
+        WGS84ReferenceLongitude = refLon;
+    }
+    else
+    {
+        refLat = WGS84ReferenceLatitude;
+        refLon = WGS84ReferenceLongitude;
+        refAlt = 0.0;
+    }
+
+    // -------------------------------------------------
+    // Create PROJ context + pipeline
+    // -------------------------------------------------
+    PJ_CONTEXT* ctx = proj_context_create();
+
+    std::string pipeline =
+        "+proj=pipeline "
+        "+step +proj=cart +ellps=WGS84 "
+        "+step +proj=topocentric "
+        "+ellps=WGS84 "
+        "+lat_0=" + std::to_string(refLat) +
+        " +lon_0=" + std::to_string(refLon) +
+        " +h_0="   + std::to_string(refAlt);
+
+    PJ* P = proj_create(ctx, pipeline.c_str());
+    if (!P)
+    {
+        proj_context_destroy(ctx);
+        return false;
+    }
+
+    // -------------------------------------------------
+    // Transform all GNSS poses
+    // -------------------------------------------------
+    for (auto& pose : gnss_poses)
+    {
+        PJ_COORD geo = proj_coord(
+            pose.lon * M_PI / 180.0,   // longitude in radians
+            pose.lat * M_PI / 180.0,   // latitude in radians
+            pose.alt,                  // altitude (meters)
+            0
+        );
+
+        PJ_COORD enu = proj_trans(P, PJ_FWD, geo);
+
+        pose.x = enu.xyz.x;   // East (meters)
+        pose.y = enu.xyz.y;   // North (meters)
+        // pose.z = enu.xyz.z; // Up if you want
+    }
+
+    proj_destroy(P);
+    proj_context_destroy(ctx);
+
+    return true;
+
 }
 
 double dm_to_dd(const std::string& dm, char direction, bool is_latitude)

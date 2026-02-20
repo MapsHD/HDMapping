@@ -3020,9 +3020,30 @@ void display()
 
                         if (input_file_names.size() > 0)
                         {
-                            if (!tls_registration.gnss.load_mercator_projection(input_file_names))
+                            if (!tls_registration.gnss.load_raw_data(input_file_names))
                             {
                                 spdlog::error("Error loading GNSS files!");
+                            }
+                            if (!tls_registration.gnss.project_to_mercator_projection())
+                            {
+                                spdlog::error("Error converting WGS84 to Mercator projection!");
+                            }
+                        }
+                    }
+                    if (ImGui::MenuItem("Load GNSS(PROJ)"))
+                    {
+                        std::vector<std::string> input_file_names;
+                        input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", { "GNSS", "*.gnss" }, true);
+
+                        if (input_file_names.size() > 0)
+                        {
+                            if (!tls_registration.gnss.load_raw_data(input_file_names))
+                            {
+                                spdlog::error("Error loading GNSS files!");
+                            }
+                            if (!tls_registration.gnss.project_using_proj())
+                            {
+                                spdlog::error("Error converting WGS84 to PROJ projection!");
                             }
                         }
                     }

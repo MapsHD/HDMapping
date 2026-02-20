@@ -52,7 +52,9 @@ function(add_core_target target_name with_gui)
         ${THIRDPARTY_DIRECTORY}/json/include
         ${THIRDPARTY_DIRECTORY}/observation_equations/codes
         ${EXTERNAL_LIBRARIES_DIRECTORY}/include
-    )
+        )
+     
+    target_link_libraries(${target_name} PRIVATE PROJ::proj)
 
     if(${with_gui})
         target_include_directories(${target_name} PRIVATE

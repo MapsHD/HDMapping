@@ -38,7 +38,11 @@ public:
     //! \param input_file_names - vector of file names
     //! \param localize - if true, the data is moved to the first point
     bool load(const std::vector<std::string>& input_file_names, Eigen::Vector3d& out_offset, bool localize = false);
-    bool load_mercator_projection(const std::vector<std::string>& input_file_names);
+    bool load_raw_data(const std::vector<std::string>& input_file_names);
+    
+    bool project_to_mercator_projection();
+    bool project_using_proj();
+
     bool load_nmea_mercator_projection(const std::vector<std::string>& input_file_names);
     void render(const PointClouds& point_clouds_container);
     bool save_to_laz(const std::string& output_file_names, double offset_x, double offset_y, double offset_alt);

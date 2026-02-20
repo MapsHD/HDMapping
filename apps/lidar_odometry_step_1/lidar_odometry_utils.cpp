@@ -469,9 +469,9 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
                 myfile.close();
             }
         }
-    } catch (...)
+    } catch (const std::exception& e)
     {
-        std::cout << "load_imu error for file: '" << imu_file << "'" << std::endl;
+        std::cout << "load_imu error for file: '" << imu_file << "'" << e.what() << std::endl;
         // return all_data;
     }
 

@@ -368,6 +368,12 @@ include(${THIRDPARTY_DIRECTORY_BINARY}/OpenCV/CMakeLists.txt)
 find_package(OpenCV REQUIRED)
 MESSAGE(STATUS "OpenCV include dir: ${OpenCV_INCLUDE_DIRS}, OpenCV librarys: ${OpenCV_LIBS}")
 
+
+# Download or Search for PROJ
+include(${THIRDPARTY_DIRECTORY_BINARY}/Proj/CMakeLists.txt)
+MESSAGE(STATUS "PROJ include dir: ${PROJ_INCLUDE_DIR}, PROJ library: ${PROJ_LIBRARY}")
+MESSAGE(STATUS "PROJ implementation library: ${PROJ_IMPLIB}, PROJ database: ${PROJ_DB}")
+
 # Option to build with bundled oneTBB
 option(BUILD_WITH_BUNDLED_ONETBB "Build with bundled oneTBB" ON)
 if (BUILD_WITH_BUNDLED_ONETBB)

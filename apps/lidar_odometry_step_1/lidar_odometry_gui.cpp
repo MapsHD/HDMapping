@@ -392,8 +392,7 @@ void find_best_stretch(
                 // }
             }
         }
-        std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
-        std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+        std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
 
         update_rgd(rgd_params, my_buckets, points_global2, trajectory_stretched[0].translation());
 
@@ -1819,7 +1818,7 @@ void display()
 
     if (show_reference_buckets_indoor)
     {
-        std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+        std::scoped_lock lock(params.mutex_buckets_indoor);
         glColor3f(1, 0, 0);
         glBegin(GL_POINTS);
         for (const auto& b : params.buckets_indoor)
@@ -1829,7 +1828,7 @@ void display()
 
     if (show_reference_buckets_outdoor)
     {
-        std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+        std::scoped_lock lock2(params.mutex_buckets_outdoor);
         glColor3f(0, 0, 1);
         glBegin(GL_POINTS);
         for (const auto& b : params.buckets_outdoor)
@@ -1839,14 +1838,14 @@ void display()
 
     if (show_covs_indoor)
     {
-        std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+        std::scoped_lock lock(params.mutex_buckets_indoor);
         for (const auto& b : params.buckets_indoor)
             draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(1.0f, 0.0f, 0.0f), 3);
     }
 
     if (show_covs_outdoor)
     {
-        std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+        std::scoped_lock lock2(params.mutex_buckets_outdoor);
         for (const auto& b : params.buckets_outdoor)
             draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
     }

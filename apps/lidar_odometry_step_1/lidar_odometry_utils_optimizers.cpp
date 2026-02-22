@@ -2411,6 +2411,159 @@ bool process_worker_step_1(
     return true;
 }
 
+bool process_worker_step_2(
+    WorkerData& worker_data,
+    const WorkerData& prev_worker_data,
+    const WorkerData& prev_prev_worker_data,
+    LidarOdometryParams& params,
+    const std::atomic<bool>& pause,
+    int i,
+    bool debug,
+    LookupStats& lookup_stats,
+    bool debugMsg,
+    int64_t& total_iterations,
+    double& total_optimization_time_seconds,
+    double& acc_distance,
+    size_t worker_data_size,
+    std::atomic<float>& loProgress,
+    double& ts_failure,
+    std::vector<Point3Di>& intermediate_points)
+{
+    bool add_pitch_roll_constraint = false;
+
+    spdlog::stopwatch stopwatch_worker;
+
+    auto tmp_worker_data = worker_data.intermediate_trajectory;
+
+    if (params.use_robust_and_accurate_lidar_odometry)
+    {
+        std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
+        std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
+
+        auto tr = worker_data.intermediate_trajectory;
+        auto trmm = worker_data.intermediate_trajectory_motion_model;
+
+        auto firstm = tr[0];
+
+        for (auto& t : tr)
+            t.translation() -= firstm.translation();
+
+        for (auto& t : trmm)
+            t.translation() -= firstm.translation();
+
+        NDT::GridParameters rgd_params_sc;
+
+        rgd_params_sc.resolution_X = params.distance_bucket;
+        rgd_params_sc.resolution_Y = params.polar_angle_deg;
+        rgd_params_sc.resolution_Z = params.azimutal_angle_deg;
+
+        std::vector<Point3Di> points_local_sf;
+        std::vector<Point3Di> points_local;
+
+        ///
+        for (int ii = 0; ii < intermediate_points.size(); ii++)
+        {
+            double r_l = intermediate_points[ii].point.norm();
+
+            // std::cout << worker_data[i].intermediate_points[ii].index_pose << " ";
+            if (r_l > 0.5 && intermediate_points[ii].index_pose != -1 && r_l < params.max_distance_lidar_rigid_sf)
+            {
+                double polar_angle_deg_l = atan2(intermediate_points[ii].point.y(), intermediate_points[ii].point.x()) * RAD_TO_DEG;
+                double azimutal_angle_deg_l = acos(intermediate_points[ii].point.z() / r_l) * RAD_TO_DEG;
+
+                points_local.push_back(intermediate_points[ii]);
+
+                ///////////////////////////////////////////////////////
+                Point3Di p_sl = intermediate_points[ii];
+                p_sl.point.x() = r_l;
+                p_sl.point.y() = polar_angle_deg_l;
+                p_sl.point.z() = azimutal_angle_deg_l;
+
+                points_local_sf.push_back(p_sl);
+            }
+        }
+        ///
+        spdlog::info("optimize_sf2");
+
+        std::vector<Eigen::Vector3d> pointcloud;
+        std::vector<unsigned short> intensity;
+        std::vector<double> timestamps;
+
+        if (debug)
+        {
+            static int index_fn = 0;
+
+            for (int ii = 0; ii < points_local.size(); ii++)
+            {
+                Eigen::Vector3d pg = points_local[ii].point;
+                pg = tr[points_local[ii].index_pose] * pg;
+                pointcloud.push_back(pg);
+                intensity.push_back(points_local[ii].intensity);
+                timestamps.push_back(0);
+            }
+        }
+
+        double wx = 1000000;
+        double wy = 1000000;
+        double wz = 1000000;
+        double angle_sigma_rad = 0.1 * DEG_TO_RAD;
+        double wom = 1.0 / (angle_sigma_rad * angle_sigma_rad);
+        double wfi = 1.0 / (angle_sigma_rad * angle_sigma_rad);
+        double wka = 1.0 / (angle_sigma_rad * angle_sigma_rad);
+
+        for (int iter = 0; iter < params.robust_and_accurate_lidar_odometry_iterations; iter++)
+            optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, params.useMultithread, wx, wy, wz, wom, wfi, wka);
+
+        if (debug)
+        {
+            static int index_fn = 0;
+
+            for (int i = 0; i < points_local.size(); i++)
+            {
+                Eigen::Vector3d pg = points_local[i].point;
+                pg = tr[points_local[i].index_pose] * pg;
+                pointcloud.push_back(pg);
+                intensity.push_back(points_local[i].intensity);
+                timestamps.push_back(1);
+            }
+
+            std::string output_file_name = "optimize_sf2_" + std::to_string(index_fn++) + ".laz";
+
+            if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
+                spdlog::warn("problem with saving file: {}", output_file_name);
+        }
+
+        for (auto& t : tr)
+            t.translation() += firstm.translation();
+
+        for (auto& t : trmm)
+            t.translation() += firstm.translation();
+
+        worker_data.intermediate_trajectory = tr;
+        worker_data.intermediate_trajectory_motion_model = tr;
+
+        optimize_rigid_sf(
+            intermediate_points,
+            worker_data.intermediate_trajectory,
+            worker_data.intermediate_trajectory_motion_model,
+            params.buckets_indoor,
+            params.distance_bucket_rigid_sf,
+            params.polar_angle_deg_rigid_sf,
+            params.azimutal_angle_deg_rigid_sf,
+            params.robust_and_accurate_lidar_odometry_rigid_sf_iterations,
+            params.max_distance_lidar_rigid_sf,
+            params.useMultithread,
+            params.rgd_sf_sigma_x_m,
+            params.rgd_sf_sigma_y_m,
+            params.rgd_sf_sigma_z_m,
+            params.rgd_sf_sigma_om_deg,
+            params.rgd_sf_sigma_fi_deg,
+            params.rgd_sf_sigma_ka_deg);
+    }
+    return true;
+}
+
+
 bool compute_step_2(
     std::vector<WorkerData>& worker_data,
     LidarOdometryParams& params,
@@ -2436,167 +2589,7 @@ bool compute_step_2(
     {
         for (int i = 0; i < worker_data.size(); i++)
         {
-
-            #if 0
-            UTL_PROFILER_BEGIN(before_iter, "before_iterations");
-            std::vector<Point3Di> intermediate_points;
-            // = worker_data[i].load_points(worker_data[i].intermediate_points_cache_file_name);
-            load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points);
-
-            if (pause)
-            {
-                while (pause)
-                {
-                    spdlog::info("pause");
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
-                }
-            }
-
-            process_worker(
-                worker_data[i],
-                i > 0 ? worker_data[i - 1] : worker_data[0],
-                i > 1 ? worker_data[i - 2] : worker_data[0],
-                params,
-                pause,
-                i,
-                debug,
-                lookup_stats,
-                debugMsg,
-                total_iterations,
-                total_optimization_time_seconds,
-                acc_distance,
-                worker_data.size(),
-                loProgress,
-                ts_failure);
-
-            UTL_PROFILER_BEGIN(propagate_traj, "propagate_trajectory");
-            for (int j = i + 1; j < worker_data.size(); j++)
-            {
-                Eigen::Affine3d m_last = worker_data[j - 1].intermediate_trajectory[worker_data[j - 1].intermediate_trajectory.size() - 1];
-                auto tmp = worker_data[j].intermediate_trajectory;
-
-                worker_data[j].intermediate_trajectory[0] = m_last;
-
-                for (int k = 1; k < tmp.size(); k++)
-                {
-                    Eigen::Affine3d m_update = tmp[k - 1].inverse() * tmp[k];
-                    m_last = m_last * m_update;
-                    worker_data[j].intermediate_trajectory[k] = m_last;
-                }
-            }
-            UTL_PROFILER_END(propagate_traj);
-
-            UTL_PROFILER_BEGIN(transform_pts, "transform_points_global");
-            for (int j = 0; j < intermediate_points.size(); j++)
-            {
-                Point3Di pp = intermediate_points[j];
-                pp.point = worker_data[i].intermediate_trajectory[intermediate_points[j].index_pose] * pp.point;
-                points_global.push_back(pp);
-            }
-            UTL_PROFILER_END(transform_pts);
-
-            // if(reference_points.size() == 0){
-            UTL_PROFILER_BEGIN(update_rgd_after, "update_rgd");
-            if (acc_distance > params.sliding_window_trajectory_length_threshold)
-            {
-                spdlog::stopwatch stopwatch_update;
-
-                if (params.reference_points.size() == 0)
-                {
-                    params.buckets_indoor.clear();
-                    params.buckets_outdoor.clear();
-                }
-
-                std::vector<Point3Di> points_global_new;
-                points_global_new.reserve(points_global.size() / 2 + 1);
-                for (int k = points_global.size() / 2; k < points_global.size(); k++)
-                    points_global_new.emplace_back(points_global[k]);
-
-                acc_distance = 0;
-                points_global = points_global_new;
-
-                // decimate
-                if (params.decimation > 0)
-                {
-                    decimate(points_global, params.decimation, params.decimation, params.decimation);
-                }
-
-                if (params.ablation_study_use_hierarchical_rgd)
-                {
-                    std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
-                    std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
-
-                    update_rgd_hierarchy(
-                        params.in_out_params_indoor,
-                        params.buckets_indoor,
-                        points_global,
-                        worker_data[i].intermediate_trajectory[0].translation(),
-                        params.in_out_params_outdoor,
-                        params.buckets_outdoor,
-                        lookup_stats);
-                }
-                else
-                {
-                    std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
-                    std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
-
-                    update_rgd(
-                        params.in_out_params_indoor,
-                        params.buckets_indoor,
-                        points_global,
-                        worker_data[i].intermediate_trajectory[0].translation(),
-                        &lookup_stats.indoor_lookups);
-                }
-                // elapsed_secondsu previously commented out, now using stopwatch
-                // spdlog::info("elapsed time update: {:.0f}s", stopwatch_update);
-            }
-            else
-            {
-                std::vector<Point3Di> pg;
-                for (int j = 0; j < intermediate_points.size(); j++)
-                {
-                    Point3Di pp = intermediate_points[j];
-                    pp.point = worker_data[i].intermediate_trajectory[intermediate_points[j].index_pose] * pp.point;
-                    pg.push_back(pp);
-                }
-                if (params.ablation_study_use_hierarchical_rgd)
-                {
-                    std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
-                    std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
-
-                    update_rgd_hierarchy(
-                        params.in_out_params_indoor,
-                        params.buckets_indoor,
-                        pg,
-                        worker_data[i].intermediate_trajectory[0].translation(),
-                        params.in_out_params_outdoor,
-                        params.buckets_outdoor,
-                        lookup_stats);
-                }
-                else
-                {
-                    std::lock_guard<std::mutex> lock(params.mutex_buckets_indoor);
-                    std::lock_guard<std::mutex> lock2(params.mutex_buckets_outdoor);
-
-                    update_rgd(
-                        params.in_out_params_indoor,
-                        params.buckets_indoor,
-                        pg,
-                        worker_data[i].intermediate_trajectory[0].translation(),
-                        &lookup_stats.indoor_lookups);
-                }
-            }
-            UTL_PROFILER_END(update_rgd_after);
-
-            if (i > 1)
-            {
-                double translation = (worker_data[i - 1].intermediate_trajectory[0].translation() -
-                                      worker_data[i - 2].intermediate_trajectory[0].translation())
-                                         .norm();
-                params.consecutive_distance += translation;
-            }
-            UTL_PROFILER_END(after_iter);
-            #endif
+            
 #if 1
             UTL_PROFILER_BEGIN(before_iter, "before_iterations");
             std::vector<Point3Di> intermediate_points;
@@ -2704,6 +2697,28 @@ bool compute_step_2(
             }
             #endif
 
+            process_worker_step_2(
+                worker_data[i],
+                i > 0 ? worker_data[i - 1] : worker_data[0],
+                i > 1 ? worker_data[i - 2] : worker_data[0],
+                params,
+                pause,
+                i,
+                debug,
+                lookup_stats,
+                debugMsg,
+                total_iterations,
+                total_optimization_time_seconds,
+                acc_distance,
+                worker_data.size(),
+                loProgress,
+                ts_failure,
+                intermediate_points);
+
+            spdlog::stopwatch stopwatch_worker;
+            auto tmp_worker_data = worker_data[i].intermediate_trajectory;
+            
+#if 0
             bool add_pitch_roll_constraint = false;
 
             spdlog::stopwatch stopwatch_worker;
@@ -2835,7 +2850,7 @@ bool compute_step_2(
                     params.rgd_sf_sigma_fi_deg,
                     params.rgd_sf_sigma_ka_deg);
             }
-
+#endif
             worker_data[i].intermediate_trajectory_motion_model = worker_data[i].intermediate_trajectory;
 
             double delta = 100000.0;

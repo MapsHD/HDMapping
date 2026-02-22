@@ -2651,6 +2651,8 @@ bool process_worker_step_lidar_odometry_core(
         }
     }
     UTL_PROFILER_END(iter_loop);
+
+    return true;
 }
 
 bool process_worker_step_update_rgd_after(

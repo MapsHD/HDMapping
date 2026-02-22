@@ -1785,7 +1785,7 @@ void display()
 
                 ImGui::MenuItem("Multithread", nullptr, &params.useMultithread);
                 ImGui::SetNextItemWidth(ImGuiNumberWidth / 2);
-                ImGui::InputDouble("Time threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.1f");
+                ImGui::InputDouble("Time threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.3f");
                 if (ImGui::IsItemHovered())
                 {
                     ImGui::BeginTooltip();

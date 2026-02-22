@@ -449,8 +449,9 @@ void calculate_trajectory(
         Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
         t.rotate(d);
 
-        RawIMUData rawImuData{ timestamp_pair.first, { accelerometer.axis.x, accelerometer.axis.y, accelerometer.axis.z },
-                        { gyroscope.axis.x, gyroscope.axis.y, gyroscope.axis.z } }; //check timestamp
+        RawIMUData rawImuData{ timestamp_pair.first,
+                               { accelerometer.axis.x, accelerometer.axis.y, accelerometer.axis.z },
+                               { gyroscope.axis.x, gyroscope.axis.y, gyroscope.axis.z } }; // check timestamp
         trajectory[timestamp_pair.first] = std::make_tuple(t.matrix(), timestamp_pair.second, rawImuData);
 
         if (debugMsg)
@@ -504,7 +505,7 @@ bool compute_step_1(
     std::vector<std::pair<double, double>> timestamps;
     std::vector<Eigen::Affine3d> poses;
     std::vector<RawIMUData> raw_imu_data;
-    
+
     timestamps.reserve(trajectory.size());
     poses.reserve(trajectory.size());
     raw_imu_data.reserve(trajectory.size());
@@ -514,7 +515,6 @@ bool compute_step_1(
         if (time < timestamp_begin)
             continue;
 
-        
         poses.emplace_back(std::get<0>(pose_tuple));
         timestamps.emplace_back(time, std::get<1>(pose_tuple));
         raw_imu_data.emplace_back(std::get<2>(pose_tuple));
@@ -557,7 +557,7 @@ bool compute_step_1(
         wd.intermediate_trajectory_timestamps.reserve(threshold);
         wd.imu_om_fi_ka.reserve(threshold);
         wd.raw_imu_data.reserve(threshold);
-       
+
         const size_t start_idx = i * threshold;
         const size_t end_idx = (i + 1) * threshold;
 

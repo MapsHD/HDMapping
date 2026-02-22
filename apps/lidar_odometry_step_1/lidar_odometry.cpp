@@ -449,7 +449,9 @@ void calculate_trajectory(
         Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
         t.rotate(d);
 
-        trajectory[timestamp_pair.first] = std::pair(t.matrix(), timestamp_pair.second);
+        RawIMUData rawImuData{ timestamp_pair.first, { accelerometer.axis.x, accelerometer.axis.y, accelerometer.axis.z },
+                        { gyroscope.axis.x, gyroscope.axis.y, gyroscope.axis.z } }; //check timestamp
+        trajectory[timestamp_pair.first] = std::make_tuple(t.matrix(), timestamp_pair.second, rawImuData);
 
         if (debugMsg)
         {
@@ -501,20 +503,26 @@ bool compute_step_1(
 
     std::vector<std::pair<double, double>> timestamps;
     std::vector<Eigen::Affine3d> poses;
+    std::vector<RawIMUData> raw_imu_data;
+    
     timestamps.reserve(trajectory.size());
     poses.reserve(trajectory.size());
+    raw_imu_data.reserve(trajectory.size());
 
-    for (const auto& [time, pose_pair] : trajectory)
+    for (const auto& [time, pose_tuple] : trajectory)
     {
         if (time < timestamp_begin)
             continue;
 
-        timestamps.emplace_back(time, pose_pair.second);
-        poses.emplace_back(pose_pair.first);
+        
+        poses.emplace_back(std::get<0>(pose_tuple));
+        timestamps.emplace_back(time, std::get<1>(pose_tuple));
+        raw_imu_data.emplace_back(std::get<2>(pose_tuple));
     }
 
     timestamps.shrink_to_fit();
     poses.shrink_to_fit();
+    raw_imu_data.shrink_to_fit();
 
     std::cout << "number of poses: " << poses.size() << std::endl;
 
@@ -548,7 +556,8 @@ bool compute_step_1(
         wd.intermediate_trajectory_motion_model.reserve(threshold);
         wd.intermediate_trajectory_timestamps.reserve(threshold);
         wd.imu_om_fi_ka.reserve(threshold);
-
+        wd.raw_imu_data.reserve(threshold);
+       
         const size_t start_idx = i * threshold;
         const size_t end_idx = (i + 1) * threshold;
 
@@ -561,6 +570,8 @@ bool compute_step_1(
             const TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(poses[idx]);
             // wd.imu_roll_pitch.emplace_back(tb.om, tb.fi);
             wd.imu_om_fi_ka.emplace_back(tb.om, tb.fi, tb.ka);
+
+            wd.raw_imu_data.emplace_back(raw_imu_data[idx]);
         }
 
         std::vector<Point3Di> points;

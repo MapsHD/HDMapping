@@ -13,7 +13,7 @@
 
 // #define SAMPLE_PERIOD (1.0 / 200.0)
 
-using Trajectory = std::map<double, std::pair<Eigen::Matrix4d, double>>;
+using Trajectory = std::map<double, std::tuple<Eigen::Matrix4d, double, RawIMUData>>;
 using Imu = std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>>;
 
 bool load_data(

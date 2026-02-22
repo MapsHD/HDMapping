@@ -2336,24 +2336,6 @@ bool compute_step_2(
             Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
             if (i > 1 && params.use_motion_from_previous_step)
             {
-                // mean_shift = worker_data[i - 1].intermediate_trajectory[0].translation() - worker_data[i -
-                // 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].translation(); mean_shift /=
-                // ((worker_data[i - 2].intermediate_trajectory.size()) - 2);
-
-                mean_shift =
-                    worker_data[i - 1].intermediate_trajectory[worker_data[i - 1].intermediate_trajectory.size() - 1].translation() -
-                    worker_data[i - 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].translation();
-                // mean_shift = worker_data[i - 1].intermediate_trajectory[0].translation() -
-                //               worker_data[i - 2].intermediate_trajectory[0].translation();
-
-                mean_shift /= (worker_data[i - 1].intermediate_trajectory.size());
-
-                if (mean_shift.norm() > 1.0)
-                {
-                    spdlog::warn("mean_shift.norm() > 1.0");
-                    mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
-                }
-
                 std::vector<Eigen::Affine3d> new_trajectory;
                 Eigen::Affine3d current_node =
                     worker_data[i - 1].intermediate_trajectory[worker_data[i - 1].intermediate_trajectory.size() - 1];
@@ -2368,8 +2350,53 @@ bool compute_step_2(
                     new_trajectory.push_back(current_node);
                 }
 
-                for (int tr = 0; tr < new_trajectory.size(); tr++)
-                    new_trajectory[tr].translation() += mean_shift * tr;
+                //preintegration imu
+                // imu preintegration style mean shift computation
+                // mean_shift <- foo(worker_data[i].raw_imu_data)
+                //
+                /*for (int k = 0; k < worker_data[i].raw_imu_data.size(); k++)
+                {
+                    std::cout << std::setprecision(20);
+                    std::cout << worker_data[i].raw_imu_data[k].timestamp << " "
+                              << worker_data[i].raw_imu_data[k].accelerometers.x() << " "
+                              << worker_data[i].raw_imu_data[k].accelerometers.y() << " "
+                              << worker_data[i].raw_imu_data[k].accelerometers.z() << " " << worker_data[i].raw_imu_data[k].guroscopes.x()
+                              << " " << worker_data[i].raw_imu_data[k].guroscopes.y() << " "
+                              << worker_data[i].raw_imu_data[k].guroscopes.z() << std::endl;
+
+                    // mean_shift += worker_data[i].raw_imu_data[k].delta_position;
+                }*/
+
+                // mean_shift = worker_data[i - 1].intermediate_trajectory[0].translation() - worker_data[i -
+                // 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].translation(); mean_shift /=
+                // ((worker_data[i - 2].intermediate_trajectory.size()) - 2);
+
+                bool use_imu_preintegtation = false;
+
+                if (use_imu_preintegtation){
+                    // change mean_shift with preintegrated IMU data
+                    // use rotation from std::vector<Eigen::Affine3d> new_trajectory;
+                    // new_trajectory.size() == worker_data[i].raw_imu_data.size();
+                    // mean_shift = preintegrate_imu(worker_data[i].raw_imu_data); ToDo
+                }else{
+                    mean_shift =
+                        worker_data[i - 1].intermediate_trajectory[worker_data[i - 1].intermediate_trajectory.size() - 1].translation() -
+                        worker_data[i - 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].translation();
+                    // mean_shift = worker_data[i - 1].intermediate_trajectory[0].translation() -
+                    //               worker_data[i - 2].intermediate_trajectory[0].translation();
+
+                    mean_shift /= (worker_data[i - 1].intermediate_trajectory.size());
+
+                    if (mean_shift.norm() > 1.0)
+                    {
+                        spdlog::warn("mean_shift.norm() > 1.0");
+                        mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
+                    }
+
+                    for (int tr = 0; tr < new_trajectory.size(); tr++){
+                        new_trajectory[tr].translation() += mean_shift * tr;
+                    }
+                }
 
                 worker_data[i].intermediate_trajectory = new_trajectory;
                 worker_data[i].intermediate_trajectory_motion_model = new_trajectory;

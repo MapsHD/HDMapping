@@ -189,6 +189,16 @@ ToDo
 - https://github.com/SlamCabbage/Optimized-SC-F-LOAM
 - https://github.com/gisbi-kim/SC-LeGO-LOAM
 - https://github.com/ChaoqinRobotics/LINS---LiDAR-inertial-SLAM
+- https://github.com/PRBonn/PIN_SLAM
+- https://arxiv.org/pdf/2510.09966. - FORM
+- https://arxiv.org/pdf/2503.12660 - KISS-SLAM
+- https://arxiv.org/pdf/2509.06593 - rko-lio
+- https://arxiv.org/pdf/2410.05433 - 2FAST-LAMA
+- https://arxiv.org/pdf/2503.19506 - MM-LINS
+- https://arxiv.org/pdf/2410.08935 - VOXEL-SLAM
+- https://arxiv.org/pdf/2204.04932 - SC-F-LOAM
+- https://www.mdpi.com/1424-8220/22/2/520 - LEGO-LOAM-SC
+- https://arxiv.org/pdf/1907.02233 - LINS-SLAM
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
 

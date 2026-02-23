@@ -82,7 +82,9 @@ public:
         { "rgd_sf_sigma_ka_deg", &LidarOdometryParams::rgd_sf_sigma_ka_deg },
         { "max_distance_lidar_rigid_sf", &LidarOdometryParams::max_distance_lidar_rigid_sf },
         { "current_output_dir", &LidarOdometryParams::current_output_dir },
-        { "working_directory_preview", &LidarOdometryParams::working_directory_preview }
+        { "working_directory_preview", &LidarOdometryParams::working_directory_preview },
+        { "use_imu_preintegration", &LidarOdometryParams::use_imu_preintegration },
+        { "imu_preintegration_method", &LidarOdometryParams::imu_preintegration_method }
     };
 
     // Special handling for TaitBryanPose members
@@ -144,6 +146,7 @@ public:
             "rgd_sf_sigma_om_deg",
             "rgd_sf_sigma_fi_deg",
             "rgd_sf_sigma_ka_deg" } },
+        { "imu_preintegration", { "use_imu_preintegration", "imu_preintegration_method" } },
         { "paths", { "current_output_dir", "working_directory_preview" } },
         { "misc", { "clear_color" } }
     };

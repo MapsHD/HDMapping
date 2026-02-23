@@ -154,6 +154,10 @@ struct LidarOdometryParams
 
     bool use_removie_imu_bias_from_first_stationary_scan = false;
 
+    // IMU preintegration
+    bool use_imu_preintegration = true;
+    int imu_preintegration_method = 3; // 0=euler_body, 1=trapezoidal_body, 2=euler_gravity, 3=trapezoidal_gravity, 4=kalman
+
     // ablation study
     bool ablation_study_use_planarity = false;
     bool ablation_study_use_norm = false;

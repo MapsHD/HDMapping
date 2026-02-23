@@ -1,5 +1,6 @@
 #include "lidar_odometry_utils.h"
 #include <UTL/profiler.hpp>
+#include <imu_preintegration.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 #include <tbb/combinable.h>
@@ -2357,6 +2358,24 @@ bool process_worker_step_1(
 {
     UTL_PROFILER_SCOPE("process_worker_step_1");
 
+    {
+        static int last_logged_method = -2;
+        int current_state = params.use_imu_preintegration ? params.imu_preintegration_method : -1;
+        if (current_state != last_logged_method)
+        {
+            if (params.use_imu_preintegration)
+            {
+                auto method = static_cast<PreintegrationMethod>(params.imu_preintegration_method);
+                spdlog::info("IMU preintegration enabled with method: {}", to_string(method));
+            }
+            else
+            {
+                spdlog::info("IMU preintegration disabled");
+            }
+            last_logged_method = current_state;
+        }
+    }
+
     Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
     if (i > 1 && params.use_motion_from_previous_step)
     {
@@ -2394,34 +2413,43 @@ bool process_worker_step_1(
         // 2].intermediate_trajectory[worker_data[i - 2].intermediate_trajectory.size() - 1].translation(); mean_shift /=
         // ((worker_data[i - 2].intermediate_trajectory.size()) - 2);
 
-        bool use_imu_preintegtation = false;
-
-        if (use_imu_preintegtation)
+        if (params.use_imu_preintegration)
         {
-            // change mean_shift with preintegrated IMU data
-            // use rotation from std::vector<Eigen::Affine3d> new_trajectory;
-            // new_trajectory.size() == worker_data[i].raw_imu_data.size();
-            // mean_shift = preintegrate_imu(worker_data[i].raw_imu_data); ToDo
+            IntegrationParams imu_params;
+
+            // Estimate initial velocity from previous trajectory segments
+            Eigen::Vector3d prev_displacement =
+                prev_worker_data.intermediate_trajectory[prev_worker_data.intermediate_trajectory.size() - 1].translation() -
+                prev_prev_worker_data.intermediate_trajectory[prev_prev_worker_data.intermediate_trajectory.size() - 1].translation();
+
+            if (worker_data.raw_imu_data.size() >= 2)
+            {
+                double total_imu_time = worker_data.raw_imu_data.back().timestamp - worker_data.raw_imu_data.front().timestamp;
+                if (total_imu_time > 0.0)
+                    imu_params.initial_velocity = prev_displacement / total_imu_time;
+            }
+
+            mean_shift = ImuPreintegration::create_and_preintegrate(
+                static_cast<PreintegrationMethod>(params.imu_preintegration_method),
+                worker_data.raw_imu_data, new_trajectory, imu_params);
         }
         else
         {
             mean_shift = prev_worker_data.intermediate_trajectory[prev_worker_data.intermediate_trajectory.size() - 1].translation() -
                 prev_prev_worker_data.intermediate_trajectory[prev_prev_worker_data.intermediate_trajectory.size() - 1].translation();
-            // mean_shift = worker_data[i - 1].intermediate_trajectory[0].translation() -
-            //               worker_data[i - 2].intermediate_trajectory[0].translation();
 
             mean_shift /= (prev_worker_data.intermediate_trajectory.size());
+        }
 
-            if (mean_shift.norm() > 1.0)
-            {
-                spdlog::warn("mean_shift.norm() > 1.0");
-                mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
-            }
+        if (mean_shift.norm() > 1.0)
+        {
+            spdlog::warn("mean_shift.norm() > 1.0, resetting to zero (was: {})", mean_shift.norm());
+            mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
+        }
 
-            for (int tr = 0; tr < new_trajectory.size(); tr++)
-            {
-                new_trajectory[tr].translation() += mean_shift * tr;
-            }
+        for (int tr = 0; tr < new_trajectory.size(); tr++)
+        {
+            new_trajectory[tr].translation() += mean_shift * tr;
         }
 
         worker_data.intermediate_trajectory = new_trajectory;

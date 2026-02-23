@@ -936,6 +936,13 @@ void settings_gui()
             ImGui::NewLine();
 
             ImGui::Checkbox("Use motion from previous step", &params.use_motion_from_previous_step);
+            ImGui::Checkbox("Use IMU preintegration", &params.use_imu_preintegration);
+            if (params.use_imu_preintegration)
+            {
+                const char* methods[] = { "Euler (body frame)", "Trapezoidal (body frame)",
+                    "Euler (gravity compensated)", "Trapezoidal (gravity compensated)", "Kalman filter" };
+                ImGui::Combo("IMU preintegration method", &params.imu_preintegration_method, methods, IM_ARRAYSIZE(methods));
+            }
             ImGui::InputDouble("AHRS gain", &params.ahrs_gain, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
             {

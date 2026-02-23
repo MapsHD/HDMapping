@@ -9,6 +9,7 @@ set(CORE_BASE_SOURCES
     src/ground_control_points.cpp
     src/hash_utils.cpp
     src/icp.cpp
+    src/imu_preintegration.cpp
     src/ndt.cpp
     src/nmea.cpp
     src/optimization_point_to_point_source_to_target.cpp

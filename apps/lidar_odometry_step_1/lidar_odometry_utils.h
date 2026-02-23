@@ -303,6 +303,79 @@ void align_to_reference(
 // this function apply correction to pitch and roll
 // void fix_ptch_roll(std::vector<WorkerData> &worker_data);
 
+bool initialize_lidar_odometry(
+    std::vector<WorkerData>& worker_data,
+    LidarOdometryParams& params,
+    double& ts_failure,
+    std::atomic<float>& loProgress,
+    const std::atomic<bool>& pause,
+    bool debugMsg,
+    LookupStats& lookup_stats);
+
+bool process_worker_step_1(
+    WorkerData& worker_data,
+    const WorkerData& prev_worker_data,
+    const WorkerData& prev_prev_worker_data,
+    LidarOdometryParams& params,
+    const std::atomic<bool>& pause,
+    int i,
+    bool debug,
+    LookupStats& lookup_stats,
+    bool debugMsg,
+    int64_t& total_iterations,
+    double& total_optimization_time_seconds,
+    double& acc_distance,
+    size_t worker_data_size,
+    std::atomic<float>& loProgress,
+    double& ts_failure);
+
+bool process_worker_step_2(
+    WorkerData& worker_data,
+    const WorkerData& prev_worker_data,
+    const WorkerData& prev_prev_worker_data,
+    LidarOdometryParams& params,
+    const std::atomic<bool>& pause,
+    int i,
+    bool debug,
+    LookupStats& lookup_stats,
+    bool debugMsg,
+    int64_t& total_iterations,
+    double& total_optimization_time_seconds,
+    double& acc_distance,
+    size_t worker_data_size,
+    std::atomic<float>& loProgress,
+    double& ts_failure,
+    std::vector<Point3Di>& intermediate_points);
+
+bool process_worker_step_lidar_odometry_core(
+    WorkerData& worker_data,
+    const WorkerData& prev_worker_data,
+    const WorkerData& prev_prev_worker_data,
+    LidarOdometryParams& params,
+    const std::atomic<bool>& pause,
+    int i,
+    bool debug,
+    LookupStats& lookup_stats,
+    bool debugMsg,
+    int64_t& total_iterations,
+    double& total_optimization_time_seconds,
+    double& acc_distance,
+    size_t worker_data_size,
+    std::atomic<float>& loProgress,
+    double& ts_failure,
+    std::vector<Point3Di>& intermediate_points,
+    int& iter_end,
+    double& delta,
+    double& lm_factor);
+
+bool process_worker_step_update_rgd_after(
+    double& acc_distance,
+    LidarOdometryParams& params,
+    std::vector<Point3Di>& points_global,
+    WorkerData& worker_data,
+    LookupStats& lookup_stats,
+    std::vector<Point3Di>& intermediate_points);
+
 bool compute_step_2(
     std::vector<WorkerData>& worker_data,
     LidarOdometryParams& params,

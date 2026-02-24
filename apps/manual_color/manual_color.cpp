@@ -1391,7 +1391,7 @@ void mouse(int glut_button, int state, int x, int y)
                     [&](const mandeye::PointRGB& p)
                     {
                         double D = GetDistanceToRay(p.point, SystemData::clickedRay);
-                        std::lock_guard<std::mutex> guard(mtx);
+                        std::scoped_lock guard(mtx);
                         if (D < distanceIndexPair.first)
                         {
                             // Assume that SystemData::point is an array-like type implementation, naked pointer arithmetic ahead:

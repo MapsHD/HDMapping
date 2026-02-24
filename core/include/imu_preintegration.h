@@ -12,6 +12,7 @@ struct IntegrationParams
     double max_acceleration_threshold = 50.0; // m/s^2
     double max_dt_threshold = 0.1;            // seconds
     Eigen::Vector3d initial_velocity = Eigen::Vector3d::Zero();
+    double ahrs_gain = 0.5;
 };
 
 namespace imu_utils
@@ -21,6 +22,10 @@ Eigen::Vector3d convert_gyro_to_rads(const Eigen::Vector3d& raw, bool units_in_d
 double safe_dt(double t_prev, double t_curr, double max_dt);
 bool has_nan(const Eigen::Vector3d& v);
 bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold);
+std::vector<Eigen::Matrix3d> estimate_orientations(
+    const std::vector<RawIMUData>& raw_imu_data,
+    const Eigen::Matrix3d& initial_orientation,
+    const IntegrationParams& params);
 } // namespace imu_utils
 
 class AccelerationModel
@@ -109,6 +114,9 @@ enum class PreintegrationMethod
     euler_gravity_compensated = 2,
     trapezoidal_gravity_compensated = 3,
     kalman_filter = 4,
+    euler_gyro_gravity_compensated = 5,
+    trapezoidal_gyro_gravity_compensated = 6,
+    kalman_gyro_gravity_compensated = 7,
 };
 
 inline const char* to_string(PreintegrationMethod method)
@@ -120,6 +128,9 @@ inline const char* to_string(PreintegrationMethod method)
     case PreintegrationMethod::euler_gravity_compensated: return "Euler (gravity compensated)";
     case PreintegrationMethod::trapezoidal_gravity_compensated: return "Trapezoidal (gravity compensated)";
     case PreintegrationMethod::kalman_filter: return "Kalman filter";
+    case PreintegrationMethod::euler_gyro_gravity_compensated: return "Euler (AHRS)";
+    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated: return "Trapezoidal (AHRS)";
+    case PreintegrationMethod::kalman_gyro_gravity_compensated: return "Kalman (AHRS)";
     default: return "unknown";
     }
 }

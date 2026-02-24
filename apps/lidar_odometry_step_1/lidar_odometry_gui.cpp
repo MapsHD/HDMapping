@@ -940,7 +940,8 @@ void settings_gui()
             if (params.use_imu_preintegration)
             {
                 const char* methods[] = { "Euler (body frame)", "Trapezoidal (body frame)",
-                    "Euler (gravity compensated)", "Trapezoidal (gravity compensated)", "Kalman filter" };
+                    "Euler (gravity compensated)", "Trapezoidal (gravity compensated)", "Kalman filter",
+                    "Euler (AHRS)", "Trapezoidal (AHRS)", "Kalman (AHRS)" };
                 ImGui::Combo("IMU preintegration method", &params.imu_preintegration_method, methods, IM_ARRAYSIZE(methods));
             }
             ImGui::InputDouble("AHRS gain", &params.ahrs_gain, 0.0, 0.0, "%.3f");

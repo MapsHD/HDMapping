@@ -39,6 +39,56 @@ bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold)
     return accel_ms2.norm() < threshold && !has_nan(accel_ms2);
 }
 
+std::vector<Eigen::Matrix3d> estimate_orientations(
+    const std::vector<RawIMUData>& raw_imu_data,
+    const Eigen::Matrix3d& initial_orientation,
+    const IntegrationParams& params)
+{
+    std::vector<Eigen::Matrix3d> orientations;
+    orientations.reserve(raw_imu_data.size());
+
+    Eigen::Matrix3d R = initial_orientation;
+    orientations.push_back(R);
+
+    for (size_t k = 1; k < raw_imu_data.size(); k++)
+    {
+        double dt = safe_dt(raw_imu_data[k - 1].timestamp, raw_imu_data[k].timestamp, params.max_dt_threshold);
+        if (dt == 0.0)
+        {
+            orientations.push_back(R);
+            continue;
+        }
+
+        Eigen::Vector3d omega = convert_gyro_to_rads(raw_imu_data[k].guroscopes, params.gyro_units_in_deg_per_sec);
+        double angle = omega.norm() * dt;
+        if (angle > 1e-10)
+        {
+            Eigen::Vector3d axis = omega.normalized();
+            R = R * Eigen::AngleAxisd(angle, axis).toRotationMatrix();
+        }
+
+        if (params.ahrs_gain > 0.0)
+        {
+            Eigen::Vector3d a_body = convert_accel_to_ms2(raw_imu_data[k].accelerometers, params.accel_units_in_g);
+            if (a_body.norm() > 1e-6)
+            {
+                Eigen::Vector3d a_norm = a_body.normalized();
+                Eigen::Vector3d g_expected = R.transpose() * Eigen::Vector3d(0, 0, -1);
+                Eigen::Vector3d correction_axis = g_expected.cross(a_norm);
+                double correction_angle = std::asin(std::min(1.0, correction_axis.norm()));
+                if (correction_angle > 1e-10)
+                {
+                    correction_axis.normalize();
+                    R = R * Eigen::AngleAxisd(params.ahrs_gain * correction_angle, correction_axis).toRotationMatrix();
+                }
+            }
+        }
+
+        orientations.push_back(R);
+    }
+    return orientations;
+}
+
 } // namespace imu_utils
 
 Eigen::Vector3d BodyFrameAcceleration::compute(
@@ -248,6 +298,27 @@ Eigen::Vector3d ImuPreintegration::create_and_preintegrate(
         accel_model = std::make_unique<GravityCompensatedAcceleration>();
         integration_method = std::make_unique<KalmanFilterIntegration>();
         break;
+    case PreintegrationMethod::euler_gyro_gravity_compensated:
+    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated:
+    case PreintegrationMethod::kalman_gyro_gravity_compensated:
+    {
+        auto orientations = imu_utils::estimate_orientations(
+            raw_imu_data, new_trajectory[0].rotation(), params);
+
+        std::vector<Eigen::Affine3d> imu_trajectory = new_trajectory;
+        for (size_t k = 0; k < imu_trajectory.size() && k < orientations.size(); k++)
+            imu_trajectory[k].linear() = orientations[k];
+
+        accel_model = std::make_unique<GravityCompensatedAcceleration>();
+        if (method == PreintegrationMethod::euler_gyro_gravity_compensated)
+            integration_method = std::make_unique<EulerIntegration>();
+        else if (method == PreintegrationMethod::trapezoidal_gyro_gravity_compensated)
+            integration_method = std::make_unique<TrapezoidalIntegration>();
+        else
+            integration_method = std::make_unique<KalmanFilterIntegration>();
+
+        return preint.preintegrate(raw_imu_data, imu_trajectory, *accel_model, *integration_method);
+    }
     default:
         std::cerr << "ImuPreintegration: unknown method " << static_cast<int>(method) << std::endl;
         return Eigen::Vector3d::Zero();

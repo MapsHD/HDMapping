@@ -282,7 +282,7 @@ void display()
     }*/
 
     {
-        std::lock_guard<std::mutex> lock(renderPtrLock);
+        std::scoped_lock lock(renderPtrLock);
 
         glLineWidth(2);
         glColor3f(0.0, 1.0, 0.0);
@@ -554,7 +554,7 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
             std::cout << "optimizing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << " elapsed time: " << elapsed_seconds1.count() << std::endl;
 
             {
-                std::lock_guard<std::mutex> lock(renderPtrLock);
+                std::scoped_lock lock(renderPtrLock);
 
                 for (int k = 0; k < worker_data[i].intermediate_points.size(); k++)
                 {
@@ -1104,7 +1104,7 @@ int main(int argc, char *argv[])
                    {
         compute_step_2_demo(worker_data, params, ts_failure);
         {
-        std::lock_guard<std::mutex> lock(renderPtrLock);
+        std::scoped_lock lock(renderPtrLock);
 
         std::vector<Eigen::Vector3d> global_pointcloud;
         std::vector<unsigned short> intensity; 

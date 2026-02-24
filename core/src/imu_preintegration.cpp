@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <iostream>
 
+#include <Fusion.h>
+
 namespace imu_utils
 {
 
@@ -47,44 +49,37 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
     std::vector<Eigen::Matrix3d> orientations;
     orientations.reserve(raw_imu_data.size());
 
-    Eigen::Matrix3d R = initial_orientation;
-    orientations.push_back(R);
+    FusionAhrs ahrs;
+    FusionAhrsInitialise(&ahrs);
+    ahrs.settings.convention = FusionConventionNwu;
+    ahrs.settings.gain = static_cast<float>(params.ahrs_gain);
+
+    orientations.push_back(initial_orientation);
 
     for (size_t k = 1; k < raw_imu_data.size(); k++)
     {
         double dt = safe_dt(raw_imu_data[k - 1].timestamp, raw_imu_data[k].timestamp, params.max_dt_threshold);
         if (dt == 0.0)
         {
-            orientations.push_back(R);
+            orientations.push_back(orientations.back());
             continue;
         }
 
-        Eigen::Vector3d omega = convert_gyro_to_rads(raw_imu_data[k].guroscopes, params.gyro_units_in_deg_per_sec);
-        double angle = omega.norm() * dt;
-        if (angle > 1e-10)
-        {
-            Eigen::Vector3d axis = omega.normalized();
-            R = R * Eigen::AngleAxisd(angle, axis).toRotationMatrix();
-        }
+        // RawIMUData: gyro in deg/s, accel in g — matches Fusion expectations
+        const FusionVector gyroscope = {
+            static_cast<float>(raw_imu_data[k].guroscopes.x()),
+            static_cast<float>(raw_imu_data[k].guroscopes.y()),
+            static_cast<float>(raw_imu_data[k].guroscopes.z()) };
+        const FusionVector accelerometer = {
+            static_cast<float>(raw_imu_data[k].accelerometers.x()),
+            static_cast<float>(raw_imu_data[k].accelerometers.y()),
+            static_cast<float>(raw_imu_data[k].accelerometers.z()) };
 
-        if (params.ahrs_gain > 0.0)
-        {
-            Eigen::Vector3d a_body = convert_accel_to_ms2(raw_imu_data[k].accelerometers, params.accel_units_in_g);
-            if (a_body.norm() > 1e-6)
-            {
-                Eigen::Vector3d a_norm = a_body.normalized();
-                Eigen::Vector3d g_expected = R.transpose() * Eigen::Vector3d(0, 0, -1);
-                Eigen::Vector3d correction_axis = g_expected.cross(a_norm);
-                double correction_angle = std::asin(std::min(1.0, correction_axis.norm()));
-                if (correction_angle > 1e-10)
-                {
-                    correction_axis.normalize();
-                    R = R * Eigen::AngleAxisd(params.ahrs_gain * correction_angle, correction_axis).toRotationMatrix();
-                }
-            }
-        }
+        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, static_cast<float>(dt));
 
-        orientations.push_back(R);
+        FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
+        Eigen::Quaterniond q(quat.element.w, quat.element.x, quat.element.y, quat.element.z);
+        orientations.push_back(q.toRotationMatrix());
     }
     return orientations;
 }

@@ -11,6 +11,38 @@
 
 #include <laszip/laszip_api.h>
 #include <proj.h>
+const std::string Elipsooid = "WGS84Elipsoid";
+
+const std::vector<std::string> PathCandidate{
+    std::filesystem::current_path().string(),
+    std::filesystem::current_path().string() + "/proj",
+    std::filesystem::current_path().string() + "/share/proj",
+    std::filesystem::current_path().string() + "/data/proj",
+   "/usr/local/share/proj", "/usr/share/proj", "C:/HDMapping",
+};
+
+std::vector<std::string> GNSS::get_available_geoids()
+{
+    std::set<std::string> unique;
+    unique.insert(Elipsooid);
+    for (const auto& path : PathCandidate)
+    {
+        std::filesystem::path proj_path(path);
+        if (std::filesystem::exists(proj_path))
+        {
+            for (const auto& entry : std::filesystem::directory_iterator(proj_path))
+            {
+                if (entry.is_regular_file() && entry.path().extension() == ".gtx")
+                {
+                    std::cout << "found geoid model: " << entry.path().filename().string() << std::endl;
+                    unique.insert(entry.path().filename().string());
+                }
+            }
+        }
+    }
+
+    return std::vector<std::string>(unique.begin(), unique.end());
+}
 
 inline void split(std::string& str, char delim, std::vector<std::string>& out)
 {
@@ -24,7 +56,8 @@ inline void split(std::string& str, char delim, std::vector<std::string>& out)
     }
 }
 
-bool GNSS::load(const std::vector<std::string>& input_file_names, Eigen::Vector3d& out_offset, bool localize)
+bool GNSS::load_data_from_gnss_and_convert_to_92(
+    const std::vector<std::string>& input_file_names, Eigen::Vector3d& out_offset, bool localize)
 {
     // 54651848940 5156.43798828125 2009.1610107421875 122.1999969482421875 1.25 8 35.799999237060546875 nan 14:51:42 1
     // timestamp lat lon alt hdop satelites_tracked height age time fix_quality
@@ -74,9 +107,9 @@ bool GNSS::load(const std::vector<std::string>& input_file_names, Eigen::Vector3
                 double L = gp.lon;
                 double B = gp.lat;
 
-                wgs84_do_puwg92(B, L, &gp.y, &gp.x);
-
-                if (Eigen::Vector3d(gp.y, gp.x, gp.alt).norm() > 0)
+                wgs84_do_puwg92(B, L, &gp.enu_y, &gp.enu_x);
+                gp.enu_z = gp.alt;
+                if (Eigen::Vector3d(gp.enu_y, gp.enu_x, gp.alt).norm() > 0)
                 {
                     gnss_poses.push_back(gp);
                 }
@@ -99,7 +132,7 @@ bool GNSS::load(const std::vector<std::string>& input_file_names, Eigen::Vector3
         gnss_poses.end(),
         [](const GNSS::GlobalPose& gp)
         {
-            return gp.x != 0 && gp.y != 0 && gp.alt != 0;
+            return gp.enu_x != 0 && gp.enu_y != 0 && gp.enu_z != 0;
         });
     if (firstGNSSIt == gnss_poses.end())
     {
@@ -112,34 +145,34 @@ bool GNSS::load(const std::vector<std::string>& input_file_names, Eigen::Vector3
 
     std::cout << std::setprecision(20);
     std::cout << "firstGNSS: " << firstGNSS.lat << " " << firstGNSS.lon << " " << firstGNSS.alt << std::endl;
-    std::cout << "firstGNSS: " << firstGNSS.x << " " << firstGNSS.y << " " << firstGNSS.alt << std::endl;
+    std::cout << "firstGNSS: " << firstGNSS.enu_x << " " << firstGNSS.enu_y << " " << firstGNSS.enu_z << std::endl;
 
     WGS84ReferenceLatitude = firstGNSS.lat;
     WGS84ReferenceLongitude = firstGNSS.lon;
 
-    out_offset.x() = firstGNSS.x;
-    out_offset.y() = firstGNSS.y;
-    out_offset.z() = firstGNSS.alt;
+    out_offset.x() = firstGNSS.enu_x;
+    out_offset.y() = firstGNSS.enu_y;
+    out_offset.z() = firstGNSS.enu_z;
 
     if (localize)
     {
         for (auto& pose : gnss_poses)
         {
-            pose.x = pose.x - firstGNSS.x;
-            pose.y = pose.y - firstGNSS.y;
-            pose.alt = pose.alt - firstGNSS.alt;
+            pose.enu_x = pose.enu_x - firstGNSS.enu_x;
+            pose.enu_y = pose.enu_y - firstGNSS.enu_y;
+            pose.enu_z = pose.enu_z - firstGNSS.enu_z;
             // std::cout << "pose.x: " << pose.x << " pose.y: " << pose.y << " pose.alt: " << pose.alt << std::endl;
         }
     }
 
     std::cout << std::setprecision(20);
     std::cout << "firstGNSS: " << firstGNSS.lat << " " << firstGNSS.lon << " " << firstGNSS.alt << std::endl;
-    std::cout << "firstGNSS: " << firstGNSS.x << " " << firstGNSS.y << " " << firstGNSS.alt << std::endl;
+    std::cout << "firstGNSS: " << firstGNSS.enu_x << " " << firstGNSS.enu_y << " " << firstGNSS.enu_z << std::endl;
 
     return true;
 }
 
-bool GNSS::load_raw_data(const std::vector<std::string>& input_file_names)
+bool GNSS::load_raw_data_from_gnss(const std::vector<std::string>& input_file_names)
 {
     gnss_poses.clear();
 
@@ -202,6 +235,7 @@ bool GNSS::load_raw_data(const std::vector<std::string>& input_file_names)
 
 bool GNSS::project_to_mercator_projection()
 {   
+
     std::array<double, 2> WGS84Reference{ 0, 0 };
 
     if (gnss_poses.size() > 0)
@@ -223,15 +257,16 @@ bool GNSS::project_to_mercator_projection()
     {
         std::array<double, 2> WGS84Position{ gnss_poses[i].lat, gnss_poses[i].lon };
         std::array<double, 2> result{ wgs84::toCartesian(WGS84Reference, WGS84Position) };
-        gnss_poses[i].x = result[0];
-        gnss_poses[i].y = result[1];
+        gnss_poses[i].enu_x = result[0];
+        gnss_poses[i].enu_y = result[1];
+        gnss_poses[i].enu_z = gnss_poses[i].alt;
     }
 
     return true;
 
 }
 
-bool GNSS::project_using_proj()
+bool GNSS::project_using_proj(const std::string& geoidFile)
 {
     if (gnss_poses.empty())
         return false;
@@ -258,6 +293,8 @@ bool GNSS::project_using_proj()
         refLon = WGS84ReferenceLongitude;
         refAlt = 0.0;
     }
+    
+    geoidSeparation = getGeoidSeparation(refLat, refLon, geoidFile);
 
     // -------------------------------------------------
     // Create PROJ context + pipeline
@@ -271,7 +308,7 @@ bool GNSS::project_using_proj()
         "+ellps=WGS84 "
         "+lat_0=" + std::to_string(refLat) +
         " +lon_0=" + std::to_string(refLon) +
-        " +h_0="   + std::to_string(refAlt);
+        " +h_0="   + std::to_string(refAlt + geoidSeparation);
 
     PJ* P = proj_create(ctx, pipeline.c_str());
     if (!P)
@@ -288,15 +325,15 @@ bool GNSS::project_using_proj()
         PJ_COORD geo = proj_coord(
             pose.lon * M_PI / 180.0,   // longitude in radians
             pose.lat * M_PI / 180.0,   // latitude in radians
-            pose.alt,                  // altitude (meters)
+            pose.alt + geoidSeparation,// altitude (meters)
             0
         );
 
         PJ_COORD enu = proj_trans(P, PJ_FWD, geo);
 
-        pose.x = enu.xyz.x;   // East (meters)
-        pose.y = enu.xyz.y;   // North (meters)
-        // pose.z = enu.xyz.z; // Up if you want
+        pose.enu_x = enu.xyz.x; // East (meters)
+        pose.enu_y = enu.xyz.y; // North (meters)
+        pose.enu_z = enu.xyz.z; // 
     }
 
     proj_destroy(P);
@@ -323,7 +360,55 @@ double dm_to_dd(const std::string& dm, char direction, bool is_latitude)
     return dd;
 }
 
-bool GNSS::load_nmea_mercator_projection(const std::vector<std::string>& input_file_names)
+std::vector<Eigen::Vector3d> GNSS::unproject_using_proj(const std::vector<Eigen::Vector3d>& pointcloud, const std::string& geoidFile)
+{
+    PJ_CONTEXT* ctx = proj_context_create();
+
+    geoidSeparation = getGeoidSeparation(WGS84ReferenceLatitude, WGS84ReferenceLongitude, geoidFile);
+    const double alt = gnss_poses[0].alt + geoidSeparation;
+
+    std::string pipeline = "+proj=pipeline "
+                           "+step +inv +proj=topocentric "
+                           "+lat_0=" +
+        std::to_string(WGS84ReferenceLatitude) +
+        " "
+        "+lon_0=" +
+        std::to_string(WGS84ReferenceLongitude) +
+        " "
+        "+h_0=" +
+        std::to_string(alt) +
+        " "
+        "+ellps=WGS84 "
+        "+step +inv +proj=cart +ellps=WGS84";
+    PJ* P = proj_create(ctx, pipeline.c_str());
+
+    std::vector<Eigen::Vector3d> lla_points;
+    lla_points.reserve(pointcloud.size());
+
+    for (const auto& p : pointcloud)
+    {
+        PJ_COORD c;
+        c.xyz.x = p.x(); // East
+        c.xyz.y = p.y(); // North
+        c.xyz.z = p.z(); // Up
+
+        PJ_COORD r = proj_trans(P, PJ_FWD, c);
+
+        double lon = r.lpzt.lam * 180.0 / M_PI;
+        double lat = r.lpzt.phi * 180.0 / M_PI;
+        double h_msl = r.lpzt.z - geoidSeparation;
+
+        lla_points.emplace_back(lat, lon, h_msl);
+    }
+
+    proj_destroy(P);
+    proj_context_destroy(ctx);
+
+    return lla_points;
+}
+
+
+bool GNSS::load_raw_data_from_nmea(const std::vector<std::string>& input_file_names)
 {
     gnss_poses.clear();
 
@@ -399,36 +484,160 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string>& input_f
             return (a.timestamp < b.timestamp);
         });
 
-    std::array<double, 2> WGS84Reference{ 0, 0 };
-
-    if (gnss_poses.size() > 0)
-    {
-        if (setWGS84ReferenceFromFirstPose)
-        {
-            WGS84Reference[0] = gnss_poses[0].lat;
-            WGS84Reference[1] = gnss_poses[0].lon;
-            WGS84ReferenceLatitude = gnss_poses[0].lat;
-            WGS84ReferenceLongitude = gnss_poses[0].lon;
-        }
-        else
-        {
-            WGS84Reference[0] = WGS84ReferenceLatitude;
-            WGS84Reference[1] = WGS84ReferenceLongitude;
-        }
-    }
-
-    for (int i = 0; i < gnss_poses.size(); i++)
-    {
-        std::array<double, 2> WGS84Position{ gnss_poses[i].lat, gnss_poses[i].lon };
-        std::array<double, 2> result{ wgs84::toCartesian(WGS84Reference, WGS84Position) };
-        gnss_poses[i].x = result[0];
-        gnss_poses[i].y = result[1];
-
-        // std::cout << "gnss_poses[i].x " << gnss_poses[i].x << " gnss_poses[i].y " << gnss_poses[i].y << std::endl;
-    }
-
     return true;
 }
+
+std::vector<Eigen::Vector3d> GNSS::CRTConvert(
+    const std::vector<Eigen::Vector3d>& llaPointcloud, const std::string targetCRT, const std::string geoid)
+{
+
+    std::vector<Eigen::Vector3d> result;
+    result.reserve(llaPointcloud.size());
+
+    if (llaPointcloud.empty())
+        return result;
+    if (!CRTs::SupportedCRTs.contains(targetCRT))
+    {
+        std::cerr << "Unsuported CRT " << targetCRT << std::endl;
+        return result;
+    }
+
+    std::string target = "";
+
+    if (targetCRT == CRTs::PUWG92_ID)
+    {
+        target = "EPSG:2180";
+    }
+    else if (targetCRT == CRTs::WEBMERC_ID)
+    {
+        target = "EPSG:3857";
+    }
+    else if (targetCRT == CRTs::UTM_AUTO_ID)
+    {
+        double lat = llaPointcloud[0].x();
+        double lon = llaPointcloud[0].y();
+
+        int zone = int(std::floor((lon + 180.0) / 6.0)) + 1;
+        bool north = (lat >= 0.0);
+
+        target = "+proj=utm +zone=" + std::to_string(zone) + (north ? " +north " : " +south ") + "+datum=WGS84 +units=m +no_defs";
+    }
+
+    std::cout << "target CRT " << target << std::endl;
+
+    PJ_CONTEXT* ctx = proj_context_create();
+    PJ* P_geoid = nullptr;
+
+    if (!(geoid.empty() || geoid == Elipsooid))
+    {
+        std::string pipeline = "+proj=pipeline "
+                               "+step +proj=unitconvert +xy_in=deg +xy_out=rad "
+                               "+step +proj=vgridshift +grids=" +
+            geoid +
+            " "
+            "+step +proj=unitconvert +xy_in=rad +xy_out=deg";
+
+        P_geoid = proj_create(ctx, pipeline.c_str());
+
+        if (!P_geoid)
+        {
+            std::cerr << "Failed to create geoid transformation\n";
+            proj_context_destroy(ctx);
+            return result;
+        }
+    }
+
+    // ---------------------------
+    // CRS transform (LLA to target)
+    // ---------------------------
+    PJ* P_crs = proj_create_crs_to_crs(
+        ctx,
+        "EPSG:4979", // WGS84 3D
+        target.c_str(), 
+        nullptr);
+
+    if (!P_crs)
+    {
+        std::cerr << "Failed to create CRS transformation\n";
+        if (P_geoid)
+            proj_destroy(P_geoid);
+        proj_context_destroy(ctx);
+        return result;
+    }
+
+    P_crs = proj_normalize_for_visualization(ctx, P_crs);
+
+    // ---------------------------
+    // Transform loop
+    // ---------------------------
+    for (const auto& p : llaPointcloud)
+    {
+        double lat = p.x();
+        double lon = p.y();
+        double h = p.z();
+
+        // Geoid correction (if requested)
+        if (P_geoid)
+        {
+            PJ_COORD c_geo = proj_coord(lon, lat, h, 0);
+            PJ_COORD r_geo = proj_trans(P_geoid, PJ_FWD, c_geo);
+
+            lon = r_geo.lpzt.lam;
+            lat = r_geo.lpzt.phi;
+            h = r_geo.lpzt.z;
+        }
+
+        // CRS conversion
+        PJ_COORD c = proj_coord(lon, lat, h, 0);
+        PJ_COORD r = proj_trans(P_crs, PJ_FWD, c);
+
+        result.emplace_back(
+            r.xy.x, // Easting / X
+            r.xy.y, // Northing / Y
+            r.xyz.z // height (after geoid if applied)
+        );
+    }
+
+    // ---------------------------
+    // Cleanup
+    // ---------------------------
+    proj_destroy(P_crs);
+    if (P_geoid)
+        proj_destroy(P_geoid);
+    proj_context_destroy(ctx);
+
+    return result;
+
+}
+
+double GNSS::getGeoidSeparation(double lat_deg, double lon_deg, const std::string& geoidFile)
+{
+    PJ_CONTEXT* ctx = proj_context_create();
+
+    std::string pipeline = "+proj=pipeline "
+                           "+step +proj=unitconvert +xy_in=deg +xy_out=rad "
+                           "+step +proj=vgridshift +grids=" +
+        geoidFile +
+        " "
+        "+step +proj=unitconvert +xy_in=rad +xy_out=deg";
+
+    PJ* P = proj_create(ctx, pipeline.c_str());
+    if (!P)
+    {
+        proj_context_destroy(ctx);
+        return 0.0;
+    }
+
+    PJ_COORD c = proj_coord(lon_deg, lat_deg, 0.0, 0);
+    PJ_COORD r = proj_trans(P, PJ_FWD, c);
+
+    proj_destroy(P);
+    proj_context_destroy(ctx);
+
+    return -r.lpzt.z;
+}
+
+
 
 #if WITH_GUI == 1
 void GNSS::render(const PointClouds& point_clouds_container)
@@ -438,9 +647,9 @@ void GNSS::render(const PointClouds& point_clouds_container)
     for (int i = 0; i < gnss_poses.size(); i++)
     {
         glVertex3f(
-            gnss_poses[i].x - point_clouds_container.offset.x(),
-            gnss_poses[i].y - point_clouds_container.offset.y(),
-            gnss_poses[i].alt - point_clouds_container.offset.z());
+            gnss_poses[i].enu_x - point_clouds_container.offset.x(),
+            gnss_poses[i].enu_y - point_clouds_container.offset.y(),
+            gnss_poses[i].enu_z - point_clouds_container.offset.z());
     }
     glEnd();
 
@@ -473,9 +682,9 @@ void GNSS::render(const PointClouds& point_clouds_container)
                         glVertex3f(m(0, 3), m(1, 3), m(2, 3));
 
                         glVertex3f(
-                            gnss_poses[i].x - point_clouds_container.offset.x(),
-                            gnss_poses[i].y - point_clouds_container.offset.y(),
-                            gnss_poses[i].alt - point_clouds_container.offset.z());
+                            gnss_poses[i].enu_x - point_clouds_container.offset.x(),
+                            gnss_poses[i].enu_y - point_clouds_container.offset.y(),
+                            gnss_poses[i].enu_z - point_clouds_container.offset.z());
                     }
                 }
             }
@@ -495,13 +704,13 @@ bool GNSS::save_to_laz(const std::string& output_file_names, double offset_x, do
 
     for (int i = 0; i < gnss_poses.size(); i++)
     {
-        max.x() = std::max(max.x(), gnss_poses[i].x);
-        max.y() = std::max(max.y(), gnss_poses[i].y);
-        max.z() = std::max(max.z(), gnss_poses[i].alt);
+        max.x() = std::max(max.x(), gnss_poses[i].enu_x);
+        max.y() = std::max(max.y(), gnss_poses[i].enu_y);
+        max.z() = std::max(max.z(), gnss_poses[i].enu_z);
 
-        min.x() = std::min(min.x(), gnss_poses[i].x);
-        min.y() = std::min(min.y(), gnss_poses[i].y);
-        min.z() = std::min(min.z(), gnss_poses[i].alt);
+        min.x() = std::min(min.x(), gnss_poses[i].enu_x);
+        min.y() = std::min(min.y(), gnss_poses[i].enu_y);
+        min.z() = std::min(min.z(), gnss_poses[i].enu_z);
     }
 
     // create the writer
@@ -581,9 +790,9 @@ bool GNSS::save_to_laz(const std::string& output_file_names, double offset_x, do
 
         const auto& p = gnss_poses[i];
         p_count++;
-        coordinates[0] = p.x;
-        coordinates[1] = p.y;
-        coordinates[2] = p.alt;
+        coordinates[0] = p.enu_x;
+        coordinates[1] = p.enu_y;
+        coordinates[2] = p.enu_z;
         if (laszip_set_coordinates(laszip_writer, coordinates))
         {
             fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);

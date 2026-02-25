@@ -32,6 +32,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <tuple>
 
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include "multi_view_tls_registration.h"
@@ -47,6 +48,7 @@
 #include "wgs84_do_puwg92.h"
 #include <export_laz.h>
 
+#include <proj.h>
 #ifdef _WIN32
 #include "resource.h"
 #include <windows.h>
@@ -216,6 +218,8 @@ bool manipulate_only_marked_gizmo = false;
 Session session;
 PointClouds::PointCloudDimensions session_dims;
 bool session_loaded = false;
+std::vector<std::string> geoids;
+std::string selected_geoid_model;
 
 // these functions performs experiment from paper
 //@article
@@ -2998,7 +3002,7 @@ void display()
                         if (input_file_names.size() > 0)
                         {
                             Eigen::Vector3d out_offset(0.0, 0.0, 0.0);
-                            if (!tls_registration.gnss.load(input_file_names, out_offset, gnssWithOffset))
+                            if (!tls_registration.gnss.load_data_from_gnss_and_convert_to_92(input_file_names, out_offset, gnssWithOffset))
                             {
                                 spdlog::error("Error loading GNSS files!");
                             }
@@ -3013,14 +3017,14 @@ void display()
 
                     ImGui::Text("Load & convert WGS84 to Cartesian by Mercator projection");
 
-                    if (ImGui::MenuItem("Load GNSS"))
+                    if (ImGui::MenuItem("Load GNSS (deprecated)"))
                     {
                         std::vector<std::string> input_file_names;
                         input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", { "GNSS", "*.gnss" }, true);
 
                         if (input_file_names.size() > 0)
                         {
-                            if (!tls_registration.gnss.load_raw_data(input_file_names))
+                            if (!tls_registration.gnss.load_raw_data_from_gnss(input_file_names))
                             {
                                 spdlog::error("Error loading GNSS files!");
                             }
@@ -3030,26 +3034,43 @@ void display()
                             }
                         }
                     }
-                    if (ImGui::MenuItem("Load GNSS(PROJ)"))
+                    if (ImGui::MenuItem("Load GNSS"))
                     {
                         std::vector<std::string> input_file_names;
                         input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", { "GNSS", "*.gnss" }, true);
 
                         if (input_file_names.size() > 0)
                         {
-                            if (!tls_registration.gnss.load_raw_data(input_file_names))
+                            if (!tls_registration.gnss.load_raw_data_from_gnss(input_file_names))
                             {
                                 spdlog::error("Error loading GNSS files!");
                             }
-                            if (!tls_registration.gnss.project_using_proj())
+                            if (!tls_registration.gnss.project_using_proj(selected_geoid_model))
                             {
                                 spdlog::error("Error converting WGS84 to PROJ projection!");
                             }
                         }
                     }
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Load structured GNSS dataset and decode it into coordinates");
+                        ImGui::SetTooltip("Load structured GNSS dataset and decode it into coordinates, using PROJ library");
 
+                    if (ImGui::MenuItem("Load NMEA (deprecated)"))
+                    {
+                        std::vector<std::string> input_file_names;
+                        input_file_names = mandeye::fd::OpenFileDialog("Load nmea files", { "NMEA", "*.nmea" }, true);
+
+                        if (input_file_names.size() > 0)
+                        {
+                            if (!tls_registration.gnss.load_raw_data_from_nmea(input_file_names))
+                                spdlog::error("Error loading NMEA files!");
+                        }
+                        if (!tls_registration.gnss.project_to_mercator_projection())
+                        {
+                            spdlog::error("Error converting WGS84 to Mercator projection!");
+                        }
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Load raw GNSS serial output and decode it into coordinates");
                     if (ImGui::MenuItem("Load NMEA"))
                     {
                         std::vector<std::string> input_file_names;
@@ -3057,12 +3078,16 @@ void display()
 
                         if (input_file_names.size() > 0)
                         {
-                            if (!tls_registration.gnss.load_nmea_mercator_projection(input_file_names))
-                                spdlog::error("Error loading GNSS files!");
+                            if (!tls_registration.gnss.load_raw_data_from_nmea(input_file_names))
+                                spdlog::error("Error loading NMEA files!");
+                        }
+                        if (!tls_registration.gnss.project_using_proj(selected_geoid_model))
+                        {
+                            spdlog::error("Error converting WGS84 to PROJ projection!");
                         }
                     }
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Load raw GNSS serial output and decode it into coordinates");
+                        ImGui::SetTooltip("Load raw GNSS serial output and decode it into coordinates, using PROJ library");
 
                     ImGui::Separator();
 
@@ -3079,10 +3104,8 @@ void display()
                                 session.point_clouds_container.offset.y(),
                                 session.point_clouds_container.offset.z());
                     }
-
-                    if (ImGui::MenuItem("Save metascan points in PUWG92"))
+                    const auto prepareVisibleData = [&]()
                     {
-                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
                         std::vector<Eigen::Vector3d> pointcloud;
                         std::vector<unsigned short> intensity;
                         std::vector<double> timestamps;
@@ -3107,6 +3130,13 @@ void display()
                                 }
                             }
                         }
+                        return std::tuple(pointcloud, intensity, timestamps);
+                    };
+
+                    if (ImGui::MenuItem("Save metascan points in PUWG92(dep!)"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        const auto [pointcloud, intensity, timestamps] = prepareVisibleData();
 
                         const auto lat = tls_registration.gnss.WGS84ReferenceLatitude;
                         const auto lon = tls_registration.gnss.WGS84ReferenceLongitude;
@@ -3117,6 +3147,70 @@ void display()
                         wgs84_do_puwg92(lat, lon, &Xpuwg92, &Ypuwg92);
                         Eigen::Vector3d offset(Ypuwg92, Xpuwg92, alt);
                         exportLaz(output_file_name, pointcloud, intensity, timestamps, offset.x(), offset.y(), offset.z());
+                    }
+                    ImGui::Separator();
+                    for (const auto& geoid : geoids)
+                    {
+                        if (ImGui::MenuItem(std::string("Set geoid to " + geoid).c_str(), nullptr, selected_geoid_model == geoid))
+                        {
+                            selected_geoid_model = geoid;
+                        }
+                    }
+                    ImGui::Separator();
+
+                    if (ImGui::MenuItem("Save metascan points in WGS84 LLA (PROJ)"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        const auto [pointcloud, intensity, timestamps] = prepareVisibleData();
+
+                        const auto lla_points = tls_registration.gnss.unproject_using_proj(pointcloud, selected_geoid_model);
+
+                        exportLaz(output_file_name, lla_points, intensity, timestamps, 0, 0, 0);
+                    }
+                    for (const auto& crtName : CRTs::SupportedCRTs)
+                    {
+                        std::string itemName = "Save metascan points in " + crtName + " (PROJ)";
+                        if (ImGui::MenuItem(itemName.c_str()))
+                        {
+                            const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+
+                            const auto [pointcloud, intensity, timestamps] = prepareVisibleData();
+                            const auto lla_points = tls_registration.gnss.unproject_using_proj(pointcloud, selected_geoid_model);
+                            auto crt_points = tls_registration.gnss.CRTConvert(lla_points, crtName, selected_geoid_model);
+                            Eigen::Vector3d offset = crt_points.front();
+                            for (auto& p : crt_points)
+                            {
+                                p = p - offset;
+                            }
+                            exportLaz(output_file_name, crt_points, intensity, timestamps, offset.x(), offset.y(), offset.z());
+                        }
+                    }
+
+                    for (const auto& crtName : CRTs::SupportedCRTs)
+                    {
+                        std::string itemName = "Save GNSS data to las/laz in " + crtName + " (PROJ)";
+                        if (ImGui::MenuItem(itemName.c_str()))
+                        {
+                            const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+
+                            std::vector<Eigen::Vector3d> lla_points;
+                            std::vector<unsigned short> intensity;
+                            std::vector<double> timestamps;
+                            for (const auto& gnss : tls_registration.gnss.gnss_poses)
+                            {
+                                lla_points.emplace_back(gnss.lat, gnss.lon, gnss.alt);
+                                intensity.push_back(gnss.hdop);
+                                timestamps.push_back(gnss.timestamp);
+                            }
+
+                            auto crt_points = tls_registration.gnss.CRTConvert(lla_points, crtName, selected_geoid_model);
+                            Eigen::Vector3d offset = crt_points.front();
+                            for (auto& p : crt_points)
+                            {
+                                p = p - offset;
+                            }
+                            exportLaz(output_file_name, crt_points, intensity, timestamps, offset.x(), offset.y(), offset.z());
+                        }
                     }
 
                     ImGui::EndMenu();
@@ -3805,6 +3899,9 @@ int main(int argc, char* argv[])
             return 0;
         }
 
+        // search for available geoid models in the system and populate the menu
+        geoids = GNSS::get_available_geoids();
+
         initGL(&argc, argv, winTitle, display, mouse);
 
         if (argc > 1)
@@ -3814,7 +3911,7 @@ int main(int argc, char* argv[])
                 std::string ext = fs::path(argv[i]).extension().string();
                 std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
-                if (ext == ".mjs")
+                if (ext == ".mjs" || ext == ".json")
                 {
                     loadSession(argv[i]);
 

@@ -31,12 +31,12 @@ if(WIN32)
 
     set(PROJ_FILENAME "proj-windows.zip")
     set(PROJ_URL
-        "https://github.com/michalpelka/proj_win_deploy/releases/download/v9.3.0-2/proj-windows.zip"
+        "https://github.com/michalpelka/proj_win_deploy/releases/download/v9.3.0-5/proj-windows.zip"
     )
 
-    # <- wklej SHA256 z release
+  
     set(PROJ_SHA256
-        "fc1fcbe1598f0c153febfbda6a5c068d4ddaef7d44d052dae55b23fbb4b66e28"
+        "2d0cef6a07ca4d3e83cb6ca89637fb62db1650006876305e8d6a2af21468ae48"
     )
 
     set(PROJ_DOWNLOAD_PATH "${CMAKE_BINARY_DIR}/${PROJ_FILENAME}")
@@ -79,8 +79,18 @@ if(WIN32)
 
     set_target_properties(PROJ::proj PROPERTIES
         IMPORTED_LOCATION "${PROJ_ROOT}/bin/proj_9_3.dll"
-        IMPORTED_IMPLIB  "${PROJ_ROOT}/lib/proj_9_3.lib"
+        IMPORTED_IMPLIB  "${PROJ_ROOT}/lib/proj.lib"
         INTERFACE_INCLUDE_DIRECTORIES "${PROJ_ROOT}/include"
+    )
+    add_library(PROJ::ZLIB SHARED IMPORTED)
+    set_target_properties(PROJ::ZLIB PROPERTIES
+        IMPORTED_LOCATION "${PROJ_ROOT}/bin/z.dll"
+        IMPORTED_IMPLIB  "${PROJ_ROOT}/lib/zs.lib"
+        INTERFACE_INCLUDE_DIRECTORIES "${PROJ_ROOT}/include"
+    )
+
+    set_property(TARGET PROJ::proj APPEND PROPERTY
+        INTERFACE_LINK_LIBRARIES PROJ::ZLIB
     )
 
 endif()

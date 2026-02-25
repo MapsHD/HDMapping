@@ -18,7 +18,9 @@ const std::vector<std::string> PathCandidate{
     std::filesystem::current_path().string() + "/proj",
     std::filesystem::current_path().string() + "/share/proj",
     std::filesystem::current_path().string() + "/data/proj",
-   "/usr/local/share/proj", "/usr/share/proj", "C:/HDMapping",
+    "/usr/local/share/proj",
+    "/usr/share/proj",
+    "C:/HDMapping",
 };
 
 std::vector<std::string> GNSS::get_available_geoids()
@@ -210,11 +212,7 @@ bool GNSS::load_raw_data_from_gnss(const std::vector<std::string>& input_file_na
                 std::istringstream(strs[7]) >> gp.age;
                 std::istringstream(strs[8]) >> gp.time;
                 std::istringstream(strs[9]) >> gp.fix_quality;
-                if (std::isfinite(gp.lat) &&
-                    std::isfinite(gp.lon) &&
-                    std::isfinite(gp.alt) &&
-                    gp.lat != 0.0 &&
-                    gp.lon != 0.0)
+                if (std::isfinite(gp.lat) && std::isfinite(gp.lon) && std::isfinite(gp.alt) && gp.lat != 0.0 && gp.lon != 0.0)
                 {
                     gnss_poses.push_back(gp);
                 }
@@ -230,12 +228,10 @@ bool GNSS::load_raw_data_from_gnss(const std::vector<std::string>& input_file_na
         {
             return (a.timestamp < b.timestamp);
         });
-
 }
 
 bool GNSS::project_to_mercator_projection()
-{   
-
+{
     std::array<double, 2> WGS84Reference{ 0, 0 };
 
     if (gnss_poses.size() > 0)
@@ -263,7 +259,6 @@ bool GNSS::project_to_mercator_projection()
     }
 
     return true;
-
 }
 
 double get_ellipsoid_height(const GNSS::GlobalPose& pose)
@@ -281,7 +276,7 @@ bool GNSS::project_using_proj()
     // -------------------------------------------------
     double refLat = 0.0;
     double refLon = 0.0;
-    double refAlt = 0.0;   // assume 0 if you don't store altitude
+    double refAlt = 0.0; // assume 0 if you don't store altitude
 
     if (setWGS84ReferenceFromFirstPose)
     {
@@ -289,7 +284,7 @@ bool GNSS::project_using_proj()
         refLon = gnss_poses.front().lon;
         refAlt = get_ellipsoid_height(gnss_poses.front());
 
-        WGS84ReferenceLatitude  = refLat;
+        WGS84ReferenceLatitude = refLat;
         WGS84ReferenceLongitude = refLon;
     }
     else
@@ -298,21 +293,18 @@ bool GNSS::project_using_proj()
         refLon = WGS84ReferenceLongitude;
         refAlt = 0.0;
     }
-    
 
     // -------------------------------------------------
     // Create PROJ context + pipeline
     // -------------------------------------------------
     PJ_CONTEXT* ctx = proj_context_create();
 
-    std::string pipeline =
-        "+proj=pipeline "
-        "+step +proj=cart +ellps=WGS84 "
-        "+step +proj=topocentric "
-        "+ellps=WGS84 "
-        "+lat_0=" + std::to_string(refLat) +
-        " +lon_0=" + std::to_string(refLon) +
-        " +h_0="   + std::to_string(refAlt);
+    std::string pipeline = "+proj=pipeline "
+                           "+step +proj=cart +ellps=WGS84 "
+                           "+step +proj=topocentric "
+                           "+ellps=WGS84 "
+                           "+lat_0=" +
+        std::to_string(refLat) + " +lon_0=" + std::to_string(refLon) + " +h_0=" + std::to_string(refAlt);
 
     PJ* P = proj_create(ctx, pipeline.c_str());
     if (!P)
@@ -327,24 +319,22 @@ bool GNSS::project_using_proj()
     for (auto& pose : gnss_poses)
     {
         PJ_COORD geo = proj_coord(
-            pose.lon * M_PI / 180.0,   // longitude in radians
-            pose.lat * M_PI / 180.0,   // latitude in radians
+            pose.lon * M_PI / 180.0, // longitude in radians
+            pose.lat * M_PI / 180.0, // latitude in radians
             get_ellipsoid_height(pose),
-            0
-        );
+            0);
 
         PJ_COORD enu = proj_trans(P, PJ_FWD, geo);
 
         pose.enu_x = enu.xyz.x; // East (meters)
         pose.enu_y = enu.xyz.y; // North (meters)
-        pose.enu_z = enu.xyz.z; // 
+        pose.enu_z = enu.xyz.z; //
     }
 
     proj_destroy(P);
     proj_context_destroy(ctx);
 
     return true;
-
 }
 
 double dm_to_dd(const std::string& dm, char direction, bool is_latitude)
@@ -409,7 +399,6 @@ std::vector<Eigen::Vector3d> GNSS::unproject_using_proj(const std::vector<Eigen:
 
     return lla_points;
 }
-
 
 bool GNSS::load_raw_data_from_nmea(const std::vector<std::string>& input_file_names)
 {
@@ -493,7 +482,6 @@ bool GNSS::load_raw_data_from_nmea(const std::vector<std::string>& input_file_na
 std::vector<Eigen::Vector3d> GNSS::CRTConvert(
     const std::vector<Eigen::Vector3d>& llaPointcloud, const std::string targetCRT, const std::string geoid)
 {
-
     std::vector<Eigen::Vector3d> result;
     result.reserve(llaPointcloud.size());
 
@@ -556,7 +544,7 @@ std::vector<Eigen::Vector3d> GNSS::CRTConvert(
     PJ* P_crs = proj_create_crs_to_crs(
         ctx,
         "EPSG:4979", // WGS84 3D
-        target.c_str(), 
+        target.c_str(),
         nullptr);
 
     if (!P_crs)
@@ -610,7 +598,6 @@ std::vector<Eigen::Vector3d> GNSS::CRTConvert(
     proj_context_destroy(ctx);
 
     return result;
-
 }
 
 double GNSS::getGeoidSeparation(double lat_deg, double lon_deg, const std::string& geoidFile)
@@ -639,8 +626,6 @@ double GNSS::getGeoidSeparation(double lat_deg, double lon_deg, const std::strin
 
     return -r.lpzt.z;
 }
-
-
 
 #if WITH_GUI == 1
 void GNSS::render(const PointClouds& point_clouds_container)

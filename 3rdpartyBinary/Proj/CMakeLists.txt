@@ -4,20 +4,27 @@ cmake_minimum_required(VERSION 3.28)
 # PROJ setup
 # ============================================================
 
-set(PROJ_VERSION v9.3.0)
+
 
 # ----------------------------
 # Linux / Unix
 # ----------------------------
 if(UNIX AND NOT WIN32)
 
-    find_package(PROJ QUIET)
-    if(NOT TARGET PROJ::proj)
+    find_package(PROJ CONFIG QUIET)
+
+    # Some distros expose lowercase target
+    if(TARGET PROJ::proj)
+        set(PROJ_TARGET PROJ::proj)
+
+    elseif(TARGET proj)
+        set(PROJ_TARGET proj)
+
+    else()
         message(FATAL_ERROR
             "PROJ not found.\n"
-            "Install it using:\n"
-            "  sudo apt install libproj-dev\n"
-            "Then reconfigure CMake."
+            "libproj-dev is installed but CMake could not locate the config package.\n"
+            "Check CMAKE_PREFIX_PATH or PROJ_DIR."
         )
     endif()
 
@@ -27,7 +34,6 @@ endif()
 # Windows – download prebuilt
 # ----------------------------
 if(WIN32)
-
     set(PROJ_FILENAME "proj-windows.zip")
     set(PROJ_URL
         "https://github.com/michalpelka/proj_win_deploy/releases/download/v9.3.0-5/proj-windows.zip"
@@ -65,6 +71,7 @@ if(WIN32)
             DESTINATION "${PROJ_EXTRACT_DIR}"
         )
     endif()
+    set(PROJ_VERSION v9.3.0)
     set(PROJ_ROOT "${PROJ_EXTRACT_DIR}/install_proj")
     set (PROJ_INCLUDE_DIR "${PROJ_ROOT}/include")
     set (PROJ_LIBRARY "${PROJ_ROOT}/bin/proj_9_3.dll")

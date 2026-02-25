@@ -2,9 +2,9 @@
 
 #include <point_clouds.h>
 
+#include <set>
 #include <string>
 #include <vector>
-#include <set>
 namespace CRTs
 {
     // List of supported CRTs:
@@ -13,12 +13,11 @@ namespace CRTs
     constexpr const char* UTM_AUTO_ID = "UTM_AUTO";
     constexpr const char* WEBMERC_ID = "WebMercator";
     const std::set<std::string> SupportedCRTs{ PUWG92_ID, UTM_AUTO_ID, WEBMERC_ID };
-}
+} // namespace CRTs
 
 class GNSS
 {
 public:
-
     struct GlobalPose
     {
         double timestamp;
@@ -53,21 +52,21 @@ public:
     //! \brief Load GNSS data from file and converts to PUWG92
     //! \param input_file_names - vector of file names
     //! \param localize - if true, the data is moved to the first point
-    bool load_data_from_gnss_and_convert_to_92(const std::vector<std::string>& input_file_names, Eigen::Vector3d& out_offset, bool localize = false);
-    
-    //! Load data from timestamped NMEA files (timestamp + NMEA sentence) 
+    bool load_data_from_gnss_and_convert_to_92(
+        const std::vector<std::string>& input_file_names, Eigen::Vector3d& out_offset, bool localize = false);
+
+    //! Load data from timestamped NMEA files (timestamp + NMEA sentence)
     //! \param input_file_names - vector of file names
     bool load_raw_data_from_nmea(const std::vector<std::string>& input_file_names);
-
 
     //! \brief Load *.GNSS files data from file without projection
     //! \param input_file_names - vector of file names
     //! \ return true if the data was loaded successfully, false otherwise
     bool load_raw_data_from_gnss(const std::vector<std::string>& input_file_names);
-   
+
     //! Project the loaded GNSS data to Mercator projection using the WGS84 reference point
     bool project_to_mercator_projection();
-    
+
     //! Project loaded WGS84 data to topocentric coordinates using the WGS84 reference point
     //! \see https://proj.org/en/stable/operations/conversions/topocentric.html
     bool project_using_proj();
@@ -81,8 +80,9 @@ public:
     //! \param llaPointcloud - pointcloud converted to LLA (WGS84)
     //! \targetCRT - target coordinate system e.g. PUWG92 or UTM
     //! \geoid - name of geoid/ellipsoid, empty for WG84 e
-    std::vector<Eigen::Vector3d> CRTConvert(const std::vector<Eigen::Vector3d>& llaPointcloud, const std::string targetCRT, const std::string geoid);
-    
+    std::vector<Eigen::Vector3d> CRTConvert(
+        const std::vector<Eigen::Vector3d>& llaPointcloud, const std::string targetCRT, const std::string geoid);
+
     void render(const PointClouds& point_clouds_container);
     bool save_to_laz(const std::string& output_file_names, double offset_x, double offset_y, double offset_alt);
 

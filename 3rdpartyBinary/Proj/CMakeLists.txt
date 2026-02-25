@@ -12,8 +12,7 @@ set(PROJ_VERSION v9.3.0)
 if(UNIX AND NOT WIN32)
 
     find_package(PROJ QUIET)
-
-    if(NOT PROJ_FOUND)
+    if(NOT TARGET PROJ::proj)
         message(FATAL_ERROR
             "PROJ not found.\n"
             "Install it using:\n"

@@ -23,7 +23,7 @@ jobs:
     - name: Load repository cache
       run:  sudo apt-get update --allow-releaseinfo-change
     - name: Install Libs
-      run: sudo apt-get install -y --no-install-recommends libeigen3-dev libglew-dev freeglut3-dev libx11-dev libxi-dev libtbb-dev liblaszip-dev libopencv-dev
+      run: sudo apt-get install -y --no-install-recommends libeigen3-dev libglew-dev freeglut3-dev libx11-dev libxi-dev libtbb-dev liblaszip-dev libopencv-dev libproj-dev
 
     - uses: actions/checkout@v4
       with:

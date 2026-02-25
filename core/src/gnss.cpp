@@ -266,7 +266,12 @@ bool GNSS::project_to_mercator_projection()
 
 }
 
-bool GNSS::project_using_proj(const std::string& geoidFile)
+double get_ellipsoid_height(const GNSS::GlobalPose& pose)
+{
+    return pose.alt + pose.height;
+}
+
+bool GNSS::project_using_proj()
 {
     if (gnss_poses.empty())
         return false;
@@ -280,9 +285,9 @@ bool GNSS::project_using_proj(const std::string& geoidFile)
 
     if (setWGS84ReferenceFromFirstPose)
     {
-        refLat = gnss_poses[0].lat;
-        refLon = gnss_poses[0].lon;
-        refAlt = gnss_poses[0].alt;
+        refLat = gnss_poses.front().lat;
+        refLon = gnss_poses.front().lon;
+        refAlt = get_ellipsoid_height(gnss_poses.front());
 
         WGS84ReferenceLatitude  = refLat;
         WGS84ReferenceLongitude = refLon;
@@ -294,7 +299,6 @@ bool GNSS::project_using_proj(const std::string& geoidFile)
         refAlt = 0.0;
     }
     
-    geoidSeparation = getGeoidSeparation(refLat, refLon, geoidFile);
 
     // -------------------------------------------------
     // Create PROJ context + pipeline
@@ -308,7 +312,7 @@ bool GNSS::project_using_proj(const std::string& geoidFile)
         "+ellps=WGS84 "
         "+lat_0=" + std::to_string(refLat) +
         " +lon_0=" + std::to_string(refLon) +
-        " +h_0="   + std::to_string(refAlt + geoidSeparation);
+        " +h_0="   + std::to_string(refAlt);
 
     PJ* P = proj_create(ctx, pipeline.c_str());
     if (!P)
@@ -325,7 +329,7 @@ bool GNSS::project_using_proj(const std::string& geoidFile)
         PJ_COORD geo = proj_coord(
             pose.lon * M_PI / 180.0,   // longitude in radians
             pose.lat * M_PI / 180.0,   // latitude in radians
-            pose.alt + geoidSeparation,// altitude (meters)
+            get_ellipsoid_height(pose),
             0
         );
 
@@ -360,12 +364,11 @@ double dm_to_dd(const std::string& dm, char direction, bool is_latitude)
     return dd;
 }
 
-std::vector<Eigen::Vector3d> GNSS::unproject_using_proj(const std::vector<Eigen::Vector3d>& pointcloud, const std::string& geoidFile)
+std::vector<Eigen::Vector3d> GNSS::unproject_using_proj(const std::vector<Eigen::Vector3d>& pointcloud)
 {
     PJ_CONTEXT* ctx = proj_context_create();
 
-    geoidSeparation = getGeoidSeparation(WGS84ReferenceLatitude, WGS84ReferenceLongitude, geoidFile);
-    const double alt = gnss_poses[0].alt + geoidSeparation;
+    const double alt = get_ellipsoid_height(gnss_poses.front());
 
     std::string pipeline = "+proj=pipeline "
                            "+step +inv +proj=topocentric "
@@ -396,7 +399,7 @@ std::vector<Eigen::Vector3d> GNSS::unproject_using_proj(const std::vector<Eigen:
 
         double lon = r.lpzt.lam * 180.0 / M_PI;
         double lat = r.lpzt.phi * 180.0 / M_PI;
-        double h_msl = r.lpzt.z - geoidSeparation;
+        double h_msl = r.lpzt.z;
 
         lla_points.emplace_back(lat, lon, h_msl);
     }

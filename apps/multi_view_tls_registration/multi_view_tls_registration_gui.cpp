@@ -3045,7 +3045,7 @@ void display()
                             {
                                 spdlog::error("Error loading GNSS files!");
                             }
-                            if (!tls_registration.gnss.project_using_proj(selected_geoid_model))
+                            if (!tls_registration.gnss.project_using_proj())
                             {
                                 spdlog::error("Error converting WGS84 to PROJ projection!");
                             }
@@ -3081,7 +3081,7 @@ void display()
                             if (!tls_registration.gnss.load_raw_data_from_nmea(input_file_names))
                                 spdlog::error("Error loading NMEA files!");
                         }
-                        if (!tls_registration.gnss.project_using_proj(selected_geoid_model))
+                        if (!tls_registration.gnss.project_using_proj())
                         {
                             spdlog::error("Error converting WGS84 to PROJ projection!");
                         }
@@ -3163,7 +3163,7 @@ void display()
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
                         const auto [pointcloud, intensity, timestamps] = prepareVisibleData();
 
-                        const auto lla_points = tls_registration.gnss.unproject_using_proj(pointcloud, selected_geoid_model);
+                        const auto lla_points = tls_registration.gnss.unproject_using_proj(pointcloud);
 
                         exportLaz(output_file_name, lla_points, intensity, timestamps, 0, 0, 0);
                     }
@@ -3175,7 +3175,7 @@ void display()
                             const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
 
                             const auto [pointcloud, intensity, timestamps] = prepareVisibleData();
-                            const auto lla_points = tls_registration.gnss.unproject_using_proj(pointcloud, selected_geoid_model);
+                            const auto lla_points = tls_registration.gnss.unproject_using_proj(pointcloud);
                             auto crt_points = tls_registration.gnss.CRTConvert(lla_points, crtName, selected_geoid_model);
                             Eigen::Vector3d offset = crt_points.front();
                             for (auto& p : crt_points)

@@ -70,10 +70,10 @@ public:
     
     //! Project loaded WGS84 data to topocentric coordinates using the WGS84 reference point
     //! \see https://proj.org/en/stable/operations/conversions/topocentric.html
-    bool project_using_proj(const std::string& geoidFile);
+    bool project_using_proj();
 
     //! Unproject the loaded data from topocentric coordinates to WGS84 using the WGS84 reference point
-    std::vector<Eigen::Vector3d> unproject_using_proj(const std::vector<Eigen::Vector3d>& pointcloud, const std::string& geoidFile);
+    std::vector<Eigen::Vector3d> unproject_using_proj(const std::vector<Eigen::Vector3d>& pointcloud);
 
     double getGeoidSeparation(double lat_deg, double lon_deg, const std::string& geoidFile);
 

@@ -1840,35 +1840,38 @@ void optimize_lidar_odometry(
             chunk_matrices[c].second = Eigen::MatrixXd::Zero(mat_dim, 1);
         }
 
-        tbb::parallel_for(size_t(0), num_chunks, [&](size_t chunk)
-        {
-            const size_t start = chunk * chunk_size;
-            const size_t end = std::min(start + chunk_size, num_points);
-            auto& [local_AtPA, local_AtPB] = chunk_matrices[chunk];
-            auto& local_stats = chunk_stats[chunk];
-            for (size_t i = start; i < end; ++i)
+        tbb::parallel_for(
+            size_t(0),
+            num_chunks,
+            [&](size_t chunk)
             {
-                compute_hessian(
-                    intermediate_points[i],
-                    intermediate_trajectory,
-                    tait_bryan_poses,
-                    buckets_indoor,
-                    bucket_size_indoor,
-                    buckets_outdoor,
-                    bucket_size_outdoor,
-                    max_distance,
-                    ablation_study_use_hierarchical_rgd,
-                    ablation_study_use_view_point_and_normal_vectors,
-                    ablation_study_use_planarity,
-                    ablation_study_use_norm,
-                    local_AtPA,
-                    local_AtPB,
-                    local_stats,
-                    ablation_study_use_threshold_outer_rgd,
-                    convergence_result,
-                    convergence_delta_threshold_outer_rgd);
-            }
-        });
+                const size_t start = chunk * chunk_size;
+                const size_t end = std::min(start + chunk_size, num_points);
+                auto& [local_AtPA, local_AtPB] = chunk_matrices[chunk];
+                auto& local_stats = chunk_stats[chunk];
+                for (size_t i = start; i < end; ++i)
+                {
+                    compute_hessian(
+                        intermediate_points[i],
+                        intermediate_trajectory,
+                        tait_bryan_poses,
+                        buckets_indoor,
+                        bucket_size_indoor,
+                        buckets_outdoor,
+                        bucket_size_outdoor,
+                        max_distance,
+                        ablation_study_use_hierarchical_rgd,
+                        ablation_study_use_view_point_and_normal_vectors,
+                        ablation_study_use_planarity,
+                        ablation_study_use_norm,
+                        local_AtPA,
+                        local_AtPB,
+                        local_stats,
+                        ablation_study_use_threshold_outer_rgd,
+                        convergence_result,
+                        convergence_delta_threshold_outer_rgd);
+                }
+            });
 
         for (size_t c = 0; c < num_chunks; ++c)
         {
@@ -2774,7 +2777,7 @@ bool compute_step_2(
         for (int i = 0; i < worker_data.size(); i++)
         {
             UTL_PROFILER_BEGIN(before_iter, "before_iterations");
-            
+
             std::vector<Point3Di> intermediate_points;
             // = worker_data[i].load_points(worker_data[i].intermediate_points_cache_file_name);
             load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points);

@@ -36,7 +36,7 @@ endif()
 if(WIN32)
     set(PROJ_FILENAME "proj-windows.zip")
     set(PROJ_URL
-        "https://github.com/michalpelka/proj_win_deploy/releases/download/v9.3.0-5/proj-windows.zip"
+        "https://github.com/MapsHD/proj_win_deploy/releases/download/v9.3.0-5/proj-windows.zip"
     )
 
   

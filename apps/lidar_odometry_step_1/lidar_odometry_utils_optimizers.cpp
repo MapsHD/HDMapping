@@ -4,8 +4,8 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 #include <tbb/blocked_range.h>
-#include <tbb/combinable.h>
 #include <tbb/parallel_for.h>
+#include <thread>
 
 #include <export_laz.h>
 
@@ -1826,58 +1826,57 @@ void optimize_lidar_odometry(
     UTL_PROFILER_BEGIN(hessian_compute, "hessian_compute");
     if (multithread)
     {
-        using MatrixPair = std::pair<Eigen::MatrixXd, Eigen::MatrixXd>;
-        tbb::combinable<MatrixPair> thread_local_matrices(
-            [&intermediate_trajectory]()
-            {
-                return std::make_pair(
-                    Eigen::MatrixXd::Zero(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6),
-                    Eigen::MatrixXd::Zero(intermediate_trajectory.size() * 6, 1));
-            });
-        tbb::combinable<LookupStats> thread_local_stats;
+        const size_t num_points = intermediate_points.size();
+        const size_t hw_threads = std::thread::hardware_concurrency();
+        const size_t num_chunks = hw_threads > 0 ? hw_threads : 4; // fallback to 4 if hw_concurrency unknown
+        const size_t chunk_size = (num_points + num_chunks - 1) / num_chunks; // ceiling division
 
-        tbb::parallel_for(
-            tbb::blocked_range<size_t>(0, intermediate_points.size()),
-            [&](const tbb::blocked_range<size_t>& range)
-            {
-                auto& [local_AtPA, local_AtPB] = thread_local_matrices.local();
-                auto& local_stats = thread_local_stats.local();
-                for (size_t i = range.begin(); i != range.end(); ++i)
-                {
-                    compute_hessian(
-                        intermediate_points[i],
-                        intermediate_trajectory,
-                        tait_bryan_poses,
-                        buckets_indoor,
-                        bucket_size_indoor,
-                        buckets_outdoor,
-                        bucket_size_outdoor,
-                        max_distance,
-                        ablation_study_use_hierarchical_rgd,
-                        ablation_study_use_view_point_and_normal_vectors,
-                        ablation_study_use_planarity,
-                        ablation_study_use_norm,
-                        local_AtPA,
-                        local_AtPB,
-                        local_stats,
-                        ablation_study_use_threshold_outer_rgd,
-                        convergence_result,
-                        convergence_delta_threshold_outer_rgd);
-                }
-            });
+        const size_t mat_dim = intermediate_trajectory.size() * 6;
+        std::vector<std::pair<Eigen::MatrixXd, Eigen::MatrixXd>> chunk_matrices(num_chunks);
+        std::vector<LookupStats> chunk_stats(num_chunks);
+        for (size_t c = 0; c < num_chunks; ++c)
+        {
+            chunk_matrices[c].first = Eigen::MatrixXd::Zero(mat_dim, mat_dim);
+            chunk_matrices[c].second = Eigen::MatrixXd::Zero(mat_dim, 1);
+        }
 
-        thread_local_matrices.combine_each(
-            [&AtPAndt, &AtPBndt](const MatrixPair& local)
+        tbb::parallel_for(size_t(0), num_chunks, [&](size_t chunk)
+        {
+            const size_t start = chunk * chunk_size;
+            const size_t end = std::min(start + chunk_size, num_points);
+            auto& [local_AtPA, local_AtPB] = chunk_matrices[chunk];
+            auto& local_stats = chunk_stats[chunk];
+            for (size_t i = start; i < end; ++i)
             {
-                AtPAndt += local.first;
-                AtPBndt += local.second;
-            });
-        thread_local_stats.combine_each(
-            [&lookup_stats](const LookupStats& local)
-            {
-                lookup_stats.indoor_lookups += local.indoor_lookups;
-                lookup_stats.outdoor_lookups += local.outdoor_lookups;
-            });
+                compute_hessian(
+                    intermediate_points[i],
+                    intermediate_trajectory,
+                    tait_bryan_poses,
+                    buckets_indoor,
+                    bucket_size_indoor,
+                    buckets_outdoor,
+                    bucket_size_outdoor,
+                    max_distance,
+                    ablation_study_use_hierarchical_rgd,
+                    ablation_study_use_view_point_and_normal_vectors,
+                    ablation_study_use_planarity,
+                    ablation_study_use_norm,
+                    local_AtPA,
+                    local_AtPB,
+                    local_stats,
+                    ablation_study_use_threshold_outer_rgd,
+                    convergence_result,
+                    convergence_delta_threshold_outer_rgd);
+            }
+        });
+
+        for (size_t c = 0; c < num_chunks; ++c)
+        {
+            AtPAndt += chunk_matrices[c].first;
+            AtPBndt += chunk_matrices[c].second;
+            lookup_stats.indoor_lookups += chunk_stats[c].indoor_lookups;
+            lookup_stats.outdoor_lookups += chunk_stats[c].outdoor_lookups;
+        }
     }
     else
     {

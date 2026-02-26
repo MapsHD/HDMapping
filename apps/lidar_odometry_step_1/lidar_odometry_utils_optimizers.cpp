@@ -2335,6 +2335,8 @@ bool process_worker_step_1(
     std::atomic<float>& loProgress,
     double& ts_failure)
 {
+    UTL_PROFILER_SCOPE("process_worker_step_1");
+
     Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
     if (i > 1 && params.use_motion_from_previous_step)
     {
@@ -2427,6 +2429,8 @@ bool process_worker_step_2(
     double& ts_failure,
     std::vector<Point3Di>& intermediate_points)
 {
+    UTL_PROFILER_SCOPE("process_worker_step_2");
+
     bool add_pitch_roll_constraint = false;
 
     spdlog::stopwatch stopwatch_worker;
@@ -2583,8 +2587,7 @@ bool process_worker_step_lidar_odometry_core(
 {
     spdlog::stopwatch stopwatch_realtime;
 
-    UTL_PROFILER_END(before_iter);
-    UTL_PROFILER_BEGIN(iter_loop, "iteration_loop");
+    UTL_PROFILER_SCOPE("process_worker_step_lidar_odometry_core");
 
     for (int iter = 0; iter < params.nr_iter; iter++)
     {
@@ -2646,7 +2649,6 @@ bool process_worker_step_lidar_odometry_core(
             break;
         }
     }
-    UTL_PROFILER_END(iter_loop);
 
     return true;
 }
@@ -2773,6 +2775,7 @@ bool compute_step_2(
         for (int i = 0; i < worker_data.size(); i++)
         {
             UTL_PROFILER_BEGIN(before_iter, "before_iterations");
+            
             std::vector<Point3Di> intermediate_points;
             // = worker_data[i].load_points(worker_data[i].intermediate_points_cache_file_name);
             load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points);
@@ -2829,6 +2832,8 @@ bool compute_step_2(
             int iter_end = 0;
             double delta = 100000.0;
             double lm_factor = 1.0;
+
+            UTL_PROFILER_END(before_iter);
 
             process_worker_step_lidar_odometry_core(
                 worker_data[i],

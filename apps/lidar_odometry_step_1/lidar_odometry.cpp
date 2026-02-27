@@ -549,7 +549,7 @@ bool compute_step_1(
     for (size_t i = 0; i < n_iter; i++)
     {
         if (i % 50 == 0)
-            std::cout << "\rrunning iterations: " << i + 1 << "/" << n_iter << std::flush;
+            std::cout << "\rrunning iterations: " << i + 1 << "/" << n_iter << std::endl << std::flush;
 
         WorkerData& wd = worker_data.emplace_back(); // construct in-place
         wd.intermediate_trajectory.reserve(threshold);

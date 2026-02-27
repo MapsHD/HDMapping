@@ -1723,9 +1723,9 @@ void PointCloud::render(
     {
         if (line_width > 0)
         {
-            // glColor3f(traj_color[0], traj_color[1], traj_color[2]);
+            glColor3f(traj_color[0], traj_color[1], traj_color[2]);
 
-            glColor3f(render_color[0], render_color[1], render_color[2]);
+            // glColor3f(render_color[0], render_color[1], render_color[2]);
 
             glLineWidth(line_width);
             glBegin(GL_LINE_STRIP);

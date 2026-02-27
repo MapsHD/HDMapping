@@ -3,7 +3,6 @@
 #include <hash_utils.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
-#include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <thread>
 
@@ -1452,12 +1451,11 @@ static void add_indoor_hessian_contribution(
     const Eigen::Vector3d& point_source,
     const TaitBryanPoseWithTrig& pose_trig,
     const Eigen::Vector3d& viewport,
-    const int matrix_offset,
     const bool ablation_study_use_view_point_and_normal_vectors,
     const bool ablation_study_use_planarity,
     const bool ablation_study_use_norm,
-    Eigen::MatrixXd& AtPAndt,
-    Eigen::MatrixXd& AtPBndt)
+    Eigen::Matrix<double, 6, 6, Eigen::RowMajor>& out_AtPA,
+    Eigen::Matrix<double, 6, 1>& out_AtPB)
 {
     // Use precomputed cov_inverse from update_rgd
     const Eigen::Matrix3d& infm = indoor_bucket.cov_inverse;
@@ -1551,8 +1549,8 @@ static void add_indoor_hessian_contribution(
         AtPB *= w;
     }
 
-    AtPAndt.block<6, 6>(matrix_offset, matrix_offset) += AtPA;
-    AtPBndt.block<6, 1>(matrix_offset, 0) -= AtPB;
+    out_AtPA += AtPA;
+    out_AtPB += AtPB;
 }
 
 // Helper to process outdoor bucket contribution
@@ -1561,11 +1559,10 @@ static void add_outdoor_hessian_contribution(
     const Eigen::Vector3d& point_source,
     const TaitBryanPoseWithTrig& pose_trig,
     const Eigen::Vector3d& viewport,
-    const int matrix_offset,
     const bool ablation_study_use_view_point_and_normal_vectors,
     const bool ablation_study_use_planarity,
-    Eigen::MatrixXd& AtPAndt,
-    Eigen::MatrixXd& AtPBndt)
+    Eigen::Matrix<double, 6, 6, Eigen::RowMajor>& out_AtPA,
+    Eigen::Matrix<double, 6, 1>& out_AtPB)
 {
     // Use precomputed cov_inverse from update_rgd
     const Eigen::Matrix3d& infm = outdoor_bucket.cov_inverse;
@@ -1652,12 +1649,13 @@ static void add_outdoor_hessian_contribution(
         AtPB *= planarity;
     }
 
-    AtPAndt.block<6, 6>(matrix_offset, matrix_offset) += AtPA;
-    AtPBndt.block<6, 1>(matrix_offset, 0) -= AtPB;
+    out_AtPA += AtPA;
+    out_AtPB += AtPB;
 }
 
 // Unified hessian function that handles indoor and optionally outdoor contributions
 static void compute_hessian(
+    size_t point_index,
     const Point3Di& point,
     const std::vector<Eigen::Affine3d>& trajectory,
     const std::vector<TaitBryanPoseWithTrig>& tait_bryan_poses,
@@ -1670,9 +1668,9 @@ static void compute_hessian(
     const bool ablation_study_use_view_point_and_normal_vectors,
     const bool ablation_study_use_planarity,
     const bool ablation_study_use_norm,
-    Eigen::MatrixXd& AtPAndt,
-    Eigen::MatrixXd& AtPBndt,
-    LookupStats& stats,
+    std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>& point_AtPA,
+    std::vector<Eigen::Matrix<double, 6, 1>>& point_AtPB,
+    std::vector<LookupStats>& per_point_stats,
     const bool& ablation_study_use_threshold_outer_rgd,
     const double& convergence_result,
     const double& convergence_delta_threshold_outer_rgd)
@@ -1689,29 +1687,25 @@ static void compute_hessian(
     const Eigen::Vector3d point_global = trajectory[point.index_pose] * point.point;
     const Eigen::Vector3d& point_source = point.point;
     const TaitBryanPoseWithTrig& pose_trig = tait_bryan_poses[point.index_pose];
-    const int matrix_offset = point.index_pose * 6;
     const Eigen::Vector3d viewport = trajectory[point.index_pose].translation();
 
     // Indoor contribution (independent)
     const auto indoor_key = get_rgd_index_3d(point_global, bucket_size_indoor);
     const auto indoor_it = buckets_indoor.find(indoor_key);
-    ++stats.indoor_lookups;
+    ++per_point_stats[point_index].indoor_lookups;
 
-    const NDT::Bucket* indoor_bucket = nullptr;
     if (indoor_it != buckets_indoor.end())
     {
-        indoor_bucket = &indoor_it->second;
         add_indoor_hessian_contribution(
-            *indoor_bucket,
+            indoor_it->second,
             point_source,
             pose_trig,
             viewport,
-            matrix_offset,
             ablation_study_use_view_point_and_normal_vectors,
             ablation_study_use_planarity,
             ablation_study_use_norm,
-            AtPAndt,
-            AtPBndt);
+            point_AtPA[point_index],
+            point_AtPB[point_index]);
     }
 
     // Outdoor contribution (independent, only when hierarchical mode and range >= 5.0)
@@ -1736,7 +1730,7 @@ static void compute_hessian(
     {
         const auto outdoor_key = get_rgd_index_3d(point_global, bucket_size_outdoor);
         const auto outdoor_it = buckets_outdoor.find(outdoor_key);
-        ++stats.outdoor_lookups;
+        ++per_point_stats[point_index].outdoor_lookups;
 
         if (outdoor_it != buckets_outdoor.end())
         {
@@ -1745,11 +1739,10 @@ static void compute_hessian(
                 point_source,
                 pose_trig,
                 viewport,
-                matrix_offset,
                 ablation_study_use_view_point_and_normal_vectors,
                 ablation_study_use_planarity,
-                AtPAndt,
-                AtPBndt);
+                point_AtPA[point_index],
+                point_AtPB[point_index]);
         }
     }
 }
@@ -1824,87 +1817,52 @@ void optimize_lidar_odometry(
     UTL_PROFILER_END(pre_hessian);
 
     UTL_PROFILER_BEGIN(hessian_compute, "hessian_compute");
+    const size_t num_points = intermediate_points.size();
+    using Mat6x6 = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>;
+    using Vec6x1 = Eigen::Matrix<double, 6, 1>;
+    std::vector<Mat6x6> point_AtPA(num_points, Mat6x6::Zero());
+    std::vector<Vec6x1> point_AtPB(num_points, Vec6x1::Zero());
+    std::vector<LookupStats> per_point_stats(num_points);
+
+    auto compute_point = [&](size_t i)
+    {
+        compute_hessian(
+            i,
+            intermediate_points[i],
+            intermediate_trajectory,
+            tait_bryan_poses,
+            buckets_indoor,
+            bucket_size_indoor,
+            buckets_outdoor,
+            bucket_size_outdoor,
+            max_distance,
+            ablation_study_use_hierarchical_rgd,
+            ablation_study_use_view_point_and_normal_vectors,
+            ablation_study_use_planarity,
+            ablation_study_use_norm,
+            point_AtPA,
+            point_AtPB,
+            per_point_stats,
+            ablation_study_use_threshold_outer_rgd,
+            convergence_result,
+            convergence_delta_threshold_outer_rgd);
+    };
+
     if (multithread)
-    {
-        const size_t num_points = intermediate_points.size();
-        const size_t hw_threads = std::thread::hardware_concurrency();
-        const size_t num_chunks = hw_threads > 0 ? hw_threads : 4; // fallback to 4 if hw_concurrency unknown
-        const size_t chunk_size = (num_points + num_chunks - 1) / num_chunks; // ceiling division
-
-        const size_t mat_dim = intermediate_trajectory.size() * 6;
-        std::vector<std::pair<Eigen::MatrixXd, Eigen::MatrixXd>> chunk_matrices(num_chunks);
-        std::vector<LookupStats> chunk_stats(num_chunks);
-        for (size_t c = 0; c < num_chunks; ++c)
-        {
-            chunk_matrices[c].first = Eigen::MatrixXd::Zero(mat_dim, mat_dim);
-            chunk_matrices[c].second = Eigen::MatrixXd::Zero(mat_dim, 1);
-        }
-
-        tbb::parallel_for(
-            size_t(0),
-            num_chunks,
-            [&](size_t chunk)
-            {
-                const size_t start = chunk * chunk_size;
-                const size_t end = std::min(start + chunk_size, num_points);
-                auto& [local_AtPA, local_AtPB] = chunk_matrices[chunk];
-                auto& local_stats = chunk_stats[chunk];
-                for (size_t i = start; i < end; ++i)
-                {
-                    compute_hessian(
-                        intermediate_points[i],
-                        intermediate_trajectory,
-                        tait_bryan_poses,
-                        buckets_indoor,
-                        bucket_size_indoor,
-                        buckets_outdoor,
-                        bucket_size_outdoor,
-                        max_distance,
-                        ablation_study_use_hierarchical_rgd,
-                        ablation_study_use_view_point_and_normal_vectors,
-                        ablation_study_use_planarity,
-                        ablation_study_use_norm,
-                        local_AtPA,
-                        local_AtPB,
-                        local_stats,
-                        ablation_study_use_threshold_outer_rgd,
-                        convergence_result,
-                        convergence_delta_threshold_outer_rgd);
-                }
-            });
-
-        for (size_t c = 0; c < num_chunks; ++c)
-        {
-            AtPAndt += chunk_matrices[c].first;
-            AtPBndt += chunk_matrices[c].second;
-            lookup_stats.indoor_lookups += chunk_stats[c].indoor_lookups;
-            lookup_stats.outdoor_lookups += chunk_stats[c].outdoor_lookups;
-        }
-    }
+        tbb::parallel_for(size_t(0), num_points, compute_point);
     else
+        for (size_t i = 0; i < num_points; ++i)
+            compute_point(i);
+
+    // Sequential sum in point order -- guarantees identical accumulation order
+    // for both ST and MT paths, avoiding FP non-associativity nondeterminism.
+    for (size_t i = 0; i < num_points; ++i)
     {
-        for (const auto& pt : intermediate_points)
-        {
-            compute_hessian(
-                pt,
-                intermediate_trajectory,
-                tait_bryan_poses,
-                buckets_indoor,
-                bucket_size_indoor,
-                buckets_outdoor,
-                bucket_size_outdoor,
-                max_distance,
-                ablation_study_use_hierarchical_rgd,
-                ablation_study_use_view_point_and_normal_vectors,
-                ablation_study_use_planarity,
-                ablation_study_use_norm,
-                AtPAndt,
-                AtPBndt,
-                lookup_stats,
-                ablation_study_use_threshold_outer_rgd,
-                convergence_result,
-                convergence_delta_threshold_outer_rgd);
-        }
+        const int c = intermediate_points[i].index_pose * 6;
+        AtPAndt.block<6, 6>(c, c) += point_AtPA[i];
+        AtPBndt.block<6, 1>(c, 0) -= point_AtPB[i];
+        lookup_stats.indoor_lookups += per_point_stats[i].indoor_lookups;
+        lookup_stats.outdoor_lookups += per_point_stats[i].outdoor_lookups;
     }
     UTL_PROFILER_END(hessian_compute);
 

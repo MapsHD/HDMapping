@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+// TODO(mwlasiuk) : do this at the end (print -> spdlog) as it is .h and not cpp + hpp and that breaks some subprojects ...
+
 #include <filesystem>
 #include <iostream>
 #include <session.h>

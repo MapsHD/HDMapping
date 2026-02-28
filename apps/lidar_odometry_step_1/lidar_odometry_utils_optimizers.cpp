@@ -1899,10 +1899,12 @@ void optimize_lidar_odometry(
     }
     UTL_PROFILER_END(hessian_sum);
 
-    thread_local_stats.combine_each([&](const LookupStats& s) {
-        lookup_stats.indoor_lookups += s.indoor_lookups;
-        lookup_stats.outdoor_lookups += s.outdoor_lookups;
-    });
+    thread_local_stats.combine_each(
+        [&](const LookupStats& s)
+        {
+            lookup_stats.indoor_lookups += s.indoor_lookups;
+            lookup_stats.outdoor_lookups += s.outdoor_lookups;
+        });
     UTL_PROFILER_END(hessian_compute);
 
     UTL_PROFILER_BEGIN(post_hessian, "post_hessian");

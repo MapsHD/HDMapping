@@ -218,8 +218,7 @@ void ndt_gui()
             double rms_initial = 0.0;
             double rms_final = 0.0;
             double mui = 0.0;
-            // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
-            // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
+
             ndt.optimize(sessions, false, compute_mean_and_cov_for_bucket);
         }
         ImGui::End();
@@ -281,8 +280,6 @@ void ndt_gui()
         double rms_initial = 0.0;
         double rms_final = 0.0;
         double mui = 0.0;
-        // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
-        // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
         ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     }
 
@@ -2743,15 +2740,12 @@ void display()
                     for (size_t j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
                         all_m_poses.push_back(sessions[i].point_clouds_container.point_clouds[j].m_pose);
 
-                    // if (all_m_poses.size() > 1)
-                    //{
                     ImGuiIO& io = ImGui::GetIO();
-                    // ImGuizmo -----------------------------------------------
+
                     ImGuizmo::BeginFrame();
                     ImGuizmo::Enable(true);
                     ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-                    // std::cout << "3" << std::endl;
                     if (!is_ortho)
                     {
                         GLfloat projection[16];

@@ -708,8 +708,6 @@ bool ICP::optimization_point_to_point_source_to_target(
         for (auto& pc : point_clouds_container.point_clouds)
         {
             pc.points_type.resize(pc.points_local.size());
-            // std::cout << "computing nv [" << counter_computed_nv++ << "] of " << point_clouds_container.point_clouds.size() << std::endl;
-            // pc.compute_normal_vectors(0.5);
         }
     }
 
@@ -988,11 +986,6 @@ bool ICP::optimization_point_to_point_source_to_target(
 
                         rms += delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0) + delta(2, 0) * delta(2, 0);
                         sum_obs += 3.0;
-
-                        // if(sqrt(delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0) + delta(2, 0) * delta(2, 0)) > 0.1){
-                        //     std::cout << sqrt(delta(0, 0) * delta(0, 0) + delta(1, 0) * delta(1, 0) + delta(2, 0) * delta(2, 0)) <<
-                        //     std::endl;
-                        // }
                     }
 
                     double curr_rms = sqrt(rms / sum_obs);
@@ -1000,12 +993,6 @@ bool ICP::optimization_point_to_point_source_to_target(
                     std::cout << "number of observations: " << sum_obs << std::endl;
                 }
             }
-
-            // if (!precompute_rgd)
-            //{
-            //     point_clouds_container.point_clouds[i].buckets.clear();
-            //     point_clouds_container.point_clouds[i].index_pairs.clear();
-            // }
         }
         rms = sqrt(rms / sum_obs);
         out_rms = rms;
@@ -1266,13 +1253,11 @@ bool ICP::optimization_point_to_point_source_to_target(
         Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
         std::vector<double> h_x;
-        // std::cout << "Solution: " << std::endl;
         for (int k = 0; k < x.outerSize(); ++k)
         {
             for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
             {
                 h_x.push_back(it.value());
-                // std::cout << "col: " << it.col() << " row: " << it.row() << " value: " << it.value() << std::endl;
             }
         }
 
@@ -1333,12 +1318,6 @@ bool ICP::optimization_point_to_point_source_to_target(
                     {
                         continue;
                     }
-                    // if (point_clouds_container.point_clouds[i].fixed) //ToDo
-                    //{
-                    //     std::cout << "point cloud " << i << " is fixed, continue" << std::endl;
-                    //     continue;
-                    // }
-
                     if (pose_convention == PoseConvention::wc)
                     {
                         point_clouds_container.point_clouds[i].m_pose = affine_matrix_from_pose_tait_bryan(pose);
@@ -1371,11 +1350,6 @@ bool ICP::optimization_point_to_point_source_to_target(
                     {
                         continue;
                     }
-                    // if (point_clouds_container.point_clouds[i].fixed) //ToDo
-                    //{
-                    //     std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed" << std::endl;
-                    //     continue;
-                    // }
 
                     if (pose_convention == PoseConvention::wc)
                     {
@@ -1410,12 +1384,6 @@ bool ICP::optimization_point_to_point_source_to_target(
                     {
                         continue;
                     }
-                    // if (point_clouds_container.point_clouds[i].fixed)//ToDo
-                    //{
-                    //     std::cout << "PC: " << point_clouds_container.point_clouds[i].file_name << " is fixed" << std::endl;
-                    //     continue;
-                    // }
-
                     if (pose_convention == PoseConvention::wc)
                     {
                         point_clouds_container.point_clouds[i].m_pose = affine_matrix_from_pose_quaternion(pose);
@@ -1809,19 +1777,8 @@ std::vector<Eigen::Matrix<double, 7, 7, Eigen::RowMajor>> ICP::compute_covarianc
 
 bool ICP::optimize_source_to_target_lie_algebra_left_jacobian(PointClouds& point_clouds_container)
 {
-    // std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> covariance_matrices_before6x6;
-    // std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> covariance_matrices_after6x6;
-
-    // covariance_matrices_before6x6 =
-    // compute_covariance_matrices_point_to_point_source_to_target_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
-
+    // TODO(mwlasiuk) : return ???
     optimize_source_to_target_lie_algebra_left_jacobian(point_clouds_container, is_fix_first_node);
-
-    // covariance_matrices_after6x6 =
-    // compute_covariance_matrices_point_to_point_source_to_target_source_to_target_lie_algebra_left_jacobian(point_clouds_container);
-
-    // double mui = get_mean_uncertainty_xyz_impact6x6(covariance_matrices_before6x6, covariance_matrices_after6x6);
-    // std::cout << "mean uncertainty_xyz impact: " << mui << std::endl;
     return true;
 }
 
@@ -1950,19 +1907,8 @@ std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> ICP::
 
 bool ICP::optimize_source_to_target_lie_algebra_right_jacobian(PointClouds& point_clouds_container)
 {
-    // std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> covariance_matrices_before6x6;
-    // std::vector<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> covariance_matrices_after6x6;
-
-    // covariance_matrices_before6x6 =
-    // compute_covariance_matrices_point_to_point_source_to_target_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
-
+    // TODO(mwlasiuk) : return ???
     optimize_source_to_target_lie_algebra_right_jacobian(point_clouds_container, is_fix_first_node);
-
-    // covariance_matrices_after6x6 =
-    // compute_covariance_matrices_point_to_point_source_to_target_source_to_target_lie_algebra_right_jacobian(point_clouds_container);
-
-    // double mui = get_mean_uncertainty_xyz_impact6x6(covariance_matrices_before6x6, covariance_matrices_after6x6);
-    // std::cout << "mean uncertainty_xyz impact: " << mui << std::endl;
     return true;
 }
 

@@ -1070,13 +1070,11 @@ bool RegistrationPlaneFeature::optimize_point_to_projection_onto_plane_source_to
         Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
         std::vector<double> h_x;
-        // std::cout << "Solution: " << std::endl;
         for (int k = 0; k < x.outerSize(); ++k)
         {
             for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
             {
                 h_x.push_back(it.value());
-                // std::cout << "col: " << it.col() << " row: " << it.row() << " value: " << it.value() << std::endl;
             }
         }
 
@@ -1611,13 +1609,11 @@ bool RegistrationPlaneFeature::optimize_point_to_projection_onto_plane_source_to
         Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
         std::vector<double> h_x;
-        // std::cout << "Solution: " << std::endl;
         for (int k = 0; k < x.outerSize(); ++k)
         {
             for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
             {
                 h_x.push_back(it.value());
-                // std::cout << "col: " << it.col() << " row: " << it.row() << " value: " << it.value() << std::endl;
             }
         }
 
@@ -2049,13 +2045,11 @@ bool RegistrationPlaneFeature::optimize_point_to_projection_onto_plane_source_to
         Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
         std::vector<double> h_x;
-        // std::cout << "Solution: " << std::endl;
         for (int k = 0; k < x.outerSize(); ++k)
         {
             for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
             {
                 h_x.push_back(it.value());
-                // std::cout << "col: " << it.col() << " row: " << it.row() << " value: " << it.value() << std::endl;
             }
         }
 

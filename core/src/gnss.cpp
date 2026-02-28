@@ -127,7 +127,6 @@ bool GNSS::load(const std::vector<std::string>& input_file_names, Eigen::Vector3
             pose.x = pose.x - firstGNSS.x;
             pose.y = pose.y - firstGNSS.y;
             pose.alt = pose.alt - firstGNSS.alt;
-            // std::cout << "pose.x: " << pose.x << " pose.y: " << pose.y << " pose.alt: " << pose.alt << std::endl;
         }
     }
 
@@ -188,8 +187,6 @@ bool GNSS::load_mercator_projection(const std::vector<std::string>& input_file_n
                                 if (gp.lon != 0)
                                 {
                                     gnss_poses.push_back(gp);
-                                    // std::cout << std::setprecision(20);
-                                    //  std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << " gp.alt " << gp.alt << std::endl;
                                 }
                             }
                         }
@@ -312,7 +309,6 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string>& input_f
                 // register if there  is not nans
                 if (gp.lat == gp.lat && gp.lon == gp.lon && gp.alt == gp.alt)
                 {
-                    // std::cout << "gp.lat " << gp.lat << " gp.lon " << gp.lon << std::endl;
                     gnss_poses.push_back(gp);
                 }
             }
@@ -354,8 +350,6 @@ bool GNSS::load_nmea_mercator_projection(const std::vector<std::string>& input_f
         std::array<double, 2> result{ wgs84::toCartesian(WGS84Reference, WGS84Position) };
         gnss_poses[i].x = result[0];
         gnss_poses[i].y = result[1];
-
-        // std::cout << "gnss_poses[i].x " << gnss_poses[i].x << " gnss_poses[i].y " << gnss_poses[i].y << std::endl;
     }
 
     return true;

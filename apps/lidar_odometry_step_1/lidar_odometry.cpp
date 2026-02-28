@@ -391,22 +391,6 @@ void calculate_trajectory(
                                          static_cast<float>(gyr.axis.z * RAD_TO_DEG) - static_cast<float>(bias_gyr_z) };
         const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
 
-        /*if (provious_time_stamp == 0.0)
-        {
-            double SAMPLE_PERIOD = (1.0 / 200.0);
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-        }
-        else
-        {
-            double sp = timestamp_pair.first - provious_time_stamp;
-            // std::cout << "sp: " << sp << std::endl;
-            if (sp > 0.1)
-            {
-                sp = 0.1;
-            }
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, sp);
-        }*/
-
         if (first)
         {
             FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
@@ -420,25 +404,6 @@ void calculate_trajectory(
             double ts_diff = curr_ts - last_ts;
 
             FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
-
-            /*if (ts_diff < 0)
-            {
-                std::cout << "WARNING!!!!" << std::endl;
-                std::cout << "WARNING!!!!" << std::endl;
-                std::cout << "WARNING!!!!" << std::endl;
-                std::cout << "WARNING!!!!" << std::endl;
-                std::cout << "WARNING!!!!" << std::endl;
-                std::cout << "WARNING!!!!" << std::endl;
-            }
-
-            if (ts_diff < 0.01)
-            {
-                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
-            }
-            else
-            {
-                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0/200.0);
-            }*/
         }
 
         last_ts = timestamp_pair.first;
@@ -499,8 +464,6 @@ bool compute_step_1(
         if (number_of_initial_points > params.threshold_initial_points)
             break;
     }
-
-    // std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
 
     std::vector<std::pair<double, double>> timestamps;
     std::vector<Eigen::Affine3d> poses;
@@ -599,8 +562,6 @@ bool compute_step_1(
                 points.insert(points.end(), std::make_move_iterator(lower), std::make_move_iterator(upper));
         }
 
-        // wd.original_points = points;
-
         // correct points timestamps
         if (wd.intermediate_trajectory_timestamps.size() > 2)
         {
@@ -609,15 +570,9 @@ bool compute_step_1(
                               wd.intermediate_trajectory_timestamps[0].first) /
                 points.size();
 
-            // std::cout << "ts_begin " << ts_begin << std::endl;
-            // std::cout << "ts_step " << ts_step << std::endl;
-            // std::cout << "ts_end " << wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first <<
-            // std::endl;
-
             for (size_t pp = 0; pp < points.size(); pp++)
                 points[pp].timestamp = ts_begin + pp * ts_step;
         }
-        //////////////////////////////////////////
 
         for (size_t k = 0; k < points.size(); k++)
         {
@@ -996,11 +951,6 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
 
     // Save processing results and complex data to JSON file
     save_processing_results_json(params, outwd, elapsed_time_s);
-
-    // remove cache
-    // std::cout << "remove cache: '" << params.working_directory_cache << "' START" << std::endl;
-    // std::filesystem::remove_all(params.working_directory_cache);
-    // std::cout << "remove cache: '" << params.working_directory_cache << "' FINISHED" << std::endl;
 }
 
 void filter_reference_buckets(LidarOdometryParams& params)

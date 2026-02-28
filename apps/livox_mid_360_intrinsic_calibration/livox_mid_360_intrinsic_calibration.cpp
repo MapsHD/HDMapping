@@ -531,7 +531,6 @@ void project_gui()
                     for (int i = 0; i < sel.size(); i++)
                     {
                         input_file_names.push_back(sel[i]);
-                        // std::cout << "las file: '" << input_file_name << "'" << std::endl;
                     }
                 };
                 std::thread t1(t);
@@ -1450,7 +1449,6 @@ void calibrate_intrinsics()
 
     // std::vector<std::mutex> mutexes(intrinsics.size());
 
-    // std::cout << "jojo" << std::endl;
     const auto hessian_fun = [&](const Point3Di& intermediate_points_i)
     {
         int ir = tripletListB.size();
@@ -1776,7 +1774,6 @@ void calibrate_intrinsics()
     {
         for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
         {
-            // std::cout << it.value() << " ";
             h_x.push_back(it.value());
         }
     }

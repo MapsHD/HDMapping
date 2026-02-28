@@ -181,10 +181,6 @@ bool PointClouds::update_poses_from_RESSO(const std::string& folder_with_point_c
         pc.m_pose(0, 3) = t14;
         pc.m_pose(1, 3) = t24;
         pc.m_pose(2, 3) = t34;
-        // pc.m_initial_pose = pc.m_pose;
-
-        // std::cout << "update pose: " << std::endl;
-        // std::cout << pc.m_pose.matrix() << std::endl;
 
         pcs.push_back(pc);
     }
@@ -198,13 +194,6 @@ bool PointClouds::update_poses_from_RESSO(const std::string& folder_with_point_c
             {
                 if (std::filesystem::path(point_clouds[i].file_name).filename().string() == pcs[j].file_name)
                 {
-                    // std::cout << "-------------------------" << std::endl;
-                    // std::cout << "update pose: " << i << std::endl;
-                    // std::cout << "previous pose: " << std::endl
-                    //		  << point_clouds[i].m_pose.matrix() << std::endl;
-                    // std::cout << "current pose: " << std::endl
-                    //		  << pcs[j].m_pose.matrix() << std::endl;
-
                     point_clouds[i].m_pose = pcs[j].m_pose;
                     point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds[i].m_pose);
                     point_clouds[i].gui_translation[0] = point_clouds[i].pose.px;
@@ -213,19 +202,8 @@ bool PointClouds::update_poses_from_RESSO(const std::string& folder_with_point_c
                     point_clouds[i].gui_rotation[0] = rad2deg(point_clouds[i].pose.om);
                     point_clouds[i].gui_rotation[1] = rad2deg(point_clouds[i].pose.fi);
                     point_clouds[i].gui_rotation[2] = rad2deg(point_clouds[i].pose.ka);
-                } // else{
-                  //	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string() != pcs[j].file_name" <<
-                  // std::endl; 	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string(): "<<
-                  // std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl; 	std::cout <<
-                  // "pcs[j].file_name:
-                  // "<< pcs[j].file_name << std::endl; 	std::cout << "j: " << j << std::endl;
-                  // return false;
-                  //}
+                }
             }
-
-            /**/
-
-            // point_clouds[i].m_initial_pose = point_clouds[i].m_pose;
         }
     }
     else
@@ -314,13 +292,6 @@ bool PointClouds::update_poses_from_RESSO_inverse(const std::string& folder_with
             {
                 if (std::filesystem::path(point_clouds[i].file_name).filename().string() == pcs[j].file_name)
                 {
-                    // std::cout << "-------------------------" << std::endl;
-                    // std::cout << "update pose: " << i << std::endl;
-                    // std::cout << "previous pose: " << std::endl
-                    //		  << point_clouds[i].m_pose.matrix() << std::endl;
-                    // std::cout << "current pose: " << std::endl
-                    //		  << pcs[j].m_pose.matrix() << std::endl;
-
                     point_clouds[i].m_pose = pcs[j].m_pose;
                     point_clouds[i].pose = pose_tait_bryan_from_affine_matrix(point_clouds[i].m_pose);
                     point_clouds[i].gui_translation[0] = point_clouds[i].pose.px;
@@ -329,19 +300,8 @@ bool PointClouds::update_poses_from_RESSO_inverse(const std::string& folder_with
                     point_clouds[i].gui_rotation[0] = rad2deg(point_clouds[i].pose.om);
                     point_clouds[i].gui_rotation[1] = rad2deg(point_clouds[i].pose.fi);
                     point_clouds[i].gui_rotation[2] = rad2deg(point_clouds[i].pose.ka);
-                } // else{
-                  //	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string() != pcs[j].file_name" <<
-                  // std::endl; 	std::cout << "std::filesystem::path(point_clouds[i].file_name).filename().string(): "<<
-                  // std::filesystem::path(point_clouds[i].file_name).filename().string() << std::endl; 	std::cout <<
-                  // "pcs[j].file_name:
-                  // "<< pcs[j].file_name << std::endl; 	std::cout << "j: " << j << std::endl;
-                  // return false;
-                  //}
+                }
             }
-
-            /**/
-
-            // point_clouds[i].m_initial_pose = point_clouds[i].m_pose;
         }
     }
     else
@@ -425,13 +385,6 @@ bool PointClouds::update_initial_poses_from_RESSO(const std::string& folder_with
             {
                 if (std::filesystem::path(point_clouds[i].file_name).filename().string() == pcs[j].file_name)
                 {
-                    // std::cout << "-------------------------" << std::endl;
-                    // std::cout << "update pose: " << i << std::endl;
-                    // std::cout << "previous pose: " << std::endl
-                    //		  << point_clouds[i].m_initial_pose.matrix() << std::endl;
-                    // std::cout << "current pose: " << std::endl
-                    //		  << pcs[j].m_initial_pose.matrix() << std::endl;
-
                     point_clouds[i].m_initial_pose = pcs[j].m_initial_pose;
                 }
             }
@@ -1203,8 +1156,7 @@ bool PointClouds::load_pc(PointCloud& pc, std::string input_file_name, bool load
 			static_cast<float>(point->rgb[0]) / 256.0,
 			static_cast<float>(point->rgb[1]) / 256.0,
 			static_cast<float>(point->rgb[2]) / 256.0);
-
-		// std::cout << point->rgb[0] << " " << point->rgb[1] << " " << point->rgb[2] << std::endl;
+ 
 
 		pc.colors.push_back(color);
 

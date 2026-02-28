@@ -37,8 +37,6 @@ bool PointCloud::load(const std::string& file_name)
     // Example of direct access
     {
         auto xData = data["vertex"]->properties["x"];
-        // std::cout << "x value of the first vertex element:\n" << xData->at<float>(0) << std::endl;
-        // std::cout << "\n";
         auto yData = data["vertex"]->properties["y"];
         auto zData = data["vertex"]->properties["z"];
         for (size_t i = 0; i < xData->size(); i++)
@@ -56,11 +54,6 @@ bool PointCloud::load(const std::string& file_name)
             }
         }
     }
-    //}
-    // catch (const plycpp::Exception& e)
-    //{
-    //	std::cout << "An exception happened:\n" << e.what() << std::endl;
-    //}
 
 #if 0
 	std::ifstream infile(file_name);
@@ -242,25 +235,15 @@ bool PointCloud::load_pc(const std::string& input_file_name, bool load_cache_mod
             number_of_points_with_timestamp_eq_0++;
         }
 
-        // std::cout << "p.timestamp: " << p.timestamp << std::endl;
-
         Eigen::Vector3d pp(p.x, p.y, p.z);
         this->points_local.emplace_back(pp);
         this->intensities.emplace_back(point->intensity);
         this->timestamps.emplace_back(p.timestamp);
 
-        // Eigen::Vector3d color(
-        //	static_cast<uint8_t>(0xFFU * ((point->rgb[0] > 0) ? static_cast<float>(point->rgb[0]) / static_cast<float>(0xFFFFU) : 1.0f))
-        /// 256.0, 	static_cast<uint8_t>(0xFFU * ((point->rgb[1] > 0) ? static_cast<float>(point->rgb[1]) / static_cast<float>(0xFFFFU)
-        //: 1.0f)) / 256.0, 	static_cast<uint8_t>(0xFFU * ((point->rgb[2] > 0) ? static_cast<float>(point->rgb[2]) /
-        // static_cast<float>(0xFFFFU) : 1.0f)) / 256.0);
-
         Eigen::Vector3d color(
             static_cast<float>(point->rgb[0]) / 256.0,
             static_cast<float>(point->rgb[1]) / 256.0,
             static_cast<float>(point->rgb[2]) / 256.0);
-
-        // std::cout << point->rgb[0] << " " << point->rgb[1] << " " << point->rgb[2] << std::endl;
 
         this->colors.push_back(color);
 
@@ -325,8 +308,6 @@ void build_rgd_init_job(int i, PointCloud::Job* job, std::vector<PointCloud::Buc
 void build_rgd_job(
     int i, PointCloud::Job* job, std::vector<PointCloud::PointBucketIndexPair>* index_pair, std::vector<PointCloud::Bucket>* buckets)
 {
-    // std::cout << "build_rgd_job:[" << i << "]" << std::endl;
-
     for (uint64_t ii = job->index_begin_inclusive; ii < job->index_end_exclusive; ii++)
     {
         uint64_t ind = ii;
@@ -365,12 +346,8 @@ void build_rgd_job(
 
 void build_rgd_final_job(int i, PointCloud::Job* job, std::vector<PointCloud::Bucket>* buckets)
 {
-    // std::cout << "build_rgd_init_job:[" << i << "]" << std::endl;
-
     for (size_t ii = job->index_begin_inclusive; ii < job->index_end_exclusive; ii++)
     {
-        // std::cout << job->index_begin_inclusive << " " << job->index_end_exclusive << " " << (*buckets).size() << std::endl;
-
         uint64_t index_begin = (*buckets)[ii].index_begin;
         uint64_t index_end = (*buckets)[ii].index_end;
         if (index_begin != -1 && index_end != -1)
@@ -382,19 +359,13 @@ void build_rgd_final_job(int i, PointCloud::Job* job, std::vector<PointCloud::Bu
 
 bool PointCloud::build_rgd()
 {
-    // std::cout << "build_rgd()" << std::endl;
     buckets.clear();
     index_pairs.clear();
 
     grid_calculate_params(this->points_local, this->rgd_params);
     cout_rgd();
 
-    // std::cout << "grid_calculate_params done" << std::endl;
-
     reindex(this->index_pairs, this->points_local, this->rgd_params);
-    // std::cout << "reindex done" << std::endl;
-
-    // std::cout << "rgd_params.number_of_buckets: " << rgd_params.number_of_buckets << std::endl;
 
     buckets.resize(rgd_params.number_of_buckets);
 
@@ -503,8 +474,6 @@ void reindex_job(
     std::vector<PointCloud::PointBucketIndexPair>* pairs,
     PointCloud::GridParameters rgd_params)
 {
-    // std::cout << "reindex_job:[" << i << "]" << std::endl;
-
     for (size_t ii = job->index_begin_inclusive; ii < job->index_end_exclusive; ii++)
     {
         Eigen::Vector3d& p = (*points)[ii];
@@ -576,11 +545,6 @@ std::vector<PointCloud::Job> PointCloud::get_jobs(uint64_t size, int num_threads
         jobs.push_back(j);
     }
 
-    // std::cout << jobs.size() << " jobs; chunks: ";
-    // for(size_t i = 0; i < jobs.size(); i++){
-    //	std::cout << "("<<jobs[i].index_begin_inclusive << ", " << jobs[i].index_end_exclusive <<") ";
-    // }
-    // std::cout << "\n";
     return jobs;
 }
 
@@ -1558,7 +1522,6 @@ void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
     {
         if (ip[i - 1].index_of_bucket != ip[i].index_of_bucket)
         {
-            // std::cout << index_pairs[i].index_of_bucket << std::endl;
             n_points_local.emplace_back(points_local[ip[i].index_of_point]);
             if (normal_vectors_local.size() == points_local.size())
                 n_normal_vectors_local.emplace_back(normal_vectors_local[ip[i].index_of_point]);
@@ -1643,10 +1606,6 @@ void PointCloud::render(
             glColor3f(0, 0, 1);
             glVertex3f(m(0, 3), m(1, 3), m(2, 3));
             glVertex3f(m(0, 3), m(1, 3), m(2, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.z() * 10);
-
-            // std::cout << this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.x() << " " <<
-            // this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.y() << " " << this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.z()
-            // << std::endl;
         }
         glEnd();
     }

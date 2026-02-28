@@ -330,8 +330,6 @@ void PoseGraphLoopClosure::graph_slam(PointClouds& point_clouds_container, GNSS&
                             p_t.y(),
                             p_t.z());
 
-                        // std::cout << " delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
-
                         int ir = tripletListB.size();
                         int ic = index_pose * 6;
                         for (int row = 0; row < 3; row++)
@@ -1020,8 +1018,6 @@ void PoseGraphLoopClosure::FuseTrajectoryWithGNSS(PointClouds& point_clouds_cont
                         p_t.x(),
                         p_t.y(),
                         p_t.z());
-
-                    // std::cout << " delta_x " << delta_x << " delta_y " << delta_y << " delta_z " << delta_z << std::endl;
 
                     int ir = tripletListB.size();
                     int ic = 0;

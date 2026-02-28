@@ -599,7 +599,6 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
                 acc_distance = acc_distance_tmp;
                 std::cout << "please split data set into subsets" << std::endl;
                 ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
-                // std::cout << "calculations canceled for TIMESTAMP: " << (int64_t)worker_data[i].intermediate_trajectory_timestamps[0].first << std::endl;
                 return false;
             }
 
@@ -763,9 +762,6 @@ int main(int argc, char *argv[])
     {
         working_directory = "."; // fs::path(input_file_names[0]).parent_path().string();
 
-        // std::cout << "0" << std::endl;
-
-        // check if folder exists!
         if (!fs::exists(working_directory))
         {
             std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
@@ -893,8 +889,6 @@ int main(int argc, char *argv[])
                                std::cout << calib.matrix() << std::endl;
                            }
                            return data;
-                           // std::cout << fn << std::endl;
-                           //
                        });
         std::cout << "std::transform finished" << std::endl;
 
@@ -922,8 +916,6 @@ int main(int argc, char *argv[])
             const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
             const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
 
-            // std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z: " << acc.axis.z << std::endl;
-
             FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
 
             FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
@@ -932,14 +924,6 @@ int main(int argc, char *argv[])
             Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
             t.rotate(d);
 
-            //
-            // TaitBryanPose rot_y;
-            // rot_y.px = rot_y.py = rot_y.pz = rot_y.px = rot_y.py = rot_y.pz;
-            // rot_y.fi = -5 * M_PI / 180.0;
-            // Eigen::Affine3d m_rot_y = affine_matrix_from_pose_tait_bryan(rot_y);
-            // t = t * m_rot_y;
-            //
-            // std::map<double, Eigen::Matrix4d> trajectory;
             trajectory[timestamp_pair.first] = std::pair(t.matrix(), timestamp_pair.second);
             const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
             counter++;

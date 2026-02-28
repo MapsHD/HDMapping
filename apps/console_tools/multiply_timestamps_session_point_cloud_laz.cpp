@@ -148,8 +148,6 @@ bool load_pc(PointCloud& pc, const std::string& input_file_name)
             static_cast<float>(point->rgb[1]) / 256.0,
             static_cast<float>(point->rgb[2]) / 256.0);
 
-        // std::cout << point->rgb[0] << " " << point->rgb[1] << " " << point->rgb[2] << std::endl;
-
         pc.colors.push_back(color);
 
         p_count++;

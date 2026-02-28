@@ -140,11 +140,6 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
             }
         }
 
-        // std::cout << "------laz file names-----" << std::endl;
-        // for (const auto &fn : laz_file_names)
-        //{
-        //     std::cout << "'" << fn << "'" << std::endl;
-        // }
 #if WITH_GUI == 1
         for (const auto& gcp_json : data["ground_control_points"])
         {
@@ -289,22 +284,7 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
                 Eigen::Vector3d diff(fabs(tb_pose_mm.om - tb_pose.om), fabs(tb_pose_mm.fi - tb_pose.fi), fabs(tb_pose_mm.ka - tb_pose.ka));
 
                 point_clouds_container.point_clouds[i].local_trajectory[j].imu_diff_angle_om_fi_ka_deg = diff;
-
-                // TaitBryanPose tb_pose2;
-                // tb_pose2.om = point_clouds_container.point_clouds[i].local_trajectory[j-1].imu_om_fi_ka.x()
-
-                // std::cout << tb_pose.om << " " << tb_pose.fi << " " << tb_pose.ka << " "
-                //          << point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.x() << " " <<
-                //    point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.y() << " "
-                //    << point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.z() <<  std::endl;
             }
-            // struct LocalTrajectoryNode{
-            //    std::pair<double, double> timestamps;
-            //    Eigen::Affine3d m_pose;
-            //    Eigen::Vector3d imu_om_fi_ka;
-            //    Eigen::Vector3d imu_diff_angle_om_fi_ka_deg;
-            //};
-            // pc.local_trajectory
         }
 
         return true;

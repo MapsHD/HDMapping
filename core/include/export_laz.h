@@ -167,20 +167,6 @@ inline bool exportLaz(
     return writer.close();
 }
 
-// inline Eigen::Vector3d adjustPoint(laszip_F64 input_coordinates[3], const Eigen::Affine3d &m_pose)
-//{
-//     Eigen::Vector3d i(input_coordinates[0], input_coordinates[1], input_coordinates[2]);
-// i -= offset;
-//    Eigen::Vector3d o = m_pose * i;
-
-// std::cout << i.x() << " " << i.y() << " " << i.z() << " " << o.x() << " " << o.y() << " " << o.z() << std::endl;
-// o += offset;
-// output_coordinates[0] = o.x();
-// output_coordinates[1] = o.y();
-// output_coordinates[2] = o.z();
-//    return o;
-//}
-
 inline void save_processed_pc(
     const fs::path& file_path_in,
     const fs::path& file_path_put,

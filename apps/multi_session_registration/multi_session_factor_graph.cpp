@@ -13,7 +13,6 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
 {
     for (auto& session : sessions)
     {
-        // std::cout << session.point_clouds_container.point_clouds.size() << std::endl;
         for (auto& pc : session.point_clouds_container.point_clouds)
             pc.m_pose_temp = pc.m_pose;
     }
@@ -45,8 +44,6 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
         }
     }
 
-    ///////////////////////////////////////////////////////////////////
-    // graph slam
     bool is_ok = true;
     std::vector<Eigen::Affine3d> m_poses;
     std::vector<Eigen::Affine3d> poses_motion_model;
@@ -143,7 +140,6 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
 
     for (int iter = 0; iter < iterations; iter++)
     {
-        // std::cout << "iteration " << iter + 1 << " of " << iterations << std::endl;
         std::vector<Eigen::Triplet<double>> tripletListA;
         std::vector<Eigen::Triplet<double>> tripletListP;
         std::vector<Eigen::Triplet<double>> tripletListB;
@@ -257,53 +253,14 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
             tripletListB.emplace_back(ir + 4, 0, normalize_angle(delta(4, 0)));
             tripletListB.emplace_back(ir + 5, 0, normalize_angle(delta(5, 0)));
 
-            // std::cout << "delta(0, 0): " << delta(0, 0) << std::endl;
-            // std::cout << "delta(1, 0): " << delta(0, 0) << std::endl;
-            // std::cout << "delta(2, 0): " << delta(0, 0) << std::endl;
-            // std::cout << "normalize_angle(delta(3, 0)): " << normalize_angle(delta(3, 0)) << std::endl;
-            // std::cout << "normalize_angle(delta(4, 0)): " << normalize_angle(delta(4, 0)) << std::endl;
-            // std::cout << "normalize_angle(delta(5, 0)): " << normalize_angle(delta(5, 0)) << std::endl;
-
-            // for (int r = 0; r < 6; r++) {
-            //     for (int c = 0; c < 6; c++) {
-            //         tripletListP.emplace_back(ir + r, ir + c, edges[i].information_matrix.coeffRef(r, c));
-            //    }
-            // }
-
-            // tripletListP.emplace_back(ir    , ir    , get_cauchy_w(delta(0, 0), 10));
-            // tripletListP.emplace_back(ir + 1, ir + 1, get_cauchy_w(delta(1, 0), 10));
-            // tripletListP.emplace_back(ir + 2, ir + 2, get_cauchy_w(delta(2, 0), 10));
-            // tripletListP.emplace_back(ir + 3, ir + 3, get_cauchy_w(delta(3, 0), 10));
-            // tripletListP.emplace_back(ir + 4, ir + 4, get_cauchy_w(delta(4, 0), 10));
-            // tripletListP.emplace_back(ir + 5, ir + 5, get_cauchy_w(delta(5, 0), 10));
-
-            // if (sessions[all_edges[i].index_session_from].is_ground_truth || sessions[all_edges[i].index_session_to].is_ground_truth)
-            //{
-            //     tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
-            //     tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
-            //     tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
-            //     tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
-            //     tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
-            //     tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
-            // }
-            // else
-            //{
-
             tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
             tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
             tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
             tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
             tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
             tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
-
-            // tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px * get_cauchy_w(delta(0, 0), 1));
-            // tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py * get_cauchy_w(delta(1, 0), 1));
-            // tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz * get_cauchy_w(delta(2, 0), 1));
-            // tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om * get_cauchy_w(delta(3, 0), 1));
-            // tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi * get_cauchy_w(delta(4, 0), 1));
-            // tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka * get_cauchy_w(delta(5, 0), 1));
-            // }
         }
+
         if (is_fix_first_node)
         {
             int ir = tripletListB.size();
@@ -590,19 +547,8 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
                     tripletListP.emplace_back(ir, ir, 1);
                     tripletListB.emplace_back(ir, 0, 0);
                 }
-
-                // std::cout << "add manual_pose_graph_loop_closure.edge" << std::endl;
-                // Edge edge;
-                // edge.index_from = sessions[i].pose_graph_loop_closure.edges[j].index_from + sums[i];
-                // edge.index_to = sessions[i].pose_graph_loop_closure.edges[j].index_to + sums[i];
-                // edge.relative_pose_tb = sessions[i].pose_graph_loop_closure.edges[j].relative_pose_tb;
-                // edge.relative_pose_tb_weights = sessions[i].pose_graph_loop_closure.edges[j].relative_pose_tb_weights;
-                // edge.is_fixed_fi = ToDo
-                // all_edges.push_back(edge);
             }
         }
-
-        // fuse_inclination_from_imu
 
         double error_imu = 0;
         double error_imu_sum = 0;
@@ -888,13 +834,8 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
         tripletListP.clear();
         tripletListB.clear();
 
-        // std::cout << "AtPA.size: " << AtPA.size() << std::endl;
-        // std::cout << "AtPB.size: " << AtPB.size() << std::endl;
-
-        // std::cout << "start solving AtPA=AtPB" << std::endl;
         Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
 
-        // std::cout << "x = solver.solve(AtPB)" << std::endl;
         Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
         std::vector<double> h_x;
@@ -906,16 +847,6 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
                 h_x.push_back(it.value());
             }
         }
-
-        // std::cout << "h_x.size(): " << h_x.size() << std::endl;
-
-        // std::cout << "AtPA=AtPB SOLVED" << std::endl;
-        //  std::cout << "updates:" << std::endl;
-        //  for (size_t i = 0; i < h_x.size(); i += 6)
-        //{
-        //      std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i + 5]
-        //      << std::endl;
-        //  }
 
         if (h_x.size() == 6 * poses.size())
         {
@@ -931,30 +862,13 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
                 pose.fi += h_x[counter++] * 0.1;
                 pose.ka += h_x[counter++] * 0.1;
 
-                /*if (!vfixed_x[i])
-                    poses[i].px = pose.px;
-                if (!vfixed_y[i])
-                    poses[i].py = pose.py;
-                if (!vfixed_z[i])
-                    poses[i].pz = pose.pz;
-                if (!vfixed_om[i])
-                    poses[i].om = pose.om;
-                if (!vfixed_fi[i])
-                    poses[i].fi = pose.fi;
-                if (!vfixed_ka[i])
-                    poses[i].ka = pose.ka;*/
-
                 poses[i].px = pose.px;
                 poses[i].py = pose.py;
                 poses[i].pz = pose.pz;
                 poses[i].om = pose.om;
                 poses[i].fi = pose.fi;
                 poses[i].ka = pose.ka;
-
-                // if (i == 0 && is_fix_first_node)
-                //     poses[i] = pose;
             }
-            // std::cout << "optimizing with tait bryan finished" << std::endl;
         }
         else
         {

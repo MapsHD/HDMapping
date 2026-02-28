@@ -1106,6 +1106,18 @@ void settings_gui()
                 }
             }
 
+            if (ImGui::Button("Set parameters for drone with Ouster (https://ntu-aris.github.io/ntu_viral_dataset/)"))
+            {
+                params.decimation = 1.0;
+                params.in_out_params_indoor.resolution_X = 1.0;
+                params.in_out_params_indoor.resolution_Y = 1.0;
+                params.in_out_params_indoor.resolution_Z = 1.0;
+
+                params.in_out_params_outdoor.resolution_X = 2.0;
+                params.in_out_params_outdoor.resolution_Y = 2.0;
+                params.in_out_params_outdoor.resolution_Z = 2.0;
+            }
+
             if (!input_file_names.empty())
             {
                 ImGui::Checkbox("Show points", &show_reference_points);

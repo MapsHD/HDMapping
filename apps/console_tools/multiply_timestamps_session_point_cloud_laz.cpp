@@ -16,18 +16,6 @@ bool load_pc(PointCloud& pc, const std::string& input_file_name)
     if (laszip_create(&laszip_reader))
     {
         fprintf(stderr, ":DLL ERROR: creating laszip reader\n");
-        /*PointCloud pc;
-        pc.m_pose = Eigen::Affine3d::Identity();
-        pc.m_initial_pose = pc.m_pose;
-        pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-        pc.gui_translation[0] = pc.pose.px;
-        pc.gui_translation[1] = pc.pose.py;
-        pc.gui_translation[2] = pc.pose.pz;
-        pc.gui_rotation[0] = rad2deg(pc.pose.om);
-        pc.gui_rotation[1] = rad2deg(pc.pose.fi);
-        pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-        pc.file_name = input_file_names[i];
-        point_clouds.push_back(pc);*/
         return false;
     }
 
@@ -35,18 +23,6 @@ bool load_pc(PointCloud& pc, const std::string& input_file_name)
     if (laszip_open_reader(laszip_reader, input_file_name.c_str(), &is_compressed))
     {
         fprintf(stderr, ":DLL ERROR: opening laszip reader for '%s'\n", input_file_name.c_str());
-        /*PointCloud pc;
-        pc.m_pose = Eigen::Affine3d::Identity();
-        pc.m_initial_pose = pc.m_pose;
-        pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-        pc.gui_translation[0] = pc.pose.px;
-        pc.gui_translation[1] = pc.pose.py;
-        pc.gui_translation[2] = pc.pose.pz;
-        pc.gui_rotation[0] = rad2deg(pc.pose.om);
-        pc.gui_rotation[1] = rad2deg(pc.pose.fi);
-        pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-        pc.file_name = input_file_names[i];
-        point_clouds.push_back(pc);*/
         return false;
     }
     laszip_header* header;
@@ -54,18 +30,6 @@ bool load_pc(PointCloud& pc, const std::string& input_file_name)
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
         fprintf(stderr, ":DLL ERROR: getting header pointer from laszip reader\n");
-        /*PointCloud pc;
-        pc.m_pose = Eigen::Affine3d::Identity();
-        pc.m_initial_pose = pc.m_pose;
-        pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-        pc.gui_translation[0] = pc.pose.px;
-        pc.gui_translation[1] = pc.pose.py;
-        pc.gui_translation[2] = pc.pose.pz;
-        pc.gui_rotation[0] = rad2deg(pc.pose.om);
-        pc.gui_rotation[1] = rad2deg(pc.pose.fi);
-        pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-        pc.file_name = input_file_names[i];
-        point_clouds.push_back(pc);*/
         return false;
     }
 

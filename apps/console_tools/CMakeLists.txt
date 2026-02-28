@@ -8,7 +8,7 @@ target_include_directories(
   matrix_mul PRIVATE include ${REPOSITORY_DIRECTORY}/core/include
                      ${EIGEN3_INCLUDE_DIR})
 
-target_link_libraries(matrix_mul PRIVATE ${PLATFORM_MISCELLANEOUS_LIBS})
+target_link_libraries(matrix_mul PRIVATE ${PLATFORM_MISCELLANEOUS_LIBS} spdlog::spdlog)
 
 
 add_executable(multiply_timestamps_session_point_cloud_laz multiply_timestamps_session_point_cloud_laz.cpp)
@@ -18,7 +18,7 @@ target_include_directories(
                      ${EIGEN3_INCLUDE_DIR}
                      ${LASZIP_INCLUDE_DIR}/LASzip/include)
 
-target_link_libraries(multiply_timestamps_session_point_cloud_laz PRIVATE ${PLATFORM_MISCELLANEOUS_LIBS} ${PLATFORM_LASZIP_LIB})
+target_link_libraries(multiply_timestamps_session_point_cloud_laz PRIVATE ${PLATFORM_MISCELLANEOUS_LIBS} ${PLATFORM_LASZIP_LIB} spdlog::spdlog)
 
 add_executable(multiply_timestamps_session_trajectory_csv multiply_timestamps_session_trajectory_csv.cpp)
 
@@ -26,20 +26,20 @@ target_include_directories(
   multiply_timestamps_session_trajectory_csv PRIVATE include ${REPOSITORY_DIRECTORY}/core/include
                      ${EIGEN3_INCLUDE_DIR})
 
-target_link_libraries(multiply_timestamps_session_trajectory_csv PRIVATE ${PLATFORM_MISCELLANEOUS_LIBS})
+target_link_libraries(multiply_timestamps_session_trajectory_csv PRIVATE ${PLATFORM_MISCELLANEOUS_LIBS} spdlog::spdlog)
 
 add_executable(laz_to_ply laz_to_ply.cpp)
-target_link_libraries(laz_to_ply PRIVATE ${PLATFORM_LASZIP_LIB})
+target_link_libraries(laz_to_ply PRIVATE ${PLATFORM_LASZIP_LIB} spdlog::spdlog)
 target_include_directories(laz_to_ply PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/include ${PROJECT_BINARY_DIR}/include)
 
 add_executable(laz_to_pcd laz_to_pcd.cpp)
-target_link_libraries(laz_to_pcd PRIVATE ${PLATFORM_LASZIP_LIB})
+target_link_libraries(laz_to_pcd PRIVATE ${PLATFORM_LASZIP_LIB} spdlog::spdlog)
 target_include_directories(laz_to_pcd PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/include ${PROJECT_BINARY_DIR}/include)
 
 add_executable(pcd_to_laz pcd_to_laz.cpp)
-target_link_libraries(pcd_to_laz PRIVATE ${PLATFORM_LASZIP_LIB})
+target_link_libraries(pcd_to_laz PRIVATE ${PLATFORM_LASZIP_LIB} spdlog::spdlog)
 target_include_directories(pcd_to_laz PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/include ${PROJECT_BINARY_DIR}/include)
 
 add_executable(laz_to_txt laz_to_txt.cpp)
-target_link_libraries(laz_to_txt PRIVATE ${PLATFORM_LASZIP_LIB})
+target_link_libraries(laz_to_txt PRIVATE ${PLATFORM_LASZIP_LIB} spdlog::spdlog)
 target_include_directories(laz_to_txt PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/include ${PROJECT_BINARY_DIR}/include)

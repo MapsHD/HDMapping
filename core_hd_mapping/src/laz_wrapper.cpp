@@ -12,6 +12,8 @@
 
 #include <pfd_wrapper.hpp>
 
+#include <spdlog/spdlog.h>
+
 void LazWrapper::imgui(const CommonData& common_data, const ProjectSettings& project_setings)
 {
     ImGui::Begin("LazWrapper");
@@ -152,14 +154,14 @@ LAZSector LazWrapper::load_sector(const std::string& filename, const double shif
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))
     {
-        fprintf(stderr, "DLL ERROR: creating laszip reader\n");
+        spdlog::error("DLL ERROR: creating laszip reader");
         std::abort();
     }
 
     laszip_BOOL is_compressed = 0;
     if (laszip_open_reader(laszip_reader, filename.c_str(), &is_compressed))
     {
-        fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", filename.c_str());
+        spdlog::error("DLL ERROR: opening laszip reader for '{}'", filename.c_str());
         std::abort();
     }
     std::cout << "compressed : " << is_compressed << std::endl;
@@ -167,17 +169,18 @@ LAZSector LazWrapper::load_sector(const std::string& filename, const double shif
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
-        fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting header pointer from laszip reader");
         std::abort();
     }
-    fprintf(stderr, "file '%s' contains %u points\n", filename.c_str(), header->number_of_point_records);
+
+    spdlog::info("file '{}' contains {} points", filename, header->number_of_point_records);
+
     laszip_point* point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting point pointer from laszip reader");
         std::abort();
     }
-    //    int64_t point_count;
 
     sector.point_cloud.reserve(header->number_of_point_records);
 
@@ -190,9 +193,10 @@ LAZSector LazWrapper::load_sector(const std::string& filename, const double shif
     {
         if (laszip_read_point(laszip_reader))
         {
-            fprintf(stderr, "DLL ERROR: reading point %u\n", i);
+            spdlog::error("DLL ERROR: reading point {}", i);
             std::abort();
         }
+
         LAZPoint p;
         p.x = header->x_offset + header->x_scale_factor * static_cast<double>(point->X) + shift_x;
         p.y = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y) + shift_y;

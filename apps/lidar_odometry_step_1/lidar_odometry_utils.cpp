@@ -7,6 +7,8 @@
 #include <tbb/parallel_for_each.h>
 #include <tbb/parallel_invoke.h>
 
+#include <spdlog/spdlog.h>
+
 namespace fs = std::filesystem;
 
 std::vector<Point3Di> decimate(const std::vector<Point3Di>& points, double bucket_x, double bucket_y, double bucket_z)
@@ -465,14 +467,14 @@ std::vector<Point3Di> load_point_cloud(
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))
     {
-        fprintf(stderr, "DLL ERROR: creating laszip reader\n");
+        spdlog::error("DLL ERROR: creating laszip reader");
         std::abort();
     }
 
     laszip_BOOL is_compressed = 0;
     if (laszip_open_reader(laszip_reader, lazFile.c_str(), &is_compressed))
     {
-        fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", lazFile.c_str());
+        spdlog::error("DLL ERROR: opening laszip reader for '{}'\n", lazFile);
         std::abort();
     }
 
@@ -480,14 +482,14 @@ std::vector<Point3Di> load_point_cloud(
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
-        fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting header pointer from laszip reader");
         std::abort();
     }
 
     laszip_point* point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting point pointer from laszip reader");
         std::abort();
     }
 
@@ -498,7 +500,7 @@ std::vector<Point3Di> load_point_cloud(
     {
         if (laszip_read_point(laszip_reader))
         {
-            fprintf(stderr, "DLL ERROR: reading point %u\n", j);
+            spdlog::error("DLL ERROR: reading point {}", j);
             laszip_close_reader(laszip_reader);
             return points;
             // std::abort();
@@ -527,44 +529,12 @@ std::vector<Point3Di> load_point_cloud(
         p.timestamp = point->gps_time;
         p.intensity = point->intensity;
 
-        // add z correction
-        // if (p.point.z() > 0)
-        //{
-        //    double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
-        //    double correction = dist * asin(0.08 / 10.0);
-
-        //    p.point.z() += correction;
-        //}
-        /*if (p.point.z() > 0)
-        {
-            double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
-            double correction = 0;//dist * asin(0.08 / 10.0);
-
-            if (dist < 11.0){
-                correction = 0.005;
-            }else{
-                correction = -0.015;
-            }
-
-            p.point.z() += correction;
-        }*/
-
         if (p.timestamp == 0 && ommit_points_with_timestamp_equals_zero)
         {
             counter_ts0++;
         }
         else
         {
-            /* underground mining
-            if (sqrt(pf.x() * pf.x()) < 4.5 && sqrt(pf.y() * pf.y()) < 2){
-                counter_filtered_points++;
-            }else{
-
-
-                points.emplace_back(p);
-            }
-            */
-
             if (sqrt(pf.x() * pf.x() + pf.y() * pf.y()) > filter_threshold_xy_inner &&
                 sqrt(pf.x() * pf.x() + pf.y() * pf.y()) < filter_threshold_xy_outer)
             {

@@ -44,7 +44,7 @@ function(add_core_target target_name with_gui)
 
     add_library(${target_name} STATIC ${SOURCES})
     target_compile_definitions(${target_name} PRIVATE ${DEFINES})
-    target_link_libraries(${target_name} PRIVATE ${PLATFORM_LASZIP_LIB} ${PLATFORM_MISCELLANEOUS_LIBS})
+    target_link_libraries(${target_name} PRIVATE ${PLATFORM_LASZIP_LIB} ${PLATFORM_MISCELLANEOUS_LIBS} spdlog::spdlog)
     target_include_directories(${target_name} PRIVATE
         include
         ${EIGEN3_INCLUDE_DIR}

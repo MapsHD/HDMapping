@@ -2,20 +2,22 @@
 
 #include "color_las_loader.h"
 
+#include <spdlog/spdlog.h>
+
 std::vector<mandeye::Point> mandeye::load(const std::string& lazFile)
 {
     std::vector<Point> points;
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))
     {
-        fprintf(stderr, "DLL ERROR: creating laszip reader\n");
+        spdlog::error("DLL ERROR: creating laszip reader");
         std::abort();
     }
 
     laszip_BOOL is_compressed = 0;
     if (laszip_open_reader(laszip_reader, lazFile.c_str(), &is_compressed))
     {
-        fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", lazFile.c_str());
+        spdlog::error("DLL ERROR: opening laszip reader for '{}'", lazFile);
         std::abort();
     }
     std::cout << "compressed : " << is_compressed << std::endl;
@@ -23,19 +25,19 @@ std::vector<mandeye::Point> mandeye::load(const std::string& lazFile)
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
-        fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting header pointer from laszip reader");
         std::abort();
     }
 
     laszip_I64 npoints = (header->number_of_point_records ? header->number_of_point_records : header->extended_number_of_point_records);
 
-    fprintf(stderr, "file '%s' contains %I64d points\n", lazFile.c_str(), npoints);
+    spdlog::info("file '{}' contains {} points", lazFile, npoints);
 
     laszip_point* point;
 
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting point pointer from laszip reader");
     }
 
     laszip_I64 p_count = 0;
@@ -44,8 +46,9 @@ std::vector<mandeye::Point> mandeye::load(const std::string& lazFile)
     {
         if (laszip_read_point(laszip_reader))
         {
-            fprintf(stderr, "DLL ERROR: reading point %I64d\n", p_count);
+            spdlog::error("DLL ERROR: reading point {}", p_count);
         }
+
         Point p;
         p.point.x() = header->x_offset + header->x_scale_factor * static_cast<double>(point->X);
         p.point.y() = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y);
@@ -93,7 +96,7 @@ bool mandeye::saveLaz(const std::string& filename, const std::vector<mandeye::Po
     laszip_POINTER laszip_writer;
     if (laszip_create(&laszip_writer))
     {
-        fprintf(stderr, "DLL ERROR: creating laszip writer\n");
+        spdlog::error("DLL ERROR: creating laszip writer");
         return false;
     }
 
@@ -103,7 +106,7 @@ bool mandeye::saveLaz(const std::string& filename, const std::vector<mandeye::Po
 
     if (laszip_get_header_pointer(laszip_writer, &header))
     {
-        fprintf(stderr, "DLL ERROR: getting header pointer from laszip writer\n");
+        spdlog::error("DLL ERROR: getting header pointer from laszip writer");
         return false;
     }
 
@@ -138,18 +141,18 @@ bool mandeye::saveLaz(const std::string& filename, const std::vector<mandeye::Po
 
     if (laszip_open_writer(laszip_writer, filename.c_str(), compress))
     {
-        fprintf(stderr, "DLL ERROR: opening laszip writer for '%s'\n", filename.c_str());
+        spdlog::error("DLL ERROR: opening laszip writer for '{}'", filename);
         return false;
     }
 
-    fprintf(stderr, "writing file '%s' %scompressed\n", filename.c_str(), (compress ? "" : "un"));
+    spdlog::info("writing file '{}' {}compressed", filename, (compress ? "" : "un"));
 
     // get a pointer to the point of the writer that we will populate and write
 
     laszip_point* point;
     if (laszip_get_point_pointer(laszip_writer, &point))
     {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip writer\n");
+        spdlog::error("DLL ERROR: getting point pointer from laszip writer");
         return false;
     }
 
@@ -174,30 +177,30 @@ bool mandeye::saveLaz(const std::string& filename, const std::vector<mandeye::Po
         coordinates[2] = p.point[2];
         if (laszip_set_coordinates(laszip_writer, coordinates))
         {
-            fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);
+            spdlog::error("DLL ERROR: setting coordinates for point {}", p_count);
             return false;
         }
 
         if (laszip_write_point(laszip_writer))
         {
-            fprintf(stderr, "DLL ERROR: writing point %I64d\n", p_count);
+            spdlog::error("DLL ERROR: writing point {}", p_count);
             return false;
         }
     }
 
     if (laszip_get_point_count(laszip_writer, &p_count))
     {
-        fprintf(stderr, "DLL ERROR: getting point count\n");
+        spdlog::error("DLL ERROR: getting point count");
         return false;
     }
 
-    fprintf(stderr, "successfully written %I64d points\n", p_count);
+    spdlog::info("successfully written {} points\n", p_count);
 
     // close the writer
 
     if (laszip_close_writer(laszip_writer))
     {
-        fprintf(stderr, "DLL ERROR: closing laszip writer\n");
+        spdlog::error("DLL ERROR: closing laszip writer");
         return false;
     }
 
@@ -205,7 +208,7 @@ bool mandeye::saveLaz(const std::string& filename, const std::vector<mandeye::Po
 
     if (laszip_destroy(laszip_writer))
     {
-        fprintf(stderr, "DLL ERROR: destroying laszip writer\n");
+        spdlog::error("DLL ERROR: destroying laszip writer");
         return false;
     }
 

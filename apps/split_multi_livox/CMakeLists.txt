@@ -23,7 +23,7 @@ target_include_directories(
           ${FREEGLUT_INCLUDE_DIR})
 
 target_link_libraries(split_multi_livox PRIVATE core ${PLATFORM_LASZIP_LIB}
-                                                ${PLATFORM_MISCELLANEOUS_LIBS})
+                                                ${PLATFORM_MISCELLANEOUS_LIBS} spdlog::spdlog)
 
 if(WIN32)
   add_custom_command(

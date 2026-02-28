@@ -3,9 +3,9 @@
 #include <hash_utils.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
-#include <tbb/blocked_range.h>
 #include <tbb/combinable.h>
 #include <tbb/parallel_for.h>
+#include <thread>
 
 #include <export_laz.h>
 
@@ -1452,12 +1452,11 @@ static void add_indoor_hessian_contribution(
     const Eigen::Vector3d& point_source,
     const TaitBryanPoseWithTrig& pose_trig,
     const Eigen::Vector3d& viewport,
-    const int matrix_offset,
     const bool ablation_study_use_view_point_and_normal_vectors,
     const bool ablation_study_use_planarity,
     const bool ablation_study_use_norm,
-    Eigen::MatrixXd& AtPAndt,
-    Eigen::MatrixXd& AtPBndt)
+    Eigen::Matrix<double, 6, 6, Eigen::RowMajor>& out_AtPA,
+    Eigen::Matrix<double, 6, 1>& out_AtPB)
 {
     // Use precomputed cov_inverse from update_rgd
     const Eigen::Matrix3d& infm = indoor_bucket.cov_inverse;
@@ -1551,8 +1550,8 @@ static void add_indoor_hessian_contribution(
         AtPB *= w;
     }
 
-    AtPAndt.block<6, 6>(matrix_offset, matrix_offset) += AtPA;
-    AtPBndt.block<6, 1>(matrix_offset, 0) -= AtPB;
+    out_AtPA += AtPA;
+    out_AtPB += AtPB;
 }
 
 // Helper to process outdoor bucket contribution
@@ -1561,11 +1560,10 @@ static void add_outdoor_hessian_contribution(
     const Eigen::Vector3d& point_source,
     const TaitBryanPoseWithTrig& pose_trig,
     const Eigen::Vector3d& viewport,
-    const int matrix_offset,
     const bool ablation_study_use_view_point_and_normal_vectors,
     const bool ablation_study_use_planarity,
-    Eigen::MatrixXd& AtPAndt,
-    Eigen::MatrixXd& AtPBndt)
+    Eigen::Matrix<double, 6, 6, Eigen::RowMajor>& out_AtPA,
+    Eigen::Matrix<double, 6, 1>& out_AtPB)
 {
     // Use precomputed cov_inverse from update_rgd
     const Eigen::Matrix3d& infm = outdoor_bucket.cov_inverse;
@@ -1652,8 +1650,8 @@ static void add_outdoor_hessian_contribution(
         AtPB *= planarity;
     }
 
-    AtPAndt.block<6, 6>(matrix_offset, matrix_offset) += AtPA;
-    AtPBndt.block<6, 1>(matrix_offset, 0) -= AtPB;
+    out_AtPA += AtPA;
+    out_AtPB += AtPB;
 }
 
 // Unified hessian function that handles indoor and optionally outdoor contributions
@@ -1670,8 +1668,8 @@ static void compute_hessian(
     const bool ablation_study_use_view_point_and_normal_vectors,
     const bool ablation_study_use_planarity,
     const bool ablation_study_use_norm,
-    Eigen::MatrixXd& AtPAndt,
-    Eigen::MatrixXd& AtPBndt,
+    Eigen::Matrix<double, 6, 6, Eigen::RowMajor>& out_AtPA,
+    Eigen::Matrix<double, 6, 1>& out_AtPB,
     LookupStats& stats,
     const bool& ablation_study_use_threshold_outer_rgd,
     const double& convergence_result,
@@ -1689,32 +1687,28 @@ static void compute_hessian(
     const Eigen::Vector3d point_global = trajectory[point.index_pose] * point.point;
     const Eigen::Vector3d& point_source = point.point;
     const TaitBryanPoseWithTrig& pose_trig = tait_bryan_poses[point.index_pose];
-    const int matrix_offset = point.index_pose * 6;
     const Eigen::Vector3d viewport = trajectory[point.index_pose].translation();
 
-    // Indoor contribution (independent)
+    // Indoor contribution
     const auto indoor_key = get_rgd_index_3d(point_global, bucket_size_indoor);
     const auto indoor_it = buckets_indoor.find(indoor_key);
     ++stats.indoor_lookups;
 
-    const NDT::Bucket* indoor_bucket = nullptr;
     if (indoor_it != buckets_indoor.end())
     {
-        indoor_bucket = &indoor_it->second;
         add_indoor_hessian_contribution(
-            *indoor_bucket,
+            indoor_it->second,
             point_source,
             pose_trig,
             viewport,
-            matrix_offset,
             ablation_study_use_view_point_and_normal_vectors,
             ablation_study_use_planarity,
             ablation_study_use_norm,
-            AtPAndt,
-            AtPBndt);
+            out_AtPA,
+            out_AtPB);
     }
 
-    // Outdoor contribution (independent, only when hierarchical mode and range >= 5.0)
+    // Outdoor contribution (only when hierarchical mode and range >= 5.0)
 
     bool check_threshold_outdoor_rgd = true;
     if (ablation_study_use_threshold_outer_rgd)
@@ -1745,11 +1739,10 @@ static void compute_hessian(
                 point_source,
                 pose_trig,
                 viewport,
-                matrix_offset,
                 ablation_study_use_view_point_and_normal_vectors,
                 ablation_study_use_planarity,
-                AtPAndt,
-                AtPBndt);
+                out_AtPA,
+                out_AtPB);
         }
     }
 }
@@ -1824,67 +1817,49 @@ void optimize_lidar_odometry(
     UTL_PROFILER_END(pre_hessian);
 
     UTL_PROFILER_BEGIN(hessian_compute, "hessian_compute");
-    if (multithread)
+    const size_t num_points = intermediate_points.size();
+    const size_t num_poses = intermediate_trajectory.size();
+    using Mat6x6 = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>;
+    using Vec6x1 = Eigen::Matrix<double, 6, 1>;
+
+    constexpr size_t NUM_CHUNKS = 128; // must be >= max number of CPU cores
+    const size_t num_chunks = std::min(NUM_CHUNKS, num_points);
+    const size_t chunk_size = (num_points + num_chunks - 1) / num_chunks;
+
+    // Per-chunk per-pose accumulators: chunk_AtPA[chunk][pose]
+    UTL_PROFILER_BEGIN(hessian_alloc, "hessian_alloc");
+    static std::vector<std::vector<Mat6x6>> chunk_AtPA;
+    static std::vector<std::vector<Vec6x1>> chunk_AtPB;
+    chunk_AtPA.resize(num_chunks);
+    chunk_AtPB.resize(num_chunks);
+    for (size_t c = 0; c < num_chunks; ++c)
     {
-        using MatrixPair = std::pair<Eigen::MatrixXd, Eigen::MatrixXd>;
-        tbb::combinable<MatrixPair> thread_local_matrices(
-            [&intermediate_trajectory]()
-            {
-                return std::make_pair(
-                    Eigen::MatrixXd::Zero(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6),
-                    Eigen::MatrixXd::Zero(intermediate_trajectory.size() * 6, 1));
-            });
-        tbb::combinable<LookupStats> thread_local_stats;
-
-        tbb::parallel_for(
-            tbb::blocked_range<size_t>(0, intermediate_points.size()),
-            [&](const tbb::blocked_range<size_t>& range)
-            {
-                auto& [local_AtPA, local_AtPB] = thread_local_matrices.local();
-                auto& local_stats = thread_local_stats.local();
-                for (size_t i = range.begin(); i != range.end(); ++i)
-                {
-                    compute_hessian(
-                        intermediate_points[i],
-                        intermediate_trajectory,
-                        tait_bryan_poses,
-                        buckets_indoor,
-                        bucket_size_indoor,
-                        buckets_outdoor,
-                        bucket_size_outdoor,
-                        max_distance,
-                        ablation_study_use_hierarchical_rgd,
-                        ablation_study_use_view_point_and_normal_vectors,
-                        ablation_study_use_planarity,
-                        ablation_study_use_norm,
-                        local_AtPA,
-                        local_AtPB,
-                        local_stats,
-                        ablation_study_use_threshold_outer_rgd,
-                        convergence_result,
-                        convergence_delta_threshold_outer_rgd);
-                }
-            });
-
-        thread_local_matrices.combine_each(
-            [&AtPAndt, &AtPBndt](const MatrixPair& local)
-            {
-                AtPAndt += local.first;
-                AtPBndt += local.second;
-            });
-        thread_local_stats.combine_each(
-            [&lookup_stats](const LookupStats& local)
-            {
-                lookup_stats.indoor_lookups += local.indoor_lookups;
-                lookup_stats.outdoor_lookups += local.outdoor_lookups;
-            });
+        chunk_AtPA[c].resize(num_poses);
+        chunk_AtPB[c].resize(num_poses);
     }
-    else
+    tbb::combinable<LookupStats> thread_local_stats;
+    UTL_PROFILER_END(hessian_alloc);
+
+    // Each chunk processes a fixed range of points and accumulates into its own
+    // per-pose matrices. Fixed chunk boundaries guarantee identical accumulation
+    // order for both ST and MT paths.
+    auto process_chunk = [&](size_t chunk)
     {
-        for (const auto& pt : intermediate_points)
+        const size_t begin = chunk * chunk_size;
+        const size_t end = std::min(begin + chunk_size, num_points);
+        auto& stats = thread_local_stats.local();
+
+        for (size_t p = 0; p < num_poses; ++p)
         {
+            chunk_AtPA[chunk][p].setZero();
+            chunk_AtPB[chunk][p].setZero();
+        }
+
+        for (size_t i = begin; i < end; ++i)
+        {
+            const int pose = intermediate_points[i].index_pose;
             compute_hessian(
-                pt,
+                intermediate_points[i],
                 intermediate_trajectory,
                 tait_bryan_poses,
                 buckets_indoor,
@@ -1896,14 +1871,40 @@ void optimize_lidar_odometry(
                 ablation_study_use_view_point_and_normal_vectors,
                 ablation_study_use_planarity,
                 ablation_study_use_norm,
-                AtPAndt,
-                AtPBndt,
-                lookup_stats,
+                chunk_AtPA[chunk][pose],
+                chunk_AtPB[chunk][pose],
+                stats,
                 ablation_study_use_threshold_outer_rgd,
                 convergence_result,
                 convergence_delta_threshold_outer_rgd);
         }
+    };
+
+    if (multithread)
+        tbb::parallel_for(size_t(0), num_chunks, process_chunk);
+    else
+        for (size_t c = 0; c < num_chunks; ++c)
+            process_chunk(c);
+
+    // Reduce chunk accumulators in fixed order
+    UTL_PROFILER_BEGIN(hessian_sum, "hessian_sum");
+    for (size_t chunk = 0; chunk < num_chunks; ++chunk)
+    {
+        for (size_t p = 0; p < num_poses; ++p)
+        {
+            const int c = p * 6;
+            AtPAndt.block<6, 6>(c, c) += chunk_AtPA[chunk][p];
+            AtPBndt.block<6, 1>(c, 0) -= chunk_AtPB[chunk][p];
+        }
     }
+    UTL_PROFILER_END(hessian_sum);
+
+    thread_local_stats.combine_each(
+        [&](const LookupStats& s)
+        {
+            lookup_stats.indoor_lookups += s.indoor_lookups;
+            lookup_stats.outdoor_lookups += s.outdoor_lookups;
+        });
     UTL_PROFILER_END(hessian_compute);
 
     UTL_PROFILER_BEGIN(post_hessian, "post_hessian");
@@ -2335,6 +2336,8 @@ bool process_worker_step_1(
     std::atomic<float>& loProgress,
     double& ts_failure)
 {
+    UTL_PROFILER_SCOPE("process_worker_step_1");
+
     Eigen::Vector3d mean_shift(0.0, 0.0, 0.0);
     if (i > 1 && params.use_motion_from_previous_step)
     {
@@ -2427,6 +2430,8 @@ bool process_worker_step_2(
     double& ts_failure,
     std::vector<Point3Di>& intermediate_points)
 {
+    UTL_PROFILER_SCOPE("process_worker_step_2");
+
     bool add_pitch_roll_constraint = false;
 
     spdlog::stopwatch stopwatch_worker;
@@ -2583,8 +2588,7 @@ bool process_worker_step_lidar_odometry_core(
 {
     spdlog::stopwatch stopwatch_realtime;
 
-    UTL_PROFILER_END(before_iter);
-    UTL_PROFILER_BEGIN(iter_loop, "iteration_loop");
+    UTL_PROFILER_SCOPE("process_worker_step_lidar_odometry_core");
 
     for (int iter = 0; iter < params.nr_iter; iter++)
     {
@@ -2646,7 +2650,6 @@ bool process_worker_step_lidar_odometry_core(
             break;
         }
     }
-    UTL_PROFILER_END(iter_loop);
 
     return true;
 }
@@ -2773,6 +2776,7 @@ bool compute_step_2(
         for (int i = 0; i < worker_data.size(); i++)
         {
             UTL_PROFILER_BEGIN(before_iter, "before_iterations");
+
             std::vector<Point3Di> intermediate_points;
             // = worker_data[i].load_points(worker_data[i].intermediate_points_cache_file_name);
             load_vector_data(worker_data[i].intermediate_points_cache_file_name.string(), intermediate_points);
@@ -2829,6 +2833,8 @@ bool compute_step_2(
             int iter_end = 0;
             double delta = 100000.0;
             double lm_factor = 1.0;
+
+            UTL_PROFILER_END(before_iter);
 
             process_worker_step_lidar_odometry_core(
                 worker_data[i],

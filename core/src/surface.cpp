@@ -90,22 +90,14 @@ void Surface::generate_initial_surface(const std::vector<Eigen::Vector3d>& point
     {
         for (double y = min_y; y <= max_y; y += surface_resolution)
         {
-            // if (number_rows == 0)
-            //{
-            //     number_cols++;
-            // }
             Eigen::Affine3d pose = Eigen::Affine3d::Identity();
             pose(0, 3) = x;
             pose(1, 3) = y;
             pose(2, 3) = min_z;
             vertices.push_back(pose);
-            // std::cout << pose(0, 3) << " " << pose(1, 3) << " " << pose(2, 3) << std::endl;
         }
-        // number_rows++;
     }
 
-    // number_rows = floor(double(max_x - min_x) / surface_resolution);
-    // number_cols = floor(double(max_y - min_y) / surface_resolution);
     number_rows = 0;
     for (double x = min_x; x <= max_x; x += surface_resolution)
     {
@@ -375,10 +367,6 @@ void Surface::align_surface_to_ground_points(const std::vector<Eigen::Vector3d>&
 
     std::cout << "AtPA=AtPB SOLVED" << std::endl;
 
-    // for(size_t i = 0 ; i < h_x.size(); i++){
-    //	std::cout << h_x[i] << std::endl;
-    // }
-
     if (h_x.size() == 6 * vertices.size())
     {
         int counter = 0;
@@ -536,35 +524,10 @@ std::vector<int> Surface::get_filtered_indexes(
 
             cov /= batch_of_points.size();
 
-            // std::cout <<
             if (sqrt(cov(2, 2)) < z_sigma_threshold)
             {
                 lowest_points[index_element_source].second = true;
             }
-
-            // std::cout << "cov " << cov << std::endl;
-            //  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(cov, Eigen::ComputeEigenvectors);
-            //  points[index_element_source].eigen_values = eigen_solver.eigenvalues();
-            //  points[index_element_source].eigen_vectors = eigen_solver.eigenvectors();
-
-            // points[index_element_source].normal_vector = Eigen::Vector3d(points[index_element_source].eigen_vectors(0, 0),
-            // points[index_element_source].eigen_vectors(1, 0), points[index_element_source].eigen_vectors(2, 0));
-
-            // double ev1 = points[index_element_source].eigen_values.x();
-            // double ev2 = points[index_element_source].eigen_values.y();
-            // double ev3 = points[index_element_source].eigen_values.z();
-
-            // double sum_ev = ev1 + ev2 + ev3;
-
-            // points[index_element_source].planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
-            // points[index_element_source].cylindrical_likeness = (ev3 - ev2) / sum_ev;
-            // points[index_element_source].plane_likeness = 2 * (ev2 - ev1) / (sum_ev);
-
-            // points[index_element_source].sphericity = ev1 / ev3;
-            // points[index_element_source].change_of_curvature = ev3 / (sum_ev);
-            // points[index_element_source].omnivariance = std::cbrt(ev1 * ev2 * ev3);
-
-            // points[index_element_source].eigen_entropy = -ev1 * log(ev1) - ev2 * log(ev2) - ev3 * log(ev3);
         }
         else
         {
@@ -588,20 +551,6 @@ std::vector<int> Surface::get_filtered_indexes(
             out_indexes.push_back(lowest_points_indexes[i]);
         }
     }
-
-    //
-
-    // for (const auto &p : lowest_points){
-    // std::cout << (int)p.second;
-    //}
-
-    /*std::vector<std::pair<uint64_t, uint32_t>> indexes;
-
-    for (int i = 0; i < lowest_points.size(); i++)
-    {
-        uint64_t index = get_rgd_index_2d(lowest_points[i], bucket_dim_xy);
-        indexes.emplace_back(index, i);
-    }*/
 
     return out_indexes;
 }
@@ -672,10 +621,6 @@ std::vector<Eigen::Vector3d> Surface::get_points_without_surface(
                 points[i].z() > z_ground + distance_to_ground_threshold_up)
             {
                 to_remove[i] = true;
-                // std::cout << vertices[index_element_target].translation().x() << " " << vertices[index_element_target].translation().y()
-                // << " "
-                //          << vertices[index_element_target].translation().z() << " " << points[i].x() << " " << points[i].y() << " " <<
-                //          points[i].z() << std::endl;
             }
         }
     }

@@ -5,11 +5,12 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include <spdlog/spdlog.h>
 
 namespace fs = std::filesystem;
 
@@ -103,7 +104,7 @@ bool convert_and_save(const char* from, const char* to)
     std::ifstream pcd_file(from, std::ios::binary);
     if (!pcd_file.is_open())
     {
-        std::fprintf(stderr, "Failed to open input file %s\n", from);
+        spdlog::error("Failed to open input file {}", from);
         return false;
     }
 
@@ -111,7 +112,7 @@ bool convert_and_save(const char* from, const char* to)
     size_t data_offset = 0;
     if (!read_pcd_header(pcd_file, pcd_header, data_offset))
     {
-        std::fprintf(stderr, "Failed to read PCD header from file %s\n", from);
+        spdlog::error("Failed to read PCD header from file {}", from);
         return false;
     }
 
@@ -132,21 +133,21 @@ bool convert_and_save(const char* from, const char* to)
 
     if (x_offset < 0 || y_offset < 0 || z_offset < 0)
     {
-        std::fprintf(stderr, "PCD file must contain x, y, z fields\n");
+        spdlog::error("PCD file must contain x, y, z fields");
         return false;
     }
 
-    std::fprintf(stderr, "PCD Header: %d points, point record length: %d bytes\n", pcd_header.points, pcd_header.point_record_length);
-    std::fprintf(
-        stderr, "Fields: x_offset=%d, y_offset=%d, z_offset=%d, intensity_offset=%d\n", x_offset, y_offset, z_offset, intensity_offset);
+    spdlog::error("PCD Header: {} points, point record length: {} bytes", pcd_header.points, pcd_header.point_record_length);
+    spdlog::error("Fields: x_offset={}, y_offset={}, z_offset={}, intensity_offset={}", x_offset, y_offset, z_offset, intensity_offset);
 
     // Read all point data
     std::vector<uint8_t> pointsBinary(pcd_header.points * pcd_header.point_record_length);
     pcd_file.read((char*)pointsBinary.data(), pointsBinary.size());
     if (pcd_file.gcount() != static_cast<std::streamsize>(pointsBinary.size()))
     {
-        std::fprintf(stderr, "Failed to read point data from file %s\n", from);
-        std::fprintf(stderr, "Expected %zu bytes, got %zd bytes\n", pointsBinary.size(), pcd_file.gcount());
+        spdlog::error("Failed to read point data from file {}", from);
+        spdlog::error("Expected {} bytes, got {} bytes", pointsBinary.size(), pcd_file.gcount());
+
         return false;
     }
 
@@ -154,7 +155,7 @@ bool convert_and_save(const char* from, const char* to)
     laszip_POINTER laszip_writer = nullptr;
     if (laszip_create(&laszip_writer))
     {
-        std::fprintf(stderr, "Failed to create LAZ writer\n");
+        spdlog::error("Failed to create LAZ writer");
         return false;
     }
 
@@ -206,14 +207,14 @@ bool convert_and_save(const char* from, const char* to)
     if (laszip_set_header(laszip_writer, &laszip_hdr))
     {
         laszip_destroy(laszip_writer);
-        std::fprintf(stderr, "Failed to set LAZ header\n");
+        spdlog::error("Failed to set LAZ header");
         return false;
     }
 
     if (laszip_open_writer(laszip_writer, to, 1))
     {
         laszip_destroy(laszip_writer);
-        std::fprintf(stderr, "Failed to open LAZ writer for file %s\n", to);
+        spdlog::error("Failed to open LAZ writer for file {}", to);
         return false;
     }
 
@@ -223,7 +224,7 @@ bool convert_and_save(const char* from, const char* to)
     {
         laszip_close_writer(laszip_writer);
         laszip_destroy(laszip_writer);
-        std::fprintf(stderr, "Failed to get LAZ point pointer\n");
+        spdlog::error("Failed to get LAZ point pointer");
         return false;
     }
 
@@ -271,7 +272,7 @@ bool convert_and_save(const char* from, const char* to)
         {
             laszip_close_writer(laszip_writer);
             laszip_destroy(laszip_writer);
-            std::fprintf(stderr, "Failed to write point %d to LAZ file %s\n", i, to);
+            spdlog::error("Failed to write point {} to LAZ file {}", i, to);
             return false;
         }
     }
@@ -279,12 +280,12 @@ bool convert_and_save(const char* from, const char* to)
     if (laszip_close_writer(laszip_writer))
     {
         laszip_destroy(laszip_writer);
-        std::fprintf(stderr, "Failed to close LAZ writer for file %s\n", to);
+        spdlog::error("Failed to close LAZ writer for file {}", to);
         return false;
     }
 
     laszip_destroy(laszip_writer);
-    std::fprintf(stderr, "Successfully converted %d points\n", pcd_header.points);
+    spdlog::error("Successfully converted {} points\n", pcd_header.points);
     return true;
 }
 
@@ -297,8 +298,8 @@ int main(const int argc, const char** argv)
 
     if (argc != expected_argc)
     {
-        std::fprintf(stderr, "Invalid argument count. Got %d expected %d.\n", argc, expected_argc);
-        std::fprintf(stderr, "Usage : %s </PATH/FROM/POINT/CLOUD.pcd> </PATH/TO/POINT/CLOUD.laz>\n", argv[0]);
+        spdlog::error("Invalid argument count. Got {} expected {}", argc, expected_argc);
+        spdlog::error("Usage : {} </PATH/FROM/POINT/CLOUD.pcd> </PATH/TO/POINT/CLOUD.laz>", argv[0]);
 
         return EXIT_FAILURE;
     }
@@ -308,29 +309,25 @@ int main(const int argc, const char** argv)
 
     if (!check_path_ext(from, expected_pcd_extension))
     {
-        std::fprintf(stderr, "Invalid extension for input file %s - expected %s\n", from, expected_pcd_extension);
-
+        spdlog::error("Invalid extension for input file {} - expected {}", from, expected_pcd_extension);
         return EXIT_FAILURE;
     }
 
     if (!check_path_ext(to, expected_laz_extension))
     {
-        std::fprintf(stderr, "Invalid extension for output file %s - expected %s\n", to, expected_laz_extension);
-
+        spdlog::error("Invalid extension for output file {} - expected {}", to, expected_laz_extension);
         return EXIT_FAILURE;
     }
 
     if (!std::filesystem::exists(from))
     {
-        std::fprintf(stderr, "Input file %s - does not exist\n", from);
-
+        spdlog::error("Input file {} - does not exist", from);
         return EXIT_FAILURE;
     }
 
     if (!convert_and_save(from, to))
     {
-        std::fprintf(stderr, "Conversion from %s to  %s failed\n", from, to);
-
+        spdlog::error("Conversion from {} to {} failed\n", from, to);
         return EXIT_FAILURE;
     }
 

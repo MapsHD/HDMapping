@@ -311,8 +311,6 @@ void optimize()
                 continue;
             }
 
-            // std::cout << infm << std::endl;
-
             const Eigen::Affine3d& m_pose = tr[points_local[i].index_pose];
             //spdlog::info("points_local[i].index_pose {}", points_local[i].index_pose);
             const Eigen::Vector3d& p_s = points_local[i].point;
@@ -1585,8 +1583,6 @@ void display()
                         all_data[index_rendered_points_local].points_local[i].timestamp -
                         all_data[index_rendered_points_local].timestamps[index_pose].first) > max_diff)
                 {
-                    // std::cout << index_pose << " " << all_data[index_rendered_points_local].points_local[i].timestamp -
-                    // all_data[index_rendered_points_local].timestamps[index_pose].first << std::endl;
                     max_diff = fabs(
                         all_data[index_rendered_points_local].points_local[i].timestamp -
                         all_data[index_rendered_points_local].timestamps[index_pose].first);
@@ -1606,8 +1602,6 @@ void display()
                 });
 
             int index_pose = std::distance(all_data[index_rendered_points_local].timestamps.begin(), lower) - 1;
-
-            // std::cout << index_pose << std::endl;
 
             if (max_diff < 0.1)
             {

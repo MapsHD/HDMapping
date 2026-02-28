@@ -7,6 +7,8 @@
 
 #include <laszip/laszip_api.h>
 
+#include <spdlog/spdlog.h>
+
 bool PointCloud::load(const std::string& file_name)
 {
     points_local.clear();
@@ -37,8 +39,6 @@ bool PointCloud::load(const std::string& file_name)
     // Example of direct access
     {
         auto xData = data["vertex"]->properties["x"];
-        // std::cout << "x value of the first vertex element:\n" << xData->at<float>(0) << std::endl;
-        // std::cout << "\n";
         auto yData = data["vertex"]->properties["y"];
         auto zData = data["vertex"]->properties["z"];
         for (size_t i = 0; i < xData->size(); i++)
@@ -56,11 +56,6 @@ bool PointCloud::load(const std::string& file_name)
             }
         }
     }
-    //}
-    // catch (const plycpp::Exception& e)
-    //{
-    //	std::cout << "An exception happened:\n" << e.what() << std::endl;
-    //}
 
 #if 0
 	std::ifstream infile(file_name);
@@ -99,66 +94,30 @@ bool PointCloud::load_pc(const std::string& input_file_name, bool load_cache_mod
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))
     {
-        fprintf(stderr, ":DLL ERROR: creating laszip reader\n");
-        /*PointCloud pc;
-        pc.m_pose = Eigen::Affine3d::Identity();
-        pc.m_initial_pose = pc.m_pose;
-        pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-        pc.gui_translation[0] = pc.pose.px;
-        pc.gui_translation[1] = pc.pose.py;
-        pc.gui_translation[2] = pc.pose.pz;
-        pc.gui_rotation[0] = rad2deg(pc.pose.om);
-        pc.gui_rotation[1] = rad2deg(pc.pose.fi);
-        pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-        pc.file_name = input_file_names[i];
-        point_clouds.push_back(pc);*/
+        spdlog::error(":DLL ERROR: creating laszip reader");
         return false;
     }
 
     laszip_BOOL is_compressed = 0;
     if (laszip_open_reader(laszip_reader, input_file_name.c_str(), &is_compressed))
     {
-        fprintf(stderr, ":DLL ERROR: opening laszip reader for '%s'\n", input_file_name.c_str());
-        /*PointCloud pc;
-        pc.m_pose = Eigen::Affine3d::Identity();
-        pc.m_initial_pose = pc.m_pose;
-        pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-        pc.gui_translation[0] = pc.pose.px;
-        pc.gui_translation[1] = pc.pose.py;
-        pc.gui_translation[2] = pc.pose.pz;
-        pc.gui_rotation[0] = rad2deg(pc.pose.om);
-        pc.gui_rotation[1] = rad2deg(pc.pose.fi);
-        pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-        pc.file_name = input_file_names[i];
-        point_clouds.push_back(pc);*/
+        spdlog::error(":DLL ERROR: opening laszip reader for '{}'", input_file_name);
         return false;
     }
     laszip_header* header;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
-        fprintf(stderr, ":DLL ERROR: getting header pointer from laszip reader\n");
-        /*PointCloud pc;
-        pc.m_pose = Eigen::Affine3d::Identity();
-        pc.m_initial_pose = pc.m_pose;
-        pc.pose = pose_tait_bryan_from_affine_matrix(pc.m_pose);
-        pc.gui_translation[0] = pc.pose.px;
-        pc.gui_translation[1] = pc.pose.py;
-        pc.gui_translation[2] = pc.pose.pz;
-        pc.gui_rotation[0] = rad2deg(pc.pose.om);
-        pc.gui_rotation[1] = rad2deg(pc.pose.fi);
-        pc.gui_rotation[2] = rad2deg(pc.pose.ka);
-        pc.file_name = input_file_names[i];
-        point_clouds.push_back(pc);*/
+        spdlog::error(":DLL ERROR: getting header pointer from laszip reader");
         return false;
     }
 
-    // fprintf(stderr, "file '%s' contains %u points\n", input_file_name.c_str(), header->number_of_point_records);
+    spdlog::info("file '{}' contains {} points", input_file_name, header->number_of_point_records);
 
     laszip_point* point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
-        fprintf(stderr, ":DLL ERROR: getting point pointer from laszip reader\n");
+        spdlog::error(":DLL ERROR: getting point pointer from laszip reader");
         return false;
     }
 
@@ -174,28 +133,6 @@ bool PointCloud::load_pc(const std::string& input_file_name, bool load_cache_mod
         this->gui_rotation[1] = rad2deg(this->pose.fi);
         this->gui_rotation[2] = rad2deg(this->pose.ka);
     }
-
-    /*for (int j = 0; j < header->number_of_point_records; j++)
-    {
-            if (laszip_read_point(laszip_reader))
-            {
-                    fprintf(stderr, ":DLL ERROR: reading point %u\n", j);
-                    laszip_close_reader(laszip_reader);
-                    return true;
-                    // continue;
-            }
-
-            LAZPoint p;
-            p.x = header->x_offset + header->x_scale_factor * static_cast<double>(point->X);
-            p.y = header->y_offset + header->y_scale_factor * static_cast<double>(point->Y);
-            p.z = header->z_offset + header->z_scale_factor * static_cast<double>(point->Z);
-            p.timestamp = point->gps_time;
-
-            Eigen::Vector3d pp(p.x, p.y, p.z);
-            pc.points_local.push_back(pp);
-            pc.intensities.push_back(point->intensity);
-            pc.timestamps.push_back(p.timestamp);
-    }*/
 
     laszip_I64 npoints = (header->number_of_point_records ? header->number_of_point_records : header->extended_number_of_point_records);
 
@@ -216,7 +153,7 @@ bool PointCloud::load_pc(const std::string& input_file_name, bool load_cache_mod
     {
         if (laszip_read_point(laszip_reader))
         {
-            fprintf(stderr, "DLL ERROR: reading point %I64d\n", p_count);
+            spdlog::error("DLL ERROR: reading point {}", p_count);
             laszip_close_reader(laszip_reader);
             return false;
         }
@@ -242,25 +179,15 @@ bool PointCloud::load_pc(const std::string& input_file_name, bool load_cache_mod
             number_of_points_with_timestamp_eq_0++;
         }
 
-        // std::cout << "p.timestamp: " << p.timestamp << std::endl;
-
         Eigen::Vector3d pp(p.x, p.y, p.z);
         this->points_local.emplace_back(pp);
         this->intensities.emplace_back(point->intensity);
         this->timestamps.emplace_back(p.timestamp);
 
-        // Eigen::Vector3d color(
-        //	static_cast<uint8_t>(0xFFU * ((point->rgb[0] > 0) ? static_cast<float>(point->rgb[0]) / static_cast<float>(0xFFFFU) : 1.0f))
-        /// 256.0, 	static_cast<uint8_t>(0xFFU * ((point->rgb[1] > 0) ? static_cast<float>(point->rgb[1]) / static_cast<float>(0xFFFFU)
-        //: 1.0f)) / 256.0, 	static_cast<uint8_t>(0xFFU * ((point->rgb[2] > 0) ? static_cast<float>(point->rgb[2]) /
-        // static_cast<float>(0xFFFFU) : 1.0f)) / 256.0);
-
         Eigen::Vector3d color(
             static_cast<float>(point->rgb[0]) / 256.0,
             static_cast<float>(point->rgb[1]) / 256.0,
             static_cast<float>(point->rgb[2]) / 256.0);
-
-        // std::cout << point->rgb[0] << " " << point->rgb[1] << " " << point->rgb[2] << std::endl;
 
         this->colors.push_back(color);
 
@@ -325,8 +252,6 @@ void build_rgd_init_job(int i, PointCloud::Job* job, std::vector<PointCloud::Buc
 void build_rgd_job(
     int i, PointCloud::Job* job, std::vector<PointCloud::PointBucketIndexPair>* index_pair, std::vector<PointCloud::Bucket>* buckets)
 {
-    // std::cout << "build_rgd_job:[" << i << "]" << std::endl;
-
     for (uint64_t ii = job->index_begin_inclusive; ii < job->index_end_exclusive; ii++)
     {
         uint64_t ind = ii;
@@ -365,12 +290,8 @@ void build_rgd_job(
 
 void build_rgd_final_job(int i, PointCloud::Job* job, std::vector<PointCloud::Bucket>* buckets)
 {
-    // std::cout << "build_rgd_init_job:[" << i << "]" << std::endl;
-
     for (size_t ii = job->index_begin_inclusive; ii < job->index_end_exclusive; ii++)
     {
-        // std::cout << job->index_begin_inclusive << " " << job->index_end_exclusive << " " << (*buckets).size() << std::endl;
-
         uint64_t index_begin = (*buckets)[ii].index_begin;
         uint64_t index_end = (*buckets)[ii].index_end;
         if (index_begin != -1 && index_end != -1)
@@ -382,19 +303,13 @@ void build_rgd_final_job(int i, PointCloud::Job* job, std::vector<PointCloud::Bu
 
 bool PointCloud::build_rgd()
 {
-    // std::cout << "build_rgd()" << std::endl;
     buckets.clear();
     index_pairs.clear();
 
     grid_calculate_params(this->points_local, this->rgd_params);
     cout_rgd();
 
-    // std::cout << "grid_calculate_params done" << std::endl;
-
     reindex(this->index_pairs, this->points_local, this->rgd_params);
-    // std::cout << "reindex done" << std::endl;
-
-    // std::cout << "rgd_params.number_of_buckets: " << rgd_params.number_of_buckets << std::endl;
 
     buckets.resize(rgd_params.number_of_buckets);
 
@@ -503,8 +418,6 @@ void reindex_job(
     std::vector<PointCloud::PointBucketIndexPair>* pairs,
     PointCloud::GridParameters rgd_params)
 {
-    // std::cout << "reindex_job:[" << i << "]" << std::endl;
-
     for (size_t ii = job->index_begin_inclusive; ii < job->index_end_exclusive; ii++)
     {
         Eigen::Vector3d& p = (*points)[ii];
@@ -576,11 +489,6 @@ std::vector<PointCloud::Job> PointCloud::get_jobs(uint64_t size, int num_threads
         jobs.push_back(j);
     }
 
-    // std::cout << jobs.size() << " jobs; chunks: ";
-    // for(size_t i = 0; i < jobs.size(); i++){
-    //	std::cout << "("<<jobs[i].index_begin_inclusive << ", " << jobs[i].index_end_exclusive <<") ";
-    // }
-    // std::cout << "\n";
     return jobs;
 }
 
@@ -1558,7 +1466,6 @@ void PointCloud::decimate(double bucket_x, double bucket_y, double bucket_z)
     {
         if (ip[i - 1].index_of_bucket != ip[i].index_of_bucket)
         {
-            // std::cout << index_pairs[i].index_of_bucket << std::endl;
             n_points_local.emplace_back(points_local[ip[i].index_of_point]);
             if (normal_vectors_local.size() == points_local.size())
                 n_normal_vectors_local.emplace_back(normal_vectors_local[ip[i].index_of_point]);
@@ -1643,10 +1550,6 @@ void PointCloud::render(
             glColor3f(0, 0, 1);
             glVertex3f(m(0, 3), m(1, 3), m(2, 3));
             glVertex3f(m(0, 3), m(1, 3), m(2, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.z() * 10);
-
-            // std::cout << this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.x() << " " <<
-            // this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.y() << " " << this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.z()
-            // << std::endl;
         }
         glEnd();
     }

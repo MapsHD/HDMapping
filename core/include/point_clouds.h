@@ -102,7 +102,7 @@ public:
     void print_point_cloud_dimension();
     bool load_3DTK_tls(std::vector<std::string> input_file_names, bool is_decimate, double bucket_x, double bucket_y, double bucket_z);
 
-    bool load_pc(PointCloud& pc, std::string input_file_name, bool load_cache_mode);
+    bool load_pc(PointCloud& pc, const std::string& input_file_name, bool load_cache_mode);
 };
 
 double get_mean_uncertainty_xyz_impact6x6(

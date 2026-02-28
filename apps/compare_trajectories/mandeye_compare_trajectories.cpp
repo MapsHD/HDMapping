@@ -496,32 +496,17 @@ void project_gui()
         }
         if (ImGui::Button("(Step 3) Calculate ATE (Absolute Trajectory Error)"))
         {
-            // std::cout << std::setprecision(20);
-            // for (const auto &p : Data::trajectory_est)
-            //{
-            //     std::cout << p.first << std::endl;
-            // }
-            // std::cout << " ---------------------------" << std::endl;
-            // for (const auto &p : Data::trajectory_gt)
-            //{
-            //     std::cout << p.first << std::endl;
-            // }
-
             double ATE = 0.0;
             double max_ATE = -1000000.0;
             double min_ATE = 1000000.0;
             int count = 0;
             for (const auto& p : Data::trajectory_est)
             {
-                // std::cout << p.second.matrix() << std::endl;
-
                 auto it = getInterpolatedPose(Data::trajectory_gt, p.first);
                 if (!it.isZero())
                 {
                     auto tp = Data::trajectory_offset * p.second;
-                    // std::cout << tp.matrix() << " " <<   std::endl;
 
-                    // std::cout << "ATE " << ATE << std::endl;
                     double ate = (tp - it).norm();
 
                     if (ate > max_ATE)

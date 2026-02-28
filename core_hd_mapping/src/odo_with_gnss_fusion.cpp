@@ -253,7 +253,6 @@ std::vector<Node> OdoWithGnssFusion::load_trajectory(const std::string& file_nam
                 break;
             }
             Node n;
-            // std::cout<<"size: "<<results.size()<<'\n';
             n.timestamp = std::stod(results[0]);
             n.m_pose(0, 3) = std::stod(results[1]);
             n.m_pose(1, 3) = std::stod(results[2]);
@@ -350,9 +349,6 @@ std::vector<std::pair<int, int>> OdoWithGnssFusion::find_correspondences_from_lo
 
 bool OdoWithGnssFusion::rigid_registration(bool adaptive_robust_kernel)
 {
-    // std::cout << "rigid_registration()" << std::endl;
-
-    // barron
     double min_sum_x = 1000000000000; // std::numeric_limits<double>::max();
     double min_sum_y = 1000000000000; // std::numeric_limits<double>::max();
     double min_sum_z = 1000000000000; // std::numeric_limits<double>::max();
@@ -413,8 +409,6 @@ bool OdoWithGnssFusion::rigid_registration(bool adaptive_robust_kernel)
                 sum_x += get_truncated_robust_kernel(delta_x, alpha, barron_c, Z_tilde);
                 sum_y += get_truncated_robust_kernel(delta_y, alpha, barron_c, Z_tilde);
                 sum_z += get_truncated_robust_kernel(delta_z, alpha, barron_c, Z_tilde);
-
-                // std::cout << "sum_x: " << sum_x << " sum_y: " << sum_y << " sum_z: " << sum_z << std::endl;
 
                 if (sum_x < min_sum_x)
                 {
@@ -603,8 +597,6 @@ std::vector<BetweenNode> OdoWithGnssFusion::find_between_nodes()
         double dist_increment = (fused_trajectory[i].m_pose.translation() - fused_trajectory[i - 1].m_pose.translation()).norm();
         dist_along += dist_increment;
         dist_along_gnss += dist_increment;
-
-        // std::cout << "dist_increment " << dist_increment << std::endl;
 
         if (dist_along_gnss > 10)
         {
@@ -954,7 +946,6 @@ bool OdoWithGnssFusion::semi_rigid_registration()
     {
         for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
         {
-            // std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
             h_x.push_back(it.value());
         }
     }

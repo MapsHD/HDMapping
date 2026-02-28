@@ -1722,7 +1722,6 @@ static void compute_hessian(
         if (convergence_result > convergence_delta_threshold_outer_rgd)
         {
             check_threshold_outdoor_rgd = false;
-            // std::cout << "do not use out " << std::endl;
         }
     }
 
@@ -2462,12 +2461,10 @@ bool process_worker_step_2(
         std::vector<Point3Di> points_local_sf;
         std::vector<Point3Di> points_local;
 
-        ///
         for (int ii = 0; ii < intermediate_points.size(); ii++)
         {
             double r_l = intermediate_points[ii].point.norm();
 
-            // std::cout << worker_data[i].intermediate_points[ii].index_pose << " ";
             if (r_l > 0.5 && intermediate_points[ii].index_pose != -1 && r_l < params.max_distance_lidar_rigid_sf)
             {
                 double polar_angle_deg_l = atan2(intermediate_points[ii].point.y(), intermediate_points[ii].point.x()) * RAD_TO_DEG;
@@ -2475,7 +2472,6 @@ bool process_worker_step_2(
 
                 points_local.push_back(intermediate_points[ii]);
 
-                ///////////////////////////////////////////////////////
                 Point3Di p_sl = intermediate_points[ii];
                 p_sl.point.x() = r_l;
                 p_sl.point.y() = polar_angle_deg_l;

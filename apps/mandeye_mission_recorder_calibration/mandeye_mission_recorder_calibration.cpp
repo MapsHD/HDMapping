@@ -34,8 +34,9 @@
 #include "resource.h"
 #include <shellapi.h> // <-- Required for ShellExecuteA
 #include <windows.h>
-
 #endif
+
+#include <spdlog/spdlog.h>
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -105,14 +106,14 @@ void load_pc(
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))
     {
-        fprintf(stderr, "DLL ERROR: creating laszip reader\n");
+        spdlog::error("DLL ERROR: creating laszip reader");
         std::abort();
     }
 
     laszip_BOOL is_compressed = 0;
     if (laszip_open_reader(laszip_reader, lazFile.c_str(), &is_compressed))
     {
-        fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", lazFile.c_str());
+        spdlog::error("DLL ERROR: opening laszip reader for '{}'", lazFile);
         std::abort();
     }
     spdlog::info("Compressed : {}", is_compressed);
@@ -123,7 +124,9 @@ void load_pc(
         spdlog::error("DLL ERROR: getting header pointer from laszip reader");
         std::abort();
     }
-    fprintf(stderr, "File '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
+
+    spdlog::info("File '{}' contains {} points", lazFile, header->number_of_point_records);
+
     laszip_point* point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {

@@ -323,7 +323,6 @@ void find_best_stretch(
     {
         auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), points[i].timestamp);
         points[i].index_pose = std::distance(timestamps.begin(), lower);
-        // std::cout << "points[i].timestamp " << points[i].timestamp << " timestamps " << timestamps[points[i].index_pose] << std::endl;
     }
 
     std::set<int> indexes;
@@ -1724,8 +1723,6 @@ void display()
             glBegin(GL_POINTS);
             for (const auto &p : worker_data[i].intermediate_points)
             {
-                // std::cout << "kk";
-                // std::cout << p.index_pose;
                 Eigen::Vector3d pt = worker_data[i].intermediate_trajectory[p.index_pose] * p.point;
                 glVertex3d(pt.x(), pt.y(), pt.z());
             }
@@ -2324,11 +2321,6 @@ void mouse(int glut_button, int state, int x, int y)
 
 int main(int argc, char* argv[])
 {
-    // std::cout << "argc " << argc << std::endl;
-    // if (argc == 2){
-    //     std::cout << "argv[1]: '" << argv[1] << "'" << std::endl;
-    // }
-
     spdlog::cfg::load_env_levels();
     spdlog::flush_on(spdlog::level::warn);
     set_lidar_odometry_default_params(params);

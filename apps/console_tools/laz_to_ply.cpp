@@ -6,6 +6,8 @@
 #include <fstream>
 #include <vector>
 
+#include <spdlog/spdlog.h>
+
 struct Point
 {
     float x = 0.0f;
@@ -100,8 +102,8 @@ int main(const int argc, const char** argv)
 
     if (argc != expected_argc)
     {
-        std::fprintf(stderr, "Invalid argument count. Got %d expected %d.\n", argc, expected_argc);
-        std::fprintf(stderr, "Usage : %s </PATH/FROM/POINT/CLOUD.laz> </PATH/TO/POINT/CLOUD.ply>\n", argv[0]);
+        spdlog::error("Invalid argument count. Got {} expected {}", argc, expected_argc);
+        spdlog::error("Usage : {} </PATH/FROM/POINT/CLOUD.laz> </PATH/TO/POINT/CLOUD.ply>", argv[0]);
 
         return EXIT_FAILURE;
     }
@@ -111,28 +113,28 @@ int main(const int argc, const char** argv)
 
     if (!check_path_ext(from, expected_laz_extension))
     {
-        std::fprintf(stderr, "Invalid extension for input file %s - expected %s\n", from, expected_laz_extension);
+        spdlog::error("Invalid extension for input file {} - expected {}", from, expected_laz_extension);
 
         return EXIT_FAILURE;
     }
 
     if (!check_path_ext(to, expected_ply_extension))
     {
-        std::fprintf(stderr, "Invalid extension for output file %s - expected %s\n", from, expected_ply_extension);
+        spdlog::error("Invalid extension for output file {} - expected {}", from, expected_ply_extension);
 
         return EXIT_FAILURE;
     }
 
     if (!std::filesystem::exists(from))
     {
-        std::fprintf(stderr, "Input file %s - does not exist\n", from);
+        spdlog::error("Input file {} - does not exist", from);
 
         return EXIT_FAILURE;
     }
 
     if (!convert_and_save(from, to))
     {
-        std::fprintf(stderr, "Conversion from %s to  %s failed\n", from, to);
+        spdlog::error("Conversion from {} to {} failed\n", from, to);
 
         return EXIT_FAILURE;
     }

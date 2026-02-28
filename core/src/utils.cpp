@@ -364,8 +364,6 @@ void keyboardDown(unsigned char key, int x, int y)
 
     // forward to ImGui GLUT backend
     ImGui_ImplGLUT_KeyboardFunc(key, x, y);
-
-    // std::cout << "Down key: " << key << ", mod: " << mods << std::endl;
 }
 
 void keyboardUp(unsigned char key, int x, int y)
@@ -385,8 +383,6 @@ void keyboardUp(unsigned char key, int x, int y)
     io.AddKeyEvent(keyToImGuiKey(key), false);
 
     ImGui_ImplGLUT_KeyboardUpFunc(key, x, y);
-
-    // std::cout << "Up key: " << key << ", mod: " << mods << std::endl;
 }
 
 static bool first_time = true;
@@ -1401,7 +1397,6 @@ void getClosestTrajectoriesPoint(
 
     if (number_visible_sessions == 1)
     {
-        // std::cout << "first_session_index " << first_session_index << std::endl;
         for (size_t i = 0; i < sessions[first_session_index].point_clouds_container.point_clouds.size(); i++)
         {
             for (size_t j = 0; j < sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
@@ -1450,7 +1445,6 @@ void getClosestTrajectoriesPoint(
         {
             index = second_session_index;
         }
-        // std::cout << "first_session_index " << first_session_index << std::endl;
         for (size_t i = 0; i < sessions[index].point_clouds_container.point_clouds.size(); i++)
         {
             for (size_t j = 0; j < sessions[index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
@@ -1484,7 +1478,6 @@ void getClosestTrajectoriesPoint(
     }
     else // (number_visible_sessions > 2)
     {
-        // std::cout << "first_session_index " << first_session_index << std::endl;
         for (size_t s = 0; s < sessions.size(); s++)
         {
             if (sessions[s].visible)

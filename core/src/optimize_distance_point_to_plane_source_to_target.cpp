@@ -873,13 +873,11 @@ bool RegistrationPlaneFeature::optimize_distance_point_to_plane_source_to_target
         Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
         std::vector<double> h_x;
-        // std::cout << "Solution: " << std::endl;
         for (int k = 0; k < x.outerSize(); ++k)
         {
             for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
             {
                 h_x.push_back(it.value());
-                // std::cout << "col: " << it.col() << " row: " << it.row() << " value: " << it.value() << std::endl;
             }
         }
 

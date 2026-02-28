@@ -679,13 +679,6 @@ void ndt_job(
                     Eigen::Matrix<double, 3, 3> cov_xyz = j * cov_r_alpha_theta * j.transpose();
                     std::vector<Eigen::Vector3d> points = get_points_normal_distribution(cov_xyz, point_local, num_extended_points);
 
-                    // for (const auto &ppp : points)
-                    //{
-                    //	std::cout << "---" << std::endl;
-                    //	std::cout << ppp << std::endl;
-                    // }
-                    // exit(1);
-
                     for (const auto& pp : points)
                     {
                         auto ppg = m * pp;
@@ -743,10 +736,7 @@ void ndt_job(
             if (min_eigen_value > 3 * sigma_r)
             {
                 continue;
-            } // else{
-              // std::cout << min_eigen_value << " ";
-              //}
-              // std::cout << min_eigen_value << " ";
+            }
 
             Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
             Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
@@ -1321,8 +1311,6 @@ void ndt_job(
     (*md_out) = md;
     (*md_count_out) = md_count;
 
-    // std::cout << md << " ";
-
     if (tripletListB.size() > 0)
     {
         Eigen::SparseMatrix<double> matA(tripletListB.size(), trajectory_size * number_of_unknowns);
@@ -1354,7 +1342,6 @@ void ndt_job(
                 (*AtPA) = AtPAt_tmp;
                 (*AtPB) = AtPBt_tmp;
             }
-            // std::cout << AtPAt << std::endl;
         }
     }
     else
@@ -1404,7 +1391,6 @@ void ndt_jobi(
 
     for (size_t ii = job->index_begin_inclusive; ii < job->index_end_exclusive; ii++)
     {
-        // std::cout << ii << " ";
         NDT::Bucket& b = (*buckets)[ii];
         if (b.number_of_points < 5)
         {
@@ -1463,7 +1449,6 @@ void ndt_jobi(
                 const auto& p = (*pp)[(*index_pair_internal)[index].index_of_point];
                 mean += p.point; //::Vector3d(p.x, p.y, p.z);
                 counter++;
-                // std::cout << counter << " ";
             }
         }
 
@@ -1540,7 +1525,6 @@ void ndt_jobi(
         (*buckets)[ii].mean = mean;
         (*buckets)[ii].cov = cov;
 
-        // std::cout << mean << " ";
 #if 0
 		if(compute_only_mean_and_cov){
 			continue;
@@ -1961,7 +1945,6 @@ void ndt_jobi(
 	(*md_out) = md;
 	(*md_count_out) = md_count;
 
-	// std::cout << md << " ";
 
 	if (tripletListB.size() > 0)
 	{
@@ -1994,7 +1977,6 @@ void ndt_jobi(
 				(*AtPA) = AtPAt_tmp;
 				(*AtPB) = AtPBt_tmp;
 			}
-			// std::cout << AtPAt << std::endl;
 		}
 	}
 	else
@@ -2157,7 +2139,6 @@ bool NDT::optimize(std::vector<PointCloud>& point_clouds, bool compute_only_maha
 
         for (const auto& b : buckets_external)
         {
-            // std::cout << "number of points inside bucket: " << b.number_of_points << std::endl;
             if (b.number_of_points > 1000)
             {
                 buckets_external_reduced.push_back(b);
@@ -2965,7 +2946,6 @@ bool NDT::optimize(std::vector<Session>& sessions, bool compute_only_mahalanobis
 
         for (const auto& b : buckets_external)
         {
-            // std::cout << "number of points inside bucket: " << b.number_of_points << std::endl;
             if (b.number_of_points > 1000)
             {
                 buckets_external_reduced.push_back(b);
@@ -3632,12 +3612,9 @@ std::vector<Eigen::SparseMatrix<double>> NDT::compute_covariance_matrices_and_rm
     std::vector<Eigen::Affine3d> mposes_inv;
     for (size_t i = 0; i < point_clouds.size(); i++)
     {
-        // poses.push_back(pose_tait_bryan_from_affine_matrix(point_clouds[i].m_pose));
         mposes.push_back(point_clouds[i].m_pose);
         mposes_inv.push_back(point_clouds[i].m_pose.inverse());
     }
-    // std::cout << "XXX" << std::endl;
-    // std::cout << (int)pose_convention << " " << (int)rotation_matrix_parametrization << " " << (int)number_of_unknowns << std::endl;
 
     for (size_t k = 0; k < jobs.size(); k++)
     {
@@ -3685,8 +3662,6 @@ std::vector<Eigen::SparseMatrix<double>> NDT::compute_covariance_matrices_and_rm
     double sq = ssr / ((double)num_obs - point_clouds.size() * number_of_unknowns);
     rms = ssr / (double)num_obs;
 
-    // std::cout << "sq " << sq << " num_obs " << num_obs << std::endl;
-
     bool init = false;
     Eigen::SparseMatrix<double> AtPA_ndt(point_clouds.size() * number_of_unknowns, point_clouds.size() * number_of_unknowns);
 
@@ -3732,8 +3707,6 @@ std::vector<Eigen::SparseMatrix<double>> NDT::compute_covariance_matrices_and_rm
             }
         }
         covariance_matrices.push_back(cm);
-        // std::cout << "cm" << std::endl;
-        // std::cout << cm << std::endl;
     }
     return covariance_matrices;
 }
@@ -3880,11 +3853,6 @@ bool NDT::compute_cov_mean(
     }
     std::cout << "computing cov mean finished" << std::endl;
 
-    // for(int i = 0; i < buckets.size(); i++){
-    //	if(buckets[i].number_of_points > 5){
-    //		std::cout << i << " " << buckets[i].cov << std::endl;
-    //	}
-    // }
     buckets[0].number_of_points = 0;
     for (auto& b : buckets)
     {
@@ -3907,12 +3875,9 @@ bool NDT::compute_cov_mean(
 
     std::cout << "grid_calculate_params start" << std::endl;
     grid_calculate_params(points, rgd_params);
-    // for(auto &p:points){
-    //	std::cout << p.point;
-    // }
+
     std::cout << "grid_calculate_params finished" << std::endl;
 
-    // grid_calculate_params(rgd_params, min_x, max_x, min_y, max_y, min_z, max_z);
     std::cout << "build_rgd start" << std::endl;
     build_rgd(points, index_pair, buckets, rgd_params);
     std::cout << "build_rgd finished" << std::endl;
@@ -4001,11 +3966,6 @@ bool NDT::compute_cov_mean(
     }
     std::cout << "computing cov mean ndt_jobi finished" << std::endl;
 
-    // for(int i = 0; i < buckets.size(); i++){
-    //	if(buckets[i].number_of_points > 5){
-    //		std::cout << i << " " << buckets[i].cov << std::endl;
-    //	}
-    // }
     buckets[0].number_of_points = 0;
 
     // int counter_active_buckets = 0;
@@ -4020,7 +3980,7 @@ bool NDT::compute_cov_mean(
             // counter_active_buckets ++;
         }
     }
-    // std::cout << "counter_active_buckets: " << counter_active_buckets << std::endl;
+
     return true;
 }
 
@@ -4036,9 +3996,7 @@ bool NDT::compute_cov_mean(
 
 	std::cout << "grid_calculate_params start" << std::endl;	
 	grid_calculate_params(points, rgd_params);
-	//for(auto &p:points){
-	//	std::cout << p.point;
-	//}
+
 	std::cout << "grid_calculate_params finished" << std::endl;	
 
 	//grid_calculate_params(rgd_params, min_x, max_x, min_y, max_y, min_z, max_z);
@@ -4115,21 +4073,7 @@ bool NDT::compute_cov_mean(
 	}
 	std::cout << "computing cov mean ndt_jobi finished" << std::endl;
 
-	//for(int i = 0; i < buckets.size(); i++){
-	//	if(buckets[i].number_of_points > 5){
-	//		std::cout << i << " " << buckets[i].cov << std::endl;
-	//	}
-	//}
 	buckets[0].number_of_points = 0;
-
-	//int counter_active_buckets = 0;
-	/*for(auto &b:buckets){
-		if(b.number_of_points < 5){
-			b.number_of_points = 0;
-		}else{
-			//counter_active_buckets ++;
-		}
-	}*/
 
 	for (auto& [key, value] : buckets){
 		if(value.number_of_points < 5){
@@ -4137,7 +4081,6 @@ bool NDT::compute_cov_mean(
 		}
 	}
 
-	//std::cout << "counter_active_buckets: " << counter_active_buckets << std::endl;
 #endif
     return true;
 }
@@ -4156,55 +4099,4 @@ void NDT::build_rgd(
     std::cout << "reindex start" << std::endl;
     reindex(points, index_pair, rgd_params, num_threads);
     std::cout << "reindex finished" << std::endl;
-
-    // buckets.resize(rgd_params.number_of_buckets);
-
-    // std::vector<NDT::Job> jobs = get_jobs(buckets.size(), num_threads);
-    // std::vector<std::thread> threads;
-
-    // std::cout << "build_rgd_init_jobs start" << std::endl;
-    // for (size_t i = 0; i < jobs.size(); i++)
-    //{
-    //	threads.push_back(std::thread(build_rgd_init_job, i, &jobs[i], &buckets));
-    // }
-
-    // for (size_t j = 0; j < threads.size(); j++)
-    //{
-    //	threads[j].join();
-    // }
-    // threads.clear();
-    // std::cout << "build_rgd_init_jobs finished" << std::endl;
-
-    // jobs = get_jobs(points.size(), num_threads);
-
-    // std::cout << "build_rgd_jobs start jobs.size():" << jobs.size() << std::endl;
-    // std::cout << "points.size() " << points.size() << std::endl;
-    // std::cout << "index_pair.size() " << index_pair.size() << std::endl;
-    // std::cout << "buckets.size() " << buckets.size() << std::endl;
-
-    // for (size_t i = 0; i < jobs.size(); i++)
-    //{
-    //	threads.push_back(std::thread(build_rgd_job, i, &jobs[i], &index_pair, &buckets));
-    // }
-    // for (size_t j = 0; j < threads.size(); j++)
-    //{
-    //	threads[j].join();
-    // }
-    // threads.clear();
-    // std::cout << "build_rgd_jobs finished" << std::endl;
-
-    // jobs = get_jobs(buckets.size(), num_threads);
-
-    // std::cout << "build_rgd_final_jobs start" << std::endl;
-    // for (size_t i = 0; i < jobs.size(); i++)
-    //{
-    //	threads.push_back(std::thread(build_rgd_final_job, i, &jobs[i], &buckets));
-    // }
-
-    // for (size_t j = 0; j < threads.size(); j++)
-    //{
-    //	threads[j].join();
-    // }
-    // threads.clear();
-    // std::cout << "build_rgd_final_jobs finished" << std::endl;
 }

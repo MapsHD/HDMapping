@@ -108,7 +108,6 @@ std::vector<Point> SingleTrajectoryViewer::load_points_and_transform_to_global(d
                             .norm() < 0.1)
                     {
                         ii += 10000;
-                        // std::cout << "pp " << ii << " ";
                     }
                 }
             }

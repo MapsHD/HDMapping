@@ -8,21 +8,8 @@
 class Surface
 {
 public:
-    // struct TripletIndexes
-    //{
-    //     int index_before;
-    //     int index_curr;
-    //     int index_after;
-    // };
-
-    Surface()
-    {
-        ;
-    };
-    ~Surface()
-    {
-        ;
-    };
+    Surface() = default;
+    ~Surface() = default;
 
     std::vector<Eigen::Affine3d> vertices;
     std::vector<Eigen::Affine3d> vertices_odo;

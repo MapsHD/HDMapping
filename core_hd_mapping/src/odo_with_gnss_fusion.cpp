@@ -22,8 +22,7 @@ void OdoWithGnssFusion::imgui(CommonData& common_data)
 
     if (ImGui::Button("load GNSS trajectory"))
     {
-        std::string input_file_name = "";
-        input_file_name = mandeye::fd::OpenFileDialogOneFile("Load GNSS trajectory", {});
+        std::string input_file_name = mandeye::fd::OpenFileDialogOneFile("Load GNSS trajectory", {});
 
         if (input_file_name.size() > 0)
         {

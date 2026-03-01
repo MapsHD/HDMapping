@@ -1,6 +1,4 @@
-#include <pch/pch.h>
-
-#include <surface.h>
+#include "surface.h"
 
 #include <GL/freeglut.h>
 

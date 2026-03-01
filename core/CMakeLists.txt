@@ -23,6 +23,7 @@ set(CORE_BASE_SOURCES
     src/pose_graph_slam.cpp
     src/registration_plane_feature.cpp
     src/session.cpp
+    # src/utils.cpp # TODO(mwlasiuk) : broken AF ...
     ${EXTERNAL_LIBRARIES_DIRECTORY}/src/wgs84_do_puwg92.cc
     ${EXTERNAL_LIBRARIES_DIRECTORY}/src/plycpp.cpp
 )

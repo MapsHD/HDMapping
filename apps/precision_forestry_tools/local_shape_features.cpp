@@ -1,7 +1,8 @@
-#include <pch/pch.h>
-
 #include <hash_utils.h>
-#include <local_shape_features.h>
+
+#include "local_shape_features.h"
+
+#include <execution>
 
 bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLocalShapeFeatures>& points, const Params& params)
 {

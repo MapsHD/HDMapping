@@ -8,25 +8,26 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include <mutex>
-#include <vector>
 
 #include <array>
 #include <cstdint>
+#include <execution>
 #include <iostream>
-#include <nlohmann/json.hpp>
+#include <mutex>
 #include <sstream>
-
-#include "color_las_loader.h"
-#include "pfd_wrapper.hpp"
-#include <pch/pch.h>
+#include <vector>
 
 #include <Eigen/Eigen>
+#include <nlohmann/json.hpp>
+
+#include <Core/color_las_loader.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/structures.h>
+#include <Core/transformations.h>
+
 #include <observation_equations/codes/common/include/cauchy.h>
 #include <observation_equations/codes/python-scripts/camera-metrics/equirectangular_camera_colinearity_tait_bryan_wc_jacobian.h>
 #include <observation_equations/codes/python-scripts/camera-metrics/fisheye_camera_calibRT_tait_bryan_wc_jacobian.h>
-#include <structures.h>
-#include <transformations.h>
 
 #include <HDMapping/Version.hpp>
 

@@ -1,8 +1,9 @@
 #pragma once
 
+#include <Core/point_cloud.h>
+#include <Core/session.h>
+
 #include <Eigen/Eigen>
-#include <point_cloud.h>
-#include <session.h>
 #include <thread>
 
 class NDT

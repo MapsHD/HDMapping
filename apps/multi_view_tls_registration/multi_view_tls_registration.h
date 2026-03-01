@@ -2,14 +2,15 @@
 #pragma once
 
 #include <filesystem>
-#include <gnss.h>
-#include <icp.h>
-#include <ndt.h>
-#include <pose_graph_slam.h>
 #include <regex>
-#include <registration_plane_feature.h>
-#include <session.h>
-#include <transformations.h>
+
+#include <Core/gnss.h>
+#include <Core/icp.h>
+#include <Core/ndt.h>
+#include <Core/pose_graph_slam.h>
+#include <Core/registration_plane_feature.h>
+#include <Core/session.h>
+#include <Core/transformations.h>
 
 namespace fs = std::filesystem;
 

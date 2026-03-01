@@ -2,9 +2,10 @@
 
 #include <GL/freeglut.h>
 
-#include <structures.h>
-#include <transformations.h>
+#include <Core/structures.h>
+#include <Core/transformations.h>
 
+//  TODO(mwlasiuk) : fix includes
 #include <../../3rdparty/observation_equations/codes/common/include/cauchy.h>
 #include <../../3rdparty/observation_equations/codes/python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
 #include <../../3rdparty/observation_equations/codes/python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>

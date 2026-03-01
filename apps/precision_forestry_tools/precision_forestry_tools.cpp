@@ -15,11 +15,11 @@
 
 #include <Eigen/Eigen>
 
-#include "pfd_wrapper.hpp"
-
 #include <HDMapping/Version.hpp>
-#include <session.h>
-#include <transformations.h>
+
+#include <Core/pfd_wrapper.hpp>
+#include <Core/session.h>
+#include <Core/transformations.h>
 
 #include <filesystem>
 #include <fstream>

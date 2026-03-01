@@ -13,13 +13,14 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <spdlog/spdlog.h>
-#include <utils.hpp>
+
+#include <Core/export_laz.h>
+#include <Core/hash_utils.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/transformations.h>
+#include <Core/utils.hpp>
 
 #include <Eigen/Eigen>
-
-#include <transformations.h>
-
-#include "pfd_wrapper.hpp"
 
 #include "../lidar_odometry_step_1/lidar_odometry.h"
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
@@ -30,11 +31,7 @@
 #include "tbb/tbb.h"
 #include <mutex>
 
-#include <export_laz.h>
-
 #include <opencv2/opencv.hpp>
-
-#include <hash_utils.h>
 
 #ifdef _WIN32
 #include "resource.h"

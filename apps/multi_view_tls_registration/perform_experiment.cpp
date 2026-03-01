@@ -1,4 +1,7 @@
 #include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 
 // clang-format off
 #include <GL/glew.h>
@@ -17,25 +20,19 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <icp.h>
-#include <ndt.h>
-#include <observation_picking.h>
-#include <pose_graph_slam.h>
-#include <registration_plane_feature.h>
-#include <transformations.h>
+#include <Core/gnss.h>
+#include <Core/icp.h>
+#include <Core/manual_pose_graph_loop_closure.h>
+#include <Core/ndt.h>
+#include <Core/observation_picking.h>
+#include <Core/pose_graph_slam.h>
+#include <Core/registration_plane_feature.h>
+#include <Core/session.h>
+#include <Core/transformations.h>
 
 #include <portable-file-dialogs.h>
 
 #include <laszip/laszip_api.h>
-
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-
-#include <manual_pose_graph_loop_closure.h>
-
-#include <gnss.h>
-#include <session.h>
 
 #include <spdlog/spdlog.h>
 

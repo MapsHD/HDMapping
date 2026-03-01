@@ -1,8 +1,9 @@
 #include <pch/pch.h>
 
+#include <Core/gnss.h>
+#include <Core/nmea.h>
+
 #include <WGS84toCartesian.hpp>
-#include <gnss.h>
-#include <nmea.h>
 #include <wgs84_do_puwg92.h>
 
 #if WITH_GUI == 1

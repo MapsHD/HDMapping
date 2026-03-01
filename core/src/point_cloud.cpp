@@ -1,7 +1,7 @@
 #include <pch/pch.h>
 
-#include <point_cloud.h>
-#include <transformations.h>
+#include <Core/point_cloud.h>
+#include <Core/transformations.h>
 
 #include <plycpp.h>
 

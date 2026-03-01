@@ -1,9 +1,9 @@
 #include <pch/pch.h>
 
-#include <laszip/laszip_api.h>
-#include <point_clouds.h>
-#include <transformations.h>
+#include <Core/point_clouds.h>
+#include <Core/transformations.h>
 
+#include <laszip/laszip_api.h>
 #include <spdlog/spdlog.h>
 
 inline void split(std::string& str, char delim, std::vector<std::string>& out)

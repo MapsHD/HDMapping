@@ -9,21 +9,26 @@
 
 #include <ImGuizmo.h>
 
+#include <spdlog/spdlog.h>
+
 #include <Eigen/Eigen>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <icp.h>
-#include <ndt.h>
-#include <observation_picking.h>
-#include <pose_graph_slam.h>
-#include <registration_plane_feature.h>
-#include <transformations.h>
-
-#include <fmt_filesystem.hpp>
-#include <spdlog/spdlog.h>
-#include <utils.hpp>
+#include <Core/export_laz.h>
+#include <Core/fmt_filesystem.hpp>
+#include <Core/gnss.h>
+#include <Core/icp.h>
+#include <Core/manual_pose_graph_loop_closure.h>
+#include <Core/ndt.h>
+#include <Core/observation_picking.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/pose_graph_slam.h>
+#include <Core/registration_plane_feature.h>
+#include <Core/session.h>
+#include <Core/transformations.h>
+#include <Core/utils.hpp>
 
 #include <portable-file-dialogs.h>
 
@@ -36,17 +41,11 @@
 
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include "multi_view_tls_registration.h"
-#include <manual_pose_graph_loop_closure.h>
-
-#include <gnss.h>
-#include <pfd_wrapper.hpp>
-#include <session.h>
 
 #include <HDMapping/Version.hpp>
 
 #include "WGS84toCartesian.hpp"
 #include "wgs84_do_puwg92.h"
-#include <export_laz.h>
 
 #include <proj.h>
 #ifdef _WIN32

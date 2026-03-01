@@ -2,9 +2,10 @@
 
 // TODO(mwlasiuk) : do this at the end (print -> spdlog) as it is .h and not cpp + hpp and that breaks some subprojects ...
 
+#include <Core/session.h>
+
 #include <filesystem>
 #include <iostream>
-#include <session.h>
 #include <string>
 #include <vector>
 

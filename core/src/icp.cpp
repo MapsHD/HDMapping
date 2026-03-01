@@ -1,12 +1,11 @@
 #include <pch/pch.h>
 
-#include <icp.h>
+#include <Core/icp.h>
+#include <Core/m_estimators.h>
+#include <Core/transformations.h>
 
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_tait_bryan_wc_jacobian.h>
-
-#include <m_estimators.h>
-#include <transformations.h>
 
 std::vector<ICP::Job> ICP::get_jobs(uint64_t size, int num_threads)
 {

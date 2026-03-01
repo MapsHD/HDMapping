@@ -1,7 +1,7 @@
 #pragma once
 
-#include <icp.h>
-#include <point_clouds.h>
+#include <Core/icp.h>
+#include <Core/point_clouds.h>
 
 class PoseGraphSLAM
 {

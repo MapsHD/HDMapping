@@ -3,11 +3,13 @@
 #if WITH_GUI == 1
 
 #include <GL/freeglut.h>
-#include <gnss.h>
+
 #include <imgui.h>
-#include <observation_picking.h>
-#include <point_clouds.h>
-#include <pose_graph_loop_closure.h>
+
+#include <Core/gnss.h>
+#include <Core/observation_picking.h>
+#include <Core/point_clouds.h>
+#include <Core/pose_graph_loop_closure.h>
 
 class ManualPoseGraphLoopClosure : public PoseGraphLoopClosure
 {

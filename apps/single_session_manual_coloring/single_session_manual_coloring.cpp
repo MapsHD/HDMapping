@@ -7,32 +7,30 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include <mutex>
-#include <vector>
 
-#include "color_las_loader.h"
-#include "pfd_wrapper.hpp"
-#include <pch/pch.h>
+#include <Core/color_las_loader.h>
+#include <Core/observation_picking.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/session.h>
+#include <Core/structures.h>
+#include <Core/transformations.h>
 
 #include <Eigen/Eigen>
+
 #include <observation_equations/codes/common/include/cauchy.h>
 #include <observation_equations/codes/python-scripts/camera-metrics/equirectangular_camera_colinearity_tait_bryan_wc_jacobian.h>
 #include <observation_equations/codes/python-scripts/camera-metrics/fisheye_camera_calibRT_tait_bryan_wc_jacobian.h>
-#include <structures.h>
-#include <transformations.h>
 
 #include <HDMapping/Version.hpp>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <session.h>
-
-#include <observation_picking.h>
-
 #include <execution>
 #include <filesystem>
 #include <iostream>
+#include <mutex>
+#include <vector>
 
 const uint32_t window_width = 800;
 const uint32_t window_height = 600;

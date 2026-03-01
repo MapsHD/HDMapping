@@ -13,13 +13,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <spdlog/spdlog.h>
-#include <utils.hpp>
 
 #include <Eigen/Eigen>
-
-#include <transformations.h>
-
-#include "pfd_wrapper.hpp"
 
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include <filesystem>
@@ -28,15 +23,16 @@
 
 #include <mutex>
 
-#include <pair_wise_iterative_closest_point.h>
+#include <Core/pair_wise_iterative_closest_point.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/transformations.h>
+#include <Core/utils.hpp>
 
 #ifdef _WIN32
 #include "resource.h"
 #include <shellapi.h> // <-- Required for ShellExecuteA
 #include <windows.h>
 #endif
-
-#include <spdlog/spdlog.h>
 
 ///////////////////////////////////////////////////////////////////////////////////
 

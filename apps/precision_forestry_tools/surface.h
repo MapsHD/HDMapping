@@ -3,7 +3,7 @@
 #include <Eigen/Eigen>
 #include <vector>
 
-#include <hash_utils.h>
+#include <Core/hash_utils.h>
 
 class Surface
 {

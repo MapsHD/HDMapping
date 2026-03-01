@@ -17,25 +17,19 @@
 
 #include <Eigen/Eigen>
 
-#include <session.h>
+#include <Core/export_laz.h>
+#include <Core/icp.h>
+#include <Core/ndt.h>
+#include <Core/observation_picking.h>
+#include <Core/pair_wise_iterative_closest_point.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/registration_plane_feature.h>
+#include <Core/session.h>
+#include <Core/utils.hpp>
 
-#include <pfd_wrapper.hpp>
 #include <portable-file-dialogs.h>
 
-#include <utils.hpp>
-
-#include <icp.h>
-
-#include <registration_plane_feature.h>
-
 #include <HDMapping/Version.hpp>
-
-#include <ndt.h>
-
-#include <observation_picking.h>
-#include <pair_wise_iterative_closest_point.h>
-
-#include <export_laz.h>
 
 #ifdef _WIN32
 #include "resource.h"

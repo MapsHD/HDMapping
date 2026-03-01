@@ -14,10 +14,11 @@
 #include <Fusion.h>
 #include <common/include/cauchy.h>
 #include <laszip/laszip_api.h>
-#include <ndt.h>
 #include <nlohmann/json.hpp>
-#include <structures.h>
-#include <transformations.h>
+
+#include <Core/ndt.h>
+#include <Core/structures.h>
+#include <Core/transformations.h>
 
 #include <python-scripts/constraints/constraint_fixed_parameter_jacobian.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>

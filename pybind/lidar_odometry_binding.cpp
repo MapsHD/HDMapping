@@ -3,8 +3,8 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 
-#include <lidar_odometry_utils.h>
 #include <lidar_odometry.h>
+#include <lidar_odometry_utils.h>
 
 #include <Core/export_laz.h>
 #include <Core/session.h>

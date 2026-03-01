@@ -16,6 +16,7 @@
 #include <mutex>
 #include <sstream>
 #include <vector>
+#include <thread>
 
 #include <Eigen/Eigen>
 #include <nlohmann/json.hpp>

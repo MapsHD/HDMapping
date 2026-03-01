@@ -30,11 +30,24 @@ std::vector<std::string> GNSS::get_available_geoids()
     for (const auto& path : PathCandidate)
     {
         std::filesystem::path proj_path(path);
-        if (std::filesystem::exists(proj_path))
+        std::error_code ec;
+        if (std::filesystem::exists(proj_path, ec) && !ec)
         {
-            for (const auto& entry : std::filesystem::directory_iterator(proj_path))
+            std::filesystem::directory_iterator dir_it(proj_path, ec);
+            if (ec)
             {
-                if (entry.is_regular_file() && entry.path().extension() == ".gtx")
+                std::cerr << "cannot open directory " << proj_path << ": " << ec.message() << std::endl;
+                continue;
+            }
+            for (; dir_it != std::filesystem::directory_iterator(); dir_it.increment(ec))
+            {
+                if (ec)
+                {
+                    std::cerr << "error iterating directory " << proj_path << ": " << ec.message() << std::endl;
+                    break;
+                }
+                const auto& entry = *dir_it;
+                if (entry.is_regular_file(ec) && !ec && entry.path().extension() == ".gtx")
                 {
                     std::cout << "found geoid model: " << entry.path().filename().string() << std::endl;
                     unique.insert(entry.path().filename().string());

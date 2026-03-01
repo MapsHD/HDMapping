@@ -1259,7 +1259,9 @@ bool PointClouds::load_whu_tls(
     point_clouds.resize(point_clouds_nodata.size());
 
     std::transform(
+#if USE_EXECUTION_PAR_UNSEQ
         std::execution::par_unseq,
+#endif
         std::begin(point_clouds_nodata),
         std::end(point_clouds_nodata),
         std::begin(point_clouds),

@@ -174,7 +174,9 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloud(
 {
     std::vector<mandeye::PointRGB> newCloud(pointsRGB.size());
     std::transform(
+#if USE_EXECUTION_PAR_UNSEQ
         std::execution::par_unseq,
+#endif
         pointsRGB.begin(),
         pointsRGB.end(),
         newCloud.begin(),

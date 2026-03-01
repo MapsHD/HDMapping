@@ -1,4 +1,3 @@
-
 #include <GL/freeglut.h>
 #include <iostream>
 
@@ -370,7 +369,9 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloud(
 {
     std::vector<mandeye::PointRGB> newCloud(pointsRGB.size());
     std::transform(
+#if USE_EXECUTION_PAR_UNSEQ
         std::execution::par_unseq,
+#endif
         pointsRGB.begin(),
         pointsRGB.end(),
         newCloud.begin(),
@@ -418,7 +419,9 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloudFishEye(
 {
     std::vector<mandeye::PointRGB> newCloud(pointsRGB.size());
     std::transform(
+#if USE_EXECUTION_PAR_UNSEQ
         std::execution::par_unseq,
+#endif
         pointsRGB.begin(),
         pointsRGB.end(),
         newCloud.begin(),
@@ -1359,7 +1362,9 @@ void mouse(int glut_button, int state, int x, int y)
                 std::pair<double, int> distanceIndexPair{ std::numeric_limits<double>::max(), -1 };
 
                 std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
                     std::execution::par_unseq,
+#endif
                     SystemData::points.begin(),
                     SystemData::points.end(),
                     [&](const mandeye::PointRGB& p)

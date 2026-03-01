@@ -296,7 +296,13 @@ bool PairWiseICP::compute(
 
         if (multithread)
         {
-            std::for_each(std::execution::par_unseq, std::begin(source), std::end(source), hessian_fun);
+            std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+                std::execution::par_unseq,
+#endif
+                std::begin(source),
+                std::end(source),
+                hessian_fun);
         }
         else
         {
@@ -503,7 +509,13 @@ bool PairWiseICP::compute_fast(
 
         if (multithread)
         {
-            std::for_each(std::execution::par_unseq, std::begin(source), std::end(source), hessian_fun);
+            std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+                std::execution::par_unseq,
+#endif
+                std::begin(source),
+                std::end(source),
+                hessian_fun);
         }
         else
         {

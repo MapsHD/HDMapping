@@ -1526,7 +1526,13 @@ void calibrate_intrinsics()
     std::cout << "start adding lidar observations" << std::endl;
     if (multithread)
     {
-        std::for_each(std::execution::par_unseq, std::begin(point_cloud), std::end(point_cloud), hessian_fun);
+        std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+            std::execution::par_unseq,
+#endif
+            std::begin(point_cloud),
+            std::end(point_cloud),
+            hessian_fun);
     }
     else
     {

@@ -598,7 +598,13 @@ void optimize_sf(
     {
         // spdlog::info("start adding lidar observations");
         if (multithread)
-            std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
+            std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+                std::execution::par_unseq,
+#endif
+                std::begin(points_local),
+                std::end(points_local),
+                hessian_fun);
         else
             std::for_each(std::begin(points_local), std::end(points_local), hessian_fun);
         // spdlog::info("adding lidar observations finished");
@@ -915,7 +921,14 @@ void optimize_sf2(
     std::vector<Blocks> AtPAndtBlocksToSum(intermediate_points.size());
 
     if (useMultithread)
-        std::transform(std::execution::par_unseq, std::begin(indexes), std::end(indexes), std::begin(AtPAndtBlocksToSum), hessian_fun);
+        std::transform(
+#if USE_EXECUTION_PAR_UNSEQ
+            std::execution::par_unseq,
+#endif
+            std::begin(indexes),
+            std::end(indexes),
+            std::begin(AtPAndtBlocksToSum),
+            hessian_fun);
     else
         std::transform(std::begin(indexes), std::end(indexes), std::begin(AtPAndtBlocksToSum), hessian_fun);
 
@@ -1303,7 +1316,14 @@ void optimize_rigid_sf(
         std::vector<Blocks> blocks(indexes.size());
 
         if (useMultithread) // ToDo fix for this case
-            std::transform(std::execution::par_unseq, std::begin(indexes), std::end(indexes), std::begin(blocks), hessian_fun);
+            std::transform(
+#if USE_EXECUTION_PAR_UNSEQ
+                std::execution::par_unseq,
+#endif
+                std::begin(indexes),
+                std::end(indexes),
+                std::begin(blocks),
+                hessian_fun);
         else
             std::transform(std::begin(indexes), std::end(indexes), std::begin(blocks), hessian_fun);
 
@@ -3306,7 +3326,13 @@ void Consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams
             };
 
             if (multithread)
-                std::for_each(std::execution::par_unseq, std::begin(points_local), std::end(points_local), hessian_fun);
+                std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+                    std::execution::par_unseq,
+#endif
+                    std::begin(points_local),
+                    std::end(points_local),
+                    hessian_fun);
             else
                 std::for_each(std::begin(points_local), std::end(points_local), hessian_fun);
 

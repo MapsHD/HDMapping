@@ -131,7 +131,13 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
 
     if (params.multithread)
     {
-        std::for_each(std::execution::par_unseq, std::begin(indexes), std::end(indexes), hessian_fun);
+        std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+            std::execution::par_unseq,
+#endif
+            std::begin(indexes),
+            std::end(indexes),
+            hessian_fun);
     }
     else
     {

@@ -536,7 +536,13 @@ std::vector<int> Surface::get_filtered_indexes(
 
     if (multithread)
     {
-        std::for_each(std::execution::par_unseq, std::begin(indexes), std::end(indexes), hessian_fun);
+        std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+            std::execution::par_unseq,
+#endif
+            std::begin(indexes),
+            std::end(indexes),
+            hessian_fun);
     }
     else
     {

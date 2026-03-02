@@ -97,7 +97,7 @@ class KalmanFilterIntegration : public IntegrationMethod
 public:
     double process_noise_accel = 0.5;
     double process_noise_bias = 0.01;
-    double measurement_noise_accel = 1.0;
+    double measurement_noise_velocity = 1.0;
     Eigen::Vector3d initial_accel_bias = Eigen::Vector3d::Zero();
 
     Eigen::Vector3d integrate(

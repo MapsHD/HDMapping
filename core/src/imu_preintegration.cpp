@@ -170,7 +170,8 @@ Eigen::Vector3d TrapezoidalIntegration::integrate(
 }
 
 // EKF state: x = [position(3), velocity(3), accel_bias(3)]^T (9-dim)
-// F = [I, I*dt, 0; 0, I, -I*dt; 0, 0, I], H = [0, 0, -I]
+// F = [I, I*dt, 0; 0, I, -I*dt; 0, 0, I]
+// Measurement: velocity constraint H = [0, I, 0], z = initial_velocity
 Eigen::Vector3d KalmanFilterIntegration::integrate(
     const std::vector<RawIMUData>& raw_imu_data,
     const std::vector<Eigen::Affine3d>& new_trajectory,
@@ -222,13 +223,13 @@ Eigen::Vector3d KalmanFilterIntegration::integrate(
         Eigen::Matrix<double, 9, 9> P_pred = F * P * F.transpose() + Q;
 
         Eigen::Matrix<double, 3, 9> H = Eigen::Matrix<double, 3, 9>::Zero();
-        H.block<3, 3>(0, 6) = -Eigen::Matrix3d::Identity();
+        H.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity();
 
-        Eigen::Matrix3d R_meas = Eigen::Matrix3d::Identity() * (measurement_noise_accel * measurement_noise_accel);
+        Eigen::Matrix3d R_meas = Eigen::Matrix3d::Identity() * (measurement_noise_velocity * measurement_noise_velocity);
         Eigen::Matrix3d S = H * P_pred * H.transpose() + R_meas;
         Eigen::Matrix<double, 9, 3> K = P_pred * H.transpose() * S.inverse();
 
-        Eigen::Vector3d innovation = state_pred.segment<3>(6);
+        Eigen::Vector3d innovation = params.initial_velocity - state_pred.segment<3>(3);
 
         state = state_pred + K * innovation;
         P = (Eigen::Matrix<double, 9, 9>::Identity() - K * H) * P_pred;

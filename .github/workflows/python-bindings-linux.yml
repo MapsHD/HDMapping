@@ -11,7 +11,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         python-version: ["3.12"]
@@ -21,7 +21,7 @@ jobs:
         run: sudo apt-get update --allow-releaseinfo-change
 
       - name: Install system libraries
-        run: sudo apt-get install -y --no-install-recommends libx11-dev libxi-dev libtbb-dev libegl1-mesa-dev libglu1-mesa-dev libopencv-dev
+        run: sudo apt-get install -y --no-install-recommends libx11-dev libxi-dev libtbb-dev libegl1-mesa-dev libglu1-mesa-dev libopencv-dev libproj-dev
 
       - uses: actions/checkout@v4
         with:
@@ -56,5 +56,6 @@ jobs:
           python -c "import sys; sys.path.insert(0, '.'); import core_py; print('core_py imported successfully')"
           python -c "import sys; sys.path.insert(0, '.'); import lidar_odometry_py; print('lidar_odometry_py imported successfully')"
           python -c "import sys; sys.path.insert(0, '.'); import multi_view_tls_registration_py; print('multi_view_tls_registration_py imported successfully')"
+
 
 

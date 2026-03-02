@@ -1,13 +1,14 @@
 #include <pch/pch.h>
 
 #include <common/include/cauchy.h>
-#include <control_points.h>
-#include <ground_control_points.h>
-#include <icp.h>
-#include <m_estimators.h>
-#include <pair_wise_iterative_closest_point.h>
-#include <pose_graph_loop_closure.h>
-#include <transformations.h>
+
+#include <Core/control_points.h>
+#include <Core/ground_control_points.h>
+#include <Core/icp.h>
+#include <Core/m_estimators.h>
+#include <Core/pair_wise_iterative_closest_point.h>
+#include <Core/pose_graph_loop_closure.h>
+#include <Core/transformations.h>
 
 #include <python-scripts/constraints/relative_pose_tait_bryan_cw_jacobian.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>

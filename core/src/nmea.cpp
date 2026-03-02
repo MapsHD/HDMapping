@@ -1,6 +1,6 @@
 #include <pch/pch.h>
 
-#include "nmea.h"
+#include <Core/nmea.h>
 
 namespace hd_mapping::nmea
 {

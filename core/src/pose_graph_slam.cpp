@@ -1,17 +1,17 @@
 #include <pch/pch.h>
 
-#include <pose_graph_slam.h>
+#include <Core/m_estimators.h>
+#include <Core/ndt.h>
+#include <Core/pose_graph_slam.h>
+#include <Core/registration_plane_feature.h>
+#include <Core/transformations.h>
+
 #include <python-scripts/constraints/quaternion_constraint_jacobian.h>
 #include <python-scripts/constraints/relative_pose_quaternion_cw_jacobian.h>
 #include <python-scripts/constraints/relative_pose_quaternion_wc_jacobian.h>
 #include <python-scripts/constraints/relative_pose_rodrigues_wc_jacobian.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_cw_jacobian.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
-
-#include <transformations.h>
-
-#include <ndt.h>
-#include <registration_plane_feature.h>
 
 #ifdef WITH_PCL
 #include <pcl/filters/approximate_voxel_grid.h>
@@ -37,8 +37,6 @@
 #if WITH_MANIF
 #include <manif/SE3.h>
 #endif
-
-#include <m_estimators.h>
 
 std::random_device rd;
 std::mt19937 gen(rd());

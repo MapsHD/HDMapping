@@ -9,7 +9,8 @@
 
 #include <Eigen/Eigen>
 
-#include <structures.h>
+// TODO(mwlasiuk) : cross includes ???
+#include <Core/structures.h>
 
 class OdoWithGnssFusion
 {

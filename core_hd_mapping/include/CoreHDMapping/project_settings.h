@@ -7,8 +7,10 @@
 
 #include <ImGuizmo.h>
 
-#include <odo_with_gnss_fusion.h>
-#include <structures.h>
+#include <CoreHDMapping/odo_with_gnss_fusion.h>
+
+// TODO(mwlasiuk) : cross includes ???
+#include <Core/structures.h>
 
 class ProjectSettings
 {

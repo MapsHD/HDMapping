@@ -15,17 +15,18 @@
 
 #include <Eigen/Eigen>
 
-#include "pfd_wrapper.hpp"
-
 #include <HDMapping/Version.hpp>
-#include <local_shape_features.h>
-#include <session.h>
-#include <surface.h>
-#include <transformations.h>
+
+#include <Core/pfd_wrapper.hpp>
+#include <Core/session.h>
+#include <Core/transformations.h>
 
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+
+#include "local_shape_features.h"
+#include "surface.h"
 
 const uint32_t window_width = 800;
 const uint32_t window_height = 600;

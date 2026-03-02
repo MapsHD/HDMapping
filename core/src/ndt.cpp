@@ -1,11 +1,9 @@
 #include <pch/pch.h>
 
-#include <ndt.h>
-#include <structures.h>
-
-#include <point_clouds.h>
-
-#include <transformations.h>
+#include <Core/ndt.h>
+#include <Core/point_clouds.h>
+#include <Core/structures.h>
+#include <Core/transformations.h>
 
 #include <python-scripts/constraints/quaternion_constraint_jacobian.h>
 #include <python-scripts/elementary_error_theory_for_terrestrial_laser_scanner_jacobian.h>

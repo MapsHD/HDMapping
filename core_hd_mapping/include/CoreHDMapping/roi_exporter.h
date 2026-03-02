@@ -7,8 +7,10 @@
 
 #include <ImGuizmo.h>
 
-#include <project_settings.h>
-#include <structures.h>
+#include <CoreHDMapping/project_settings.h>
+
+// TODO(mwlasiuk) : cross includes ???
+#include <Core/structures.h>
 
 class RoiExporter
 {

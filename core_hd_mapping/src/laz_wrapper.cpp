@@ -1,6 +1,6 @@
 #include <pch/pch.h>
 
-#include <laz_wrapper.h>
+#include <CoreHDMapping/laz_wrapper.h>
 
 #include <GL/freeglut.h>
 #include <laszip/laszip_api.h>
@@ -10,7 +10,7 @@
 #include <iostream>
 #include <thread>
 
-#include <pfd_wrapper.hpp>
+#include <Core/pfd_wrapper.hpp>
 
 #include <spdlog/spdlog.h>
 

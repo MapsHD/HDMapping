@@ -1,10 +1,9 @@
 #include <pch/pch.h>
 
-#include <icp.h>
-#include <registration_plane_feature.h>
-
-#include <m_estimators.h>
-#include <transformations.h>
+#include <Core/icp.h>
+#include <Core/m_estimators.h>
+#include <Core/registration_plane_feature.h>
+#include <Core/transformations.h>
 
 #include <python-scripts/feature-to-feature-metrics/plane_to_plane_source_to_target_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-feature-metrics/distance_point_to_plane_tait_bryan_wc_jacobian.h>

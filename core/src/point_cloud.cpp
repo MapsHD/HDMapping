@@ -1,7 +1,7 @@
 #include <pch/pch.h>
 
-#include <point_cloud.h>
-#include <transformations.h>
+#include <Core/point_cloud.h>
+#include <Core/transformations.h>
 
 #include <plycpp.h>
 
@@ -317,6 +317,7 @@ bool PointCloud::build_rgd()
 
     std::vector<std::thread> threads;
 
+    // TODO(mwlasiuk) : uint64 -> uint32 conversion warning
     for (size_t i = 0; i < jobs.size(); i++)
     {
         threads.push_back(std::thread(build_rgd_init_job, i, &jobs[i], &buckets));

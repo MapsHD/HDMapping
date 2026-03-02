@@ -1,14 +1,13 @@
 #include <pch/pch.h>
 
-#include <odo_with_gnss_fusion.h>
+#include <CoreHDMapping/odo_with_gnss_fusion.h>
 
 #include <GL/freeglut.h>
 #include <portable-file-dialogs.h>
 
-#include <m_estimators.h>
-#include <transformations.h>
-
-#include <pfd_wrapper.hpp>
+#include <Core/m_estimators.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/transformations.h>
 
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
@@ -22,8 +21,7 @@ void OdoWithGnssFusion::imgui(CommonData& common_data)
 
     if (ImGui::Button("load GNSS trajectory"))
     {
-        std::string input_file_name = "";
-        input_file_name = mandeye::fd::OpenFileDialogOneFile("Load GNSS trajectory", {});
+        std::string input_file_name = mandeye::fd::OpenFileDialogOneFile("Load GNSS trajectory", {});
 
         if (input_file_name.size() > 0)
         {

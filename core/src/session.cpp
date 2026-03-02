@@ -1,8 +1,10 @@
 #include <pch/pch.h>
 
-#include "../../shared/include/HDMapping/Version.hpp"
+#include <Core/session.h>
+
 #include <nlohmann/json.hpp>
-#include <session.h>
+
+#include <HDMapping/Version.hpp>
 
 namespace fs = std::filesystem;
 

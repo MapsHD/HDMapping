@@ -15,7 +15,7 @@
 
 #include <Eigen/Eigen>
 
-#include <transformations.h>
+#include <Core/transformations.h>
 
 #include <portable-file-dialogs.h>
 

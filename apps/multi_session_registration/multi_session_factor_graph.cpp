@@ -1,7 +1,7 @@
 #include "multi_session_factor_graph.h"
-#include <utils.hpp>
 
-#include <m_estimators.h>
+#include <Core/m_estimators.h>
+#include <Core/utils.hpp>
 
 #include <python-scripts/constraints/relative_pose_tait_bryan_cw_jacobian.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>

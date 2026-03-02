@@ -1,8 +1,8 @@
 #include <pch/pch.h>
 
-#include <GL/freeglut.h>
-#include <observation_picking.h>
+#include <Core/observation_picking.h>
 
+#include <GL/freeglut.h>
 #include <nlohmann/json.hpp>
 
 // void renderBitmapString(float x, float y, float z, char* string) {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <session.h>
+#include <Core/session.h>
 
 struct Edge
 {

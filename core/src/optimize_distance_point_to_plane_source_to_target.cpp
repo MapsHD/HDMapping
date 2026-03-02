@@ -1,18 +1,16 @@
 #include <pch/pch.h>
 
-#include <m_estimators.h>
-#include <registration_plane_feature.h>
-#include <transformations.h>
-
-#include <python-scripts/point-to-feature-metrics/distance_point_to_plane_tait_bryan_cw_jacobian.h>
-#include <python-scripts/point-to-feature-metrics/distance_point_to_plane_tait_bryan_wc_jacobian.h>
-
-#include <python-scripts/point-to-feature-metrics/distance_point_to_plane_rodrigues_cw_jacobian.h>
-#include <python-scripts/point-to-feature-metrics/distance_point_to_plane_rodrigues_wc_jacobian.h>
+#include <Core/m_estimators.h>
+#include <Core/registration_plane_feature.h>
+#include <Core/transformations.h>
 
 #include <python-scripts/constraints/quaternion_constraint_jacobian.h>
 #include <python-scripts/point-to-feature-metrics/distance_point_to_plane_quaternion_cw_jacobian.h>
 #include <python-scripts/point-to-feature-metrics/distance_point_to_plane_quaternion_wc_jacobian.h>
+#include <python-scripts/point-to-feature-metrics/distance_point_to_plane_rodrigues_cw_jacobian.h>
+#include <python-scripts/point-to-feature-metrics/distance_point_to_plane_rodrigues_wc_jacobian.h>
+#include <python-scripts/point-to-feature-metrics/distance_point_to_plane_tait_bryan_cw_jacobian.h>
+#include <python-scripts/point-to-feature-metrics/distance_point_to_plane_tait_bryan_wc_jacobian.h>
 
 Eigen::Matrix<double, 1, 1> get_delta_distance_point_to_plane_tait_bryan(
     RegistrationPlaneFeature::PoseConvention pose_convention,

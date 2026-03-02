@@ -1,6 +1,7 @@
 #pragma once
 
-#include <point_clouds.h>
+#include <Core/point_clouds.h>
+
 #include <string>
 #include <vector>
 #if WITH_GUI == 1

@@ -14,13 +14,13 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <spdlog/spdlog.h>
-#include <utils.hpp>
+
+#include <Core/GL_assert.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/transformations.h>
+#include <Core/utils.hpp>
 
 #include <Eigen/Eigen>
-
-#include <transformations.h>
-
-#include "pfd_wrapper.hpp"
 
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include <filesystem>
@@ -34,7 +34,6 @@
 #include <shellapi.h> // <-- Required for ShellExecuteA
 #include <windows.h>
 #endif
-#include <GL_assert.h>
 
 ///////////////////////////////////////////////////////////////////////////////////
 

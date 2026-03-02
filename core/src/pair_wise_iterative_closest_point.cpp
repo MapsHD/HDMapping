@@ -1,10 +1,11 @@
 #include <pch/pch.h>
 
-#include <hash_utils.h>
-#include <pair_wise_iterative_closest_point.h>
+#include <Core/hash_utils.h>
+#include <Core/pair_wise_iterative_closest_point.h>
+#include <Core/structures.h>
+#include <Core/transformations.h>
+
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian_simplified.h>
-#include <structures.h>
-#include <transformations.h>
 
 inline void point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified_4(
     Eigen::Matrix<double, 6, 6, Eigen::RowMajor>& AtPA,
@@ -295,7 +296,13 @@ bool PairWiseICP::compute(
 
         if (multithread)
         {
-            std::for_each(std::execution::par_unseq, std::begin(source), std::end(source), hessian_fun);
+            std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+                std::execution::par_unseq,
+#endif
+                std::begin(source),
+                std::end(source),
+                hessian_fun);
         }
         else
         {
@@ -502,7 +509,13 @@ bool PairWiseICP::compute_fast(
 
         if (multithread)
         {
-            std::for_each(std::execution::par_unseq, std::begin(source), std::end(source), hessian_fun);
+            std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+                std::execution::par_unseq,
+#endif
+                std::begin(source),
+                std::end(source),
+                hessian_fun);
         }
         else
         {

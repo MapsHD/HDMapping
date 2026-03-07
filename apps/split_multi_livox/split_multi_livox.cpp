@@ -1,12 +1,13 @@
-#include <Eigen/Dense>
+#include <Core/export_laz.h>
 #include <HDMapping/Version.hpp>
-#include <export_laz.h>
+
 #include <filesystem>
 #include <iostream>
-#include <laszip/laszip_api.h>
 #include <string>
 #include <vector>
 
+#include <Eigen/Dense>
+#include <laszip/laszip_api.h>
 #include <spdlog/spdlog.h>
 
 struct Point3Dis

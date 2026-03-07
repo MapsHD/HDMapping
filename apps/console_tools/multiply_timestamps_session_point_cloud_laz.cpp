@@ -1,14 +1,13 @@
 #include <Eigen/Eigen>
 #include <fstream>
 #include <iostream>
-#include <structures.h>
-#include <transformations.h>
 
-#include <point_clouds.h>
+#include <Core/export_laz.h>
+#include <Core/point_clouds.h>
+#include <Core/structures.h>
+#include <Core/transformations.h>
 
 #include <laszip/laszip_api.h>
-
-#include <export_laz.h>
 
 #include <spdlog/spdlog.h>
 

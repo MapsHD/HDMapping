@@ -34,6 +34,12 @@ set(EXTERNAL_LIBRARIES_DIRECTORY ${REPOSITORY_DIRECTORY}/external)
 set(HD_CPU_OPTIMIZATION "AUTO" CACHE STRING "CPU optimization target (AUTO, INTEL, AMD, ARM, GENERIC)")
 set_property(CACHE HD_CPU_OPTIMIZATION PROPERTY STRINGS AUTO INTEL AMD ARM GENERIC)
 
+if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    add_compile_definitions(USE_EXECUTION_PAR_UNSEQ=0)
+else()
+    add_compile_definitions(USE_EXECUTION_PAR_UNSEQ=1)
+endif()
+
 if (MSVC)
     add_definitions(-D_HAS_STD_BYTE=0)
     
@@ -367,6 +373,12 @@ endif ()
 include(${THIRDPARTY_DIRECTORY_BINARY}/OpenCV/CMakeLists.txt)
 find_package(OpenCV REQUIRED)
 MESSAGE(STATUS "OpenCV include dir: ${OpenCV_INCLUDE_DIRS}, OpenCV librarys: ${OpenCV_LIBS}")
+
+
+# Download or Search for PROJ
+include(${THIRDPARTY_DIRECTORY_BINARY}/Proj/CMakeLists.txt)
+MESSAGE(STATUS "PROJ include dir: ${PROJ_INCLUDE_DIR}, PROJ library: ${PROJ_LIBRARY}")
+MESSAGE(STATUS "PROJ implementation library: ${PROJ_IMPLIB}, PROJ database: ${PROJ_DB}")
 
 # Option to build with bundled oneTBB
 option(BUILD_WITH_BUNDLED_ONETBB "Build with bundled oneTBB" ON)

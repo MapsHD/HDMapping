@@ -1,7 +1,8 @@
-#include <pch/pch.h>
+#include <Core/hash_utils.h>
 
-#include <hash_utils.h>
-#include <local_shape_features.h>
+#include "local_shape_features.h"
+
+#include <execution>
 
 bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLocalShapeFeatures>& points, const Params& params)
 {
@@ -130,7 +131,13 @@ bool LocalShapeFeatures::calculate_local_shape_features(std::vector<PointWithLoc
 
     if (params.multithread)
     {
-        std::for_each(std::execution::par_unseq, std::begin(indexes), std::end(indexes), hessian_fun);
+        std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+            std::execution::par_unseq,
+#endif
+            std::begin(indexes),
+            std::end(indexes),
+            hessian_fun);
     }
     else
     {

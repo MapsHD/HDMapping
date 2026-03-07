@@ -1,13 +1,15 @@
 #pragma once
 
 #include <Eigen/Eigen>
+
 #include <string>
-#include <structures.h>
 #include <vector>
 
+#include <Core/structures.h>
+
 #if WITH_GUI == 1
+#include <Core/observation_picking.h>
 #include <GL/freeglut.h>
-#include <observation_picking.h>
 #endif
 
 class PointCloud

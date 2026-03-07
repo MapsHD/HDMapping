@@ -1,9 +1,9 @@
 #include <pch/pch.h>
 
-#include <laszip/laszip_api.h>
-#include <point_clouds.h>
-#include <transformations.h>
+#include <Core/point_clouds.h>
+#include <Core/transformations.h>
 
+#include <laszip/laszip_api.h>
 #include <spdlog/spdlog.h>
 
 inline void split(std::string& str, char delim, std::vector<std::string>& out)
@@ -1259,7 +1259,9 @@ bool PointClouds::load_whu_tls(
     point_clouds.resize(point_clouds_nodata.size());
 
     std::transform(
+#if USE_EXECUTION_PAR_UNSEQ
         std::execution::par_unseq,
+#endif
         std::begin(point_clouds_nodata),
         std::end(point_clouds_nodata),
         std::begin(point_clouds),

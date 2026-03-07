@@ -1,19 +1,16 @@
 #include <pch/pch.h>
 
-#include <icp.h>
-
-#include <m_estimators.h>
-#include <transformations.h>
-
-#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_cw_jacobian.h>
-#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
-
-#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_rodrigues_cw_jacobian.h>
-#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_rodrigues_wc_jacobian.h>
+#include <Core/icp.h>
+#include <Core/m_estimators.h>
+#include <Core/transformations.h>
 
 #include <python-scripts/constraints/quaternion_constraint_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_quaternion_cw_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_quaternion_wc_jacobian.h>
+#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_rodrigues_cw_jacobian.h>
+#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_rodrigues_wc_jacobian.h>
+#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_cw_jacobian.h>
+#include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 
 Eigen::Matrix<double, 3, 1> get_delta_point_to_point_tait_bryan(
     ICP::PoseConvention pose_convention, Eigen::Affine3d m_pose_wc, Eigen::Vector3d p_s, Eigen::Vector3d p_t)

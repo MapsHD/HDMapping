@@ -1,16 +1,17 @@
 #pragma once
 
-#include <point_clouds.h>
+#include <Core/point_clouds.h>
+
 #include <string>
 #include <vector>
 
 #if WITH_GUI == 1
-#include <control_points.h>
-#include <ground_control_points.h>
-#include <manual_pose_graph_loop_closure.h>
+#include <Core/control_points.h>
+#include <Core/ground_control_points.h>
+#include <Core/manual_pose_graph_loop_closure.h>
 
 #else
-#include <pose_graph_loop_closure.h>
+#include <Core/pose_graph_loop_closure.h>
 #endif
 
 class Session

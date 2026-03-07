@@ -3,10 +3,11 @@
 #include <string>
 #include <vector>
 
-#include <point_cloud.h>
-#include <transformations.h>
+#include <Core/point_cloud.h>
+#include <Core/transformations.h>
+
 #if WITH_GUI == 1
-#include <observation_picking.h>
+#include <Core/observation_picking.h>
 #endif
 
 class PointClouds

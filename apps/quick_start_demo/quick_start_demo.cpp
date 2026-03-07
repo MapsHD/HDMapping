@@ -853,7 +853,11 @@ int main(int argc, char *argv[])
         std::mutex mtx;
         std::cout << "start std::transform" << std::endl;
 
-        std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [&](const std::string &fn)
+        std::transform(
+            #if USE_EXECUTION_PAR_UNSEQ
+            std::execution::par_unseq, 
+            #endif
+            std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [&](const std::string &fn)
                        {
                            // Load mapping from id to sn
                            fs::path fnSn(fn);

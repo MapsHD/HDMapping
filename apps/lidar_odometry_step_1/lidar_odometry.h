@@ -6,10 +6,11 @@
 #include "lidar_odometry_utils.h"
 #include "toml_io.h"
 #include <HDMapping/Version.hpp>
-#include <export_laz.h>
 #include <laszip/laszip_api.h>
 #include <nlohmann/json.hpp>
-#include <session.h>
+
+#include <Core/export_laz.h>
+#include <Core/session.h>
 
 // #define SAMPLE_PERIOD (1.0 / 200.0)
 

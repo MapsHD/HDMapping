@@ -15,19 +15,15 @@
 
 #include <Eigen/Eigen>
 
-#include <transformations.h>
-
-#include "pfd_wrapper.hpp"
+#include <Core/export_laz.h>
+#include <Core/hash_utils.h>
+#include <Core/pair_wise_iterative_closest_point.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/transformations.h>
 
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 
 #include <HDMapping/Version.hpp>
-
-#include <pair_wise_iterative_closest_point.h>
-
-#include <export_laz.h>
-
-#include <hash_utils.h>
 
 #include <filesystem>
 #include <mutex>
@@ -1530,7 +1526,13 @@ void calibrate_intrinsics()
     std::cout << "start adding lidar observations" << std::endl;
     if (multithread)
     {
-        std::for_each(std::execution::par_unseq, std::begin(point_cloud), std::end(point_cloud), hessian_fun);
+        std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+            std::execution::par_unseq,
+#endif
+            std::begin(point_cloud),
+            std::end(point_cloud),
+            hessian_fun);
     }
     else
     {

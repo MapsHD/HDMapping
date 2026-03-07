@@ -1,13 +1,14 @@
 #include <pch/pch.h>
 
 #include <common/include/cauchy.h>
-#include <control_points.h>
-#include <ground_control_points.h>
-#include <icp.h>
-#include <m_estimators.h>
-#include <pair_wise_iterative_closest_point.h>
-#include <pose_graph_loop_closure.h>
-#include <transformations.h>
+
+#include <Core/control_points.h>
+#include <Core/ground_control_points.h>
+#include <Core/icp.h>
+#include <Core/m_estimators.h>
+#include <Core/pair_wise_iterative_closest_point.h>
+#include <Core/pose_graph_loop_closure.h>
+#include <Core/transformations.h>
 
 #include <python-scripts/constraints/relative_pose_tait_bryan_cw_jacobian.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
@@ -309,9 +310,9 @@ void PoseGraphLoopClosure::graph_slam(PointClouds& point_clouds_container, GNSS&
                         // Eigen::Vector3d p_t(gnss.gnss_poses[i].x - gnss.offset_x, gnss.gnss_poses[i].y - gnss.offset_y,
                         // gnss.gnss_poses[i].alt - gnss.offset_alt);
                         Eigen::Vector3d p_t(
-                            gnss.gnss_poses[i].x - point_clouds_container.offset.x(),
-                            gnss.gnss_poses[i].y - point_clouds_container.offset.y(),
-                            gnss.gnss_poses[i].alt - point_clouds_container.offset.z());
+                            gnss.gnss_poses[i].enu_x - point_clouds_container.offset.x(),
+                            gnss.gnss_poses[i].enu_y - point_clouds_container.offset.y(),
+                            gnss.gnss_poses[i].enu_z - point_clouds_container.offset.z());
 
                         point_to_point_source_to_target_tait_bryan_wc(
                             delta_x,
@@ -998,9 +999,9 @@ void PoseGraphLoopClosure::FuseTrajectoryWithGNSS(PointClouds& point_clouds_cont
                     double delta_y;
                     double delta_z;
                     Eigen::Vector3d p_t(
-                        gnss.gnss_poses[index].x - point_clouds_container.offset.x(),
-                        gnss.gnss_poses[index].y - point_clouds_container.offset.y(),
-                        gnss.gnss_poses[index].alt - point_clouds_container.offset.z());
+                        gnss.gnss_poses[index].enu_x - point_clouds_container.offset.x(),
+                        gnss.gnss_poses[index].enu_y - point_clouds_container.offset.y(),
+                        gnss.gnss_poses[index].enu_z - point_clouds_container.offset.z());
 
                     point_to_point_source_to_target_tait_bryan_wc(
                         delta_x,

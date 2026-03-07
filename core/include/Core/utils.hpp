@@ -3,11 +3,13 @@
 
 #pragma once
 
-#include <Eigen/Geometry>
+#include <Core/registration_plane_feature.h>
+#include <Core/session.h>
+#include <Core/structures.h>
+
 #include <imgui.h>
-#include <registration_plane_feature.h>
-#include <session.h>
-#include <structures.h>
+
+#include <Eigen/Geometry>
 
 ///////////////////////////////////////////////////////////////////////////////////
 

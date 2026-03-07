@@ -1,10 +1,15 @@
 #include <pch/pch.h>
 
 #if WITH_GUI == 1
-#include <icp.h>
-#include <manual_pose_graph_loop_closure.h>
-#include <pair_wise_iterative_closest_point.h>
-#include <transformations.h>
+#include <Core/export_laz.h>
+#include <Core/gnss.h>
+#include <Core/icp.h>
+#include <Core/m_estimators.h>
+#include <Core/manual_pose_graph_loop_closure.h>
+#include <Core/pair_wise_iterative_closest_point.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/transformations.h>
+#include <Core/utils.hpp>
 
 #include <python-scripts/constraints/quaternion_constraint_jacobian.h>
 #include <python-scripts/constraints/relative_pose_quaternion_cw_jacobian.h>
@@ -15,16 +20,7 @@
 #include <python-scripts/point-to-feature-metrics/point_to_line_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 
-#include <gnss.h>
-#include <m_estimators.h>
-
 #include <common/include/cauchy.h>
-
-#include <pfd_wrapper.hpp>
-
-#include "export_laz.h"
-
-#include <utils.hpp>
 
 void ManualPoseGraphLoopClosure::Gui(
     PointClouds& point_clouds_container,

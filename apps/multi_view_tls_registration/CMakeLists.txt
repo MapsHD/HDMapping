@@ -51,7 +51,8 @@ target_include_directories(
           ${PLATFORM_LASZIP_LIB}
           ${PLATFORM_MISCELLANEOUS_LIBS}
           ${CORE_LIBRARIES}
-          ${GUI_LIBRARIES})
+          ${GUI_LIBRARIES}
+          PROJ::proj)
 
 if(WIN32)
   add_custom_command(

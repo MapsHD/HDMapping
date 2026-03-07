@@ -23,6 +23,7 @@ set(CORE_BASE_SOURCES
     src/pose_graph_slam.cpp
     src/registration_plane_feature.cpp
     src/session.cpp
+    # src/utils.cpp # TODO(mwlasiuk) : broken AF ...
     ${EXTERNAL_LIBRARIES_DIRECTORY}/src/wgs84_do_puwg92.cc
     ${EXTERNAL_LIBRARIES_DIRECTORY}/src/plycpp.cpp
 )
@@ -52,7 +53,9 @@ function(add_core_target target_name with_gui)
         ${THIRDPARTY_DIRECTORY}/json/include
         ${THIRDPARTY_DIRECTORY}/observation_equations/codes
         ${EXTERNAL_LIBRARIES_DIRECTORY}/include
-    )
+        )
+     
+    target_link_libraries(${target_name} PRIVATE PROJ::proj)
 
     if(${with_gui})
         target_include_directories(${target_name} PRIVATE

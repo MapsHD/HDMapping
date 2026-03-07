@@ -1,10 +1,10 @@
-#include <single_trajectory_viewer.h>
-
 #include <pch/pch.h>
 
+#include <Core/pfd_wrapper.hpp>
+#include <Core/transformations.h>
+#include <CoreHDMapping/single_trajectory_viewer.h>
+
 #include <GL/freeglut.h>
-#include <pfd_wrapper.hpp>
-#include <transformations.h>
 
 namespace fs = std::filesystem;
 

@@ -12,19 +12,18 @@
 
 #include "lidar_odometry.h"
 #include "lidar_odometry_utils.h"
-#include <export_laz.h>
-#include <registration_plane_feature.h>
 
-#include <utils.hpp>
+#include <Core/export_laz.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/registration_plane_feature.h>
+#include <Core/session.h>
+#include <Core/utils.hpp>
 
 #include "toml_io.h"
 #include <HDMapping/Version.hpp>
 #include <chrono>
 #include <ctime>
-#include <export_laz.h>
 #include <mutex>
-#include <pfd_wrapper.hpp>
-#include <session.h>
 #include <spdlog/cfg/env.h>
 #include <spdlog/spdlog.h>
 

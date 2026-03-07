@@ -1,12 +1,13 @@
 #pragma once
 
+#include <Core/structures.h>
+#include <Core/transformations.h>
+
 #include <Eigen/Eigen>
 #include <GL/freeglut.h>
 #include <imgui.h>
 #include <map>
 #include <nlohmann/json.hpp>
-#include <structures.h>
-#include <transformations.h>
 
 struct PointInsideIntersection
 {

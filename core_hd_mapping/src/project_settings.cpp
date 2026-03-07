@@ -1,14 +1,14 @@
 #include <pch/pch.h>
 
-#include <project_settings.h>
+#include <CoreHDMapping/project_settings.h>
 
 #include <GL/freeglut.h>
 #include <nlohmann/json.hpp>
 #include <portable-file-dialogs.h>
 
-#include <m_estimators.h>
-#include <pfd_wrapper.hpp>
-#include <transformations.h>
+#include <Core/m_estimators.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/transformations.h>
 
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>

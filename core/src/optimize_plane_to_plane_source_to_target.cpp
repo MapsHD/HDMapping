@@ -1,20 +1,17 @@
 #include <pch/pch.h>
 
-#include <icp.h>
-#include <registration_plane_feature.h>
-
-#include <m_estimators.h>
-#include <transformations.h>
-
-#include <python-scripts/feature-to-feature-metrics/plane_to_plane_source_to_target_tait_bryan_cw_jacobian.h>
-#include <python-scripts/feature-to-feature-metrics/plane_to_plane_source_to_target_tait_bryan_wc_jacobian.h>
-
-#include <python-scripts/feature-to-feature-metrics/plane_to_plane_source_to_target_rodrigues_cw_jacobian.h>
-#include <python-scripts/feature-to-feature-metrics/plane_to_plane_source_to_target_rodrigues_wc_jacobian.h>
+#include <Core/icp.h>
+#include <Core/m_estimators.h>
+#include <Core/registration_plane_feature.h>
+#include <Core/transformations.h>
 
 #include <python-scripts/constraints/quaternion_constraint_jacobian.h>
 #include <python-scripts/feature-to-feature-metrics/plane_to_plane_source_to_target_quaternion_cw_jacobian.h>
 #include <python-scripts/feature-to-feature-metrics/plane_to_plane_source_to_target_quaternion_wc_jacobian.h>
+#include <python-scripts/feature-to-feature-metrics/plane_to_plane_source_to_target_rodrigues_cw_jacobian.h>
+#include <python-scripts/feature-to-feature-metrics/plane_to_plane_source_to_target_rodrigues_wc_jacobian.h>
+#include <python-scripts/feature-to-feature-metrics/plane_to_plane_source_to_target_tait_bryan_cw_jacobian.h>
+#include <python-scripts/feature-to-feature-metrics/plane_to_plane_source_to_target_tait_bryan_wc_jacobian.h>
 
 Eigen::Matrix<double, 4, 1> get_plane_to_plane_source_to_target_tait_bryan(
     RegistrationPlaneFeature::PoseConvention pose_convention,

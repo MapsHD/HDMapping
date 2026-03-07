@@ -1,9 +1,9 @@
 #pragma once
 
-#include <control_points.h>
-#include <gnss.h>
-#include <ground_control_points.h>
-#include <point_clouds.h>
+#include <Core/control_points.h>
+#include <Core/gnss.h>
+#include <Core/ground_control_points.h>
+#include <Core/point_clouds.h>
 
 class PoseGraphLoopClosure
 {

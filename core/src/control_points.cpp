@@ -1,6 +1,6 @@
 #include <pch/pch.h>
 
-#include <control_points.h>
+#include <Core/control_points.h>
 
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 

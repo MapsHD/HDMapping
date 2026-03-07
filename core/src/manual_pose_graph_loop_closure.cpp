@@ -96,23 +96,23 @@ void ManualPoseGraphLoopClosure::Gui(
 
             if (!manipulate_active_edge)
             {
-                ImGui::Text("Motion model setting:");
-                ImGui::SameLine();
-                if (ImGui::Button("initial poses"))
-                    set_initial_poses_as_motion_model(point_clouds_container);
-                ImGui::SameLine();
-                if (ImGui::Button("current result"))
-                    set_current_poses_as_motion_model(point_clouds_container);
+                static bool keep_initial_trajectory_curvature = true;
 
-                if (poses_motion_model.size() == point_clouds_container.point_clouds.size())
+                if (ImGui::Button("Compute Pose Graph SLAM"))
                 {
-                    ImGui::SameLine();
-                    if (ImGui::Button("Compute Pose Graph SLAM"))
+                    if (keep_initial_trajectory_curvature)
                     {
-                        graph_slam(point_clouds_container, gnss, gcps, cps);
+                        set_initial_poses_as_motion_model(point_clouds_container);
                     }
+                    else
+                    {
+                        set_current_poses_as_motion_model(point_clouds_container);
+                    }
+                    graph_slam(point_clouds_container, gnss, gcps, cps);
                 }
-                // ImGui::Text("motion model");
+
+                ImGui::SameLine();
+                ImGui::Checkbox("Keep initial trajectory curvature", &keep_initial_trajectory_curvature);
 
                 ImGui::Separator();
 

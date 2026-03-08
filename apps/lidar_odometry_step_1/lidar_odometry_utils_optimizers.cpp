@@ -2456,7 +2456,7 @@ bool process_worker_step_1(
             }
 
             mean_shift = ImuPreintegration::create_and_preintegrate(
-                method, worker_data.raw_imu_data, new_trajectory, imu_params);
+                method, worker_data.raw_imu_data, new_trajectory, imu_params, buildVQFParams(params));
         }
         else
         {

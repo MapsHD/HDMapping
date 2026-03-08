@@ -44,7 +44,8 @@ bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold)
 std::vector<Eigen::Matrix3d> estimate_orientations(
     const std::vector<RawIMUData>& raw_imu_data,
     const Eigen::Matrix3d& initial_orientation,
-    const IntegrationParams& params)
+    const IntegrationParams& params,
+    const VQFParams& vqf_params)
 {
     std::vector<Eigen::Matrix3d> orientations;
     orientations.reserve(raw_imu_data.size());
@@ -58,8 +59,6 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
             avg_dt = total_time / static_cast<double>(raw_imu_data.size() - 1);
     }
 
-    VQFParams vqf_params;
-    vqf_params.tauAcc = params.vqf_tauAcc > 0.0 ? params.vqf_tauAcc : 3.0;
     VQF vqf(vqf_params, avg_dt);
 
     orientations.push_back(initial_orientation);
@@ -270,7 +269,8 @@ Eigen::Vector3d ImuPreintegration::create_and_preintegrate(
     PreintegrationMethod method,
     const std::vector<RawIMUData>& raw_imu_data,
     const std::vector<Eigen::Affine3d>& new_trajectory,
-    const IntegrationParams& params)
+    const IntegrationParams& params,
+    const VQFParams& vqf_params)
 {
     ImuPreintegration preint;
     preint.params = params;
@@ -306,7 +306,7 @@ Eigen::Vector3d ImuPreintegration::create_and_preintegrate(
     {
         // Per-worker VQF: estimate local orientations from IMU data
         auto orientations = imu_utils::estimate_orientations(
-            raw_imu_data, new_trajectory[0].rotation(), params);
+            raw_imu_data, new_trajectory[0].rotation(), params, vqf_params);
 
         std::vector<Eigen::Affine3d> imu_trajectory = new_trajectory;
         for (size_t k = 0; k < imu_trajectory.size() && k < orientations.size(); k++)

@@ -4,6 +4,7 @@
 #include <Eigen/Eigen>
 #include <memory>
 #include <vector>
+#include <vqf.hpp>
 
 struct IntegrationParams
 {
@@ -25,7 +26,8 @@ bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold);
 std::vector<Eigen::Matrix3d> estimate_orientations(
     const std::vector<RawIMUData>& raw_imu_data,
     const Eigen::Matrix3d& initial_orientation,
-    const IntegrationParams& params);
+    const IntegrationParams& params,
+    const VQFParams& vqf_params = VQFParams());
 } // namespace imu_utils
 
 class AccelerationModel
@@ -141,5 +143,6 @@ public:
         PreintegrationMethod method,
         const std::vector<RawIMUData>& raw_imu_data,
         const std::vector<Eigen::Affine3d>& new_trajectory,
-        const IntegrationParams& params = IntegrationParams());
+        const IntegrationParams& params = IntegrationParams(),
+        const VQFParams& vqf_params = VQFParams());
 };

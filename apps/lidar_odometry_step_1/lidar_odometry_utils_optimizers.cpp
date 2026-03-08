@@ -2418,13 +2418,13 @@ bool process_worker_step_1(
             IntegrationParams imu_params;
 
             auto method = static_cast<PreintegrationMethod>(params.imu_preintegration_method);
-            bool is_per_worker_vqf = (method == PreintegrationMethod::euler_gyro_gravity_compensated ||
+            bool uses_vqf_velocity = (method == PreintegrationMethod::euler_gyro_gravity_compensated ||
                                       method == PreintegrationMethod::trapezoidal_gyro_gravity_compensated ||
                                       method == PreintegrationMethod::kalman_gyro_gravity_compensated);
 
-            if (is_per_worker_vqf)
+            if (uses_vqf_velocity)
             {
-                // SM-independent initial_velocity for per-worker VQF methods:
+                // SM-independent initial_velocity for VQF velocity methods (5-7):
                 // - Direction: AHRS orientation (VQF, not SM-optimized)
                 // - Speed: from previous worker's MOTION MODEL displacement (IMU prediction, not SM result)
                 Eigen::Vector3d prev_mm_displacement =

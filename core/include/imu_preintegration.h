@@ -123,14 +123,14 @@ inline const char* to_string(PreintegrationMethod method)
 {
     switch (method)
     {
-    case PreintegrationMethod::euler_body_frame: return "Euler (body frame)";
-    case PreintegrationMethod::trapezoidal_body_frame: return "Trapezoidal (body frame)";
-    case PreintegrationMethod::euler_gravity_compensated: return "Euler (gravity compensated)";
-    case PreintegrationMethod::trapezoidal_gravity_compensated: return "Trapezoidal (gravity compensated)";
-    case PreintegrationMethod::kalman_filter: return "Kalman filter";
-    case PreintegrationMethod::euler_gyro_gravity_compensated: return "Euler (AHRS)";
-    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated: return "Trapezoidal (AHRS)";
-    case PreintegrationMethod::kalman_gyro_gravity_compensated: return "Kalman (AHRS)";
+    case PreintegrationMethod::euler_body_frame: return "Euler, no gravity compensation";
+    case PreintegrationMethod::trapezoidal_body_frame: return "Trapezoidal, no gravity compensation";
+    case PreintegrationMethod::euler_gravity_compensated: return "Euler, gravity comp. (initial trajectory orientations)";
+    case PreintegrationMethod::trapezoidal_gravity_compensated: return "Trapezoidal, gravity comp. (initial trajectory orientations)";
+    case PreintegrationMethod::kalman_filter: return "Kalman, gravity comp. (initial trajectory orientations)";
+    case PreintegrationMethod::euler_gyro_gravity_compensated: return "Euler, gravity comp. (per-worker VQF orientations)";
+    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated: return "Trapezoidal, gravity comp. (per-worker VQF orientations)";
+    case PreintegrationMethod::kalman_gyro_gravity_compensated: return "Kalman, gravity comp. (per-worker VQF orientations)";
     default: return "unknown";
     }
 }

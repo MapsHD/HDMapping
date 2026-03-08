@@ -26,12 +26,8 @@ bool load_data(
 void calculate_trajectory(
     Trajectory& trajectory,
     Imu& imu_data,
-    bool fusionConventionNwu,
-    bool fusionConventionEnu,
-    bool fusionConventionNed,
-    double vqf_tauAcc,
-    bool debugMsg,
-    bool use_removie_imu_bias_from_first_stationary_scan);
+    const LidarOdometryParams& params,
+    bool debugMsg);
 bool compute_step_1(
     const std::vector<std::vector<Point3Di>>& pointsPerFile,
     LidarOdometryParams& params,

@@ -317,12 +317,8 @@ bool load_data(
 void calculate_trajectory(
     Trajectory& trajectory,
     Imu& imu_data,
-    bool fusionConventionNwu,
-    bool fusionConventionEnu,
-    bool fusionConventionNed,
-    double vqf_tauAcc,
-    bool debugMsg,
-    bool use_remove_imu_bias_from_first_stationary_scan)
+    const LidarOdometryParams& params,
+    bool debugMsg)
 {
     UTL_PROFILER_SCOPE("calculate_trajectory");
 
@@ -341,11 +337,11 @@ void calculate_trajectory(
             avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
     }
 
-    VQFParams vqf_params;
-    vqf_params.tauAcc = vqf_tauAcc > 0.0 ? vqf_tauAcc : 3.0;
-    // VQF handles gyro bias estimation internally via Kalman filter
+    VQFParams vqf_params = buildVQFParams(params);
     VQF vqf(vqf_params, avg_dt);
-    std::cout << "AHRS: VQF (tauAcc=" << vqf_params.tauAcc << ", dt=" << avg_dt << ", samples=" << imu_data.size() << ")" << std::endl;
+    std::cout << "AHRS: VQF (tauAcc=" << vqf_params.tauAcc
+              << ", useMag=" << (params.vqf_useMagnetometer ? "true" : "false")
+              << ", dt=" << avg_dt << ", samples=" << imu_data.size() << ")" << std::endl;
 
     for (const auto& [timestamp_pair, gyr, acc] : imu_data)
     {
@@ -364,7 +360,10 @@ void calculate_trajectory(
         vqf.update(gyr_vqf, acc_vqf);
 
         vqf_real_t quat[4];
-        vqf.getQuat6D(quat);
+        if (params.vqf_useMagnetometer)
+            vqf.getQuat9D(quat);
+        else
+            vqf.getQuat6D(quat);
         Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
         Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
         t.rotate(d);
@@ -1023,12 +1022,8 @@ std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOd
     calculate_trajectory(
         trajectory,
         imu_data,
-        params.fusionConventionNwu,
-        params.fusionConventionEnu,
-        params.fusionConventionNed,
-        params.vqf_tauAcc,
-        true,
-        params.use_removie_imu_bias_from_first_stationary_scan);
+        params,
+        true);
 
     std::atomic<bool> pause{ false };
 

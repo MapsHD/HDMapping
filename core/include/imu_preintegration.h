@@ -105,28 +105,28 @@ public:
 
 enum class PreintegrationMethod
 {
-    euler_body_frame = 0,
-    trapezoidal_body_frame = 1,
-    euler_gravity_compensated = 2,
-    trapezoidal_gravity_compensated = 3,
-    kalman_filter = 4,
-    euler_gyro_gravity_compensated = 5,
-    trapezoidal_gyro_gravity_compensated = 6,
-    kalman_gyro_gravity_compensated = 7,
+    euler_no_gravity_sm_vel = 0,
+    trapezoidal_no_gravity_sm_vel = 1,
+    euler_gravity_sm_vel = 2,
+    trapezoidal_gravity_sm_vel = 3,
+    kalman_gravity_sm_vel = 4,
+    euler_gravity_vqf_vel = 5,
+    trapezoidal_gravity_vqf_vel = 6,
+    kalman_gravity_vqf_vel = 7,
 };
 
 inline const char* to_string(PreintegrationMethod method)
 {
     switch (method)
     {
-    case PreintegrationMethod::euler_body_frame: return "Euler, no gravity comp., SM velocity";
-    case PreintegrationMethod::trapezoidal_body_frame: return "Trapezoidal, no gravity comp., SM velocity";
-    case PreintegrationMethod::euler_gravity_compensated: return "Euler, gravity comp., SM velocity";
-    case PreintegrationMethod::trapezoidal_gravity_compensated: return "Trapezoidal, gravity comp., SM velocity";
-    case PreintegrationMethod::kalman_filter: return "Kalman, gravity comp., SM velocity";
-    case PreintegrationMethod::euler_gyro_gravity_compensated: return "Euler, gravity comp., VQF velocity";
-    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated: return "Trapezoidal, gravity comp., VQF velocity";
-    case PreintegrationMethod::kalman_gyro_gravity_compensated: return "Kalman, gravity comp., VQF velocity";
+    case PreintegrationMethod::euler_no_gravity_sm_vel: return "Euler, no gravity comp., SM velocity";
+    case PreintegrationMethod::trapezoidal_no_gravity_sm_vel: return "Trapezoidal, no gravity comp., SM velocity";
+    case PreintegrationMethod::euler_gravity_sm_vel: return "Euler, gravity comp., SM velocity";
+    case PreintegrationMethod::trapezoidal_gravity_sm_vel: return "Trapezoidal, gravity comp., SM velocity";
+    case PreintegrationMethod::kalman_gravity_sm_vel: return "Kalman, gravity comp., SM velocity";
+    case PreintegrationMethod::euler_gravity_vqf_vel: return "Euler, gravity comp., VQF velocity";
+    case PreintegrationMethod::trapezoidal_gravity_vqf_vel: return "Trapezoidal, gravity comp., VQF velocity";
+    case PreintegrationMethod::kalman_gravity_vqf_vel: return "Kalman, gravity comp., VQF velocity";
     default: return "unknown";
     }
 }

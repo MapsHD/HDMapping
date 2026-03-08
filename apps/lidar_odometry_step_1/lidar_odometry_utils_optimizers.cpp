@@ -2425,9 +2425,9 @@ bool process_worker_step_1(
 
             if (total_imu_time > 0.0)
             {
-                bool uses_vqf_velocity = (method == PreintegrationMethod::euler_gyro_gravity_compensated ||
-                                          method == PreintegrationMethod::trapezoidal_gyro_gravity_compensated ||
-                                          method == PreintegrationMethod::kalman_gyro_gravity_compensated);
+                bool uses_vqf_velocity = (method == PreintegrationMethod::euler_gravity_vqf_vel ||
+                                          method == PreintegrationMethod::trapezoidal_gravity_vqf_vel ||
+                                          method == PreintegrationMethod::kalman_gravity_vqf_vel);
 
                 if (uses_vqf_velocity)
                 {
@@ -2440,9 +2440,10 @@ bool process_worker_step_1(
 
                     Eigen::Vector3d forward_global = worker_data.intermediate_trajectory[0].linear() * Eigen::Vector3d(1, 0, 0);
                     forward_global.z() = 0;
-                    imu_params.initial_velocity = (forward_global.norm() > 1e-6)
-                        ? forward_global.normalized() * speed
-                        : Eigen::Vector3d::Zero();
+                    if (forward_global.norm() > 1e-6)
+                        imu_params.initial_velocity = forward_global.normalized() * speed;
+                    else
+                        imu_params.initial_velocity = Eigen::Vector3d::Zero();
                 }
                 else
                 {

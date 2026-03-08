@@ -229,36 +229,36 @@ Eigen::Vector3d ImuPreintegration::create_and_preintegrate(
 
     switch (method)
     {
-    case PreintegrationMethod::euler_body_frame:
+    case PreintegrationMethod::euler_no_gravity_sm_vel:
         accel_model = std::make_unique<BodyFrameAcceleration>();
         integration_method = std::make_unique<EulerIntegration>();
         break;
-    case PreintegrationMethod::trapezoidal_body_frame:
+    case PreintegrationMethod::trapezoidal_no_gravity_sm_vel:
         accel_model = std::make_unique<BodyFrameAcceleration>();
         integration_method = std::make_unique<TrapezoidalIntegration>();
         break;
-    case PreintegrationMethod::euler_gravity_compensated:
+    case PreintegrationMethod::euler_gravity_sm_vel:
         accel_model = std::make_unique<GravityCompensatedAcceleration>();
         integration_method = std::make_unique<EulerIntegration>();
         break;
-    case PreintegrationMethod::trapezoidal_gravity_compensated:
+    case PreintegrationMethod::trapezoidal_gravity_sm_vel:
         accel_model = std::make_unique<GravityCompensatedAcceleration>();
         integration_method = std::make_unique<TrapezoidalIntegration>();
         break;
-    case PreintegrationMethod::kalman_filter:
+    case PreintegrationMethod::kalman_gravity_sm_vel:
         accel_model = std::make_unique<GravityCompensatedAcceleration>();
         integration_method = std::make_unique<KalmanFilterIntegration>();
         break;
-    case PreintegrationMethod::euler_gyro_gravity_compensated:
-    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated:
-    case PreintegrationMethod::kalman_gyro_gravity_compensated:
+    case PreintegrationMethod::euler_gravity_vqf_vel:
+    case PreintegrationMethod::trapezoidal_gravity_vqf_vel:
+    case PreintegrationMethod::kalman_gravity_vqf_vel:
     {
         // Use orientations from new_trajectory directly (global VQF from calculate_trajectory,
         // anchored to previous worker's SM pose). No per-worker VQF needed.
         accel_model = std::make_unique<GravityCompensatedAcceleration>();
-        if (method == PreintegrationMethod::euler_gyro_gravity_compensated)
+        if (method == PreintegrationMethod::euler_gravity_vqf_vel)
             integration_method = std::make_unique<EulerIntegration>();
-        else if (method == PreintegrationMethod::trapezoidal_gyro_gravity_compensated)
+        else if (method == PreintegrationMethod::trapezoidal_gravity_vqf_vel)
             integration_method = std::make_unique<TrapezoidalIntegration>();
         else
             integration_method = std::make_unique<KalmanFilterIntegration>();

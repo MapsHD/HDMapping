@@ -921,14 +921,14 @@ void settings_gui()
             if (params.use_imu_preintegration)
             {
                 const char* methods[] = {
-                    "Euler, no gravity compensation",
-                    "Trapezoidal, no gravity compensation",
-                    "Euler, gravity comp. (initial trajectory orientations)",
-                    "Trapezoidal, gravity comp. (initial trajectory orientations)",
-                    "Kalman, gravity comp. (initial trajectory orientations)",
-                    "Euler, gravity comp. (per-worker VQF orientations)",
-                    "Trapezoidal, gravity comp. (per-worker VQF orientations)",
-                    "Kalman, gravity comp. (per-worker VQF orientations)" };
+                    "Euler, no gravity comp., SM velocity",
+                    "Trapezoidal, no gravity comp., SM velocity",
+                    "Euler, gravity comp. (initial traj. orient.), SM velocity",
+                    "Trapezoidal, gravity comp. (initial traj. orient.), SM velocity",
+                    "Kalman, gravity comp. (initial traj. orient.), SM velocity",
+                    "Euler, gravity comp. (per-worker VQF orient.), VQF velocity",
+                    "Trapezoidal, gravity comp. (per-worker VQF orient.), VQF velocity",
+                    "Kalman, gravity comp. (per-worker VQF orient.), VQF velocity" };
                 ImGui::Combo("IMU preintegration method", &params.imu_preintegration_method, methods, IM_ARRAYSIZE(methods));
             }
             ImGui::InputDouble("VQF tauAcc [s]", &params.vqf_tauAcc, 0.0, 0.0, "%.3f");
@@ -957,17 +957,6 @@ void settings_gui()
                         ImGui::SetTooltip("Forgetting factor for unobservable bias in vertical direction during motion.\nGyro bias is not observable vertically without magnetometer.\nRelative weight of artificial zero measurement ensuring\nbias estimate decays to zero. Default: 0.0001");
                 }
 
-                ImGui::Checkbox("Rest bias estimation", &params.vqf_restBiasEstEnabled);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Enables rest detection and gyroscope bias estimation during rest phases.\nDuring rest, gyro bias is estimated from low-pass filtered gyro readings.");
-
-                if (params.vqf_restBiasEstEnabled)
-                {
-                    ImGui::InputDouble("Bias sigma rest [deg/s]", &params.vqf_biasSigmaRest, 0.0, 0.0, "%.4f");
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Std dev of converged bias estimation uncertainty during rest.\nDetermines trust on rest bias estimation updates.\nSmall value leads to fast convergence. Default: 0.03");
-                }
-
                 ImGui::InputDouble("Bias sigma init [deg/s]", &params.vqf_biasSigmaInit, 0.0, 0.0, "%.3f");
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Std dev of the initial bias estimation uncertainty. Default: 0.5 deg/s");
@@ -978,23 +967,29 @@ void settings_gui()
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Maximum expected gyroscope bias.\nUsed to clip bias estimate and measurement error in update step.\nAlso used by rest detection to not regard large constant angular rate as rest.\nDefault: 2.0");
 
-                ImGui::TreePop();
-            }
+                ImGui::Checkbox("Rest bias estimation", &params.vqf_restBiasEstEnabled);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Enables rest detection and gyroscope bias estimation during rest phases.\nDuring rest, gyro bias is estimated from low-pass filtered gyro readings.");
 
-            if (params.vqf_restBiasEstEnabled && ImGui::TreeNode("VQF Rest Detection"))
-            {
-                ImGui::InputDouble("Rest min time [s]", &params.vqf_restMinT, 0.0, 0.0, "%.2f");
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Time threshold for rest detection.\nRest is detected when measurements have been close to\nthe low-pass filtered reference for the given time. Default: 1.5");
-                ImGui::InputDouble("Rest filter tau [s]", &params.vqf_restFilterTau, 0.0, 0.0, "%.2f");
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Time constant for the second-order Butterworth low-pass filter\nused to obtain the reference for rest detection. Default: 0.5");
-                ImGui::InputDouble("Rest threshold gyro [deg/s]", &params.vqf_restThGyr, 0.0, 0.0, "%.2f");
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Angular velocity threshold for rest detection.\nDeviation norm between measurement and reference must be below threshold.\nEach component must also be below biasClip. Default: 2.0");
-                ImGui::InputDouble("Rest threshold acc [m/s2]", &params.vqf_restThAcc, 0.0, 0.0, "%.2f");
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Acceleration threshold for rest detection.\nDeviation norm between measurement and reference must be below threshold.\nDefault: 0.5");
+                if (params.vqf_restBiasEstEnabled)
+                {
+                    ImGui::InputDouble("Bias sigma rest [deg/s]", &params.vqf_biasSigmaRest, 0.0, 0.0, "%.4f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Std dev of converged bias estimation uncertainty during rest.\nDetermines trust on rest bias estimation updates.\nSmall value leads to fast convergence. Default: 0.03");
+                    ImGui::InputDouble("Rest min time [s]", &params.vqf_restMinT, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Time threshold for rest detection.\nRest is detected when measurements have been close to\nthe low-pass filtered reference for the given time. Default: 1.5");
+                    ImGui::InputDouble("Rest filter tau [s]", &params.vqf_restFilterTau, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Time constant for the second-order Butterworth low-pass filter\nused to obtain the reference for rest detection. Default: 0.5");
+                    ImGui::InputDouble("Rest threshold gyro [deg/s]", &params.vqf_restThGyr, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Angular velocity threshold for rest detection.\nDeviation norm between measurement and reference must be below threshold.\nEach component must also be below biasClip. Default: 2.0");
+                    ImGui::InputDouble("Rest threshold acc [m/s2]", &params.vqf_restThAcc, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Acceleration threshold for rest detection.\nDeviation norm between measurement and reference must be below threshold.\nDefault: 0.5");
+                }
+
                 ImGui::TreePop();
             }
 

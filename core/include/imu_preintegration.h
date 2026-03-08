@@ -123,14 +123,14 @@ inline const char* to_string(PreintegrationMethod method)
 {
     switch (method)
     {
-    case PreintegrationMethod::euler_body_frame: return "Euler, no gravity compensation";
-    case PreintegrationMethod::trapezoidal_body_frame: return "Trapezoidal, no gravity compensation";
-    case PreintegrationMethod::euler_gravity_compensated: return "Euler, gravity comp. (initial trajectory orientations)";
-    case PreintegrationMethod::trapezoidal_gravity_compensated: return "Trapezoidal, gravity comp. (initial trajectory orientations)";
-    case PreintegrationMethod::kalman_filter: return "Kalman, gravity comp. (initial trajectory orientations)";
-    case PreintegrationMethod::euler_gyro_gravity_compensated: return "Euler, gravity comp. (per-worker VQF orientations)";
-    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated: return "Trapezoidal, gravity comp. (per-worker VQF orientations)";
-    case PreintegrationMethod::kalman_gyro_gravity_compensated: return "Kalman, gravity comp. (per-worker VQF orientations)";
+    case PreintegrationMethod::euler_body_frame: return "Euler, no gravity comp., SM velocity";
+    case PreintegrationMethod::trapezoidal_body_frame: return "Trapezoidal, no gravity comp., SM velocity";
+    case PreintegrationMethod::euler_gravity_compensated: return "Euler, gravity comp. (initial traj. orient.), SM velocity";
+    case PreintegrationMethod::trapezoidal_gravity_compensated: return "Trapezoidal, gravity comp. (initial traj. orient.), SM velocity";
+    case PreintegrationMethod::kalman_filter: return "Kalman, gravity comp. (initial traj. orient.), SM velocity";
+    case PreintegrationMethod::euler_gyro_gravity_compensated: return "Euler, gravity comp. (per-worker VQF orient.), VQF velocity";
+    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated: return "Trapezoidal, gravity comp. (per-worker VQF orient.), VQF velocity";
+    case PreintegrationMethod::kalman_gyro_gravity_compensated: return "Kalman, gravity comp. (per-worker VQF orient.), VQF velocity";
     default: return "unknown";
     }
 }

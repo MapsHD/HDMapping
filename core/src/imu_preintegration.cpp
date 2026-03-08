@@ -74,13 +74,12 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
         }
 
         // VQF expects: gyro in rad/s, acc in m/s²
-        // RawIMUData: gyro in deg/s, accel in g
-        const double deg2rad = M_PI / 180.0;
+        // RawIMUData: gyro in rad/s, accel in g
         const double g = 9.81;
         vqf_real_t gyr[3] = {
-            raw_imu_data[k].guroscopes.x() * deg2rad,
-            raw_imu_data[k].guroscopes.y() * deg2rad,
-            raw_imu_data[k].guroscopes.z() * deg2rad };
+            raw_imu_data[k].guroscopes.x(),
+            raw_imu_data[k].guroscopes.y(),
+            raw_imu_data[k].guroscopes.z() };
         vqf_real_t acc[3] = {
             raw_imu_data[k].accelerometers.x() * g,
             raw_imu_data[k].accelerometers.y() * g,

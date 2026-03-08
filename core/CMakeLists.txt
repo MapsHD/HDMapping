@@ -9,6 +9,7 @@ set(CORE_BASE_SOURCES
     src/ground_control_points.cpp
     src/hash_utils.cpp
     src/icp.cpp
+    src/imu_preintegration.cpp
     src/ndt.cpp
     src/nmea.cpp
     src/optimization_point_to_point_source_to_target.cpp
@@ -45,7 +46,7 @@ function(add_core_target target_name with_gui)
 
     add_library(${target_name} STATIC ${SOURCES})
     target_compile_definitions(${target_name} PRIVATE ${DEFINES})
-    target_link_libraries(${target_name} PRIVATE ${PLATFORM_LASZIP_LIB} ${PLATFORM_MISCELLANEOUS_LIBS} spdlog::spdlog)
+    target_link_libraries(${target_name} PRIVATE ${PLATFORM_LASZIP_LIB} ${PLATFORM_MISCELLANEOUS_LIBS} spdlog::spdlog vqf)
     target_include_directories(${target_name} PRIVATE
         include
         ${EIGEN3_INCLUDE_DIR}
@@ -53,8 +54,9 @@ function(add_core_target target_name with_gui)
         ${THIRDPARTY_DIRECTORY}/json/include
         ${THIRDPARTY_DIRECTORY}/observation_equations/codes
         ${EXTERNAL_LIBRARIES_DIRECTORY}/include
-        )
-     
+        ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+    )
+
     target_link_libraries(${target_name} PRIVATE PROJ::proj)
 
     if(${with_gui})

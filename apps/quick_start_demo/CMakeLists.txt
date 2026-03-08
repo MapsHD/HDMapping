@@ -26,13 +26,13 @@ target_include_directories(
   ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
   ${LASZIP_INCLUDE_DIR}/LASzip/include
   ${THIRDPARTY_DIRECTORY}/observation_equations/codes
-  ${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
+  ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
 
 target_compile_definitions(quick_start_demo PRIVATE UTL_PROFILER_DISABLE)
 
 target_link_libraries(
   quick_start_demo
-  PRIVATE Fusion
+  PRIVATE vqf
   spdlog::spdlog
   UTL::include
   ${FREEGLUT_LIBRARY}

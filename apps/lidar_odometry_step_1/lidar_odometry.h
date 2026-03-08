@@ -15,7 +15,7 @@
 // #define SAMPLE_PERIOD (1.0 / 200.0)
 
 using Trajectory = std::map<double, std::tuple<Eigen::Matrix4d, double, RawIMUData>>;
-using Imu = std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>>;
+using Imu = std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>>;
 
 bool load_data(
     std::vector<std::string>& input_file_names,
@@ -26,12 +26,8 @@ bool load_data(
 void calculate_trajectory(
     Trajectory& trajectory,
     Imu& imu_data,
-    bool fusionConventionNwu,
-    bool fusionConventionEnu,
-    bool fusionConventionNed,
-    double ahrs_gain,
-    bool debugMsg,
-    bool use_removie_imu_bias_from_first_stationary_scan);
+    const LidarOdometryParams& params,
+    bool debugMsg);
 bool compute_step_1(
     const std::vector<std::vector<Point3Di>>& pointsPerFile,
     LidarOdometryParams& params,

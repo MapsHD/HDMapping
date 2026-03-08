@@ -7,8 +7,6 @@
 
 namespace fs = std::filesystem;
 
-const float RAD_TO_DEG = 180.0f / static_cast<float>(M_PI);
-
 bool load_data(
     std::vector<std::string>& input_file_names,
     LidarOdometryParams& params,
@@ -207,7 +205,7 @@ bool load_data(
 
         std::size_t minSize = std::min(laz_files.size(), csv_files.size());
         // Each thread loads into its own local vector
-        std::vector<std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>>> imuChunks(minSize);
+        std::vector<Imu> imuChunks(minSize);
 
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, minSize),
@@ -319,115 +317,71 @@ bool load_data(
 void calculate_trajectory(
     Trajectory& trajectory,
     Imu& imu_data,
-    bool fusionConventionNwu,
-    bool fusionConventionEnu,
-    bool fusionConventionNed,
-    double ahrs_gain,
-    bool debugMsg,
-    bool use_remove_imu_bias_from_first_stationary_scan)
+    const LidarOdometryParams& params,
+    bool debugMsg)
 {
     UTL_PROFILER_SCOPE("calculate_trajectory");
-    FusionAhrs ahrs;
-    FusionAhrsInitialise(&ahrs);
 
-    if (fusionConventionNwu)
-        ahrs.settings.convention = FusionConventionNwu;
-    else if (fusionConventionEnu)
-        ahrs.settings.convention = FusionConventionEnu;
-    else if (fusionConventionNed)
-        ahrs.settings.convention = FusionConventionNed;
-    ahrs.settings.gain = ahrs_gain;
     int counter = 1;
-
     double previous_time_stamp = 0.0;
-
-    static bool first = true;
-    static double last_ts;
 
     std::cout << "start calculating trajectory.." << std::endl;
 
-    double bias_gyr_x = 0.0;
-    double bias_gyr_y = 0.0;
-    double bias_gyr_z = 0.0;
-
-    if (use_remove_imu_bias_from_first_stationary_scan)
+    // Compute average dt for VQF initialization
+    double avg_dt = 1.0 / 200.0;
+    if (imu_data.size() >= 2)
     {
-        if (imu_data.size() > 1000)
-        {
-            std::vector<double> gyr_x;
-            std::vector<double> gyr_y;
-            std::vector<double> gyr_z;
-
-            for (int i = 0; i < 1000; i++)
-            {
-                const auto& [timestamp_pair, gyr, acc] = imu_data[i];
-
-                gyr_x.push_back(gyr.axis.x * RAD_TO_DEG);
-                gyr_y.push_back(gyr.axis.y * RAD_TO_DEG);
-                gyr_z.push_back(gyr.axis.z * RAD_TO_DEG);
-            }
-
-            // Median without full sort
-            std::nth_element(gyr_x.begin(), gyr_x.begin() + 500, gyr_x.end());
-            std::nth_element(gyr_y.begin(), gyr_y.begin() + 500, gyr_y.end());
-            std::nth_element(gyr_z.begin(), gyr_z.begin() + 500, gyr_z.end());
-
-            bias_gyr_x = gyr_x[500];
-            bias_gyr_y = gyr_y[500];
-            bias_gyr_z = gyr_z[500];
-        }
-
-        std::cout << "------------------" << std::endl;
-        std::cout << "GYRO BIAS" << std::endl;
-        std::cout << "bias_gyr_x [deg/s]: " << bias_gyr_x << std::endl;
-        std::cout << "bias_gyr_y [deg/s]: " << bias_gyr_y << std::endl;
-        std::cout << "bias_gyr_z [deg/s]: " << bias_gyr_z << std::endl;
-        std::cout << "------------------" << std::endl;
+        double t0 = std::get<0>(imu_data.front()).first;
+        double t1 = std::get<0>(imu_data.back()).first;
+        if (t1 > t0)
+            avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
     }
+
+    VQFParams vqf_params = buildVQFParams(params);
+    VQF vqf(vqf_params, avg_dt);
+    std::cout << "AHRS: VQF (tauAcc=" << vqf_params.tauAcc
+              << ", useMag=" << (params.vqf_useMagnetometer ? "true" : "false")
+              << ", dt=" << avg_dt << ", samples=" << imu_data.size() << ")" << std::endl;
 
     for (const auto& [timestamp_pair, gyr, acc] : imu_data)
     {
-        const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * RAD_TO_DEG) - static_cast<float>(bias_gyr_x),
-                                         static_cast<float>(gyr.axis.y * RAD_TO_DEG) - static_cast<float>(bias_gyr_y),
-                                         static_cast<float>(gyr.axis.z * RAD_TO_DEG) - static_cast<float>(bias_gyr_z) };
-        const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
+        // IMU data: gyro in rad/s, acc in g
+        // VQF expects: gyro in rad/s, acc in m/s²
+        const double g = 9.81;
+        vqf_real_t gyr_vqf[3] = {
+            static_cast<double>(gyr.x()),
+            static_cast<double>(gyr.y()),
+            static_cast<double>(gyr.z()) };
+        vqf_real_t acc_vqf[3] = {
+            static_cast<double>(acc.x()) * g,
+            static_cast<double>(acc.y()) * g,
+            static_cast<double>(acc.z()) * g };
 
-        if (first)
-        {
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
-            first = false;
-            // last_ts = timestamp_pair.first;
-        }
+        vqf.update(gyr_vqf, acc_vqf);
+
+        vqf_real_t quat[4];
+        if (params.vqf_useMagnetometer)
+            vqf.getQuat9D(quat);
         else
-        {
-            double curr_ts = timestamp_pair.first;
-
-            double ts_diff = curr_ts - last_ts;
-
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
-        }
-
-        last_ts = timestamp_pair.first;
-
-        FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-        Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
+            vqf.getQuat6D(quat);
+        Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
         Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
         t.rotate(d);
 
+        // Store gyro/acc in original units for RawIMUData
         RawIMUData rawImuData{ timestamp_pair.first,
-                               { accelerometer.axis.x, accelerometer.axis.y, accelerometer.axis.z },
-                               { gyroscope.axis.x, gyroscope.axis.y, gyroscope.axis.z } }; // check timestamp
+                               { static_cast<double>(acc.x()), static_cast<double>(acc.y()), static_cast<double>(acc.z()) },
+                               { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) } };
         trajectory[timestamp_pair.first] = std::make_tuple(t.matrix(), timestamp_pair.second, rawImuData);
 
         if (debugMsg)
         {
-            const FusionEuler euler = FusionQuaternionToEuler(quat);
             counter++;
             if (counter % 100 == 0)
             {
-                std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw << " ["
-                          << counter++ << " of " << imu_data.size() << "]" << std::endl;
+                Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
+                std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " ["
+                          << counter << " of " << imu_data.size() << "]" << std::endl;
             }
         }
 
@@ -1068,12 +1022,8 @@ std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOd
     calculate_trajectory(
         trajectory,
         imu_data,
-        params.fusionConventionNwu,
-        params.fusionConventionEnu,
-        params.fusionConventionNed,
-        params.ahrs_gain,
-        true,
-        params.use_removie_imu_bias_from_first_stationary_scan);
+        params,
+        true);
 
     std::atomic<bool> pause{ false };
 

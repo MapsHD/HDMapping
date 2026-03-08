@@ -11,7 +11,7 @@
 #include <ankerl/unordered_dense.h>
 
 #include <Eigen/Dense>
-#include <Fusion.h>
+#include <vqf.hpp>
 #include <common/include/cauchy.h>
 #include <laszip/laszip_api.h>
 #include <nlohmann/json.hpp>
@@ -65,11 +65,44 @@ struct LidarOdometryParams
     double threshould_output_filter = 0.5; // for export --> all points xyz.norm() < threshould_output_filter will be removed
     int min_counter_concatenated_trajectory_nodes = 10; // for export
 
-    // Madgwick filter
+    // AHRS (VQF) — fusionConvention params kept for TOML backwards compatibility
     bool fusionConventionNwu = true;
     bool fusionConventionEnu = false;
     bool fusionConventionNed = false;
-    double ahrs_gain = 0.5;
+
+    // VQF core
+    double vqf_tauAcc = 0.5; // accelerometer time constant [s] (higher = more gyro trust)
+
+    // VQF gyroscope bias estimation
+    bool vqf_motionBiasEstEnabled = true;    // estimate gyro bias during motion
+    bool vqf_restBiasEstEnabled = true;      // estimate gyro bias during rest
+    double vqf_biasSigmaInit = 0.5;          // initial bias uncertainty [°/s]
+    double vqf_biasForgettingTime = 100.0;   // time for uncertainty to grow 0→0.1 °/s [s]
+    double vqf_biasClip = 2.0;              // max expected gyro bias [°/s]
+    double vqf_biasSigmaMotion = 0.1;        // converged bias uncertainty during motion [°/s]
+    double vqf_biasVerticalForgettingFactor = 0.0001; // forgetting for unobservable vertical bias
+    double vqf_biasSigmaRest = 0.03;         // converged bias uncertainty during rest [°/s]
+
+    // VQF rest detection
+    double vqf_restMinT = 1.5;              // time threshold for rest detection [s]
+    double vqf_restFilterTau = 0.5;          // LP filter time constant for rest detection [s]
+    double vqf_restThGyr = 2.0;             // gyro threshold for rest detection [°/s]
+    double vqf_restThAcc = 0.5;             // acc threshold for rest detection [m/s²]
+
+    // VQF magnetometer (only used when vqf_useMagnetometer is true)
+    bool vqf_useMagnetometer = false;        // use 9D mode (with magnetometer) instead of 6D
+    double vqf_tauMag = 9.0;                // magnetometer time constant [s]
+    bool vqf_magDistRejectionEnabled = true;  // magnetic disturbance detection & rejection
+    double vqf_magCurrentTau = 0.05;         // LP filter for current mag norm/dip [s]
+    double vqf_magRefTau = 20.0;             // adjustment time for mag reference [s]
+    double vqf_magNormTh = 0.1;              // relative threshold for mag field strength
+    double vqf_magDipTh = 10.0;              // threshold for mag dip angle [°]
+    double vqf_magNewTime = 20.0;            // time to accept new mag field [s]
+    double vqf_magNewFirstTime = 5.0;        // time to accept first mag field [s]
+    double vqf_magNewMinGyr = 20.0;          // min angular velocity for mag acceptance [°/s]
+    double vqf_magMinUndisturbedTime = 0.5;  // min undisturbed time [s]
+    double vqf_magMaxRejectionTime = 60.0;   // max full mag rejection duration [s]
+    double vqf_magRejectionFactor = 2.0;     // slowdown factor for heading correction
 
     // lidar odometry control
     bool use_motion_from_previous_step = true;
@@ -154,6 +187,10 @@ struct LidarOdometryParams
 
     bool use_removie_imu_bias_from_first_stationary_scan = false;
 
+    // IMU preintegration
+    bool use_imu_preintegration = true;
+    int imu_preintegration_method = 6; // 0=euler_body, 1=trapezoidal_body, 2=euler_gravity, 3=trapezoidal_gravity, 4=kalman, 5=euler_ahrs, 6=trapezoidal_ahrs, 7=kalman_ahrs
+
     // ablation study
     bool ablation_study_use_planarity = false;
     bool ablation_study_use_norm = false;
@@ -162,6 +199,41 @@ struct LidarOdometryParams
     bool ablation_study_use_threshold_outer_rgd = false;
     bool save_index_pose = false;
 };
+
+inline VQFParams buildVQFParams(const LidarOdometryParams& p)
+{
+    VQFParams vp;
+    vp.tauAcc = p.vqf_tauAcc > 0.0 ? p.vqf_tauAcc : 3.0;
+    vp.tauMag = p.vqf_tauMag;
+#ifndef VQF_NO_MOTION_BIAS_ESTIMATION
+    vp.motionBiasEstEnabled = p.vqf_motionBiasEstEnabled;
+#endif
+    vp.restBiasEstEnabled = p.vqf_restBiasEstEnabled;
+    vp.magDistRejectionEnabled = p.vqf_magDistRejectionEnabled;
+    vp.biasSigmaInit = p.vqf_biasSigmaInit;
+    vp.biasForgettingTime = p.vqf_biasForgettingTime;
+    vp.biasClip = p.vqf_biasClip;
+#ifndef VQF_NO_MOTION_BIAS_ESTIMATION
+    vp.biasSigmaMotion = p.vqf_biasSigmaMotion;
+    vp.biasVerticalForgettingFactor = p.vqf_biasVerticalForgettingFactor;
+#endif
+    vp.biasSigmaRest = p.vqf_biasSigmaRest;
+    vp.restMinT = p.vqf_restMinT;
+    vp.restFilterTau = p.vqf_restFilterTau;
+    vp.restThGyr = p.vqf_restThGyr;
+    vp.restThAcc = p.vqf_restThAcc;
+    vp.magCurrentTau = p.vqf_magCurrentTau;
+    vp.magRefTau = p.vqf_magRefTau;
+    vp.magNormTh = p.vqf_magNormTh;
+    vp.magDipTh = p.vqf_magDipTh;
+    vp.magNewTime = p.vqf_magNewTime;
+    vp.magNewFirstTime = p.vqf_magNewFirstTime;
+    vp.magNewMinGyr = p.vqf_magNewMinGyr;
+    vp.magMinUndisturbedTime = p.vqf_magMinUndisturbedTime;
+    vp.magMaxRejectionTime = p.vqf_magMaxRejectionTime;
+    vp.magRejectionFactor = p.vqf_magRejectionFactor;
+    return vp;
+}
 
 // this function finds interpolated pose between two poses according to query_time
 Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& trajectory, double query_time);
@@ -208,7 +280,7 @@ void update_rgd_spherical_coordinates(
 //! @param imu_file - path to file with IMU data
 //! @param imuToUse - id number of IMU to use, the same index as in pointcloud return by @ref load_point_cloud
 //! @return vector of tuples (std::pair<timestamp, timestampUnix>, angular_velocity, linear_acceleration)
-std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> load_imu(const std::string& imu_file, int imuToUse);
+std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> load_imu(const std::string& imu_file, int imuToUse);
 
 //! This function load point cloud from LAS/LAZ file.
 //! Optionally it can apply extrinsic calibration to each point.

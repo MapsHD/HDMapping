@@ -97,7 +97,7 @@ int index_rendered_points_local = -1;
 // std::vector<std::vector<Point3Di>> all_points_local;
 // std::vector<std::vector<int>> all_lidar_ids;
 std::vector<int> indexes_to_filename;
-double ahrs_gain = 0.5;
+double vqf_tauAcc = 0.5;
 double wx = 1000000.0;
 double wy = 1000000.0;
 double wz = 1000000.0;
@@ -887,7 +887,7 @@ void loadFiles(std::vector<std::string> input_file_names)
     params.filter_threshold_xy_outer = filter_threshold_xy_outer;
 
     std::vector<std::vector<Point3Di>> pointsPerFile;
-    std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
+    Imu imu_data;
 
     // no files selected, quit loading
     if (input_file_names.empty())
@@ -964,104 +964,70 @@ void loadFiles(std::vector<std::string> input_file_names)
 
         // rest of RAW data viewer processing
 
-        FusionAhrs ahrs;
-        FusionAhrsInitialise(&ahrs);
+        // VQF initialization
+        double avg_dt = SAMPLE_PERIOD;
+        if (imu_data.size() >= 2)
+        {
+            double t0 = std::get<0>(imu_data.front()).first;
+            double t1 = std::get<0>(imu_data.back()).first;
+            if (t1 > t0)
+                avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
+        }
 
-        if (fusionConventionNwu)
-            ahrs.settings.convention = FusionConventionNwu;
-
-        if (fusionConventionEnu)
-            ahrs.settings.convention = FusionConventionEnu;
-
-        if (fusionConventionNed)
-            ahrs.settings.convention = FusionConventionNed;
-
-        ahrs.settings.gain = ahrs_gain;
+        VQFParams vqf_params;
+        vqf_params.tauAcc = vqf_tauAcc > 0.0 ? vqf_tauAcc : 3.0;
+        VQF vqf(vqf_params, avg_dt);
 
         std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;
 
         int counter = 1;
-        static bool first = true;
-
-        static double last_ts;
 
         for (const auto& [timestamp_pair, gyr, acc] : imu_data)
         {
-            const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * 180.0 / M_PI),
-                                             static_cast<float>(gyr.axis.y * 180.0 / M_PI),
-                                             static_cast<float>(gyr.axis.z * 180.0 / M_PI) };
-            // const FusionVector gyroscope = {static_cast<float>(gyr.axis.x), static_cast<float>(gyr.axis.y),
-            // static_cast<float>(gyr.axis.z)};
-            const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
+            const double g = 9.81;
+            vqf_real_t gyr_vqf[3] = {
+                static_cast<double>(gyr.x()),
+                static_cast<double>(gyr.y()),
+                static_cast<double>(gyr.z()) };
+            vqf_real_t acc_vqf[3] = {
+                static_cast<double>(acc.x()) * g,
+                static_cast<double>(acc.y()) * g,
+                static_cast<double>(acc.z()) * g };
 
-            if (first)
-            {
-                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-                first = false;
-                // last_ts = timestamp_pair.first;
-            }
-            else
-            {
-                double curr_ts = timestamp_pair.first;
+            vqf.update(gyr_vqf, acc_vqf);
 
-                double ts_diff = curr_ts - last_ts;
-
-                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
-
-                /*if (ts_diff < 0)
-                {
-                    spdlog::warning("WARNING!!!!");
-                    spdlog::warning("WARNING!!!!");
-                    spdlog::warning("WARNING!!!!");
-                    spdlog::warning("WARNING!!!!");
-                    spdlog::warning("WARNING!!!!");
-                    spdlog::warning("WARNING!!!!");
-                }
-
-                if (ts_diff < 0.01)
-                {
-                    FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
-                }
-                else
-                {
-                    FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-                }*/
-            }
-
-            last_ts = timestamp_pair.first;
-            //
-
-            FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-            Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
+            vqf_real_t quat[4];
+            vqf.getQuat6D(quat);
+            Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
             Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
             t.rotate(d);
 
             trajectory[timestamp_pair.first] = std::pair(t.matrix(), timestamp_pair.second);
-            const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+
+            Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
             counter++;
             if (counter % 100 == 0)
             {
                 spdlog::info(
                     "[{} of {}]: Roll {}, Pitch {}, Yaw {}",
-                    counter++,
+                    counter,
                     imu_data.size(),
-                    euler.angle.roll,
-                    euler.angle.pitch,
-                    euler.angle.yaw);
+                    euler.x(),
+                    euler.y(),
+                    euler.z());
             }
 
             // log it for implot
             imu_data_plot.timestampLidar.push_back(timestamp_pair.first);
-            imu_data_plot.angX.push_back(gyr.axis.x);
-            imu_data_plot.angY.push_back(gyr.axis.y);
-            imu_data_plot.angZ.push_back(gyr.axis.z);
-            imu_data_plot.accX.push_back(acc.axis.x);
-            imu_data_plot.accY.push_back(acc.axis.y);
-            imu_data_plot.accZ.push_back(acc.axis.z);
-            imu_data_plot.yaw.push_back(euler.angle.yaw);
-            imu_data_plot.pitch.push_back(euler.angle.pitch);
-            imu_data_plot.roll.push_back(euler.angle.roll);
+            imu_data_plot.angX.push_back(gyr.x());
+            imu_data_plot.angY.push_back(gyr.y());
+            imu_data_plot.angZ.push_back(gyr.z());
+            imu_data_plot.accX.push_back(acc.x());
+            imu_data_plot.accY.push_back(acc.y());
+            imu_data_plot.accZ.push_back(acc.z());
+            imu_data_plot.yaw.push_back(euler.z());
+            imu_data_plot.pitch.push_back(euler.y());
+            imu_data_plot.roll.push_back(euler.x());
         }
 
         std::vector<std::pair<double, double>> timestamps;
@@ -1339,13 +1305,13 @@ void settings_gui()
                 number_of_points_threshold = 0;
         }
 
-        ImGui::InputDouble("AHRS gain", &ahrs_gain);
+        ImGui::InputDouble("VQF tauAcc [s]", &vqf_tauAcc);
         if (ImGui::IsItemHovered())
         {
             ImGui::BeginTooltip();
-            ImGui::Text("Parameter for AHRS (Attitude and Heading Reference System) filter");
-            ImGui::Text("Controls how strongly the filter corrects its orientation estimate");
-            ImGui::Text("using accelerometer and magnetometer data, relative to the gyroscope integration");
+            ImGui::Text("VQF accelerometer time constant (tauAcc) in seconds.");
+            ImGui::Text("Controls how strongly accelerometer corrects the gyroscope-based orientation.");
+            ImGui::Text("Higher = more gyro trust (stable but may drift). Lower = more acc trust (noisy but no drift).");
             ImGui::EndTooltip();
         }
 

@@ -1010,7 +1010,7 @@ void loadFiles(std::vector<std::string> input_file_names)
             {
                 spdlog::info(
                     "[{} of {}]: Roll {}, Pitch {}, Yaw {}",
-                    counter++,
+                    counter,
                     imu_data.size(),
                     euler.x(),
                     euler.y(),

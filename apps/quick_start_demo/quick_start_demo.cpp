@@ -898,6 +898,7 @@ int main(int argc, char *argv[])
 
         // VQF initialization
         VQFParams vqf_params;
+        vqf_params.tauAcc = 3.0;
         VQF vqf(vqf_params, SAMPLE_PERIOD);
 
         std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;
@@ -928,7 +929,7 @@ int main(int argc, char *argv[])
             if (counter % 100 == 0)
             {
                 Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
-                std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter++ << " of " << imu_data.size() << "]" << std::endl;
+                std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter << " of " << imu_data.size() << "]" << std::endl;
             }
         }
 

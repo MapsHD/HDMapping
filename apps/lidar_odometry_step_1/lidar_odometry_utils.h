@@ -65,11 +65,11 @@ struct LidarOdometryParams
     double threshould_output_filter = 0.5; // for export --> all points xyz.norm() < threshould_output_filter will be removed
     int min_counter_concatenated_trajectory_nodes = 10; // for export
 
-    // Madgwick filter
+    // AHRS (VQF) — fusionConvention params kept for TOML backwards compatibility
     bool fusionConventionNwu = true;
     bool fusionConventionEnu = false;
     bool fusionConventionNed = false;
-    double ahrs_gain = 0.5;
+    double ahrs_gain = 0.5; // VQF tauAcc parameter
 
     // lidar odometry control
     bool use_motion_from_previous_step = true;

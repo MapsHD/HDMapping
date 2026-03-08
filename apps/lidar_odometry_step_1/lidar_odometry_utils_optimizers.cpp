@@ -2417,16 +2417,30 @@ bool process_worker_step_1(
         {
             IntegrationParams imu_params;
 
-            // Estimate initial velocity from previous trajectory segments
-            Eigen::Vector3d prev_displacement =
-                prev_worker_data.intermediate_trajectory[prev_worker_data.intermediate_trajectory.size() - 1].translation() -
-                prev_prev_worker_data.intermediate_trajectory[prev_prev_worker_data.intermediate_trajectory.size() - 1].translation();
+            // Estimate initial velocity fully SM-independent:
+            // - Direction: AHRS orientation (VQF, not SM-optimized)
+            // - Speed: from previous worker's MOTION MODEL displacement (IMU prediction, not SM result)
+            Eigen::Vector3d prev_mm_displacement =
+                prev_worker_data.intermediate_trajectory_motion_model.back().translation() -
+                prev_worker_data.intermediate_trajectory_motion_model.front().translation();
 
             if (worker_data.raw_imu_data.size() >= 2)
             {
                 double total_imu_time = worker_data.raw_imu_data.back().timestamp - worker_data.raw_imu_data.front().timestamp;
                 if (total_imu_time > 0.0)
-                    imu_params.initial_velocity = prev_displacement / total_imu_time;
+                {
+                    double speed = prev_mm_displacement.norm() / total_imu_time;
+
+                    // Use AHRS orientation from current worker (original VQF, not SM-optimized)
+                    // to determine forward direction — breaks SM feedback loop
+                    Eigen::Matrix3d R_ahrs = worker_data.intermediate_trajectory[0].linear();
+                    Eigen::Vector3d forward_global = R_ahrs * Eigen::Vector3d(1, 0, 0);
+                    forward_global.z() = 0; // project to horizontal plane
+                    if (forward_global.norm() > 1e-6)
+                        imu_params.initial_velocity = forward_global.normalized() * speed;
+                    else
+                        imu_params.initial_velocity = Eigen::Vector3d::Zero();
+                }
             }
 
             mean_shift = ImuPreintegration::create_and_preintegrate(

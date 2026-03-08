@@ -139,8 +139,8 @@ int main(int argc, char* argv[])
         for (const auto& [timestamp, gyro, accel] : imu)
         {
             out << static_cast<uint64_t>(1e9 * timestamp.first) << " " << static_cast<uint64_t>(1e9 * timestamp.second) << " "
-                << accel.axis.x << " " << accel.axis.y << " " << accel.axis.z << " " << gyro.axis.x << " " << gyro.axis.y << " "
-                << gyro.axis.z << "\n";
+                << accel.x() << " " << accel.y() << " " << accel.z() << " " << gyro.x() << " " << gyro.y() << " "
+                << gyro.z() << "\n";
         }
         std::cout << "Saved IMU data to: " << output_path_csv.string() << std::endl;
     }

@@ -15,7 +15,7 @@
 // #define SAMPLE_PERIOD (1.0 / 200.0)
 
 using Trajectory = std::map<double, std::tuple<Eigen::Matrix4d, double, RawIMUData>>;
-using Imu = std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>>;
+using Imu = std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>>;
 
 bool load_data(
     std::vector<std::string>& input_file_names,

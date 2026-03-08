@@ -832,7 +832,7 @@ int main(int argc, char *argv[])
             std::cout << input_file_names[i] << std::endl;
         }
         std::cout << "loading imu" << std::endl;
-        std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
+        std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> imu_data;
 
         for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
         {
@@ -896,44 +896,39 @@ int main(int argc, char *argv[])
                        });
         std::cout << "std::transform finished" << std::endl;
 
-        FusionAhrs ahrs;
-        FusionAhrsInitialise(&ahrs);
-
-        if (fusionConventionNwu)
-        {
-            ahrs.settings.convention = FusionConventionNwu;
-        }
-        if (fusionConventionEnu)
-        {
-            ahrs.settings.convention = FusionConventionEnu;
-        }
-        if (fusionConventionNed)
-        {
-            ahrs.settings.convention = FusionConventionNed;
-        }
+        // VQF initialization
+        VQFParams vqf_params;
+        VQF vqf(vqf_params, SAMPLE_PERIOD);
 
         std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;
 
         int counter = 1;
         for (const auto &[timestamp_pair, gyr, acc] : imu_data)
         {
-            const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
-            const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
+            const double g = 9.81;
+            vqf_real_t gyr_vqf[3] = {
+                static_cast<double>(gyr.x()),
+                static_cast<double>(gyr.y()),
+                static_cast<double>(gyr.z()) };
+            vqf_real_t acc_vqf[3] = {
+                static_cast<double>(acc.x()) * g,
+                static_cast<double>(acc.y()) * g,
+                static_cast<double>(acc.z()) * g };
 
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
+            vqf.update(gyr_vqf, acc_vqf);
 
-            FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-            Eigen::Quaterniond d{quat.element.w, quat.element.x, quat.element.y, quat.element.z};
+            vqf_real_t quat[4];
+            vqf.getQuat6D(quat);
+            Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
             Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
             t.rotate(d);
 
             trajectory[timestamp_pair.first] = std::pair(t.matrix(), timestamp_pair.second);
-            const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
             counter++;
             if (counter % 100 == 0)
             {
-                std::cout << "Roll " << euler.angle.roll<< ", Pitch " << euler.angle.pitch<< ", Yaw " << euler.angle.yaw<< " [" << counter++ << " of " << imu_data.size() << "]"<< std::endl;
+                Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
+                std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter++ << " of " << imu_data.size() << "]" << std::endl;
             }
         }
 

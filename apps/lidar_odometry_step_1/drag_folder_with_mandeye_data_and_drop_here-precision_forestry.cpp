@@ -730,7 +730,7 @@ void settings_gui()
             if (fusionConvention < 0 || fusionConvention > 2)
                 fusionConvention = 0;
 
-            ImGui::Text("Fusion convention: ");
+            ImGui::Text("AHRS convention: ");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(
                     "Coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");

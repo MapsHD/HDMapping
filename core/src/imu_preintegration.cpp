@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <iostream>
 
-#include <Fusion.h>
+#include <vqf.hpp>
 
 namespace imu_utils
 {
@@ -49,10 +49,18 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
     std::vector<Eigen::Matrix3d> orientations;
     orientations.reserve(raw_imu_data.size());
 
-    FusionAhrs ahrs;
-    FusionAhrsInitialise(&ahrs);
-    ahrs.settings.convention = FusionConventionNwu;
-    ahrs.settings.gain = static_cast<float>(params.ahrs_gain);
+    // Compute average dt for VQF initialization
+    double avg_dt = 1.0 / 200.0; // default 200 Hz
+    if (raw_imu_data.size() >= 2)
+    {
+        double total_time = raw_imu_data.back().timestamp - raw_imu_data.front().timestamp;
+        if (total_time > 0.0)
+            avg_dt = total_time / static_cast<double>(raw_imu_data.size() - 1);
+    }
+
+    VQFParams vqf_params;
+    vqf_params.tauAcc = params.ahrs_gain > 0.0 ? params.ahrs_gain : 3.0;
+    VQF vqf(vqf_params, avg_dt);
 
     orientations.push_back(initial_orientation);
 
@@ -65,20 +73,24 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
             continue;
         }
 
-        // RawIMUData: gyro in deg/s, accel in g — matches Fusion expectations
-        const FusionVector gyroscope = {
-            static_cast<float>(raw_imu_data[k].guroscopes.x()),
-            static_cast<float>(raw_imu_data[k].guroscopes.y()),
-            static_cast<float>(raw_imu_data[k].guroscopes.z()) };
-        const FusionVector accelerometer = {
-            static_cast<float>(raw_imu_data[k].accelerometers.x()),
-            static_cast<float>(raw_imu_data[k].accelerometers.y()),
-            static_cast<float>(raw_imu_data[k].accelerometers.z()) };
+        // VQF expects: gyro in rad/s, acc in m/s²
+        // RawIMUData: gyro in deg/s, accel in g
+        const double deg2rad = M_PI / 180.0;
+        const double g = 9.81;
+        vqf_real_t gyr[3] = {
+            raw_imu_data[k].guroscopes.x() * deg2rad,
+            raw_imu_data[k].guroscopes.y() * deg2rad,
+            raw_imu_data[k].guroscopes.z() * deg2rad };
+        vqf_real_t acc[3] = {
+            raw_imu_data[k].accelerometers.x() * g,
+            raw_imu_data[k].accelerometers.y() * g,
+            raw_imu_data[k].accelerometers.z() * g };
 
-        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, static_cast<float>(dt));
+        vqf.update(gyr, acc);
 
-        FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-        Eigen::Quaterniond q(quat.element.w, quat.element.x, quat.element.y, quat.element.z);
+        vqf_real_t quat[4]; // [w, x, y, z]
+        vqf.getQuat6D(quat);
+        Eigen::Quaterniond q(quat[0], quat[1], quat[2], quat[3]);
         orientations.push_back(q.toRotationMatrix());
     }
     return orientations;

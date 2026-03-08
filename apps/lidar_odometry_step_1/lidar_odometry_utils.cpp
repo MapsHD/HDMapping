@@ -346,9 +346,9 @@ bool save_poses(const std::string& file_name, const std::vector<Eigen::Affine3d>
     return true;
 }
 
-std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> load_imu(const std::string& imu_file, int imuToUse)
+std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> load_imu(const std::string& imu_file, int imuToUse)
 {
-    std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> all_data;
+    std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> all_data;
 
     csv::CSVFormat format;
     format.delimiter({ ' ', ',', '\t' });
@@ -396,14 +396,14 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
                 {
                     double timestamp = row["timestamp"].get<double>();
                     double timestampUnix = row["timestampUnix"].get<double>();
-                    FusionVector gyr;
-                    gyr.axis.x = row["gyroX"].get<double>();
-                    gyr.axis.y = row["gyroY"].get<double>();
-                    gyr.axis.z = row["gyroZ"].get<double>();
-                    FusionVector acc;
-                    acc.axis.x = row["accX"].get<double>();
-                    acc.axis.y = row["accY"].get<double>();
-                    acc.axis.z = row["accZ"].get<double>();
+                    Eigen::Vector3f gyr(
+                        row["gyroX"].get<float>(),
+                        row["gyroY"].get<float>(),
+                        row["gyroZ"].get<float>());
+                    Eigen::Vector3f acc(
+                        row["accX"].get<float>(),
+                        row["accY"].get<float>(),
+                        row["accZ"].get<float>());
                     all_data.emplace_back(std::pair(timestamp / 1e9, timestampUnix / 1e9), gyr, acc);
                 }
             }
@@ -433,15 +433,14 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
 
                     if (data[0] > 0 && imuId == imuToUse)
                     {
-                        FusionVector gyr;
-                        gyr.axis.x = data[1];
-                        gyr.axis.y = data[2];
-                        gyr.axis.z = data[3];
-
-                        FusionVector acc;
-                        acc.axis.x = data[4];
-                        acc.axis.y = data[5];
-                        acc.axis.z = data[6];
+                        Eigen::Vector3f gyr(
+                            static_cast<float>(data[1]),
+                            static_cast<float>(data[2]),
+                            static_cast<float>(data[3]));
+                        Eigen::Vector3f acc(
+                            static_cast<float>(data[4]),
+                            static_cast<float>(data[5]),
+                            static_cast<float>(data[6]));
 
                         all_data.emplace_back(std::pair(data[0] / 1e9, timestampUnix / 1e9), gyr, acc);
                     }

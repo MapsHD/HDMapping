@@ -11,7 +11,7 @@
 #include <ankerl/unordered_dense.h>
 
 #include <Eigen/Dense>
-#include <Fusion.h>
+#include <vqf.hpp>
 #include <common/include/cauchy.h>
 #include <laszip/laszip_api.h>
 #include <nlohmann/json.hpp>
@@ -212,7 +212,7 @@ void update_rgd_spherical_coordinates(
 //! @param imu_file - path to file with IMU data
 //! @param imuToUse - id number of IMU to use, the same index as in pointcloud return by @ref load_point_cloud
 //! @return vector of tuples (std::pair<timestamp, timestampUnix>, angular_velocity, linear_acceleration)
-std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> load_imu(const std::string& imu_file, int imuToUse);
+std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> load_imu(const std::string& imu_file, int imuToUse);
 
 //! This function load point cloud from LAS/LAZ file.
 //! Optionally it can apply extrinsic calibration to each point.

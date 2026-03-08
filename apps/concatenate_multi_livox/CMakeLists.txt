@@ -20,7 +20,7 @@ target_include_directories(
           ${LASZIP_INCLUDE_DIR}/LASzip/include
           ${THIRDPARTY_DIRECTORY}/glew-cmake/include
           ${THIRDPARTY_DIRECTORY}/observation_equations/codes
-          ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+          ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
           ${FREEGLUT_INCLUDE_DIR})
 
 target_link_libraries(concatenate_multi_livox PRIVATE core

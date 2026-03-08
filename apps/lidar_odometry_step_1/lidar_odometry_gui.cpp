@@ -465,7 +465,7 @@ void alternative_approach()
             }
 
             std::cout << "loading imu" << std::endl;
-            std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
+            Imu imu_data;
 
             std::for_each(std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string& fn)
                 {
@@ -473,67 +473,50 @@ void alternative_approach()
                     std::cout << fn << std::endl;
                     imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu)); });
 
-            FusionAhrs ahrs;
-            FusionAhrsInitialise(&ahrs);
+            // Compute average dt for VQF initialization
+            double avg_dt = 1.0 / 200.0;
+            if (imu_data.size() >= 2)
+            {
+                double t0 = std::get<0>(imu_data.front()).first;
+                double t1 = std::get<0>(imu_data.back()).first;
+                if (t1 > t0)
+                    avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
+            }
 
-            if (params.fusionConventionNwu)
-            {
-                ahrs.settings.convention = FusionConventionNwu;
-            }
-            if (params.fusionConventionEnu)
-            {
-                ahrs.settings.convention = FusionConventionEnu;
-            }
-            if (params.fusionConventionNed)
-            {
-                ahrs.settings.convention = FusionConventionNed;
-            }
+            VQFParams vqf_params;
+            vqf_params.tauAcc = params.ahrs_gain > 0.0 ? params.ahrs_gain : 3.0;
+            VQF vqf(vqf_params, avg_dt);
 
             std::map<double, Eigen::Matrix4d> trajectory;
 
             int counter = 1;
-            static bool first = true;
-            static double last_ts;
 
             for (const auto& [timestamp_pair, gyr, acc] : imu_data)
             {
-                const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * RAD_TO_DEG), static_cast<float>(gyr.axis.y * RAD_TO_DEG), static_cast<float>(gyr.axis.z * RAD_TO_DEG) };
-                const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
+                const double g = 9.81;
+                vqf_real_t gyr_vqf[3] = {
+                    static_cast<double>(gyr.x()),
+                    static_cast<double>(gyr.y()),
+                    static_cast<double>(gyr.z()) };
+                vqf_real_t acc_vqf[3] = {
+                    static_cast<double>(acc.x()) * g,
+                    static_cast<double>(acc.y()) * g,
+                    static_cast<double>(acc.z()) * g };
 
-                //FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-                if (first)
-                {
-                    FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
-                    first = false;
-                }
-                else
-                {
-                    double curr_ts = timestamp_pair.first;
-                    double ts_diff = curr_ts - last_ts;
-                    if (ts_diff < 0.01)
-                    {
-                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
-                    }
-                    else
-                    {
-                        std::cout << "IMU TS jump!!!" << std::endl;
-                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
-                    }
-                }
-                last_ts = timestamp_pair.first;
+                vqf.update(gyr_vqf, acc_vqf);
 
-                FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-                Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
+                vqf_real_t quat[4];
+                vqf.getQuat6D(quat);
+                Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
                 Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
                 t.rotate(d);
 
                 trajectory[timestamp_pair.first] = t.matrix();
-                const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
                 counter++;
                 if (counter % 100 == 0)
                 {
-                    std::cout << << "Roll " << euler.angle.roll<< ", Pitch " << euler.angle.pitch<< ", Yaw " << euler.angle.yaw<< " [" << counter++ << " of " << imu_data.size() << "]"<< std::endl;
+                    Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
+                    std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter++ << " of " << imu_data.size() << "]" << std::endl;
                 }
             }
 
@@ -910,7 +893,7 @@ void settings_gui()
             if (fusionConvention < 0 || fusionConvention > 2)
                 fusionConvention = 0;
 
-            ImGui::Text("Fusion convention: ");
+            ImGui::Text("AHRS convention: ");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(
                     "Coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");

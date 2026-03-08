@@ -608,11 +608,7 @@ void step1(const std::atomic<bool>& loPause)
         if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
         {
             working_directory = fs::path(input_file_names[0]).parent_path().string();
-            calculate_trajectory(
-                trajectory,
-                imu_data,
-                params,
-                full_debug_messages);
+            calculate_trajectory(trajectory, imu_data, params, full_debug_messages);
             compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
             step_1_done = true;
         }
@@ -920,15 +916,14 @@ void settings_gui()
             ImGui::Checkbox("Use IMU preintegration", &params.use_imu_preintegration);
             if (params.use_imu_preintegration)
             {
-                const char* methods[] = {
-                    "Euler, no gravity compensation",
-                    "Trapezoidal, no gravity compensation",
-                    "Euler, gravity comp. (initial trajectory orientations)",
-                    "Trapezoidal, gravity comp. (initial trajectory orientations)",
-                    "Kalman, gravity comp. (initial trajectory orientations)",
-                    "Euler, gravity comp. (per-worker VQF orientations)",
-                    "Trapezoidal, gravity comp. (per-worker VQF orientations)",
-                    "Kalman, gravity comp. (per-worker VQF orientations)" };
+                const char* methods[] = { "Euler, no gravity compensation",
+                                          "Trapezoidal, no gravity compensation",
+                                          "Euler, gravity comp. (initial trajectory orientations)",
+                                          "Trapezoidal, gravity comp. (initial trajectory orientations)",
+                                          "Kalman, gravity comp. (initial trajectory orientations)",
+                                          "Euler, gravity comp. (per-worker VQF orientations)",
+                                          "Trapezoidal, gravity comp. (per-worker VQF orientations)",
+                                          "Kalman, gravity comp. (per-worker VQF orientations)" };
                 ImGui::Combo("IMU preintegration method", &params.imu_preintegration_method, methods, IM_ARRAYSIZE(methods));
             }
             ImGui::InputDouble("VQF tauAcc [s]", &params.vqf_tauAcc, 0.0, 0.0, "%.3f");
@@ -945,27 +940,38 @@ void settings_gui()
             {
                 ImGui::Checkbox("Motion bias estimation", &params.vqf_motionBiasEstEnabled);
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Enables gyroscope bias estimation during motion phases,\nbased on the inclination correction only (without magnetometer).");
+                    ImGui::SetTooltip(
+                        "Enables gyroscope bias estimation during motion phases,\nbased on the inclination correction only (without "
+                        "magnetometer).");
 
                 if (params.vqf_motionBiasEstEnabled)
                 {
                     ImGui::InputDouble("Bias sigma motion [deg/s]", &params.vqf_biasSigmaMotion, 0.0, 0.0, "%.4f");
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Std dev of converged bias estimation uncertainty during motion.\nDetermines trust on motion bias estimation updates.\nSmall value leads to fast convergence. Default: 0.1");
+                        ImGui::SetTooltip(
+                            "Std dev of converged bias estimation uncertainty during motion.\nDetermines trust on motion bias estimation "
+                            "updates.\nSmall value leads to fast convergence. Default: 0.1");
                     ImGui::InputDouble("Bias vertical forgetting", &params.vqf_biasVerticalForgettingFactor, 0.0, 0.0, "%.6f");
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Forgetting factor for unobservable bias in vertical direction during motion.\nGyro bias is not observable vertically without magnetometer.\nRelative weight of artificial zero measurement ensuring\nbias estimate decays to zero. Default: 0.0001");
+                        ImGui::SetTooltip(
+                            "Forgetting factor for unobservable bias in vertical direction during motion.\nGyro bias is not observable "
+                            "vertically without magnetometer.\nRelative weight of artificial zero measurement ensuring\nbias estimate "
+                            "decays to zero. Default: 0.0001");
                 }
 
                 ImGui::Checkbox("Rest bias estimation", &params.vqf_restBiasEstEnabled);
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Enables rest detection and gyroscope bias estimation during rest phases.\nDuring rest, gyro bias is estimated from low-pass filtered gyro readings.");
+                    ImGui::SetTooltip(
+                        "Enables rest detection and gyroscope bias estimation during rest phases.\nDuring rest, gyro bias is estimated "
+                        "from low-pass filtered gyro readings.");
 
                 if (params.vqf_restBiasEstEnabled)
                 {
                     ImGui::InputDouble("Bias sigma rest [deg/s]", &params.vqf_biasSigmaRest, 0.0, 0.0, "%.4f");
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Std dev of converged bias estimation uncertainty during rest.\nDetermines trust on rest bias estimation updates.\nSmall value leads to fast convergence. Default: 0.03");
+                        ImGui::SetTooltip(
+                            "Std dev of converged bias estimation uncertainty during rest.\nDetermines trust on rest bias estimation "
+                            "updates.\nSmall value leads to fast convergence. Default: 0.03");
                 }
 
                 ImGui::InputDouble("Bias sigma init [deg/s]", &params.vqf_biasSigmaInit, 0.0, 0.0, "%.3f");
@@ -973,10 +979,14 @@ void settings_gui()
                     ImGui::SetTooltip("Std dev of the initial bias estimation uncertainty. Default: 0.5 deg/s");
                 ImGui::InputDouble("Bias forgetting time [s]", &params.vqf_biasForgettingTime, 0.0, 0.0, "%.1f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Time in which bias estimation uncertainty increases from 0 to 0.1 deg/s.\nDetermines the system noise assumed by the Kalman filter. Default: 100.0");
+                    ImGui::SetTooltip(
+                        "Time in which bias estimation uncertainty increases from 0 to 0.1 deg/s.\nDetermines the system noise assumed by "
+                        "the Kalman filter. Default: 100.0");
                 ImGui::InputDouble("Bias clip [deg/s]", &params.vqf_biasClip, 0.0, 0.0, "%.2f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Maximum expected gyroscope bias.\nUsed to clip bias estimate and measurement error in update step.\nAlso used by rest detection to not regard large constant angular rate as rest.\nDefault: 2.0");
+                    ImGui::SetTooltip(
+                        "Maximum expected gyroscope bias.\nUsed to clip bias estimate and measurement error in update step.\nAlso used by "
+                        "rest detection to not regard large constant angular rate as rest.\nDefault: 2.0");
 
                 ImGui::TreePop();
             }
@@ -985,61 +995,94 @@ void settings_gui()
             {
                 ImGui::InputDouble("Rest min time [s]", &params.vqf_restMinT, 0.0, 0.0, "%.2f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Time threshold for rest detection.\nRest is detected when measurements have been close to\nthe low-pass filtered reference for the given time. Default: 1.5");
+                    ImGui::SetTooltip(
+                        "Time threshold for rest detection.\nRest is detected when measurements have been close to\nthe low-pass filtered "
+                        "reference for the given time. Default: 1.5");
                 ImGui::InputDouble("Rest filter tau [s]", &params.vqf_restFilterTau, 0.0, 0.0, "%.2f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Time constant for the second-order Butterworth low-pass filter\nused to obtain the reference for rest detection. Default: 0.5");
+                    ImGui::SetTooltip(
+                        "Time constant for the second-order Butterworth low-pass filter\nused to obtain the reference for rest detection. "
+                        "Default: 0.5");
                 ImGui::InputDouble("Rest threshold gyro [deg/s]", &params.vqf_restThGyr, 0.0, 0.0, "%.2f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Angular velocity threshold for rest detection.\nDeviation norm between measurement and reference must be below threshold.\nEach component must also be below biasClip. Default: 2.0");
+                    ImGui::SetTooltip(
+                        "Angular velocity threshold for rest detection.\nDeviation norm between measurement and reference must be below "
+                        "threshold.\nEach component must also be below biasClip. Default: 2.0");
                 ImGui::InputDouble("Rest threshold acc [m/s2]", &params.vqf_restThAcc, 0.0, 0.0, "%.2f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Acceleration threshold for rest detection.\nDeviation norm between measurement and reference must be below threshold.\nDefault: 0.5");
+                    ImGui::SetTooltip(
+                        "Acceleration threshold for rest detection.\nDeviation norm between measurement and reference must be below "
+                        "threshold.\nDefault: 0.5");
                 ImGui::TreePop();
             }
 
             ImGui::Checkbox("Use magnetometer", &params.vqf_useMagnetometer);
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Enable 9D mode (gyro+acc+mag) for absolute heading correction.\nDefault: off (6D mode, gyro+acc only, heading from gyro integration).");
+                ImGui::SetTooltip(
+                    "Enable 9D mode (gyro+acc+mag) for absolute heading correction.\nDefault: off (6D mode, gyro+acc only, heading from "
+                    "gyro integration).");
 
             if (params.vqf_useMagnetometer && ImGui::TreeNode("VQF Magnetometer"))
             {
                 ImGui::InputDouble("tauMag [s]", &params.vqf_tauMag, 0.0, 0.0, "%.2f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Time constant for magnetometer update.\nSmall values imply trust on magnetometer, large values trust on gyroscope.\nCorresponds to cutoff frequency of first-order LP filter\nfor heading correction. Default: 9.0");
+                    ImGui::SetTooltip(
+                        "Time constant for magnetometer update.\nSmall values imply trust on magnetometer, large values trust on "
+                        "gyroscope.\nCorresponds to cutoff frequency of first-order LP filter\nfor heading correction. Default: 9.0");
                 ImGui::Checkbox("Mag disturbance rejection", &params.vqf_magDistRejectionEnabled);
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Enables magnetic disturbance detection and rejection.\nFor short disturbances, mag correction is fully disabled.\nFor long disturbances (>magMaxRejectionTime), correction uses\nincreased time constant (magRejectionFactor).");
+                    ImGui::SetTooltip(
+                        "Enables magnetic disturbance detection and rejection.\nFor short disturbances, mag correction is fully "
+                        "disabled.\nFor long disturbances (>magMaxRejectionTime), correction uses\nincreased time constant "
+                        "(magRejectionFactor).");
                 ImGui::InputDouble("Mag current tau [s]", &params.vqf_magCurrentTau, 0.0, 0.0, "%.3f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Time constant for current norm/dip value in disturbance detection.\nFast LP filter for robustness with noisy or async mag measurements.\nSet to -1 to disable. Default: 0.05");
+                    ImGui::SetTooltip(
+                        "Time constant for current norm/dip value in disturbance detection.\nFast LP filter for robustness with noisy or "
+                        "async mag measurements.\nSet to -1 to disable. Default: 0.05");
                 ImGui::InputDouble("Mag ref tau [s]", &params.vqf_magRefTau, 0.0, 0.0, "%.1f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Time constant for adjustment of the magnetic field reference.\nAllows reference to converge to observed undisturbed field. Default: 20.0");
+                    ImGui::SetTooltip(
+                        "Time constant for adjustment of the magnetic field reference.\nAllows reference to converge to observed "
+                        "undisturbed field. Default: 20.0");
                 ImGui::InputDouble("Mag norm threshold", &params.vqf_magNormTh, 0.0, 0.0, "%.3f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Relative threshold for magnetic field strength for disturbance detection.\nRelative to the reference norm. Default: 0.1 (10%%)");
+                    ImGui::SetTooltip(
+                        "Relative threshold for magnetic field strength for disturbance detection.\nRelative to the reference norm. "
+                        "Default: 0.1 (10%%)");
                 ImGui::InputDouble("Mag dip threshold [deg]", &params.vqf_magDipTh, 0.0, 0.0, "%.1f");
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Threshold for the magnetic field dip angle for disturbance detection. Default: 10.0");
                 ImGui::InputDouble("Mag new time [s]", &params.vqf_magNewTime, 0.0, 0.0, "%.1f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Duration after which to accept a different homogeneous magnetic field.\nNew reference accepted when within magNormTh and magDipTh for this time.\nOnly phases with sufficient movement (magNewMinGyr) count. Default: 20.0");
+                    ImGui::SetTooltip(
+                        "Duration after which to accept a different homogeneous magnetic field.\nNew reference accepted when within "
+                        "magNormTh and magDipTh for this time.\nOnly phases with sufficient movement (magNewMinGyr) count. Default: 20.0");
                 ImGui::InputDouble("Mag new first time [s]", &params.vqf_magNewFirstTime, 0.0, 0.0, "%.1f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Duration after which to accept a homogeneous magnetic field for the first time.\nUsed instead of magNewTime when no current estimate exists,\nto allow faster initial reference acquisition. Default: 5.0");
+                    ImGui::SetTooltip(
+                        "Duration after which to accept a homogeneous magnetic field for the first time.\nUsed instead of magNewTime when "
+                        "no current estimate exists,\nto allow faster initial reference acquisition. Default: 5.0");
                 ImGui::InputDouble("Mag new min gyro [deg/s]", &params.vqf_magNewMinGyr, 0.0, 0.0, "%.1f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Minimum angular velocity needed to count time for new mag field acceptance.\nPeriods with angular velocity norm below this threshold\ndo not count towards magNewTime. Default: 20.0");
+                    ImGui::SetTooltip(
+                        "Minimum angular velocity needed to count time for new mag field acceptance.\nPeriods with angular velocity norm "
+                        "below this threshold\ndo not count towards magNewTime. Default: 20.0");
                 ImGui::InputDouble("Mag min undisturbed [s]", &params.vqf_magMinUndisturbedTime, 0.0, 0.0, "%.2f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Minimum duration within thresholds after which to regard\nthe field as undisturbed again. Default: 0.5");
+                    ImGui::SetTooltip(
+                        "Minimum duration within thresholds after which to regard\nthe field as undisturbed again. Default: 0.5");
                 ImGui::InputDouble("Mag max rejection [s]", &params.vqf_magMaxRejectionTime, 0.0, 0.0, "%.1f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Maximum duration of full magnetic disturbance rejection.\nUp to this duration, heading correction is fully disabled\nand tracked by gyroscope only. After this, correction uses\nincreased time constant (magRejectionFactor). Default: 60.0");
+                    ImGui::SetTooltip(
+                        "Maximum duration of full magnetic disturbance rejection.\nUp to this duration, heading correction is fully "
+                        "disabled\nand tracked by gyroscope only. After this, correction uses\nincreased time constant "
+                        "(magRejectionFactor). Default: 60.0");
                 ImGui::InputDouble("Mag rejection factor", &params.vqf_magRejectionFactor, 0.0, 0.0, "%.2f");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Factor by which to slow heading correction during long disturbed phases.\nAfter magMaxRejectionTime of full rejection, correction uses\nthis factor to increase the time constant. Default: 2.0");
+                    ImGui::SetTooltip(
+                        "Factor by which to slow heading correction during long disturbed phases.\nAfter magMaxRejectionTime of full "
+                        "rejection, correction uses\nthis factor to increase the time constant. Default: 2.0");
                 ImGui::TreePop();
             }
 
@@ -1739,11 +1782,7 @@ void step1(
     if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
-        calculate_trajectory(
-            trajectory,
-            imu_data,
-            params,
-            full_debug_messages);
+        calculate_trajectory(trajectory, imu_data, params, full_debug_messages);
         compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
         std::cout << "step_1_done" << std::endl;
     }

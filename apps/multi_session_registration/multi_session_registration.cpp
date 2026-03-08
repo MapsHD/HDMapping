@@ -2226,6 +2226,9 @@ void settings_gui()
                             ("Color##" + std::to_string(i)).c_str(), (float*)&sessions[i].render_color, ImGuiColorEditFlags_NoInputs);
                         for (auto& pc : sessions[i].point_clouds_container.point_clouds)
                         {
+                            pc.traj_color[0] = sessions[i].render_color[0];
+                            pc.traj_color[1] = sessions[i].render_color[1];
+                            pc.traj_color[2] = sessions[i].render_color[2];
                             pc.render_color[0] = sessions[i].render_color[0];
                             pc.render_color[1] = sessions[i].render_color[1];
                             pc.render_color[2] = sessions[i].render_color[2];

@@ -985,14 +985,10 @@ void loadFiles(std::vector<std::string> input_file_names)
         for (const auto& [timestamp_pair, gyr, acc] : imu_data)
         {
             const double g = 9.81;
-            vqf_real_t gyr_vqf[3] = {
-                static_cast<double>(gyr.x()),
-                static_cast<double>(gyr.y()),
-                static_cast<double>(gyr.z()) };
-            vqf_real_t acc_vqf[3] = {
-                static_cast<double>(acc.x()) * g,
-                static_cast<double>(acc.y()) * g,
-                static_cast<double>(acc.z()) * g };
+            vqf_real_t gyr_vqf[3] = { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) };
+            vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g,
+                                      static_cast<double>(acc.y()) * g,
+                                      static_cast<double>(acc.z()) * g };
 
             vqf.update(gyr_vqf, acc_vqf);
 
@@ -1008,13 +1004,7 @@ void loadFiles(std::vector<std::string> input_file_names)
             counter++;
             if (counter % 100 == 0)
             {
-                spdlog::info(
-                    "[{} of {}]: Roll {}, Pitch {}, Yaw {}",
-                    counter,
-                    imu_data.size(),
-                    euler.x(),
-                    euler.y(),
-                    euler.z());
+                spdlog::info("[{} of {}]: Roll {}, Pitch {}, Yaw {}", counter, imu_data.size(), euler.x(), euler.y(), euler.z());
             }
 
             // log it for implot

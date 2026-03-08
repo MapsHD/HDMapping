@@ -1,31 +1,29 @@
 #pragma once
 
-#include <Eigen/Eigen>
 #include <Core/structures.h>
-#include <vector>
+#include <Eigen/Eigen>
 #include <memory>
+#include <vector>
 
 struct IntegrationParams
 {
     bool accel_units_in_g = true;
     bool gyro_units_in_deg_per_sec = true;
     double max_acceleration_threshold = 50.0; // m/s^2
-    double max_dt_threshold = 0.1;            // seconds
+    double max_dt_threshold = 0.1; // seconds
     Eigen::Vector3d initial_velocity = Eigen::Vector3d::Zero();
     double vqf_tauAcc = 0.5; // VQF accelerometer time constant [s]
 };
 
 namespace imu_utils
 {
-Eigen::Vector3d convert_accel_to_ms2(const Eigen::Vector3d& raw, bool units_in_g, double g = 9.81);
-Eigen::Vector3d convert_gyro_to_rads(const Eigen::Vector3d& raw, bool units_in_deg);
-double safe_dt(double t_prev, double t_curr, double max_dt);
-bool has_nan(const Eigen::Vector3d& v);
-bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold);
-std::vector<Eigen::Matrix3d> estimate_orientations(
-    const std::vector<RawIMUData>& raw_imu_data,
-    const Eigen::Matrix3d& initial_orientation,
-    const IntegrationParams& params);
+    Eigen::Vector3d convert_accel_to_ms2(const Eigen::Vector3d& raw, bool units_in_g, double g = 9.81);
+    Eigen::Vector3d convert_gyro_to_rads(const Eigen::Vector3d& raw, bool units_in_deg);
+    double safe_dt(double t_prev, double t_curr, double max_dt);
+    bool has_nan(const Eigen::Vector3d& v);
+    bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold);
+    std::vector<Eigen::Matrix3d> estimate_orientations(
+        const std::vector<RawIMUData>& raw_imu_data, const Eigen::Matrix3d& initial_orientation, const IntegrationParams& params);
 } // namespace imu_utils
 
 class AccelerationModel
@@ -33,19 +31,13 @@ class AccelerationModel
 public:
     virtual ~AccelerationModel() = default;
 
-    virtual Eigen::Vector3d compute(
-        const RawIMUData& imu,
-        const Eigen::Affine3d& pose,
-        const IntegrationParams& params) const = 0;
+    virtual Eigen::Vector3d compute(const RawIMUData& imu, const Eigen::Affine3d& pose, const IntegrationParams& params) const = 0;
 };
 
 class BodyFrameAcceleration : public AccelerationModel
 {
 public:
-    Eigen::Vector3d compute(
-        const RawIMUData& imu,
-        const Eigen::Affine3d& pose,
-        const IntegrationParams& params) const override;
+    Eigen::Vector3d compute(const RawIMUData& imu, const Eigen::Affine3d& pose, const IntegrationParams& params) const override;
 };
 
 class GravityCompensatedAcceleration : public AccelerationModel
@@ -54,10 +46,7 @@ public:
     double gravity_magnitude = 9.81;
     Eigen::Vector3d gravity_vector = Eigen::Vector3d(0.0, 0.0, -9.81);
 
-    Eigen::Vector3d compute(
-        const RawIMUData& imu,
-        const Eigen::Affine3d& pose,
-        const IntegrationParams& params) const override;
+    Eigen::Vector3d compute(const RawIMUData& imu, const Eigen::Affine3d& pose, const IntegrationParams& params) const override;
 };
 
 class IntegrationMethod
@@ -123,15 +112,24 @@ inline const char* to_string(PreintegrationMethod method)
 {
     switch (method)
     {
-    case PreintegrationMethod::euler_body_frame: return "Euler, no gravity compensation";
-    case PreintegrationMethod::trapezoidal_body_frame: return "Trapezoidal, no gravity compensation";
-    case PreintegrationMethod::euler_gravity_compensated: return "Euler, gravity comp. (initial trajectory orientations)";
-    case PreintegrationMethod::trapezoidal_gravity_compensated: return "Trapezoidal, gravity comp. (initial trajectory orientations)";
-    case PreintegrationMethod::kalman_filter: return "Kalman, gravity comp. (initial trajectory orientations)";
-    case PreintegrationMethod::euler_gyro_gravity_compensated: return "Euler, gravity comp. (per-worker VQF orientations)";
-    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated: return "Trapezoidal, gravity comp. (per-worker VQF orientations)";
-    case PreintegrationMethod::kalman_gyro_gravity_compensated: return "Kalman, gravity comp. (per-worker VQF orientations)";
-    default: return "unknown";
+    case PreintegrationMethod::euler_body_frame:
+        return "Euler, no gravity compensation";
+    case PreintegrationMethod::trapezoidal_body_frame:
+        return "Trapezoidal, no gravity compensation";
+    case PreintegrationMethod::euler_gravity_compensated:
+        return "Euler, gravity comp. (initial trajectory orientations)";
+    case PreintegrationMethod::trapezoidal_gravity_compensated:
+        return "Trapezoidal, gravity comp. (initial trajectory orientations)";
+    case PreintegrationMethod::kalman_filter:
+        return "Kalman, gravity comp. (initial trajectory orientations)";
+    case PreintegrationMethod::euler_gyro_gravity_compensated:
+        return "Euler, gravity comp. (per-worker VQF orientations)";
+    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated:
+        return "Trapezoidal, gravity comp. (per-worker VQF orientations)";
+    case PreintegrationMethod::kalman_gyro_gravity_compensated:
+        return "Kalman, gravity comp. (per-worker VQF orientations)";
+    default:
+        return "unknown";
     }
 }
 

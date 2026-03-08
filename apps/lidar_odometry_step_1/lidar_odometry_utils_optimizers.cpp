@@ -2420,8 +2420,7 @@ bool process_worker_step_1(
             // Estimate initial velocity fully SM-independent:
             // - Direction: AHRS orientation (VQF, not SM-optimized)
             // - Speed: from previous worker's MOTION MODEL displacement (IMU prediction, not SM result)
-            Eigen::Vector3d prev_mm_displacement =
-                prev_worker_data.intermediate_trajectory_motion_model.back().translation() -
+            Eigen::Vector3d prev_mm_displacement = prev_worker_data.intermediate_trajectory_motion_model.back().translation() -
                 prev_worker_data.intermediate_trajectory_motion_model.front().translation();
 
             if (worker_data.raw_imu_data.size() >= 2)
@@ -2444,8 +2443,7 @@ bool process_worker_step_1(
             }
 
             mean_shift = ImuPreintegration::create_and_preintegrate(
-                static_cast<PreintegrationMethod>(params.imu_preintegration_method),
-                worker_data.raw_imu_data, new_trajectory, imu_params);
+                static_cast<PreintegrationMethod>(params.imu_preintegration_method), worker_data.raw_imu_data, new_trajectory, imu_params);
         }
         else
         {

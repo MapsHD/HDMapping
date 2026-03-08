@@ -449,7 +449,7 @@ void step1(const std::atomic<bool>& loPause, std::string input_folder_name)
                 params.fusionConventionNwu,
                 params.fusionConventionEnu,
                 params.fusionConventionNed,
-                params.ahrs_gain,
+                params.vqf_tauAcc,
                 full_debug_messages,
                 params.use_removie_imu_bias_from_first_stationary_scan);
             compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
@@ -756,15 +756,13 @@ void settings_gui()
             ImGui::NewLine();
 
             ImGui::Checkbox("Use motion from previous step", &params.use_motion_from_previous_step);
-            ImGui::InputDouble("AHRS gain", &params.ahrs_gain, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("VQF tauAcc [s]", &params.vqf_tauAcc, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Attitude and Heading Reference System gain:");
-                ImGui::Text(
-                    "How strongly the accelerometer/magnetometer corrections influence the orientation estimate versus gyroscope "
-                    "integration");
-                ImGui::Text("Larger value means faster response to changes in orientation, but more noise");
+                ImGui::Text("VQF accelerometer time constant (tauAcc) in seconds.");
+                ImGui::Text("Controls how strongly accelerometer corrects the gyroscope-based orientation.");
+                ImGui::Text("Higher = more gyro trust (stable but may drift). Lower = more acc trust (noisy but no drift).");
                 ImGui::EndTooltip();
             }
 
@@ -1438,7 +1436,7 @@ void step1(
             params.fusionConventionNwu,
             params.fusionConventionEnu,
             params.fusionConventionNed,
-            params.ahrs_gain,
+            params.vqf_tauAcc,
             full_debug_messages,
             params.use_removie_imu_bias_from_first_stationary_scan);
         compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);

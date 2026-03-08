@@ -69,7 +69,7 @@ struct LidarOdometryParams
     bool fusionConventionNwu = true;
     bool fusionConventionEnu = false;
     bool fusionConventionNed = false;
-    double ahrs_gain = 0.5; // VQF tauAcc parameter
+    double vqf_tauAcc = 0.5; // VQF accelerometer time constant [s] (higher = more gyro trust)
 
     // lidar odometry control
     bool use_motion_from_previous_step = true;

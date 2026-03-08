@@ -29,7 +29,7 @@ void calculate_trajectory(
     bool fusionConventionNwu,
     bool fusionConventionEnu,
     bool fusionConventionNed,
-    double ahrs_gain,
+    double vqf_tauAcc,
     bool debugMsg,
     bool use_removie_imu_bias_from_first_stationary_scan);
 bool compute_step_1(

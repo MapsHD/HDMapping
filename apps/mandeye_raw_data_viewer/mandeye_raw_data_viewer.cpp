@@ -97,7 +97,7 @@ int index_rendered_points_local = -1;
 // std::vector<std::vector<Point3Di>> all_points_local;
 // std::vector<std::vector<int>> all_lidar_ids;
 std::vector<int> indexes_to_filename;
-double ahrs_gain = 0.5;
+double vqf_tauAcc = 0.5;
 double wx = 1000000.0;
 double wy = 1000000.0;
 double wz = 1000000.0;
@@ -975,7 +975,7 @@ void loadFiles(std::vector<std::string> input_file_names)
         }
 
         VQFParams vqf_params;
-        vqf_params.tauAcc = ahrs_gain > 0.0 ? ahrs_gain : 3.0;
+        vqf_params.tauAcc = vqf_tauAcc > 0.0 ? vqf_tauAcc : 3.0;
         VQF vqf(vqf_params, avg_dt);
 
         std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;
@@ -1305,13 +1305,13 @@ void settings_gui()
                 number_of_points_threshold = 0;
         }
 
-        ImGui::InputDouble("AHRS gain", &ahrs_gain);
+        ImGui::InputDouble("VQF tauAcc [s]", &vqf_tauAcc);
         if (ImGui::IsItemHovered())
         {
             ImGui::BeginTooltip();
-            ImGui::Text("Parameter for AHRS (Attitude and Heading Reference System) filter");
-            ImGui::Text("Controls how strongly the filter corrects its orientation estimate");
-            ImGui::Text("using accelerometer and magnetometer data, relative to the gyroscope integration");
+            ImGui::Text("VQF accelerometer time constant (tauAcc) in seconds.");
+            ImGui::Text("Controls how strongly accelerometer corrects the gyroscope-based orientation.");
+            ImGui::Text("Higher = more gyro trust (stable but may drift). Lower = more acc trust (noisy but no drift).");
             ImGui::EndTooltip();
         }
 

@@ -484,7 +484,7 @@ void alternative_approach()
             }
 
             VQFParams vqf_params;
-            vqf_params.tauAcc = params.ahrs_gain > 0.0 ? params.ahrs_gain : 3.0;
+            vqf_params.tauAcc = params.vqf_tauAcc > 0.0 ? params.vqf_tauAcc : 3.0;
             VQF vqf(vqf_params, avg_dt);
 
             std::map<double, Eigen::Matrix4d> trajectory;
@@ -612,7 +612,7 @@ void step1(const std::atomic<bool>& loPause)
                 params.fusionConventionNwu,
                 params.fusionConventionEnu,
                 params.fusionConventionNed,
-                params.ahrs_gain,
+                params.vqf_tauAcc,
                 full_debug_messages,
                 params.use_removie_imu_bias_from_first_stationary_scan);
             compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
@@ -927,15 +927,13 @@ void settings_gui()
                     "Euler (AHRS)", "Trapezoidal (AHRS)", "Kalman (AHRS)" };
                 ImGui::Combo("IMU preintegration method", &params.imu_preintegration_method, methods, IM_ARRAYSIZE(methods));
             }
-            ImGui::InputDouble("AHRS gain", &params.ahrs_gain, 0.0, 0.0, "%.3f");
+            ImGui::InputDouble("VQF tauAcc [s]", &params.vqf_tauAcc, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Attitude and Heading Reference System gain:");
-                ImGui::Text(
-                    "How strongly the accelerometer/magnetometer corrections influence the orientation estimate versus gyroscope "
-                    "integration");
-                ImGui::Text("Larger value means faster response to changes in orientation, but more noise");
+                ImGui::Text("VQF accelerometer time constant (tauAcc) in seconds.");
+                ImGui::Text("Controls how strongly accelerometer corrects the gyroscope-based orientation.");
+                ImGui::Text("Higher = more gyro trust (stable but may drift). Lower = more acc trust (noisy but no drift).");
                 ImGui::EndTooltip();
             }
 
@@ -1641,7 +1639,7 @@ void step1(
             params.fusionConventionNwu,
             params.fusionConventionEnu,
             params.fusionConventionNed,
-            params.ahrs_gain,
+            params.vqf_tauAcc,
             full_debug_messages,
             params.use_removie_imu_bias_from_first_stationary_scan);
         compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);

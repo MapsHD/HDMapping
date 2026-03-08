@@ -59,7 +59,7 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
     }
 
     VQFParams vqf_params;
-    vqf_params.tauAcc = params.ahrs_gain > 0.0 ? params.ahrs_gain : 3.0;
+    vqf_params.tauAcc = params.vqf_tauAcc > 0.0 ? params.vqf_tauAcc : 3.0;
     VQF vqf(vqf_params, avg_dt);
 
     orientations.push_back(initial_orientation);

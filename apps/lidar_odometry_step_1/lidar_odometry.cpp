@@ -320,7 +320,7 @@ void calculate_trajectory(
     bool fusionConventionNwu,
     bool fusionConventionEnu,
     bool fusionConventionNed,
-    double ahrs_gain,
+    double vqf_tauAcc,
     bool debugMsg,
     bool use_remove_imu_bias_from_first_stationary_scan)
 {
@@ -342,7 +342,7 @@ void calculate_trajectory(
     }
 
     VQFParams vqf_params;
-    vqf_params.tauAcc = ahrs_gain > 0.0 ? ahrs_gain : 3.0;
+    vqf_params.tauAcc = vqf_tauAcc > 0.0 ? vqf_tauAcc : 3.0;
     // VQF handles gyro bias estimation internally via Kalman filter
     VQF vqf(vqf_params, avg_dt);
     std::cout << "AHRS: VQF (tauAcc=" << vqf_params.tauAcc << ", dt=" << avg_dt << ", samples=" << imu_data.size() << ")" << std::endl;
@@ -1026,7 +1026,7 @@ std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOd
         params.fusionConventionNwu,
         params.fusionConventionEnu,
         params.fusionConventionNed,
-        params.ahrs_gain,
+        params.vqf_tauAcc,
         true,
         params.use_removie_imu_bias_from_first_stationary_scan);
 

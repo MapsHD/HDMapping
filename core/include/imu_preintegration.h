@@ -12,7 +12,7 @@ struct IntegrationParams
     double max_acceleration_threshold = 50.0; // m/s^2
     double max_dt_threshold = 0.1;            // seconds
     Eigen::Vector3d initial_velocity = Eigen::Vector3d::Zero();
-    double ahrs_gain = 0.5;
+    double vqf_tauAcc = 0.5; // VQF accelerometer time constant [s]
 };
 
 namespace imu_utils

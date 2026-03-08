@@ -156,7 +156,7 @@ struct LidarOdometryParams
 
     // IMU preintegration
     bool use_imu_preintegration = true;
-    int imu_preintegration_method = 3; // 0=euler_body, 1=trapezoidal_body, 2=euler_gravity, 3=trapezoidal_gravity, 4=kalman
+    int imu_preintegration_method = 6; // 0=euler_body, 1=trapezoidal_body, 2=euler_gravity, 3=trapezoidal_gravity, 4=kalman, 5=euler_ahrs, 6=trapezoidal_ahrs, 7=kalman_ahrs
 
     // ablation study
     bool ablation_study_use_planarity = false;

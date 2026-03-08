@@ -157,7 +157,7 @@ It is designed for a benchmark.
 [[quantitative evaluation benchmark movie]](https://youtu.be/PsJaXpWFAis)
 [[quantitative benchmark]](https://github.com/MapsHD/benchmark-HDMapping-evaluation-of-odometry-and-SLAM)
 
-Benmchark Orchestration
+Benchmark Orchestration
 
 - https://github.com/MapsHD/benchmark-HDMapping-Orchestration
 

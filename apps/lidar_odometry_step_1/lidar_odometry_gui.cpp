@@ -145,6 +145,7 @@ int dec_reference_points = 100;
 bool show_initial_points = true;
 bool show_trajectory = true;
 bool show_trajectory_as_axes = false;
+bool show_prediction_vectors = false;
 bool show_covs_indoor = false;
 bool show_covs_outdoor = false;
 int dec_covs = 10;
@@ -916,14 +917,15 @@ void settings_gui()
             ImGui::Checkbox("Use IMU preintegration", &params.use_imu_preintegration);
             if (params.use_imu_preintegration)
             {
-                const char* methods[] = { "Euler, no gravity compensation",
-                                          "Trapezoidal, no gravity compensation",
-                                          "Euler, gravity comp. (initial trajectory orientations)",
-                                          "Trapezoidal, gravity comp. (initial trajectory orientations)",
-                                          "Kalman, gravity comp. (initial trajectory orientations)",
-                                          "Euler, gravity comp. (per-worker VQF orientations)",
-                                          "Trapezoidal, gravity comp. (per-worker VQF orientations)",
-                                          "Kalman, gravity comp. (per-worker VQF orientations)" };
+                const char* methods[] = {
+                    "Euler, no gravity comp., SM velocity",
+                    "Trapezoidal, no gravity comp., SM velocity",
+                    "Euler, gravity comp., SM velocity",
+                    "Trapezoidal, gravity comp., SM velocity",
+                    "Kalman, gravity comp., SM velocity",
+                    "Euler, gravity comp., VQF velocity",
+                    "Trapezoidal, gravity comp., VQF velocity",
+                    "Kalman, gravity comp., VQF velocity" };
                 ImGui::Combo("IMU preintegration method", &params.imu_preintegration_method, methods, IM_ARRAYSIZE(methods));
             }
             ImGui::InputDouble("VQF tauAcc [s]", &params.vqf_tauAcc, 0.0, 0.0, "%.3f");
@@ -959,21 +961,6 @@ void settings_gui()
                             "decays to zero. Default: 0.0001");
                 }
 
-                ImGui::Checkbox("Rest bias estimation", &params.vqf_restBiasEstEnabled);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(
-                        "Enables rest detection and gyroscope bias estimation during rest phases.\nDuring rest, gyro bias is estimated "
-                        "from low-pass filtered gyro readings.");
-
-                if (params.vqf_restBiasEstEnabled)
-                {
-                    ImGui::InputDouble("Bias sigma rest [deg/s]", &params.vqf_biasSigmaRest, 0.0, 0.0, "%.4f");
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip(
-                            "Std dev of converged bias estimation uncertainty during rest.\nDetermines trust on rest bias estimation "
-                            "updates.\nSmall value leads to fast convergence. Default: 0.03");
-                }
-
                 ImGui::InputDouble("Bias sigma init [deg/s]", &params.vqf_biasSigmaInit, 0.0, 0.0, "%.3f");
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Std dev of the initial bias estimation uncertainty. Default: 0.5 deg/s");
@@ -988,31 +975,29 @@ void settings_gui()
                         "Maximum expected gyroscope bias.\nUsed to clip bias estimate and measurement error in update step.\nAlso used by "
                         "rest detection to not regard large constant angular rate as rest.\nDefault: 2.0");
 
-                ImGui::TreePop();
-            }
+                ImGui::Checkbox("Rest bias estimation", &params.vqf_restBiasEstEnabled);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Enables rest detection and gyroscope bias estimation during rest phases.\nDuring rest, gyro bias is estimated from low-pass filtered gyro readings.");
 
-            if (params.vqf_restBiasEstEnabled && ImGui::TreeNode("VQF Rest Detection"))
-            {
-                ImGui::InputDouble("Rest min time [s]", &params.vqf_restMinT, 0.0, 0.0, "%.2f");
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(
-                        "Time threshold for rest detection.\nRest is detected when measurements have been close to\nthe low-pass filtered "
-                        "reference for the given time. Default: 1.5");
-                ImGui::InputDouble("Rest filter tau [s]", &params.vqf_restFilterTau, 0.0, 0.0, "%.2f");
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(
-                        "Time constant for the second-order Butterworth low-pass filter\nused to obtain the reference for rest detection. "
-                        "Default: 0.5");
-                ImGui::InputDouble("Rest threshold gyro [deg/s]", &params.vqf_restThGyr, 0.0, 0.0, "%.2f");
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(
-                        "Angular velocity threshold for rest detection.\nDeviation norm between measurement and reference must be below "
-                        "threshold.\nEach component must also be below biasClip. Default: 2.0");
-                ImGui::InputDouble("Rest threshold acc [m/s2]", &params.vqf_restThAcc, 0.0, 0.0, "%.2f");
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(
-                        "Acceleration threshold for rest detection.\nDeviation norm between measurement and reference must be below "
-                        "threshold.\nDefault: 0.5");
+                if (params.vqf_restBiasEstEnabled)
+                {
+                    ImGui::InputDouble("Bias sigma rest [deg/s]", &params.vqf_biasSigmaRest, 0.0, 0.0, "%.4f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Std dev of converged bias estimation uncertainty during rest.\nDetermines trust on rest bias estimation updates.\nSmall value leads to fast convergence. Default: 0.03");
+                    ImGui::InputDouble("Rest min time [s]", &params.vqf_restMinT, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Time threshold for rest detection.\nRest is detected when measurements have been close to\nthe low-pass filtered reference for the given time. Default: 1.5");
+                    ImGui::InputDouble("Rest filter tau [s]", &params.vqf_restFilterTau, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Time constant for the second-order Butterworth low-pass filter\nused to obtain the reference for rest detection. Default: 0.5");
+                    ImGui::InputDouble("Rest threshold gyro [deg/s]", &params.vqf_restThGyr, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Angular velocity threshold for rest detection.\nDeviation norm between measurement and reference must be below threshold.\nEach component must also be below biasClip. Default: 2.0");
+                    ImGui::InputDouble("Rest threshold acc [m/s2]", &params.vqf_restThAcc, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Acceleration threshold for rest detection.\nDeviation norm between measurement and reference must be below threshold.\nDefault: 0.5");
+                }
+
                 ImGui::TreePop();
             }
 
@@ -1919,6 +1904,28 @@ void display()
         glEnd();
     }
 
+    if (show_prediction_vectors)
+    {
+        glDisable(GL_DEPTH_TEST);
+        glLineWidth(3.0f);
+        glBegin(GL_LINES);
+        for (const auto& wd : worker_data)
+        {
+            if (wd.intermediate_trajectory.empty() || wd.imu_prediction_vector.norm() < 1e-6)
+                continue;
+
+            Eigen::Vector3d start = wd.intermediate_trajectory.front().translation();
+            Eigen::Vector3d end = start + wd.imu_prediction_vector;
+
+            glColor3f(1.0f, 0.0f, 1.0f);  // magenta
+            glVertex3d(start.x(), start.y(), start.z());
+            glVertex3d(end.x(), end.y(), end.z());
+        }
+        glEnd();
+        glLineWidth(1.0f);
+        glEnable(GL_DEPTH_TEST);
+    }
+
     if (show_trajectory)
     {
         glPointSize(3);
@@ -2262,6 +2269,7 @@ void display()
                 ImGui::MenuItem("Show initial points", nullptr, &show_initial_points);
                 ImGui::MenuItem("Show trajectory", nullptr, &show_trajectory);
                 ImGui::MenuItem("Show trajectory as axes", nullptr, &show_trajectory_as_axes);
+                ImGui::MenuItem("Show prediction vectors", nullptr, &show_prediction_vectors);
                 ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
                 ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);

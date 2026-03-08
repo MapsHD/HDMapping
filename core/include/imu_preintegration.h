@@ -22,10 +22,6 @@ Eigen::Vector3d convert_gyro_to_rads(const Eigen::Vector3d& raw, bool units_in_d
 double safe_dt(double t_prev, double t_curr, double max_dt);
 bool has_nan(const Eigen::Vector3d& v);
 bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold);
-std::vector<Eigen::Matrix3d> estimate_orientations(
-    const std::vector<RawIMUData>& raw_imu_data,
-    const Eigen::Matrix3d& initial_orientation,
-    const IntegrationParams& params);
 } // namespace imu_utils
 
 class AccelerationModel
@@ -125,12 +121,12 @@ inline const char* to_string(PreintegrationMethod method)
     {
     case PreintegrationMethod::euler_body_frame: return "Euler, no gravity comp., SM velocity";
     case PreintegrationMethod::trapezoidal_body_frame: return "Trapezoidal, no gravity comp., SM velocity";
-    case PreintegrationMethod::euler_gravity_compensated: return "Euler, gravity comp. (initial traj. orient.), SM velocity";
-    case PreintegrationMethod::trapezoidal_gravity_compensated: return "Trapezoidal, gravity comp. (initial traj. orient.), SM velocity";
-    case PreintegrationMethod::kalman_filter: return "Kalman, gravity comp. (initial traj. orient.), SM velocity";
-    case PreintegrationMethod::euler_gyro_gravity_compensated: return "Euler, gravity comp. (per-worker VQF orient.), VQF velocity";
-    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated: return "Trapezoidal, gravity comp. (per-worker VQF orient.), VQF velocity";
-    case PreintegrationMethod::kalman_gyro_gravity_compensated: return "Kalman, gravity comp. (per-worker VQF orient.), VQF velocity";
+    case PreintegrationMethod::euler_gravity_compensated: return "Euler, gravity comp., SM velocity";
+    case PreintegrationMethod::trapezoidal_gravity_compensated: return "Trapezoidal, gravity comp., SM velocity";
+    case PreintegrationMethod::kalman_filter: return "Kalman, gravity comp., SM velocity";
+    case PreintegrationMethod::euler_gyro_gravity_compensated: return "Euler, gravity comp., VQF velocity";
+    case PreintegrationMethod::trapezoidal_gyro_gravity_compensated: return "Trapezoidal, gravity comp., VQF velocity";
+    case PreintegrationMethod::kalman_gyro_gravity_compensated: return "Kalman, gravity comp., VQF velocity";
     default: return "unknown";
     }
 }

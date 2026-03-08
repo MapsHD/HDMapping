@@ -2482,6 +2482,9 @@ bool process_worker_step_1(
             mean_shift = Eigen::Vector3d(0.0, 0.0, 0.0);
         }
 
+        // Store prediction vector for visualization (total displacement over worker)
+        worker_data.imu_prediction_vector = mean_shift * static_cast<double>(new_trajectory.size());
+
         for (int tr = 0; tr < new_trajectory.size(); tr++)
         {
             new_trajectory[tr].translation() += mean_shift * tr;

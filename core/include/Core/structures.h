@@ -426,5 +426,6 @@ struct WorkerData
     std::vector<std::pair<double, double>> intermediate_trajectory_timestamps;
     std::vector<Eigen::Vector3d> imu_om_fi_ka;
     std::vector<RawIMUData> raw_imu_data;
+    Eigen::Vector3d imu_prediction_vector = Eigen::Vector3d::Zero();
     bool show = false;
 };

@@ -145,6 +145,7 @@ int dec_reference_points = 100;
 bool show_initial_points = true;
 bool show_trajectory = true;
 bool show_trajectory_as_axes = false;
+bool show_prediction_vectors = false;
 bool show_covs_indoor = false;
 bool show_covs_outdoor = false;
 int dec_covs = 10;
@@ -923,12 +924,12 @@ void settings_gui()
                 const char* methods[] = {
                     "Euler, no gravity comp., SM velocity",
                     "Trapezoidal, no gravity comp., SM velocity",
-                    "Euler, gravity comp. (initial traj. orient.), SM velocity",
-                    "Trapezoidal, gravity comp. (initial traj. orient.), SM velocity",
-                    "Kalman, gravity comp. (initial traj. orient.), SM velocity",
-                    "Euler, gravity comp. (per-worker VQF orient.), VQF velocity",
-                    "Trapezoidal, gravity comp. (per-worker VQF orient.), VQF velocity",
-                    "Kalman, gravity comp. (per-worker VQF orient.), VQF velocity" };
+                    "Euler, gravity comp., SM velocity",
+                    "Trapezoidal, gravity comp., SM velocity",
+                    "Kalman, gravity comp., SM velocity",
+                    "Euler, gravity comp., VQF velocity",
+                    "Trapezoidal, gravity comp., VQF velocity",
+                    "Kalman, gravity comp., VQF velocity" };
                 ImGui::Combo("IMU preintegration method", &params.imu_preintegration_method, methods, IM_ARRAYSIZE(methods));
             }
             ImGui::InputDouble("VQF tauAcc [s]", &params.vqf_tauAcc, 0.0, 0.0, "%.3f");
@@ -1875,6 +1876,31 @@ void display()
         glEnd();
     }
 
+    if (show_prediction_vectors)
+    {
+        glLineWidth(2.0f);
+        glBegin(GL_LINES);
+        for (const auto& wd : worker_data)
+        {
+            if (wd.intermediate_trajectory.size() > 0 && wd.imu_prediction_vector.norm() > 1e-6)
+            {
+                const auto& first_pose = wd.intermediate_trajectory[0];
+                double x = first_pose(0, 3);
+                double y = first_pose(1, 3);
+                double z = first_pose(2, 3);
+
+                // Yellow arrow: prediction vector
+                glColor3f(1.0f, 1.0f, 0.0f);
+                glVertex3f(x, y, z);
+                glVertex3f(x + wd.imu_prediction_vector.x(),
+                           y + wd.imu_prediction_vector.y(),
+                           z + wd.imu_prediction_vector.z());
+            }
+        }
+        glEnd();
+        glLineWidth(1.0f);
+    }
+
     if (show_trajectory)
     {
         glPointSize(3);
@@ -2218,6 +2244,7 @@ void display()
                 ImGui::MenuItem("Show initial points", nullptr, &show_initial_points);
                 ImGui::MenuItem("Show trajectory", nullptr, &show_trajectory);
                 ImGui::MenuItem("Show trajectory as axes", nullptr, &show_trajectory_as_axes);
+                ImGui::MenuItem("Show prediction vectors", nullptr, &show_prediction_vectors);
                 ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
                 ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);

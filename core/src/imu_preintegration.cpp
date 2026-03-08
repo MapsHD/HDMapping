@@ -4,8 +4,6 @@
 #include <algorithm>
 #include <iostream>
 
-#include <vqf.hpp>
-
 namespace imu_utils
 {
 
@@ -39,60 +37,6 @@ bool has_nan(const Eigen::Vector3d& v)
 bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold)
 {
     return accel_ms2.norm() < threshold && !has_nan(accel_ms2);
-}
-
-std::vector<Eigen::Matrix3d> estimate_orientations(
-    const std::vector<RawIMUData>& raw_imu_data,
-    const Eigen::Matrix3d& initial_orientation,
-    const IntegrationParams& params)
-{
-    std::vector<Eigen::Matrix3d> orientations;
-    orientations.reserve(raw_imu_data.size());
-
-    // Compute average dt for VQF initialization
-    double avg_dt = 1.0 / 200.0; // default 200 Hz
-    if (raw_imu_data.size() >= 2)
-    {
-        double total_time = raw_imu_data.back().timestamp - raw_imu_data.front().timestamp;
-        if (total_time > 0.0)
-            avg_dt = total_time / static_cast<double>(raw_imu_data.size() - 1);
-    }
-
-    VQFParams vqf_params;
-    vqf_params.tauAcc = params.vqf_tauAcc > 0.0 ? params.vqf_tauAcc : 3.0;
-    VQF vqf(vqf_params, avg_dt);
-
-    orientations.push_back(initial_orientation);
-
-    for (size_t k = 1; k < raw_imu_data.size(); k++)
-    {
-        double dt = safe_dt(raw_imu_data[k - 1].timestamp, raw_imu_data[k].timestamp, params.max_dt_threshold);
-        if (dt == 0.0)
-        {
-            orientations.push_back(orientations.back());
-            continue;
-        }
-
-        // VQF expects: gyro in rad/s, acc in m/s²
-        // RawIMUData: gyro in rad/s, accel in g
-        const double g = 9.81;
-        vqf_real_t gyr[3] = {
-            raw_imu_data[k].guroscopes.x(),
-            raw_imu_data[k].guroscopes.y(),
-            raw_imu_data[k].guroscopes.z() };
-        vqf_real_t acc[3] = {
-            raw_imu_data[k].accelerometers.x() * g,
-            raw_imu_data[k].accelerometers.y() * g,
-            raw_imu_data[k].accelerometers.z() * g };
-
-        vqf.update(gyr, acc);
-
-        vqf_real_t quat[4]; // [w, x, y, z]
-        vqf.getQuat6D(quat);
-        Eigen::Quaterniond q(quat[0], quat[1], quat[2], quat[3]);
-        orientations.push_back(q.toRotationMatrix());
-    }
-    return orientations;
 }
 
 } // namespace imu_utils
@@ -309,13 +253,8 @@ Eigen::Vector3d ImuPreintegration::create_and_preintegrate(
     case PreintegrationMethod::trapezoidal_gyro_gravity_compensated:
     case PreintegrationMethod::kalman_gyro_gravity_compensated:
     {
-        auto orientations = imu_utils::estimate_orientations(
-            raw_imu_data, new_trajectory[0].rotation(), params);
-
-        std::vector<Eigen::Affine3d> imu_trajectory = new_trajectory;
-        for (size_t k = 0; k < imu_trajectory.size() && k < orientations.size(); k++)
-            imu_trajectory[k].linear() = orientations[k];
-
+        // Use orientations from new_trajectory directly (global VQF from calculate_trajectory,
+        // anchored to previous worker's SM pose). No per-worker VQF needed.
         accel_model = std::make_unique<GravityCompensatedAcceleration>();
         if (method == PreintegrationMethod::euler_gyro_gravity_compensated)
             integration_method = std::make_unique<EulerIntegration>();
@@ -323,8 +262,7 @@ Eigen::Vector3d ImuPreintegration::create_and_preintegrate(
             integration_method = std::make_unique<TrapezoidalIntegration>();
         else
             integration_method = std::make_unique<KalmanFilterIntegration>();
-
-        return preint.preintegrate(raw_imu_data, imu_trajectory, *accel_model, *integration_method);
+        break;
     }
     default:
         std::cerr << "ImuPreintegration: unknown method " << static_cast<int>(method) << std::endl;

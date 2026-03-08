@@ -1878,27 +1878,24 @@ void display()
 
     if (show_prediction_vectors)
     {
-        glLineWidth(2.0f);
+        glDisable(GL_DEPTH_TEST);
+        glLineWidth(3.0f);
         glBegin(GL_LINES);
         for (const auto& wd : worker_data)
         {
-            if (wd.intermediate_trajectory.size() > 0 && wd.imu_prediction_vector.norm() > 1e-6)
-            {
-                const auto& first_pose = wd.intermediate_trajectory[0];
-                double x = first_pose(0, 3);
-                double y = first_pose(1, 3);
-                double z = first_pose(2, 3);
+            if (wd.intermediate_trajectory.empty() || wd.imu_prediction_vector.norm() < 1e-6)
+                continue;
 
-                // Yellow arrow: prediction vector
-                glColor3f(1.0f, 1.0f, 0.0f);
-                glVertex3f(x, y, z);
-                glVertex3f(x + wd.imu_prediction_vector.x(),
-                           y + wd.imu_prediction_vector.y(),
-                           z + wd.imu_prediction_vector.z());
-            }
+            Eigen::Vector3d start = wd.intermediate_trajectory.front().translation();
+            Eigen::Vector3d end = start + wd.imu_prediction_vector;
+
+            glColor3f(1.0f, 0.0f, 1.0f);  // magenta
+            glVertex3d(start.x(), start.y(), start.z());
+            glVertex3d(end.x(), end.y(), end.z());
         }
         glEnd();
         glLineWidth(1.0f);
+        glEnable(GL_DEPTH_TEST);
     }
 
     if (show_trajectory)

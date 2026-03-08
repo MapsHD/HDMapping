@@ -2416,64 +2416,53 @@ bool process_worker_step_1(
         if (params.use_imu_preintegration)
         {
             IntegrationParams imu_params;
-
             auto method = static_cast<PreintegrationMethod>(params.imu_preintegration_method);
-            bool uses_vqf_velocity = (method == PreintegrationMethod::euler_gyro_gravity_compensated ||
-                                      method == PreintegrationMethod::trapezoidal_gyro_gravity_compensated ||
-                                      method == PreintegrationMethod::kalman_gyro_gravity_compensated);
 
-            if (uses_vqf_velocity)
+            // Compute IMU time span for velocity estimation
+            double total_imu_time = 0.0;
+            if (worker_data.raw_imu_data.size() >= 2)
+                total_imu_time = worker_data.raw_imu_data.back().timestamp - worker_data.raw_imu_data.front().timestamp;
+
+            if (total_imu_time > 0.0)
             {
-                // SM-independent initial_velocity for VQF velocity methods (5-7):
-                // - Direction: AHRS orientation (VQF, not SM-optimized)
-                // - Speed: from previous worker's MOTION MODEL displacement (IMU prediction, not SM result)
-                Eigen::Vector3d prev_mm_displacement =
-                    prev_worker_data.intermediate_trajectory_motion_model.back().translation() -
-                    prev_worker_data.intermediate_trajectory_motion_model.front().translation();
+                bool uses_vqf_velocity = (method == PreintegrationMethod::euler_gyro_gravity_compensated ||
+                                          method == PreintegrationMethod::trapezoidal_gyro_gravity_compensated ||
+                                          method == PreintegrationMethod::kalman_gyro_gravity_compensated);
 
-                if (worker_data.raw_imu_data.size() >= 2)
+                if (uses_vqf_velocity)
                 {
-                    double total_imu_time = worker_data.raw_imu_data.back().timestamp - worker_data.raw_imu_data.front().timestamp;
-                    if (total_imu_time > 0.0)
-                    {
-                        double speed = prev_mm_displacement.norm() / total_imu_time;
+                    // Methods 5-7: SM-independent velocity
+                    // Direction from VQF AHRS, speed from motion model displacement
+                    Eigen::Vector3d prev_mm_displacement =
+                        prev_worker_data.intermediate_trajectory_motion_model.back().translation() -
+                        prev_worker_data.intermediate_trajectory_motion_model.front().translation();
+                    double speed = prev_mm_displacement.norm() / total_imu_time;
 
-                        Eigen::Matrix3d R_ahrs = worker_data.intermediate_trajectory[0].linear();
-                        Eigen::Vector3d forward_global = R_ahrs * Eigen::Vector3d(1, 0, 0);
-                        forward_global.z() = 0;
-                        if (forward_global.norm() > 1e-6)
-                            imu_params.initial_velocity = forward_global.normalized() * speed;
-                        else
-                            imu_params.initial_velocity = Eigen::Vector3d::Zero();
-                    }
+                    Eigen::Vector3d forward_global = worker_data.intermediate_trajectory[0].linear() * Eigen::Vector3d(1, 0, 0);
+                    forward_global.z() = 0;
+                    imu_params.initial_velocity = (forward_global.norm() > 1e-6)
+                        ? forward_global.normalized() * speed
+                        : Eigen::Vector3d::Zero();
                 }
-            }
-            else
-            {
-                // For methods using initial trajectory orientations (0-4):
-                // velocity from previous trajectory segments (original approach)
-                Eigen::Vector3d prev_displacement =
-                    prev_worker_data.intermediate_trajectory[prev_worker_data.intermediate_trajectory.size() - 1].translation() -
-                    prev_prev_worker_data.intermediate_trajectory[prev_prev_worker_data.intermediate_trajectory.size() - 1].translation();
-
-                if (worker_data.raw_imu_data.size() >= 2)
+                else
                 {
-                    double total_imu_time = worker_data.raw_imu_data.back().timestamp - worker_data.raw_imu_data.front().timestamp;
-                    if (total_imu_time > 0.0)
-                        imu_params.initial_velocity = prev_displacement / total_imu_time;
+                    // Methods 0-4: velocity from previous SM trajectory
+                    Eigen::Vector3d prev_displacement =
+                        prev_worker_data.intermediate_trajectory.back().translation() -
+                        prev_prev_worker_data.intermediate_trajectory.back().translation();
+                    imu_params.initial_velocity = prev_displacement / total_imu_time;
                 }
             }
 
             mean_shift = ImuPreintegration::create_and_preintegrate(
-                method,
-                worker_data.raw_imu_data, new_trajectory, imu_params);
+                method, worker_data.raw_imu_data, new_trajectory, imu_params);
         }
         else
         {
-            mean_shift = prev_worker_data.intermediate_trajectory[prev_worker_data.intermediate_trajectory.size() - 1].translation() -
-                prev_prev_worker_data.intermediate_trajectory[prev_prev_worker_data.intermediate_trajectory.size() - 1].translation();
-
-            mean_shift /= (prev_worker_data.intermediate_trajectory.size());
+            // No preintegration: simple velocity from previous two workers
+            mean_shift = (prev_worker_data.intermediate_trajectory.back().translation() -
+                          prev_prev_worker_data.intermediate_trajectory.back().translation()) /
+                         static_cast<double>(prev_worker_data.intermediate_trajectory.size());
         }
 
         if (mean_shift.norm() > 1.0)

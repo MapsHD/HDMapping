@@ -314,11 +314,7 @@ bool load_data(
     }
 }
 
-void calculate_trajectory(
-    Trajectory& trajectory,
-    Imu& imu_data,
-    const LidarOdometryParams& params,
-    bool debugMsg)
+void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, const LidarOdometryParams& params, bool debugMsg)
 {
     UTL_PROFILER_SCOPE("calculate_trajectory");
 
@@ -339,8 +335,7 @@ void calculate_trajectory(
 
     VQFParams vqf_params = buildVQFParams(params);
     VQF vqf(vqf_params, avg_dt);
-    std::cout << "AHRS: VQF (tauAcc=" << vqf_params.tauAcc
-              << ", useMag=" << (params.vqf_useMagnetometer ? "true" : "false")
+    std::cout << "AHRS: VQF (tauAcc=" << vqf_params.tauAcc << ", useMag=" << (params.vqf_useMagnetometer ? "true" : "false")
               << ", dt=" << avg_dt << ", samples=" << imu_data.size() << ")" << std::endl;
 
     for (const auto& [timestamp_pair, gyr, acc] : imu_data)
@@ -348,14 +343,8 @@ void calculate_trajectory(
         // IMU data: gyro in rad/s, acc in g
         // VQF expects: gyro in rad/s, acc in m/s²
         const double g = 9.81;
-        vqf_real_t gyr_vqf[3] = {
-            static_cast<double>(gyr.x()),
-            static_cast<double>(gyr.y()),
-            static_cast<double>(gyr.z()) };
-        vqf_real_t acc_vqf[3] = {
-            static_cast<double>(acc.x()) * g,
-            static_cast<double>(acc.y()) * g,
-            static_cast<double>(acc.z()) * g };
+        vqf_real_t gyr_vqf[3] = { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) };
+        vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g, static_cast<double>(acc.y()) * g, static_cast<double>(acc.z()) * g };
 
         vqf.update(gyr_vqf, acc_vqf);
 
@@ -380,8 +369,8 @@ void calculate_trajectory(
             if (counter % 100 == 0)
             {
                 Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
-                std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " ["
-                          << counter << " of " << imu_data.size() << "]" << std::endl;
+                std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter << " of "
+                          << imu_data.size() << "]" << std::endl;
             }
         }
 
@@ -1019,11 +1008,7 @@ std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOd
         return worker_data;
     }
     Trajectory trajectory;
-    calculate_trajectory(
-        trajectory,
-        imu_data,
-        params,
-        true);
+    calculate_trajectory(trajectory, imu_data, params, true);
 
     std::atomic<bool> pause{ false };
 

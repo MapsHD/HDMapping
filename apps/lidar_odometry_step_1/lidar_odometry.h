@@ -23,11 +23,7 @@ bool load_data(
     std::vector<std::vector<Point3Di>>& pointsPerFile,
     Imu& imu_data,
     bool debugMsg);
-void calculate_trajectory(
-    Trajectory& trajectory,
-    Imu& imu_data,
-    const LidarOdometryParams& params,
-    bool debugMsg);
+void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, const LidarOdometryParams& params, bool debugMsg);
 bool compute_step_1(
     const std::vector<std::vector<Point3Di>>& pointsPerFile,
     LidarOdometryParams& params,

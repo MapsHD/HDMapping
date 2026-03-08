@@ -236,6 +236,11 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
             pc.render_color[0] = render_color[0];
             pc.render_color[1] = render_color[1];
             pc.render_color[2] = render_color[2];
+
+            pc.traj_color[0] = render_color[0];
+            pc.traj_color[1] = render_color[1];
+            pc.traj_color[2] = render_color[2];
+
             pc.fixed_x = vfixed_x[index];
             pc.fixed_y = vfixed_y[index];
             pc.fixed_z = vfixed_z[index];

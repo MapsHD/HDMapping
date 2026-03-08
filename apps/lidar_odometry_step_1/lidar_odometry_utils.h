@@ -11,10 +11,10 @@
 #include <ankerl/unordered_dense.h>
 
 #include <Eigen/Dense>
-#include <vqf.hpp>
 #include <common/include/cauchy.h>
 #include <laszip/laszip_api.h>
 #include <nlohmann/json.hpp>
+#include <vqf.hpp>
 
 #include <Core/ndt.h>
 #include <Core/structures.h>
@@ -74,35 +74,35 @@ struct LidarOdometryParams
     double vqf_tauAcc = 0.5; // accelerometer time constant [s] (higher = more gyro trust)
 
     // VQF gyroscope bias estimation
-    bool vqf_motionBiasEstEnabled = true;    // estimate gyro bias during motion
-    bool vqf_restBiasEstEnabled = true;      // estimate gyro bias during rest
-    double vqf_biasSigmaInit = 0.5;          // initial bias uncertainty [°/s]
-    double vqf_biasForgettingTime = 100.0;   // time for uncertainty to grow 0→0.1 °/s [s]
-    double vqf_biasClip = 2.0;              // max expected gyro bias [°/s]
-    double vqf_biasSigmaMotion = 0.1;        // converged bias uncertainty during motion [°/s]
+    bool vqf_motionBiasEstEnabled = true; // estimate gyro bias during motion
+    bool vqf_restBiasEstEnabled = true; // estimate gyro bias during rest
+    double vqf_biasSigmaInit = 0.5; // initial bias uncertainty [°/s]
+    double vqf_biasForgettingTime = 100.0; // time for uncertainty to grow 0→0.1 °/s [s]
+    double vqf_biasClip = 2.0; // max expected gyro bias [°/s]
+    double vqf_biasSigmaMotion = 0.1; // converged bias uncertainty during motion [°/s]
     double vqf_biasVerticalForgettingFactor = 0.0001; // forgetting for unobservable vertical bias
-    double vqf_biasSigmaRest = 0.03;         // converged bias uncertainty during rest [°/s]
+    double vqf_biasSigmaRest = 0.03; // converged bias uncertainty during rest [°/s]
 
     // VQF rest detection
-    double vqf_restMinT = 1.5;              // time threshold for rest detection [s]
-    double vqf_restFilterTau = 0.5;          // LP filter time constant for rest detection [s]
-    double vqf_restThGyr = 2.0;             // gyro threshold for rest detection [°/s]
-    double vqf_restThAcc = 0.5;             // acc threshold for rest detection [m/s²]
+    double vqf_restMinT = 1.5; // time threshold for rest detection [s]
+    double vqf_restFilterTau = 0.5; // LP filter time constant for rest detection [s]
+    double vqf_restThGyr = 2.0; // gyro threshold for rest detection [°/s]
+    double vqf_restThAcc = 0.5; // acc threshold for rest detection [m/s²]
 
     // VQF magnetometer (only used when vqf_useMagnetometer is true)
-    bool vqf_useMagnetometer = false;        // use 9D mode (with magnetometer) instead of 6D
-    double vqf_tauMag = 9.0;                // magnetometer time constant [s]
-    bool vqf_magDistRejectionEnabled = true;  // magnetic disturbance detection & rejection
-    double vqf_magCurrentTau = 0.05;         // LP filter for current mag norm/dip [s]
-    double vqf_magRefTau = 20.0;             // adjustment time for mag reference [s]
-    double vqf_magNormTh = 0.1;              // relative threshold for mag field strength
-    double vqf_magDipTh = 10.0;              // threshold for mag dip angle [°]
-    double vqf_magNewTime = 20.0;            // time to accept new mag field [s]
-    double vqf_magNewFirstTime = 5.0;        // time to accept first mag field [s]
-    double vqf_magNewMinGyr = 20.0;          // min angular velocity for mag acceptance [°/s]
-    double vqf_magMinUndisturbedTime = 0.5;  // min undisturbed time [s]
-    double vqf_magMaxRejectionTime = 60.0;   // max full mag rejection duration [s]
-    double vqf_magRejectionFactor = 2.0;     // slowdown factor for heading correction
+    bool vqf_useMagnetometer = false; // use 9D mode (with magnetometer) instead of 6D
+    double vqf_tauMag = 9.0; // magnetometer time constant [s]
+    bool vqf_magDistRejectionEnabled = true; // magnetic disturbance detection & rejection
+    double vqf_magCurrentTau = 0.05; // LP filter for current mag norm/dip [s]
+    double vqf_magRefTau = 20.0; // adjustment time for mag reference [s]
+    double vqf_magNormTh = 0.1; // relative threshold for mag field strength
+    double vqf_magDipTh = 10.0; // threshold for mag dip angle [°]
+    double vqf_magNewTime = 20.0; // time to accept new mag field [s]
+    double vqf_magNewFirstTime = 5.0; // time to accept first mag field [s]
+    double vqf_magNewMinGyr = 20.0; // min angular velocity for mag acceptance [°/s]
+    double vqf_magMinUndisturbedTime = 0.5; // min undisturbed time [s]
+    double vqf_magMaxRejectionTime = 60.0; // max full mag rejection duration [s]
+    double vqf_magRejectionFactor = 2.0; // slowdown factor for heading correction
 
     // lidar odometry control
     bool use_motion_from_previous_step = true;

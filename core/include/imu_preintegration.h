@@ -1,16 +1,16 @@
 #pragma once
 
-#include <Eigen/Eigen>
 #include <Core/structures.h>
-#include <vector>
+#include <Eigen/Eigen>
 #include <memory>
+#include <vector>
 
 struct IntegrationParams
 {
     bool accel_units_in_g = true;
     bool gyro_units_in_deg_per_sec = true;
     double max_acceleration_threshold = 50.0; // m/s^2
-    double max_dt_threshold = 0.1;            // seconds
+    double max_dt_threshold = 0.1; // seconds
     Eigen::Vector3d initial_velocity = Eigen::Vector3d::Zero();
     double vqf_tauAcc = 0.5; // VQF accelerometer time constant [s]
 };
@@ -29,19 +29,13 @@ class AccelerationModel
 public:
     virtual ~AccelerationModel() = default;
 
-    virtual Eigen::Vector3d compute(
-        const RawIMUData& imu,
-        const Eigen::Affine3d& pose,
-        const IntegrationParams& params) const = 0;
+    virtual Eigen::Vector3d compute(const RawIMUData& imu, const Eigen::Affine3d& pose, const IntegrationParams& params) const = 0;
 };
 
 class BodyFrameAcceleration : public AccelerationModel
 {
 public:
-    Eigen::Vector3d compute(
-        const RawIMUData& imu,
-        const Eigen::Affine3d& pose,
-        const IntegrationParams& params) const override;
+    Eigen::Vector3d compute(const RawIMUData& imu, const Eigen::Affine3d& pose, const IntegrationParams& params) const override;
 };
 
 class GravityCompensatedAcceleration : public AccelerationModel
@@ -50,10 +44,7 @@ public:
     double gravity_magnitude = 9.81;
     Eigen::Vector3d gravity_vector = Eigen::Vector3d(0.0, 0.0, -9.81);
 
-    Eigen::Vector3d compute(
-        const RawIMUData& imu,
-        const Eigen::Affine3d& pose,
-        const IntegrationParams& params) const override;
+    Eigen::Vector3d compute(const RawIMUData& imu, const Eigen::Affine3d& pose, const IntegrationParams& params) const override;
 };
 
 class IntegrationMethod

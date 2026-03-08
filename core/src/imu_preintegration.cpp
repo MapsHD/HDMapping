@@ -1,58 +1,29 @@
 #include <imu_preintegration.h>
 
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 
 namespace imu_utils
 {
 
-Eigen::Vector3d convert_accel_to_ms2(const Eigen::Vector3d& raw, bool units_in_g, double g)
-{
-    if (units_in_g)
-        return raw * g;
-    return raw;
-}
-
-Eigen::Vector3d convert_gyro_to_rads(const Eigen::Vector3d& raw, bool units_in_deg)
-{
-    if (units_in_deg)
-        return raw * (M_PI / 180.0);
-    return raw;
-}
-
-double safe_dt(double t_prev, double t_curr, double max_dt)
-{
-    double dt = t_curr - t_prev;
-    if (dt <= 0.0 || std::isnan(dt))
-        return 0.0;
-    return std::min(dt, max_dt);
-}
-
-bool has_nan(const Eigen::Vector3d& v)
-{
-    return std::isnan(v.x()) || std::isnan(v.y()) || std::isnan(v.z());
-}
-
-bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold)
-{
-    return accel_ms2.norm() < threshold && !has_nan(accel_ms2);
-}
+    Eigen::Vector3d convert_accel_to_ms2(const Eigen::Vector3d& raw, bool units_in_g, double g)
+    {
+        if (units_in_g)
+            return raw * g;
+        return raw;
+    }
 
 } // namespace imu_utils
 
 Eigen::Vector3d BodyFrameAcceleration::compute(
-    const RawIMUData& imu,
-    const Eigen::Affine3d& /*pose*/,
-    const IntegrationParams& params) const
+    const RawIMUData& imu, const Eigen::Affine3d& /*pose*/, const IntegrationParams& params) const
 {
     return imu_utils::convert_accel_to_ms2(imu.accelerometers, params.accel_units_in_g);
 }
 
 Eigen::Vector3d GravityCompensatedAcceleration::compute(
-    const RawIMUData& imu,
-    const Eigen::Affine3d& pose,
-    const IntegrationParams& params) const
+    const RawIMUData& imu, const Eigen::Affine3d& pose, const IntegrationParams& params) const
 {
     Eigen::Vector3d a_body = imu_utils::convert_accel_to_ms2(imu.accelerometers, params.accel_units_in_g, gravity_magnitude);
     Eigen::Matrix3d R = pose.rotation();
@@ -205,8 +176,7 @@ Eigen::Vector3d ImuPreintegration::preintegrate(
     if (raw_imu_data.size() != new_trajectory.size())
         return Eigen::Vector3d::Zero();
 
-    Eigen::Vector3d total_displacement = integration_method.integrate(
-        raw_imu_data, new_trajectory, accel_model, params);
+    Eigen::Vector3d total_displacement = integration_method.integrate(raw_imu_data, new_trajectory, accel_model, params);
 
     if (imu_utils::has_nan(total_displacement))
         return Eigen::Vector3d::Zero();

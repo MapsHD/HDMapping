@@ -396,14 +396,8 @@ std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector
                 {
                     double timestamp = row["timestamp"].get<double>();
                     double timestampUnix = row["timestampUnix"].get<double>();
-                    Eigen::Vector3f gyr(
-                        row["gyroX"].get<float>(),
-                        row["gyroY"].get<float>(),
-                        row["gyroZ"].get<float>());
-                    Eigen::Vector3f acc(
-                        row["accX"].get<float>(),
-                        row["accY"].get<float>(),
-                        row["accZ"].get<float>());
+                    Eigen::Vector3f gyr(row["gyroX"].get<float>(), row["gyroY"].get<float>(), row["gyroZ"].get<float>());
+                    Eigen::Vector3f acc(row["accX"].get<float>(), row["accY"].get<float>(), row["accZ"].get<float>());
                     all_data.emplace_back(std::pair(timestamp / 1e9, timestampUnix / 1e9), gyr, acc);
                 }
             }
@@ -433,14 +427,8 @@ std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector
 
                     if (data[0] > 0 && imuId == imuToUse)
                     {
-                        Eigen::Vector3f gyr(
-                            static_cast<float>(data[1]),
-                            static_cast<float>(data[2]),
-                            static_cast<float>(data[3]));
-                        Eigen::Vector3f acc(
-                            static_cast<float>(data[4]),
-                            static_cast<float>(data[5]),
-                            static_cast<float>(data[6]));
+                        Eigen::Vector3f gyr(static_cast<float>(data[1]), static_cast<float>(data[2]), static_cast<float>(data[3]));
+                        Eigen::Vector3f acc(static_cast<float>(data[4]), static_cast<float>(data[5]), static_cast<float>(data[6]));
 
                         all_data.emplace_back(std::pair(data[0] / 1e9, timestampUnix / 1e9), gyr, acc);
                     }

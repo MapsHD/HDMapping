@@ -85,10 +85,12 @@ namespace imu_utils
             }
             fusion_ahrs.settings.gain = static_cast<float>(params.fusion_gain);
             // Seed Fusion with initial orientation (Fusion has no internal bias estimation)
-            fusion_ahrs.quaternion = (FusionQuaternion){ .element = { .w = static_cast<float>(init_q.w()),
-                                                                      .x = static_cast<float>(init_q.x()),
-                                                                      .y = static_cast<float>(init_q.y()),
-                                                                      .z = static_cast<float>(init_q.z()) } };
+            FusionQuaternion init_fq;
+            init_fq.element.w = static_cast<float>(init_q.w());
+            init_fq.element.x = static_cast<float>(init_q.x());
+            init_fq.element.y = static_cast<float>(init_q.y());
+            init_fq.element.z = static_cast<float>(init_q.z());
+            fusion_ahrs.quaternion = init_fq;
             fusion_ahrs.initialising = false;
         }
 

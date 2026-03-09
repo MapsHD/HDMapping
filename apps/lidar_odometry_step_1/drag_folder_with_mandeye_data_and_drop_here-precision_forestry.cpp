@@ -717,37 +717,48 @@ void settings_gui()
 
             ImGui::NewLine();
 
-            static int fusionConvention; // 0=NWU, 1=ENU, 2=NED
-            // initialize if none selected
-            if (fusionConvention < 0 || fusionConvention > 2)
-                fusionConvention = 0;
+            ImGui::Checkbox("Use VQF (instead of Fusion/Madgwick)", &params.use_vqf);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Unchecked = Fusion (Madgwick complementary filter, default)\nChecked = VQF (Versatile Quaternion-based Filter)");
 
-            ImGui::Text("AHRS convention: ");
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(
-                    "Coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");
+            if (!params.use_vqf)
+            {
+                static int fusionConvention; // 0=NWU, 1=ENU, 2=NED
+                if (fusionConvention < 0 || fusionConvention > 2)
+                    fusionConvention = 0;
 
-            ImGui::SameLine();
-            ImGui::RadioButton("NWU", &fusionConvention, 0);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("North West Up");
-            ImGui::SameLine();
-            ImGui::RadioButton("ENU", &fusionConvention, 1);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("East North Up");
-            ImGui::SameLine();
-            ImGui::RadioButton("NED", &fusionConvention, 2);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("North East Down");
+                ImGui::Text("Fusion convention: ");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");
 
-            // then update your bools if you still need them
-            params.fusionConventionNwu = (fusionConvention == 0);
-            params.fusionConventionEnu = (fusionConvention == 1);
-            params.fusionConventionNed = (fusionConvention == 2);
+                ImGui::SameLine();
+                ImGui::RadioButton("NWU", &fusionConvention, 0);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("North West Up");
+                ImGui::SameLine();
+                ImGui::RadioButton("ENU", &fusionConvention, 1);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("East North Up");
+                ImGui::SameLine();
+                ImGui::RadioButton("NED", &fusionConvention, 2);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("North East Down");
+
+                params.fusionConventionNwu = (fusionConvention == 0);
+                params.fusionConventionEnu = (fusionConvention == 1);
+                params.fusionConventionNed = (fusionConvention == 2);
+
+                ImGui::InputDouble("Fusion gain", &params.fusion_gain, 0.0, 0.0, "%.3f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Complementary filter gain (0-1). Higher = more accelerometer trust.");
+            }
 
             ImGui::NewLine();
 
             ImGui::Checkbox("Use motion from previous step", &params.use_motion_from_previous_step);
+            if (params.use_vqf)
+            {
             ImGui::InputDouble("VQF tauAcc [s]", &params.vqf_tauAcc, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
             {
@@ -901,6 +912,7 @@ void settings_gui()
                         "rejection, correction uses\nthis factor to increase the time constant. Default: 2.0");
                 ImGui::TreePop();
             }
+            } // end if (params.use_vqf)
 
             ImGui::PopItemWidth();
         }

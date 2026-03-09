@@ -314,67 +314,150 @@ bool load_data(
     }
 }
 
-void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, const LidarOdometryParams& params, bool debugMsg)
+void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryParams& params, bool debugMsg)
 {
     UTL_PROFILER_SCOPE("calculate_trajectory");
 
+    const float RAD_TO_DEG = 180.0f / static_cast<float>(M_PI);
     int counter = 1;
-    double previous_time_stamp = 0.0;
 
     std::cout << "start calculating trajectory.." << std::endl;
 
-    // Compute average dt for VQF initialization
-    double avg_dt = 1.0 / 200.0;
-    if (imu_data.size() >= 2)
+    if (params.use_vqf)
     {
-        double t0 = std::get<0>(imu_data.front()).first;
-        double t1 = std::get<0>(imu_data.back()).first;
-        if (t1 > t0)
-            avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
-    }
-
-    VQFParams vqf_params = buildVQFParams(params);
-    VQF vqf(vqf_params, avg_dt);
-    std::cout << "AHRS: VQF (tauAcc=" << vqf_params.tauAcc << ", useMag=" << (params.vqf_useMagnetometer ? "true" : "false")
-              << ", dt=" << avg_dt << ", samples=" << imu_data.size() << ")" << std::endl;
-
-    for (const auto& [timestamp_pair, gyr, acc] : imu_data)
-    {
-        // IMU data: gyro in rad/s, acc in g
-        // VQF expects: gyro in rad/s, acc in m/s²
-        const double g = 9.81;
-        vqf_real_t gyr_vqf[3] = { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) };
-        vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g, static_cast<double>(acc.y()) * g, static_cast<double>(acc.z()) * g };
-
-        vqf.update(gyr_vqf, acc_vqf);
-
-        vqf_real_t quat[4];
-        if (params.vqf_useMagnetometer)
-            vqf.getQuat9D(quat);
-        else
-            vqf.getQuat6D(quat);
-        Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
-        Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
-        t.rotate(d);
-
-        // Store gyro/acc in original units for RawIMUData
-        RawIMUData rawImuData{ timestamp_pair.first,
-                               { static_cast<double>(acc.x()), static_cast<double>(acc.y()), static_cast<double>(acc.z()) },
-                               { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) } };
-        trajectory[timestamp_pair.first] = std::make_tuple(t.matrix(), timestamp_pair.second, rawImuData);
-
-        if (debugMsg)
+        // ---- VQF path ----
+        double avg_dt = 1.0 / 200.0;
+        if (imu_data.size() >= 2)
         {
-            counter++;
-            if (counter % 100 == 0)
-            {
-                Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
-                std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter << " of "
-                          << imu_data.size() << "]" << std::endl;
-            }
+            double t0 = std::get<0>(imu_data.front()).first;
+            double t1 = std::get<0>(imu_data.back()).first;
+            if (t1 > t0)
+                avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
         }
 
-        previous_time_stamp = timestamp_pair.first;
+        VQFParams vqf_params = buildVQFParams(params);
+        VQF vqf(vqf_params, avg_dt);
+        std::cout << "AHRS: VQF (tauAcc=" << vqf_params.tauAcc << ", useMag=" << (params.vqf_useMagnetometer ? "true" : "false")
+                  << ", dt=" << avg_dt << ", samples=" << imu_data.size() << ")" << std::endl;
+
+        for (const auto& [timestamp_pair, gyr, acc] : imu_data)
+        {
+            const double g = 9.81;
+            vqf_real_t gyr_vqf[3] = { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) };
+            vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g, static_cast<double>(acc.y()) * g, static_cast<double>(acc.z()) * g };
+
+            vqf.update(gyr_vqf, acc_vqf);
+
+            vqf_real_t quat[4];
+            if (params.vqf_useMagnetometer)
+                vqf.getQuat9D(quat);
+            else
+                vqf.getQuat6D(quat);
+            Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
+            Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
+            t.rotate(d);
+
+            RawIMUData rawImuData{ timestamp_pair.first,
+                                   { static_cast<double>(acc.x()), static_cast<double>(acc.y()), static_cast<double>(acc.z()) },
+                                   { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) } };
+            trajectory[timestamp_pair.first] = std::make_tuple(t.matrix(), timestamp_pair.second, rawImuData);
+
+            if (debugMsg)
+            {
+                counter++;
+                if (counter % 100 == 0)
+                {
+                    Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
+                    std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter << " of "
+                              << imu_data.size() << "]" << std::endl;
+                }
+            }
+        }
+    }
+    else
+    {
+        // ---- Fusion (Madgwick) path ----
+        FusionAhrs ahrs;
+        FusionAhrsInitialise(&ahrs);
+
+        if (params.fusionConventionNwu)
+            ahrs.settings.convention = FusionConventionNwu;
+        else if (params.fusionConventionEnu)
+            ahrs.settings.convention = FusionConventionEnu;
+        else if (params.fusionConventionNed)
+            ahrs.settings.convention = FusionConventionNed;
+        ahrs.settings.gain = static_cast<float>(params.fusion_gain);
+
+        // Gyro bias estimation from first 1000 stationary samples
+        double bias_gyr_x = 0.0, bias_gyr_y = 0.0, bias_gyr_z = 0.0;
+        if (params.use_removie_imu_bias_from_first_stationary_scan && imu_data.size() > 1000)
+        {
+            std::vector<double> gyr_x, gyr_y, gyr_z;
+            gyr_x.reserve(1000); gyr_y.reserve(1000); gyr_z.reserve(1000);
+            for (int i = 0; i < 1000; i++)
+            {
+                const auto& [timestamp_pair, gyr, acc] = imu_data[i];
+                gyr_x.push_back(gyr.x() * RAD_TO_DEG);
+                gyr_y.push_back(gyr.y() * RAD_TO_DEG);
+                gyr_z.push_back(gyr.z() * RAD_TO_DEG);
+            }
+            std::nth_element(gyr_x.begin(), gyr_x.begin() + 500, gyr_x.end());
+            std::nth_element(gyr_y.begin(), gyr_y.begin() + 500, gyr_y.end());
+            std::nth_element(gyr_z.begin(), gyr_z.begin() + 500, gyr_z.end());
+            bias_gyr_x = gyr_x[500]; bias_gyr_y = gyr_y[500]; bias_gyr_z = gyr_z[500];
+            params.estimated_gyro_bias_dps = Eigen::Vector3d(bias_gyr_x, bias_gyr_y, bias_gyr_z);
+
+            std::cout << "------------------\nGYRO BIAS\n"
+                      << "bias_gyr_x [deg/s]: " << bias_gyr_x << "\n"
+                      << "bias_gyr_y [deg/s]: " << bias_gyr_y << "\n"
+                      << "bias_gyr_z [deg/s]: " << bias_gyr_z << "\n------------------" << std::endl;
+        }
+
+        std::cout << "AHRS: Fusion (gain=" << params.fusion_gain << ", samples=" << imu_data.size() << ")" << std::endl;
+
+        bool first = true;
+        double last_ts = 0.0;
+
+        for (const auto& [timestamp_pair, gyr, acc] : imu_data)
+        {
+            const FusionVector gyroscope = { static_cast<float>(gyr.x() * RAD_TO_DEG) - static_cast<float>(bias_gyr_x),
+                                             static_cast<float>(gyr.y() * RAD_TO_DEG) - static_cast<float>(bias_gyr_y),
+                                             static_cast<float>(gyr.z() * RAD_TO_DEG) - static_cast<float>(bias_gyr_z) };
+            const FusionVector accelerometer = { acc.x(), acc.y(), acc.z() };
+
+            if (first)
+            {
+                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0f / 200.0f);
+                first = false;
+            }
+            else
+            {
+                float ts_diff = static_cast<float>(timestamp_pair.first - last_ts);
+                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+            }
+            last_ts = timestamp_pair.first;
+
+            FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
+            Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
+            Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
+            t.rotate(d);
+
+            RawIMUData rawImuData{ timestamp_pair.first,
+                                   { static_cast<double>(acc.x()), static_cast<double>(acc.y()), static_cast<double>(acc.z()) },
+                                   { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) } };
+            trajectory[timestamp_pair.first] = std::make_tuple(t.matrix(), timestamp_pair.second, rawImuData);
+
+            if (debugMsg)
+            {
+                counter++;
+                if (counter % 100 == 0)
+                {
+                    const FusionEuler euler = FusionQuaternionToEuler(quat);
+                    std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw
+                              << " [" << counter << " of " << imu_data.size() << "]" << std::endl;
+                }
+            }
+        }
     }
 }
 

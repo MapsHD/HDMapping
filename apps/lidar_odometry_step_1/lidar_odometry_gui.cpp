@@ -474,52 +474,95 @@ void alternative_approach()
                     std::cout << fn << std::endl;
                     imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu)); });
 
-            // Compute average dt for VQF initialization
-            double avg_dt = 1.0 / 200.0;
-            if (imu_data.size() >= 2)
-            {
-                double t0 = std::get<0>(imu_data.front()).first;
-                double t1 = std::get<0>(imu_data.back()).first;
-                if (t1 > t0)
-                    avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
-            }
-
-            VQFParams vqf_params = buildVQFParams(params);
-            VQF vqf(vqf_params, avg_dt);
-
             std::map<double, Eigen::Matrix4d> trajectory;
-
             int counter = 1;
+            const float RAD_TO_DEG = 180.0f / static_cast<float>(M_PI);
 
-            for (const auto& [timestamp_pair, gyr, acc] : imu_data)
+            if (params.use_vqf)
             {
-                const double g = 9.81;
-                vqf_real_t gyr_vqf[3] = {
-                    static_cast<double>(gyr.x()),
-                    static_cast<double>(gyr.y()),
-                    static_cast<double>(gyr.z()) };
-                vqf_real_t acc_vqf[3] = {
-                    static_cast<double>(acc.x()) * g,
-                    static_cast<double>(acc.y()) * g,
-                    static_cast<double>(acc.z()) * g };
-
-                vqf.update(gyr_vqf, acc_vqf);
-
-                vqf_real_t quat[4];
-                if (params.vqf_useMagnetometer)
-                    vqf.getQuat9D(quat);
-                else
-                    vqf.getQuat6D(quat);
-                Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
-                Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
-                t.rotate(d);
-
-                trajectory[timestamp_pair.first] = t.matrix();
-                counter++;
-                if (counter % 100 == 0)
+                double avg_dt = 1.0 / 200.0;
+                if (imu_data.size() >= 2)
                 {
-                    Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
-                    std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter << " of " << imu_data.size() << "]" << std::endl;
+                    double t0 = std::get<0>(imu_data.front()).first;
+                    double t1 = std::get<0>(imu_data.back()).first;
+                    if (t1 > t0)
+                        avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
+                }
+
+                VQFParams vqf_params = buildVQFParams(params);
+                VQF vqf(vqf_params, avg_dt);
+
+                for (const auto& [timestamp_pair, gyr, acc] : imu_data)
+                {
+                    const double g = 9.81;
+                    vqf_real_t gyr_vqf[3] = { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) };
+                    vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g, static_cast<double>(acc.y()) * g, static_cast<double>(acc.z()) * g };
+
+                    vqf.update(gyr_vqf, acc_vqf);
+
+                    vqf_real_t quat[4];
+                    if (params.vqf_useMagnetometer)
+                        vqf.getQuat9D(quat);
+                    else
+                        vqf.getQuat6D(quat);
+                    Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
+                    Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
+                    t.rotate(d);
+                    trajectory[timestamp_pair.first] = t.matrix();
+                    counter++;
+                    if (counter % 100 == 0)
+                    {
+                        Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
+                        std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter << " of " << imu_data.size() << "]" << std::endl;
+                    }
+                }
+            }
+            else
+            {
+                FusionAhrs ahrs;
+                FusionAhrsInitialise(&ahrs);
+                if (params.fusionConventionNwu) ahrs.settings.convention = FusionConventionNwu;
+                else if (params.fusionConventionEnu) ahrs.settings.convention = FusionConventionEnu;
+                else if (params.fusionConventionNed) ahrs.settings.convention = FusionConventionNed;
+                ahrs.settings.gain = params.fusion_gain;
+
+                bool first = true;
+                double last_ts = 0.0;
+
+                for (const auto& [timestamp_pair, gyr, acc] : imu_data)
+                {
+                    const FusionVector gyroscope = { static_cast<float>(gyr.x() * RAD_TO_DEG),
+                                                     static_cast<float>(gyr.y() * RAD_TO_DEG),
+                                                     static_cast<float>(gyr.z() * RAD_TO_DEG) };
+                    const FusionVector accelerometer = { acc.x(), acc.y(), acc.z() };
+
+                    if (first)
+                    {
+                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0f / 200.0f);
+                        first = false;
+                    }
+                    else
+                    {
+                        float ts_diff = static_cast<float>(timestamp_pair.first - last_ts);
+                        if (ts_diff < 0.01f)
+                            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+                        else
+                            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0f / 200.0f);
+                    }
+                    last_ts = timestamp_pair.first;
+
+                    FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
+                    Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
+                    Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
+                    t.rotate(d);
+                    trajectory[timestamp_pair.first] = t.matrix();
+                    counter++;
+                    if (counter % 100 == 0)
+                    {
+                        const FusionEuler euler = FusionQuaternionToEuler(quat);
+                        std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw
+                                  << " [" << counter << " of " << imu_data.size() << "]" << std::endl;
+                    }
                 }
             }
 
@@ -883,33 +926,44 @@ void settings_gui()
 
             ImGui::NewLine();
 
-            static int fusionConvention; // 0=NWU, 1=ENU, 2=NED
-            // initialize if none selected
-            if (fusionConvention < 0 || fusionConvention > 2)
-                fusionConvention = 0;
+            // AHRS type selection
+            ImGui::Checkbox("Use VQF (instead of Fusion/Madgwick)", &params.use_vqf);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Unchecked = Fusion (Madgwick complementary filter, default)\nChecked = VQF (Versatile Quaternion-based Filter)");
 
-            ImGui::Text("AHRS convention: ");
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(
-                    "Coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");
+            if (!params.use_vqf)
+            {
+                // Fusion-specific parameters
+                static int fusionConvention; // 0=NWU, 1=ENU, 2=NED
+                if (fusionConvention < 0 || fusionConvention > 2)
+                    fusionConvention = 0;
 
-            ImGui::SameLine();
-            ImGui::RadioButton("NWU", &fusionConvention, 0);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("North West Up");
-            ImGui::SameLine();
-            ImGui::RadioButton("ENU", &fusionConvention, 1);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("East North Up");
-            ImGui::SameLine();
-            ImGui::RadioButton("NED", &fusionConvention, 2);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("North East Down");
+                ImGui::Text("Fusion convention: ");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");
 
-            // then update your bools if you still need them
-            params.fusionConventionNwu = (fusionConvention == 0);
-            params.fusionConventionEnu = (fusionConvention == 1);
-            params.fusionConventionNed = (fusionConvention == 2);
+                ImGui::SameLine();
+                ImGui::RadioButton("NWU", &fusionConvention, 0);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("North West Up");
+                ImGui::SameLine();
+                ImGui::RadioButton("ENU", &fusionConvention, 1);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("East North Up");
+                ImGui::SameLine();
+                ImGui::RadioButton("NED", &fusionConvention, 2);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("North East Down");
+
+                params.fusionConventionNwu = (fusionConvention == 0);
+                params.fusionConventionEnu = (fusionConvention == 1);
+                params.fusionConventionNed = (fusionConvention == 2);
+
+                ImGui::InputDouble("Fusion gain", &params.fusion_gain, 0.0, 0.0, "%.3f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Complementary filter gain (0-1). Higher = more accelerometer trust.");
+            }
 
             ImGui::NewLine();
 
@@ -923,11 +977,13 @@ void settings_gui()
                     "Euler, gravity comp., SM velocity",
                     "Trapezoidal, gravity comp., SM velocity",
                     "Kalman, gravity comp., SM velocity",
-                    "Euler, gravity comp., VQF velocity",
-                    "Trapezoidal, gravity comp., VQF velocity",
-                    "Kalman, gravity comp., VQF velocity" };
+                    "Euler, gravity comp., AHRS velocity",
+                    "Trapezoidal, gravity comp., AHRS velocity",
+                    "Kalman, gravity comp., AHRS velocity" };
                 ImGui::Combo("IMU preintegration method", &params.imu_preintegration_method, methods, IM_ARRAYSIZE(methods));
             }
+            if (params.use_vqf)
+            {
             ImGui::InputDouble("VQF tauAcc [s]", &params.vqf_tauAcc, 0.0, 0.0, "%.3f");
             if (ImGui::IsItemHovered())
             {
@@ -1070,6 +1126,7 @@ void settings_gui()
                         "rejection, correction uses\nthis factor to increase the time constant. Default: 2.0");
                 ImGui::TreePop();
             }
+            } // end if (params.use_vqf)
 
             ImGui::PopItemWidth();
         }

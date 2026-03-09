@@ -46,7 +46,7 @@ function(add_core_target target_name with_gui)
 
     add_library(${target_name} STATIC ${SOURCES})
     target_compile_definitions(${target_name} PRIVATE ${DEFINES})
-    target_link_libraries(${target_name} PRIVATE ${PLATFORM_LASZIP_LIB} ${PLATFORM_MISCELLANEOUS_LIBS} spdlog::spdlog vqf)
+    target_link_libraries(${target_name} PRIVATE ${PLATFORM_LASZIP_LIB} ${PLATFORM_MISCELLANEOUS_LIBS} spdlog::spdlog vqf Fusion)
     target_include_directories(${target_name} PRIVATE
         include
         ${EIGEN3_INCLUDE_DIR}
@@ -55,6 +55,7 @@ function(add_core_target target_name with_gui)
         ${THIRDPARTY_DIRECTORY}/observation_equations/codes
         ${EXTERNAL_LIBRARIES_DIRECTORY}/include
         ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+        ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
     )
 
     target_link_libraries(${target_name} PRIVATE PROJ::proj)

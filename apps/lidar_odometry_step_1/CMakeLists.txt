@@ -42,11 +42,12 @@ target_include_directories(
           ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
           ${LASZIP_INCLUDE_DIR}/LASzip/include
           ${THIRDPARTY_DIRECTORY}/observation_equations/codes
-          ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
+          ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+          ${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
 
 target_link_libraries(
           lidar_odometry_step_1
-          PRIVATE vqf
+          PRIVATE vqf Fusion
           unordered_dense::unordered_dense
           spdlog::spdlog
           UTL::include
@@ -99,11 +100,12 @@ target_include_directories(
           ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
           ${LASZIP_INCLUDE_DIR}/LASzip/include
           ${THIRDPARTY_DIRECTORY}/observation_equations/codes
-          ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
+          ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+          ${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
 
 target_link_libraries(
           drag_folder_with_mandeye_data_and_drop_here-precision_forestry
-          PRIVATE vqf
+          PRIVATE vqf Fusion
           unordered_dense::unordered_dense
           spdlog::spdlog
           UTL::include

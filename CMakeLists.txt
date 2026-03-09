@@ -435,6 +435,7 @@ endif()
 
 
 add_subdirectory(${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
+add_subdirectory(${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
 
 add_subdirectory(core)
 add_subdirectory(core_hd_mapping)

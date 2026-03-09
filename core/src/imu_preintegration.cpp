@@ -10,136 +10,138 @@
 namespace imu_utils
 {
 
-Eigen::Vector3d convert_accel_to_ms2(const Eigen::Vector3d& raw, bool units_in_g, double g)
-{
-    if (units_in_g)
-        return raw * g;
-    return raw;
-}
-
-Eigen::Vector3d convert_gyro_to_rads(const Eigen::Vector3d& raw, bool units_in_deg)
-{
-    if (units_in_deg)
-        return raw * (M_PI / 180.0);
-    return raw;
-}
-
-double safe_dt(double t_prev, double t_curr, double max_dt)
-{
-    double dt = t_curr - t_prev;
-    if (dt <= 0.0 || std::isnan(dt))
-        return 0.0;
-    return std::min(dt, max_dt);
-}
-
-bool has_nan(const Eigen::Vector3d& v)
-{
-    return std::isnan(v.x()) || std::isnan(v.y()) || std::isnan(v.z());
-}
-
-bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold)
-{
-    return accel_ms2.norm() < threshold && !has_nan(accel_ms2);
-}
-
-std::vector<Eigen::Matrix3d> estimate_orientations(
-    const std::vector<RawIMUData>& raw_imu_data,
-    const Eigen::Matrix3d& initial_orientation,
-    const IntegrationParams& params,
-    const VQFParams& vqf_params)
-{
-    std::vector<Eigen::Matrix3d> orientations;
-    orientations.reserve(raw_imu_data.size());
-    orientations.push_back(initial_orientation);
-
-    // Compute average dt
-    double avg_dt = 1.0 / 200.0;
-    if (raw_imu_data.size() >= 2)
+    Eigen::Vector3d convert_accel_to_ms2(const Eigen::Vector3d& raw, bool units_in_g, double g)
     {
-        double total_time = raw_imu_data.back().timestamp - raw_imu_data.front().timestamp;
-        if (total_time > 0.0)
-            avg_dt = total_time / static_cast<double>(raw_imu_data.size() - 1);
+        if (units_in_g)
+            return raw * g;
+        return raw;
     }
 
-    // Seed quaternion from initial_orientation
-    Eigen::Quaterniond init_q(initial_orientation);
-    init_q.normalize();
-
-    // Initialize selected AHRS
-    VQF vqf(vqf_params, avg_dt);
-    FusionAhrs fusion_ahrs;
-    if (!params.use_vqf)
+    Eigen::Vector3d convert_gyro_to_rads(const Eigen::Vector3d& raw, bool units_in_deg)
     {
-        FusionAhrsInitialise(&fusion_ahrs);
-        switch (params.fusion_convention)
-        {
-        case AhrsConvention::NWU: fusion_ahrs.settings.convention = FusionConventionNwu; break;
-        case AhrsConvention::ENU: fusion_ahrs.settings.convention = FusionConventionEnu; break;
-        case AhrsConvention::NED: fusion_ahrs.settings.convention = FusionConventionNed; break;
-        }
-        fusion_ahrs.settings.gain = static_cast<float>(params.fusion_gain);
-        // Seed Fusion with initial orientation (Fusion has no internal bias estimation)
-        fusion_ahrs.quaternion = (FusionQuaternion){
-            .element = { .w = static_cast<float>(init_q.w()),
-                         .x = static_cast<float>(init_q.x()),
-                         .y = static_cast<float>(init_q.y()),
-                         .z = static_cast<float>(init_q.z()) } };
-        fusion_ahrs.initialising = false;
+        if (units_in_deg)
+            return raw * (M_PI / 180.0);
+        return raw;
     }
 
-    constexpr double RAD_TO_DEG = 180.0 / M_PI;
-
-    for (size_t k = 1; k < raw_imu_data.size(); k++)
+    double safe_dt(double t_prev, double t_curr, double max_dt)
     {
-        double dt = safe_dt(raw_imu_data[k - 1].timestamp, raw_imu_data[k].timestamp, params.max_dt_threshold);
-        if (dt == 0.0)
-        {
-            orientations.push_back(orientations.back());
-            continue;
-        }
-
-        if (params.use_vqf)
-        {
-            // VQF expects: gyro in rad/s, acc in m/s²
-            const double g = 9.81;
-            vqf_real_t gyr[3] = {
-                raw_imu_data[k].guroscopes.x(),
-                raw_imu_data[k].guroscopes.y(),
-                raw_imu_data[k].guroscopes.z() };
-            vqf_real_t acc[3] = {
-                raw_imu_data[k].accelerometers.x() * g,
-                raw_imu_data[k].accelerometers.y() * g,
-                raw_imu_data[k].accelerometers.z() * g };
-
-            vqf.update(gyr, acc);
-
-            vqf_real_t quat[4];
-            vqf.getQuat6D(quat);
-            Eigen::Quaterniond q(quat[0], quat[1], quat[2], quat[3]);
-            orientations.push_back(q.toRotationMatrix());
-        }
-        else
-        {
-            // Fusion expects: gyro in deg/s, acc in g
-            // Subtract gyro bias (Fusion has no internal bias estimation, unlike VQF)
-            const FusionVector gyroscope = {
-                static_cast<float>(raw_imu_data[k].guroscopes.x() * RAD_TO_DEG - params.gyro_bias_dps.x()),
-                static_cast<float>(raw_imu_data[k].guroscopes.y() * RAD_TO_DEG - params.gyro_bias_dps.y()),
-                static_cast<float>(raw_imu_data[k].guroscopes.z() * RAD_TO_DEG - params.gyro_bias_dps.z()) };
-            const FusionVector accelerometer = {
-                static_cast<float>(raw_imu_data[k].accelerometers.x()),
-                static_cast<float>(raw_imu_data[k].accelerometers.y()),
-                static_cast<float>(raw_imu_data[k].accelerometers.z()) };
-
-            FusionAhrsUpdateNoMagnetometer(&fusion_ahrs, gyroscope, accelerometer, static_cast<float>(dt));
-
-            FusionQuaternion quat = FusionAhrsGetQuaternion(&fusion_ahrs);
-            Eigen::Quaterniond q(quat.element.w, quat.element.x, quat.element.y, quat.element.z);
-            orientations.push_back(q.toRotationMatrix());
-        }
+        double dt = t_curr - t_prev;
+        if (dt <= 0.0 || std::isnan(dt))
+            return 0.0;
+        return std::min(dt, max_dt);
     }
-    return orientations;
-}
+
+    bool has_nan(const Eigen::Vector3d& v)
+    {
+        return std::isnan(v.x()) || std::isnan(v.y()) || std::isnan(v.z());
+    }
+
+    bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold)
+    {
+        return accel_ms2.norm() < threshold && !has_nan(accel_ms2);
+    }
+
+    std::vector<Eigen::Matrix3d> estimate_orientations(
+        const std::vector<RawIMUData>& raw_imu_data,
+        const Eigen::Matrix3d& initial_orientation,
+        const IntegrationParams& params,
+        const VQFParams& vqf_params)
+    {
+        std::vector<Eigen::Matrix3d> orientations;
+        orientations.reserve(raw_imu_data.size());
+        orientations.push_back(initial_orientation);
+
+        // Compute average dt
+        double avg_dt = 1.0 / 200.0;
+        if (raw_imu_data.size() >= 2)
+        {
+            double total_time = raw_imu_data.back().timestamp - raw_imu_data.front().timestamp;
+            if (total_time > 0.0)
+                avg_dt = total_time / static_cast<double>(raw_imu_data.size() - 1);
+        }
+
+        // Seed quaternion from initial_orientation
+        Eigen::Quaterniond init_q(initial_orientation);
+        init_q.normalize();
+
+        // Initialize selected AHRS
+        VQF vqf(vqf_params, avg_dt);
+        FusionAhrs fusion_ahrs;
+        if (!params.use_vqf)
+        {
+            FusionAhrsInitialise(&fusion_ahrs);
+            switch (params.fusion_convention)
+            {
+            case AhrsConvention::NWU:
+                fusion_ahrs.settings.convention = FusionConventionNwu;
+                break;
+            case AhrsConvention::ENU:
+                fusion_ahrs.settings.convention = FusionConventionEnu;
+                break;
+            case AhrsConvention::NED:
+                fusion_ahrs.settings.convention = FusionConventionNed;
+                break;
+            }
+            fusion_ahrs.settings.gain = static_cast<float>(params.fusion_gain);
+            // Seed Fusion with initial orientation (Fusion has no internal bias estimation)
+            FusionQuaternion init_fq;
+            init_fq.element.w = static_cast<float>(init_q.w());
+            init_fq.element.x = static_cast<float>(init_q.x());
+            init_fq.element.y = static_cast<float>(init_q.y());
+            init_fq.element.z = static_cast<float>(init_q.z());
+            fusion_ahrs.quaternion = init_fq;
+            fusion_ahrs.initialising = false;
+        }
+
+        constexpr double RAD_TO_DEG = 180.0 / M_PI;
+
+        for (size_t k = 1; k < raw_imu_data.size(); k++)
+        {
+            double dt = safe_dt(raw_imu_data[k - 1].timestamp, raw_imu_data[k].timestamp, params.max_dt_threshold);
+            if (dt == 0.0)
+            {
+                orientations.push_back(orientations.back());
+                continue;
+            }
+
+            if (params.use_vqf)
+            {
+                // VQF expects: gyro in rad/s, acc in m/s²
+                const double g = 9.81;
+                vqf_real_t gyr[3] = { raw_imu_data[k].guroscopes.x(), raw_imu_data[k].guroscopes.y(), raw_imu_data[k].guroscopes.z() };
+                vqf_real_t acc[3] = { raw_imu_data[k].accelerometers.x() * g,
+                                      raw_imu_data[k].accelerometers.y() * g,
+                                      raw_imu_data[k].accelerometers.z() * g };
+
+                vqf.update(gyr, acc);
+
+                vqf_real_t quat[4];
+                vqf.getQuat6D(quat);
+                Eigen::Quaterniond q(quat[0], quat[1], quat[2], quat[3]);
+                orientations.push_back(q.toRotationMatrix());
+            }
+            else
+            {
+                // Fusion expects: gyro in deg/s, acc in g
+                // Subtract gyro bias (Fusion has no internal bias estimation, unlike VQF)
+                const FusionVector gyroscope = { static_cast<float>(raw_imu_data[k].guroscopes.x() * RAD_TO_DEG - params.gyro_bias_dps.x()),
+                                                 static_cast<float>(raw_imu_data[k].guroscopes.y() * RAD_TO_DEG - params.gyro_bias_dps.y()),
+                                                 static_cast<float>(
+                                                     raw_imu_data[k].guroscopes.z() * RAD_TO_DEG - params.gyro_bias_dps.z()) };
+                const FusionVector accelerometer = { static_cast<float>(raw_imu_data[k].accelerometers.x()),
+                                                     static_cast<float>(raw_imu_data[k].accelerometers.y()),
+                                                     static_cast<float>(raw_imu_data[k].accelerometers.z()) };
+
+                FusionAhrsUpdateNoMagnetometer(&fusion_ahrs, gyroscope, accelerometer, static_cast<float>(dt));
+
+                FusionQuaternion quat = FusionAhrsGetQuaternion(&fusion_ahrs);
+                Eigen::Quaterniond q(quat.element.w, quat.element.x, quat.element.y, quat.element.z);
+                orientations.push_back(q.toRotationMatrix());
+            }
+        }
+        return orientations;
+    }
 
 } // namespace imu_utils
 
@@ -350,25 +352,24 @@ Eigen::Vector3d ImuPreintegration::create_and_preintegrate(
     case PreintegrationMethod::euler_gravity_ahrs_vel:
     case PreintegrationMethod::trapezoidal_gravity_ahrs_vel:
     case PreintegrationMethod::kalman_gravity_ahrs_vel:
-    {
-        // Per-worker AHRS: estimate local orientations from IMU data (VQF or Fusion based on params.use_vqf)
-        auto orientations = imu_utils::estimate_orientations(
-            raw_imu_data, new_trajectory[0].rotation(), params, vqf_params);
+        {
+            // Per-worker AHRS: estimate local orientations from IMU data (VQF or Fusion based on params.use_vqf)
+            auto orientations = imu_utils::estimate_orientations(raw_imu_data, new_trajectory[0].rotation(), params, vqf_params);
 
-        std::vector<Eigen::Affine3d> imu_trajectory = new_trajectory;
-        for (size_t k = 0; k < imu_trajectory.size() && k < orientations.size(); k++)
-            imu_trajectory[k].linear() = orientations[k];
+            std::vector<Eigen::Affine3d> imu_trajectory = new_trajectory;
+            for (size_t k = 0; k < imu_trajectory.size() && k < orientations.size(); k++)
+                imu_trajectory[k].linear() = orientations[k];
 
-        accel_model = std::make_unique<GravityCompensatedAcceleration>();
-        if (method == PreintegrationMethod::euler_gravity_ahrs_vel)
-            integration_method = std::make_unique<EulerIntegration>();
-        else if (method == PreintegrationMethod::trapezoidal_gravity_ahrs_vel)
-            integration_method = std::make_unique<TrapezoidalIntegration>();
-        else
-            integration_method = std::make_unique<KalmanFilterIntegration>();
+            accel_model = std::make_unique<GravityCompensatedAcceleration>();
+            if (method == PreintegrationMethod::euler_gravity_ahrs_vel)
+                integration_method = std::make_unique<EulerIntegration>();
+            else if (method == PreintegrationMethod::trapezoidal_gravity_ahrs_vel)
+                integration_method = std::make_unique<TrapezoidalIntegration>();
+            else
+                integration_method = std::make_unique<KalmanFilterIntegration>();
 
-        return preint.preintegrate(raw_imu_data, imu_trajectory, *accel_model, *integration_method);
-    }
+            return preint.preintegrate(raw_imu_data, imu_trajectory, *accel_model, *integration_method);
+        }
     default:
         std::cerr << "ImuPreintegration: unknown method " << static_cast<int>(method) << std::endl;
         return Eigen::Vector3d::Zero();

@@ -4,6 +4,7 @@
 #include <mutex>
 
 #include <Core/system_info.hpp>
+#include <Fusion.h>
 
 namespace fs = std::filesystem;
 
@@ -344,7 +345,9 @@ void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryPa
         {
             const double g = 9.81;
             vqf_real_t gyr_vqf[3] = { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) };
-            vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g, static_cast<double>(acc.y()) * g, static_cast<double>(acc.z()) * g };
+            vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g,
+                                      static_cast<double>(acc.y()) * g,
+                                      static_cast<double>(acc.z()) * g };
 
             vqf.update(gyr_vqf, acc_vqf);
 
@@ -393,7 +396,9 @@ void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryPa
         if (params.use_removie_imu_bias_from_first_stationary_scan && imu_data.size() > 1000)
         {
             std::vector<double> gyr_x, gyr_y, gyr_z;
-            gyr_x.reserve(1000); gyr_y.reserve(1000); gyr_z.reserve(1000);
+            gyr_x.reserve(1000);
+            gyr_y.reserve(1000);
+            gyr_z.reserve(1000);
             for (int i = 0; i < 1000; i++)
             {
                 const auto& [timestamp_pair, gyr, acc] = imu_data[i];
@@ -404,7 +409,9 @@ void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryPa
             std::nth_element(gyr_x.begin(), gyr_x.begin() + 500, gyr_x.end());
             std::nth_element(gyr_y.begin(), gyr_y.begin() + 500, gyr_y.end());
             std::nth_element(gyr_z.begin(), gyr_z.begin() + 500, gyr_z.end());
-            bias_gyr_x = gyr_x[500]; bias_gyr_y = gyr_y[500]; bias_gyr_z = gyr_z[500];
+            bias_gyr_x = gyr_x[500];
+            bias_gyr_y = gyr_y[500];
+            bias_gyr_z = gyr_z[500];
             params.estimated_gyro_bias_dps = Eigen::Vector3d(bias_gyr_x, bias_gyr_y, bias_gyr_z);
 
             std::cout << "------------------\nGYRO BIAS\n"
@@ -453,8 +460,8 @@ void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryPa
                 if (counter % 100 == 0)
                 {
                     const FusionEuler euler = FusionQuaternionToEuler(quat);
-                    std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw
-                              << " [" << counter << " of " << imu_data.size() << "]" << std::endl;
+                    std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw << " ["
+                              << counter << " of " << imu_data.size() << "]" << std::endl;
                 }
             }
         }

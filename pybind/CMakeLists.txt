@@ -91,6 +91,7 @@ target_include_directories(lidar_odometry_py
             ${EIGEN3_INCLUDE_DIR}
             ${LASZIP_INCLUDE_DIR}/LASzip/include
             ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+            ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
             ${THIRDPARTY_DIRECTORY}/json/include
             ${THIRDPARTY_DIRECTORY}/tomlplusplus/include
             ${THIRDPARTY_DIRECTORY}
@@ -129,6 +130,7 @@ target_link_libraries(lidar_odometry_py
             UTL::include
             ${PLATFORM_LASZIP_LIB}
             vqf
+            Fusion
             ${PLATFORM_MISCELLANEOUS_LIBS}
 )
 

@@ -30,16 +30,16 @@ struct IntegrationParams
 
 namespace imu_utils
 {
-Eigen::Vector3d convert_accel_to_ms2(const Eigen::Vector3d& raw, bool units_in_g, double g = 9.81);
-Eigen::Vector3d convert_gyro_to_rads(const Eigen::Vector3d& raw, bool units_in_deg);
-double safe_dt(double t_prev, double t_curr, double max_dt);
-bool has_nan(const Eigen::Vector3d& v);
-bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold);
-std::vector<Eigen::Matrix3d> estimate_orientations(
-    const std::vector<RawIMUData>& raw_imu_data,
-    const Eigen::Matrix3d& initial_orientation,
-    const IntegrationParams& params,
-    const VQFParams& vqf_params = VQFParams());
+    Eigen::Vector3d convert_accel_to_ms2(const Eigen::Vector3d& raw, bool units_in_g, double g = 9.81);
+    Eigen::Vector3d convert_gyro_to_rads(const Eigen::Vector3d& raw, bool units_in_deg);
+    double safe_dt(double t_prev, double t_curr, double max_dt);
+    bool has_nan(const Eigen::Vector3d& v);
+    bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold);
+    std::vector<Eigen::Matrix3d> estimate_orientations(
+        const std::vector<RawIMUData>& raw_imu_data,
+        const Eigen::Matrix3d& initial_orientation,
+        const IntegrationParams& params,
+        const VQFParams& vqf_params = VQFParams());
 } // namespace imu_utils
 
 class AccelerationModel
@@ -128,15 +128,24 @@ inline const char* to_string(PreintegrationMethod method)
 {
     switch (method)
     {
-    case PreintegrationMethod::euler_no_gravity_sm_vel: return "Euler, no gravity comp., SM velocity";
-    case PreintegrationMethod::trapezoidal_no_gravity_sm_vel: return "Trapezoidal, no gravity comp., SM velocity";
-    case PreintegrationMethod::euler_gravity_sm_vel: return "Euler, gravity comp., SM velocity";
-    case PreintegrationMethod::trapezoidal_gravity_sm_vel: return "Trapezoidal, gravity comp., SM velocity";
-    case PreintegrationMethod::kalman_gravity_sm_vel: return "Kalman, gravity comp., SM velocity";
-    case PreintegrationMethod::euler_gravity_ahrs_vel: return "Euler, gravity comp., AHRS velocity";
-    case PreintegrationMethod::trapezoidal_gravity_ahrs_vel: return "Trapezoidal, gravity comp., AHRS velocity";
-    case PreintegrationMethod::kalman_gravity_ahrs_vel: return "Kalman, gravity comp., AHRS velocity";
-    default: return "unknown";
+    case PreintegrationMethod::euler_no_gravity_sm_vel:
+        return "Euler, no gravity comp., SM velocity";
+    case PreintegrationMethod::trapezoidal_no_gravity_sm_vel:
+        return "Trapezoidal, no gravity comp., SM velocity";
+    case PreintegrationMethod::euler_gravity_sm_vel:
+        return "Euler, gravity comp., SM velocity";
+    case PreintegrationMethod::trapezoidal_gravity_sm_vel:
+        return "Trapezoidal, gravity comp., SM velocity";
+    case PreintegrationMethod::kalman_gravity_sm_vel:
+        return "Kalman, gravity comp., SM velocity";
+    case PreintegrationMethod::euler_gravity_ahrs_vel:
+        return "Euler, gravity comp., AHRS velocity";
+    case PreintegrationMethod::trapezoidal_gravity_ahrs_vel:
+        return "Trapezoidal, gravity comp., AHRS velocity";
+    case PreintegrationMethod::kalman_gravity_ahrs_vel:
+        return "Kalman, gravity comp., AHRS velocity";
+    default:
+        return "unknown";
     }
 }
 

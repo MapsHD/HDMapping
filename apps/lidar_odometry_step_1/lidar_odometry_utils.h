@@ -14,7 +14,6 @@
 #include <common/include/cauchy.h>
 #include <laszip/laszip_api.h>
 #include <nlohmann/json.hpp>
-#include <Fusion.h>
 #include <vqf.hpp>
 
 #include <Core/ndt.h>

@@ -4,6 +4,7 @@
 #include <mutex>
 
 #include <Core/system_info.hpp>
+#include <Fusion.h>
 
 namespace fs = std::filesystem;
 

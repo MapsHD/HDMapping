@@ -39,13 +39,14 @@ target_include_directories(
   ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
   ${LASZIP_INCLUDE_DIR}/LASzip/include
   ${THIRDPARTY_DIRECTORY}/observation_equations/codes
-  ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
+  ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+  ${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
 
 target_compile_definitions(mandeye_raw_data_viewer PRIVATE UTL_PROFILER_DISABLE)
 
 target_link_libraries(
   mandeye_raw_data_viewer
-  PRIVATE vqf
+  PRIVATE vqf Fusion
   unordered_dense::unordered_dense
   spdlog::spdlog
   UTL::include

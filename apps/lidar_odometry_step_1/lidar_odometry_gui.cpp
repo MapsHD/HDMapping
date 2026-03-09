@@ -146,6 +146,7 @@ bool show_initial_points = true;
 bool show_trajectory = true;
 bool show_trajectory_as_axes = false;
 bool show_prediction_vectors = false;
+bool intermediate_trajectory_prediction_axes = false;
 bool show_covs_indoor = false;
 bool show_covs_outdoor = false;
 int dec_covs = 10;
@@ -1763,6 +1764,11 @@ void progress_window()
 
     ImGui::Checkbox("Show reference buckets indoor", &show_reference_buckets_indoor);
     ImGui::Checkbox("Show reference buckets outdoor", &show_reference_buckets_outdoor);
+    ImGui::Checkbox("Show initial points", &show_initial_points);
+    ImGui::Checkbox("Show trajectory", &show_trajectory);
+    ImGui::Checkbox("Show trajectory as axes", &show_trajectory_as_axes);
+    ImGui::Checkbox("Show prediction vectors", &show_prediction_vectors);
+    ImGui::Checkbox("Show intermediate trajectory prediction axes", &intermediate_trajectory_prediction_axes);
 
     // ImGui::Checkbox("Show covs indoor", &show_covs_indoor);
     // ImGui::Checkbox("Show covs outdoor", &show_covs_outdoor);
@@ -1997,6 +2003,36 @@ void display()
         glEnd();
         glLineWidth(1.0f);
         glEnable(GL_DEPTH_TEST);
+    }
+
+    if(intermediate_trajectory_prediction_axes){
+        glLineWidth(1.0f);
+        glBegin(GL_LINES);
+        for (const auto& wd : worker_data)
+        {
+            if (wd.intermediate_trajectory.empty() || wd.intermediate_trajectory_prediction.empty())
+                continue;
+
+            for (size_t i = 0; i < std::min(wd.intermediate_trajectory.size(), wd.intermediate_trajectory_prediction.size()); i++)
+            {
+                const auto& it = wd.intermediate_trajectory[i];
+                const auto& pred_axis = wd.intermediate_trajectory_prediction[i];
+
+                glColor3f(1,0,0);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + pred_axis(0, 0) * 0.05, it(1, 3) + pred_axis(1, 0) * 0.05, it(2, 3) + pred_axis(2, 0) * 0.05);
+
+                glColor3f(0, 1, 0);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + pred_axis(0, 1) * 0.05, it(1, 3) + pred_axis(1, 1) * 0.05, it(2, 3) + pred_axis(2, 1) * 0.05);
+
+                glColor3f(0, 0, 1);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + pred_axis(0, 2) * 0.05, it(1, 3) + pred_axis(1, 2) * 0.05, it(2, 3) + pred_axis(2, 2) * 0.05);
+            }
+        }
+        glEnd();
+        glLineWidth(1.0f);
     }
 
     if (show_trajectory)
@@ -2343,6 +2379,8 @@ void display()
                 ImGui::MenuItem("Show trajectory", nullptr, &show_trajectory);
                 ImGui::MenuItem("Show trajectory as axes", nullptr, &show_trajectory_as_axes);
                 ImGui::MenuItem("Show prediction vectors", nullptr, &show_prediction_vectors);
+                ImGui::MenuItem("Show intermediate trajectory prediction axes", nullptr, &intermediate_trajectory_prediction_axes);
+
                 ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
                 ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);

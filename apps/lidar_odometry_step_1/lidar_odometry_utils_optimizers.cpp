@@ -2383,6 +2383,8 @@ bool process_worker_step_1(
         Eigen::Affine3d current_node = prev_worker_data.intermediate_trajectory[prev_worker_data.intermediate_trajectory.size() - 1];
         new_trajectory.push_back(current_node);
 
+        worker_data.intermediate_trajectory_prediction.push_back(current_node);
+
         for (int tr = 1; tr < worker_data.intermediate_trajectory.size(); tr++)
         {
             auto update = worker_data.intermediate_trajectory[tr - 1].inverse() * worker_data.intermediate_trajectory[tr];
@@ -2390,6 +2392,8 @@ bool process_worker_step_1(
             // current_node.linear() = //worker_data[i].intermediate_trajectory[tr].linear();
             // current_node.translation() += mean_shift;
             new_trajectory.push_back(current_node);
+
+            worker_data.intermediate_trajectory_prediction.push_back(current_node);
         }
 
         // preintegration imu

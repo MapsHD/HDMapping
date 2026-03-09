@@ -2434,16 +2434,16 @@ bool process_worker_step_1(
 
             if (total_imu_time > 0.0)
             {
-                bool uses_ahrs_velocity = (method == PreintegrationMethod::euler_gravity_ahrs_vel ||
-                                           method == PreintegrationMethod::trapezoidal_gravity_ahrs_vel ||
-                                           method == PreintegrationMethod::kalman_gravity_ahrs_vel);
+                bool uses_ahrs_velocity =
+                    (method == PreintegrationMethod::euler_gravity_ahrs_vel ||
+                     method == PreintegrationMethod::trapezoidal_gravity_ahrs_vel ||
+                     method == PreintegrationMethod::kalman_gravity_ahrs_vel);
 
                 if (uses_ahrs_velocity)
                 {
                     // Methods 5-7: SM-independent velocity
                     // Direction from VQF AHRS, speed from motion model displacement
-                    Eigen::Vector3d prev_mm_displacement =
-                        prev_worker_data.intermediate_trajectory_motion_model.back().translation() -
+                    Eigen::Vector3d prev_mm_displacement = prev_worker_data.intermediate_trajectory_motion_model.back().translation() -
                         prev_worker_data.intermediate_trajectory_motion_model.front().translation();
                     double speed = prev_mm_displacement.norm() / total_imu_time;
 
@@ -2457,8 +2457,7 @@ bool process_worker_step_1(
                 else
                 {
                     // Methods 0-4: velocity from previous SM trajectory
-                    Eigen::Vector3d prev_displacement =
-                        prev_worker_data.intermediate_trajectory.back().translation() -
+                    Eigen::Vector3d prev_displacement = prev_worker_data.intermediate_trajectory.back().translation() -
                         prev_prev_worker_data.intermediate_trajectory.back().translation();
                     imu_params.initial_velocity = prev_displacement / total_imu_time;
                 }
@@ -2472,7 +2471,7 @@ bool process_worker_step_1(
             // No preintegration: simple velocity from previous two workers
             mean_shift = (prev_worker_data.intermediate_trajectory.back().translation() -
                           prev_prev_worker_data.intermediate_trajectory.back().translation()) /
-                         static_cast<double>(prev_worker_data.intermediate_trajectory.size());
+                static_cast<double>(prev_worker_data.intermediate_trajectory.size());
         }
 
         if (mean_shift.norm() > 1.0)

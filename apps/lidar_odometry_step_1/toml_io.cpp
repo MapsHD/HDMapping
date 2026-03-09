@@ -87,7 +87,7 @@ bool TomlIO::SaveParametersToTomlFile(const std::string& filepath, const LidarOd
     out << "build_date = \"" << params.build_date << "\"" << std::endl;
     out << std::endl;
 
-    out << "[ablacion study]" << std::endl;
+    out << "[ablation_study]" << std::endl;
     out << "ablation_study_use_norm = " << (params.ablation_study_use_norm ? "true" : "false") << std::endl;
     out << "ablation_study_use_hierarchical_rgd = " << (params.ablation_study_use_hierarchical_rgd ? "true" : "false") << std::endl;
     out << "ablation_study_use_view_point_and_normal_vectors = "

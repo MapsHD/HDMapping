@@ -2416,6 +2416,14 @@ bool process_worker_step_1(
         if (params.use_imu_preintegration)
         {
             IntegrationParams imu_params;
+            imu_params.use_vqf = params.use_vqf;
+            imu_params.fusion_gain = params.fusion_gain;
+            if (params.fusionConventionEnu)
+                imu_params.fusion_convention = AhrsConvention::ENU;
+            else if (params.fusionConventionNed)
+                imu_params.fusion_convention = AhrsConvention::NED;
+            else
+                imu_params.fusion_convention = AhrsConvention::NWU;
             auto method = static_cast<PreintegrationMethod>(params.imu_preintegration_method);
 
             // Compute IMU time span for velocity estimation
@@ -2425,11 +2433,11 @@ bool process_worker_step_1(
 
             if (total_imu_time > 0.0)
             {
-                bool uses_vqf_velocity = (method == PreintegrationMethod::euler_gravity_vqf_vel ||
-                                          method == PreintegrationMethod::trapezoidal_gravity_vqf_vel ||
-                                          method == PreintegrationMethod::kalman_gravity_vqf_vel);
+                bool uses_ahrs_velocity = (method == PreintegrationMethod::euler_gravity_ahrs_vel ||
+                                           method == PreintegrationMethod::trapezoidal_gravity_ahrs_vel ||
+                                           method == PreintegrationMethod::kalman_gravity_ahrs_vel);
 
-                if (uses_vqf_velocity)
+                if (uses_ahrs_velocity)
                 {
                     // Methods 5-7: SM-independent velocity
                     // Direction from VQF AHRS, speed from motion model displacement

@@ -977,9 +977,9 @@ void settings_gui()
                     "Euler, gravity comp., SM velocity",
                     "Trapezoidal, gravity comp., SM velocity",
                     "Kalman, gravity comp., SM velocity",
-                    "Euler, gravity comp., VQF velocity",
-                    "Trapezoidal, gravity comp., VQF velocity",
-                    "Kalman, gravity comp., VQF velocity" };
+                    "Euler, gravity comp., AHRS velocity",
+                    "Trapezoidal, gravity comp., AHRS velocity",
+                    "Kalman, gravity comp., AHRS velocity" };
                 ImGui::Combo("IMU preintegration method", &params.imu_preintegration_method, methods, IM_ARRAYSIZE(methods));
             }
             if (params.use_vqf)

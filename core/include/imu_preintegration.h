@@ -6,6 +6,13 @@
 #include <vector>
 #include <vqf.hpp>
 
+enum class AhrsConvention
+{
+    NWU = 0,
+    ENU = 1,
+    NED = 2
+};
+
 struct IntegrationParams
 {
     bool accel_units_in_g = true;
@@ -14,6 +21,10 @@ struct IntegrationParams
     double max_dt_threshold = 0.1; // seconds
     Eigen::Vector3d initial_velocity = Eigen::Vector3d::Zero();
     double vqf_tauAcc = 0.5; // VQF accelerometer time constant [s]
+    // AHRS selection for per-worker orientation estimation (methods 5-7)
+    bool use_vqf = true; // true = VQF, false = Fusion (Madgwick)
+    double fusion_gain = 0.5; // Fusion complementary filter gain (0-1)
+    AhrsConvention fusion_convention = AhrsConvention::NWU;
 };
 
 namespace imu_utils
@@ -107,9 +118,9 @@ enum class PreintegrationMethod
     euler_gravity_sm_vel = 2,
     trapezoidal_gravity_sm_vel = 3,
     kalman_gravity_sm_vel = 4,
-    euler_gravity_vqf_vel = 5,
-    trapezoidal_gravity_vqf_vel = 6,
-    kalman_gravity_vqf_vel = 7,
+    euler_gravity_ahrs_vel = 5,
+    trapezoidal_gravity_ahrs_vel = 6,
+    kalman_gravity_ahrs_vel = 7,
 };
 
 inline const char* to_string(PreintegrationMethod method)
@@ -121,9 +132,9 @@ inline const char* to_string(PreintegrationMethod method)
     case PreintegrationMethod::euler_gravity_sm_vel: return "Euler, gravity comp., SM velocity";
     case PreintegrationMethod::trapezoidal_gravity_sm_vel: return "Trapezoidal, gravity comp., SM velocity";
     case PreintegrationMethod::kalman_gravity_sm_vel: return "Kalman, gravity comp., SM velocity";
-    case PreintegrationMethod::euler_gravity_vqf_vel: return "Euler, gravity comp., VQF velocity";
-    case PreintegrationMethod::trapezoidal_gravity_vqf_vel: return "Trapezoidal, gravity comp., VQF velocity";
-    case PreintegrationMethod::kalman_gravity_vqf_vel: return "Kalman, gravity comp., VQF velocity";
+    case PreintegrationMethod::euler_gravity_ahrs_vel: return "Euler, gravity comp., AHRS velocity";
+    case PreintegrationMethod::trapezoidal_gravity_ahrs_vel: return "Trapezoidal, gravity comp., AHRS velocity";
+    case PreintegrationMethod::kalman_gravity_ahrs_vel: return "Kalman, gravity comp., AHRS velocity";
     default: return "unknown";
     }
 }

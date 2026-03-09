@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iostream>
 
+#include <Fusion.h>
 #include <vqf.hpp>
 
 namespace imu_utils
@@ -49,9 +50,10 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
 {
     std::vector<Eigen::Matrix3d> orientations;
     orientations.reserve(raw_imu_data.size());
+    orientations.push_back(initial_orientation);
 
-    // Compute average dt for VQF initialization
-    double avg_dt = 1.0 / 200.0; // default 200 Hz
+    // Compute average dt
+    double avg_dt = 1.0 / 200.0;
     if (raw_imu_data.size() >= 2)
     {
         double total_time = raw_imu_data.back().timestamp - raw_imu_data.front().timestamp;
@@ -59,9 +61,22 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
             avg_dt = total_time / static_cast<double>(raw_imu_data.size() - 1);
     }
 
+    // Initialize selected AHRS
     VQF vqf(vqf_params, avg_dt);
+    FusionAhrs fusion_ahrs;
+    if (!params.use_vqf)
+    {
+        FusionAhrsInitialise(&fusion_ahrs);
+        switch (params.fusion_convention)
+        {
+        case AhrsConvention::NWU: fusion_ahrs.settings.convention = FusionConventionNwu; break;
+        case AhrsConvention::ENU: fusion_ahrs.settings.convention = FusionConventionEnu; break;
+        case AhrsConvention::NED: fusion_ahrs.settings.convention = FusionConventionNed; break;
+        }
+        fusion_ahrs.settings.gain = static_cast<float>(params.fusion_gain);
+    }
 
-    orientations.push_back(initial_orientation);
+    constexpr double RAD_TO_DEG = 180.0 / M_PI;
 
     for (size_t k = 1; k < raw_imu_data.size(); k++)
     {
@@ -72,24 +87,44 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
             continue;
         }
 
-        // VQF expects: gyro in rad/s, acc in m/s²
-        // RawIMUData: gyro in rad/s, accel in g
-        const double g = 9.81;
-        vqf_real_t gyr[3] = {
-            raw_imu_data[k].guroscopes.x(),
-            raw_imu_data[k].guroscopes.y(),
-            raw_imu_data[k].guroscopes.z() };
-        vqf_real_t acc[3] = {
-            raw_imu_data[k].accelerometers.x() * g,
-            raw_imu_data[k].accelerometers.y() * g,
-            raw_imu_data[k].accelerometers.z() * g };
+        if (params.use_vqf)
+        {
+            // VQF expects: gyro in rad/s, acc in m/s²
+            const double g = 9.81;
+            vqf_real_t gyr[3] = {
+                raw_imu_data[k].guroscopes.x(),
+                raw_imu_data[k].guroscopes.y(),
+                raw_imu_data[k].guroscopes.z() };
+            vqf_real_t acc[3] = {
+                raw_imu_data[k].accelerometers.x() * g,
+                raw_imu_data[k].accelerometers.y() * g,
+                raw_imu_data[k].accelerometers.z() * g };
 
-        vqf.update(gyr, acc);
+            vqf.update(gyr, acc);
 
-        vqf_real_t quat[4]; // [w, x, y, z]
-        vqf.getQuat6D(quat);
-        Eigen::Quaterniond q(quat[0], quat[1], quat[2], quat[3]);
-        orientations.push_back(q.toRotationMatrix());
+            vqf_real_t quat[4];
+            vqf.getQuat6D(quat);
+            Eigen::Quaterniond q(quat[0], quat[1], quat[2], quat[3]);
+            orientations.push_back(q.toRotationMatrix());
+        }
+        else
+        {
+            // Fusion expects: gyro in deg/s, acc in g
+            const FusionVector gyroscope = {
+                static_cast<float>(raw_imu_data[k].guroscopes.x() * RAD_TO_DEG),
+                static_cast<float>(raw_imu_data[k].guroscopes.y() * RAD_TO_DEG),
+                static_cast<float>(raw_imu_data[k].guroscopes.z() * RAD_TO_DEG) };
+            const FusionVector accelerometer = {
+                static_cast<float>(raw_imu_data[k].accelerometers.x()),
+                static_cast<float>(raw_imu_data[k].accelerometers.y()),
+                static_cast<float>(raw_imu_data[k].accelerometers.z()) };
+
+            FusionAhrsUpdateNoMagnetometer(&fusion_ahrs, gyroscope, accelerometer, static_cast<float>(dt));
+
+            FusionQuaternion quat = FusionAhrsGetQuaternion(&fusion_ahrs);
+            Eigen::Quaterniond q(quat.element.w, quat.element.x, quat.element.y, quat.element.z);
+            orientations.push_back(q.toRotationMatrix());
+        }
     }
     return orientations;
 }
@@ -300,11 +335,11 @@ Eigen::Vector3d ImuPreintegration::create_and_preintegrate(
         accel_model = std::make_unique<GravityCompensatedAcceleration>();
         integration_method = std::make_unique<KalmanFilterIntegration>();
         break;
-    case PreintegrationMethod::euler_gravity_vqf_vel:
-    case PreintegrationMethod::trapezoidal_gravity_vqf_vel:
-    case PreintegrationMethod::kalman_gravity_vqf_vel:
+    case PreintegrationMethod::euler_gravity_ahrs_vel:
+    case PreintegrationMethod::trapezoidal_gravity_ahrs_vel:
+    case PreintegrationMethod::kalman_gravity_ahrs_vel:
     {
-        // Per-worker VQF: estimate local orientations from IMU data
+        // Per-worker AHRS: estimate local orientations from IMU data (VQF or Fusion based on params.use_vqf)
         auto orientations = imu_utils::estimate_orientations(
             raw_imu_data, new_trajectory[0].rotation(), params, vqf_params);
 
@@ -313,9 +348,9 @@ Eigen::Vector3d ImuPreintegration::create_and_preintegrate(
             imu_trajectory[k].linear() = orientations[k];
 
         accel_model = std::make_unique<GravityCompensatedAcceleration>();
-        if (method == PreintegrationMethod::euler_gravity_vqf_vel)
+        if (method == PreintegrationMethod::euler_gravity_ahrs_vel)
             integration_method = std::make_unique<EulerIntegration>();
-        else if (method == PreintegrationMethod::trapezoidal_gravity_vqf_vel)
+        else if (method == PreintegrationMethod::trapezoidal_gravity_ahrs_vel)
             integration_method = std::make_unique<TrapezoidalIntegration>();
         else
             integration_method = std::make_unique<KalmanFilterIntegration>();

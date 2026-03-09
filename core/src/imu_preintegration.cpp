@@ -61,6 +61,10 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
             avg_dt = total_time / static_cast<double>(raw_imu_data.size() - 1);
     }
 
+    // Seed quaternion from initial_orientation
+    Eigen::Quaterniond init_q(initial_orientation);
+    init_q.normalize();
+
     // Initialize selected AHRS
     VQF vqf(vqf_params, avg_dt);
     FusionAhrs fusion_ahrs;
@@ -74,6 +78,13 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
         case AhrsConvention::NED: fusion_ahrs.settings.convention = FusionConventionNed; break;
         }
         fusion_ahrs.settings.gain = static_cast<float>(params.fusion_gain);
+        // Seed Fusion with initial orientation (Fusion has no internal bias estimation)
+        fusion_ahrs.quaternion = (FusionQuaternion){
+            .element = { .w = static_cast<float>(init_q.w()),
+                         .x = static_cast<float>(init_q.x()),
+                         .y = static_cast<float>(init_q.y()),
+                         .z = static_cast<float>(init_q.z()) } };
+        fusion_ahrs.initialising = false;
     }
 
     constexpr double RAD_TO_DEG = 180.0 / M_PI;
@@ -110,10 +121,11 @@ std::vector<Eigen::Matrix3d> estimate_orientations(
         else
         {
             // Fusion expects: gyro in deg/s, acc in g
+            // Subtract gyro bias (Fusion has no internal bias estimation, unlike VQF)
             const FusionVector gyroscope = {
-                static_cast<float>(raw_imu_data[k].guroscopes.x() * RAD_TO_DEG),
-                static_cast<float>(raw_imu_data[k].guroscopes.y() * RAD_TO_DEG),
-                static_cast<float>(raw_imu_data[k].guroscopes.z() * RAD_TO_DEG) };
+                static_cast<float>(raw_imu_data[k].guroscopes.x() * RAD_TO_DEG - params.gyro_bias_dps.x()),
+                static_cast<float>(raw_imu_data[k].guroscopes.y() * RAD_TO_DEG - params.gyro_bias_dps.y()),
+                static_cast<float>(raw_imu_data[k].guroscopes.z() * RAD_TO_DEG - params.gyro_bias_dps.z()) };
             const FusionVector accelerometer = {
                 static_cast<float>(raw_imu_data[k].accelerometers.x()),
                 static_cast<float>(raw_imu_data[k].accelerometers.y()),

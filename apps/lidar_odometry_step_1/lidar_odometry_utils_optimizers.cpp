@@ -2424,6 +2424,7 @@ bool process_worker_step_1(
                 imu_params.fusion_convention = AhrsConvention::NED;
             else
                 imu_params.fusion_convention = AhrsConvention::NWU;
+            imu_params.gyro_bias_dps = params.estimated_gyro_bias_dps;
             auto method = static_cast<PreintegrationMethod>(params.imu_preintegration_method);
 
             // Compute IMU time span for velocity estimation

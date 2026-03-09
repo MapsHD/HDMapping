@@ -314,7 +314,7 @@ bool load_data(
     }
 }
 
-void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, const LidarOdometryParams& params, bool debugMsg)
+void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryParams& params, bool debugMsg)
 {
     UTL_PROFILER_SCOPE("calculate_trajectory");
 
@@ -405,6 +405,7 @@ void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, const LidarOdom
             std::nth_element(gyr_y.begin(), gyr_y.begin() + 500, gyr_y.end());
             std::nth_element(gyr_z.begin(), gyr_z.begin() + 500, gyr_z.end());
             bias_gyr_x = gyr_x[500]; bias_gyr_y = gyr_y[500]; bias_gyr_z = gyr_z[500];
+            params.estimated_gyro_bias_dps = Eigen::Vector3d(bias_gyr_x, bias_gyr_y, bias_gyr_z);
 
             std::cout << "------------------\nGYRO BIAS\n"
                       << "bias_gyr_x [deg/s]: " << bias_gyr_x << "\n"

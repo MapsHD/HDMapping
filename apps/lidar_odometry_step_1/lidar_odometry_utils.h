@@ -191,6 +191,7 @@ struct LidarOdometryParams
 #endif
 
     bool use_removie_imu_bias_from_first_stationary_scan = false;
+    Eigen::Vector3d estimated_gyro_bias_dps = Eigen::Vector3d::Zero(); // runtime: gyro bias in deg/s from stationary samples
 
     // IMU preintegration
     bool use_imu_preintegration = false;

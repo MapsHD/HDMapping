@@ -25,6 +25,7 @@ struct IntegrationParams
     bool use_vqf = true; // true = VQF, false = Fusion (Madgwick)
     double fusion_gain = 0.5; // Fusion complementary filter gain (0-1)
     AhrsConvention fusion_convention = AhrsConvention::NWU;
+    Eigen::Vector3d gyro_bias_dps = Eigen::Vector3d::Zero(); // gyro bias in deg/s (for Fusion only)
 };
 
 namespace imu_utils

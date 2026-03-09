@@ -14,6 +14,7 @@
 #include <common/include/cauchy.h>
 #include <laszip/laszip_api.h>
 #include <nlohmann/json.hpp>
+#include <Fusion.h>
 #include <vqf.hpp>
 
 #include <Core/ndt.h>
@@ -65,10 +66,14 @@ struct LidarOdometryParams
     double threshould_output_filter = 0.5; // for export --> all points xyz.norm() < threshould_output_filter will be removed
     int min_counter_concatenated_trajectory_nodes = 10; // for export
 
-    // AHRS (VQF) — fusionConvention params kept for TOML backwards compatibility
+    // AHRS type selection: false = Fusion (Madgwick, default), true = VQF
+    bool use_vqf = false;
+
+    // Fusion (Madgwick) AHRS parameters
     bool fusionConventionNwu = true;
     bool fusionConventionEnu = false;
     bool fusionConventionNed = false;
+    double fusion_gain = 0.5; // complementary filter gain (0-1, higher = more accelerometer trust)
 
     // VQF core
     double vqf_tauAcc = 0.5; // accelerometer time constant [s] (higher = more gyro trust)

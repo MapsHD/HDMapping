@@ -4,6 +4,7 @@
 #include <Eigen/Eigen>
 #include <memory>
 #include <vector>
+#include <vqf.hpp>
 
 struct IntegrationParams
 {
@@ -22,6 +23,11 @@ Eigen::Vector3d convert_gyro_to_rads(const Eigen::Vector3d& raw, bool units_in_d
 double safe_dt(double t_prev, double t_curr, double max_dt);
 bool has_nan(const Eigen::Vector3d& v);
 bool is_accel_valid(const Eigen::Vector3d& accel_ms2, double threshold);
+std::vector<Eigen::Matrix3d> estimate_orientations(
+    const std::vector<RawIMUData>& raw_imu_data,
+    const Eigen::Matrix3d& initial_orientation,
+    const IntegrationParams& params,
+    const VQFParams& vqf_params = VQFParams());
 } // namespace imu_utils
 
 class AccelerationModel
@@ -137,5 +143,6 @@ public:
         PreintegrationMethod method,
         const std::vector<RawIMUData>& raw_imu_data,
         const std::vector<Eigen::Affine3d>& new_trajectory,
-        const IntegrationParams& params = IntegrationParams());
+        const IntegrationParams& params = IntegrationParams(),
+        const VQFParams& vqf_params = VQFParams());
 };

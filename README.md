@@ -157,9 +157,13 @@ It is designed for a benchmark.
 [[quantitative evaluation benchmark movie]](https://youtu.be/PsJaXpWFAis)
 [[quantitative benchmark]](https://github.com/MapsHD/benchmark-HDMapping-evaluation-of-odometry-and-SLAM)
 
+under testing
+
+- https://github.com/MapsHD/benchmark-FORM-to-HDMapping (ICRA, 2026)
+
 Benchmark Orchestration
 
-- https://github.com/MapsHD/benchmark-HDMapping-Orchestration
+- https://github.com/MapsHD/benchmark-HDMapping-Orchestration 
 
 Datasets
 
@@ -171,7 +175,6 @@ ToDo
 
 - https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MAD-ICP.bib))
 - https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib))
-- https://github.com/rpl-cmu/form (ICRA, 2026)
 - https://robotics-upo.github.io/D-LIO/
 - https://github.com/MapsHD/benchmark-KISS-SLAM-to-HDMapping (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/kiss-slam.bib)) (not solved issue https://github.com/kpmrozowski/KISS-SLAM-to-HDMapping/issues/1)
 - https://github.com/MapsHD/rko_lio (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RKO-LIO.bib)) (not solved issue: https://github.com/marcinmatecki/rko-lio-to-HDMapping/issues/1)

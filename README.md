@@ -174,7 +174,8 @@ Datasets
 - https://github.com/Jakubach/kitti_to_hdmapping
 
 ToDo
-
+- https://github.com/KTH-RPL/dufomap
+- https://github.com/KTH-RPL/DynamicMap_Benchmark
 - https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MAD-ICP.bib))
 - https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib))
 - https://robotics-upo.github.io/D-LIO/

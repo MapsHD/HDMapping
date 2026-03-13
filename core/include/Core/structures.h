@@ -429,5 +429,5 @@ struct WorkerData
     Eigen::Vector3d imu_prediction_vector = Eigen::Vector3d::Zero();
     bool show = false;
     std::vector<Eigen::Affine3d> intermediate_trajectory_prediction;
-    //Eigen::Vector3d mean_shift = Eigen::Vector3d::Zero();
+    // Eigen::Vector3d mean_shift = Eigen::Vector3d::Zero();
 };

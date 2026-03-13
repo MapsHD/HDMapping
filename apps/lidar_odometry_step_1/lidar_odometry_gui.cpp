@@ -2005,7 +2005,8 @@ void display()
         glEnable(GL_DEPTH_TEST);
     }
 
-    if(intermediate_trajectory_prediction_axes){
+    if (intermediate_trajectory_prediction_axes)
+    {
         glLineWidth(1.0f);
         glBegin(GL_LINES);
         for (const auto& wd : worker_data)
@@ -2018,7 +2019,7 @@ void display()
                 const auto& it = wd.intermediate_trajectory[i];
                 const auto& pred_axis = wd.intermediate_trajectory_prediction[i];
 
-                glColor3f(1,0,0);
+                glColor3f(1, 0, 0);
                 glVertex3f(it(0, 3), it(1, 3), it(2, 3));
                 glVertex3f(it(0, 3) + pred_axis(0, 0) * 0.05, it(1, 3) + pred_axis(1, 0) * 0.05, it(2, 3) + pred_axis(2, 0) * 0.05);
 

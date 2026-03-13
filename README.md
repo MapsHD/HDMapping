@@ -132,7 +132,7 @@ It is designed for a benchmark.
 
 - https://github.com/MapsHD/benchmark-HDMapping-ground-truth (2026, 'under review', [[movie]](https://youtu.be/8sHyUNC3mZs))
 - https://github.com/MapsHD/benchmark-HDMapping_LIO-to-HDMapping (2026, 'under review', [[movie]](https://youtu.be/9AUvPTLUcos))
-- https://github.com/MapsHD/benchmark-FORM-to-HDMapping (2026, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib),[[movie]](https://youtu.be/2c2ySFIncyA))
+- https://github.com/MapsHD/benchmark-FORM-to-HDMapping (2026, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib), [[movie]](https://youtu.be/2c2ySFIncyA))
 - https://github.com/MapsHD/benchmark-Super-LIO-to-HDMapping (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/form.bib), [[movie]](https://youtu.be/CQmLOdV_mQA))
 - https://github.com/MapsHD/benchmark-lidar_odometry_ros_wrapper-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/lidar_odometry_ros_wrapper.bib), [[movie]](https://youtu.be/w233P_MZMWk))
 - https://github.com/MapsHD/benchmark-SuperOdometry-to-HDMapping (2021, IROS, 2025, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SuperOdometry.bib), [[movie]](https://youtu.be/2bRunzG43sw))
@@ -172,6 +172,12 @@ Datasets
 - https://charleshamesse.github.io/bunker-dvi-dataset/
 - https://github.com/Jakubach/kitti_to_ros
 - https://github.com/Jakubach/kitti_to_hdmapping
+- M2DGR https://github.com/SJTU-ViSYS/M2DGR
+- NCLT https://robots.engin.umich.edu/nclt/
+- Hilti SLAM Challenge https://hilti-challenge.com/dataset-2023
+- Complex Urban https://sites.google.com/view/complex-urban-dataset
+- NTU VIRAL https://ntu-aris.github.io/ntu_viral_dataset/
+
 
 ToDo
 - https://github.com/KTH-RPL/dufomap

@@ -211,7 +211,6 @@ ToDo
 - https://github.com/gisbi-kim/SC-LeGO-LOAM
 - https://github.com/ChaoqinRobotics/LINS---LiDAR-inertial-SLAM
 - https://github.com/PRBonn/PIN_SLAM
-- https://arxiv.org/pdf/2510.09966. - FORM
 - https://arxiv.org/pdf/2503.12660 - KISS-SLAM
 - https://arxiv.org/pdf/2509.06593 - rko-lio
 - https://arxiv.org/pdf/2410.05433 - 2FAST-LAMA

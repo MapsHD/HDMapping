@@ -223,6 +223,7 @@ ToDo
 - https://ieeexplore.ieee.org/abstract/document/11045969
 - https://ieeexplore.ieee.org/document/10954274
 - https://www.sciencedirect.com/science/article/abs/pii/S0921889025001903
+- https://www.mdpi.com/2072-4292/17/15/2661
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
 

@@ -114,7 +114,7 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "Ctrl+S", "Save session" },
                                                          { "", "Ctrl+Shift+S", "Save subsession" },
                                                          { "", "T", "" },
-                                                         { "", "Ctrl+T", "" },
+                                                         { "", "Ctrl+T", "Solid cloud color" },
                                                          { "", "U", "" },
                                                          { "", "Ctrl+U", "" },
                                                          { "", "V", "" },
@@ -2667,6 +2667,37 @@ void display()
 
         // workaround
         io.AddKeyEvent(ImGuiKey_S, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_T)) // solid colors
+    {
+        csPointCloud = CS_SOLID;
+
+        float color[3];
+        if (session_loaded)
+        {
+            color[0] = session.point_clouds_container.point_clouds[0].render_color[0];
+            color[1] = session.point_clouds_container.point_clouds[0].render_color[1];
+            color[2] = session.point_clouds_container.point_clouds[0].render_color[2];
+        }
+
+        for (auto& pc : session.point_clouds_container.point_clouds)
+        {
+            pc.render_color[0] = color[0];
+            pc.render_color[1] = color[1];
+            pc.render_color[2] = color[2];
+
+            if (csTrajectory == CS_FOLLOW)
+            {
+                pc.traj_color[0] = pc.render_color[0];
+                pc.traj_color[1] = pc.render_color[1];
+                pc.traj_color[2] = pc.render_color[2];
+            }
+        }
+
+        // workaround
+        io.AddKeyEvent(ImGuiKey_T, false);
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
 

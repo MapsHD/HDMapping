@@ -808,18 +808,21 @@ void display()
             ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);
 
             ImGui::Separator();
-            ImGui::Text("Colors:");
+            if (ImGui::BeginMenu("Colors"))
+            {
+                ImGui::ColorEdit3("Background", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
+                if (idToSn.size() == 2)
+                {
+                    ImGui::ColorEdit3(idToSn.at(0).c_str(), (float*)&pc_color, ImGuiColorEditFlags_NoInputs);
+                    ImGui::ColorEdit3(idToSn.at(1).c_str(), (float*)&pc_color2, ImGuiColorEditFlags_NoInputs);
+                }
+                else
+                {
+                    ImGui::ColorEdit3("Point cloud 1", (float*)&pc_color, ImGuiColorEditFlags_NoInputs);
+                    ImGui::ColorEdit3("Point cloud 2", (float*)&pc_color2, ImGuiColorEditFlags_NoInputs);
+                }
 
-            ImGui::ColorEdit3("Background", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
-            if (idToSn.size() == 2)
-            {
-                ImGui::ColorEdit3(idToSn.at(0).c_str(), (float*)&pc_color, ImGuiColorEditFlags_NoInputs);
-                ImGui::ColorEdit3(idToSn.at(1).c_str(), (float*)&pc_color2, ImGuiColorEditFlags_NoInputs);
-            }
-            else
-            {
-                ImGui::ColorEdit3("Point cloud 1", (float*)&pc_color, ImGuiColorEditFlags_NoInputs);
-                ImGui::ColorEdit3("Point cloud 2", (float*)&pc_color2, ImGuiColorEditFlags_NoInputs);
+                ImGui::EndMenu();
             }
 
             ImGui::EndMenu();

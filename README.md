@@ -221,6 +221,7 @@ ToDo
 - https://arxiv.org/pdf/1907.02233 - LINS-SLAM
 - https://ieeexplore.ieee.org/abstract/document/11206445
 - https://ieeexplore.ieee.org/abstract/document/11045969
+- https://ieeexplore.ieee.org/document/10954274
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
 

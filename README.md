@@ -8,7 +8,7 @@
 This is open-source software for large-scale 3D mapping using an open-hardware hand-held/wearable/mountable measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
 We provide an end-to-end mobile mapping framework that does not require any installation, including:
 
-- **HDMapping_LI0**: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art.
+- **HDMapping_LI0**: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art [[movie]](https://youtu.be/UB-Hx7qgey8).
 - **HDMapping_Pose_GRAPH_SLAM** to create city-level maps.
 - **HDMapping_Georeferencing** (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
 

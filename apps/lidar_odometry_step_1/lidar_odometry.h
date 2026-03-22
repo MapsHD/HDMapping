@@ -6,15 +6,16 @@
 #include "lidar_odometry_utils.h"
 #include "toml_io.h"
 #include <HDMapping/Version.hpp>
-#include <export_laz.h>
 #include <laszip/laszip_api.h>
 #include <nlohmann/json.hpp>
-#include <session.h>
+
+#include <Core/export_laz.h>
+#include <Core/session.h>
 
 // #define SAMPLE_PERIOD (1.0 / 200.0)
 
-using Trajectory = std::map<double, std::pair<Eigen::Matrix4d, double>>;
-using Imu = std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>>;
+using Trajectory = std::map<double, std::tuple<Eigen::Matrix4d, double, RawIMUData>>;
+using Imu = std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>>;
 
 bool load_data(
     std::vector<std::string>& input_file_names,
@@ -22,15 +23,7 @@ bool load_data(
     std::vector<std::vector<Point3Di>>& pointsPerFile,
     Imu& imu_data,
     bool debugMsg);
-void calculate_trajectory(
-    Trajectory& trajectory,
-    Imu& imu_data,
-    bool fusionConventionNwu,
-    bool fusionConventionEnu,
-    bool fusionConventionNed,
-    double ahrs_gain,
-    bool debugMsg,
-    bool use_removie_imu_bias_from_first_stationary_scan);
+void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryParams& params, bool debugMsg);
 bool compute_step_1(
     const std::vector<std::vector<Point3Di>>& pointsPerFile,
     LidarOdometryParams& params,

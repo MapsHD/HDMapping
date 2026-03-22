@@ -282,7 +282,7 @@ void display()
     }*/
 
     {
-        std::lock_guard<std::mutex> lock(renderPtrLock);
+        std::scoped_lock lock(renderPtrLock);
 
         glLineWidth(2);
         glColor3f(0.0, 1.0, 0.0);
@@ -554,7 +554,7 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
             std::cout << "optimizing worker_data [" << i + 1 << "] of " << worker_data.size() << " acc_distance: " << acc_distance << " elapsed time: " << elapsed_seconds1.count() << std::endl;
 
             {
-                std::lock_guard<std::mutex> lock(renderPtrLock);
+                std::scoped_lock lock(renderPtrLock);
 
                 for (int k = 0; k < worker_data[i].intermediate_points.size(); k++)
                 {
@@ -599,7 +599,6 @@ bool compute_step_2_demo(std::vector<WorkerData> &worker_data, LidarOdometryPara
                 acc_distance = acc_distance_tmp;
                 std::cout << "please split data set into subsets" << std::endl;
                 ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
-                // std::cout << "calculations canceled for TIMESTAMP: " << (int64_t)worker_data[i].intermediate_trajectory_timestamps[0].first << std::endl;
                 return false;
             }
 
@@ -763,9 +762,6 @@ int main(int argc, char *argv[])
     {
         working_directory = "."; // fs::path(input_file_names[0]).parent_path().string();
 
-        // std::cout << "0" << std::endl;
-
-        // check if folder exists!
         if (!fs::exists(working_directory))
         {
             std::cout << "folder '" << working_directory << "' does not exist" << std::endl;
@@ -836,7 +832,7 @@ int main(int argc, char *argv[])
             std::cout << input_file_names[i] << std::endl;
         }
         std::cout << "loading imu" << std::endl;
-        std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
+        std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> imu_data;
 
         for (size_t fileNo = 0; fileNo < csv_files.size(); fileNo++)
         {
@@ -857,7 +853,11 @@ int main(int argc, char *argv[])
         std::mutex mtx;
         std::cout << "start std::transform" << std::endl;
 
-        std::transform(std::execution::par_unseq, std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [&](const std::string &fn)
+        std::transform(
+            #if USE_EXECUTION_PAR_UNSEQ
+            std::execution::par_unseq, 
+            #endif
+            std::begin(laz_files), std::end(laz_files), std::begin(pointsPerFile), [&](const std::string &fn)
                        {
                            // Load mapping from id to sn
                            fs::path fnSn(fn);
@@ -893,59 +893,43 @@ int main(int argc, char *argv[])
                                std::cout << calib.matrix() << std::endl;
                            }
                            return data;
-                           // std::cout << fn << std::endl;
-                           //
                        });
         std::cout << "std::transform finished" << std::endl;
 
-        FusionAhrs ahrs;
-        FusionAhrsInitialise(&ahrs);
-
-        if (fusionConventionNwu)
-        {
-            ahrs.settings.convention = FusionConventionNwu;
-        }
-        if (fusionConventionEnu)
-        {
-            ahrs.settings.convention = FusionConventionEnu;
-        }
-        if (fusionConventionNed)
-        {
-            ahrs.settings.convention = FusionConventionNed;
-        }
+        // VQF initialization
+        VQFParams vqf_params;
+        vqf_params.tauAcc = 3.0;
+        VQF vqf(vqf_params, SAMPLE_PERIOD);
 
         std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;
 
         int counter = 1;
         for (const auto &[timestamp_pair, gyr, acc] : imu_data)
         {
-            const FusionVector gyroscope = {static_cast<float>(gyr.axis.x * 180.0 / M_PI), static_cast<float>(gyr.axis.y * 180.0 / M_PI), static_cast<float>(gyr.axis.z * 180.0 / M_PI)};
-            const FusionVector accelerometer = {acc.axis.x, acc.axis.y, acc.axis.z};
+            const double g = 9.81;
+            vqf_real_t gyr_vqf[3] = {
+                static_cast<double>(gyr.x()),
+                static_cast<double>(gyr.y()),
+                static_cast<double>(gyr.z()) };
+            vqf_real_t acc_vqf[3] = {
+                static_cast<double>(acc.x()) * g,
+                static_cast<double>(acc.y()) * g,
+                static_cast<double>(acc.z()) * g };
 
-            // std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z: " << acc.axis.z << std::endl;
+            vqf.update(gyr_vqf, acc_vqf);
 
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-
-            FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-            Eigen::Quaterniond d{quat.element.w, quat.element.x, quat.element.y, quat.element.z};
+            vqf_real_t quat[4];
+            vqf.getQuat6D(quat);
+            Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
             Eigen::Affine3d t{Eigen::Matrix4d::Identity()};
             t.rotate(d);
 
-            //
-            // TaitBryanPose rot_y;
-            // rot_y.px = rot_y.py = rot_y.pz = rot_y.px = rot_y.py = rot_y.pz;
-            // rot_y.fi = -5 * M_PI / 180.0;
-            // Eigen::Affine3d m_rot_y = affine_matrix_from_pose_tait_bryan(rot_y);
-            // t = t * m_rot_y;
-            //
-            // std::map<double, Eigen::Matrix4d> trajectory;
             trajectory[timestamp_pair.first] = std::pair(t.matrix(), timestamp_pair.second);
-            const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
             counter++;
             if (counter % 100 == 0)
             {
-                std::cout << "Roll " << euler.angle.roll<< ", Pitch " << euler.angle.pitch<< ", Yaw " << euler.angle.yaw<< " [" << counter++ << " of " << imu_data.size() << "]"<< std::endl;
+                Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
+                std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter << " of " << imu_data.size() << "]" << std::endl;
             }
         }
 
@@ -1104,7 +1088,7 @@ int main(int argc, char *argv[])
                    {
         compute_step_2_demo(worker_data, params, ts_failure);
         {
-        std::lock_guard<std::mutex> lock(renderPtrLock);
+        std::scoped_lock lock(renderPtrLock);
 
         std::vector<Eigen::Vector3d> global_pointcloud;
         std::vector<unsigned short> intensity; 

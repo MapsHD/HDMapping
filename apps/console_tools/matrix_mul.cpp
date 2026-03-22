@@ -1,8 +1,9 @@
 #include <Eigen/Eigen>
 #include <fstream>
 #include <iostream>
-#include <structures.h>
-#include <transformations.h>
+
+#include <Core/structures.h>
+#include <Core/transformations.h>
 
 int main(int argc, char* argv[])
 {

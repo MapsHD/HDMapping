@@ -53,3 +53,6 @@
 [submodule "3rdparty/UTL"]
 	path = 3rdparty/UTL
 	url = https://github.com/DmitriBogdanov/UTL.git
+[submodule "3rdparty/vqf"]
+	path = 3rdparty/vqf
+	url = https://github.com/dlaidig/vqf.git

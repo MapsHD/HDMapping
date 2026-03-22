@@ -1,6 +1,7 @@
 #include <pch/pch.h>
 
-#include <pfd_wrapper.hpp>
+#include <Core/pfd_wrapper.hpp>
+
 #include <portable-file-dialogs.h>
 
 namespace mandeye::fd
@@ -73,7 +74,6 @@ namespace mandeye::fd
         std::string output_folder_name = "";
 
         output_folder_name = pfd::select_folder(title, internal::lastLocationHint).result();
-        std::cout << "folder: '" << output_folder_name << "'" << std::endl;
 
         return output_folder_name;
     }

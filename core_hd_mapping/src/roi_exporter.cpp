@@ -1,14 +1,14 @@
 #include <pch/pch.h>
 
-#include <roi_exporter.h>
+#include <Core/pfd_wrapper.hpp>
+
+#include <CoreHDMapping/laz_wrapper.h>
+#include <CoreHDMapping/roi_exporter.h>
+#include <CoreHDMapping/single_trajectory_viewer.h>
 
 #include <GL/freeglut.h>
 #include <plycpp.h>
 #include <portable-file-dialogs.h>
-
-#include <laz_wrapper.h>
-#include <pfd_wrapper.hpp>
-#include <single_trajectory_viewer.h>
 
 std::vector<Point> decimate(const std::vector<Point>& pc)
 {

@@ -2,22 +2,23 @@
 
 #include <chrono>
 #include <cmath>
-#include <execution>
 #include <filesystem>
 #include <iostream>
 #include <map>
+#include <pch/pch.h>
 #include <vector>
 
 #include <ankerl/unordered_dense.h>
 
 #include <Eigen/Dense>
-#include <Fusion.h>
 #include <common/include/cauchy.h>
 #include <laszip/laszip_api.h>
-#include <ndt.h>
 #include <nlohmann/json.hpp>
-#include <structures.h>
-#include <transformations.h>
+#include <vqf.hpp>
+
+#include <Core/ndt.h>
+#include <Core/structures.h>
+#include <Core/transformations.h>
 
 #include <python-scripts/constraints/constraint_fixed_parameter_jacobian.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
@@ -32,9 +33,7 @@
 
 namespace fs = std::filesystem;
 
-// segmented_map provides pointer stability - pointers to values remain valid after insertions.
-// This is required for NDT::Bucket::coarser_bucket pointer optimization in link_buckets_to_coarser().
-using NDTBucketMapType = ankerl::unordered_dense::segmented_map<uint64_t, NDT::Bucket>;
+using NDTBucketMapType = ankerl::unordered_dense::map<uint64_t, NDT::Bucket>;
 using NDTBucketMapType2 = ankerl::unordered_dense::map<uint64_t, NDT::Bucket2>;
 
 // Helper function for getting software version from CMake macros
@@ -66,11 +65,48 @@ struct LidarOdometryParams
     double threshould_output_filter = 0.5; // for export --> all points xyz.norm() < threshould_output_filter will be removed
     int min_counter_concatenated_trajectory_nodes = 10; // for export
 
-    // Madgwick filter
+    // AHRS type selection: false = Fusion (Madgwick, default), true = VQF
+    bool use_vqf = false;
+
+    // Fusion (Madgwick) AHRS parameters
     bool fusionConventionNwu = true;
     bool fusionConventionEnu = false;
     bool fusionConventionNed = false;
-    double ahrs_gain = 0.5;
+    double fusion_gain = 0.5; // complementary filter gain (0-1, higher = more accelerometer trust)
+
+    // VQF core
+    double vqf_tauAcc = 0.5; // accelerometer time constant [s] (higher = more gyro trust)
+
+    // VQF gyroscope bias estimation
+    bool vqf_motionBiasEstEnabled = true; // estimate gyro bias during motion
+    bool vqf_restBiasEstEnabled = true; // estimate gyro bias during rest
+    double vqf_biasSigmaInit = 0.5; // initial bias uncertainty [°/s]
+    double vqf_biasForgettingTime = 100.0; // time for uncertainty to grow 0→0.1 °/s [s]
+    double vqf_biasClip = 2.0; // max expected gyro bias [°/s]
+    double vqf_biasSigmaMotion = 0.1; // converged bias uncertainty during motion [°/s]
+    double vqf_biasVerticalForgettingFactor = 0.0001; // forgetting for unobservable vertical bias
+    double vqf_biasSigmaRest = 0.03; // converged bias uncertainty during rest [°/s]
+
+    // VQF rest detection
+    double vqf_restMinT = 1.5; // time threshold for rest detection [s]
+    double vqf_restFilterTau = 0.5; // LP filter time constant for rest detection [s]
+    double vqf_restThGyr = 2.0; // gyro threshold for rest detection [°/s]
+    double vqf_restThAcc = 0.5; // acc threshold for rest detection [m/s²]
+
+    // VQF magnetometer (only used when vqf_useMagnetometer is true)
+    bool vqf_useMagnetometer = false; // use 9D mode (with magnetometer) instead of 6D
+    double vqf_tauMag = 9.0; // magnetometer time constant [s]
+    bool vqf_magDistRejectionEnabled = true; // magnetic disturbance detection & rejection
+    double vqf_magCurrentTau = 0.05; // LP filter for current mag norm/dip [s]
+    double vqf_magRefTau = 20.0; // adjustment time for mag reference [s]
+    double vqf_magNormTh = 0.1; // relative threshold for mag field strength
+    double vqf_magDipTh = 10.0; // threshold for mag dip angle [°]
+    double vqf_magNewTime = 20.0; // time to accept new mag field [s]
+    double vqf_magNewFirstTime = 5.0; // time to accept first mag field [s]
+    double vqf_magNewMinGyr = 20.0; // min angular velocity for mag acceptance [°/s]
+    double vqf_magMinUndisturbedTime = 0.5; // min undisturbed time [s]
+    double vqf_magMaxRejectionTime = 60.0; // max full mag rejection duration [s]
+    double vqf_magRejectionFactor = 2.0; // slowdown factor for heading correction
 
     // lidar odometry control
     bool use_motion_from_previous_step = true;
@@ -82,6 +118,7 @@ struct LidarOdometryParams
     int threshold_initial_points = 10000;
     int threshold_nr_poses = 20;
     double convergence_delta_threshold = 1e-12; // convergence threshold for optimization
+    double convergence_delta_threshold_outer_rgd = 1e-6;
 
     // lidar odometry debug info
     bool save_calibration_validation = false;
@@ -139,39 +176,76 @@ struct LidarOdometryParams
     std::vector<Point3Di> initial_points;
     double consecutive_distance = 0.0;
     std::vector<Point3Di> reference_points;
-    NDTBucketMapType reference_buckets;
+    // NDTBucketMapType reference_buckets;
     double total_length_of_calculated_trajectory = 0.0;
+
+    std::mutex mutex_buckets_indoor;
     NDTBucketMapType buckets_indoor;
+
+    std::mutex mutex_buckets_outdoor;
     NDTBucketMapType buckets_outdoor;
+
 #if WITH_GUI == 1
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 #endif
 
     bool use_removie_imu_bias_from_first_stationary_scan = false;
+    Eigen::Vector3d estimated_gyro_bias_dps = Eigen::Vector3d::Zero(); // runtime: gyro bias in deg/s from stationary samples
+
+    // IMU preintegration
+    bool use_imu_preintegration = false;
+    int imu_preintegration_method = 6; // 0=euler_body, 1=trapezoidal_body, 2=euler_gravity, 3=trapezoidal_gravity, 4=kalman, 5=euler_ahrs,
+                                       // 6=trapezoidal_ahrs, 7=kalman_ahrs
 
     // ablation study
     bool ablation_study_use_planarity = false;
     bool ablation_study_use_norm = false;
     bool ablation_study_use_hierarchical_rgd = true;
     bool ablation_study_use_view_point_and_normal_vectors = true;
+    bool ablation_study_use_threshold_outer_rgd = false;
     bool save_index_pose = false;
 };
+
+inline VQFParams buildVQFParams(const LidarOdometryParams& p)
+{
+    VQFParams vp;
+    vp.tauAcc = p.vqf_tauAcc > 0.0 ? p.vqf_tauAcc : 3.0;
+    vp.tauMag = p.vqf_tauMag;
+#ifndef VQF_NO_MOTION_BIAS_ESTIMATION
+    vp.motionBiasEstEnabled = p.vqf_motionBiasEstEnabled;
+#endif
+    vp.restBiasEstEnabled = p.vqf_restBiasEstEnabled;
+    vp.magDistRejectionEnabled = p.vqf_magDistRejectionEnabled;
+    vp.biasSigmaInit = p.vqf_biasSigmaInit;
+    vp.biasForgettingTime = p.vqf_biasForgettingTime;
+    vp.biasClip = p.vqf_biasClip;
+#ifndef VQF_NO_MOTION_BIAS_ESTIMATION
+    vp.biasSigmaMotion = p.vqf_biasSigmaMotion;
+    vp.biasVerticalForgettingFactor = p.vqf_biasVerticalForgettingFactor;
+#endif
+    vp.biasSigmaRest = p.vqf_biasSigmaRest;
+    vp.restMinT = p.vqf_restMinT;
+    vp.restFilterTau = p.vqf_restFilterTau;
+    vp.restThGyr = p.vqf_restThGyr;
+    vp.restThAcc = p.vqf_restThAcc;
+    vp.magCurrentTau = p.vqf_magCurrentTau;
+    vp.magRefTau = p.vqf_magRefTau;
+    vp.magNormTh = p.vqf_magNormTh;
+    vp.magDipTh = p.vqf_magDipTh;
+    vp.magNewTime = p.vqf_magNewTime;
+    vp.magNewFirstTime = p.vqf_magNewFirstTime;
+    vp.magNewMinGyr = p.vqf_magNewMinGyr;
+    vp.magMinUndisturbedTime = p.vqf_magMinUndisturbedTime;
+    vp.magMaxRejectionTime = p.vqf_magMaxRejectionTime;
+    vp.magRejectionFactor = p.vqf_magRejectionFactor;
+    return vp;
+}
 
 // this function finds interpolated pose between two poses according to query_time
 Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& trajectory, double query_time);
 
 // this function reduces number of points by preserving only first point for each bucket {bucket_x, bucket_y, bucket_z}
 std::vector<Point3Di> decimate(const std::vector<Point3Di>& points, double bucket_x, double bucket_y, double bucket_z);
-
-// Check if outdoor bucket size is integer multiple of indoor bucket size
-bool is_integer_bucket_ratio(const NDT::GridParameters& rgd_params_indoor, const NDT::GridParameters& rgd_params_outdoor);
-
-// Link indoor buckets to their corresponding outdoor buckets via coarser_bucket pointer
-void link_buckets_to_coarser(
-    const NDT::GridParameters& rgd_params_indoor,
-    NDTBucketMapType& buckets_indoor,
-    const NDT::GridParameters& rgd_params_outdoor,
-    const NDTBucketMapType& buckets_outdoor);
 
 // this function updates each bucket (mean value, covariance) in regular grid decomposition
 void update_rgd(
@@ -186,8 +260,6 @@ struct LookupStats
 {
     size_t indoor_lookups = 0;
     size_t outdoor_lookups = 0;
-    size_t outdoor_pointer_hits = 0; // times coarser_bucket pointer was used instead of lookup
-    double link_time_seconds = 0.0; // cumulative time spent in link_buckets_to_coarser
 };
 
 // hierarchical version: updates both indoor and outdoor, then links buckets
@@ -214,7 +286,7 @@ void update_rgd_spherical_coordinates(
 //! @param imu_file - path to file with IMU data
 //! @param imuToUse - id number of IMU to use, the same index as in pointcloud return by @ref load_point_cloud
 //! @return vector of tuples (std::pair<timestamp, timestampUnix>, angular_velocity, linear_acceleration)
-std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> load_imu(const std::string& imu_file, int imuToUse);
+std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> load_imu(const std::string& imu_file, int imuToUse);
 
 //! This function load point cloud from LAS/LAZ file.
 //! Optionally it can apply extrinsic calibration to each point.
@@ -266,7 +338,10 @@ void optimize_lidar_odometry(
     bool ablation_study_use_norm,
     bool ablation_study_use_hierarchical_rgd,
     bool ablation_study_use_view_point_and_normal_vectors,
-    LookupStats& lookup_stats);
+    LookupStats& lookup_stats,
+    const bool& ablation_study_use_threshold_outer_rgd,
+    const double& convergence_result,
+    const double& convergence_delta_threshold_outer_rgd);
 
 void optimize_sf(
     std::vector<Point3Di>& intermediate_points,
@@ -306,6 +381,79 @@ void align_to_reference(
 
 // this function apply correction to pitch and roll
 // void fix_ptch_roll(std::vector<WorkerData> &worker_data);
+
+bool initialize_lidar_odometry(
+    std::vector<WorkerData>& worker_data,
+    LidarOdometryParams& params,
+    double& ts_failure,
+    std::atomic<float>& loProgress,
+    const std::atomic<bool>& pause,
+    bool debugMsg,
+    LookupStats& lookup_stats);
+
+bool process_worker_step_1(
+    WorkerData& worker_data,
+    const WorkerData& prev_worker_data,
+    const WorkerData& prev_prev_worker_data,
+    LidarOdometryParams& params,
+    const std::atomic<bool>& pause,
+    int i,
+    bool debug,
+    LookupStats& lookup_stats,
+    bool debugMsg,
+    int64_t& total_iterations,
+    double& total_optimization_time_seconds,
+    double& acc_distance,
+    size_t worker_data_size,
+    std::atomic<float>& loProgress,
+    double& ts_failure);
+
+bool process_worker_step_2(
+    WorkerData& worker_data,
+    const WorkerData& prev_worker_data,
+    const WorkerData& prev_prev_worker_data,
+    LidarOdometryParams& params,
+    const std::atomic<bool>& pause,
+    int i,
+    bool debug,
+    LookupStats& lookup_stats,
+    bool debugMsg,
+    int64_t& total_iterations,
+    double& total_optimization_time_seconds,
+    double& acc_distance,
+    size_t worker_data_size,
+    std::atomic<float>& loProgress,
+    double& ts_failure,
+    std::vector<Point3Di>& intermediate_points);
+
+bool process_worker_step_lidar_odometry_core(
+    WorkerData& worker_data,
+    const WorkerData& prev_worker_data,
+    const WorkerData& prev_prev_worker_data,
+    LidarOdometryParams& params,
+    const std::atomic<bool>& pause,
+    int i,
+    bool debug,
+    LookupStats& lookup_stats,
+    bool debugMsg,
+    int64_t& total_iterations,
+    double& total_optimization_time_seconds,
+    double& acc_distance,
+    size_t worker_data_size,
+    std::atomic<float>& loProgress,
+    double& ts_failure,
+    std::vector<Point3Di>& intermediate_points,
+    int& iter_end,
+    double& delta,
+    double& lm_factor);
+
+bool process_worker_step_update_rgd_after(
+    double& acc_distance,
+    LidarOdometryParams& params,
+    std::vector<Point3Di>& points_global,
+    WorkerData& worker_data,
+    LookupStats& lookup_stats,
+    std::vector<Point3Di>& intermediate_points);
 
 bool compute_step_2(
     std::vector<WorkerData>& worker_data,

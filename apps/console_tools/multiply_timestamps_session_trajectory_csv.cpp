@@ -1,10 +1,10 @@
 #include <Eigen/Eigen>
 #include <fstream>
 #include <iostream>
-#include <structures.h>
-#include <transformations.h>
 
-#include <point_clouds.h>
+#include <Core/point_clouds.h>
+#include <Core/structures.h>
+#include <Core/transformations.h>
 
 inline void split(std::string& str, char delim, std::vector<std::string>& out)
 {

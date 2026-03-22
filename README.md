@@ -1,11 +1,31 @@
-# Open-source (Windows and Linux), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
+# PROJECT ONBOARDING VIDEOS - OPENING MEASUREMENT SEASON 2026
+
+[![MANDEYE-D](https://img.youtube.com/vi/ntF8kO8r8MM/default.jpg)](https://youtu.be/ntF8kO8r8MM)
+[![MANDEYE-PRO](https://img.youtube.com/vi/Is4IvLiTCyw/default.jpg)](https://youtu.be/Is4IvLiTCyw)
+[![USER FREINDLY SOFTWARE](https://img.youtube.com/vi/rJST0zhNVwc/default.jpg)](https://youtu.be/rJST0zhNVwc)
+
+# Open-source (Windows, Linux and macOS), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
 This is open-source software for large-scale 3D mapping using an open-hardware hand-held/wearable/mountable measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
 We provide an end-to-end mobile mapping framework that does not require any installation, including:
-- **HDMapping_LI0**: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art.
+
+- **HDMapping_LI0**: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art [[movie]](https://youtu.be/UB-Hx7qgey8).
 - **HDMapping_Pose_GRAPH_SLAM** to create city-level maps.
 - **HDMapping_Georeferencing** (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
 
-If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches: LeGO-LOAM, LOAM, FAST-LIO, LIO-SAM, CT-ICP, DLO, VoxelMap, Faster-LIO, KISS-ICP, SLICT, DLIO, Point-LIO, GLIM, MAD-ICP, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE, 93won/lidar_odometry, KISS-SLAM. We work on integration: mola_lidar_odometry, rko_lio, lio_gvm, sr_lio, Light-LOAM, LIO-SEGMOT, GLIO, floam, A-LOAM, LOG-LIO, LOG-LIO2, VOX-LIO.
+# We start working on automatic loop closure
+
+We provide easy tool that will help You annotating ground truth SLAM loop closures. You mark pair of point clouds that forms edge, then use ICP like pair wise registration to generatie ground truth for AI training.
+Annotated ground truth edges for LiDAR pose graph slam are available at [ground truth edges](https://zenodo.org/records/18527593).
+Movie how to use it is available at [prepare training dataset movie](https://youtu.be/LOGpVg1Nc3k).
+
+[![GROUND-TRUTH-EDGE-ANNOTATION-TOOL](https://img.youtube.com/vi/tJdNNfBubeM/default.jpg)](https://youtu.be/tJdNNfBubeM)
+[![MANUAL-LOOP_CLOSURE-TOOL](https://img.youtube.com/vi/6SNvrZ2ROKg/default.jpg)](https://youtu.be/6SNvrZ2ROKg)
+
+# DOWNLOAD SOFTWARE USING THIS LINK -> [v0.100](https://github.com/MapsHD/HDMapping/releases/tag/v0.100)
+
+# DOWNLOAD DEMO FROM THIS LINK -> [DEMO](https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z)
+
+If You are looking for end-to-end mobile mapping framework You can start from this project, since we also provide a benchmark for all other approaches: LeGO-LOAM, LOAM, FAST-LIO, LIO-SAM, CT-ICP, DLO, VoxelMap, Faster-LIO, KISS-ICP, SLICT, DLIO, Point-LIO, GLIM, MAD-ICP, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE, 93won/lidar_odometry, KISS-SLAM, Super-LIO, SuperOdometry, mola_lidar_odometry. We work on integration: rko_lio, lio_gvm, sr_lio, Light-LOAM, LIO-SEGMOT, GLIO, floam, A-LOAM, LOG-LIO, LOG-LIO2, VOX-LIO.
 **Our goal is to find/develop/discover best end-to-end mobile mapping framework.**
 
 ## Quick Start (Ubuntu / Ubuntu 24.04 @ WSL2)
@@ -15,17 +35,19 @@ If You are looking for end-to-end mobile mapping framework You can start from th
 This project requires **CMake 4.0.0** or higher. If you don't have it installed, you can download it from:
 
 **Official CMake Downloads:**
+
 - **Linux/macOS/Windows:** https://cmake.org/download/
 - **GitHub Releases (Linux binaries):** https://github.com/Kitware/CMake/releases/tag/v4.0.0
 
 **Installation on Linux:**
+
 ```bash
 wget https://github.com/Kitware/CMake/releases/download/v4.0.0/cmake-4.0.0-linux-x86_64.sh
 sudo sh cmake-4.0.0-linux-x86_64.sh --skip-license --prefix=/usr/local
 cmake --version
 ```
 
-``` bash
+```bash
 git clone --recursive https://github.com/MapsHD/HDMapping.git
 cd HDMapping
 ./ubuntu-24.04-apt-requirements.sh
@@ -35,25 +57,55 @@ cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release -j
 ```
 
+## Quick Start (macOS)
+
+**Prerequisites:**
+
+1. Install **XCode Command Line Tools**: `xcode-select --install`
+2. Install **Homebrew** from [brew.sh](https://brew.sh)
+3. Install dependencies:
+
+```bash
+brew install cmake opencv
+```
+
+**Build:**
+
+```bash
+git clone --recursive https://github.com/MapsHD/HDMapping.git
+cd HDMapping
+
+# Configure with Cocoa support (native macOS windowing)
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DFREEGLUT_COCOA=ON
+
+# Build (auto-detects number of cores)
+cmake --build build -j$(sysctl -n hw.ncpu)
+```
+
 # Supported LiDARs
+
 ![lidars](images/IMG_2561.jpeg)
 We support LIVOX AVIA, HAP, MID360, Ouster OS0, OS1, OS2, OSDome, SICK multiScan100, HESAI JT16, HESAI JT128, HESAI XT, Robosense AIRY.
 HESAI XT requires external IMU. We are going to support more LiDARs ASAP.
 
 More information can be found here:
+
 - The introductory paper is available here: https://www.sciencedirect.com/science/article/pii/S235271102300314X
-- Sample data is available at https://github.com/MapsHD/OmniWarsawDataset 
+- Sample data is available at https://github.com/MapsHD/OmniWarsawDataset
 - VIDEO (how to build mobile mapping hardware) https://www.youtube.com/watch?v=BXBbuSJMFEo
 - If you are a ROS user, please visit https://github.com/MapsHD/mandeye_to_bag to convert MANDEYE data to ROSBAG
+- ROS2 wrapper for HDMapping LiDAR Inertial Odometry (HDMapping-LIO) https://github.com/MapsHD/HDMapping-LIO
 - ROSCON 2024 workshop (sample data sets and more ...): https://michalpelka.github.io/RosCon2024_workshop/
 - You can use it also for multi-view Terrestrial Laser Scanner Registration (Faro, Leica, Z+F, Riegl, etc...) https://www.sciencedirect.com/science/article/abs/pii/S0263224123007637
-- Info for Windows users: please use the latest release https://github.com/MapsHD/HDMapping/releases 
+- Info for Windows users: please use the latest release https://github.com/MapsHD/HDMapping/releases
 - Contact email: januszbedkowski@gmail.com
 
 # GNSS with RTK
+
 A portable NTRIP (Networked Transport of RTCM via Internet Protocol) client for M5Stack devices that receives RTK correction data from NTRIP casters and forwards it to u-blox GNSS receivers for high-precision positioning https://github.com/michalpelka/M5NtripClient.
 
 # MANDEYE is action
+
 [![MANDEYE-K9](https://img.youtube.com/vi/7a_o7ACH0-M/default.jpg)](https://youtu.be/7a_o7ACH0-M)
 [![MANDEYE-MR (Caver)](https://img.youtube.com/vi/Bu9kDF5y39s/default.jpg)](https://youtu.be/Bu9kDF5y39s)
 [![MANDEYE-MR (Precise Forestry)](https://img.youtube.com/vi/i6Xg_vPuqrY/default.jpg)](https://youtu.be/i6Xg_vPuqrY)
@@ -61,50 +113,84 @@ A portable NTRIP (Networked Transport of RTCM via Internet Protocol) client for 
 Our MANDEYE is designed for freedom in motion. You can also climb and crawl in most challenging scenarios.
 
 # Compatible community projects
-- Handheld Setup for Recording with Mid360 Lidar and Camera https://github.com/RomanStadlhuber/livo-handheld 
+
+- Handheld Setup for Recording with Mid360 Lidar and Camera https://github.com/RomanStadlhuber/livo-handheld
 - Lidar odometry for HDMapping project utilizing KISS-ICP https://github.com/michalpelka/kiss-lidarodometry
 
 # Compatible other SOTA algorithms (benchmark)
-Download the dataset from [Bunker DVI Dataset](https://charleshamesse.github.io/bunker-dvi-dataset/)  
+
+Download the dataset from [Bunker DVI Dataset](https://charleshamesse.github.io/bunker-dvi-dataset/)
 
 ![bunkier](images/sx1.png)
 ![benchmark](images/bunker1.png)
 ![hdmapping-lio](images/hdmapping-lio.png)
-We provide HDMapping-LIO: easy to run, easy to test LiDAR Inertial Odometry that is as accurate as FAST-LIO, FASTER-LIO and much more precise.
+We provide HDMapping-LIO: easy to run, easy to test LiDAR Inertial Odometry that is as accurate as FAST-LIO, FASTER-LIO and much more precise [[movie]](https://youtu.be/UB-Hx7qgey8).
 
 
-All following algorithms are generating session compatible with 'multi_view_tls_registration_step_2'
-- https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping (2018, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/legoloam2018.bib))
-- https://github.com/MapsHD/benchmark-LOAM-Livox-to-HDMapping (2019, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/loam_livox.bib))
-- https://github.com/MapsHD/benchmark-FAST-LIO-to-HDMapping (2020, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/FAST-LIO.bib))
-- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib))
-- https://github.com/MapsHD/benchmark-CT-ICP-to-HDMapping (2021, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/CT-ICP.bib))
-- https://github.com/MapsHD/benchmark-DLO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLO.bib))
-- https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping (2022, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/VoxelMap.bib))
-- https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Faster-LIO.bib))
-- https://github.com/MapsHD/benchmark-KISS-ICP-to-HDMapping (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/KISS-ICP.bib))
-- https://github.com/MapsHD/benchmark-SLICT-to-HDMapping (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SLICT.bib))
-- https://github.com/MapsHD/benchmark-DLIO-to-HDMapping (2023, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLIO.bib))
-- https://github.com/MapsHD/benchmark-Point-LIO-to-HDMapping (2024, JAIS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Point-LIO.bib))
-- https://github.com/MapsHD/benchmark-GLIM-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIM.bib))
-- https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MAD-ICP.bib))
-- https://github.com/MapsHD/benchmark-iG-LIO-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/iG-LIO.bib))
-- https://github.com/MapsHD/benchmark-LIO-EKF-to-HDMapping (2024, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-EKF.bib))
-- https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/I2EKF-LO.bib))  
-- https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GenZ-ICP.bib))
-- https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RESPLE.bib))
-- https://github.com/MapsHD/benchmark-lidar_odometry_ros_wrapper-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/lidar_odometry_ros_wrapper.bib))
+All following algorithms are generating session compatible with 'multi_view_tls_registration_step_2'.
+It is designed for a benchmark.
+
+- https://github.com/MapsHD/benchmark-HDMapping-ground-truth (2026, 'under review', [[movie]](https://youtu.be/8sHyUNC3mZs))
+- https://github.com/MapsHD/benchmark-HDMapping_LIO-to-HDMapping (2026, 'under review', [[movie]](https://youtu.be/9AUvPTLUcos))
+- https://github.com/MapsHD/benchmark-FORM-to-HDMapping (2026, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib), [[movie]](https://youtu.be/2c2ySFIncyA))
+- https://github.com/MapsHD/benchmark-Super-LIO-to-HDMapping (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/form.bib), [[movie]](https://youtu.be/CQmLOdV_mQA))
+- https://github.com/MapsHD/benchmark-lidar_odometry_ros_wrapper-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/lidar_odometry_ros_wrapper.bib), [[movie]](https://youtu.be/w233P_MZMWk))
+- https://github.com/MapsHD/benchmark-SuperOdometry-to-HDMapping (2021, IROS, 2025, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SuperOdometry.bib), [[movie]](https://youtu.be/2bRunzG43sw))
+- https://github.com/MapsHD/benchmark-mola_lidar_odometry-to-HDMapping (2025, IJRR, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/mola-lidar-odometry.bib), [[movie]](https://youtu.be/KcVTTurel44)) 
+- https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RESPLE.bib), [[movie]](https://youtu.be/5PAB4xJmMoo))
+- https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GenZ-ICP.bib), [[movie]](https://youtu.be/vgGkucOBVg4))
+- https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/I2EKF-LO.bib), [[movie]](https://youtu.be/B2358Gn62Ho))  
+- https://github.com/MapsHD/benchmark-LIO-EKF-to-HDMapping (2024, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-EKF.bib), [[movie]](https://youtu.be/R4Cn1LJ4U_E))
+- https://github.com/MapsHD/benchmark-iG-LIO-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/iG-LIO.bib), [[movie]](https://youtu.be/KlZf7nHeVmI))
+- https://github.com/MapsHD/benchmark-GLIM-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIM.bib), [[movie]](https://youtu.be/zyZDJECqOG0))
+- https://github.com/MapsHD/benchmark-Point-LIO-to-HDMapping (2024, JAIS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Point-LIO.bib), [[movie]](https://youtu.be/JlD1hDJHcrs))
+- https://github.com/MapsHD/benchmark-DLIO-to-HDMapping (2023, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLIO.bib), [[movie]](https://youtu.be/xFLqFcoAtk8))
+- https://github.com/MapsHD/benchmark-SLICT-to-HDMapping (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SLICT.bib), [[movie]](https://youtu.be/TUaJN7FJOFU))
+- https://github.com/MapsHD/benchmark-KISS-ICP-to-HDMapping (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/KISS-ICP.bib), [[movie]](https://youtu.be/GyB8UuQN0Io))
+- https://github.com/MapsHD/benchmark-Faster-LIO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Faster-LIO.bib), [[movie]](https://youtu.be/bV1jgF_m-Zo))
+- https://github.com/MapsHD/benchmark-VoxelMap-to-HDMapping (2022, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/VoxelMap.bib), [[movie]](https://youtu.be/oRiuvJRNl-c))
+- https://github.com/MapsHD/benchmark-DLO-to-HDMapping (2022, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DLO.bib), [[movie]](https://youtu.be/-UH81mNLw8Q))
+- https://github.com/MapsHD/benchmark-CT-ICP-to-HDMapping (2021, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/CT-ICP.bib), [[movie]](https://youtu.be/swEsJHwtE50))
+- https://github.com/MapsHD/benchmark-FAST-LIO-to-HDMapping (2020, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/FAST-LIO.bib), [[movie]](https://youtu.be/ENlaQTtOXEM))
+- https://github.com/MapsHD/benchmark-LOAM-Livox-to-HDMapping (2019, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/loam_livox.bib), [[movie]](https://youtu.be/MbKHTmUcI2w))
+- https://github.com/MapsHD/benchmark-LeGO-LOAM-to-HDMapping (2018, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/legoloam2018.bib), [[movie]](https://youtu.be/WpFBXe1zKto))
+
+[[qualitative evaluation benchmark movie]](https://youtu.be/C0CcG9vAokY)
+[[quantitative evaluation benchmark movie]](https://youtu.be/PsJaXpWFAis)
+[[quantitative benchmark]](https://github.com/MapsHD/benchmark-HDMapping-evaluation-of-odometry-and-SLAM)
+
+under testing
+
+...
+
+Benchmark Orchestration
+
+- https://github.com/MapsHD/benchmark-HDMapping-Orchestration 
+
+Datasets
+
+- https://charleshamesse.github.io/bunker-dvi-dataset/
+- https://github.com/Jakubach/kitti_to_ros
+- https://github.com/Jakubach/kitti_to_hdmapping
+- M2DGR https://github.com/SJTU-ViSYS/M2DGR
+- NCLT https://robots.engin.umich.edu/nclt/
+- Hilti SLAM Challenge https://hilti-challenge.com/dataset-2023
+- Complex Urban https://sites.google.com/view/complex-urban-dataset
+- NTU VIRAL https://ntu-aris.github.io/ntu_viral_dataset/
 
 
 ToDo
+- https://github.com/NKU-MobFly-Robotics/R-VoxelMap
+- https://github.com/KTH-RPL/dufomap
+- https://github.com/KTH-RPL/DynamicMap_Benchmark
+- https://github.com/thisparticle/btsa
+- https://github.com/MapsHD/benchmark-MAD-ICP-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MAD-ICP.bib))
+- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib))
 - https://robotics-upo.github.io/D-LIO/
 - https://github.com/MapsHD/benchmark-KISS-SLAM-to-HDMapping (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/kiss-slam.bib)) (not solved issue https://github.com/kpmrozowski/KISS-SLAM-to-HDMapping/issues/1)
-- https://github.com/MOLAorg/mola_lidar_odometry (2025, IJRR, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/mola-lidar-odometry.bib)) (not solved issue: https://github.com/MOLAorg/mola_lidar_odometry/issues/37)
-- https://github.com/Whan000/MOLA-SLAM (instruction to https://github.com/MOLAorg/mola_lidar_odometry)
 - https://github.com/MapsHD/rko_lio (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RKO-LIO.bib)) (not solved issue: https://github.com/marcinmatecki/rko-lio-to-HDMapping/issues/1)
 - https://github.com/clegenti/2fast2lamaa (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/2FAST-2LAMAA.bib))
 - https://github.com/lian-yue0515/MM-LINS (2025, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MM-LINS.bib))
-- https://github.com/Liansheng-Wang/Super-LIO (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib))
 - VOX-LIO https://www.mdpi.com/2072-4292/17/13/2214 (2025, MDPI Remote Sensing, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/VOX-LIO.bib), no code)
 - SS-LIO: Robust Tightly Coupled Solid-State LiDAR–Inertial Odometry for Indoor Degraded Environments (2025, MDPI electronics, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SS-LIO.bib), no code)
 - https://github.com/Ji1Xingyu/lio_gvm (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-GVM.bib)) (not solved issues: https://github.com/Ji1Xingyu/lio_gvm/issues/13, https://github.com/Ji1Xingyu/lio_gvm/issues/12, https://github.com/Ji1Xingyu/lio_gvm/issues/7)
@@ -112,7 +198,7 @@ ToDo
 - https://github.com/BrenYi/Light-LOAM (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Light-LOAM.bib))
 - https://github.com/tiev-tongji/LOG-LIO2 (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LOG-LIO2.bib))
 - https://github.com/dhchung/nv_liom (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/NV-LIOM.bib))
-- https://github.com/hku-mars/Voxel-SLAM (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Voxel-SLAM.bib), 2nd place ICRA HILTI 2023 SLAM Challenge, 1st place ICCV 2023 SLAM Challenge) 
+- https://github.com/hku-mars/Voxel-SLAM (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Voxel-SLAM.bib), 2nd place ICRA HILTI 2023 SLAM Challenge, 1st place ICCV 2023 SLAM Challenge)
 - https://github.com/StephLin/LIO-SEGMOT (2023, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SEGMOT.bib))
 - https://github.com/XikunLiu-huskit/GLIO (2023, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIO.bib))
 - https://github.com/tiev-tongji/LOG-LIO (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LOG-LIO.bib))
@@ -124,35 +210,30 @@ ToDo
 - https://www.sciencedirect.com/science/article/abs/pii/S1566253525002052
 - https://github.com/SlamCabbage/Optimized-SC-F-LOAM
 - https://github.com/gisbi-kim/SC-LeGO-LOAM
+- https://github.com/ChaoqinRobotics/LINS---LiDAR-inertial-SLAM
+- https://github.com/PRBonn/PIN_SLAM
+- https://arxiv.org/pdf/2503.12660 - KISS-SLAM
+- https://arxiv.org/pdf/2509.06593 - rko-lio
+- https://arxiv.org/pdf/2410.05433 - 2FAST-LAMA
+- https://arxiv.org/pdf/2503.19506 - MM-LINS
+- https://arxiv.org/pdf/2410.08935 - VOXEL-SLAM
+- https://arxiv.org/pdf/2204.04932 - SC-F-LOAM
+- https://www.mdpi.com/1424-8220/22/2/520 - LEGO-LOAM-SC
+- https://arxiv.org/pdf/1907.02233 - LINS-SLAM
+- https://ieeexplore.ieee.org/abstract/document/11206445
+- https://ieeexplore.ieee.org/abstract/document/11045969
+- https://ieeexplore.ieee.org/document/10954274
+- https://www.sciencedirect.com/science/article/abs/pii/S0921889025001903
+- https://www.mdpi.com/2072-4292/17/15/2661
+- https://github.com/Livox-SDK/LIO-Livox
 
+# Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
 
-# Quick DEMO (Windows OS, installation is not required):
-- dwonload DEMO https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z
-- unpack `quick_start_demo.7z` with 7-Zip (https://7-zip.org/)
-- double click `quick_start_demo.exe` and observe DEMO (point cloud and trajectory)
-- once calculations are finished open `out_demo_point_cloud.laz` with CloudCompare (https://cloudcompare.org/)
-![DEMO (point cloud and trajectory)](images/quick_start_demo.png)
-![DEMO result in CloudCompare](images/demo-cc.png)
-
-# Main algorithms:
-- LiDAR odometry
-- Pose Graph SLAM (Simultaneous Localisation and Mapping)
-- NDT (Normal Distributions Transform)
-- ICP (Iterative Closest Point)
-
-# Main tools:
-- Initial trajectory estimation (lidar_odometry_step_1)
-- Single trajectory refinement (multi_view_tls_registration_step_2)
-- Multiple trajectory refinement (multi_session_registration_step_3)
-- Georeferencing (georeferenced point cloud [e.g. from ALS Airborne Laser Scanning], ground control points, control points, GNSS data)
-- Multi-view terrestrial laser scanning registration (all available methods from literature and more)
-
-# Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.) 
 - Janusz Będkowski et al., "A Novel Approach to Global Positioning System Accuracy Assessment, Verified on LiDAR Alignment of One Million Kilometers at a Continent Scale, as a Foundation for Autonomous DRIVING Safety Analysis." (2021, MDPI-Sensors, [[PDF]](https://www.mdpi.com/1424-8220/21/17/5691), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sensors-v21-i17_20260104.bib))
-- Loris Redovniković, Antun Jakopec, Janusz Będkowski, Jurica Jagetić, "The affordable DIY Mandeye LiDAR system for surveying caves, and how to convert 3D clouds into traditional cave ground plans and extended profiles." (2024, IJS, [[PDF]](https://digitalcommons.usf.edu/cgi/viewcontent.cgi?article=2535&context=ijs), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/ijs.bib)) 
-- Bartosz Mitka, Klapa Przemysław and Gawronek Pelagia, "Laboratory Tests of Metrological Characteristics of a Non-Repetitive Low-Cost Mobile Handheld Laser Scanner." (2024, MDPI-Sensors, [[PDF]](https://www.mdpi.com/1424-8220/24/18/6010), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sensors-v24-i18_20260104.bib))  
+- Loris Redovniković, Antun Jakopec, Janusz Będkowski, Jurica Jagetić, "The affordable DIY Mandeye LiDAR system for surveying caves, and how to convert 3D clouds into traditional cave ground plans and extended profiles." (2024, IJS, [[PDF]](https://digitalcommons.usf.edu/cgi/viewcontent.cgi?article=2535&context=ijs), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/ijs.bib))
+- Bartosz Mitka, Klapa Przemysław and Gawronek Pelagia, "Laboratory Tests of Metrological Characteristics of a Non-Repetitive Low-Cost Mobile Handheld Laser Scanner." (2024, MDPI-Sensors, [[PDF]](https://www.mdpi.com/1424-8220/24/18/6010), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sensors-v24-i18_20260104.bib))
 - Elalailyi, Ahmad, et al., "Pose Graph Data Fusion for Visual-and LiDAR-based Low-Cost Portable Mapping Systems." (2024, LowCost 3D, [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/147/2024/isprs-archives-XLVIII-2-W8-2024-147-2024.pdf), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/isprs-archives-XLVIII-2-W8-2024-147-2024.bib))
-- Balestra Mattia, et al., "Advancing forest inventory: a comparative study of low-cost MLS lidar device with professional laser scanners." (2024, LowCost 3D, [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/9/2024/isprs-archives-XLVIII-2-W8-2024-9-2024.pdf), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/isprs-archives-XLVIII-2-W8-2024-9-2024.bib)) 
+- Balestra Mattia, et al., "Advancing forest inventory: a comparative study of low-cost MLS lidar device with professional laser scanners." (2024, LowCost 3D, [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/9/2024/isprs-archives-XLVIII-2-W8-2024-9-2024.pdf), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/isprs-archives-XLVIII-2-W8-2024-9-2024.bib))
 - Janusz Będkowski et al., "Novel (re-configurable, wearable, lightweight, ergonomic) low cost 3D mobile mapping system not only for extreme mapping applications." (2024, LowCost 3D, [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-2-W8-2024/25/2024/isprs-archives-XLVIII-2-W8-2024-25-2024.pdf), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/isprs-archives-XLVIII-2-W8-2024-25-2024.bib))
 - Biloš Josip, "3D mobilno kartiranje pomoću MandEye sustava prikupljanja i obrade prostornih podataka" (2024, [[PDF]](https://repozitorij.geof.unizg.hr/islandora/object/geof%3A142/datastream/PDF/view))
 - Janusz Będkowski, "Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms." (2023, Elsevier-Measurement, [[PDF]](https://www.sciencedirect.com/science/article/abs/pii/S0263224123007637), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/S0263224123007637.bib))
@@ -167,9 +248,12 @@ ToDo
 - Jozef Výbošťok et al.. "An Open and Novel Low-Cost Terrestrial Laser Scanner Prototype for Forest Monitoring" (2025, MDPI-Sensors, [[PDF]](https://www.mdpi.com/1424-8220/26/1/63), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sensors-v26-i01_20260104.bib))
 - Janusz Będkowski et al., "MapsHD: A Benchmark Suite for LiDAR Odometry Frameworks" (2025, SSRN, [[PDF]](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5986422))
 - Janusz Będkowski et al., "The benchmark of LiDAR odometry algorithms utilised for a low-cost mobile mapping system" (2025, GEOBENCH, [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W6-2025/25/2025/isprs-archives-XLVIII-1-W6-2025-25-2025.pdf) [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/isprs-archives-XLVIII-1-W6-2025-25-2025.bib))
+- Andro Kokeza et al. "Comparative Performance of Handheld Personal Laser Scanning Instruments and Operator Experience in Forest Inventory of Even-Aged European Beech Stand"(2026, MDPI-Forests, [[PDF]](https://www.mdpi.com/1999-4907/17/2/216) [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/forests-v17-i02_20260213.bib))
 
 # To cite this work please use as follows:
+
 Mobile mapping system: hardware and software are elaborated in the following paper:
+
 ```
 @article{BEDKOWSKI2024101618,
      title = {Open source, open hardware hand-held mobile mapping system for large scale surveys},
@@ -187,6 +271,7 @@ Mobile mapping system: hardware and software are elaborated in the following pap
 ```
 
 Terrestrial Laser Scanner data registration is elaborated in following paper:
+
 ```
 @article{BEDKOWSKI2023113199,
      title = {Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms},
@@ -202,7 +287,7 @@ Terrestrial Laser Scanner data registration is elaborated in following paper:
 }
 ```
 
-The **HDMapping** optimization framework is implemented from scratch https://github.com/JanuszBedkowski/observation_equations using the Eigen library, thus there is no need to install any additional libraries such as **Ceres**, **g2o**, **GTSAM**, **manif**, **Sophus**, etc. 
+The **HDMapping** optimization framework is implemented from scratch https://github.com/JanuszBedkowski/observation_equations using the Eigen library, thus there is no need to install any additional libraries such as **Ceres**, **g2o**, **GTSAM**, **manif**, **Sophus**, etc.
 More information can be found in:
 
 ```
@@ -221,21 +306,33 @@ More information can be found in:
 }
 ```
 
+# 0.101 VIDEOs
+
+Make session from ALS
+
+[![Make session from ALS](https://img.youtube.com/vi/k6nysHveoKU/default.jpg)](https://youtu.be/U7hYEQfdfDU)
+
+Make cave map
+
+[![Make cave map](https://img.youtube.com/vi/k6nysHveoKU/default.jpg)](https://youtu.be/srcf6qu7I08)
+
 # 0.94 VIDEOs
+
+IMU inclination prior
 
 [![IMU inclination prior](https://img.youtube.com/vi/k6nysHveoKU/default.jpg)](https://youtu.be/k6nysHveoKU)
 
-
 # Obsolete VIDEOs
+
 Where to find, how to download HDMAPPING software and manual
 
 [![Where to find, how to download HDMAPPING software and manual](https://img.youtube.com/vi/dHCOAeto9-M/default.jpg)](https://youtu.be/dHCOAeto9-M)
 
-Air ground survey 
+Air ground survey
 
 [![survey - precise forestry application](https://img.youtube.com/vi/_nvq2un_lFc/default.jpg)](https://youtu.be/_nvq2un_lFc)
 
-Air ground survey result 
+Air ground survey result
 
 [![result of precise forestry application](https://img.youtube.com/vi/InqpiFrPizg/default.jpg)](https://youtu.be/InqpiFrPizg)
 
@@ -247,7 +344,7 @@ How to build Mandeye DEV
 
 [![how to build Mandeye DEV](https://img.youtube.com/vi/BXBbuSJMFEo/default.jpg)](https://youtu.be/BXBbuSJMFEo)
 
-------------------------------------------
+---
 
 Instruction for precise forestry
 
@@ -275,37 +372,35 @@ Instruction for precise forestry
 
 [![hdmapping precise forestry session inspection](https://img.youtube.com/vi/Biz_OA8x1Ek/default.jpg)](https://youtu.be/Biz_OA8x1Ek)
 
-------------------------------------------
+---
 
 Nuclear Power Plant inspection PART 1
 
 [![Nuclear Power Plant inspection PART 1](https://img.youtube.com/vi/bpXQYZkH8Sc/default.jpg)](https://youtu.be/bpXQYZkH8Sc)
 
-Nuclear Power Plant inspection PART 2 
+Nuclear Power Plant inspection PART 2
 
 [![Nuclear Power Plant inspection PART 2](https://img.youtube.com/vi/fJcuGw1RLO0/default.jpg)](https://youtu.be/fJcuGw1RLO0)
 
-------------------------------------------
+---
 
 Cave surveys (climbing, crawling in caves with MANDEYE-MR)
 
 [![Cave data processing](https://img.youtube.com/vi/4iq69c76eG8/default.jpg)](https://youtu.be/4iq69c76eG8)
 
+---
 
-------------------------------------------
-
-Multilevel building: example of using new functionality in v0.75 - intersection 
+Multilevel building: example of using new functionality in v0.75 - intersection
 
 [![Multi level building](https://img.youtube.com/vi/XYIHKyaxQzo/default.jpg)](https://youtu.be/XYIHKyaxQzo)
 
-
-------------------------------------------
+---
 
 MANDEYE Mission Recorder calibration
 
 [![MANDEYE Mission Recorder calibration](https://img.youtube.com/vi/V9L0a6aqsJ8/default.jpg)](https://youtu.be/V9L0a6aqsJ8)
 
-------------------------------------------
+---
 
 MANDEYE georeferencing to GPS (NMEA data stream)
 
@@ -315,7 +410,6 @@ Removing GPS inconsistency after MANDEYE georeferencing to GPS (NMEA data stream
 
 [![Removing GPS inconsistency after MANDEYE georeferencing to GPS (NMEA data stream)](https://img.youtube.com/vi/gcUV22D4YrY/default.jpg)](https://youtu.be/gcUV22D4YrY)
 
-
 MANDEYE georeferencing to GCPs (ground control points)
 
 [![MANDEYE georeferencing to GCPs (ground control points)](https://img.youtube.com/vi/iLlU7xzYDe0/default.jpg)](https://youtu.be/iLlU7xzYDe0)
@@ -324,26 +418,26 @@ MANDEYE georeferencing to CPs (control points)
 
 [![MANDEYE georeferencing to CPs (control points)](https://img.youtube.com/vi/ogeAjzJvLeY/default.jpg)](https://youtu.be/ogeAjzJvLeY)
 
-------------------------------------------
+---
 
 Manual coloring
 
 [![MANDEYE manual coloring](https://img.youtube.com/vi/EUbAaJp-XmY/default.jpg)](https://youtu.be/EUbAaJp-XmY)
 
-------------------------------------------
+---
 
 # Compatible commercial products
+
 [![MANDEYE-PRO](https://img.youtube.com/vi/EBUxUBWKIco/default.jpg)](https://youtu.be/EBUxUBWKIco)
 
-------------------------------------------
+---
 
 # Building commands
 
 ## Requirements
 
-
-
 **Installation on Windows:**
+
 - Download the installer from https://cmake.org/download/
 - Run the installer and follow the instructions
 - Ensure CMake is added to your system PATH
@@ -351,7 +445,8 @@ Manual coloring
 ### clang-format
 
 **Instalation on Linux:**
-``` bash
+
+```bash
 sudo apt install clang-format
 ```
 
@@ -367,23 +462,23 @@ sudo apt install clang-format
 
 To verify that clang-format is installed run:
 Verify installation by running:
-``` bash
+
+```bash
 clang-format --version
 ```
 
 **Formating codebase**
 
 In order to format code base run:
-``` bash
+
+```bash
 python3 run_clang_fromat.py
 ```
 
-*Note that PRs without formatting might be rejected from merging*
-
-
-
+_Note that PRs without formatting might be rejected from merging_
 
 ## Quick Start (Windows)
+
 ```bash
 git clone --recursive https://github.com/MapsHD/HDMapping.git
 cd HDMapping
@@ -394,73 +489,45 @@ cmake --build build --config Release
 ```
 
 ## WSL2 GUI
+
 On WSL2 to enable file dialogs in GUI applications you need to install one of the packages used by portable-file-dialogs listed [here](https://github.com/samhocevar/portable-file-dialogs/blob/c12ea8c9a727f5320a2b4570aee863bbede2a204/portable-file-dialogs.h#L539C1-L542C57).
 
 For example on WSL2 Ubuntu-24.04 following package is required to run GUI applications:
 
-``` bash
+```bash
 sudo apt install zenity
 ```
 
-## Advanced CPU Optimization Options
-
-HDMapping includes automatic CPU optimization that detects your processor and applies the best compilation flags:
-
-```bash
-# Auto-detect CPU and optimize (default, recommended)
-cmake -DCMAKE_BUILD_TYPE=Release ..
-
-# Force AMD optimizations (AVX2, aggressive performance)
-cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=AMD ..
-
-# Force AMD AVX-512 (Ryzen 7000+ only, maximum performance)
-cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=AMD_AVX512 ..
-
-# Force Intel optimizations (AVX2, stable)  
-cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=INTEL ..
-
-# Force Intel AVX-512 (may throttle, use with caution)
-cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=INTEL_AVX512 ..
-
-# Generic optimizations (maximum compatibility)
-cmake -DCMAKE_BUILD_TYPE=Release -DHD_CPU_OPTIMIZATION=GENERIC ..
-```
-
-**CPU Optimization Options:**
-- `AUTO` (default) - Automatically detects and optimizes for your CPU
-- `AMD` - Aggressive optimizations for AMD Ryzen/EPYC (AVX2, /Oi /Ot /Oy)
-- `AMD_AVX512` - Maximum performance for AMD Zen 4+ (Ryzen 7000+, AVX-512)
-- `INTEL` - Optimizations for Intel Core/Xeon (AVX2, /Qpar, /favor:INTEL64)
-- `INTEL_AVX512` - AVX-512 for Intel (may cause frequency throttling)
-- `GENERIC` - Safe universal optimizations for any x86-64 CPU
-
-📖 **For detailed optimization information, see:** [`docs/CPU_OPTIMIZATION_GUIDE.md`](docs/CPU_OPTIMIZATION_GUIDE.md)
-
 # Building Debian package.
 
-The standard build contains all necessary libraries compiled with project. 
+The standard build contains all necessary libraries compiled with project.
 This approach allows smooth build on Windows platform and guarantee predictable experience.
 If you want to build Debian package, you can depends on system-provided libraries:
 Before build install 3rd party libraries:
+
 ```
 sudo apt-get install freeglut3-dev libeigen3-dev liblaszip-dev libopencv-dev
 ```
+
 Next build Debian package:
+
 ```
-cmake .. -DBUILD_WITH_BUNDLED_FREEGLUT=0 -DBUILD_WITH_BUNDLED_EIGEN=0 -DBUILD_WITH_BUNDLED_LIBLASZIP=0 -DCMAKE_BUILD_TYPE=Release 
+cmake .. -DBUILD_WITH_BUNDLED_FREEGLUT=0 -DBUILD_WITH_BUNDLED_EIGEN=0 -DBUILD_WITH_BUNDLED_LIBLASZIP=0 -DCMAKE_BUILD_TYPE=Release
 make -j16
 make package
 ```
-To install package :
-```
-sudo dpkg -i hd_mapping-0.*.*-Linux.deb 
-```
 
+To install package :
+
+```
+sudo dpkg -i hd_mapping-0.*.*-Linux.deb
+```
 
 ![mandeye](images/softwareX1.png)
 
 Mobile mapping systems is based on LiVOX MID360 - laser scanner with non repetetive scanning pattern.
 Specification is available at https://www.livoxtech.com/mid-360/specs. Important parameters:
+
 - weight: less than 1kg,
 - battery life: up to 5 hours,
 - suggested speed during data acquisition: walking speed (4km/h),
@@ -470,21 +537,8 @@ Specification is available at https://www.livoxtech.com/mid-360/specs. Important
 - Range Precision (1 $\sigma$): up to 2cm (@ 10m),
 - Integrated IMU (Inertial Measurement Unit).
 
-This work is dedicated to educational and research purposes.
-The core of the software is composed of three components: 
+# Possible applications:
 
-- LiDAR odometry,
-- single-session refinement,
-- multi-session refinement,
-- georeferencing.
-
-Data refinement uses a pose-graph loop closure technique and an Iterative Closest Point algorithm to minimize the error of the edge. 
-The results are 3D point clouds in LAZ data format (compressed LAS - LIDAR Aerial Survey).
-It was tested in many real-world scenarios/applications: city-level 3D mapping, culture heritage, creating ground truth data for mobile robots, precise forestry, and large-scale indoor 3D mapping.
-This software can run on Linux and Windows machines, it does not incorporate GPU computing.
-It is advised to use at least 32 GB of RAM to cope with large data sets.
-
-Possible applications:
 - culture heritage
 - environmental management
 - geology
@@ -501,7 +555,7 @@ Possible applications:
 - critical infrastructure inspection
 - space exploration
 - protection systems
-- digital twin content generation 
+- digital twin content generation
 - automation in construction
 - etc...
 
@@ -511,7 +565,7 @@ City level survey (perspective view).
 City level survey (top view).
 
 ![largescalemapping1](images/a.jpg)
-3D data from aerial LiDAR mapping. 
+3D data from aerial LiDAR mapping.
 ![largescalemapping2](images/b.jpg)
 Aerial LiDAR fused with ground MANDEYE data (fixed issue with missing elevations).
 
@@ -521,51 +575,3 @@ Construction site.
 Construction site augmented with MANDEYE 3D data.
 ![largescalemapping2](images/change.jpg)
 Construction progress monitoring, scale blue - smallest changes, red - largest changes.
-
-
-Tested on the following datasets:
-
-![datasets](images/datasets.jpg)
-
-Figure: Three publicly available data sets are incorporated into the benchmark.
-
-First row: **ETH**, second row: **RESSO**, third and fourth rows: **WHU_TLS**.
-
-```
-ETH:
-@article{THEILER2014149,
-     title = {Keypoint-based 4-Points Congruent Sets – Automated marker-less registration of laser scans},
-     author = {Pascal Willy Theiler and Jan Dirk Wegner and Konrad Schindler},
-     journal = {ISPRS Journal of Photogrammetry and Remote Sensing},
-     volume = {96},
-     pages = {149-163},
-     year = {2014},
-     issn = {0924-2716},
-     doi = {https://doi.org/10.1016/j.isprsjprs.2014.06.015},
-     url = {https://www.sciencedirect.com/science/article/pii/S0924271614001701}
-}
-
-RESSO:
-@article{chen2017plade,    
-     title = {PLADE: A Plane-based Descriptor for Point Cloud Registration with Small Overlap},    
-     author = {Chen, Songlin and Nan, Liangliang and Xia, Renbo and Zhao, Jibin and Wonka, Peter},    
-     booktitle = {IEEE Transactions on Geoscience and Remote Sensing}, 
-     volume={58},
-     number={4},
-     pages={2530-2540},     
-     year = {2020} 
-}
-
-WHU_TLS:
-@article{DONG2020327,
-     title = {Registration of large-scale terrestrial laser scanner point clouds: A review and benchmark},
-     author = {Zhen Dong and Fuxun Liang and Bisheng Yang and Yusheng Xu and Yufu Zang and Jianping Li and Yuan Wang and Wenxia Dai and Hongchao Fan and Juha Hyyppä and Uwe Stilla},
-     journal = {ISPRS Journal of Photogrammetry and Remote Sensing},
-     volume = {163},
-     pages = {327-342},
-     year = {2020},
-     issn = {0924-2716},
-     doi = {https://doi.org/10.1016/j.isprsjprs.2020.03.013},
-     url = {https://www.sciencedirect.com/science/article/pii/S0924271620300836}
-}
-```

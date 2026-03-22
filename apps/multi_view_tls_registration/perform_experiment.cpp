@@ -1,4 +1,7 @@
 #include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 
 // clang-format off
 #include <GL/glew.h>
@@ -17,25 +20,21 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <icp.h>
-#include <ndt.h>
-#include <observation_picking.h>
-#include <pose_graph_slam.h>
-#include <registration_plane_feature.h>
-#include <transformations.h>
+#include <Core/gnss.h>
+#include <Core/icp.h>
+#include <Core/manual_pose_graph_loop_closure.h>
+#include <Core/ndt.h>
+#include <Core/observation_picking.h>
+#include <Core/pose_graph_slam.h>
+#include <Core/registration_plane_feature.h>
+#include <Core/session.h>
+#include <Core/transformations.h>
 
 #include <portable-file-dialogs.h>
 
 #include <laszip/laszip_api.h>
 
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-
-#include <manual_pose_graph_loop_closure.h>
-
-#include <gnss.h>
-#include <session.h>
+#include <spdlog/spdlog.h>
 
 namespace fs = std::filesystem;
 
@@ -2162,7 +2161,7 @@ bool exportLaz(const std::string &filename,
     laszip_POINTER laszip_writer;
     if (laszip_create(&laszip_writer))
     {
-        fprintf(stderr, "DLL ERROR: creating laszip writer\n");
+        spdlog::error("DLL ERROR: creating laszip writer");
         return false;
     }
 
@@ -2172,7 +2171,7 @@ bool exportLaz(const std::string &filename,
 
     if (laszip_get_header_pointer(laszip_writer, &header))
     {
-        fprintf(stderr, "DLL ERROR: getting header pointer from laszip writer\n");
+        spdlog::error("DLL ERROR: getting header pointer from laszip writer");
         return false;
     }
 
@@ -2211,18 +2210,18 @@ bool exportLaz(const std::string &filename,
 
     if (laszip_open_writer(laszip_writer, filename.c_str(), compress))
     {
-        fprintf(stderr, "DLL ERROR: opening laszip writer for '%s'\n", filename.c_str());
+        spdlog::error("DLL ERROR: opening laszip writer for '{}'", filename );
         return false;
     }
 
-    fprintf(stderr, "writing file '%s' %scompressed\n", filename.c_str(), (compress ? "" : "un"));
+    spdlog::info("writing file '{}' {}compressed", filename, (compress ? "" : "un"));
 
     // get a pointer to the point of the writer that we will populate and write
 
     laszip_point *point;
     if (laszip_get_point_pointer(laszip_writer, &point))
     {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip writer\n");
+        spdlog::error("DLL ERROR: getting point pointer from laszip writer");
         return false;
     }
 
@@ -2240,7 +2239,7 @@ bool exportLaz(const std::string &filename,
         coordinates[2] = p.z();// + offset_alt;
         if (laszip_set_coordinates(laszip_writer, coordinates))
         {
-            fprintf(stderr, "DLL ERROR: setting coordinates for point %I64d\n", p_count);
+            spdlog::error("DLL ERROR: setting coordinates for point {}", p_count);
             return false;
         }
 
@@ -2253,24 +2252,24 @@ bool exportLaz(const std::string &filename,
 
         if (laszip_write_point(laszip_writer))
         {
-            fprintf(stderr, "DLL ERROR: writing point %I64d\n", p_count);
+            spdlog::error("DLL ERROR: writing point {}", p_count);
             return false;
         }
     }
 
     if (laszip_get_point_count(laszip_writer, &p_count))
     {
-        fprintf(stderr, "DLL ERROR: getting point count\n");
+        spdlog::error("DLL ERROR: getting point count");
         return false;
     }
 
-    fprintf(stderr, "successfully written %I64d points\n", p_count);
+    spdlog::info("successfully written {} points", p_count);
 
     // close the writer
 
     if (laszip_close_writer(laszip_writer))
     {
-        fprintf(stderr, "DLL ERROR: closing laszip writer\n");
+        spdlog::error("DLL ERROR: closing laszip writer");
         return false;
     }
 
@@ -2278,7 +2277,7 @@ bool exportLaz(const std::string &filename,
 
     if (laszip_destroy(laszip_writer))
     {
-        fprintf(stderr, "DLL ERROR: destroying laszip writer\n");
+        spdlog::error("DLL ERROR: destroying laszip writer");
         return false;
     }
 

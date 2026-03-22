@@ -1,10 +1,11 @@
 #include <pch/pch.h>
 
-#include <hash_utils.h>
-#include <pair_wise_iterative_closest_point.h>
+#include <Core/hash_utils.h>
+#include <Core/pair_wise_iterative_closest_point.h>
+#include <Core/structures.h>
+#include <Core/transformations.h>
+
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian_simplified.h>
-#include <structures.h>
-#include <transformations.h>
 
 inline void point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified_4(
     Eigen::Matrix<double, 6, 6, Eigen::RowMajor>& AtPA,
@@ -295,7 +296,13 @@ bool PairWiseICP::compute(
 
         if (multithread)
         {
-            std::for_each(std::execution::par_unseq, std::begin(source), std::end(source), hessian_fun);
+            std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+                std::execution::par_unseq,
+#endif
+                std::begin(source),
+                std::end(source),
+                hessian_fun);
         }
         else
         {
@@ -378,7 +385,6 @@ bool PairWiseICP::compute_fast(
     Eigen::Affine3d& m_pose_result,
     int dec)
 {
-    // std::cout << "PairWiseICP::compute" << std::endl;
     bool multithread = true;
 
     std::vector<std::pair<uint64_t, uint32_t>> indexes;
@@ -415,7 +421,6 @@ bool PairWiseICP::compute_fast(
 
     for (int iter = 0; iter < number_of_iterations; iter++)
     {
-        // std::cout << "iteration: " << iter + 1 << " of: " << number_of_iterations << std::endl;
         Eigen::MatrixXd AtPA(6, 6);
         AtPA.setZero();
         Eigen::MatrixXd AtPB(6, 1);
@@ -504,7 +509,13 @@ bool PairWiseICP::compute_fast(
 
         if (multithread)
         {
-            std::for_each(std::execution::par_unseq, std::begin(source), std::end(source), hessian_fun);
+            std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
+                std::execution::par_unseq,
+#endif
+                std::begin(source),
+                std::end(source),
+                hessian_fun);
         }
         else
         {
@@ -517,20 +528,14 @@ bool PairWiseICP::compute_fast(
         AtPAc = AtPA.sparseView();
         AtPBc = AtPB.sparseView();
 
-        // Eigen::SparseMatrix<double> AtPA_I(6, 6);
-        // AtPA_I.setIdentity();
-        // AtPA += AtPA_I;
-
         Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPAc);
         Eigen::SparseMatrix<double> x = solver.solve(AtPBc);
         std::vector<double> h_x;
         for (int k = 0; k < x.outerSize(); ++k)
         {
-            // std::cout << "result pose updates" << std::endl;
             for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
             {
                 h_x.push_back(it.value());
-                // std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
             }
         }
 
@@ -547,12 +552,10 @@ bool PairWiseICP::compute_fast(
             pose.ka += h_x[counter++];
 
             m_pose_result = affine_matrix_from_pose_tait_bryan(pose);
-            // std::cout << "PairWiseICP::compute SUCCESS" << std::endl;
             //  return true;
         }
         else
         {
-            // std::cout << "PairWiseICP::compute FAILED" << std::endl;
             return false;
         }
     }

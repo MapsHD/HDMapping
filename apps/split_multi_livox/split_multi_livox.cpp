@@ -1,11 +1,14 @@
-#include <Eigen/Dense>
+#include <Core/export_laz.h>
 #include <HDMapping/Version.hpp>
-#include <export_laz.h>
+
 #include <filesystem>
 #include <iostream>
-#include <laszip/laszip_api.h>
 #include <string>
 #include <vector>
+
+#include <Eigen/Dense>
+#include <laszip/laszip_api.h>
+#include <spdlog/spdlog.h>
 
 struct Point3Dis
 {
@@ -28,14 +31,14 @@ std::vector<Point3Dil> load_point_cloud(const std::string& lazFile, bool ommit_p
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))
     {
-        fprintf(stderr, "DLL ERROR: creating laszip reader\n");
+        spdlog::error("DLL ERROR: creating laszip reader");
         std::abort();
     }
 
     laszip_BOOL is_compressed = 0;
     if (laszip_open_reader(laszip_reader, lazFile.c_str(), &is_compressed))
     {
-        fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", lazFile.c_str());
+        spdlog::error("DLL ERROR: opening laszip reader for '{}'", lazFile);
         std::abort();
     }
     std::cout << "compressed : " << is_compressed << std::endl;
@@ -43,14 +46,16 @@ std::vector<Point3Dil> load_point_cloud(const std::string& lazFile, bool ommit_p
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
-        fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting header pointer from laszip reader");
         std::abort();
     }
-    fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
+
+    spdlog::info("file '{}' contains {} points", lazFile, header->number_of_point_records);
+
     laszip_point* point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting point pointer from laszip reader");
         std::abort();
     }
 
@@ -60,10 +65,9 @@ std::vector<Point3Dil> load_point_cloud(const std::string& lazFile, bool ommit_p
     {
         if (laszip_read_point(laszip_reader))
         {
-            fprintf(stderr, "DLL ERROR: reading point %u\n", j);
+            spdlog::error("DLL ERROR: reading point {}", j);
             laszip_close_reader(laszip_reader);
             return points;
-            // std::abort();
         }
         Point3Dil p;
 

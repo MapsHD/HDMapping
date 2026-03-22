@@ -1,10 +1,12 @@
 #include "lidar_odometry.h"
 #include "tbb/tbb.h"
+#include <UTL/profiler.hpp>
 #include <mutex>
 
-namespace fs = std::filesystem;
+#include <Core/system_info.hpp>
+#include <Fusion.h>
 
-const float RAD_TO_DEG = 180.0f / static_cast<float>(M_PI);
+namespace fs = std::filesystem;
 
 bool load_data(
     std::vector<std::string>& input_file_names,
@@ -13,6 +15,7 @@ bool load_data(
     Imu& imu_data,
     bool debugMsg)
 {
+    UTL_PROFILER_SCOPE("load_data");
     std::sort(input_file_names.begin(), input_file_names.end());
     std::vector<std::string> csv_files, laz_files;
     std::string sn_file;
@@ -191,7 +194,7 @@ bool load_data(
 
         std::size_t minSize = std::min(laz_files.size(), csv_files.size());
         // Each thread loads into its own local vector
-        std::vector<std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>>> imuChunks(minSize);
+        std::vector<Imu> imuChunks(minSize);
 
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, minSize),
@@ -282,6 +285,9 @@ bool load_data(
                 pointsPerFile[i] = std::move(data);
             });
 
+        if (pointsPerFile.size() > 0)
+            pointsPerFile.front().clear();
+
         // --- Summary
         size_t totalPoints = 0;
         for (const auto& pp : pointsPerFile)
@@ -297,153 +303,156 @@ bool load_data(
     }
 }
 
-void calculate_trajectory(
-    Trajectory& trajectory,
-    Imu& imu_data,
-    bool fusionConventionNwu,
-    bool fusionConventionEnu,
-    bool fusionConventionNed,
-    double ahrs_gain,
-    bool debugMsg,
-    bool use_remove_imu_bias_from_first_stationary_scan)
+void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryParams& params, bool debugMsg)
 {
-    FusionAhrs ahrs;
-    FusionAhrsInitialise(&ahrs);
+    UTL_PROFILER_SCOPE("calculate_trajectory");
 
-    if (fusionConventionNwu)
-        ahrs.settings.convention = FusionConventionNwu;
-    else if (fusionConventionEnu)
-        ahrs.settings.convention = FusionConventionEnu;
-    else if (fusionConventionNed)
-        ahrs.settings.convention = FusionConventionNed;
-    ahrs.settings.gain = ahrs_gain;
+    const float RAD_TO_DEG = 180.0f / static_cast<float>(M_PI);
     int counter = 1;
-
-    double previous_time_stamp = 0.0;
-
-    static bool first = true;
-    static double last_ts;
 
     std::cout << "start calculating trajectory.." << std::endl;
 
-    double bias_gyr_x = 0.0;
-    double bias_gyr_y = 0.0;
-    double bias_gyr_z = 0.0;
-
-    if (use_remove_imu_bias_from_first_stationary_scan)
+    if (params.use_vqf)
     {
-        if (imu_data.size() > 1000)
+        // ---- VQF path ----
+        double avg_dt = 1.0 / 200.0;
+        if (imu_data.size() >= 2)
         {
-            std::vector<double> gyr_x;
-            std::vector<double> gyr_y;
-            std::vector<double> gyr_z;
+            double t0 = std::get<0>(imu_data.front()).first;
+            double t1 = std::get<0>(imu_data.back()).first;
+            if (t1 > t0)
+                avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
+        }
 
+        VQFParams vqf_params = buildVQFParams(params);
+        VQF vqf(vqf_params, avg_dt);
+        std::cout << "AHRS: VQF (tauAcc=" << vqf_params.tauAcc << ", useMag=" << (params.vqf_useMagnetometer ? "true" : "false")
+                  << ", dt=" << avg_dt << ", samples=" << imu_data.size() << ")" << std::endl;
+
+        for (const auto& [timestamp_pair, gyr, acc] : imu_data)
+        {
+            const double g = 9.81;
+            vqf_real_t gyr_vqf[3] = { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) };
+            vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g,
+                                      static_cast<double>(acc.y()) * g,
+                                      static_cast<double>(acc.z()) * g };
+
+            vqf.update(gyr_vqf, acc_vqf);
+
+            vqf_real_t quat[4];
+            if (params.vqf_useMagnetometer)
+                vqf.getQuat9D(quat);
+            else
+                vqf.getQuat6D(quat);
+            Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
+            Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
+            t.rotate(d);
+
+            RawIMUData rawImuData{ timestamp_pair.first,
+                                   { static_cast<double>(acc.x()), static_cast<double>(acc.y()), static_cast<double>(acc.z()) },
+                                   { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) } };
+            trajectory[timestamp_pair.first] = std::make_tuple(t.matrix(), timestamp_pair.second, rawImuData);
+
+            if (debugMsg)
+            {
+                counter++;
+                if (counter % 100 == 0)
+                {
+                    Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
+                    std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter << " of "
+                              << imu_data.size() << "]" << std::endl;
+                }
+            }
+        }
+    }
+    else
+    {
+        // ---- Fusion (Madgwick) path ----
+        FusionAhrs ahrs;
+        FusionAhrsInitialise(&ahrs);
+
+        if (params.fusionConventionNwu)
+            ahrs.settings.convention = FusionConventionNwu;
+        else if (params.fusionConventionEnu)
+            ahrs.settings.convention = FusionConventionEnu;
+        else if (params.fusionConventionNed)
+            ahrs.settings.convention = FusionConventionNed;
+        ahrs.settings.gain = static_cast<float>(params.fusion_gain);
+
+        // Gyro bias estimation from first 1000 stationary samples
+        double bias_gyr_x = 0.0, bias_gyr_y = 0.0, bias_gyr_z = 0.0;
+        if (params.use_removie_imu_bias_from_first_stationary_scan && imu_data.size() > 1000)
+        {
+            std::vector<double> gyr_x, gyr_y, gyr_z;
+            gyr_x.reserve(1000);
+            gyr_y.reserve(1000);
+            gyr_z.reserve(1000);
             for (int i = 0; i < 1000; i++)
             {
                 const auto& [timestamp_pair, gyr, acc] = imu_data[i];
-
-                gyr_x.push_back(gyr.axis.x * RAD_TO_DEG);
-                gyr_y.push_back(gyr.axis.y * RAD_TO_DEG);
-                gyr_z.push_back(gyr.axis.z * RAD_TO_DEG);
+                gyr_x.push_back(gyr.x() * RAD_TO_DEG);
+                gyr_y.push_back(gyr.y() * RAD_TO_DEG);
+                gyr_z.push_back(gyr.z() * RAD_TO_DEG);
             }
-
-            // Median without full sort
             std::nth_element(gyr_x.begin(), gyr_x.begin() + 500, gyr_x.end());
             std::nth_element(gyr_y.begin(), gyr_y.begin() + 500, gyr_y.end());
             std::nth_element(gyr_z.begin(), gyr_z.begin() + 500, gyr_z.end());
-
             bias_gyr_x = gyr_x[500];
             bias_gyr_y = gyr_y[500];
             bias_gyr_z = gyr_z[500];
+            params.estimated_gyro_bias_dps = Eigen::Vector3d(bias_gyr_x, bias_gyr_y, bias_gyr_z);
+
+            std::cout << "------------------\nGYRO BIAS\n"
+                      << "bias_gyr_x [deg/s]: " << bias_gyr_x << "\n"
+                      << "bias_gyr_y [deg/s]: " << bias_gyr_y << "\n"
+                      << "bias_gyr_z [deg/s]: " << bias_gyr_z << "\n------------------" << std::endl;
         }
 
-        std::cout << "------------------" << std::endl;
-        std::cout << "GYRO BIAS" << std::endl;
-        std::cout << "bias_gyr_x [deg/s]: " << bias_gyr_x << std::endl;
-        std::cout << "bias_gyr_y [deg/s]: " << bias_gyr_y << std::endl;
-        std::cout << "bias_gyr_z [deg/s]: " << bias_gyr_z << std::endl;
-        std::cout << "------------------" << std::endl;
-    }
+        std::cout << "AHRS: Fusion (gain=" << params.fusion_gain << ", samples=" << imu_data.size() << ")" << std::endl;
 
-    for (const auto& [timestamp_pair, gyr, acc] : imu_data)
-    {
-        const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * RAD_TO_DEG) - static_cast<float>(bias_gyr_x),
-                                         static_cast<float>(gyr.axis.y * RAD_TO_DEG) - static_cast<float>(bias_gyr_y),
-                                         static_cast<float>(gyr.axis.z * RAD_TO_DEG) - static_cast<float>(bias_gyr_z) };
-        const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
+        bool first = true;
+        double last_ts = 0.0;
 
-        /*if (provious_time_stamp == 0.0)
+        for (const auto& [timestamp_pair, gyr, acc] : imu_data)
         {
-            double SAMPLE_PERIOD = (1.0 / 200.0);
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-        }
-        else
-        {
-            double sp = timestamp_pair.first - provious_time_stamp;
-            // std::cout << "sp: " << sp << std::endl;
-            if (sp > 0.1)
+            const FusionVector gyroscope = { static_cast<float>(gyr.x() * RAD_TO_DEG) - static_cast<float>(bias_gyr_x),
+                                             static_cast<float>(gyr.y() * RAD_TO_DEG) - static_cast<float>(bias_gyr_y),
+                                             static_cast<float>(gyr.z() * RAD_TO_DEG) - static_cast<float>(bias_gyr_z) };
+            const FusionVector accelerometer = { acc.x(), acc.y(), acc.z() };
+
+            if (first)
             {
-                sp = 0.1;
-            }
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, sp);
-        }*/
-
-        if (first)
-        {
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
-            first = false;
-            // last_ts = timestamp_pair.first;
-        }
-        else
-        {
-            double curr_ts = timestamp_pair.first;
-
-            double ts_diff = curr_ts - last_ts;
-
-            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
-
-            /*if (ts_diff < 0)
-            {
-                std::cout << "WARNING!!!!" << std::endl;
-                std::cout << "WARNING!!!!" << std::endl;
-                std::cout << "WARNING!!!!" << std::endl;
-                std::cout << "WARNING!!!!" << std::endl;
-                std::cout << "WARNING!!!!" << std::endl;
-                std::cout << "WARNING!!!!" << std::endl;
-            }
-
-            if (ts_diff < 0.01)
-            {
-                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0f / 200.0f);
+                first = false;
             }
             else
             {
-                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0/200.0);
-            }*/
-        }
+                float ts_diff = static_cast<float>(timestamp_pair.first - last_ts);
+                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+            }
+            last_ts = timestamp_pair.first;
 
-        last_ts = timestamp_pair.first;
+            FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
+            Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
+            Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
+            t.rotate(d);
 
-        FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
+            RawIMUData rawImuData{ timestamp_pair.first,
+                                   { static_cast<double>(acc.x()), static_cast<double>(acc.y()), static_cast<double>(acc.z()) },
+                                   { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) } };
+            trajectory[timestamp_pair.first] = std::make_tuple(t.matrix(), timestamp_pair.second, rawImuData);
 
-        Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
-        Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
-        t.rotate(d);
-
-        trajectory[timestamp_pair.first] = std::pair(t.matrix(), timestamp_pair.second);
-
-        if (debugMsg)
-        {
-            const FusionEuler euler = FusionQuaternionToEuler(quat);
-            counter++;
-            if (counter % 100 == 0)
+            if (debugMsg)
             {
-                std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw << " ["
-                          << counter++ << " of " << imu_data.size() << "]" << std::endl;
+                counter++;
+                if (counter % 100 == 0)
+                {
+                    const FusionEuler euler = FusionQuaternionToEuler(quat);
+                    std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw << " ["
+                              << counter << " of " << imu_data.size() << "]" << std::endl;
+                }
             }
         }
-
-        previous_time_stamp = timestamp_pair.first;
     }
 }
 
@@ -454,6 +463,7 @@ bool compute_step_1(
     std::vector<WorkerData>& worker_data,
     const std::atomic<bool>& pause)
 {
+    UTL_PROFILER_SCOPE("compute_step_1");
     int number_of_initial_points = 0;
     double timestamp_begin = 0.0;
 
@@ -477,24 +487,27 @@ bool compute_step_1(
             break;
     }
 
-    // std::cout << "timestamp_begin: " << timestamp_begin << std::endl;
-
     std::vector<std::pair<double, double>> timestamps;
     std::vector<Eigen::Affine3d> poses;
+    std::vector<RawIMUData> raw_imu_data;
+
     timestamps.reserve(trajectory.size());
     poses.reserve(trajectory.size());
+    raw_imu_data.reserve(trajectory.size());
 
-    for (const auto& [time, pose_pair] : trajectory)
+    for (const auto& [time, pose_tuple] : trajectory)
     {
         if (time < timestamp_begin)
             continue;
 
-        timestamps.emplace_back(time, pose_pair.second);
-        poses.emplace_back(pose_pair.first);
+        poses.emplace_back(std::get<0>(pose_tuple));
+        timestamps.emplace_back(time, std::get<1>(pose_tuple));
+        raw_imu_data.emplace_back(std::get<2>(pose_tuple));
     }
 
     timestamps.shrink_to_fit();
     poses.shrink_to_fit();
+    raw_imu_data.shrink_to_fit();
 
     std::cout << "number of poses: " << poses.size() << std::endl;
 
@@ -521,13 +534,14 @@ bool compute_step_1(
     for (size_t i = 0; i < n_iter; i++)
     {
         if (i % 50 == 0)
-            std::cout << "\rrunning iterations: " << i + 1 << "/" << n_iter << std::flush;
+            std::cout << "\rrunning iterations: " << i + 1 << "/" << n_iter << std::endl << std::flush;
 
         WorkerData& wd = worker_data.emplace_back(); // construct in-place
         wd.intermediate_trajectory.reserve(threshold);
         wd.intermediate_trajectory_motion_model.reserve(threshold);
         wd.intermediate_trajectory_timestamps.reserve(threshold);
         wd.imu_om_fi_ka.reserve(threshold);
+        wd.raw_imu_data.reserve(threshold);
 
         const size_t start_idx = i * threshold;
         const size_t end_idx = (i + 1) * threshold;
@@ -541,6 +555,8 @@ bool compute_step_1(
             const TaitBryanPose tb = pose_tait_bryan_from_affine_matrix(poses[idx]);
             // wd.imu_roll_pitch.emplace_back(tb.om, tb.fi);
             wd.imu_om_fi_ka.emplace_back(tb.om, tb.fi, tb.ka);
+
+            wd.raw_imu_data.emplace_back(raw_imu_data[idx]);
         }
 
         std::vector<Point3Di> points;
@@ -568,8 +584,6 @@ bool compute_step_1(
                 points.insert(points.end(), std::make_move_iterator(lower), std::make_move_iterator(upper));
         }
 
-        // wd.original_points = points;
-
         // correct points timestamps
         if (wd.intermediate_trajectory_timestamps.size() > 2)
         {
@@ -578,15 +592,9 @@ bool compute_step_1(
                               wd.intermediate_trajectory_timestamps[0].first) /
                 points.size();
 
-            // std::cout << "ts_begin " << ts_begin << std::endl;
-            // std::cout << "ts_step " << ts_step << std::endl;
-            // std::cout << "ts_end " << wd.intermediate_trajectory_timestamps[wd.intermediate_trajectory_timestamps.size() - 1].first <<
-            // std::endl;
-
             for (size_t pp = 0; pp < points.size(); pp++)
                 points[pp].timestamp = ts_begin + pp * ts_step;
         }
-        //////////////////////////////////////////
 
         for (size_t k = 0; k < points.size(); k++)
         {
@@ -690,6 +698,7 @@ void run_consistency(std::vector<WorkerData>& worker_data, const LidarOdometryPa
 
 void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, fs::path outwd, double elapsed_time_s)
 {
+    UTL_PROFILER_SCOPE("save_result");
     std::filesystem::create_directory(outwd);
     // concatenate data
     std::vector<WorkerData> worker_data_concatenated;
@@ -964,17 +973,12 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
 
     // Save processing results and complex data to JSON file
     save_processing_results_json(params, outwd, elapsed_time_s);
-
-    // remove cache
-    // std::cout << "remove cache: '" << params.working_directory_cache << "' START" << std::endl;
-    // std::filesystem::remove_all(params.working_directory_cache);
-    // std::cout << "remove cache: '" << params.working_directory_cache << "' FINISHED" << std::endl;
 }
 
 void filter_reference_buckets(LidarOdometryParams& params)
 {
     NDTBucketMapType reference_buckets_out;
-    for (const auto& b : params.reference_buckets)
+    for (const auto& b : params.buckets_indoor)
     {
         if (b.second.number_of_points > 10)
         {
@@ -993,7 +997,29 @@ void filter_reference_buckets(LidarOdometryParams& params)
             }
         }
     }
-    params.reference_buckets = reference_buckets_out;
+    params.buckets_indoor = reference_buckets_out;
+
+    NDTBucketMapType reference_buckets_out2;
+    for (const auto& b : params.buckets_indoor)
+    {
+        if (b.second.number_of_points > 10)
+        {
+            Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(b.second.cov, Eigen::ComputeEigenvectors);
+
+            auto eigen_values = eigen_solver.eigenvalues();
+            double sum_ev = eigen_values.x() + eigen_values.y() + eigen_values.z();
+            double ev1 = eigen_values.x();
+            double ev2 = eigen_values.y();
+            double ev3 = eigen_values.z();
+
+            double planarity = 1 - ((3 * ev1 / sum_ev) * (3 * ev2 / sum_ev) * (3 * ev3 / sum_ev));
+            if (planarity > 0.7)
+            {
+                reference_buckets_out2[b.first] = b.second;
+            }
+        }
+    }
+    params.buckets_outdoor = reference_buckets_out2;
 }
 
 void save_trajectory_to_ascii(std::vector<WorkerData>& worker_data, std::string output_file_name)
@@ -1012,7 +1038,10 @@ void save_trajectory_to_ascii(std::vector<WorkerData>& worker_data, std::string 
 
 void load_reference_point_clouds(const std::vector<std::string>& input_file_names, LidarOdometryParams& params)
 {
-    params.reference_buckets.clear();
+    // params.reference_buckets.clear();
+    params.buckets_indoor.clear();
+    params.buckets_outdoor.clear();
+
     params.reference_points.clear();
 
     for (size_t i = 0; i < input_file_names.size(); i++)
@@ -1023,8 +1052,9 @@ void load_reference_point_clouds(const std::vector<std::string>& input_file_name
         params.reference_points.insert(std::end(params.reference_points), std::begin(pp), std::end(pp));
     }
 
-    update_rgd(params.in_out_params_indoor, params.reference_buckets, params.reference_points);
-    params.buckets_indoor = params.reference_buckets;
+    update_rgd(params.in_out_params_indoor, params.buckets_indoor, params.reference_points);
+    update_rgd(params.in_out_params_outdoor, params.buckets_outdoor, params.reference_points);
+    // params.buckets_indoor = params.reference_buckets;
 }
 
 std::string save_results_automatic(
@@ -1037,6 +1067,7 @@ std::string save_results_automatic(
 
 std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOdometryParams& params)
 {
+    UTL_PROFILER_SCOPE("run_lidar_odometry");
     Session session;
     std::vector<WorkerData> worker_data;
     std::vector<std::string> input_file_names;
@@ -1055,15 +1086,7 @@ std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOd
         return worker_data;
     }
     Trajectory trajectory;
-    calculate_trajectory(
-        trajectory,
-        imu_data,
-        params.fusionConventionNwu,
-        params.fusionConventionEnu,
-        params.fusionConventionNed,
-        params.ahrs_gain,
-        true,
-        params.use_removie_imu_bias_from_first_stationary_scan);
+    calculate_trajectory(trajectory, imu_data, params, true);
 
     std::atomic<bool> pause{ false };
 
@@ -1086,7 +1109,7 @@ std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOd
     return worker_data;
 }
 
-void save_parameters_toml(const LidarOdometryParams& params, const fs::path& outwd, double elapsed_seconds)
+void save_parameters_toml(const LidarOdometryParams& _params, const fs::path& outwd, double elapsed_seconds)
 {
     // Get current date and time
     auto now = std::chrono::system_clock::now();
@@ -1099,7 +1122,7 @@ void save_parameters_toml(const LidarOdometryParams& params, const fs::path& out
     std::string datetime_str = datetime_stream.str();
 
     // Create filename with version info and datetime for TOML parameters
-    std::string toml_filename = "HDMapping_params_" + params.software_version + "_" + datetime_str + ".toml";
+    std::string toml_filename = "HDMapping_params_" + _params.software_version + "_" + datetime_str + ".toml";
     fs::path toml_path = outwd / toml_filename;
 
     try
@@ -1107,10 +1130,7 @@ void save_parameters_toml(const LidarOdometryParams& params, const fs::path& out
         // Use existing TomlIO class to save loadable parameters
         TomlIO toml_io;
 
-        // Make a non-const copy for the TomlIO class (it needs non-const reference)
-        LidarOdometryParams params_copy = params;
-
-        bool success = toml_io.SaveParametersToTomlFile(toml_path.string(), params_copy);
+        bool success = toml_io.SaveParametersToTomlFile(toml_path.string(), _params);
 
         if (success)
         {
@@ -1153,6 +1173,9 @@ void save_processing_results_json(const LidarOdometryParams& params, const fs::p
         results["processing_info"]["build_date"] = params.build_date;
         results["processing_info"]["processing_date"] = datetime_str;
         results["processing_info"]["elapsed_time_seconds"] = elapsed_seconds;
+        results["processing_info"]["OS"] = system_info::getOSName();
+        results["processing_info"]["CPU"] = system_info::getCPUName();
+        results["processing_info"]["RAM"] = system_info::getTotalRAM();
 
         // Processing results and computed values
         results["trajectory_results"]["total_length_calculated"] = params.total_length_of_calculated_trajectory;

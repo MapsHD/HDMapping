@@ -1,4 +1,3 @@
-
 #include <GL/freeglut.h>
 #include <iostream>
 
@@ -8,25 +7,27 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include <mutex>
-#include <vector>
 
 #include <array>
 #include <cstdint>
-#include <iostream>
-#include <nlohmann/json.hpp>
-#include <sstream>
-
-#include "color_las_loader.h"
-#include "pfd_wrapper.hpp"
 #include <execution>
+#include <iostream>
+#include <mutex>
+#include <sstream>
+#include <thread>
+#include <vector>
 
 #include <Eigen/Eigen>
+#include <nlohmann/json.hpp>
+
+#include <Core/color_las_loader.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/structures.h>
+#include <Core/transformations.h>
+
 #include <observation_equations/codes/common/include/cauchy.h>
 #include <observation_equations/codes/python-scripts/camera-metrics/equirectangular_camera_colinearity_tait_bryan_wc_jacobian.h>
 #include <observation_equations/codes/python-scripts/camera-metrics/fisheye_camera_calibRT_tait_bryan_wc_jacobian.h>
-#include <structures.h>
-#include <transformations.h>
 
 #include <HDMapping/Version.hpp>
 
@@ -368,7 +369,9 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloud(
 {
     std::vector<mandeye::PointRGB> newCloud(pointsRGB.size());
     std::transform(
+#if USE_EXECUTION_PAR_UNSEQ
         std::execution::par_unseq,
+#endif
         pointsRGB.begin(),
         pointsRGB.end(),
         newCloud.begin(),
@@ -416,7 +419,9 @@ std::vector<mandeye::PointRGB> ApplyColorToPointcloudFishEye(
 {
     std::vector<mandeye::PointRGB> newCloud(pointsRGB.size());
     std::transform(
+#if USE_EXECUTION_PAR_UNSEQ
         std::execution::par_unseq,
+#endif
         pointsRGB.begin(),
         pointsRGB.end(),
         newCloud.begin(),
@@ -649,13 +654,10 @@ void ImGuiLoadSaveButtons()
         const auto input_file_names = mandeye::fd::OpenFileDialog("Choose Image", mandeye::fd::ImageFilter, false);
         if (input_file_names.size())
         {
-            // std::cout << "1" << std::endl;
             tex1 = make_tex(input_file_names.front());
-            // std::cout << "2" << std::endl;
             SD::imageData = stbi_load(input_file_names.front().c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
-            // std::cout << "3" << std::endl;
         }
-        // std::cout << "4" << std::endl;
+
         SystemData::points = ApplyColorToPointcloud(
             SystemData::points,
             SystemData::imageData,
@@ -663,7 +665,6 @@ void ImGuiLoadSaveButtons()
             SystemData::imageHeight,
             SystemData::imageNrChannels,
             SystemData::camera_pose);
-        // std::cout << "5" << std::endl;
     }
     ImGui::SameLine();
     if (ImGui::Button("Load Poincloud"))
@@ -791,13 +792,8 @@ void optimize()
         tripletListP.clear();
         tripletListB.clear();
 
-        // std::cout << "AtPA.size: " << AtPA.size() << std::endl;
-        // std::cout << "AtPB.size: " << AtPB.size() << std::endl;
-
-        // std::cout << "start solving AtPA=AtPB" << std::endl;
         Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
 
-        // std::cout << "x = solver.solve(AtPB)" << std::endl;
         Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
         std::vector<double> h_x;
@@ -812,13 +808,6 @@ void optimize()
 
         if (h_x.size() == 6)
         {
-            // for (size_t i = 0; i < h_x.size(); i++)
-            //{
-            //     std::cout << h_x[i] << std::endl;
-            // }
-            // std::cout << "AtPA=AtPB SOLVED" << std::endl;
-            // std::cout << "update" << std::endl;
-
             int counter = 0;
             pose.px += h_x[counter++] * 0.1;
             pose.py += h_x[counter++] * 0.1;
@@ -960,13 +949,8 @@ void optimize_fish_eye()
         tripletListP.clear();
         tripletListB.clear();
 
-        // std::cout << "AtPA.size: " << AtPA.size() << std::endl;
-        // std::cout << "AtPB.size: " << AtPB.size() << std::endl;
-
-        // std::cout << "start solving AtPA=AtPB" << std::endl;
         Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
 
-        // std::cout << "x = solver.solve(AtPB)" << std::endl;
         Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
         std::vector<double> h_x;
@@ -981,13 +965,6 @@ void optimize_fish_eye()
 
         if (h_x.size() == 6)
         {
-            // for (size_t i = 0; i < h_x.size(); i++)
-            //{
-            //     std::cout << h_x[i] << std::endl;
-            // }
-            // std::cout << "AtPA=AtPB SOLVED" << std::endl;
-            // std::cout << "update" << std::endl;
-
             int counter = 0;
             pose.px += h_x[counter++] * 0.1;
             pose.py += h_x[counter++] * 0.1;
@@ -1385,13 +1362,15 @@ void mouse(int glut_button, int state, int x, int y)
                 std::pair<double, int> distanceIndexPair{ std::numeric_limits<double>::max(), -1 };
 
                 std::for_each(
+#if USE_EXECUTION_PAR_UNSEQ
                     std::execution::par_unseq,
+#endif
                     SystemData::points.begin(),
                     SystemData::points.end(),
                     [&](const mandeye::PointRGB& p)
                     {
                         double D = GetDistanceToRay(p.point, SystemData::clickedRay);
-                        std::lock_guard<std::mutex> guard(mtx);
+                        std::scoped_lock guard(mtx);
                         if (D < distanceIndexPair.first)
                         {
                             // Assume that SystemData::point is an array-like type implementation, naked pointer arithmetic ahead:

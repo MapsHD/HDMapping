@@ -12,26 +12,24 @@
 
 #include "lidar_odometry.h"
 #include "lidar_odometry_utils.h"
-#include <export_laz.h>
-#include <registration_plane_feature.h>
 
-#include <utils.hpp>
+#include <Core/export_laz.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/registration_plane_feature.h>
+#include <Core/session.h>
+#include <Core/utils.hpp>
 
 #include "toml_io.h"
 #include <HDMapping/Version.hpp>
 #include <chrono>
 #include <ctime>
-#include <export_laz.h>
 #include <mutex>
-#include <pfd_wrapper.hpp>
-#include <session.h>
 #include <spdlog/cfg/env.h>
 #include <spdlog/spdlog.h>
 
 #ifdef _WIN32
 #include "resource.h"
 #include <windows.h>
-
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -140,13 +138,17 @@ namespace fs = std::filesystem;
 bool is_settings_gui = false;
 bool full_debug_messages = false;
 NDT ndt;
-bool show_reference_buckets = true;
+bool show_reference_buckets_indoor = false;
+bool show_reference_buckets_outdoor = false;
 bool show_reference_points = false;
 int dec_reference_points = 100;
 bool show_initial_points = true;
 bool show_trajectory = true;
 bool show_trajectory_as_axes = false;
-bool show_covs = false;
+bool show_prediction_vectors = false;
+bool intermediate_trajectory_prediction_axes = false;
+bool show_covs_indoor = false;
+bool show_covs_outdoor = false;
 int dec_covs = 10;
 bool simple_gui = true;
 bool step_1_done = false;
@@ -322,7 +324,6 @@ void find_best_stretch(
     {
         auto lower = std::lower_bound(timestamps.begin(), timestamps.end(), points[i].timestamp);
         points[i].index_pose = std::distance(timestamps.begin(), lower);
-        // std::cout << "points[i].timestamp " << points[i].timestamp << " timestamps " << timestamps[points[i].index_pose] << std::endl;
     }
 
     std::set<int> indexes;
@@ -391,6 +392,8 @@ void find_best_stretch(
                 // }
             }
         }
+        std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
+
         update_rgd(rgd_params, my_buckets, points_global2, trajectory_stretched[0].translation());
 
         std::cout << "number of buckets [" << x << "]: " << my_buckets.size() << std::endl;
@@ -464,7 +467,7 @@ void alternative_approach()
             }
 
             std::cout << "loading imu" << std::endl;
-            std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
+            Imu imu_data;
 
             std::for_each(std::begin(csv_files), std::end(csv_files), [&imu_data](const std::string& fn)
                 {
@@ -472,67 +475,95 @@ void alternative_approach()
                     std::cout << fn << std::endl;
                     imu_data.insert(std::end(imu_data), std::begin(imu), std::end(imu)); });
 
-            FusionAhrs ahrs;
-            FusionAhrsInitialise(&ahrs);
-
-            if (params.fusionConventionNwu)
-            {
-                ahrs.settings.convention = FusionConventionNwu;
-            }
-            if (params.fusionConventionEnu)
-            {
-                ahrs.settings.convention = FusionConventionEnu;
-            }
-            if (params.fusionConventionNed)
-            {
-                ahrs.settings.convention = FusionConventionNed;
-            }
-
             std::map<double, Eigen::Matrix4d> trajectory;
-
             int counter = 1;
-            static bool first = true;
-            static double last_ts;
+            const float RAD_TO_DEG = 180.0f / static_cast<float>(M_PI);
 
-            for (const auto& [timestamp_pair, gyr, acc] : imu_data)
+            if (params.use_vqf)
             {
-                const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * RAD_TO_DEG), static_cast<float>(gyr.axis.y * RAD_TO_DEG), static_cast<float>(gyr.axis.z * RAD_TO_DEG) };
-                const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
-
-                //FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-                if (first)
+                double avg_dt = 1.0 / 200.0;
+                if (imu_data.size() >= 2)
                 {
-                    FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
-                    first = false;
+                    double t0 = std::get<0>(imu_data.front()).first;
+                    double t1 = std::get<0>(imu_data.back()).first;
+                    if (t1 > t0)
+                        avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
                 }
-                else
+
+                VQFParams vqf_params = buildVQFParams(params);
+                VQF vqf(vqf_params, avg_dt);
+
+                for (const auto& [timestamp_pair, gyr, acc] : imu_data)
                 {
-                    double curr_ts = timestamp_pair.first;
-                    double ts_diff = curr_ts - last_ts;
-                    if (ts_diff < 0.01)
+                    const double g = 9.81;
+                    vqf_real_t gyr_vqf[3] = { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) };
+                    vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g, static_cast<double>(acc.y()) * g, static_cast<double>(acc.z()) * g };
+
+                    vqf.update(gyr_vqf, acc_vqf);
+
+                    vqf_real_t quat[4];
+                    if (params.vqf_useMagnetometer)
+                        vqf.getQuat9D(quat);
+                    else
+                        vqf.getQuat6D(quat);
+                    Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
+                    Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
+                    t.rotate(d);
+                    trajectory[timestamp_pair.first] = t.matrix();
+                    counter++;
+                    if (counter % 100 == 0)
                     {
-                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+                        Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
+                        std::cout << "Roll " << euler.x() << ", Pitch " << euler.y() << ", Yaw " << euler.z() << " [" << counter << " of " << imu_data.size() << "]" << std::endl;
+                    }
+                }
+            }
+            else
+            {
+                FusionAhrs ahrs;
+                FusionAhrsInitialise(&ahrs);
+                if (params.fusionConventionNwu) ahrs.settings.convention = FusionConventionNwu;
+                else if (params.fusionConventionEnu) ahrs.settings.convention = FusionConventionEnu;
+                else if (params.fusionConventionNed) ahrs.settings.convention = FusionConventionNed;
+                ahrs.settings.gain = params.fusion_gain;
+
+                bool first = true;
+                double last_ts = 0.0;
+
+                for (const auto& [timestamp_pair, gyr, acc] : imu_data)
+                {
+                    const FusionVector gyroscope = { static_cast<float>(gyr.x() * RAD_TO_DEG),
+                                                     static_cast<float>(gyr.y() * RAD_TO_DEG),
+                                                     static_cast<float>(gyr.z() * RAD_TO_DEG) };
+                    const FusionVector accelerometer = { acc.x(), acc.y(), acc.z() };
+
+                    if (first)
+                    {
+                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0f / 200.0f);
+                        first = false;
                     }
                     else
                     {
-                        std::cout << "IMU TS jump!!!" << std::endl;
-                        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0 / 200.0);
+                        float ts_diff = static_cast<float>(timestamp_pair.first - last_ts);
+                        if (ts_diff < 0.01f)
+                            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
+                        else
+                            FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 1.0f / 200.0f);
                     }
-                }
-                last_ts = timestamp_pair.first;
+                    last_ts = timestamp_pair.first;
 
-                FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-                Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
-                Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
-                t.rotate(d);
-
-                trajectory[timestamp_pair.first] = t.matrix();
-                const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
-                counter++;
-                if (counter % 100 == 0)
-                {
-                    std::cout << << "Roll " << euler.angle.roll<< ", Pitch " << euler.angle.pitch<< ", Yaw " << euler.angle.yaw<< " [" << counter++ << " of " << imu_data.size() << "]"<< std::endl;
+                    FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
+                    Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
+                    Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
+                    t.rotate(d);
+                    trajectory[timestamp_pair.first] = t.matrix();
+                    counter++;
+                    if (counter % 100 == 0)
+                    {
+                        const FusionEuler euler = FusionQuaternionToEuler(quat);
+                        std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw
+                                  << " [" << counter << " of " << imu_data.size() << "]" << std::endl;
+                    }
                 }
             }
 
@@ -622,15 +653,7 @@ void step1(const std::atomic<bool>& loPause)
         if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
         {
             working_directory = fs::path(input_file_names[0]).parent_path().string();
-            calculate_trajectory(
-                trajectory,
-                imu_data,
-                params.fusionConventionNwu,
-                params.fusionConventionEnu,
-                params.fusionConventionNed,
-                params.ahrs_gain,
-                full_debug_messages,
-                params.use_removie_imu_bias_from_first_stationary_scan);
+            calculate_trajectory(trajectory, imu_data, params, full_debug_messages);
             compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
             step_1_done = true;
         }
@@ -904,48 +927,223 @@ void settings_gui()
 
             ImGui::NewLine();
 
-            static int fusionConvention; // 0=NWU, 1=ENU, 2=NED
-            // initialize if none selected
-            if (fusionConvention < 0 || fusionConvention > 2)
-                fusionConvention = 0;
-
-            ImGui::Text("Fusion convention: ");
+            // AHRS type selection
+            ImGui::Checkbox("Use VQF (instead of Fusion/Madgwick)", &params.use_vqf);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(
-                    "Coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");
+                    "Unchecked = Fusion (Madgwick complementary filter, default)\nChecked = VQF (Versatile Quaternion-based Filter)");
 
-            ImGui::SameLine();
-            ImGui::RadioButton("NWU", &fusionConvention, 0);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("North West Up");
-            ImGui::SameLine();
-            ImGui::RadioButton("ENU", &fusionConvention, 1);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("East North Up");
-            ImGui::SameLine();
-            ImGui::RadioButton("NED", &fusionConvention, 2);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("North East Down");
+            if (!params.use_vqf)
+            {
+                // Fusion-specific parameters
+                static int fusionConvention; // 0=NWU, 1=ENU, 2=NED
+                if (fusionConvention < 0 || fusionConvention > 2)
+                    fusionConvention = 0;
 
-            // then update your bools if you still need them
-            params.fusionConventionNwu = (fusionConvention == 0);
-            params.fusionConventionEnu = (fusionConvention == 1);
-            params.fusionConventionNed = (fusionConvention == 2);
+                ImGui::Text("Fusion convention: ");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Coordinate system conventions for sensor fusion defining how the axes are oriented relative to world frame");
+
+                ImGui::SameLine();
+                ImGui::RadioButton("NWU", &fusionConvention, 0);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("North West Up");
+                ImGui::SameLine();
+                ImGui::RadioButton("ENU", &fusionConvention, 1);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("East North Up");
+                ImGui::SameLine();
+                ImGui::RadioButton("NED", &fusionConvention, 2);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("North East Down");
+
+                params.fusionConventionNwu = (fusionConvention == 0);
+                params.fusionConventionEnu = (fusionConvention == 1);
+                params.fusionConventionNed = (fusionConvention == 2);
+
+                ImGui::InputDouble("Fusion gain", &params.fusion_gain, 0.0, 0.0, "%.3f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Complementary filter gain (0-1). Higher = more accelerometer trust.");
+            }
 
             ImGui::NewLine();
 
             ImGui::Checkbox("Use motion from previous step", &params.use_motion_from_previous_step);
-            ImGui::InputDouble("AHRS gain", &params.ahrs_gain, 0.0, 0.0, "%.3f");
-            if (ImGui::IsItemHovered())
+            ImGui::Checkbox("Use IMU preintegration", &params.use_imu_preintegration);
+            if (params.use_imu_preintegration)
             {
-                ImGui::BeginTooltip();
-                ImGui::Text("Attitude and Heading Reference System gain:");
-                ImGui::Text(
-                    "How strongly the accelerometer/magnetometer corrections influence the orientation estimate versus gyroscope "
-                    "integration");
-                ImGui::Text("Larger value means faster response to changes in orientation, but more noise");
-                ImGui::EndTooltip();
+                const char* methods[] = { "Euler, no gravity comp., SM velocity",      "Trapezoidal, no gravity comp., SM velocity",
+                                          "Euler, gravity comp., SM velocity",         "Trapezoidal, gravity comp., SM velocity",
+                                          "Kalman, gravity comp., SM velocity",        "Euler, gravity comp., AHRS velocity",
+                                          "Trapezoidal, gravity comp., AHRS velocity", "Kalman, gravity comp., AHRS velocity" };
+                ImGui::Combo("IMU preintegration method", &params.imu_preintegration_method, methods, IM_ARRAYSIZE(methods));
             }
+            if (params.use_vqf)
+            {
+                ImGui::InputDouble("VQF tauAcc [s]", &params.vqf_tauAcc, 0.0, 0.0, "%.3f");
+                if (ImGui::IsItemHovered())
+                {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("VQF accelerometer time constant (tauAcc) in seconds.");
+                    ImGui::Text("Controls how strongly accelerometer corrects the gyroscope-based orientation.");
+                    ImGui::Text("Higher = more gyro trust (stable but may drift). Lower = more acc trust (noisy but no drift).");
+                    ImGui::EndTooltip();
+                }
+
+                if (ImGui::TreeNode("VQF Gyro Bias Estimation"))
+                {
+                    ImGui::Checkbox("Motion bias estimation", &params.vqf_motionBiasEstEnabled);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Enables gyroscope bias estimation during motion phases,\nbased on the inclination correction only (without "
+                            "magnetometer).");
+
+                    if (params.vqf_motionBiasEstEnabled)
+                    {
+                        ImGui::InputDouble("Bias sigma motion [deg/s]", &params.vqf_biasSigmaMotion, 0.0, 0.0, "%.4f");
+                        if (ImGui::IsItemHovered())
+                            ImGui::SetTooltip(
+                                "Std dev of converged bias estimation uncertainty during motion.\nDetermines trust on motion bias "
+                                "estimation "
+                                "updates.\nSmall value leads to fast convergence. Default: 0.1");
+                        ImGui::InputDouble("Bias vertical forgetting", &params.vqf_biasVerticalForgettingFactor, 0.0, 0.0, "%.6f");
+                        if (ImGui::IsItemHovered())
+                            ImGui::SetTooltip(
+                                "Forgetting factor for unobservable bias in vertical direction during motion.\nGyro bias is not observable "
+                                "vertically without magnetometer.\nRelative weight of artificial zero measurement ensuring\nbias estimate "
+                                "decays to zero. Default: 0.0001");
+                    }
+
+                    ImGui::InputDouble("Bias sigma init [deg/s]", &params.vqf_biasSigmaInit, 0.0, 0.0, "%.3f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Std dev of the initial bias estimation uncertainty. Default: 0.5 deg/s");
+                    ImGui::InputDouble("Bias forgetting time [s]", &params.vqf_biasForgettingTime, 0.0, 0.0, "%.1f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Time in which bias estimation uncertainty increases from 0 to 0.1 deg/s.\nDetermines the system noise assumed "
+                            "by "
+                            "the Kalman filter. Default: 100.0");
+                    ImGui::InputDouble("Bias clip [deg/s]", &params.vqf_biasClip, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Maximum expected gyroscope bias.\nUsed to clip bias estimate and measurement error in update step.\nAlso used "
+                            "by "
+                            "rest detection to not regard large constant angular rate as rest.\nDefault: 2.0");
+
+                    ImGui::Checkbox("Rest bias estimation", &params.vqf_restBiasEstEnabled);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Enables rest detection and gyroscope bias estimation during rest phases.\nDuring rest, gyro bias is estimated "
+                            "from low-pass filtered gyro readings.");
+
+                    if (params.vqf_restBiasEstEnabled)
+                    {
+                        ImGui::InputDouble("Bias sigma rest [deg/s]", &params.vqf_biasSigmaRest, 0.0, 0.0, "%.4f");
+                        if (ImGui::IsItemHovered())
+                            ImGui::SetTooltip(
+                                "Std dev of converged bias estimation uncertainty during rest.\nDetermines trust on rest bias estimation "
+                                "updates.\nSmall value leads to fast convergence. Default: 0.03");
+                        ImGui::InputDouble("Rest min time [s]", &params.vqf_restMinT, 0.0, 0.0, "%.2f");
+                        if (ImGui::IsItemHovered())
+                            ImGui::SetTooltip(
+                                "Time threshold for rest detection.\nRest is detected when measurements have been close to\nthe low-pass "
+                                "filtered reference for the given time. Default: 1.5");
+                        ImGui::InputDouble("Rest filter tau [s]", &params.vqf_restFilterTau, 0.0, 0.0, "%.2f");
+                        if (ImGui::IsItemHovered())
+                            ImGui::SetTooltip(
+                                "Time constant for the second-order Butterworth low-pass filter\nused to obtain the reference for rest "
+                                "detection. Default: 0.5");
+                        ImGui::InputDouble("Rest threshold gyro [deg/s]", &params.vqf_restThGyr, 0.0, 0.0, "%.2f");
+                        if (ImGui::IsItemHovered())
+                            ImGui::SetTooltip(
+                                "Angular velocity threshold for rest detection.\nDeviation norm between measurement and reference must be "
+                                "below threshold.\nEach component must also be below biasClip. Default: 2.0");
+                        ImGui::InputDouble("Rest threshold acc [m/s2]", &params.vqf_restThAcc, 0.0, 0.0, "%.2f");
+                        if (ImGui::IsItemHovered())
+                            ImGui::SetTooltip(
+                                "Acceleration threshold for rest detection.\nDeviation norm between measurement and reference must be "
+                                "below threshold.\nDefault: 0.5");
+                    }
+
+                    ImGui::TreePop();
+                }
+
+                ImGui::Checkbox("Use magnetometer", &params.vqf_useMagnetometer);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Enable 9D mode (gyro+acc+mag) for absolute heading correction.\nDefault: off (6D mode, gyro+acc only, heading "
+                        "from "
+                        "gyro integration).");
+
+                if (params.vqf_useMagnetometer && ImGui::TreeNode("VQF Magnetometer"))
+                {
+                    ImGui::InputDouble("tauMag [s]", &params.vqf_tauMag, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Time constant for magnetometer update.\nSmall values imply trust on magnetometer, large values trust on "
+                            "gyroscope.\nCorresponds to cutoff frequency of first-order LP filter\nfor heading correction. Default: 9.0");
+                    ImGui::Checkbox("Mag disturbance rejection", &params.vqf_magDistRejectionEnabled);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Enables magnetic disturbance detection and rejection.\nFor short disturbances, mag correction is fully "
+                            "disabled.\nFor long disturbances (>magMaxRejectionTime), correction uses\nincreased time constant "
+                            "(magRejectionFactor).");
+                    ImGui::InputDouble("Mag current tau [s]", &params.vqf_magCurrentTau, 0.0, 0.0, "%.3f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Time constant for current norm/dip value in disturbance detection.\nFast LP filter for robustness with noisy "
+                            "or "
+                            "async mag measurements.\nSet to -1 to disable. Default: 0.05");
+                    ImGui::InputDouble("Mag ref tau [s]", &params.vqf_magRefTau, 0.0, 0.0, "%.1f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Time constant for adjustment of the magnetic field reference.\nAllows reference to converge to observed "
+                            "undisturbed field. Default: 20.0");
+                    ImGui::InputDouble("Mag norm threshold", &params.vqf_magNormTh, 0.0, 0.0, "%.3f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Relative threshold for magnetic field strength for disturbance detection.\nRelative to the reference norm. "
+                            "Default: 0.1 (10%%)");
+                    ImGui::InputDouble("Mag dip threshold [deg]", &params.vqf_magDipTh, 0.0, 0.0, "%.1f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Threshold for the magnetic field dip angle for disturbance detection. Default: 10.0");
+                    ImGui::InputDouble("Mag new time [s]", &params.vqf_magNewTime, 0.0, 0.0, "%.1f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Duration after which to accept a different homogeneous magnetic field.\nNew reference accepted when within "
+                            "magNormTh and magDipTh for this time.\nOnly phases with sufficient movement (magNewMinGyr) count. Default: "
+                            "20.0");
+                    ImGui::InputDouble("Mag new first time [s]", &params.vqf_magNewFirstTime, 0.0, 0.0, "%.1f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Duration after which to accept a homogeneous magnetic field for the first time.\nUsed instead of magNewTime "
+                            "when "
+                            "no current estimate exists,\nto allow faster initial reference acquisition. Default: 5.0");
+                    ImGui::InputDouble("Mag new min gyro [deg/s]", &params.vqf_magNewMinGyr, 0.0, 0.0, "%.1f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Minimum angular velocity needed to count time for new mag field acceptance.\nPeriods with angular velocity "
+                            "norm "
+                            "below this threshold\ndo not count towards magNewTime. Default: 20.0");
+                    ImGui::InputDouble("Mag min undisturbed [s]", &params.vqf_magMinUndisturbedTime, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Minimum duration within thresholds after which to regard\nthe field as undisturbed again. Default: 0.5");
+                    ImGui::InputDouble("Mag max rejection [s]", &params.vqf_magMaxRejectionTime, 0.0, 0.0, "%.1f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Maximum duration of full magnetic disturbance rejection.\nUp to this duration, heading correction is fully "
+                            "disabled\nand tracked by gyroscope only. After this, correction uses\nincreased time constant "
+                            "(magRejectionFactor). Default: 60.0");
+                    ImGui::InputDouble("Mag rejection factor", &params.vqf_magRejectionFactor, 0.0, 0.0, "%.2f");
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Factor by which to slow heading correction during long disturbed phases.\nAfter magMaxRejectionTime of full "
+                            "rejection, correction uses\nthis factor to increase the time constant. Default: 2.0");
+                    ImGui::TreePop();
+                }
+            } // end if (params.use_vqf)
 
             ImGui::PopItemWidth();
         }
@@ -985,7 +1183,7 @@ void settings_gui()
             {
                 ImGui::BeginTooltip();
                 ImGui::Text("This process makes trajectory smooth, point cloud will be more consistent");
-                ImGui::SetTooltip("Press optionally before pressing 'Save result'");
+                ImGui::Text("Press optionally before pressing 'Save result'");
                 ImGui::EndTooltip();
             }
 
@@ -996,11 +1194,13 @@ void settings_gui()
 
             if (ImGui::Button("Save result"))
                 save_results(true, 0.0);
-
-            ImGui::SameLine();
-            ImGui::Text(
-                "Press this button for saving resulting trajectory and point clouds as single session for "
-                "'multi_view_tls_registration_step_2' program");
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Press this button for saving resulting trajectory and point clouds");
+                ImGui::Text("as single session for 'multi_view_tls_registration_step_2' program");
+                ImGui::EndTooltip();
+            }
         }
         if (step_1_done && step_2_done)
         {
@@ -1102,11 +1302,23 @@ void settings_gui()
                 }
             }
 
+            if (ImGui::Button("Set parameters for drone with Ouster (https://ntu-aris.github.io/ntu_viral_dataset/)"))
+            {
+                params.decimation = 1.0;
+                params.in_out_params_indoor.resolution_X = 1.0;
+                params.in_out_params_indoor.resolution_Y = 1.0;
+                params.in_out_params_indoor.resolution_Z = 1.0;
+
+                params.in_out_params_outdoor.resolution_X = 2.0;
+                params.in_out_params_outdoor.resolution_Y = 2.0;
+                params.in_out_params_outdoor.resolution_Z = 2.0;
+            }
+
             if (!input_file_names.empty())
             {
                 ImGui::Checkbox("Show points", &show_reference_points);
                 ImGui::SameLine();
-                ImGui::Checkbox("Show buckets", &show_reference_buckets);
+                // ImGui::Checkbox("Show buckets ", &show_reference_buckets);
                 ImGui::SetNextItemWidth(ImGuiNumberWidth);
                 ImGui::InputInt("Downsamplingn###ref", &dec_reference_points);
 
@@ -1147,7 +1359,7 @@ void settings_gui()
                     {
                         for (int i = 0; i < 30; i++)
                         {
-                            align_to_reference(params.in_out_params_indoor, params.initial_points, params.m_g, params.reference_buckets);
+                            align_to_reference(params.in_out_params_indoor, params.initial_points, params.m_g, params.buckets_indoor);
                         }
                     }
                 }
@@ -1515,6 +1727,18 @@ void progress_window()
     ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), progressText);
     ImGui::Text("%s", timeInfo);
 
+#ifdef _WIN32
+    // Update Windows taskbar progress
+    if (progress > 0.01f && progress < 1.0f)
+    {
+        SetTaskbarProgress(progress);
+    }
+    else if (progress >= 1.0f)
+    {
+        ClearTaskbarProgress();
+    }
+#endif
+
     ImGui::NewLine();
 
     if (!loPause)
@@ -1537,6 +1761,17 @@ void progress_window()
     }
     ImGui::SameLine();
     ImGui::Text("Also check console for progress..");
+
+    ImGui::Checkbox("Show reference buckets indoor", &show_reference_buckets_indoor);
+    ImGui::Checkbox("Show reference buckets outdoor", &show_reference_buckets_outdoor);
+    ImGui::Checkbox("Show initial points", &show_initial_points);
+    ImGui::Checkbox("Show trajectory", &show_trajectory);
+    ImGui::Checkbox("Show trajectory as axes", &show_trajectory_as_axes);
+    ImGui::Checkbox("Show prediction vectors", &show_prediction_vectors);
+    ImGui::Checkbox("Show intermediate trajectory prediction axes", &intermediate_trajectory_prediction_axes);
+
+    // ImGui::Checkbox("Show covs indoor", &show_covs_indoor);
+    // ImGui::Checkbox("Show covs outdoor", &show_covs_outdoor);
 
     ImGui::End();
 }
@@ -1611,15 +1846,7 @@ void step1(
     if (load_data(input_file_names, params, pointsPerFile, imu_data, full_debug_messages))
     {
         working_directory = fs::path(input_file_names[0]).parent_path().string();
-        calculate_trajectory(
-            trajectory,
-            imu_data,
-            params.fusionConventionNwu,
-            params.fusionConventionEnu,
-            params.fusionConventionNed,
-            params.ahrs_gain,
-            full_debug_messages,
-            params.use_removie_imu_bias_from_first_stationary_scan);
+        calculate_trajectory(trajectory, imu_data, params, full_debug_messages);
         compute_step_1(pointsPerFile, params, trajectory, worker_data, loPause);
         std::cout << "step_1_done" << std::endl;
     }
@@ -1691,12 +1918,6 @@ void display()
         glEnd();
     }
 
-    if (show_covs)
-    {
-        for (const auto& b : params.buckets_indoor)
-            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
-    }
-
 #if 0 // ToDo
     for (size_t i = 0; i < worker_data.size(); i++)
     {
@@ -1707,8 +1928,6 @@ void display()
             glBegin(GL_POINTS);
             for (const auto &p : worker_data[i].intermediate_points)
             {
-                // std::cout << "kk";
-                // std::cout << p.index_pose;
                 Eigen::Vector3d pt = worker_data[i].intermediate_trajectory[p.index_pose] * p.point;
                 glVertex3d(pt.x(), pt.y(), pt.z());
             }
@@ -1764,6 +1983,59 @@ void display()
         glEnd();
     }
 
+    if (show_prediction_vectors)
+    {
+        glDisable(GL_DEPTH_TEST);
+        glLineWidth(3.0f);
+        glBegin(GL_LINES);
+        for (const auto& wd : worker_data)
+        {
+            if (wd.intermediate_trajectory.empty() || wd.imu_prediction_vector.norm() < 1e-6)
+                continue;
+
+            Eigen::Vector3d start = wd.intermediate_trajectory.front().translation();
+            Eigen::Vector3d end = start + wd.imu_prediction_vector;
+
+            glColor3f(1.0f, 0.0f, 1.0f); // magenta
+            glVertex3d(start.x(), start.y(), start.z());
+            glVertex3d(end.x(), end.y(), end.z());
+        }
+        glEnd();
+        glLineWidth(1.0f);
+        glEnable(GL_DEPTH_TEST);
+    }
+
+    if (intermediate_trajectory_prediction_axes)
+    {
+        glLineWidth(1.0f);
+        glBegin(GL_LINES);
+        for (const auto& wd : worker_data)
+        {
+            if (wd.intermediate_trajectory.empty() || wd.intermediate_trajectory_prediction.empty())
+                continue;
+
+            for (size_t i = 0; i < std::min(wd.intermediate_trajectory.size(), wd.intermediate_trajectory_prediction.size()); i++)
+            {
+                const auto& it = wd.intermediate_trajectory[i];
+                const auto& pred_axis = wd.intermediate_trajectory_prediction[i];
+
+                glColor3f(1, 0, 0);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + pred_axis(0, 0) * 0.05, it(1, 3) + pred_axis(1, 0) * 0.05, it(2, 3) + pred_axis(2, 0) * 0.05);
+
+                glColor3f(0, 1, 0);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + pred_axis(0, 1) * 0.05, it(1, 3) + pred_axis(1, 1) * 0.05, it(2, 3) + pred_axis(2, 1) * 0.05);
+
+                glColor3f(0, 0, 1);
+                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
+                glVertex3f(it(0, 3) + pred_axis(0, 2) * 0.05, it(1, 3) + pred_axis(1, 2) * 0.05, it(2, 3) + pred_axis(2, 2) * 0.05);
+            }
+        }
+        glEnd();
+        glLineWidth(1.0f);
+    }
+
     if (show_trajectory)
     {
         glPointSize(3);
@@ -1799,13 +2071,58 @@ void display()
         glEnd();
     }
 
-    if (show_reference_buckets)
+    if (show_reference_buckets_indoor)
     {
+        std::scoped_lock lock(params.mutex_buckets_indoor);
         glColor3f(1, 0, 0);
         glBegin(GL_POINTS);
-        for (const auto& b : params.reference_buckets)
+        for (const auto& b : params.buckets_indoor)
+        {
+            if (b.second.number_of_points == -1)
+            {
+                glColor3f(0, 1, 1);
+            }
+            else
+            {
+                glColor3f(1, 0, 0);
+            }
             glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+        }
         glEnd();
+    }
+
+    if (show_reference_buckets_outdoor)
+    {
+        std::scoped_lock lock2(params.mutex_buckets_outdoor);
+        glColor3f(0, 0, 1);
+        glBegin(GL_POINTS);
+        for (const auto& b : params.buckets_outdoor)
+        {
+            if (b.second.number_of_points == -1)
+            {
+                glColor3f(1, 0, 1);
+            }
+            else
+            {
+                glColor3f(0, 0, 1);
+            }
+            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+        }
+        glEnd();
+    }
+
+    if (show_covs_indoor)
+    {
+        std::scoped_lock lock(params.mutex_buckets_indoor);
+        for (const auto& b : params.buckets_indoor)
+            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(1.0f, 0.0f, 0.0f), 3);
+    }
+
+    if (show_covs_outdoor)
+    {
+        std::scoped_lock lock2(params.mutex_buckets_outdoor);
+        for (const auto& b : params.buckets_outdoor)
+            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
     }
 
     //
@@ -1873,7 +2190,7 @@ void display()
         {
             if (ImGui::BeginMenu("Presets"))
             {
-                if (ImGui::MenuItem("1 Velocity < 8km/h, tiny spaces", nullptr, (lastPar == 1)))
+                if (ImGui::MenuItem("1 Velocity < 8km/h, tiny spaces (default)", nullptr, (lastPar == 1)))
                 {
                     lastPar = 1;
 
@@ -1881,69 +2198,9 @@ void display()
 
                     std::cout << "clicked: Set parameters for velocity up to 8km/h, tiny spaces" << std::endl;
                 }
-                if (ImGui::MenuItem("2 Velocity < 8km/h, quick but less accurate/precise", nullptr, (lastPar == 2)))
+                if (ImGui::MenuItem("2 Velocity < 8km/h, larger spaces, precise forestry (generic)", nullptr, (lastPar == 2)))
                 {
                     lastPar = 2;
-
-                    params.decimation = 0.03;
-                    params.in_out_params_indoor.resolution_X = 0.1;
-                    params.in_out_params_indoor.resolution_Y = 0.1;
-                    params.in_out_params_indoor.resolution_Z = 0.1;
-
-                    params.in_out_params_outdoor.resolution_X = 0.3;
-                    params.in_out_params_outdoor.resolution_Y = 0.3;
-                    params.in_out_params_outdoor.resolution_Z = 0.3;
-
-                    params.filter_threshold_xy_inner = 0.3;
-                    params.filter_threshold_xy_outer = 70.0;
-                    params.threshould_output_filter = 0.3;
-
-                    params.use_robust_and_accurate_lidar_odometry = false;
-                    params.distance_bucket = 0.2;
-                    params.polar_angle_deg = 10.0;
-                    params.azimutal_angle_deg = 10.0;
-                    params.robust_and_accurate_lidar_odometry_iterations = 20;
-
-                    params.max_distance_lidar = 30.0;
-                    params.nr_iter = 30;
-                    params.sliding_window_trajectory_length_threshold = 200;
-                    params.real_time_threshold_seconds = 0.3;
-
-                    std::cout << "clicked: Set parameters for velocity < 8km/h, quick but less accurate/precise" << std::endl;
-                }
-                if (ImGui::MenuItem("3 Velocity < 30 km/h, fast motion, open spaces", nullptr, (lastPar == 3)))
-                {
-                    lastPar = 3;
-
-                    params.decimation = 0.03;
-                    params.in_out_params_indoor.resolution_X = 0.3;
-                    params.in_out_params_indoor.resolution_Y = 0.3;
-                    params.in_out_params_indoor.resolution_Z = 0.3;
-
-                    params.in_out_params_outdoor.resolution_X = 0.5;
-                    params.in_out_params_outdoor.resolution_Y = 0.5;
-                    params.in_out_params_outdoor.resolution_Z = 0.5;
-
-                    params.filter_threshold_xy_inner = 3.0;
-                    params.filter_threshold_xy_outer = 70.0;
-                    params.threshould_output_filter = 3.0;
-
-                    params.use_robust_and_accurate_lidar_odometry = false;
-                    params.distance_bucket = 0.2;
-                    params.polar_angle_deg = 10.0;
-                    params.azimutal_angle_deg = 10.0;
-                    params.robust_and_accurate_lidar_odometry_iterations = 20;
-
-                    params.max_distance_lidar = 70.0;
-                    params.nr_iter = 500;
-                    params.sliding_window_trajectory_length_threshold = 200;
-                    params.real_time_threshold_seconds = 10;
-
-                    std::cout << "clicked: Set parameters for velocity < 30 km/h, fast motion, open spaces" << std::endl;
-                }
-                if (ImGui::MenuItem("4 Velocity < 8km/h, precise forestry", nullptr, (lastPar == 4)))
-                {
-                    lastPar = 4;
 
                     params.decimation = 0.01;
                     params.in_out_params_indoor.resolution_X = 0.1;
@@ -1954,7 +2211,7 @@ void display()
                     params.in_out_params_outdoor.resolution_Y = 0.3;
                     params.in_out_params_outdoor.resolution_Z = 0.3;
 
-                    params.filter_threshold_xy_inner = 1.5;
+                    params.filter_threshold_xy_inner = 1.0;
                     params.filter_threshold_xy_outer = 70.0;
                     params.threshould_output_filter = 1.5;
 
@@ -1969,7 +2226,37 @@ void display()
                     params.sliding_window_trajectory_length_threshold = 10000;
                     params.real_time_threshold_seconds = 10;
 
-                    std::cout << "clicked: Set parameters for velocity < 8km/h, precise forestry" << std::endl;
+                    std::cout << "clicked: Set parameters for velocity < 8km/h, larger spaces, precise forestry (generic)" << std::endl;
+                }
+                if (ImGui::MenuItem("3 Velocity < 30 km/h, largest open spaces, fast motion", nullptr, (lastPar == 3)))
+                {
+                    lastPar = 3;
+
+                    params.decimation = 0.03;
+                    params.in_out_params_indoor.resolution_X = 0.3;
+                    params.in_out_params_indoor.resolution_Y = 0.3;
+                    params.in_out_params_indoor.resolution_Z = 0.3;
+
+                    params.in_out_params_outdoor.resolution_X = 0.5;
+                    params.in_out_params_outdoor.resolution_Y = 0.5;
+                    params.in_out_params_outdoor.resolution_Z = 0.5;
+
+                    params.filter_threshold_xy_inner = 1.0;
+                    params.filter_threshold_xy_outer = 70.0;
+                    params.threshould_output_filter = 3.0;
+
+                    params.use_robust_and_accurate_lidar_odometry = false;
+                    params.distance_bucket = 0.2;
+                    params.polar_angle_deg = 10.0;
+                    params.azimutal_angle_deg = 10.0;
+                    params.robust_and_accurate_lidar_odometry_iterations = 20;
+
+                    params.max_distance_lidar = 70.0;
+                    params.nr_iter = 500;
+                    params.sliding_window_trajectory_length_threshold = 200;
+                    params.real_time_threshold_seconds = 10;
+
+                    std::cout << "clicked: Set parameters for velocity < 30 km/h, largest open spaces, fast motion" << std::endl;
                 }
 
                 ImGui::EndMenu();
@@ -1986,7 +2273,7 @@ void display()
 
                 ImGui::MenuItem("Multithread", nullptr, &params.useMultithread);
                 ImGui::SetNextItemWidth(ImGuiNumberWidth / 2);
-                ImGui::InputDouble("Time threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.1f");
+                ImGui::InputDouble("Time threshold [s]", &params.real_time_threshold_seconds, 0.0, 0.0, "%.3f");
                 if (ImGui::IsItemHovered())
                 {
                     ImGui::BeginTooltip();
@@ -2020,8 +2307,9 @@ void display()
                 {
                     ImGui::MenuItem("Use planarity", nullptr, &params.ablation_study_use_planarity);
                     ImGui::MenuItem("Use norm", nullptr, &params.ablation_study_use_norm);
-                    ImGui::MenuItem("Use hierarchical RGD", nullptr, &params.ablation_study_use_hierarchical_rgd);
+                    ImGui::MenuItem("Use hierarchical RGD (outer RGD turned on)", nullptr, &params.ablation_study_use_hierarchical_rgd);
                     ImGui::MenuItem("Use view point and normal vectors", nullptr, &params.ablation_study_use_view_point_and_normal_vectors);
+                    ImGui::MenuItem("Use threshold '1e-6' outer RGD", nullptr, &params.ablation_study_use_threshold_outer_rgd);
 
                     ImGui::EndMenu();
                 }
@@ -2111,6 +2399,9 @@ void display()
                 ImGui::MenuItem("Show initial points", nullptr, &show_initial_points);
                 ImGui::MenuItem("Show trajectory", nullptr, &show_trajectory);
                 ImGui::MenuItem("Show trajectory as axes", nullptr, &show_trajectory_as_axes);
+                ImGui::MenuItem("Show prediction vectors", nullptr, &show_prediction_vectors);
+                ImGui::MenuItem("Show intermediate trajectory prediction axes", nullptr, &intermediate_trajectory_prediction_axes);
+
                 ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
 
                 ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);
@@ -2331,7 +2622,32 @@ int main(int argc, char* argv[])
             return 0;
         }
 
-        if (argc == 4) // runnning from command line
+        if (argc == 2) // running from command line
+        {
+            auto path = fs::path(argv[1]);
+            if (is_directory(path))
+            {
+                std::string working_directory;
+                std::vector<WorkerData> worker_data;
+
+                std::chrono::time_point<std::chrono::system_clock> start, end;
+                start = std::chrono::system_clock::now();
+
+                std::atomic<bool> loPause{ false };
+                step1(path.string(), params, pointsPerFile, imu_data, working_directory, trajectory, worker_data, loPause);
+
+                step2(worker_data, params, loPause);
+
+                end = std::chrono::system_clock::now();
+                std::chrono::duration<double> elapsed_seconds = end - start;
+                std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+                std::cout << "calculations finished computation at " << std::ctime(&end_time)
+                          << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "s\n";
+
+                save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);
+            }
+        }
+        else if (argc == 4) // runnning from command line with custom params
         {
             // Load parameters from file using original TomlIO class
             TomlIO toml_io;
@@ -2363,6 +2679,10 @@ int main(int argc, char* argv[])
 
             initGL(&argc, argv, winTitle, display, mouse);
             glutCloseFunc(on_exit);
+
+#ifdef _WIN32
+            InitTaskbarProgress();
+#endif
 
             glutMainLoop();
 

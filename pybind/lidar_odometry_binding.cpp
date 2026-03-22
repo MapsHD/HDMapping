@@ -1,12 +1,14 @@
-#include <export_laz.h>
-#include <lidar_odometry.h>
-#include <lidar_odometry_utils.h>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
-#include <session.h>
-#include <structures.h>
+
+#include <lidar_odometry.h>
+#include <lidar_odometry_utils.h>
+
+#include <Core/export_laz.h>
+#include <Core/session.h>
+#include <Core/structures.h>
 
 namespace py = pybind11;
 
@@ -66,7 +68,6 @@ PYBIND11_MODULE(lidar_odometry_py, m)
         .def_readwrite("useMultithread", &LidarOdometryParams::useMultithread)
         .def_readwrite("reference_points", &LidarOdometryParams::reference_points)
         .def_readwrite("decimation", &LidarOdometryParams::decimation)
-        .def_readwrite("reference_buckets", &LidarOdometryParams::reference_buckets)
         .def_readwrite("working_directory_preview", &LidarOdometryParams::working_directory_preview)
         .def_readwrite("sliding_window_trajectory_length_threshold", &LidarOdometryParams::sliding_window_trajectory_length_threshold)
         .def_readwrite("save_calibration_validation", &LidarOdometryParams::save_calibration_validation)
@@ -99,7 +100,7 @@ PYBIND11_MODULE(lidar_odometry_py, m)
         .def_readwrite("use_mutliple_gaussian", &LidarOdometryParams::use_mutliple_gaussian)
         .def_readwrite("num_constistency_iter", &LidarOdometryParams::num_constistency_iter)
         .def_readwrite("threshould_output_filter", &LidarOdometryParams::threshould_output_filter)
-        .def_readwrite("ahrs_gain", &LidarOdometryParams::ahrs_gain)
+        .def_readwrite("vqf_tauAcc", &LidarOdometryParams::vqf_tauAcc)
         .def_readwrite("threshold_nr_poses", &LidarOdometryParams::threshold_nr_poses)
         .def_readwrite("current_output_dir", &LidarOdometryParams::current_output_dir)
         //.def_readwrite("min_counter", &LidarOdometryParams::min_counter)

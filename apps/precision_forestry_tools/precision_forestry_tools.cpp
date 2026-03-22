@@ -15,17 +15,18 @@
 
 #include <Eigen/Eigen>
 
-#include "pfd_wrapper.hpp"
-
 #include <HDMapping/Version.hpp>
-#include <local_shape_features.h>
-#include <session.h>
-#include <surface.h>
-#include <transformations.h>
+
+#include <Core/pfd_wrapper.hpp>
+#include <Core/session.h>
+#include <Core/transformations.h>
 
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+
+#include "local_shape_features.h"
+#include "surface.h"
 
 const uint32_t window_width = 800;
 const uint32_t window_height = 600;
@@ -219,7 +220,6 @@ void project_gui()
 
             if (input_file_names.size() == 1)
             {
-                // std::cout << "Las/Laz file (only 1):" << std::endl;
                 for (size_t i = 0; i < input_file_names.size(); i++)
                 {
                     std::cout << input_file_names[i] << std::endl;
@@ -346,13 +346,6 @@ void project_gui()
 
                 LocalShapeFeatures lsf;
                 lsf.calculate_local_shape_features(points_with_lsf, params);
-
-                // for (const auto &p : points_with_lsf)
-                //{
-                //   if (p.valid)
-                //     std::cout << p.planarity << "," << p.cylindrical_likeness << "," << p.plane_likeness << "," << p.sphericity << "," <<
-                //     p.change_of_curvature << "," << p.omnivariance << "," << p.eigen_entropy << std::endl;
-                // }
             }
             else
             {
@@ -514,7 +507,7 @@ void display()
     for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
     {
         session.point_clouds_container.point_clouds[i].render(
-            false, ObservationPicking(), viewer_decmiate_point_cloud, false, false, false, 100000, false);
+            false, ObservationPicking(), viewer_decmiate_point_cloud, 1, false, false, false, 100000, false);
     }
 
     if (session.point_clouds_container.point_clouds.size() == 1)
@@ -528,15 +521,10 @@ void display()
                 session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].x(),
                 session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].y(),
                 session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].z());
-
-            // std::cout << session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].x() << " " <<
-            //     session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].y() << " " <<
-            //     session.point_clouds_container.point_clouds[0].points_local[lowest_points_indexes[i]].z() << std::endl;
         }
         glEnd();
         glPointSize(1);
     }
-    // void render(bool show_with_initial_pose, const ObservationPicking &observation_picking, int viewer_decmiate_point_cloud);
 
     if (show_normal_vectors)
     {

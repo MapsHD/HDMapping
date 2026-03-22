@@ -1,17 +1,17 @@
 #include <pch/pch.h>
 
-#include <pose_graph_slam.h>
+#include <Core/m_estimators.h>
+#include <Core/ndt.h>
+#include <Core/pose_graph_slam.h>
+#include <Core/registration_plane_feature.h>
+#include <Core/transformations.h>
+
 #include <python-scripts/constraints/quaternion_constraint_jacobian.h>
 #include <python-scripts/constraints/relative_pose_quaternion_cw_jacobian.h>
 #include <python-scripts/constraints/relative_pose_quaternion_wc_jacobian.h>
 #include <python-scripts/constraints/relative_pose_rodrigues_wc_jacobian.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_cw_jacobian.h>
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
-
-#include <transformations.h>
-
-#include <ndt.h>
-#include <registration_plane_feature.h>
 
 #ifdef WITH_PCL
 #include <pcl/filters/approximate_voxel_grid.h>
@@ -37,8 +37,6 @@
 #if WITH_MANIF
 #include <manif/SE3.h>
 #endif
-
-#include <m_estimators.h>
 
 std::random_device rd;
 std::mt19937 gen(rd());
@@ -990,11 +988,6 @@ bool PoseGraphSLAM::optimize(PointClouds& point_clouds_container)
             std::cout << "h_x.size(): " << h_x.size() << std::endl;
 
             std::cout << "AtPA=AtPB SOLVED" << std::endl;
-            // std::cout << "updates:" << std::endl;
-            // for (size_t i = 0; i < h_x.size(); i += 7) {
-            //    std::cout << h_x[i] << "," << h_x[i + 1] << "," << h_x[i + 2] << "," << h_x[i + 3] << "," << h_x[i + 4] << "," << h_x[i +
-            //    5] << "," << h_x[i + 6] << std::endl;
-            //}
 
             if (h_x.size() == 7 * point_clouds_container.point_clouds.size())
             {
@@ -1063,12 +1056,6 @@ bool PoseGraphSLAM::optimize(PointClouds& point_clouds_container)
     }
     edges.clear();
 
-    //-
-    // covariance_matrices_after6x6 = compute_covariance_matrices_wc(point_clouds_container);
-
-    // double mui = get_mean_uncertainty_xyz_impact6x6(covariance_matrices_before6x6, covariance_matrices_after6x6);
-    // std::cout << "mean uncertainty_xyz impact: " << mui << std::endl;
-    //--
     return true;
 }
 

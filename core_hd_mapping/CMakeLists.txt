@@ -35,4 +35,5 @@ target_link_libraries(core-hd-mapping
         core
         ${PLATFORM_MISCELLANEOUS_LIBS}
         Threads::Threads
+        spdlog::spdlog
 )

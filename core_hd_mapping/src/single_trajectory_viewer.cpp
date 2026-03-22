@@ -1,10 +1,10 @@
-#include <single_trajectory_viewer.h>
-
 #include <pch/pch.h>
 
+#include <Core/pfd_wrapper.hpp>
+#include <Core/transformations.h>
+#include <CoreHDMapping/single_trajectory_viewer.h>
+
 #include <GL/freeglut.h>
-#include <pfd_wrapper.hpp>
-#include <transformations.h>
 
 namespace fs = std::filesystem;
 
@@ -108,7 +108,6 @@ std::vector<Point> SingleTrajectoryViewer::load_points_and_transform_to_global(d
                             .norm() < 0.1)
                     {
                         ii += 10000;
-                        // std::cout << "pp " << ii << " ";
                     }
                 }
             }

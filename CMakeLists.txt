@@ -9,7 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 project(hd-mapping)
 
 set (HDMAPPING_VERSION_MAJOR 0)
-set (HDMAPPING_VERSION_MINOR 95)
+set (HDMAPPING_VERSION_MINOR 101)
 set (HDMAPPING_VERSION_PATCH 0)
 
 add_definitions(-DHDMAPPING_VERSION_MAJOR=${HDMAPPING_VERSION_MAJOR})
@@ -21,6 +21,7 @@ if (MSVC)
     add_definitions(-DWIN32_LEAN_AND_MEAN)
 endif()
 
+option(BUILD_WITH_CLI_TOOLS "Build with command line tools" ON)
 option(UTL_PROFILER_DISABLE "Disable UTL profiler (zero overhead when ON)" ON)
 
 get_filename_component(REPOSITORY_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} ABSOLUTE)
@@ -32,6 +33,12 @@ set(EXTERNAL_LIBRARIES_DIRECTORY ${REPOSITORY_DIRECTORY}/external)
 # CPU Architecture optimization options
 set(HD_CPU_OPTIMIZATION "AUTO" CACHE STRING "CPU optimization target (AUTO, INTEL, AMD, ARM, GENERIC)")
 set_property(CACHE HD_CPU_OPTIMIZATION PROPERTY STRINGS AUTO INTEL AMD ARM GENERIC)
+
+if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    add_compile_definitions(USE_EXECUTION_PAR_UNSEQ=0)
+else()
+    add_compile_definitions(USE_EXECUTION_PAR_UNSEQ=1)
+endif()
 
 if (MSVC)
     add_definitions(-D_HAS_STD_BYTE=0)
@@ -85,7 +92,12 @@ else()
         set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -march=x86-64 -mtune=intel -DNDEBUG")
         message(STATUS "Enabling Intel-optimized build for GCC/Clang")
     elseif(HD_CPU_OPTIMIZATION STREQUAL "ARM")
-        if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
+        if(APPLE)
+            # On Apple Silicon (macOS), compiler natively targets ARM64, no -march flag needed
+            set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
+            set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -DNDEBUG")
+            message(STATUS "Enabling ARM64 native optimizations for Apple Silicon")
+        elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
             set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=armv8-a -DNDEBUG")
             set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=armv8-a -DNDEBUG")
             message(STATUS "Enabling ARM64/AArch64 optimizations for GCC/Clang")
@@ -97,7 +109,12 @@ else()
     elseif(HD_CPU_OPTIMIZATION STREQUAL "AUTO")
         # Auto-detect based on processor
         cmake_host_system_information(RESULT CPU_VENDOR QUERY PROCESSOR_DESCRIPTION)
-        if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
+        if(APPLE AND (CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64" OR CPU_VENDOR MATCHES "Apple"))
+            # On Apple Silicon (macOS), compiler natively targets ARM64, no -march flag needed
+            set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
+            set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -DNDEBUG")
+            message(STATUS "Auto-detected Apple Silicon - enabling native ARM64 optimizations")
+        elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
             if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
                 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=armv8-a -DNDEBUG")
                 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=armv8-a -DNDEBUG")
@@ -306,6 +323,12 @@ endif ()
 
 option (BUILD_WITH_BUNDLED_GLEW "Build with bundled GLEW" ON)
 if (BUILD_WITH_BUNDLED_GLEW)
+    if(APPLE)
+      # On modern macOS AGL framework is deprecated/removed.
+      # We point AGL_LIBRARY to OpenGL to trick the submodule into linking against a valid framework instead of failing.
+      find_library(AGL_LIBRARY OpenGL)
+    endif()
+
     add_subdirectory(${THIRDPARTY_DIRECTORY}/glew-cmake)
     set(GLEW_INCLUDE_DIR ${THIRDPARTY_DIRECTORY}/glew-cmake/include)
     set(GLEW_LIBRARY libglew_static)
@@ -324,6 +347,11 @@ if (BUILD_WITH_BUNDLED_LIBLASZIP)
     set(LASZIP_INCLUDE_DIR ${THIRDPARTY_DIRECTORY})
     set(LASZIP_LIBRARY laszip)
     MESSAGE(STATUS "Using bundled LASzip")
+    
+    if(APPLE)
+        target_compile_definitions(laszip PUBLIC off64_t=off_t)
+    endif()
+
     #suppress warnings from LASzip
 #    target_compile_options(laszip PRIVATE
 #            $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-Wno-cast-qual>
@@ -345,6 +373,12 @@ endif ()
 include(${THIRDPARTY_DIRECTORY_BINARY}/OpenCV/CMakeLists.txt)
 find_package(OpenCV REQUIRED)
 MESSAGE(STATUS "OpenCV include dir: ${OpenCV_INCLUDE_DIRS}, OpenCV librarys: ${OpenCV_LIBS}")
+
+
+# Download or Search for PROJ
+include(${THIRDPARTY_DIRECTORY_BINARY}/Proj/CMakeLists.txt)
+MESSAGE(STATUS "PROJ include dir: ${PROJ_INCLUDE_DIR}, PROJ library: ${PROJ_LIBRARY}")
+MESSAGE(STATUS "PROJ implementation library: ${PROJ_IMPLIB}, PROJ database: ${PROJ_DB}")
 
 # Option to build with bundled oneTBB
 option(BUILD_WITH_BUNDLED_ONETBB "Build with bundled oneTBB" ON)
@@ -400,6 +434,7 @@ else()
 endif()
 
 
+add_subdirectory(${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
 add_subdirectory(${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
 
 add_subdirectory(core)
@@ -409,9 +444,13 @@ set(CORE_LIBRARIES core core-hd-mapping)
 set(GUI_LIBRARIES imgui imguizmo implot)
 
 #add_subdirectory(apps/hd_mapper)
+
+if(BUILD_WITH_CLI_TOOLS)
+    add_subdirectory(apps/console_tools)
+endif()
+
 add_subdirectory(apps/lidar_odometry_step_1)    
 add_subdirectory(apps/manual_color)
-add_subdirectory(apps/console_tools)
 add_subdirectory(apps/multi_session_registration)
 add_subdirectory(apps/multi_view_tls_registration)
 add_subdirectory(apps/split_multi_livox)
@@ -424,8 +463,7 @@ add_subdirectory(apps/mandeye_single_session_viewer)
 add_subdirectory(apps/livox_mid_360_intrinsic_calibration)
 add_subdirectory(apps/single_session_manual_coloring)
 add_subdirectory(apps/concatenate_multi_livox)
-add_subdirectory(apps/laz_to_ply)
- 
+
 # CPack configuration
 set(CPACK_PACKAGE_NAME "hd_mapping")
 set(CPACK_PACKAGE_VERSION "${HDMAPPING_VERSION_MAJOR}.${HDMAPPING_VERSION_MINOR}.${HDMAPPING_VERSION_PATCH}")

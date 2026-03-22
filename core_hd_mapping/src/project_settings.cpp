@@ -1,14 +1,14 @@
 #include <pch/pch.h>
 
-#include <project_settings.h>
+#include <CoreHDMapping/project_settings.h>
 
 #include <GL/freeglut.h>
 #include <nlohmann/json.hpp>
 #include <portable-file-dialogs.h>
 
-#include <m_estimators.h>
-#include <pfd_wrapper.hpp>
-#include <transformations.h>
+#include <Core/m_estimators.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/transformations.h>
 
 #include <python-scripts/constraints/relative_pose_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
@@ -472,18 +472,7 @@ void ProjectSettings::pose_graph_slam(std::vector<ROIwithConstraints>& rois_with
     {
         std::vector<BetweenNode> bn = find_between_nodes(trj.fused_trajectory);
         fuse_with_georeference(bn, constraints, trj.fused_trajectory, trj.fused_trajectory_motion_model);
-        // for (auto& b : bn) {
-        //	std::cout << b.node_outer.index_to_gnss << std::endl;
-        //}
     }
-    /*for (auto& trj : trajectories) {
-            for (auto& node : trj.fused_trajectory) {
-                    node.m_pose(2, 3) += 10;
-                    std::cout << node.index_to_gnss << " ";
-                    if(node.index_to_gnss != -1)
-                    return;
-            }
-    }*/
 }
 
 std::vector<BetweenNode> ProjectSettings::find_between_nodes(std::vector<Node>& fused_trajectory)
@@ -508,9 +497,6 @@ std::vector<BetweenNode> ProjectSettings::find_between_nodes(std::vector<Node>& 
 
         double dist_increment = (fused_trajectory[i].m_pose.translation() - fused_trajectory[i - 1].m_pose.translation()).norm();
         dist_along += dist_increment;
-        // dist_along_gnss += dist_increment;
-
-        // std::cout << "dist_increment " << dist_increment << std::endl;
 #if 0
 		if (dist_along_gnss > 10) {
 			auto it = std::lower_bound(gnss_trajectory_shifted.begin(), gnss_trajectory_shifted.end(), fused_trajectory[i],
@@ -805,7 +791,6 @@ void ProjectSettings::fuse_with_georeference(
     {
         for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
         {
-            // std::cout << it.row() << " " << it.col() << " " << it.value() << std::endl;
             h_x.push_back(it.value());
         }
     }

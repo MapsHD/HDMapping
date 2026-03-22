@@ -12,13 +12,15 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <utils.hpp>
+#include <spdlog/spdlog.h>
+
+#include <Core/export_laz.h>
+#include <Core/hash_utils.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/transformations.h>
+#include <Core/utils.hpp>
 
 #include <Eigen/Eigen>
-
-#include <transformations.h>
-
-#include "pfd_wrapper.hpp"
 
 #include "../lidar_odometry_step_1/lidar_odometry.h"
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
@@ -29,11 +31,7 @@
 #include "tbb/tbb.h"
 #include <mutex>
 
-#include <export_laz.h>
-
 #include <opencv2/opencv.hpp>
-
-#include <hash_utils.h>
 
 #ifdef _WIN32
 #include "resource.h"
@@ -99,7 +97,7 @@ int index_rendered_points_local = -1;
 // std::vector<std::vector<Point3Di>> all_points_local;
 // std::vector<std::vector<int>> all_lidar_ids;
 std::vector<int> indexes_to_filename;
-double ahrs_gain = 0.5;
+double vqf_tauAcc = 0.5;
 double wx = 1000000.0;
 double wy = 1000000.0;
 double wz = 1000000.0;
@@ -176,7 +174,7 @@ void render_nearest_photo(double ts)
     {
         return;
     }
-    std::cout << "render_nearest_photo: " << photo_file << std::endl;
+    spdlog::info("render_nearest_photo: {}", photo_file);
     cv::Mat img = cv::imread(photo_file);
     if (img.empty())
     {
@@ -251,7 +249,7 @@ void optimize()
             }
         }
 
-        //std::cout << "points_local.size(): " << points_local.size() << std::endl;
+        //spdlog::info("points_local.size(): {}", points_local.size());
         // points_local
         // points_local_sf
 
@@ -310,10 +308,8 @@ void optimize()
                 continue;
             }
 
-            // std::cout << infm << std::endl;
-
             const Eigen::Affine3d& m_pose = tr[points_local[i].index_pose];
-            //std::cout << "points_local[i].index_pose " << points_local[i].index_pose << std::endl;
+            //spdlog::info("points_local[i].index_pose {}", points_local[i].index_pose);
             const Eigen::Vector3d& p_s = points_local[i].point;
             const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
             double delta_x;
@@ -328,9 +324,9 @@ void optimize()
                 pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka,
                 p_s.x(), p_s.y(), p_s.z(), this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
 
-            // std::cout << "delta_x: " << delta_x << std::endl;
-            // std::cout << "delta_y: " << delta_y << std::endl;
-            // std::cout << "delta_z: " << delta_z << std::endl;
+            // spdlog::info("delta_x: {}", delta_x);
+            // spdlog::info("delta_y: {}", delta_y);
+            // spdlog::info("delta_z: {}", delta_z);
 
             if (sqrt(delta_x * delta_x + delta_y * delta_y + delta_z * delta_z) < 0.001)
             {
@@ -636,7 +632,7 @@ void optimize()
             }
         }
 
-        std::cout << "optimize_sf2" << std::endl;
+        spdlog::info("optimize_sf2");
         for (int iter = 0; iter < robust_and_accurate_lidar_odometry_iterations; iter++)
         {
             optimize_sf2(points_local, points_local_sf, tr, trmm, rgd_params_sc, useMultithread, wx, wy, wz, wom, wfi, wka);
@@ -891,7 +887,7 @@ void loadFiles(std::vector<std::string> input_file_names)
     params.filter_threshold_xy_outer = filter_threshold_xy_outer;
 
     std::vector<std::vector<Point3Di>> pointsPerFile;
-    std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> imu_data;
+    Imu imu_data;
 
     // no files selected, quit loading
     if (input_file_names.empty())
@@ -948,9 +944,9 @@ void loadFiles(std::vector<std::string> input_file_names)
                 std::string cam_id = filename.substr(0, filename.find("_"));
                 std::string timestamp = filename.substr(filename.find("_") + 1, filename.size());
 
-                std::cout << "cam_id: " << cam_id << std::endl;
-                std::cout << "timestamp: " << timestamp << std::endl;
-                std::cout << "filename: " << filename << std::endl;
+                spdlog::info("cam_id: {}", cam_id);
+                spdlog::info("timestamp: {}", timestamp);
+                spdlog::info("filename: {}", filename);
 
                 if (cam_id == "cam0" && !timestamp.empty())
                 {
@@ -960,7 +956,7 @@ void loadFiles(std::vector<std::string> input_file_names)
                         photo_files_ts[ts] = fileName;
                     } catch (const std::exception& e)
                     {
-                        std::cerr << "Error parsing timestamp from filename: " << filename << " - " << e.what() << std::endl;
+                        spdlog::error("Error parsing timestamp from filename: {} - {}", filename, e.what());
                     }
                 }
             }
@@ -968,99 +964,60 @@ void loadFiles(std::vector<std::string> input_file_names)
 
         // rest of RAW data viewer processing
 
-        FusionAhrs ahrs;
-        FusionAhrsInitialise(&ahrs);
+        // VQF initialization
+        double avg_dt = SAMPLE_PERIOD;
+        if (imu_data.size() >= 2)
+        {
+            double t0 = std::get<0>(imu_data.front()).first;
+            double t1 = std::get<0>(imu_data.back()).first;
+            if (t1 > t0)
+                avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
+        }
 
-        if (fusionConventionNwu)
-            ahrs.settings.convention = FusionConventionNwu;
-
-        if (fusionConventionEnu)
-            ahrs.settings.convention = FusionConventionEnu;
-
-        if (fusionConventionNed)
-            ahrs.settings.convention = FusionConventionNed;
-
-        ahrs.settings.gain = ahrs_gain;
+        VQFParams vqf_params;
+        vqf_params.tauAcc = vqf_tauAcc > 0.0 ? vqf_tauAcc : 3.0;
+        VQF vqf(vqf_params, avg_dt);
 
         std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;
 
         int counter = 1;
-        static bool first = true;
-
-        static double last_ts;
 
         for (const auto& [timestamp_pair, gyr, acc] : imu_data)
         {
-            const FusionVector gyroscope = { static_cast<float>(gyr.axis.x * 180.0 / M_PI),
-                                             static_cast<float>(gyr.axis.y * 180.0 / M_PI),
-                                             static_cast<float>(gyr.axis.z * 180.0 / M_PI) };
-            // const FusionVector gyroscope = {static_cast<float>(gyr.axis.x), static_cast<float>(gyr.axis.y),
-            // static_cast<float>(gyr.axis.z)};
-            const FusionVector accelerometer = { acc.axis.x, acc.axis.y, acc.axis.z };
+            const double g = 9.81;
+            vqf_real_t gyr_vqf[3] = { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) };
+            vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g,
+                                      static_cast<double>(acc.y()) * g,
+                                      static_cast<double>(acc.z()) * g };
 
-            if (first)
-            {
-                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-                first = false;
-                // last_ts = timestamp_pair.first;
-            }
-            else
-            {
-                double curr_ts = timestamp_pair.first;
+            vqf.update(gyr_vqf, acc_vqf);
 
-                double ts_diff = curr_ts - last_ts;
-
-                FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
-
-                /*if (ts_diff < 0)
-                {
-                    std::cout << "WARNING!!!!" << std::endl;
-                    std::cout << "WARNING!!!!" << std::endl;
-                    std::cout << "WARNING!!!!" << std::endl;
-                    std::cout << "WARNING!!!!" << std::endl;
-                    std::cout << "WARNING!!!!" << std::endl;
-                    std::cout << "WARNING!!!!" << std::endl;
-                }
-
-                if (ts_diff < 0.01)
-                {
-                    FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, ts_diff);
-                }
-                else
-                {
-                    FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, SAMPLE_PERIOD);
-                }*/
-            }
-
-            last_ts = timestamp_pair.first;
-            //
-
-            FusionQuaternion quat = FusionAhrsGetQuaternion(&ahrs);
-
-            Eigen::Quaterniond d{ quat.element.w, quat.element.x, quat.element.y, quat.element.z };
+            vqf_real_t quat[4];
+            vqf.getQuat6D(quat);
+            Eigen::Quaterniond d(quat[0], quat[1], quat[2], quat[3]);
             Eigen::Affine3d t{ Eigen::Matrix4d::Identity() };
             t.rotate(d);
 
             trajectory[timestamp_pair.first] = std::pair(t.matrix(), timestamp_pair.second);
-            const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+
+            Eigen::Vector3d euler = d.toRotationMatrix().eulerAngles(0, 1, 2) * (180.0 / M_PI);
             counter++;
             if (counter % 100 == 0)
             {
-                std::cout << "Roll " << euler.angle.roll << ", Pitch " << euler.angle.pitch << ", Yaw " << euler.angle.yaw << " ["
-                          << counter++ << " of " << imu_data.size() << "]" << std::endl;
+                spdlog::info("[{} of {}]: Roll {}, Pitch {}, Yaw {}", counter, imu_data.size(), euler.x(), euler.y(), euler.z());
             }
 
             // log it for implot
             imu_data_plot.timestampLidar.push_back(timestamp_pair.first);
-            imu_data_plot.angX.push_back(gyr.axis.x);
-            imu_data_plot.angY.push_back(gyr.axis.y);
-            imu_data_plot.angZ.push_back(gyr.axis.z);
-            imu_data_plot.accX.push_back(acc.axis.x);
-            imu_data_plot.accY.push_back(acc.axis.y);
-            imu_data_plot.accZ.push_back(acc.axis.z);
-            imu_data_plot.yaw.push_back(euler.angle.yaw);
-            imu_data_plot.pitch.push_back(euler.angle.pitch);
-            imu_data_plot.roll.push_back(euler.angle.roll);
+            imu_data_plot.angX.push_back(gyr.x());
+            imu_data_plot.angY.push_back(gyr.y());
+            imu_data_plot.angZ.push_back(gyr.z());
+            imu_data_plot.accX.push_back(acc.x());
+            imu_data_plot.accY.push_back(acc.y());
+            imu_data_plot.accZ.push_back(acc.z());
+            imu_data_plot.yaw.push_back(euler.z());
+            imu_data_plot.pitch.push_back(euler.y());
+            imu_data_plot.roll.push_back(euler.x());
         }
 
         std::vector<std::pair<double, double>> timestamps;
@@ -1077,9 +1034,9 @@ void loadFiles(std::vector<std::string> input_file_names)
         for (const auto& pp : pointsPerFile)
             number_of_points += pp.size();
 
-        std::cout << "Number of points: " << number_of_points << std::endl;
+        spdlog::info("Number of points: {}", number_of_points);
 
-        std::cout << "Start indexing points" << std::endl;
+        spdlog::info("Start indexing points");
 
         // std::vector<Point3Di> points_global;
         std::vector<Point3Di> points_local;
@@ -1100,7 +1057,8 @@ void loadFiles(std::vector<std::string> input_file_names)
 
         for (size_t i = 0; i < pointsPerFile.size(); i++)
         {
-            std::cout << "Indexed: " << i + 1 << " of " << pointsPerFile.size() << " files\r";
+            std::cout << "Indexed file " << i + 1 << "/" << pointsPerFile.size() << "\r";
+
             for (const auto& pp : pointsPerFile[i])
             {
                 auto lower = std::lower_bound(
@@ -1175,9 +1133,9 @@ void loadFiles(std::vector<std::string> input_file_names)
                         double ts_step =
                             (data.timestamps[data.timestamps.size() - 1].first - data.timestamps[0].first) / data.points_local.size();
 
-                        // std::cout << "ts_begin " << ts_begin << std::endl;
-                        // std::cout << "ts_step " << ts_step << std::endl;
-                        // std::cout << "ts_end " << data.timestamps[data.timestamps.size() - 1].first << std::endl;
+                        // spdlog::info("ts_begin {}", ts_begin);
+                        // spdlog::info("ts_step {}", ts_step);
+                        // spdlog::info("ts_end {}", data.timestamps[data.timestamps.size() - 1].first);
 
                         for (size_t pp = 0; pp < data.points_local.size(); pp++)
                             data.points_local[pp].timestamp = ts_begin + pp * ts_step;
@@ -1192,7 +1150,7 @@ void loadFiles(std::vector<std::string> input_file_names)
             }
         }
 
-        std::cout << "\nIndexing points finished\n\n";
+        spdlog::info("Indexing points finished\n");
 
         if (all_data.size() > 0)
         {
@@ -1208,7 +1166,7 @@ void openFolder()
     std::vector<std::string> input_file_names;
     input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
 
-    std::cout << "Selected folder: '" << input_folder_name << std::endl;
+    spdlog::info("Selected folder: '{}'", input_folder_name);
 
     if (fs::exists(input_folder_name))
     {
@@ -1305,7 +1263,7 @@ void imu_data_gui()
         {
             std::string output_file_name = "";
             output_file_name = mandeye::fd::SaveFileDialog("Save IMU data", {}, "");
-            std::cout << "file to save: '" << output_file_name << "'" << std::endl;
+            spdlog::info("file to save: '{}'", output_file_name);
 
             ofstream file;
             file.open(output_file_name);
@@ -1337,13 +1295,13 @@ void settings_gui()
                 number_of_points_threshold = 0;
         }
 
-        ImGui::InputDouble("AHRS gain", &ahrs_gain);
+        ImGui::InputDouble("VQF tauAcc [s]", &vqf_tauAcc);
         if (ImGui::IsItemHovered())
         {
             ImGui::BeginTooltip();
-            ImGui::Text("Parameter for AHRS (Attitude and Heading Reference System) filter");
-            ImGui::Text("Controls how strongly the filter corrects its orientation estimate");
-            ImGui::Text("using accelerometer and magnetometer data, relative to the gyroscope integration");
+            ImGui::Text("VQF accelerometer time constant (tauAcc) in seconds.");
+            ImGui::Text("Controls how strongly accelerometer corrects the gyroscope-based orientation.");
+            ImGui::Text("Higher = more gyro trust (stable but may drift). Lower = more acc trust (noisy but no drift).");
             ImGui::EndTooltip();
         }
 
@@ -1359,7 +1317,7 @@ void settings_gui()
 
             if (output_file_name.size() > 0)
             {
-                std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                spdlog::info("las or laz file to save: '{}'", output_file_name);
 
                 std::vector<Eigen::Vector3d> pointcloud;
                 std::vector<unsigned short> intensity;
@@ -1377,7 +1335,7 @@ void settings_gui()
                 }*/
 
                 if (!exportLaz(output_file_name, pointcloud, intensity, timestamps, 0, 0, 0))
-                    std::cout << "problem with saving file: " << output_file_name << std::endl;
+                    spdlog::error("problem with saving file: '{}'", output_file_name);
             }
         }
         ImGui::EndDisabled();
@@ -1432,7 +1390,6 @@ void settings_gui()
         if (ImGui::Button("Print to console debug text"))
         {
             double max_diff = 0;
-            std::cout << std::setprecision(20);
             if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
             {
                 for (size_t i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
@@ -1448,29 +1405,35 @@ void settings_gui()
 
                     int index_pose = std::distance(all_data[index_rendered_points_local].timestamps.begin(), lower) - 1;
 
+                    spdlog::info(
+                        "poses {}/{}: point TS [s] - pose TS [s] = ... [s]",
+                        index_pose,
+                        all_data[index_rendered_points_local].poses.size());
+
                     if (index_pose >= 0 && index_pose < all_data[index_rendered_points_local].poses.size())
                     {
-                        std::cout << index_pose << " total nr of poses: [" << all_data[index_rendered_points_local].poses.size() << "] "
-                                  << all_data[index_rendered_points_local].points_local[i].timestamp -
-                                all_data[index_rendered_points_local].timestamps[index_pose].first
-                                  << " ts point: " << all_data[index_rendered_points_local].points_local[i].timestamp
-                                  << " pose ts: " << all_data[index_rendered_points_local].timestamps[index_pose].first << std::endl;
+                        spdlog::info(
+                            "{:.20g} - {:.20g} = {:.20g}",
+                            all_data[index_rendered_points_local].points_local[i].timestamp,
+                            all_data[index_rendered_points_local].timestamps[index_pose].first,
+                            all_data[index_rendered_points_local].points_local[i].timestamp -
+                                all_data[index_rendered_points_local].timestamps[index_pose].first);
 
                         if (fabs(
                                 all_data[index_rendered_points_local].points_local[i].timestamp -
                                 all_data[index_rendered_points_local].timestamps[index_pose].first) > max_diff)
                         {
-                            // std::cout << all_data[index_rendered_points_local].points_local[i].timestamp << std::endl;
+                            // spdlog::info("{:.20g}", all_data[index_rendered_points_local].points_local[i].timestamp);
                             max_diff = fabs(
                                 all_data[index_rendered_points_local].points_local[i].timestamp -
                                 all_data[index_rendered_points_local].timestamps[index_pose].first);
                         }
                     }
                 }
-                std::cout << "max_diff " << max_diff << std::endl;
-                std::cout << "----------------" << std::endl;
+                spdlog::info("max_diff: {} [s]", max_diff);
+                spdlog::info("----------------");
                 for (size_t k = 0; k < all_data[index_rendered_points_local].timestamps.size(); k++)
-                    std::cout << all_data[index_rendered_points_local].timestamps[k].first << std::endl;
+                    spdlog::info("{:.20g}", all_data[index_rendered_points_local].timestamps[k].first);
             }
         }
     }
@@ -1558,8 +1521,6 @@ void display()
                         all_data[index_rendered_points_local].points_local[i].timestamp -
                         all_data[index_rendered_points_local].timestamps[index_pose].first) > max_diff)
                 {
-                    // std::cout << index_pose << " " << all_data[index_rendered_points_local].points_local[i].timestamp -
-                    // all_data[index_rendered_points_local].timestamps[index_pose].first << std::endl;
                     max_diff = fabs(
                         all_data[index_rendered_points_local].points_local[i].timestamp -
                         all_data[index_rendered_points_local].timestamps[index_pose].first);
@@ -1579,8 +1540,6 @@ void display()
                 });
 
             int index_pose = std::distance(all_data[index_rendered_points_local].timestamps.begin(), lower) - 1;
-
-            // std::cout << index_pose << std::endl;
 
             if (max_diff < 0.1)
             {
@@ -2004,14 +1963,14 @@ int main(int argc, char* argv[])
         ImPlot::DestroyContext();
     } catch (const std::bad_alloc& e)
     {
-        std::cerr << "System is out of memory : " << e.what() << std::endl;
+        spdlog::error("System is out of memory : {}", e.what());
         mandeye::fd::OutOfMemMessage();
     } catch (const std::exception& e)
     {
-        std::cout << e.what();
+        spdlog::error(e.what());
     } catch (...)
     {
-        std::cerr << "Unknown fatal error occurred." << std::endl;
+        spdlog::error("Unknown fatal error occurred!");
     }
 
     return 0;

@@ -15,18 +15,20 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "utils.hpp"
+#include <Core/utils.hpp>
 
 #include <HDMapping/Version.hpp>
 
 #ifdef _WIN32
 #include <shellapi.h>
+#include <shobjidl.h> // ITaskbarList3
 #include <windows.h>
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
 
 int viewer_decimate_point_cloud = 1000;
+// int viewer_reduce_rendered_trajectory = 10;
 
 int mouse_old_x, mouse_old_y;
 int mouse_buttons = 0;
@@ -35,7 +37,7 @@ float mouse_sensitivity = 1.0;
 bool is_ortho = false;
 bool lock_z = false;
 bool show_axes = true;
-ImVec4 bg_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+ImVec4 bg_color = ImVec4(0.65f, 0.65f, 0.65f, 1.00f);
 int point_size = 1;
 
 bool info_gui = false;
@@ -168,10 +170,11 @@ std::string truncPath(const std::string& fullPath)
     namespace fs = std::filesystem;
     fs::path path(fullPath);
 
-    auto parent = path.parent_path().parent_path().filename().string(); // second to last folder
+    auto parent1 = path.parent_path().filename().string();
+    auto parent2 = path.parent_path().parent_path().filename().string(); // second to last folder
     auto filename = path.filename().string();
 
-    return "..\\" + parent + "\\..\\" + filename;
+    return "..\\" + parent2 + "\\" + parent1 + "\\" + filename;
 }
 
 void wheel(int button, int dir, int x, int y)
@@ -362,8 +365,6 @@ void keyboardDown(unsigned char key, int x, int y)
 
     // forward to ImGui GLUT backend
     ImGui_ImplGLUT_KeyboardFunc(key, x, y);
-
-    // std::cout << "Down key: " << key << ", mod: " << mods << std::endl;
 }
 
 void keyboardUp(unsigned char key, int x, int y)
@@ -383,8 +384,6 @@ void keyboardUp(unsigned char key, int x, int y)
     io.AddKeyEvent(keyToImGuiKey(key), false);
 
     ImGui_ImplGLUT_KeyboardUpFunc(key, x, y);
-
-    // std::cout << "Up key: " << key << ", mod: " << mods << std::endl;
 }
 
 static bool first_time = true;
@@ -426,6 +425,40 @@ void ShowMainDockSpace()
     ImGui::End();
 }
 
+#ifdef _WIN32
+HWND hwnd;
+ITaskbarList3* g_taskbar = nullptr;
+
+void InitTaskbarProgress()
+{
+    CoInitialize(nullptr);
+
+    HRESULT hr = CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&g_taskbar));
+
+    if (SUCCEEDED(hr))
+        g_taskbar->HrInit();
+}
+
+void SetTaskbarProgress(double progress01)
+{
+    if (!g_taskbar)
+        return;
+
+    const ULONGLONG total = 1000;
+    ULONGLONG value = (ULONGLONG)(progress01 * total);
+
+    g_taskbar->SetProgressState(hwnd, TBPF_NORMAL);
+    g_taskbar->SetProgressValue(hwnd, value, total);
+}
+
+void ClearTaskbarProgress()
+{
+    if (!g_taskbar)
+        return;
+    g_taskbar->SetProgressState(hwnd, TBPF_NOPROGRESS);
+}
+#endif
+
 bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)(), void (*mouse)(int, int, int, int))
 {
     glutInit(argc, argv);
@@ -435,7 +468,7 @@ bool initGL(int* argc, char** argv, const std::string& winTitle, void (*display)
         return false; // window creation failed
 
 #ifdef _WIN32
-    HWND hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
+    hwnd = FindWindow(NULL, winTitle.c_str()); // The window title must match exactly
     if (!hwnd)
         return false; // couldn't find window handle
     HINSTANCE hInstance = GetModuleHandle(NULL);
@@ -1357,14 +1390,14 @@ void getClosestTrajectoriesPoint(
     const int number_visible_sessions,
     int& index_loop_closure_source,
     int& index_loop_closure_target,
-    bool KeyShift)
+    bool KeyShift,
+    double& time_stamp_offset)
 {
     const auto laser_beam = GetLaserBeam(x, y);
     double min_distance = std::numeric_limits<double>::max();
 
     if (number_visible_sessions == 1)
     {
-        // std::cout << "first_session_index " << first_session_index << std::endl;
         for (size_t i = 0; i < sessions[first_session_index].point_clouds_container.point_clouds.size(); i++)
         {
             for (size_t j = 0; j < sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
@@ -1387,10 +1420,15 @@ void getClosestTrajectoriesPoint(
                             new_rotation_center.y() = static_cast<float>(vp.y());
                             new_rotation_center.z() = static_cast<float>(vp.z());
                             index_loop_closure_source = i;
+
+                            time_stamp_offset =
+                                sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
                         }
                         else // io.KeyShift
                         {
                             index_loop_closure_target = i;
+                            // time_stamp_offset =
+                            //     sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
                         }
                     }
                 }
@@ -1408,7 +1446,6 @@ void getClosestTrajectoriesPoint(
         {
             index = second_session_index;
         }
-        // std::cout << "first_session_index " << first_session_index << std::endl;
         for (size_t i = 0; i < sessions[index].point_clouds_container.point_clouds.size(); i++)
         {
             for (size_t j = 0; j < sessions[index].point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
@@ -1428,6 +1465,9 @@ void getClosestTrajectoriesPoint(
                         new_rotation_center.x() = static_cast<float>(vp.x());
                         new_rotation_center.y() = static_cast<float>(vp.y());
                         new_rotation_center.z() = static_cast<float>(vp.z());
+
+                        time_stamp_offset =
+                            sessions[first_session_index].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
                     }
                     else // io.KeyShift
                     {
@@ -1439,7 +1479,6 @@ void getClosestTrajectoriesPoint(
     }
     else // (number_visible_sessions > 2)
     {
-        // std::cout << "first_session_index " << first_session_index << std::endl;
         for (size_t s = 0; s < sessions.size(); s++)
         {
             if (sessions[s].visible)
@@ -1460,6 +1499,8 @@ void getClosestTrajectoriesPoint(
                             new_rotation_center.x() = static_cast<float>(vp.x());
                             new_rotation_center.y() = static_cast<float>(vp.y());
                             new_rotation_center.z() = static_cast<float>(vp.z());
+
+                            time_stamp_offset = sessions[s].point_clouds_container.point_clouds[i].local_trajectory[j].timestamps.first;
                         }
                     }
                 }

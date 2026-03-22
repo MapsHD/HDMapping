@@ -17,25 +17,19 @@
 
 #include <Eigen/Eigen>
 
-#include <session.h>
+#include <Core/export_laz.h>
+#include <Core/icp.h>
+#include <Core/ndt.h>
+#include <Core/observation_picking.h>
+#include <Core/pair_wise_iterative_closest_point.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/registration_plane_feature.h>
+#include <Core/session.h>
+#include <Core/utils.hpp>
 
-#include <pfd_wrapper.hpp>
 #include <portable-file-dialogs.h>
 
-#include <utils.hpp>
-
-#include <icp.h>
-
-#include <registration_plane_feature.h>
-
 #include <HDMapping/Version.hpp>
-
-#include <ndt.h>
-
-#include <observation_picking.h>
-#include <pair_wise_iterative_closest_point.h>
-
-#include <export_laz.h>
 
 #ifdef _WIN32
 #include "resource.h"
@@ -181,6 +175,7 @@ bool edge_gizmo = false;
 ProjectSettings project_settings;
 std::vector<Session> sessions;
 
+int viewer_reduce_rendered_trajectory = 1;
 namespace fs = std::filesystem;
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -218,8 +213,7 @@ void ndt_gui()
             double rms_initial = 0.0;
             double rms_final = 0.0;
             double mui = 0.0;
-            // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
-            // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
+
             ndt.optimize(sessions, false, compute_mean_and_cov_for_bucket);
         }
         ImGui::End();
@@ -281,8 +275,6 @@ void ndt_gui()
         double rms_initial = 0.0;
         double rms_final = 0.0;
         double mui = 0.0;
-        // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
-        // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
         ndt.optimize(session.point_clouds_container.point_clouds, true, compute_mean_and_cov_for_bucket);
     }
 
@@ -1811,14 +1803,14 @@ bool save_project_settings(const std::string& file_name, const ProjectSettings& 
 void update_timestamp_offset()
 {
     std::cout << "update_timestamp" << std::endl;
-    time_stamp_offset = 0.0;
+    time_stamp_offset = std::numeric_limits<double>::max();
 
     for (const auto& s : sessions)
     {
         if (!s.point_clouds_container.point_clouds.empty() && !s.point_clouds_container.point_clouds[0].local_trajectory.empty())
         {
             double ts = s.point_clouds_container.point_clouds[0].local_trajectory[0].timestamps.first;
-            if (ts > time_stamp_offset)
+            if (ts < time_stamp_offset)
                 time_stamp_offset = ts;
         }
     }
@@ -2105,8 +2097,53 @@ void settings_gui()
         ImGui::SameLine();
         if (ImGui::Button("Set to origin"))
         {
+            bool is_first_gt = false;
+
+            if (sessions.size() > 0)
+            {
+                if (sessions[0].is_ground_truth)
+                    is_first_gt = true;
+            }
+
+            Eigen::Affine3d m_gt = Eigen::Affine3d::Identity();
+            if (sessions.size() > 0)
+            {
+                int index_point_clouds = -1;
+                int index_local_trajectory = -1;
+                bool found = false;
+                for (size_t a = 0; a < sessions[0].point_clouds_container.point_clouds.size(); a++)
+                {
+                    for (size_t b = 0; b < sessions[0].point_clouds_container.point_clouds[a].local_trajectory.size(); b++)
+                    {
+                        if (sessions[0].point_clouds_container.point_clouds[a].local_trajectory[b].timestamps.first > time_stamp_offset)
+                        {
+                            if (!found)
+                            {
+                                found = true;
+                                index_point_clouds = a;
+                                index_local_trajectory = b;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (index_point_clouds != -1 && index_local_trajectory != -1)
+                {
+                    m_gt = sessions[0].point_clouds_container.point_clouds[index_point_clouds].m_pose *
+                        sessions[0].point_clouds_container.point_clouds[index_point_clouds].local_trajectory[index_local_trajectory].m_pose;
+                }
+            }
+
+            // for (auto& session : sessions)
             for (auto& session : sessions)
             {
+                if (is_first_gt)
+                {
+                    if (session.is_ground_truth)
+                        continue;
+                }
+
                 int index_point_clouds = -1;
                 int index_local_trajectory = -1;
                 bool found = false;
@@ -2133,15 +2170,137 @@ void settings_gui()
                     auto m2 =
                         session.point_clouds_container.point_clouds[index_point_clouds].local_trajectory[index_local_trajectory].m_pose;
 
-                    auto inv = (m1 * m2).inverse();
-
+                    auto inv = Eigen::Affine3d::Identity();
+                    inv = (m1 * m2).inverse();
                     for (size_t index = 0; index < session.point_clouds_container.point_clouds.size(); index++)
                         session.point_clouds_container.point_clouds[index].m_pose =
                             inv * session.point_clouds_container.point_clouds[index].m_pose;
+
+                    for (size_t index = 0; index < session.point_clouds_container.point_clouds.size(); index++)
+                        session.point_clouds_container.point_clouds[index].m_pose =
+                            m_gt * session.point_clouds_container.point_clouds[index].m_pose;
                 }
             }
         }
 
+        static bool open_import_popup = false;
+        static bool show_instruction = false;
+
+        ImGui::Dummy(ImVec2(0, 10));
+
+        if (ImGui::Button("Import Benchmark Output Folders"))
+        {
+            open_import_popup = true;
+            ImGui::OpenPopup("Import Benchmark");
+        }
+
+        if (ImGui::BeginPopupModal("Import Benchmark", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ImGui::Text("Import benchmark sessions");
+            ImGui::Separator();
+            ImGui::SetNextWindowSize(ImVec2(740, 340), ImGuiCond_Once);
+            if (ImGui::Button("Instruction"))
+            {
+                show_instruction = !show_instruction;
+            }
+
+            ImGui::Dummy(ImVec2(0, 10));
+            if (ImGui::Button("Select Folder"))
+            {
+                const std::string algorithms[] = { "ct-icp",    "glim",      "super-lio", "dlio",
+                                                   "i2ekf-lo",  "superOdom", "lego-loam", "faster-lio",
+                                                   "kiss-icp",  "fast-lio",  "lio-ekf",   "genz-icp",
+                                                   "point-lio", "ig-lio",    "dlo",       "lidar_odometry_ros_wrapper" };
+
+                std::vector<fs::path> missing;
+                std::unordered_map<std::string, std::string> algo_map;
+
+                for (const auto& algo : algorithms)
+                {
+                    if (algo == "kiss-icp")
+                    {
+                        algo_map[algo] = "output_hdmapping-kiss";
+                    }
+                    else if (algo == "genz-icp")
+                    {
+                        algo_map[algo] = "output_hdmapping-genz";
+                    }
+                    else if (algo == "lidar_odometry_ros_wrapper")
+                    {
+                        algo_map[algo] = "output_hdmapping-lidar-odometry-ros";
+                    }
+                    else
+                    {
+                        algo_map[algo] = "output_hdmapping-" + algo;
+                    }
+                }
+
+                fs::path path = fs::path(mandeye::fd::SelectFolder("Add sessions"));
+
+                for (const auto& algo : algorithms)
+                {
+                    fs::path output_folder = path / algo / algo_map[algo];
+                    fs::path session_file = output_folder / "session.json";
+
+                    if (fs::is_directory(output_folder))
+                    {
+                        auto it =
+                            std::find(project_settings.session_file_names.begin(), project_settings.session_file_names.end(), session_file);
+
+                        if (it == project_settings.session_file_names.end())
+                        {
+                            std::cout << "Adding session file: '" << session_file << "'" << std::endl;
+                            project_settings.session_file_names.push_back(session_file.string());
+                        }
+                    }
+                    else
+                    {
+                        missing.push_back(output_folder);
+                    }
+                }
+
+                for (const auto& miss : missing)
+                {
+                    std::cout << miss << " doesn't exist" << std::endl;
+                }
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Close"))
+            {
+                ImGui::CloseCurrentPopup();
+                show_instruction = false;
+            }
+
+            if (show_instruction)
+            {
+                ImGui::BeginChild("InstructionChild", ImVec2(720, 300), true, ImGuiWindowFlags_HorizontalScrollbar);
+                ImGui::Separator();
+
+                ImGui::TextWrapped("Required folder structure:");
+
+                ImGui::Spacing();
+
+                ImGui::TextWrapped("Folders must follow the structure generated in benchmark-HDMapping-Orchestration (step 3):");
+                ImGui::TextWrapped("https://github.com/MapsHD/benchmark-HDMapping-Orchestration");
+
+                ImGui::Spacing();
+                ImGui::Separator();
+
+                ImGui::BulletText("chosen_folder/");
+                ImGui::BulletText("  ct-icp/output_hdmapping-ct-icp/session.json");
+                ImGui::BulletText("  glim/output_hdmapping-glim/session.json");
+                ImGui::BulletText("  kiss-icp/output_hdmapping-kiss/session.json");
+                ImGui::BulletText("  fast-lio/output_hdmapping-fast-lio/session.json");
+                ImGui::BulletText("  ... (same pattern for other algorithms)");
+
+                ImGui::Spacing();
+                ImGui::EndChild();
+            }
+
+            ImGui::EndPopup();
+        }
         if (project_settings.session_file_names.size() > 0)
         {
             ImGui::Separator();
@@ -2186,6 +2345,9 @@ void settings_gui()
                             ("Color##" + std::to_string(i)).c_str(), (float*)&sessions[i].render_color, ImGuiColorEditFlags_NoInputs);
                         for (auto& pc : sessions[i].point_clouds_container.point_clouds)
                         {
+                            pc.traj_color[0] = sessions[i].render_color[0];
+                            pc.traj_color[1] = sessions[i].render_color[1];
+                            pc.traj_color[2] = sessions[i].render_color[2];
                             pc.render_color[0] = sessions[i].render_color[0];
                             pc.render_color[1] = sessions[i].render_color[1];
                             pc.render_color[2] = sessions[i].render_color[2];
@@ -2439,9 +2601,15 @@ void display()
                 Eigen::Affine3d m_trg = m_src * affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
                 sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).render(
-                    m_src, viewer_decimate_point_cloud);
+                    m_src,
+                    viewer_decimate_point_cloud,
+                    viewer_reduce_rendered_trajectory,
+                    sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).render_color);
                 sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_trg).render(
-                    m_trg, viewer_decimate_point_cloud);
+                    m_trg,
+                    viewer_decimate_point_cloud,
+                    viewer_reduce_rendered_trajectory,
+                    sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_trg).render_color);
             }
         }
         else
@@ -2449,10 +2617,28 @@ void display()
             ObservationPicking observation_picking;
             sessions[first_session_index]
                 .point_clouds_container.point_clouds.at(index_loop_closure_source)
-                .render(false, observation_picking, viewer_decimate_point_cloud, false, false, false, 100000, false);
+                .render(
+                    false,
+                    observation_picking,
+                    viewer_decimate_point_cloud,
+                    viewer_reduce_rendered_trajectory,
+                    false,
+                    false,
+                    false,
+                    100000,
+                    false);
             sessions[second_session_index]
                 .point_clouds_container.point_clouds.at(index_loop_closure_target)
-                .render(false, observation_picking, viewer_decimate_point_cloud, false, false, false, 100000, false);
+                .render(
+                    false,
+                    observation_picking,
+                    viewer_decimate_point_cloud,
+                    viewer_reduce_rendered_trajectory,
+                    false,
+                    false,
+                    false,
+                    100000,
+                    false);
         }
 
         // sessions[first_session_index].point_clouds_container.render();
@@ -2547,7 +2733,7 @@ void display()
         {
             if (session.visible)
             {
-                session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud);
+                session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, viewer_reduce_rendered_trajectory);
                 session.ground_control_points.render(session.point_clouds_container);
                 session.control_points.render(session.point_clouds_container, false);
 
@@ -2588,14 +2774,14 @@ void display()
 
                         auto v1 = (m1 * m2).translation();
 
-                        glVertex3f(v1.x() - 1.0, v1.y(), v1.z());
-                        glVertex3f(v1.x() + 1.0, v1.y(), v1.z());
+                        glVertex3f(v1.x() - 5.0, v1.y(), v1.z());
+                        glVertex3f(v1.x() + 5.0, v1.y(), v1.z());
 
-                        glVertex3f(v1.x(), v1.y() - 1.0, v1.z());
-                        glVertex3f(v1.x(), v1.y() + 1.0, v1.z());
+                        glVertex3f(v1.x(), v1.y() - 5.0, v1.z());
+                        glVertex3f(v1.x(), v1.y() + 5.0, v1.z());
 
-                        glVertex3f(v1.x(), v1.y(), v1.z() - 1.0);
-                        glVertex3f(v1.x(), v1.y(), v1.z() + 1.0);
+                        glVertex3f(v1.x(), v1.y(), v1.z() - 5.0);
+                        glVertex3f(v1.x(), v1.y(), v1.z() + 5.0);
 
                         glEnd();
                     }
@@ -2690,15 +2876,12 @@ void display()
                     for (size_t j = 0; j < sessions[i].point_clouds_container.point_clouds.size(); j++)
                         all_m_poses.push_back(sessions[i].point_clouds_container.point_clouds[j].m_pose);
 
-                    // if (all_m_poses.size() > 1)
-                    //{
                     ImGuiIO& io = ImGui::GetIO();
-                    // ImGuizmo -----------------------------------------------
+
                     ImGuizmo::BeginFrame();
                     ImGuizmo::Enable(true);
                     ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-                    // std::cout << "3" << std::endl;
                     if (!is_ortho)
                     {
                         GLfloat projection[16];
@@ -3213,10 +3396,7 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
                                 continue;
                             }
 
-                            outfile << "timestampLidar,x,y,z,"
-                                    << "r00,r01,r02,"
-                                    << "r10,r11,r12,"
-                                    << "r20,r21,r22\n";
+                            outfile << "timestampLidar,x,y,z," << "r00,r01,r02," << "r10,r11,r12," << "r20,r21,r22\n";
 
                             for (const auto& pc : session.point_clouds_container.point_clouds)
                             {
@@ -3271,8 +3451,7 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
                                 continue;
                             }
 
-                            outfile << "timestampUnix,x,y,z,"
-                                    << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
+                            outfile << "timestampUnix,x,y,z," << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
 
                             for (const auto& pc : session.point_clouds_container.point_clouds)
                             {
@@ -3323,8 +3502,7 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
                                 continue;
                             }
 
-                            outfile << "timestampLidar,timestampUnix,x,y,z,"
-                                    << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
+                            outfile << "timestampLidar,timestampUnix,x,y,z," << "r00,r01,r02,r10,r11,r12,r20,r21,r22\n";
 
                             for (const auto& pc : session.point_clouds_container.point_clouds)
                             {
@@ -3688,12 +3866,23 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
             ImGui::InputInt("Points render downsampling", &viewer_decimate_point_cloud, 10, 100);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("increase for better performance, decrease for rendering more points");
-            ImGui::SameLine();
+            // ImGui::SameLine();
 
             if (viewer_decimate_point_cloud < 1)
                 viewer_decimate_point_cloud = 1;
 
             ImGui::SameLine();
+
+            ImGui::InputInt("Trajectory reduce render", &viewer_reduce_rendered_trajectory, 10, 100);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("increase for better performance, decrease for rendering more nodes in the trajectory");
+            // ImGui::SameLine();
+
+            if (viewer_reduce_rendered_trajectory < 1)
+                viewer_reduce_rendered_trajectory = 1;
+
+            ImGui::SameLine();
+
             ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
         }
         ImGui::EndDisabled();
@@ -3746,17 +3935,20 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
 
         if (ImGui::Button("Remove"))
         {
-            for (size_t i = project_settings.session_file_names.size() - 1; i >= 0; i--)
+            for (size_t i = project_settings.session_file_names.size(); i > 0; --i)
             {
-                if (session_marked_for_removal[i])
+                size_t idx = i - 1;
+
+                if (session_marked_for_removal[idx])
                 {
-                    std::cout << "Removing session: " << project_settings.session_file_names[i] << std::endl;
-                    project_settings.session_file_names.erase(project_settings.session_file_names.begin() + i);
-                    if ((sessions.size() > 0) && i < sessions.size())
-                        sessions.erase(sessions.begin() + i);
+                    std::cout << "Removing session: " << project_settings.session_file_names[idx] << std::endl;
+
+                    project_settings.session_file_names.erase(project_settings.session_file_names.begin() + idx);
+
+                    if (idx < sessions.size())
+                        sessions.erase(sessions.begin() + idx);
                 }
             }
-
             session_marked_for_removal.clear();
 
             if (!sessions.empty())
@@ -3854,7 +4046,8 @@ void mouse(int glut_button, int state, int x, int y)
                     number_visible_sessions,
                     index_loop_closure_source,
                     index_loop_closure_target,
-                    io.KeyShift);
+                    io.KeyShift,
+                    time_stamp_offset);
             }
             else
             {

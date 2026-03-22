@@ -70,3 +70,5 @@ imgui.ini
 /out_old/install
 
 /.gitmodules
+/build2
+/build3

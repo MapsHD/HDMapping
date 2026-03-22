@@ -9,19 +9,26 @@
 
 #include <ImGuizmo.h>
 
+#include <spdlog/spdlog.h>
+
 #include <Eigen/Eigen>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <icp.h>
-#include <ndt.h>
-#include <observation_picking.h>
-#include <pose_graph_slam.h>
-#include <registration_plane_feature.h>
-#include <transformations.h>
-
-#include <utils.hpp>
+#include <Core/export_laz.h>
+#include <Core/fmt_filesystem.hpp>
+#include <Core/gnss.h>
+#include <Core/icp.h>
+#include <Core/manual_pose_graph_loop_closure.h>
+#include <Core/ndt.h>
+#include <Core/observation_picking.h>
+#include <Core/pfd_wrapper.hpp>
+#include <Core/pose_graph_slam.h>
+#include <Core/registration_plane_feature.h>
+#include <Core/session.h>
+#include <Core/transformations.h>
+#include <Core/utils.hpp>
 
 #include <portable-file-dialogs.h>
 
@@ -30,21 +37,17 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <tuple>
 
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
 #include "multi_view_tls_registration.h"
-#include <manual_pose_graph_loop_closure.h>
-
-#include <gnss.h>
-#include <pfd_wrapper.hpp>
-#include <session.h>
 
 #include <HDMapping/Version.hpp>
 
 #include "WGS84toCartesian.hpp"
 #include "wgs84_do_puwg92.h"
-#include <export_laz.h>
 
+#include <proj.h>
 #ifdef _WIN32
 #include "resource.h"
 #include <windows.h>
@@ -111,7 +114,7 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "Ctrl+S", "Save session" },
                                                          { "", "Ctrl+Shift+S", "Save subsession" },
                                                          { "", "T", "" },
-                                                         { "", "Ctrl+T", "" },
+                                                         { "", "Ctrl+T", "Solid cloud color" },
                                                          { "", "U", "" },
                                                          { "", "Ctrl+U", "" },
                                                          { "", "V", "" },
@@ -214,6 +217,8 @@ bool manipulate_only_marked_gizmo = false;
 Session session;
 PointClouds::PointCloudDimensions session_dims;
 bool session_loaded = false;
+std::vector<std::string> geoids;
+std::string selected_geoid_model;
 
 // these functions performs experiment from paper
 //@article
@@ -324,7 +329,7 @@ void ndt_gui()
         double rms_final = 0.0;
         double mui = 0.0;
         // ndt.optimize(point_clouds_container.point_clouds, rms_initial, rms_final, mui);
-        // std::cout << "mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
+        // spdlog::info("mui: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final << std::endl;
         tls_registration.ndt.optimize(session.point_clouds_container.point_clouds, false, tls_registration.compute_mean_and_cov_for_bucket);
     }
 
@@ -479,11 +484,11 @@ void icp_gui()
 
     ImGui::Separator();
 
-    if (ImGui::Button("Compute rms (optimization_point_to_point_source_to_target)"))
+    if (ImGui::Button("Compute RMS (optimization_point_to_point_source_to_target)"))
     {
         double rms = 0.0;
         tls_registration.icp.optimization_point_to_point_source_to_target_compute_rms(session.point_clouds_container, rms);
-        std::cout << "rms (optimization_point_to_point_source_to_target): " << rms << std::endl;
+        spdlog::info("RMS (optimization_point_to_point_source_to_target): {}", rms);
     }
 }
 
@@ -795,7 +800,7 @@ void pose_graph_slam_gui()
             // double mui = 0.0;
             tls_registration.pose_graph_slam.optimize(session.point_clouds_container);
             // pose_graph_slam.optimize(point_clouds_container, rms_initial, rms_final, mui);
-            // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final <<
+            // spdlog::info("mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final <<
             // std::endl;
         }
 
@@ -811,7 +816,7 @@ void pose_graph_slam_gui()
             double rms_final = 0.0;
             double mui = 0.0;
             tls_registration.pose_graph_slam.optimize_with_GTSAM(session.point_clouds_container);
-            // std::cout << "mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final <<
+            // spdlog::info("mean uncertainty impact: " << mui << " rms_initial: " << rms_initial << " rms_final: " << rms_final <<
             // std::endl;
         }
 #endif
@@ -822,7 +827,7 @@ void pose_graph_slam_gui()
         if (ImGui::Button("Optimize with manif (a small header-only library for Lie theory)"))
         {
             tls_registration.pose_graph_slam.optimize_with_manif(session.point_clouds_container);
-            std::cout << "optimize with manif (a small header-only library for Lie theory) DONE" << std::endl;
+            spdlog::info("Optimize with manif (a small header-only library for Lie theory) DONE" << std::endl;
         }
 #endif
     }
@@ -923,7 +928,7 @@ void observation_picking_gui()
         if (ImGui::Button("Save observations"))
         {
             const auto output_file_name = mandeye::fd::SaveFileDialog("Save observations", {}, ".json");
-            std::cout << "json file to save: '" << output_file_name << "'" << std::endl;
+            spdlog::info("JSON file to save: '{}'", output_file_name);
 
             if (output_file_name.size() > 0)
                 observation_picking.export_observation(output_file_name);
@@ -934,9 +939,9 @@ void observation_picking_gui()
         if (ImGui::Button("Compute RMS (xy)"))
         {
             double rms = compute_rms(true, session, observation_picking);
-            std::cout << "RMS (initial poses): " << rms << std::endl;
+            spdlog::info("RMS (initial poses): {}", rms);
             rms = compute_rms(false, session, observation_picking);
-            std::cout << "RMS (current poses): " << rms << std::endl;
+            spdlog::info("RMS (current poses): {}", rms);
         }
 
         ImGui::Separator();
@@ -986,7 +991,7 @@ void observation_picking_gui()
             {
                 std::string output_folder_name = "";
                 output_folder_name = mandeye::fd::SelectFolder("Choose folder");
-                std::cout << "folder: '" << output_folder_name << "'" << std::endl;
+                spdlog::info("folder: '{}'", output_folder_name);
 
                 if (output_folder_name.size() > 0)
                     export_result_to_folder(output_folder_name, observation_picking, session);
@@ -1007,6 +1012,8 @@ void loop_closure_gui()
     ImGui::Begin("Manual Pose Graph Loop Closure", &is_loop_closure_gui);
     {
         const auto point_cloud_upper = session.point_clouds_container.point_clouds.size() - 1;
+
+        ImGui::Checkbox("Render source as red target as blue", &session.pose_graph_loop_closure.render_source_as_red_target_as_blue);
 
         ImGui::Text("Num edge extended:");
 
@@ -1184,7 +1191,7 @@ void lio_segments_gui()
                 double om = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.x() * RAD_TO_DEG;
                 double fi = session.point_clouds_container.point_clouds[i].local_trajectory[0].imu_om_fi_ka.y() * RAD_TO_DEG;
 
-                std::cout << "om: " << om << " fi " << fi << std::endl;
+                spdlog::info("om: {}, fi {}", om, fi);
                 if (fabs(om) > angle_diff || fabs(fi) > angle_diff)
                 {
                 }
@@ -1258,7 +1265,7 @@ void lio_segments_gui()
                 if (ImGui::Button(std::string("#" + std::to_string(i) + " save scan(global reference frame)").c_str()))
                 {
                     const auto output_file_name = mandeye::fd::SaveFileDialog("Choose folder", {});
-                    std::cout << "Scan file to save: '" << output_file_name << "'" << std::endl;
+                    spdlog::info("Scan file to save: '" << output_file_name << "'" << std::endl;
                     if (output_file_name.size() > 0)
                     {
                         session.point_clouds_container.point_clouds[i].save_as_global(output_file_name);
@@ -1356,11 +1363,11 @@ void lio_segments_gui()
                         icp.is_tait_bryan_angles = true;
                         icp.is_quaternion = false;
                         icp.is_rodrigues = false;
-                        std::cout << "optimization_point_to_point_source_to_target" << std::endl;
+                        spdlog::info("optimization_point_to_point_source_to_target" << std::endl;
 
                         icp.optimization_point_to_point_source_to_target(pcs);
 
-                        std::cout << "pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+                        spdlog::info("pose before: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
 
                         std::vector<Eigen::Affine3d> all_m_poses;
                         for (size_t j = 0; j < session.point_clouds_container.point_clouds.size(); j++)
@@ -1370,12 +1377,12 @@ void lio_segments_gui()
 
                         session.point_clouds_container.point_clouds[index_target].m_pose = pcs.point_clouds[pcs.point_clouds.size() - 1].m_pose;
 
-                        std::cout << "pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
+                        spdlog::info("pose after ICP: " << session.point_clouds_container.point_clouds[index_target].m_pose.matrix() << std::endl;
 
                         // like gizmo
                         if (!manipulate_only_marked_gizmo)
                         {
-                            std::cout << "update all poses after current pose" << std::endl;
+                            spdlog::info("Update all poses after current pose" << std::endl;
 
                             Eigen::Affine3d curr_m_pose = session.point_clouds_container.point_clouds[index_target].m_pose;
                             for (size_t j = index_target + 1; j < session.point_clouds_container.point_clouds.size(); j++)
@@ -1470,7 +1477,7 @@ void lio_segments_gui()
                 ImGui::SameLine();
                 if (ImGui::Button(std::string("#" + std::to_string(i) + " print frame to console").c_str()))
                 {
-                    std::cout << session.point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
+                    spdlog::info(session.point_clouds_container.point_clouds[i].m_pose.matrix() << std::endl;
                 }
 #endif
             }
@@ -1483,7 +1490,7 @@ void lio_segments_gui()
 
 void loadSession(const std::string& session_file_name)
 {
-    std::cout << "Session file: '" << session_file_name << "'" << std::endl;
+    spdlog::info("Session file: '{}'", session_file_name);
 
     if (session.load(
             fs::path(session_file_name).string(),
@@ -1524,7 +1531,7 @@ std::string saveSession()
 
     if (output_file_name.size() > 0)
     {
-        std::cout << "Session file to save: '" << output_file_name << "'" << std::endl;
+        spdlog::info("Session file to save: '{}'", output_file_name);
 
         // creating filenames proposal based on current selection
         std::filesystem::path path(output_file_name);
@@ -1538,8 +1545,8 @@ std::string saveSession()
 
         if (session.point_clouds_container.initial_poses_file_name.empty())
         {
-            std::cout << "Please assign initial_poses_file_name to session" << std::endl;
-            std::cout << "Session is not saved" << std::endl;
+            spdlog::info("Please assign initial_poses_file_name to session");
+            spdlog::warn("Session is not saved!");
 
             [[maybe_unused]] pfd::message message(
                 "Please assign initial_poses_file_name to session",
@@ -1553,19 +1560,19 @@ std::string saveSession()
 
             initial_poses_file_name =
                 mandeye::fd::SaveFileDialog("Initial poses file name", mandeye::fd::IniPoses_filter, initial_poses_file_name);
-            std::cout << "Resso file to save: '" << initial_poses_file_name << "'" << std::endl;
+            spdlog::info("Resso file to save: '{}'", initial_poses_file_name);
 
             if (initial_poses_file_name.size() > 0)
             {
-                std::cout << "saving initial poses to: " << initial_poses_file_name << std::endl;
+                spdlog::info("Saving initial poses to: '{}'", initial_poses_file_name);
                 session.point_clouds_container.save_poses(initial_poses_file_name, false);
             }
         }
 
         if (session.point_clouds_container.poses_file_name.empty())
         {
-            std::cout << "Please assign poses_file_name to session" << std::endl;
-            std::cout << "Session is not saved" << std::endl;
+            spdlog::info("Please assign poses_file_name to session");
+            spdlog::warn("Session is not saved!");
 
             [[maybe_unused]] pfd::message message(
                 "Please assign poses_file_name to session",
@@ -1578,16 +1585,16 @@ std::string saveSession()
             message.result();
 
             poses_file_name = mandeye::fd::SaveFileDialog("Poses file name", mandeye::fd::Poses_filter, poses_file_name);
-            std::cout << "Resso file to save: '" << poses_file_name << "'" << std::endl;
+            spdlog::info("Resso file to save: '{}'", poses_file_name);
             if (poses_file_name.size() > 0)
             {
-                std::cout << "saving poses to: " << poses_file_name << std::endl;
+                spdlog::info("Saving poses to: '{}'", poses_file_name);
                 session.point_clouds_container.save_poses(poses_file_name, false);
             }
         }
 
         session.save(output_file_name, poses_file_name, initial_poses_file_name, false);
-        std::cout << "saving result to: " << poses_file_name << std::endl;
+        spdlog::info("Saving result to: '{}'", poses_file_name);
         session.point_clouds_container.save_poses(poses_file_name, false);
 
         try
@@ -1595,14 +1602,14 @@ std::string saveSession()
             fs::copy_file(poses_file_name, initial_poses_file_name, fs::copy_options::overwrite_existing);
         } catch (const fs::filesystem_error& e)
         {
-            std::cerr << "Error copying poses file: " << e.what() << '\n';
+            spdlog::error("Error copying poses file: {}", e.what());
         }
 
         return output_file_name;
     }
     else
     {
-        std::cout << "saving canceled" << std::endl;
+        spdlog::info("Saving canceled");
 
         return "";
     }
@@ -1617,9 +1624,9 @@ void openLaz(bool fillInSession)
     {
         session.working_directory = fs::path(input_file_names[0]).parent_path().string();
 
-        std::cout << "Creating session from las/laz files:" << std::endl;
+        spdlog::info("Creating session from las/laz files:");
         for (size_t i = 0; i < input_file_names.size(); i++)
-            std::cout << input_file_names[i] << std::endl;
+            spdlog::info("{}", input_file_names[i]);
 
         if (!session.point_clouds_container.load_whu_tls(
                 input_file_names,
@@ -1629,9 +1636,9 @@ void openLaz(bool fillInSession)
                 tls_registration.bucket_z,
                 tls_registration.calculate_offset,
                 session.load_cache_mode))
-            std::cout << "Problem creating! Check input files laz/las" << std::endl;
+            spdlog::error("Error loading session! Check input files laz/las");
         else
-            std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+            spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
 
         session_loaded = true;
         index_begin = 0;
@@ -1654,7 +1661,7 @@ void openLaz(bool fillInSession)
                 {
                     int counter = 1;
                     Eigen::Vector3d mean(pc.points_local[0]);
-                    // std::cout << "mean " << mean << std::endl;
+                    // spdlog::info("mean " << mean << std::endl;
                     for (size_t i = 100; i < pc.points_local.size(); i += 100)
                     {
                         mean += pc.points_local[i];
@@ -1715,13 +1722,13 @@ void openLaz(bool fillInSession)
 
                     // saving terajectory file
                     auto pathtrj = dir / ("trajectory_lio_" + std::to_string(i) + ".csv");
-                    std::cout << "Saving trajectory: " << pathtrj << std::endl;
+                    spdlog::info("Saving trajectory: '{}'", pathtrj);
 
                     std::ofstream outfile;
                     outfile.open(pathtrj);
                     if (!outfile.good())
                     {
-                        std::cout << "Can not save file: " << pathtrj << std::endl;
+                        spdlog::error("Error saving file: '{}'", pathtrj);
                         return;
                     }
 
@@ -1792,7 +1799,7 @@ void saveSubsession()
 
     if (output_file_name.size() > 0)
     {
-        std::cout << "Subsession file to save: '" << output_file_name << "'" << std::endl;
+        spdlog::info("Subsession file to save: '{}'", output_file_name);
 
         path = fs::path(output_file_name);
         dir = path.parent_path();
@@ -1802,7 +1809,7 @@ void saveSubsession()
         const auto poses_file_name = (dir / (stem + "_poses" + ".mrp")).string();
 
         session.save(fs::path(output_file_name).string(), poses_file_name, initial_poses_file_name, true);
-        std::cout << "Saving poses to: " << poses_file_name << std::endl;
+        spdlog::info("Saving poses to: '{}'", poses_file_name);
         session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), true);
 
         try
@@ -1810,11 +1817,11 @@ void saveSubsession()
             fs::copy_file(poses_file_name, initial_poses_file_name, fs::copy_options::overwrite_existing);
         } catch (const fs::filesystem_error& e)
         {
-            std::cerr << "Error copying poses file: " << e.what() << '\n';
+            spdlog::error("Error copying poses file: {}", e.what());
         }
     }
     else
-        std::cout << "saving canceled" << std::endl;
+        spdlog::info("Saving canceled");
 }
 
 void settings_gui()
@@ -1822,10 +1829,23 @@ void settings_gui()
     ImGui::Begin("Settings", &is_settings_gui);
     {
         std::string wd = "Working directory: '" + session.working_directory + "'";
-
         ImGui::Text(wd.c_str());
 
         ImGui::NewLine();
+
+        ImGui::InputFloat("camera_x", &new_rotation_center.x());
+        ImGui::InputFloat("camera_y", &new_rotation_center.y());
+        ImGui::InputFloat("camera_z", &new_rotation_center.z());
+
+        if (ImGui::Button("set camera"))
+        {
+            // new_rotate_x = rotate_x;
+            // new_rotate_y = rotate_y;
+            // new_translate_x = -new_rotation_center.x();
+            // new_translate_y = -new_rotation_center.y();
+            // new_translate_z = -new_rotation_center.z();
+            camera_transition_active = true;
+        }
 
         if (ImGui::Button("Set initial pose to Identity and update other poses"))
             initial_pose_to_identity(session);
@@ -1858,7 +1878,7 @@ void settings_gui()
         {
             std::string input_file_name = "";
             input_file_name = mandeye::fd::OpenFileDialogOneFile("Load RESSO", mandeye::fd::Resso_filter);
-            std::cout << "RESSO file: '" << input_file_name << "'" << std::endl;
+            spdlog::info("RESSO file: '{}'", input_file_name);
 
             if (input_file_name.size() > 0)
             {
@@ -1873,18 +1893,18 @@ void settings_gui()
                         tls_registration.bucket_z,
                         session.load_cache_mode))
                 {
-                    std::cout << "check input files" << std::endl;
+                    spdlog::error("Error loading file!");
                     return;
                 }
                 else
-                    std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                    spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
             }
         }
         ImGui::SameLine();
         if (ImGui::Button("Save RESSO file"))
         {
             const auto output_file_name = mandeye::fd::SaveFileDialog("Save RESSO file", mandeye::fd::Resso_filter);
-            std::cout << "RESSO file to save: '" << output_file_name << "'" << std::endl;
+            spdlog::info("RESSO file to save: '{}'", output_file_name);
             if (output_file_name.size() > 0)
                 session.point_clouds_container.save_poses(fs::path(output_file_name).string(), false);
         }
@@ -1910,11 +1930,11 @@ void settings_gui()
                         tls_registration.bucket_y,
                         tls_registration.bucket_z))
                 {
-                    std::cout << "check input files" << std::endl;
+                    spdlog::error("Error loading file!");
                     return;
                 }
                 else
-                    std::cout << "loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                    spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
             }
         }
         ImGui::Text("ETH dataset: ");
@@ -1933,9 +1953,9 @@ void settings_gui()
             {
                 session.working_directory = fs::path(input_file_names[0]).parent_path().string();
 
-                std::cout << "TXT files:" << std::endl;
+                spdlog::info("TXT files:");
                 for (size_t i = 0; i < input_file_names.size(); i++)
-                    std::cout << input_file_names[i] << std::endl;
+                    spdlog::info("{}", input_file_names[i]);
 
                 if (!session.point_clouds_container.load_3DTK_tls(
                         input_file_names,
@@ -1944,11 +1964,11 @@ void settings_gui()
                         tls_registration.bucket_y,
                         tls_registration.bucket_z))
                 {
-                    std::cout << "Check input files" << std::endl;
+                    spdlog::error("Error loading file!");
                     return;
                 }
                 else
-                    std::cout << "Loaded: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                    spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
             }
         }
         ImGui::Text("3DTK dataset (18: the campus of the Jacobs University Bremen)");
@@ -1968,13 +1988,13 @@ void settings_gui()
                 if (!session.point_clouds_container.update_initial_poses_from_RESSO(
                         session.working_directory.c_str(), input_file_name.c_str()))
                 {
-                    std::cout << "Check input files" << std::endl;
+                    spdlog::error("Error loading file!");
                     return;
                 }
                 else
                 {
                     session.point_clouds_container.initial_poses_file_name = input_file_name;
-                    std::cout << "Updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                    spdlog::info("Updated: {} point_clouds", session.point_clouds_container.point_clouds.size());
                 }
             }
         }
@@ -1992,12 +2012,12 @@ void settings_gui()
 
                 if (!session.point_clouds_container.update_poses_from_RESSO(session.working_directory.c_str(), input_file_name.c_str()))
                 {
-                    std::cout << "Check input files" << std::endl;
+                    spdlog::error("Error loading file!");
                     return;
                 }
                 else
                 {
-                    std::cout << "Updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                    spdlog::info("Updated: {} point_clouds", session.point_clouds_container.point_clouds.size());
                     session.point_clouds_container.poses_file_name = input_file_name;
                 }
             }
@@ -2016,12 +2036,12 @@ void settings_gui()
                 if (!session.point_clouds_container.update_poses_from_RESSO_inverse(
                         session.working_directory.c_str(), input_file_name.c_str()))
                 {
-                    std::cout << "Check input files" << std::endl;
+                    spdlog::error("Error loading file!");
                     return;
                 }
                 else
                 {
-                    std::cout << "Updated: " << session.point_clouds_container.point_clouds.size() << " point_clouds" << std::endl;
+                    spdlog::info("Updated: {} point_clouds", session.point_clouds_container.point_clouds.size());
                     session.point_clouds_container.poses_file_name = input_file_name;
                 }
             }
@@ -2089,7 +2109,7 @@ void settings_gui()
                     {
                         curr_m_pose2 = curr_m_pose2 * (all_m_poses2[j - 1].inverse() * all_m_poses2[j]);
 
-                        // std::cout << curr_m_pose2.matrix() << std::endl;
+                        // spdlog::info(curr_m_pose2.matrix() << std::endl;
                         session.point_clouds_container.point_clouds[j].m_pose = curr_m_pose2;
                         session.point_clouds_container.point_clouds[j].pose =
                             pose_tait_bryan_from_affine_matrix(session.point_clouds_container.point_clouds[j].m_pose);
@@ -2414,9 +2434,9 @@ void display()
                 }
             }
 
-            session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, session_dims);
+            session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, 1, session_dims);
 
-            // std::cout << "session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 <<
+            // spdlog::info("session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 <<
             // std::endl;
 
             observation_picking.render();
@@ -2650,6 +2670,37 @@ void display()
         io.AddKeyEvent(ImGuiMod_Ctrl, false);
     }
 
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_T)) // solid colors
+    {
+        csPointCloud = CS_SOLID;
+
+        float color[3];
+        if (session_loaded)
+        {
+            color[0] = session.point_clouds_container.point_clouds[0].render_color[0];
+            color[1] = session.point_clouds_container.point_clouds[0].render_color[1];
+            color[2] = session.point_clouds_container.point_clouds[0].render_color[2];
+        }
+
+        for (auto& pc : session.point_clouds_container.point_clouds)
+        {
+            pc.render_color[0] = color[0];
+            pc.render_color[1] = color[1];
+            pc.render_color[2] = color[2];
+
+            if (csTrajectory == CS_FOLLOW)
+            {
+                pc.traj_color[0] = pc.render_color[0];
+                pc.traj_color[1] = pc.render_color[1];
+                pc.traj_color[2] = pc.render_color[2];
+            }
+        }
+
+        // workaround
+        io.AddKeyEvent(ImGuiKey_T, false);
+        io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    }
+
     if (ImGui::BeginMainMenuBar())
     {
         if (!session_loaded)
@@ -2709,7 +2760,7 @@ void display()
                     if (ImGui::MenuItem("Local scan"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("laz file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_all_to_las(session, output_file_name, true, true);
@@ -2720,7 +2771,7 @@ void display()
                     if (ImGui::MenuItem("Global scan"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("laz file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_all_to_las(session, output_file_name, false, true);
@@ -2760,7 +2811,7 @@ void display()
                     if (ImGui::MenuItem("Save all as las/laz files"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("laz file to save: '{}'", output_file_name);
                         if (output_file_name.size() > 0)
                             save_trajectories_to_laz(
                                 session,
@@ -2778,7 +2829,7 @@ void display()
                     if (ImGui::MenuItem("Save all as csv (timestamp Lidar)##1"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
-                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("csv file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_trajectories(
@@ -2795,7 +2846,7 @@ void display()
                     if (ImGui::MenuItem("Save all as csv (timestamp Unix)##1"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
-                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("csv file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_trajectories(
@@ -2812,7 +2863,7 @@ void display()
                     if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)##1"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
-                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("csv file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_trajectories(
@@ -2833,7 +2884,7 @@ void display()
                     if (ImGui::MenuItem("Save all as csv (timestamp Lidar)##2"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
-                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("csv file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_trajectories(
@@ -2850,7 +2901,7 @@ void display()
                     if (ImGui::MenuItem("Save all as csv (timestamp Unix)##2"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
-                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("csv file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_trajectories(
@@ -2867,7 +2918,7 @@ void display()
                     if (ImGui::MenuItem("Save all as csv (timestamp Lidar, Unix)##2"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::Csv_filter, ".csv");
-                        std::cout << "csv file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("csv file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_trajectories(
@@ -2887,7 +2938,7 @@ void display()
                     if (ImGui::MenuItem("Save all as dxf as polyline"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog("Ouput file name", mandeye::fd::Dxf_filter, ".dxf");
-                        std::cout << "dxf file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("dxf file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_trajectories(
@@ -2912,7 +2963,7 @@ void display()
                     if (ImGui::MenuItem("> dec 0.1"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("laz file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_scale_board_to_laz(session, output_file_name, 0.1);
@@ -2921,7 +2972,7 @@ void display()
                     if (ImGui::MenuItem("> dec 1.0"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("laz file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_scale_board_to_laz(session, output_file_name, 1.0);
@@ -2930,7 +2981,7 @@ void display()
                     if (ImGui::MenuItem("> dec 10.0"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("laz file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_scale_board_to_laz(session, output_file_name, 10.0);
@@ -2942,7 +2993,7 @@ void display()
                     if (ImGui::MenuItem("> 10m"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("laz file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_scale_board_to_laz(session, output_file_name, 10.0, 10000.0);
@@ -2951,7 +3002,7 @@ void display()
                     if (ImGui::MenuItem("> 100m"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("laz file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_scale_board_to_laz(session, output_file_name, 100.0, 10000.0);
@@ -2960,7 +3011,7 @@ void display()
                     if (ImGui::MenuItem("> 1000m"))
                     {
                         const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                        std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("laz file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             save_scale_board_to_laz(session, output_file_name, 1000.0, 10000.0);
@@ -2981,9 +3032,9 @@ void display()
                         if (input_file_names.size() > 0)
                         {
                             Eigen::Vector3d out_offset(0.0, 0.0, 0.0);
-                            if (!tls_registration.gnss.load(input_file_names, out_offset, gnssWithOffset))
+                            if (!tls_registration.gnss.load_data_from_gnss_and_convert_to_92(input_file_names, out_offset, gnssWithOffset))
                             {
-                                std::cout << "problem with loading gnss files" << std::endl;
+                                spdlog::error("Error loading GNSS files!");
                             }
                             else
                             {
@@ -2996,6 +3047,23 @@ void display()
 
                     ImGui::Text("Load & convert WGS84 to Cartesian by Mercator projection");
 
+                    if (ImGui::MenuItem("Load GNSS (deprecated)"))
+                    {
+                        std::vector<std::string> input_file_names;
+                        input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", { "GNSS", "*.gnss" }, true);
+
+                        if (input_file_names.size() > 0)
+                        {
+                            if (!tls_registration.gnss.load_raw_data_from_gnss(input_file_names))
+                            {
+                                spdlog::error("Error loading GNSS files!");
+                            }
+                            if (!tls_registration.gnss.project_to_mercator_projection())
+                            {
+                                spdlog::error("Error converting WGS84 to Mercator projection!");
+                            }
+                        }
+                    }
                     if (ImGui::MenuItem("Load GNSS"))
                     {
                         std::vector<std::string> input_file_names;
@@ -3003,15 +3071,36 @@ void display()
 
                         if (input_file_names.size() > 0)
                         {
-                            if (!tls_registration.gnss.load_mercator_projection(input_file_names))
+                            if (!tls_registration.gnss.load_raw_data_from_gnss(input_file_names))
                             {
-                                std::cout << "problem with loading gnss files" << std::endl;
+                                spdlog::error("Error loading GNSS files!");
+                            }
+                            if (!tls_registration.gnss.project_using_proj())
+                            {
+                                spdlog::error("Error converting WGS84 to PROJ projection!");
                             }
                         }
                     }
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Load structured GNSS dataset and decode it into coordinates");
+                        ImGui::SetTooltip("Load structured GNSS dataset and decode it into coordinates, using PROJ library");
 
+                    if (ImGui::MenuItem("Load NMEA (deprecated)"))
+                    {
+                        std::vector<std::string> input_file_names;
+                        input_file_names = mandeye::fd::OpenFileDialog("Load nmea files", { "NMEA", "*.nmea" }, true);
+
+                        if (input_file_names.size() > 0)
+                        {
+                            if (!tls_registration.gnss.load_raw_data_from_nmea(input_file_names))
+                                spdlog::error("Error loading NMEA files!");
+                        }
+                        if (!tls_registration.gnss.project_to_mercator_projection())
+                        {
+                            spdlog::error("Error converting WGS84 to Mercator projection!");
+                        }
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Load raw GNSS serial output and decode it into coordinates");
                     if (ImGui::MenuItem("Load NMEA"))
                     {
                         std::vector<std::string> input_file_names;
@@ -3019,12 +3108,16 @@ void display()
 
                         if (input_file_names.size() > 0)
                         {
-                            if (!tls_registration.gnss.load_nmea_mercator_projection(input_file_names))
-                                std::cout << "problem with loading gnss files" << std::endl;
+                            if (!tls_registration.gnss.load_raw_data_from_nmea(input_file_names))
+                                spdlog::error("Error loading NMEA files!");
+                        }
+                        if (!tls_registration.gnss.project_using_proj())
+                        {
+                            spdlog::error("Error converting WGS84 to PROJ projection!");
                         }
                     }
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Load raw GNSS serial output and decode it into coordinates");
+                        ImGui::SetTooltip("Load raw GNSS serial output and decode it into coordinates, using PROJ library");
 
                     ImGui::Separator();
 
@@ -3032,7 +3125,7 @@ void display()
                     {
                         const auto output_file_name =
                             mandeye::fd::SaveFileDialog("Save las or laz file", mandeye::fd::LAS_LAZ_filter, ".laz");
-                        std::cout << "las or laz file to save: '" << output_file_name << "'" << std::endl;
+                        spdlog::info("las or laz file to save: '{}'", output_file_name);
 
                         if (output_file_name.size() > 0)
                             tls_registration.gnss.save_to_laz(
@@ -3041,10 +3134,8 @@ void display()
                                 session.point_clouds_container.offset.y(),
                                 session.point_clouds_container.offset.z());
                     }
-
-                    if (ImGui::MenuItem("Save metascan points in PUWG92"))
+                    const auto prepareVisibleData = [&]()
                     {
-                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
                         std::vector<Eigen::Vector3d> pointcloud;
                         std::vector<unsigned short> intensity;
                         std::vector<double> timestamps;
@@ -3069,6 +3160,13 @@ void display()
                                 }
                             }
                         }
+                        return std::tuple(pointcloud, intensity, timestamps);
+                    };
+
+                    if (ImGui::MenuItem("Save metascan points in PUWG92(dep!)"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        const auto [pointcloud, intensity, timestamps] = prepareVisibleData();
 
                         const auto lat = tls_registration.gnss.WGS84ReferenceLatitude;
                         const auto lon = tls_registration.gnss.WGS84ReferenceLongitude;
@@ -3079,6 +3177,70 @@ void display()
                         wgs84_do_puwg92(lat, lon, &Xpuwg92, &Ypuwg92);
                         Eigen::Vector3d offset(Ypuwg92, Xpuwg92, alt);
                         exportLaz(output_file_name, pointcloud, intensity, timestamps, offset.x(), offset.y(), offset.z());
+                    }
+                    ImGui::Separator();
+                    for (const auto& geoid : geoids)
+                    {
+                        if (ImGui::MenuItem(std::string("Set geoid to " + geoid).c_str(), nullptr, selected_geoid_model == geoid))
+                        {
+                            selected_geoid_model = geoid;
+                        }
+                    }
+                    ImGui::Separator();
+
+                    if (ImGui::MenuItem("Save metascan points in WGS84 LLA (PROJ)"))
+                    {
+                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+                        const auto [pointcloud, intensity, timestamps] = prepareVisibleData();
+
+                        const auto lla_points = tls_registration.gnss.unproject_using_proj(pointcloud);
+
+                        exportLaz(output_file_name, lla_points, intensity, timestamps, 0, 0, 0);
+                    }
+                    for (const auto& crtName : CRTs::SupportedCRTs)
+                    {
+                        std::string itemName = "Save metascan points in " + crtName + " (PROJ)";
+                        if (ImGui::MenuItem(itemName.c_str()))
+                        {
+                            const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+
+                            const auto [pointcloud, intensity, timestamps] = prepareVisibleData();
+                            const auto lla_points = tls_registration.gnss.unproject_using_proj(pointcloud);
+                            auto crt_points = tls_registration.gnss.CRTConvert(lla_points, crtName, selected_geoid_model);
+                            Eigen::Vector3d offset = crt_points.front();
+                            for (auto& p : crt_points)
+                            {
+                                p = p - offset;
+                            }
+                            exportLaz(output_file_name, crt_points, intensity, timestamps, offset.x(), offset.y(), offset.z());
+                        }
+                    }
+
+                    for (const auto& crtName : CRTs::SupportedCRTs)
+                    {
+                        std::string itemName = "Save GNSS data to las/laz in " + crtName + " (PROJ)";
+                        if (ImGui::MenuItem(itemName.c_str()))
+                        {
+                            const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
+
+                            std::vector<Eigen::Vector3d> lla_points;
+                            std::vector<unsigned short> intensity;
+                            std::vector<double> timestamps;
+                            for (const auto& gnss : tls_registration.gnss.gnss_poses)
+                            {
+                                lla_points.emplace_back(gnss.lat, gnss.lon, gnss.alt);
+                                intensity.push_back(gnss.hdop);
+                                timestamps.push_back(gnss.timestamp);
+                            }
+
+                            auto crt_points = tls_registration.gnss.CRTConvert(lla_points, crtName, selected_geoid_model);
+                            Eigen::Vector3d offset = crt_points.front();
+                            for (auto& p : crt_points)
+                            {
+                                p = p - offset;
+                            }
+                            exportLaz(output_file_name, crt_points, intensity, timestamps, offset.x(), offset.y(), offset.z());
+                        }
                     }
 
                     ImGui::EndMenu();
@@ -3210,7 +3372,7 @@ void display()
                 if (ImGui::MenuItem("Export xz intersection", nullptr, false, session.point_clouds_container.xz_intersection))
                 {
                     const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                    std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                    spdlog::info("laz file to save: '{}'", output_file_name);
 
                     if (output_file_name.size() > 0)
                     {
@@ -3234,7 +3396,7 @@ void display()
                 if (ImGui::MenuItem("Export yz intersection", nullptr, false, session.point_clouds_container.yz_intersection))
                 {
                     const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                    std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                    spdlog::info("laz file to save: '{}'", output_file_name);
 
                     if (output_file_name.size() > 0)
                     {
@@ -3258,7 +3420,7 @@ void display()
                 if (ImGui::MenuItem("Export xy intersection", nullptr, false, session.point_clouds_container.xy_intersection))
                 {
                     const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                    std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+                    spdlog::info("laz file to save: '{}'", output_file_name);
 
                     if (output_file_name.size() > 0)
                     {
@@ -3356,11 +3518,17 @@ void display()
 
                 if (ImGui::BeginMenu("Trajectory"))
                 {
-                    ImGui::BeginDisabled(!glLineWidthSupport);
+                    if (session_loaded)
                     {
                         auto tmp = session.point_clouds_container.point_clouds[0].line_width;
-                        ImGui::SetNextItemWidth(ImGuiNumberWidth);
-                        ImGui::InputInt("Line width", &tmp);
+
+                        ImGui::BeginDisabled(!glLineWidthSupport);
+                        {
+                            ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                            ImGui::InputInt("Line width", &tmp);
+                        }
+                        ImGui::EndDisabled();
+
                         if (tmp < 0)
                             tmp = 0;
                         else if (tmp > 5)
@@ -3370,7 +3538,6 @@ void display()
                             for (auto& point_cloud : session.point_clouds_container.point_clouds)
                                 point_cloud.line_width = tmp;
                     }
-                    ImGui::EndDisabled();
 
                     ImGui::MenuItem("Show IMU to LIO difference", nullptr, &session.point_clouds_container.show_imu_to_lio_diff);
 
@@ -3609,7 +3776,7 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observ
 
     Eigen::Vector3d pos = rayIntersection(laser_beam, pl);
 
-    std::cout << "intersection: " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;
+    spdlog::info("intersection: {}, {}, {}", pos.x(), pos.y(), pos.z());
 
     return pos;
 }
@@ -3641,13 +3808,13 @@ void mouse(int glut_button, int state, int x, int y)
         {
             if (session.ground_control_points.is_imgui)
             {
-                std::cout << "GCP picking" << std::endl;
+                spdlog::info("GCP picking");
                 int tmp;
                 getClosestTrajectoryPoint(session, x, y, true, tmp);
             }
             else if (session.control_points.is_imgui)
             {
-                std::cout << "Control point picking" << std::endl;
+                spdlog::info("Control point picking");
                 const auto laser_beam = GetLaserBeam(x, y);
                 double min_distance = std::numeric_limits<double>::max();
 
@@ -3762,6 +3929,9 @@ int main(int argc, char* argv[])
             return 0;
         }
 
+        // search for available geoid models in the system and populate the menu
+        geoids = GNSS::get_available_geoids();
+
         initGL(&argc, argv, winTitle, display, mouse);
 
         if (argc > 1)
@@ -3771,7 +3941,7 @@ int main(int argc, char* argv[])
                 std::string ext = fs::path(argv[i]).extension().string();
                 std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
-                if (ext == ".mjs")
+                if (ext == ".mjs" || ext == ".json")
                 {
                     loadSession(argv[i]);
 
@@ -3787,14 +3957,14 @@ int main(int argc, char* argv[])
         ImGui::DestroyContext();
     } catch (const std::bad_alloc& e)
     {
-        std::cerr << "System is out of memory : " << e.what() << std::endl;
+        spdlog::error("System is out of memory : {}", e.what());
         mandeye::fd::OutOfMemMessage();
     } catch (const std::exception& e)
     {
-        std::cout << e.what();
+        spdlog::error(e.what());
     } catch (...)
     {
-        std::cerr << "Unknown fatal error occurred." << std::endl;
+        spdlog::error("Unknown fatal error occurred!");
     }
 
     return 0;

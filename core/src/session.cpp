@@ -1,8 +1,10 @@
 #include <pch/pch.h>
 
-#include "../../shared/include/HDMapping/Version.hpp"
+#include <Core/session.h>
+
 #include <nlohmann/json.hpp>
-#include <session.h>
+
+#include <HDMapping/Version.hpp>
 
 namespace fs = std::filesystem;
 
@@ -34,7 +36,11 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
     // Local pathUpdater lambda (keep directories unchanged, update files to be in session directory)
     auto getNewPath = [&](const std::string& path) -> std::string
     {
-        fs::path p(path);
+        // Normalize Windows backslashes to forward slashes so that
+        // std::filesystem::path correctly extracts the filename on Linux.
+        std::string normalized = path;
+        std::replace(normalized.begin(), normalized.end(), '\\', '/');
+        fs::path p(normalized);
         if (is_directory(p))
             return p.string();
         return (fs::path(directory) / p.filename()).string();
@@ -136,11 +142,6 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
             }
         }
 
-        // std::cout << "------laz file names-----" << std::endl;
-        // for (const auto &fn : laz_file_names)
-        //{
-        //     std::cout << "'" << fn << "'" << std::endl;
-        // }
 #if WITH_GUI == 1
         for (const auto& gcp_json : data["ground_control_points"])
         {
@@ -235,6 +236,11 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
             pc.render_color[0] = render_color[0];
             pc.render_color[1] = render_color[1];
             pc.render_color[2] = render_color[2];
+
+            pc.traj_color[0] = render_color[0];
+            pc.traj_color[1] = render_color[1];
+            pc.traj_color[2] = render_color[2];
+
             pc.fixed_x = vfixed_x[index];
             pc.fixed_y = vfixed_y[index];
             pc.fixed_z = vfixed_z[index];
@@ -285,22 +291,7 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
                 Eigen::Vector3d diff(fabs(tb_pose_mm.om - tb_pose.om), fabs(tb_pose_mm.fi - tb_pose.fi), fabs(tb_pose_mm.ka - tb_pose.ka));
 
                 point_clouds_container.point_clouds[i].local_trajectory[j].imu_diff_angle_om_fi_ka_deg = diff;
-
-                // TaitBryanPose tb_pose2;
-                // tb_pose2.om = point_clouds_container.point_clouds[i].local_trajectory[j-1].imu_om_fi_ka.x()
-
-                // std::cout << tb_pose.om << " " << tb_pose.fi << " " << tb_pose.ka << " "
-                //          << point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.x() << " " <<
-                //    point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.y() << " "
-                //    << point_clouds_container.point_clouds[i].local_trajectory[j].imu_om_fi_ka.z() <<  std::endl;
             }
-            // struct LocalTrajectoryNode{
-            //    std::pair<double, double> timestamps;
-            //    Eigen::Affine3d m_pose;
-            //    Eigen::Vector3d imu_om_fi_ka;
-            //    Eigen::Vector3d imu_diff_angle_om_fi_ka_deg;
-            //};
-            // pc.local_trajectory
         }
 
         return true;

@@ -2,12 +2,13 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <gnss.h>
-#include <icp.h>
+#include <Core/gnss.h>
+#include <Core/icp.h>
+#include <Core/pose_graph_loop_closure.h>
+#include <Core/pose_graph_slam.h>
+#include <Core/registration_plane_feature.h>
+
 #include <multi_view_tls_registration.h>
-#include <pose_graph_loop_closure.h>
-#include <pose_graph_slam.h>
-#include <registration_plane_feature.h>
 
 namespace py = pybind11;
 

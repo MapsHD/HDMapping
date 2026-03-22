@@ -1,0 +1,62 @@
+name: Build on macOS
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies via Homebrew
+        run: |
+          brew install cmake opencv dylibbundler create-dmg
+
+      - name: Verify CMake version
+        run: cmake --version
+
+      - name: Configure CMake
+        run: |
+          cmake -B ${{github.workspace}}/build \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DFREEGLUT_COCOA=ON \
+            -DHD_CPU_OPTIMIZATION=AUTO
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} -j$(sysctl -n hw.ncpu)
+
+      - name: List built binaries
+        run: |
+          echo "Built binaries:"
+          find ${{github.workspace}}/build/bin -type f -perm +111 2>/dev/null || true
+          ls -lh ${{github.workspace}}/build/bin/
+
+      - name: Create App Bundle
+        run: |
+          chmod +x ${{github.workspace}}/macos_bundle_toolkit/create_dir_bundle.sh
+          cd ${{github.workspace}}
+          ./macos_bundle_toolkit/create_dir_bundle.sh
+
+      - name: Create DMG Package
+        run: |
+          chmod +x ${{github.workspace}}/macos_bundle_toolkit/create_dir_bundle_dmg.sh
+          cd ${{github.workspace}}
+          ./macos_bundle_toolkit/create_dir_bundle_dmg.sh
+
+      - name: Upload DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hdmapping-macos-dmg
+          path: ${{github.workspace}}/build/HDMapping.dmg
+          retention-days: 90
+          compression-level: 0

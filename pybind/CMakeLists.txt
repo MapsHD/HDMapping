@@ -76,7 +76,7 @@ target_include_directories(core_py
             ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
             ${EIGEN3_INCLUDE_DIR}
             ${LASZIP_INCLUDE_DIR}/LASzip/include
-            ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+            ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
             ${THIRDPARTY_DIRECTORY}/json/include
             ${THIRDPARTY_DIRECTORY}
             ${THIRDPARTY_DIRECTORY}/glm
@@ -90,6 +90,7 @@ target_include_directories(lidar_odometry_py
             ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
             ${EIGEN3_INCLUDE_DIR}
             ${LASZIP_INCLUDE_DIR}/LASzip/include
+            ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
             ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
             ${THIRDPARTY_DIRECTORY}/json/include
             ${THIRDPARTY_DIRECTORY}/tomlplusplus/include
@@ -105,7 +106,7 @@ target_include_directories(multi_view_tls_registration_py
             ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
             ${EIGEN3_INCLUDE_DIR}
             ${LASZIP_INCLUDE_DIR}/LASzip/include
-            ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+            ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
             ${THIRDPARTY_DIRECTORY}/json/include
             ${THIRDPARTY_DIRECTORY}
             ${THIRDPARTY_DIRECTORY}/glm
@@ -116,7 +117,7 @@ target_link_libraries(core_py
     PRIVATE pybind11::module 
             core_no_gui
             ${PLATFORM_LASZIP_LIB} 
-            Fusion
+            vqf
             ${PLATFORM_MISCELLANEOUS_LIBS}
 )
 
@@ -128,6 +129,7 @@ target_link_libraries(lidar_odometry_py
             spdlog::spdlog
             UTL::include
             ${PLATFORM_LASZIP_LIB}
+            vqf
             Fusion
             ${PLATFORM_MISCELLANEOUS_LIBS}
 )
@@ -136,7 +138,7 @@ target_link_libraries(multi_view_tls_registration_py
     PRIVATE pybind11::module 
             core_no_gui
             ${PLATFORM_LASZIP_LIB} 
-            Fusion
+            vqf
             ${PLATFORM_MISCELLANEOUS_LIBS}
 )
 

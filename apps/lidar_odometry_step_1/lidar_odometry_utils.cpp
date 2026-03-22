@@ -2,18 +2,18 @@
 #include "csv.hpp"
 #include <algorithm>
 #include <filesystem>
-#include <hash_utils.h>
 #include <regex>
 #include <tbb/parallel_for_each.h>
 #include <tbb/parallel_invoke.h>
 
-// #include <toml.hpp>
+#include <Core/hash_utils.h>
+
+#include <spdlog/spdlog.h>
 
 namespace fs = std::filesystem;
 
 std::vector<Point3Di> decimate(const std::vector<Point3Di>& points, double bucket_x, double bucket_y, double bucket_z)
 {
-    // std::cout << "points.size before decimation: " << points.size() << std::endl;
     Eigen::Vector3d b(bucket_x, bucket_y, bucket_z);
     std::vector<Point3Di> out;
 
@@ -41,7 +41,6 @@ std::vector<Point3Di> decimate(const std::vector<Point3Di>& points, double bucke
         if (ip[i - 1].index_of_bucket != ip[i].index_of_bucket)
             out.emplace_back(points[ip[i].index_of_point]);
 
-    // std::cout << "points.size after decimation: " << out.size() << std::endl;
     return out;
 }
 
@@ -53,26 +52,20 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& tra
 
     if (it_lower == trajectory.begin())
     {
-        // std::cout << "1" << std::endl;
         return ret;
     }
     if (it_lower->first > query_time)
     {
-        // std::cout << "2" << std::endl;
         it_lower = std::prev(it_lower);
     }
     if (it_lower == trajectory.begin())
     {
-        // std::cout << "3" << std::endl;
         return ret;
     }
     if (it_lower == trajectory.end())
     {
-        // std::cout << "4" << std::endl;
         return ret;
     }
-    // std::cout << std::setprecision(10);
-    // std::cout << it_lower->first << " " << query_time << " " << it_next->first << " " << std::next(it_lower)->first << std::endl;
 
     double t1 = it_lower->first;
     double t2 = it_next->first;
@@ -80,17 +73,14 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& tra
     double difft2 = t2 - query_time;
     if (t1 == t2 && std::fabs(difft1) < 0.1)
     {
-        // std::cout << "5" << std::endl;
         ret = Eigen::Matrix4d::Identity();
         ret.col(3).head<3>() = it_next->second.col(3).head<3>();
         ret.topLeftCorner(3, 3) = it_lower->second.topLeftCorner(3, 3);
         return ret;
     }
 
-    // std::cout << std::fabs(difft1) << " " << std::fabs(difft2) << std::endl;
     // if (std::fabs(difft1) < 0.15 && std::fabs(difft2) < 0.15)
     {
-        // std::cout << "6" << std::endl;
         assert(t2 > t1);
         assert(query_time > t1);
         assert(query_time < t2);
@@ -106,15 +96,13 @@ Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& tra
         ret.topLeftCorner(3, 3) = qt.toRotationMatrix();
         return ret;
     }
-    // std::cout << "Problem with : " << difft1 << " " << difft2 << "  q : " << query_time << " t1 :" << t1 << " t2: " << t2 << std::endl;
+
     return ret;
 }
 
 void limit_covariance(Eigen::Matrix3d& io_cov)
 {
     return;
-    // std::cout << "------io_cov in ------------" << std::endl;
-    // std::cout << io_cov << std::endl;
 
     Eigen::EigenSolver<Eigen::Matrix3d> eigensolver;
     eigensolver.compute(io_cov);
@@ -122,34 +110,14 @@ void limit_covariance(Eigen::Matrix3d& io_cov)
     Eigen::Vector3d eigenValues = eigensolver.eigenvalues().real();
     Eigen::Matrix3d eigenVectors = eigensolver.eigenvectors().real();
 
-    // modify eigen values
     for (int k = 0; k < 3; ++k)
     {
         eigenValues(k) = std::max(eigenValues(k), 0.0001);
     }
 
-    // create diagonal matrix
     Eigen::DiagonalMatrix<double, 3> diagonal_matrix(eigenValues(0), eigenValues(1), eigenValues(2));
 
-    // update covariance
     io_cov = eigenVectors * diagonal_matrix * eigenVectors.inverse();
-    // std::cout << "------io_cov out ------------" << std::endl;
-    // std::cout << io_cov << std::endl;
-}
-
-// Check if ratio is close to an integer: |ratio - round(ratio)| < tolerance
-static bool is_close_to_integer(const double ratio, const double tolerance = 1e-6)
-{
-    return std::fabs(ratio - std::round(ratio)) < tolerance;
-}
-
-bool is_integer_bucket_ratio(const NDT::GridParameters& rgd_params_indoor, const NDT::GridParameters& rgd_params_outdoor)
-{
-    const double ratio_x = rgd_params_outdoor.resolution_X / rgd_params_indoor.resolution_X;
-    const double ratio_y = rgd_params_outdoor.resolution_Y / rgd_params_indoor.resolution_Y;
-    const double ratio_z = rgd_params_outdoor.resolution_Z / rgd_params_indoor.resolution_Z;
-
-    return is_close_to_integer(ratio_x) && is_close_to_integer(ratio_y) && is_close_to_integer(ratio_z);
 }
 
 void update_rgd(
@@ -171,62 +139,65 @@ void update_rgd(
 
         if (bucket_it != buckets.end())
         {
-            auto& this_bucket = bucket_it->second;
-            this_bucket.number_of_points++;
-            const auto& curr_mean = points_global[i].point;
-            const auto& mean = this_bucket.mean;
-            // buckets[index_of_bucket].mean += (mean - curr_mean) / buckets[index_of_bucket].number_of_points;
-
-            auto mean_diff = mean - curr_mean;
-            Eigen::Matrix3d cov_update;
-            cov_update.row(0) = mean_diff.x() * mean_diff;
-            cov_update.row(1) = mean_diff.y() * mean_diff;
-            cov_update.row(2) = mean_diff.z() * mean_diff;
-
-            // this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
-            //                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points *
-            //                   this_bucket.number_of_points);
-
-            if (this_bucket.number_of_points == 2)
+            if (bucket_it->second.number_of_points != -1)
             {
-                this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
-                    cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-                this_bucket.cov_inverse = this_bucket.cov.inverse();
+                auto& this_bucket = bucket_it->second;
+                this_bucket.number_of_points++;
+                const auto& curr_mean = points_global[i].point;
+                const auto& mean = this_bucket.mean;
+                // buckets[index_of_bucket].mean += (mean - curr_mean) / buckets[index_of_bucket].number_of_points;
 
-                // limit_covariance(this_bucket.cov);
-            }
+                auto mean_diff = mean - curr_mean;
+                Eigen::Matrix3d cov_update;
+                cov_update.row(0) = mean_diff.x() * mean_diff;
+                cov_update.row(1) = mean_diff.y() * mean_diff;
+                cov_update.row(2) = mean_diff.z() * mean_diff;
 
-            if (this_bucket.number_of_points == 3)
-            {
-                this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
-                    cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
-                this_bucket.cov_inverse = this_bucket.cov.inverse();
-                // limit_covariance(this_bucket.cov);
-                //  calculate normal vector
-                Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
-                Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
+                // this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+                //                   cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points *
+                //                   this_bucket.number_of_points);
 
-                Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
-                nv.normalize();
-
-                // flip towards viewport
-                if (nv.dot(viewport - this_bucket.mean) < 0.0)
+                if (this_bucket.number_of_points == 2)
                 {
-                    nv *= -1.0;
+                    this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+                        cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+                    this_bucket.cov_inverse = this_bucket.cov.inverse();
+
+                    // limit_covariance(this_bucket.cov);
                 }
-                this_bucket.normal_vector = nv;
-            }
 
-            if (this_bucket.number_of_points > 3)
-            {
-                Eigen::Vector3d& nv = this_bucket.normal_vector;
-
-                if (nv.dot(viewport - this_bucket.mean) >= 0.0)
+                if (this_bucket.number_of_points == 3)
                 {
                     this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
                         cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
                     this_bucket.cov_inverse = this_bucket.cov.inverse();
                     // limit_covariance(this_bucket.cov);
+                    //  calculate normal vector
+                    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigen_solver(this_bucket.cov, Eigen::ComputeEigenvectors);
+                    Eigen::Matrix3d eigenVectorsPCA = eigen_solver.eigenvectors();
+
+                    Eigen::Vector3d nv = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
+                    nv.normalize();
+
+                    // flip towards viewport
+                    if (nv.dot(viewport - this_bucket.mean) < 0.0)
+                    {
+                        nv *= -1.0;
+                    }
+                    this_bucket.normal_vector = nv;
+                }
+
+                if (this_bucket.number_of_points > 3)
+                {
+                    Eigen::Vector3d& nv = this_bucket.normal_vector;
+
+                    if (nv.dot(viewport - this_bucket.mean) >= 0.0)
+                    {
+                        this_bucket.cov = this_bucket.cov * (this_bucket.number_of_points - 1) / this_bucket.number_of_points +
+                            cov_update * (this_bucket.number_of_points - 1) / (this_bucket.number_of_points * this_bucket.number_of_points);
+                        this_bucket.cov_inverse = this_bucket.cov.inverse();
+                        // limit_covariance(this_bucket.cov);
+                    }
                 }
             }
         }
@@ -238,32 +209,34 @@ void update_rgd(
             bucket_to_add.cov_inverse = bucket_to_add.cov.inverse();
             bucket_to_add.number_of_points = 1;
             buckets.emplace(index_of_bucket, bucket_to_add);
+
+            /*Eigen::Vector3d direction = points_global[i].point - viewport;
+            direction.normalize();
+
+            double bucket_norm = b.norm();
+
+            Eigen::Vector3d b_front = points_global[i].point - direction * bucket_norm * j;
+            NDT::Bucket bucket_to_add_front;
+            bucket_to_add_front.mean = b_front;
+            bucket_to_add_front.cov = Eigen::Matrix3d::Identity() * 0.03 * 0.03; // ToDo move to params
+            bucket_to_add_front.cov_inverse = bucket_to_add_front.cov.inverse();
+            bucket_to_add_front.number_of_points = -1; // mark as in front of real bucket
+            auto index_of_bucket_front = get_rgd_index_3d(b_front, b);
+            buckets.emplace(index_of_bucket_front, bucket_to_add_front);
+            if(lookup_count)
+                ++(*lookup_count);
+
+            Eigen::Vector3d b_back = points_global[i].point + direction * bucket_norm * j;
+            NDT::Bucket bucket_to_add_back;
+            bucket_to_add_back.mean = b_back;
+            bucket_to_add_back.cov = Eigen::Matrix3d::Identity() * 0.03 * 0.03; // ToDo move to params
+            bucket_to_add_back.cov_inverse = bucket_to_add_back.cov.inverse();
+            bucket_to_add_back.number_of_points = -1; // mark as in front of real bucket
+            auto index_of_bucket_back = get_rgd_index_3d(b_back, b);
+            buckets.emplace(index_of_bucket_back, bucket_to_add_back);
+            if (lookup_count)
+                ++(*lookup_count);*/
         }
-    }
-}
-
-void link_buckets_to_coarser(
-    const NDT::GridParameters& rgd_params_indoor,
-    NDTBucketMapType& buckets_indoor,
-    const NDT::GridParameters& rgd_params_outdoor,
-    const NDTBucketMapType& buckets_outdoor)
-{
-    if (!is_integer_bucket_ratio(rgd_params_indoor, rgd_params_outdoor))
-        return;
-
-    const Eigen::Vector3d bucket_size_outdoor{ rgd_params_outdoor.resolution_X,
-                                               rgd_params_outdoor.resolution_Y,
-                                               rgd_params_outdoor.resolution_Z };
-
-    for (auto& [key, bucket] : buckets_indoor)
-    {
-        // Skip if already linked
-        if (bucket.coarser_bucket != nullptr)
-            continue;
-
-        const auto outdoor_key = get_rgd_index_3d(bucket.mean, bucket_size_outdoor);
-        const auto outdoor_it = buckets_outdoor.find(outdoor_key);
-        bucket.coarser_bucket = (outdoor_it != buckets_outdoor.end()) ? &outdoor_it->second : nullptr;
     }
 }
 
@@ -285,11 +258,6 @@ void update_rgd_hierarchy(
         {
             update_rgd(rgd_params_outdoor, buckets_outdoor, points_global, viewport, &stats.outdoor_lookups);
         });
-
-    const auto link_start = std::chrono::high_resolution_clock::now();
-    link_buckets_to_coarser(rgd_params_indoor, buckets_indoor, rgd_params_outdoor, buckets_outdoor);
-    const auto link_end = std::chrono::high_resolution_clock::now();
-    stats.link_time_seconds += std::chrono::duration<double>(link_end - link_start).count();
 }
 
 void update_rgd_spherical_coordinates(
@@ -408,9 +376,9 @@ bool save_poses(const std::string& file_name, const std::vector<Eigen::Affine3d>
     return true;
 }
 
-std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> load_imu(const std::string& imu_file, int imuToUse)
+std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> load_imu(const std::string& imu_file, int imuToUse)
 {
-    std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> all_data;
+    std::vector<std::tuple<std::pair<double, double>, Eigen::Vector3f, Eigen::Vector3f>> all_data;
 
     csv::CSVFormat format;
     format.delimiter({ ' ', ',', '\t' });
@@ -458,17 +426,9 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
                 {
                     double timestamp = row["timestamp"].get<double>();
                     double timestampUnix = row["timestampUnix"].get<double>();
-                    FusionVector gyr;
-                    gyr.axis.x = row["gyroX"].get<double>();
-                    gyr.axis.y = row["gyroY"].get<double>();
-                    gyr.axis.z = row["gyroZ"].get<double>();
-                    FusionVector acc;
-                    acc.axis.x = row["accX"].get<double>();
-                    acc.axis.y = row["accY"].get<double>();
-                    acc.axis.z = row["accZ"].get<double>();
+                    Eigen::Vector3f gyr(row["gyroX"].get<float>(), row["gyroY"].get<float>(), row["gyroZ"].get<float>());
+                    Eigen::Vector3f acc(row["accX"].get<float>(), row["accY"].get<float>(), row["accZ"].get<float>());
                     all_data.emplace_back(std::pair(timestamp / 1e9, timestampUnix / 1e9), gyr, acc);
-                    // std::cout << "acc.axis.x: " << acc.axis.x << " acc.axis.y: " << acc.axis.y << " acc.axis.z " << acc.axis.z << "
-                    // imu_id: " << imu_id << std::endl;
                 }
             }
         }
@@ -494,19 +454,11 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
                     {
                         iss >> timestampUnix;
                     }
-                    // std::cout << data[0] << " " << data[1] << " " << data[2] << " " << data[3] << " " << data[4] << " " << data[5] << " "
-                    // << data[6] << std::endl;
+
                     if (data[0] > 0 && imuId == imuToUse)
                     {
-                        FusionVector gyr;
-                        gyr.axis.x = data[1];
-                        gyr.axis.y = data[2];
-                        gyr.axis.z = data[3];
-
-                        FusionVector acc;
-                        acc.axis.x = data[4];
-                        acc.axis.y = data[5];
-                        acc.axis.z = data[6];
+                        Eigen::Vector3f gyr(static_cast<float>(data[1]), static_cast<float>(data[2]), static_cast<float>(data[3]));
+                        Eigen::Vector3f acc(static_cast<float>(data[4]), static_cast<float>(data[5]), static_cast<float>(data[6]));
 
                         all_data.emplace_back(std::pair(data[0] / 1e9, timestampUnix / 1e9), gyr, acc);
                     }
@@ -517,7 +469,6 @@ std::vector<std::tuple<std::pair<double, double>, FusionVector, FusionVector>> l
     } catch (const std::exception& e)
     {
         std::cout << "load_imu error for file: '" << imu_file << "'" << e.what() << std::endl;
-        // return all_data;
     }
 
     return all_data;
@@ -534,29 +485,29 @@ std::vector<Point3Di> load_point_cloud(
     laszip_POINTER laszip_reader;
     if (laszip_create(&laszip_reader))
     {
-        fprintf(stderr, "DLL ERROR: creating laszip reader\n");
+        spdlog::error("DLL ERROR: creating laszip reader");
         std::abort();
     }
 
     laszip_BOOL is_compressed = 0;
     if (laszip_open_reader(laszip_reader, lazFile.c_str(), &is_compressed))
     {
-        fprintf(stderr, "DLL ERROR: opening laszip reader for '%s'\n", lazFile.c_str());
+        spdlog::error("DLL ERROR: opening laszip reader for '{}'\n", lazFile);
         std::abort();
     }
-    // std::cout << "compressed : " << is_compressed << std::endl;
+
     laszip_header* header;
 
     if (laszip_get_header_pointer(laszip_reader, &header))
     {
-        fprintf(stderr, "DLL ERROR: getting header pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting header pointer from laszip reader");
         std::abort();
     }
-    // fprintf(stderr, "file '%s' contains %u points\n", lazFile.c_str(), header->number_of_point_records);
+
     laszip_point* point;
     if (laszip_get_point_pointer(laszip_reader, &point))
     {
-        fprintf(stderr, "DLL ERROR: getting point pointer from laszip reader\n");
+        spdlog::error("DLL ERROR: getting point pointer from laszip reader");
         std::abort();
     }
 
@@ -567,7 +518,7 @@ std::vector<Point3Di> load_point_cloud(
     {
         if (laszip_read_point(laszip_reader))
         {
-            fprintf(stderr, "DLL ERROR: reading point %u\n", j);
+            spdlog::error("DLL ERROR: reading point {}", j);
             laszip_close_reader(laszip_reader);
             return points;
             // std::abort();
@@ -580,6 +531,7 @@ std::vector<Point3Di> load_point_cloud(
         {
             if (!calibrations.contains(id))
             {
+                std::cout << 1;
                 continue;
             }
         }
@@ -595,44 +547,12 @@ std::vector<Point3Di> load_point_cloud(
         p.timestamp = point->gps_time;
         p.intensity = point->intensity;
 
-        // add z correction
-        // if (p.point.z() > 0)
-        //{
-        //    double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
-        //    double correction = dist * asin(0.08 / 10.0);
-
-        //    p.point.z() += correction;
-        //}
-        /*if (p.point.z() > 0)
-        {
-            double dist = sqrt(p.point.x() * p.point.x() + p.point.y() * p.point.y());
-            double correction = 0;//dist * asin(0.08 / 10.0);
-
-            if (dist < 11.0){
-                correction = 0.005;
-            }else{
-                correction = -0.015;
-            }
-
-            p.point.z() += correction;
-        }*/
-
         if (p.timestamp == 0 && ommit_points_with_timestamp_equals_zero)
         {
             counter_ts0++;
         }
         else
         {
-            /* underground mining
-            if (sqrt(pf.x() * pf.x()) < 4.5 && sqrt(pf.y() * pf.y()) < 2){
-                counter_filtered_points++;
-            }else{
-
-
-                points.emplace_back(p);
-            }
-            */
-
             if (sqrt(pf.x() * pf.x() + pf.y() * pf.y()) > filter_threshold_xy_inner &&
                 sqrt(pf.x() * pf.x() + pf.y() * pf.y()) < filter_threshold_xy_outer)
             {
@@ -644,6 +564,9 @@ std::vector<Point3Di> load_point_cloud(
             }
         }
     }
+
+    std::cout << "header->number_of_point_records: " << header->number_of_point_records << std::endl;
+    std::cout << "counter_filtered_points: " << counter_filtered_points << std::endl;
 
     std::cout << header->number_of_point_records << " - " << counter_filtered_points << " = " << points.size();
     if (counter_ts0 > 0)
@@ -735,7 +658,6 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
     {
         const std::string& lidarSn = calibrationEntry.key();
         Eigen::Matrix4d value;
-        // std::cout << "lidarSn : " << lidarSn << std::endl;
 
         bool identity = JsonGetBool(calibrationEntry.value(), "identity", false);
         if (identity)
@@ -759,7 +681,7 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
         if (calibrationEntry.value().contains("order"))
         {
             std::string order = calibrationEntry.value()["order"].get<std::string>();
-            // std::cout << "order : " << order << std::endl;
+
             std::transform(order.begin(), order.end(), order.begin(), ::toupper);
             if (order == "COLUMN")
                 value = value.transpose();
@@ -771,9 +693,6 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
 
         Eigen::IOFormat HeavyFmt(Eigen::FullPrecision, 0, ", ", ";\n", "[", "]", "[", "]");
 
-        // std::cout << "Calibration for " << lidarSn << std::endl;
-        // std::cout << value.format(HeavyFmt) << std::endl;
-        //  Insert into the map
         dataMap[lidarSn] = value;
     }
 
@@ -832,7 +751,6 @@ std::unordered_map<int, Eigen::Affine3d> MLvxCalib::CombineIntoCalibration(
     std::unordered_map<int, Eigen::Affine3d> dataMap;
     for (const auto& [id, sn] : idToSn)
     {
-        // std::cout << "XXX: "<< id << " " << sn << std::endl;
         const auto& affine = calibration.at(sn);
         dataMap[id] = affine;
     }
@@ -851,7 +769,6 @@ int MLvxCalib::GetImuIdToUse(const std::unordered_map<int, std::string>& idToSn,
     }
     for (const auto& [id, sn] : idToSn)
     {
-        // std::cout << "snToUse " << snToUse << " sn " << sn << std::endl;
         if (snToUse == sn)
         {
             return id;

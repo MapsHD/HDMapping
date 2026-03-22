@@ -2,7 +2,7 @@
 #include <iostream>
 #include <sstream>
 
-bool TomlIO::SaveParametersToTomlFile(const std::string& filepath, LidarOdometryParams& params)
+bool TomlIO::SaveParametersToTomlFile(const std::string& filepath, const LidarOdometryParams& params)
 {
     toml::table tbl;
     for (const auto& [category, attributes] : CATEGORIES)
@@ -85,6 +85,14 @@ bool TomlIO::SaveParametersToTomlFile(const std::string& filepath, LidarOdometry
     out << "software_version = \"" << params.software_version << "\"" << std::endl;
     out << "config_version = \"" << params.config_version << "\"" << std::endl;
     out << "build_date = \"" << params.build_date << "\"" << std::endl;
+    out << std::endl;
+
+    out << "[ablation_study]" << std::endl;
+    out << "ablation_study_use_norm = " << (params.ablation_study_use_norm ? "true" : "false") << std::endl;
+    out << "ablation_study_use_hierarchical_rgd = " << (params.ablation_study_use_hierarchical_rgd ? "true" : "false") << std::endl;
+    out << "ablation_study_use_view_point_and_normal_vectors = "
+        << (params.ablation_study_use_view_point_and_normal_vectors ? "true" : "false") << std::endl;
+    out << "ablation_study_use_threshold_outdoor_rgd = " << (params.ablation_study_use_threshold_outer_rgd ? "true" : "false") << std::endl;
     out << std::endl;
 
     // Remove version_info from tbl to avoid duplication since we write it manually

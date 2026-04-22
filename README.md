@@ -144,6 +144,7 @@ It is designed for a benchmark.
 - https://github.com/MapsHD/benchmark-mola_lidar_odometry-to-HDMapping (2025, IJRR, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/mola-lidar-odometry.bib), [[movie]](https://youtu.be/KcVTTurel44)) 
 - https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RESPLE.bib), [[movie]](https://youtu.be/5PAB4xJmMoo))
 - https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GenZ-ICP.bib), [[movie]](https://youtu.be/vgGkucOBVg4))
+- https://github.com/MapsHD/benchmark-MM-LINS-to-HDMapping (2025, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MM-LINS.bib), movie ToDo) 
 - https://github.com/MapsHD/benchmark-c3p-voxelmap-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/c3p-voxelmap.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-I2EKF-LO-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/I2EKF-LO.bib), [[movie]](https://youtu.be/B2358Gn62Ho))  
 - https://github.com/MapsHD/benchmark-LIO-EKF-to-HDMapping (2024, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-EKF.bib), [[movie]](https://youtu.be/R4Cn1LJ4U_E))
@@ -203,7 +204,6 @@ Not supported algorithm
 ToDo
 - https://github.com/Livox-SDK/LIO-Livox (2026, Livox proprietary, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-Livox.bib)) - Piotr
 - https://github.com/clegenti/2fast2lamaa (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/2FAST-2LAMAA.bib))
-- https://github.com/lian-yue0515/MM-LINS (2025, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MM-LINS.bib)) - Jakub https://github.com/MapsHD/benchmark-MM-LINS-to-HDMapping
 - https://github.com/DCSI2022/DALI_SLAM (2025, Elsevier ISPRS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DALI-SLAM.bib))
 - https://github.com/KTH-RPL/dufomap (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
 - https://github.com/KTH-RPL/DynamicMap_Benchmark (2023, ITSC, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)

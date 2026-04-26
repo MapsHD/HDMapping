@@ -555,7 +555,9 @@ Specification is available at https://www.livoxtech.com/mid-360/specs. Important
 - Integrated IMU (Inertial Measurement Unit).
 
 # Possible applications:
-
+- caving
+- speleology
+- surveying
 - culture heritage
 - environmental management
 - geology

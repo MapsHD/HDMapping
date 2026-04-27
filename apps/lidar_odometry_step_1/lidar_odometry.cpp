@@ -82,7 +82,6 @@ bool load_data(
         if (!found)
         {
             std::cout << "\n!!! there is no CSV file for: " << laz_files[i] << " !!! \n\n";
-
         }
     }
 

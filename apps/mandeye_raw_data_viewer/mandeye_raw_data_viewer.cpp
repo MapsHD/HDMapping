@@ -1666,7 +1666,6 @@ void display()
         render_nearest_photo(ts);
     }
 
-
     if (ImGui::BeginMainMenuBar())
     {
         {

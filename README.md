@@ -242,6 +242,14 @@ ToDo: check if addressed
 - https://arxiv.org/pdf/2204.04932 - SC-F-LOAM
 - https://www.mdpi.com/1424-8220/22/2/520 - LEGO-LOAM-SC
 - https://arxiv.org/pdf/1907.02233 - LINS-SLAM
+- https://github.com/RoboFeng/RI-LIO
+- https://github.com/hku-mars/fast-livo
+- https://github.com/TixiaoShan/LVI-SAM
+- https://github.com/ethz-asl/COIN-LIO
+- https://github.com/HxCa1/BEV-LIO-LC
+- https://github.com/YangSiri/OR-LIM
+- https://github.com/TixiaoShan/LVI-SAM
+- https://github.com/hku-mars/fast-livo2
 
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
 

@@ -179,6 +179,9 @@ Datasets
 - Hilti SLAM Challenge https://hilti-challenge.com/dataset-2023
 - Complex Urban https://sites.google.com/view/complex-urban-dataset
 - NTU VIRAL https://ntu-aris.github.io/ntu_viral_dataset/
+- HeRCULES
+- He-LiPR
+- AevaScene
 
 Algorithms without code
 - https://kafeiyin00.github.io/AEOS/ (2026, ISPRS-Elsevier, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/AEOS.bib), no source code)

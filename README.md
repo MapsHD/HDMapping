@@ -194,6 +194,7 @@ Algorithms without code
 - https://ieeexplore.ieee.org/document/10954274 (2025, IEEE TITS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Universal-LiDAR-Odometry-and-Mapping-With-Dual-Channel-Descriptor.bib), no source code)
 - https://github.com/kafeiyin00/HCTO (2024, ISPRS-Elsevier, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/HCTO.bib), no source code)
 - Fast and Robust LiDAR-Inertial Odometry by Tightly-Coupled Iterated Kalman Smoother and Robocentric Voxels, RC-Vox (2024, IEEE TITS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RC-Vox.bib), no source code)
+- https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=11419773 (2026, RA-L)
 
 Algorithms with unsolved issues
 - https://github.com/MapsHD/benchmark-KISS-SLAM-to-HDMapping (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/kiss-slam.bib)) (not solved issue https://github.com/kpmrozowski/KISS-SLAM-to-HDMapping/issues/1)

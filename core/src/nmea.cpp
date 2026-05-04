@@ -119,6 +119,7 @@ namespace hd_mapping::nmea
         data.hdop = fields[8].empty() ? 0.0 : std::stod(fields[8]);
         data.fix_quality = fields[6].empty() ? 0 : std::stoi(fields[6]);
         data.satellites_tracked = fields[7].empty() ? 0 : std::stoi(fields[7]);
+        data.undulation = fields[11].empty() ? 0.0 : std::stod(fields[11]);
         data.age_of_data = fields.size() > 13 && !fields[13].empty() ? std::stod(fields[13]) : -1.0;
 
         return data;

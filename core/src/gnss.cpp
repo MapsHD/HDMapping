@@ -239,12 +239,14 @@ bool GNSS::load_raw_data_from_gnss(const std::vector<std::string>& input_file_na
                 std::istringstream(strs[3]) >> gp.alt;
                 std::istringstream(strs[4]) >> gp.hdop;
                 std::istringstream(strs[5]) >> gp.satelites_tracked;
-                std::istringstream(strs[6]) >> gp.height;
+                std::istringstream(strs[6]) >> gp.undulation;
                 std::istringstream(strs[7]) >> gp.age;
                 std::istringstream(strs[8]) >> gp.time;
                 std::istringstream(strs[9]) >> gp.fix_quality;
-                if (std::isfinite(gp.lat) && std::isfinite(gp.lon) && std::isfinite(gp.alt) && gp.lat != 0.0 && gp.lon != 0.0)
+                if (std::isfinite(gp.lat) && std::isfinite(gp.lon) && std::isfinite(gp.alt) && gp.lat != 0.0 && gp.lon != 0.0 &&
+                    std::isfinite(gp.undulation))
                 {
+                    gp.h_wgs84 = gp.alt + gp.undulation;
                     gnss_poses.push_back(gp);
                 }
             }
@@ -295,7 +297,7 @@ bool GNSS::project_to_mercator_projection()
 
 double get_ellipsoid_height(const GNSS::GlobalPose& pose)
 {
-    return pose.alt + pose.height;
+    return pose.h_wgs84;
 }
 
 bool GNSS::project_using_proj()
@@ -492,10 +494,12 @@ bool GNSS::load_raw_data_from_nmea(const std::vector<std::string>& input_file_na
                 gp.age = gga->age_of_data;
                 gp.time = 0; // todo convert to seconds from string
                 gp.fix_quality = gga->fix_quality;
+                gp.undulation = gga->undulation;
 
                 // register if there  is not nans
-                if (gp.lat == gp.lat && gp.lon == gp.lon && gp.alt == gp.alt)
+                if (gp.lat == gp.lat && gp.lon == gp.lon && gp.alt == gp.alt && gp.undulation == gp.undulation)
                 {
+                    gp.h_wgs84 = gp.alt + gp.undulation;
                     gnss_poses.push_back(gp);
                 }
             }

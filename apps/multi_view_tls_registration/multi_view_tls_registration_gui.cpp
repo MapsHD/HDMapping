@@ -3232,7 +3232,7 @@ void display()
                             std::vector<double> timestamps;
                             for (const auto& gnss : tls_registration.gnss.gnss_poses)
                             {
-                                lla_points.emplace_back(gnss.lat, gnss.lon, gnss.alt);
+                                lla_points.emplace_back(gnss.lat, gnss.lon, gnss.h_wgs84);
                                 intensity.push_back(gnss.hdop);
                                 timestamps.push_back(gnss.timestamp);
                             }

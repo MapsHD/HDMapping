@@ -21,8 +21,10 @@ public:
     struct GlobalPose
     {
         double timestamp;
-        double lat;
-        double lon;
+        double lat; // WGS-84 Ellipsoid
+        double lon; // WGS-84 Ellipsoid
+        double h_wgs84; // height above WGS-84 ellipsoid
+        double undulation;
         double alt;
         double hdop;
         double satelites_tracked;

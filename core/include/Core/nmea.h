@@ -36,6 +36,7 @@ namespace hd_mapping::nmea
         int fix_quality;
         int satellites_tracked;
         double age_of_data;
+        double undulation;
     };
 
     //! Breaks a line from an NMEA file into its components.

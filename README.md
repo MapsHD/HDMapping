@@ -279,6 +279,9 @@ ToDo: check if addressed
 - Janusz Będkowski et al., "The benchmark of LiDAR odometry algorithms utilised for a low-cost mobile mapping system" (2025, GEOBENCH, [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W6-2025/25/2025/isprs-archives-XLVIII-1-W6-2025-25-2025.pdf) [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/isprs-archives-XLVIII-1-W6-2025-25-2025.bib))
 - Andro Kokeza et al. "Comparative Performance of Handheld Personal Laser Scanning Instruments and Operator Experience in Forest Inventory of Even-Aged European Beech Stand"(2026, MDPI-Forests, [[PDF]](https://www.mdpi.com/1999-4907/17/2/216) [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/forests-v17-i02_20260213.bib))
 - Janusz Będkowski et al., "Comprehensive solution for georeferencing of humanitarian demining tools" ([[PDF]](https://dial.uclouvain.be/pr/boreal/object/boreal%3A313158/datastream/PDF_01/view#page=49))
+- Jozef Výbošťok et al., "Low-cost mobile laser scanning for urban tree assessment: accuracy evaluation and application potential", ([[PDF]](https://www.frontiersin.org/journals/remote-sensing/articles/10.3389/frsen.2026.1774149/full))
+
+
 
 # To cite this work please use as follows:
 

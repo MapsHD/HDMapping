@@ -61,24 +61,114 @@ int viewer_decmiate_point_cloud = 100;
 std::vector<int> lowest_points_indexes;
 std::vector<LocalShapeFeatures::PointWithLocalShapeFeatures> points_with_lsf;
 bool show_normal_vectors = false;
+bool show_poles = false;
+double local_shape_feature_radious = 0.2;
+double verticality_threshold = 0.7;
+double cylindrical_likeness_threshold = 0.5;
 
 Surface surface;
 double distance_to_ground_threshold_bottom = 0.2;
-double distance_to_ground_threshold_up = 0.6;
-double local_shape_feature_radious = 0.2;
+double distance_to_ground_threshold_up = 0.5;
+
+std::vector<Eigen::Vector3d> poles;
 
 namespace fs = std::filesystem;
 
-std::vector<int> get_lowest_points_indexes(const PointCloud& pc, Eigen::Vector2d bucket_dim_xy)
+std::vector<int> get_lowest_points_indexes(const std::vector<Eigen::Vector3d>& pc, Eigen::Vector2d bucket_dim_xy);
+
+struct ComputePolesParams
+{
+    Eigen::Vector2d bucket_dim_xy = { 0.2, 0.2 };
+    double distance_to_ground_threshold_bottom = 0.2;
+    double distance_to_ground_threshold_up = 0.5;
+    double local_shape_feature_radious = 0.2;
+    double verticality_threshold = 0.7;
+    double cylindrical_likeness_threshold = 0.5;
+    double max_x = 5.0;
+    double min_x = -15.0;
+    double fabs_y = 3.0;
+    double lowest_points_filter_resolution = 0.3;
+    double surface_resolution = 1.0;
+    double lowest_points_resolution = 0.2;
+};
+
+std::vector<Eigen::Vector3d> get_poles(std::vector<Eigen::Vector3d> _point_cloud, ComputePolesParams _params, Surface _surface)
+{
+    std::vector<Eigen::Vector3d> _poles;
+
+    auto _lowest_points_indexes =
+        get_lowest_points_indexes(_point_cloud, Eigen::Vector2d(_params.lowest_points_resolution, _params.lowest_points_resolution));
+
+    _lowest_points_indexes = _surface.get_filtered_indexes(
+        _point_cloud, _lowest_points_indexes, { _params.lowest_points_filter_resolution, _params.lowest_points_filter_resolution });
+
+    std::vector<Eigen::Vector3d> _lowest_points;
+    for (int i = 0; i < _lowest_points_indexes.size(); i++)
+    {
+        _lowest_points.push_back(_point_cloud[_lowest_points_indexes[i]]);
+    }
+
+    _surface.generate_initial_surface(_lowest_points);
+
+    {
+        std::vector<Eigen::Vector3d> _lowest_points;
+        for (int i = 0; i < _lowest_points_indexes.size(); i++)
+        {
+            _lowest_points.push_back(_point_cloud[_lowest_points_indexes[i]]);
+        }
+        _surface.align_surface_to_ground_points(_lowest_points);
+    }
+
+    std::vector<Eigen::Vector3d> _points_without_surface = _surface.get_points_without_surface(
+        _point_cloud,
+        _params.distance_to_ground_threshold_bottom,
+        _params.distance_to_ground_threshold_up,
+        Eigen::Vector2d(_params.surface_resolution, _params.surface_resolution));
+
+    std::vector<LocalShapeFeatures::PointWithLocalShapeFeatures> _points_with_lsf;
+    _points_with_lsf.clear();
+    LocalShapeFeatures::Params params;
+
+    params.search_radious =
+        Eigen::Vector3d(_params.local_shape_feature_radious, _params.local_shape_feature_radious, _params.local_shape_feature_radious);
+    params.radious = _params.local_shape_feature_radious;
+
+    for (int i = 0; i < _points_without_surface.size(); i++)
+    {
+        LocalShapeFeatures::PointWithLocalShapeFeatures point;
+        point.coordinates_global = _points_without_surface[i];
+        _points_with_lsf.push_back(point);
+    }
+
+    LocalShapeFeatures lsf;
+    lsf.calculate_local_shape_features(_points_with_lsf, params);
+
+    for (int i = 0; i < _points_with_lsf.size(); i++)
+    {
+        const auto& p = _points_with_lsf[i];
+        if (p.valid && p.coordinates_global.x() < _params.max_x && p.coordinates_global.x() > _params.min_x &&
+            fabs(p.coordinates_global.y()) < _params.fabs_y)
+        {
+            if (p.verticality > _params.verticality_threshold && p.cylindrical_likeness > _params.cylindrical_likeness_threshold)
+            {
+                _poles.push_back(_points_with_lsf[i].coordinates_global);
+            }
+        }
+    }
+
+    return _poles;
+}
+
+std::vector<int> get_lowest_points_indexes(const std::vector<Eigen::Vector3d>& pc, Eigen::Vector2d bucket_dim_xy)
 {
     std::vector<int> indexes;
 
     std::vector<std::tuple<uint64_t, uint32_t, double>> indexes_tuple;
 
-    for (size_t i = 0; i < pc.points_local.size(); i++)
+    for (size_t i = 0; i < pc.size(); i++)
     {
-        uint64_t index = get_rgd_index_2d(pc.points_local[i], bucket_dim_xy);
-        indexes_tuple.emplace_back(index, i, pc.points_local[i].z());
+        uint64_t index = get_rgd_index_2d(pc[i], bucket_dim_xy);
+        indexes_tuple.emplace_back(index, i, pc[i].z());
     }
 
     std::sort(
@@ -216,7 +306,7 @@ void project_gui()
         if (ImGui::Button("Load *.laz file"))
         {
             std::vector<std::string> input_file_names;
-            input_file_names = mandeye::fd::OpenFileDialog("Load laz files", {}, true);
+            input_file_names = mandeye::fd::OpenFileDialog("Load laz files", {}, false);
 
             if (input_file_names.size() == 1)
             {
@@ -243,12 +333,121 @@ void project_gui()
             }
         }
 
+        if (ImGui::Button("Load pose and trasform point_cloud via its inverse"))
+        {
+            /*std::string statusMsg;
+
+            // Pick the most recent pose_*.txt in the cwd; fall back to any .txt.
+            namespace fs = std::filesystem;
+            fs::path chosen;
+            fs::file_time_type chosen_time{};
+            std::error_code ec;
+            for (const auto& entry : fs::directory_iterator(fs::current_path(), ec))
+            {
+                if (!entry.is_regular_file())
+                    continue;
+                const auto fname = entry.path().filename().string();
+                auto ext = entry.path().extension().string();
+                std::transform(
+                    ext.begin(),
+                    ext.end(),
+                    ext.begin(),
+                    [](unsigned char c)
+                    {
+                        return std::tolower(c);
+                    });
+                if (ext != ".txt")
+                    continue;
+                if (fname.rfind("pose_", 0) != 0)
+                    continue;
+                auto t = entry.last_write_time(ec);
+                if (chosen.empty() || t > chosen_time)
+                {
+                    chosen = entry.path();
+                    chosen_time = t;
+                }
+            }*/
+            std::string statusMsg;
+            fs::path chosen;
+
+            std::vector<std::string> input_file_names;
+            input_file_names = mandeye::fd::OpenFileDialog("Load pose file", {}, false);
+
+            if (input_file_names.size() == 1)
+            {
+                chosen = fs::path(input_file_names[0]);
+            }
+
+            if (chosen.empty())
+            {
+                statusMsg = "Load pose: no pose_*.txt found in " + fs::current_path().string();
+            }
+            else
+            {
+                std::string filename = chosen.string();
+                std::ifstream ifs(filename);
+                if (!ifs)
+                {
+                    statusMsg = "Load pose: cannot open " + filename;
+                }
+                else
+                {
+                    // Parse the 4x4 row-major matrix written by the Save button.
+                    // Skip comment lines starting with '#'.
+                    Eigen::Matrix4d M = Eigen::Matrix4d::Identity();
+                    int row = 0;
+                    std::string line;
+                    bool ok = false;
+                    while (row < 4 && std::getline(ifs, line))
+                    {
+                        // Strip leading whitespace.
+                        size_t p = line.find_first_not_of(" \t\r\n");
+                        if (p == std::string::npos)
+                            continue;
+                        if (line[p] == '#')
+                            continue;
+                        std::istringstream iss(line.substr(p));
+                        double a, b, c, d;
+                        if (!(iss >> a >> b >> c >> d))
+                            continue;
+                        M(row, 0) = a;
+                        M(row, 1) = b;
+                        M(row, 2) = c;
+                        M(row, 3) = d;
+                        ++row;
+                    }
+                    ok = (row == 4);
+                    if (!ok)
+                    {
+                        statusMsg = "Load pose: failed to parse 4x4 matrix from " + filename;
+                    }
+                    else
+                    {
+                        Eigen::Affine3d loaded;
+                        loaded.matrix() = M;
+                        // std::lock_guard<std::mutex> lock(cloudMutex);
+                        // latestPose = loaded;
+                        // statusMsg = "Loaded pose from " + filename;
+
+                        for (int i = 0; i < session.point_clouds_container.point_clouds.size(); i++)
+                        {
+                            for (int j = 0; j < session.point_clouds_container.point_clouds[i].points_local.size(); j++)
+                            {
+                                session.point_clouds_container.point_clouds[i].points_local[j] =
+                                    loaded.inverse() * session.point_clouds_container.point_clouds[i].points_local[j];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (ImGui::Button("get indexes lowest points"))
         {
             if (session.point_clouds_container.point_clouds.size() > 0)
             {
                 lowest_points_indexes = get_lowest_points_indexes(
-                    session.point_clouds_container.point_clouds[0],
+                    session.point_clouds_container.point_clouds[0].points_local,
                     Eigen::Vector2d(surface.lowest_points_resolution, surface.lowest_points_resolution));
             }
             else
@@ -288,6 +487,7 @@ void project_gui()
         ImGui::SameLine();
         ImGui::Checkbox("robust_kernel", &surface.robust_kernel);
 
+        // ImGui::InputDouble("local_shape_feature_radious", &local_shape_feature_radious);
         ImGui::InputDouble("distance_to_ground_threshold_bottom", &distance_to_ground_threshold_bottom);
         ImGui::InputDouble("distance_to_ground_threshold_up", &distance_to_ground_threshold_up);
 
@@ -380,7 +580,19 @@ void project_gui()
                 }
             }
             ImGui::Checkbox("show_normal_vectors", &show_normal_vectors);
+
+            ImGui::Checkbox("show poles", &show_poles);
+            // ImGui::SameLine();
+            ImGui::InputDouble("verticality_threshold", &verticality_threshold);
+            ImGui::InputDouble("cylindrical_likeness_threshold", &cylindrical_likeness_threshold);
         }
+
+        if (ImGui::Button("Compute poles"))
+        {
+            ComputePolesParams params;
+            poles = get_poles(session.point_clouds_container.point_clouds[0].points_local, params, surface);
+        }
+
         ImGui::End();
     }
     return;
@@ -546,6 +758,36 @@ void display()
         glEnd();
     }
 
+    if (show_poles)
+    {
+        glColor3f(1, 0, 0);
+        glPointSize(5);
+        glBegin(GL_POINTS);
+        for (int i = 0; i < points_with_lsf.size(); i++)
+        {
+            const auto& p = points_with_lsf[i];
+            if (p.valid && p.coordinates_global.x() < 5.0 && p.coordinates_global.x() > -15.0 && fabs(p.coordinates_global.y()) < 3.0)
+            {
+                if (p.verticality > verticality_threshold && p.cylindrical_likeness > cylindrical_likeness_threshold)
+                {
+                    glColor3f(1, 0, 0);
+                    glVertex3f(p.coordinates_global.x(), p.coordinates_global.y(), p.coordinates_global.z());
+                }
+            }
+        }
+        glEnd();
+    }
+
+    glColor3f(1, 1, 0);
+    glPointSize(5);
+    glBegin(GL_POINTS);
+    for (int i = 0; i < poles.size(); i++)
+    {
+        glVertex3f(poles[i].x(), poles[i].y(), poles[i].z());
+    }
+    glEnd();
+
+    /**/
     //
     /*glColor3f(0, 0, 0);
     glBegin(GL_LINES);

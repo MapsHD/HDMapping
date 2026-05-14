@@ -4,6 +4,7 @@
 
 #include <Core/session.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -79,12 +80,19 @@ public:
     }
 
     bool writePoint(
-        const Eigen::Vector3d& position, unsigned short intensity, double timestamp, double offset_x, double offset_y, double offset_z)
+        const Eigen::Vector3d& position,
+        unsigned short intensity,
+        double timestamp,
+        double offset_x,
+        double offset_y,
+        double offset_z,
+        unsigned short point_source_id = 0)
     {
         point_->intensity = intensity;
         point_->return_number = 1;
         point_->number_of_returns = 1;
         point_->gps_time = timestamp * 1e9;
+        point_->point_source_ID = point_source_id;
 
         laszip_F64 coordinates[3];
         coordinates[0] = position.x() + offset_x;
@@ -155,7 +163,8 @@ inline bool exportLaz(
     const std::vector<double>& timestamps,
     double offset_x = 0.0,
     double offset_y = 0.0,
-    double offset_alt = 0.0)
+    double offset_alt = 0.0,
+    const std::vector<unsigned short>* point_source_ids = nullptr)
 {
     LazWriter writer;
     if (!writer.open(filename, offset_x, offset_y, offset_alt))
@@ -163,7 +172,8 @@ inline bool exportLaz(
 
     for (size_t i = 0; i < pointcloud.size(); i++)
     {
-        if (!writer.writePoint(pointcloud[i], intensity[i], timestamps[i], offset_x, offset_y, offset_alt))
+        const unsigned short psid = (point_source_ids && i < point_source_ids->size()) ? (*point_source_ids)[i] : 0;
+        if (!writer.writePoint(pointcloud[i], intensity[i], timestamps[i], offset_x, offset_y, offset_alt, psid))
             return false;
     }
 
@@ -175,7 +185,8 @@ inline void save_processed_pc(
     const fs::path& file_path_put,
     const Eigen::Affine3d& m_pose,
     const Eigen::Vector3d& offset,
-    bool override_compressed = false)
+    bool override_compressed = false,
+    unsigned short point_source_id = 0)
 {
     std::cout << "processing: " << file_path_in << std::endl;
 
@@ -292,6 +303,7 @@ inline void save_processed_pc(
         output_point->classification = input_point->classification;
         output_point->num_extra_bytes = input_point->num_extra_bytes;
         output_point->gps_time = input_point->gps_time;
+        output_point->point_source_ID = point_source_id;
         memcpy(output_point->extra_bytes, input_point->extra_bytes, output_point->num_extra_bytes);
 
         if (laszip_write_point(laszip_writer))
@@ -396,6 +408,13 @@ inline void save_all_to_las(const Session& session, std::string output_las_name,
     bool found_first_pose = false;
 
     const auto& offset = session.point_clouds_container.offset;
+    const auto& clouds = session.point_clouds_container.point_clouds;
+
+    if (clouds.size() > 65535)
+    {
+        std::cerr << "warning: more than 65535 scans, point_source_ID capped at 65535\n";
+    }
+
     LazWriter writer;
     if (!writer.open(output_las_name, offset.x(), offset.y(), offset.z()))
     {
@@ -403,8 +422,9 @@ inline void save_all_to_las(const Session& session, std::string output_las_name,
         return;
     }
 
-    for (const auto& p : session.point_clouds_container.point_clouds)
+    for (size_t scan_idx = 0; scan_idx < clouds.size(); ++scan_idx)
     {
+        const auto& p = clouds[scan_idx];
         if (p.visible)
         {
             if (!found_first_pose)
@@ -412,6 +432,8 @@ inline void save_all_to_las(const Session& session, std::string output_las_name,
                 found_first_pose = true;
                 first_pose = p.m_pose;
             }
+
+            const unsigned short psid = static_cast<unsigned short>(std::min<size_t>(scan_idx, 65535));
 
             for (size_t i = 0; i < p.points_local.size(); ++i)
             {
@@ -428,7 +450,7 @@ inline void save_all_to_las(const Session& session, std::string output_las_name,
                 unsigned short inten = (i < p.intensities.size()) ? p.intensities[i] : 0;
                 double ts = (i < p.timestamps.size()) ? p.timestamps[i] : 0.0;
 
-                if (!writer.writePoint(vp, inten, ts, offset.x(), offset.y(), offset.z()))
+                if (!writer.writePoint(vp, inten, ts, offset.x(), offset.y(), offset.z(), psid))
                     return;
             }
         }

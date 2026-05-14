@@ -107,10 +107,17 @@ void save_intersection(
 
 void save_separately_to_las(const Session& session, fs::path outwd, std::string extension)
 {
-    for (auto& p : session.point_clouds_container.point_clouds)
+    const auto& clouds = session.point_clouds_container.point_clouds;
+    if (clouds.size() > 65535)
     {
+        std::cerr << "warning: more than 65535 scans, point_source_ID capped at 65535\n";
+    }
+    for (size_t scan_idx = 0; scan_idx < clouds.size(); ++scan_idx)
+    {
+        const auto& p = clouds[scan_idx];
         if (p.visible)
         {
+            const unsigned short psid = static_cast<unsigned short>(std::min<size_t>(scan_idx, 65535));
             fs::path file_path_in = p.file_name;
             fs::path file_path_put = outwd;
             file_path_put /= (file_path_in.stem().string() + "_processed" + extension);
@@ -118,7 +125,7 @@ void save_separately_to_las(const Session& session, fs::path outwd, std::string 
             std::cout << "file_out: " << file_path_put << std::endl;
             std::cout << "start save_processed_pc" << std::endl;
             bool compressed = (extension == ".laz");
-            save_processed_pc(file_path_in, file_path_put, p.m_pose, session.point_clouds_container.offset, compressed);
+            save_processed_pc(file_path_in, file_path_put, p.m_pose, session.point_clouds_container.offset, compressed, psid);
             std::cout << "save_processed_pc finished" << std::endl;
         }
     }
@@ -134,12 +141,21 @@ void save_trajectories_to_laz(
     std::vector<Eigen::Vector3d> pointcloud;
     std::vector<unsigned short> intensity;
     std::vector<double> timestamps;
+    std::vector<unsigned short> point_source_ids;
+
+    const auto& clouds = session.point_clouds_container.point_clouds;
+    if (clouds.size() > 65535)
+    {
+        std::cerr << "warning: more than 65535 scans, point_source_ID capped at 65535\n";
+    }
 
     float consecutive_distance = 0;
-    for (auto& p : session.point_clouds_container.point_clouds)
+    for (size_t scan_idx = 0; scan_idx < clouds.size(); ++scan_idx)
     {
+        const auto& p = clouds[scan_idx];
         if (p.visible)
         {
+            const unsigned short psid = static_cast<unsigned short>(std::min<size_t>(scan_idx, 65535));
             for (int i = 0; i < p.local_trajectory.size(); i++)
             {
                 const auto& pp = p.local_trajectory[i].m_pose.translation();
@@ -185,6 +201,7 @@ void save_trajectories_to_laz(
                     pointcloud.push_back(vp);
                     intensity.push_back(0);
                     timestamps.push_back(p.local_trajectory[i].timestamps.first);
+                    point_source_ids.push_back(psid);
                 }
                 else
                 {
@@ -194,6 +211,7 @@ void save_trajectories_to_laz(
                         pointcloud.push_back(vp);
                         intensity.push_back(0);
                         timestamps.push_back(p.local_trajectory[i].timestamps.first);
+                        point_source_ids.push_back(psid);
                     }
                 }
             }
@@ -207,7 +225,8 @@ void save_trajectories_to_laz(
             timestamps,
             session.point_clouds_container.offset.x(),
             session.point_clouds_container.offset.y(),
-            session.point_clouds_container.offset.z()))
+            session.point_clouds_container.offset.z(),
+            &point_source_ids))
     {
         std::cout << "problem with saving file: " << output_file_name << std::endl;
     }

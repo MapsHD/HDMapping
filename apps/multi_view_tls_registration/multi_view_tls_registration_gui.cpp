@@ -192,6 +192,20 @@ bool is_manual_analisys = false;
 bool is_loop_closure_gui = false;
 bool is_lio_segments_gui = false;
 bool is_settings_gui = true;
+bool is_translate_gui = false;
+
+struct TranslateTool
+{
+    enum class Step { Idle, PickOrigin, PickXAxis, PickYHint, Ready };
+    Step step = Step::Idle;
+    Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+    Eigen::Vector3d x_point = Eigen::Vector3d::Zero();
+    Eigen::Vector3d y_hint = Eigen::Vector3d::Zero();
+    Eigen::Affine3d transform = Eigen::Affine3d::Identity();
+    bool has_transform = false;
+    float plane_z = 0.0f;
+};
+TranslateTool translate_tool;
 
 bool fillInSession = true;
 
@@ -269,6 +283,8 @@ void perform_experiment_on_linux(
     PoseGraphSLAM& pose_graph_slam);
 double compute_rms(bool initial, Session& session, ObservationPicking& observation_picking);
 void reset_poses(Session& session);
+void translate_gui();
+void draw_translate_preview();
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -3356,6 +3372,11 @@ void display()
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Manually adjust or review Lidar Inertial Odometry trajectory segments");
 
+                ImGui::Separator();
+                ImGui::MenuItem("Translate", nullptr, &is_translate_gui);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Define new coordinate frame from 3 picked points and transform all clouds");
+
                 ImGui::EndMenu();
             }
 
@@ -3753,9 +3774,23 @@ void display()
     if (is_lio_segments_gui)
         lio_segments_gui();
 
+    if (is_translate_gui)
+    {
+        translate_gui();
+    }
+    else if (translate_tool.step != TranslateTool::Step::Idle)
+    {
+        translate_tool.step = TranslateTool::Step::Idle;
+        translate_tool.has_transform = false;
+        translate_tool.transform = Eigen::Affine3d::Identity();
+        glutSetCursor(GLUT_CURSOR_INHERIT);
+    }
+
     cor_window();
 
     info_window(infoLines, appShortcuts);
+
+    draw_translate_preview();
 
     if (compass_ruler)
         drawMiniCompassWithRuler();
@@ -3765,6 +3800,184 @@ void display()
 
     glutSwapBuffers();
     glutPostRedisplay();
+}
+
+void draw_translate_preview()
+{
+    if (translate_tool.step != TranslateTool::Step::PickXAxis &&
+        translate_tool.step != TranslateTool::Step::PickYHint)
+        return;
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse)
+        return;
+
+    const auto laser_beam = GetLaserBeam((int)io.MousePos.x, (int)io.MousePos.y);
+    RegistrationPlaneFeature::Plane pl;
+    pl.a = 0;
+    pl.b = 0;
+    pl.c = 1;
+    pl.d = -translate_tool.plane_z;
+    Eigen::Vector3d cursor_world = rayIntersection(laser_beam, pl);
+
+    const Eigen::Vector3d O = translate_tool.origin;
+
+    Eigen::Vector3d x_dir;
+    if (translate_tool.step == TranslateTool::Step::PickXAxis)
+        x_dir = cursor_world - O;
+    else
+        x_dir = translate_tool.x_point - O;
+    x_dir.z() = 0.0;
+    if (x_dir.norm() < 1e-9)
+        return;
+    double x_len = x_dir.norm();
+    Eigen::Vector3d x_n = x_dir / x_len;
+    Eigen::Vector3d y_n(-x_n.y(), x_n.x(), 0.0);
+
+    if (translate_tool.step == TranslateTool::Step::PickYHint)
+    {
+        Eigen::Vector3d v = cursor_world - O;
+        if (v.dot(y_n) < 0.0)
+            y_n = -y_n;
+    }
+
+    double y_len = x_len * 0.5;
+    double z_len = x_len * 0.25;
+
+    glLineWidth(3.0f);
+    glBegin(GL_LINES);
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glVertex3d(O.x(), O.y(), O.z());
+    glVertex3d(O.x() + x_n.x() * x_len, O.y() + x_n.y() * x_len, O.z());
+
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glVertex3d(O.x(), O.y(), O.z());
+    glVertex3d(O.x() + y_n.x() * y_len, O.y() + y_n.y() * y_len, O.z());
+
+    glColor3f(0.0f, 0.0f, 1.0f);
+    glVertex3d(O.x(), O.y(), O.z());
+    glVertex3d(O.x(), O.y(), O.z() + z_len);
+    glEnd();
+    glLineWidth(1.0f);
+}
+
+Eigen::Affine3d compute_translate_matrix(
+    const Eigen::Vector3d& O,
+    const Eigen::Vector3d& X,
+    const Eigen::Vector3d& Y_hint)
+{
+    Eigen::Vector3d dx = X - O;
+    dx.z() = 0.0;
+    if (dx.norm() < 1e-9)
+        return Eigen::Affine3d::Identity();
+    dx.normalize();
+
+    double theta = -std::atan2(dx.y(), dx.x());
+
+    Eigen::Affine3d T = Eigen::Affine3d::Identity();
+    T.prerotate(Eigen::AngleAxisd(theta, Eigen::Vector3d::UnitZ()));
+    T.pretranslate(-(T.linear() * O));
+
+    Eigen::Vector3d y_h_new = T * Y_hint;
+    if (y_h_new.y() < 0.0)
+    {
+        Eigen::Affine3d flip = Eigen::Affine3d::Identity();
+        Eigen::Matrix3d R;
+        R << 1, 0, 0,
+             0, -1, 0,
+             0, 0, -1;
+        flip.linear() = R;
+        T = flip * T;
+    }
+    return T;
+}
+
+void translate_gui()
+{
+    ImGui::Begin("Translate", &is_translate_gui);
+
+    ImGui::PushItemWidth(ImGuiNumberWidth);
+    ImGui::InputFloat("Plane Z [m]", &translate_tool.plane_z);
+    ImGui::PopItemWidth();
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Height of the horizontal pick plane used to project mouse clicks into 3D");
+
+    if (ImGui::Button("Start picking"))
+    {
+        translate_tool.step = TranslateTool::Step::PickOrigin;
+        translate_tool.has_transform = false;
+        translate_tool.transform = Eigen::Affine3d::Identity();
+
+        is_ortho = true;
+        new_rotation_center = rotation_center;
+        new_rotate_x = 0.0;
+        new_rotate_y = 0.0;
+        new_translate_x = translate_x;
+        new_translate_y = translate_y;
+        new_translate_z = translate_z;
+        camera_transition_active = true;
+
+        glutSetCursor(GLUT_CURSOR_CROSSHAIR);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset"))
+    {
+        translate_tool.step = TranslateTool::Step::Idle;
+        translate_tool.has_transform = false;
+        translate_tool.transform = Eigen::Affine3d::Identity();
+        glutSetCursor(GLUT_CURSOR_INHERIT);
+    }
+
+    const char* step_text = "Idle";
+    switch (translate_tool.step)
+    {
+        case TranslateTool::Step::PickOrigin: step_text = "Pick origin (new 0,0)"; break;
+        case TranslateTool::Step::PickXAxis:  step_text = "Pick point on +X axis"; break;
+        case TranslateTool::Step::PickYHint:  step_text = "Pick point on +Y side"; break;
+        case TranslateTool::Step::Ready:      step_text = "Ready - press Translate"; break;
+        default: break;
+    }
+    ImGui::Text("Step: %s", step_text);
+
+    ImGui::Text("Origin : %.3f %.3f %.3f", translate_tool.origin.x(), translate_tool.origin.y(), translate_tool.origin.z());
+    ImGui::Text("X point: %.3f %.3f %.3f", translate_tool.x_point.x(), translate_tool.x_point.y(), translate_tool.x_point.z());
+    ImGui::Text("Y hint : %.3f %.3f %.3f", translate_tool.y_hint.x(), translate_tool.y_hint.y(), translate_tool.y_hint.z());
+
+    if (translate_tool.has_transform)
+    {
+        ImGui::Separator();
+        ImGui::Text("Transformation matrix:");
+        const Eigen::Matrix4d M = translate_tool.transform.matrix();
+        for (int r = 0; r < 4; r++)
+            ImGui::Text("%8.4f %8.4f %8.4f %8.4f", M(r, 0), M(r, 1), M(r, 2), M(r, 3));
+    }
+
+    ImGui::Separator();
+    ImGui::BeginDisabled(!translate_tool.has_transform);
+    {
+        if (ImGui::Button("Translate"))
+        {
+            for (auto& pc : session.point_clouds_container.point_clouds)
+                pc.m_pose = translate_tool.transform * pc.m_pose;
+
+            for (auto& cp : session.control_points.cps)
+            {
+                Eigen::Vector3d g(cp.x_target_global, cp.y_target_global, cp.z_target_global);
+                g = translate_tool.transform * g;
+                cp.x_target_global = g.x();
+                cp.y_target_global = g.y();
+                cp.z_target_global = g.z();
+            }
+
+            translate_tool.step = TranslateTool::Step::Idle;
+            translate_tool.has_transform = false;
+            translate_tool.transform = Eigen::Affine3d::Identity();
+            glutSetCursor(GLUT_CURSOR_INHERIT);
+        }
+    }
+    ImGui::EndDisabled();
+
+    ImGui::End();
 }
 
 Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observation_picking)
@@ -3808,6 +4021,44 @@ void mouse(int glut_button, int state, int x, int y)
 
     if (!io.WantCaptureMouse)
     {
+        if (glut_button == GLUT_LEFT_BUTTON && state == GLUT_DOWN && !io.KeyCtrl && !io.KeyShift &&
+            translate_tool.step != TranslateTool::Step::Idle &&
+            translate_tool.step != TranslateTool::Step::Ready)
+        {
+            const auto laser_beam = GetLaserBeam(x, y);
+            RegistrationPlaneFeature::Plane pl;
+            pl.a = 0;
+            pl.b = 0;
+            pl.c = 1;
+            pl.d = -translate_tool.plane_z;
+            Eigen::Vector3d p = rayIntersection(laser_beam, pl);
+
+            switch (translate_tool.step)
+            {
+                case TranslateTool::Step::PickOrigin:
+                    translate_tool.origin = p;
+                    translate_tool.step = TranslateTool::Step::PickXAxis;
+                    break;
+                case TranslateTool::Step::PickXAxis:
+                    translate_tool.x_point = p;
+                    translate_tool.step = TranslateTool::Step::PickYHint;
+                    break;
+                case TranslateTool::Step::PickYHint:
+                    translate_tool.y_hint = p;
+                    translate_tool.transform = compute_translate_matrix(
+                        translate_tool.origin, translate_tool.x_point, translate_tool.y_hint);
+                    translate_tool.has_transform = true;
+                    translate_tool.step = TranslateTool::Step::Ready;
+                    break;
+                default:
+                    break;
+            }
+
+            mouse_old_x = x;
+            mouse_old_y = y;
+            return;
+        }
+
         if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_LEFT_BUTTON) && state == GLUT_DOWN && (io.KeyCtrl || io.KeyShift))
         {
             if (session.ground_control_points.is_imgui)

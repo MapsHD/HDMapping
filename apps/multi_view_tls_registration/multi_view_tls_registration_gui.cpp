@@ -196,7 +196,14 @@ bool is_translate_gui = false;
 
 struct TranslateTool
 {
-    enum class Step { Idle, PickOrigin, PickXAxis, PickYHint, Ready };
+    enum class Step
+    {
+        Idle,
+        PickOrigin,
+        PickXAxis,
+        PickYHint,
+        Ready
+    };
     Step step = Step::Idle;
     Eigen::Vector3d origin = Eigen::Vector3d::Zero();
     Eigen::Vector3d x_point = Eigen::Vector3d::Zero();
@@ -3804,8 +3811,7 @@ void display()
 
 void draw_translate_preview()
 {
-    if (translate_tool.step != TranslateTool::Step::PickXAxis &&
-        translate_tool.step != TranslateTool::Step::PickYHint)
+    if (translate_tool.step != TranslateTool::Step::PickXAxis && translate_tool.step != TranslateTool::Step::PickYHint)
         return;
 
     ImGuiIO& io = ImGui::GetIO();
@@ -3861,10 +3867,7 @@ void draw_translate_preview()
     glLineWidth(1.0f);
 }
 
-Eigen::Affine3d compute_translate_matrix(
-    const Eigen::Vector3d& O,
-    const Eigen::Vector3d& X,
-    const Eigen::Vector3d& Y_hint)
+Eigen::Affine3d compute_translate_matrix(const Eigen::Vector3d& O, const Eigen::Vector3d& X, const Eigen::Vector3d& Y_hint)
 {
     Eigen::Vector3d dx = X - O;
     dx.z() = 0.0;
@@ -3883,9 +3886,7 @@ Eigen::Affine3d compute_translate_matrix(
     {
         Eigen::Affine3d flip = Eigen::Affine3d::Identity();
         Eigen::Matrix3d R;
-        R << 1, 0, 0,
-             0, -1, 0,
-             0, 0, -1;
+        R << 1, 0, 0, 0, -1, 0, 0, 0, -1;
         flip.linear() = R;
         T = flip * T;
     }
@@ -3931,11 +3932,20 @@ void translate_gui()
     const char* step_text = "Idle";
     switch (translate_tool.step)
     {
-        case TranslateTool::Step::PickOrigin: step_text = "Pick origin (new 0,0)"; break;
-        case TranslateTool::Step::PickXAxis:  step_text = "Pick point on +X axis"; break;
-        case TranslateTool::Step::PickYHint:  step_text = "Pick point on +Y side"; break;
-        case TranslateTool::Step::Ready:      step_text = "Ready - press Translate"; break;
-        default: break;
+    case TranslateTool::Step::PickOrigin:
+        step_text = "Pick origin (new 0,0)";
+        break;
+    case TranslateTool::Step::PickXAxis:
+        step_text = "Pick point on +X axis";
+        break;
+    case TranslateTool::Step::PickYHint:
+        step_text = "Pick point on +Y side";
+        break;
+    case TranslateTool::Step::Ready:
+        step_text = "Ready - press Translate";
+        break;
+    default:
+        break;
     }
     ImGui::Text("Step: %s", step_text);
 
@@ -4022,8 +4032,7 @@ void mouse(int glut_button, int state, int x, int y)
     if (!io.WantCaptureMouse)
     {
         if (glut_button == GLUT_LEFT_BUTTON && state == GLUT_DOWN && !io.KeyCtrl && !io.KeyShift &&
-            translate_tool.step != TranslateTool::Step::Idle &&
-            translate_tool.step != TranslateTool::Step::Ready)
+            translate_tool.step != TranslateTool::Step::Idle && translate_tool.step != TranslateTool::Step::Ready)
         {
             const auto laser_beam = GetLaserBeam(x, y);
             RegistrationPlaneFeature::Plane pl;
@@ -4035,23 +4044,22 @@ void mouse(int glut_button, int state, int x, int y)
 
             switch (translate_tool.step)
             {
-                case TranslateTool::Step::PickOrigin:
-                    translate_tool.origin = p;
-                    translate_tool.step = TranslateTool::Step::PickXAxis;
-                    break;
-                case TranslateTool::Step::PickXAxis:
-                    translate_tool.x_point = p;
-                    translate_tool.step = TranslateTool::Step::PickYHint;
-                    break;
-                case TranslateTool::Step::PickYHint:
-                    translate_tool.y_hint = p;
-                    translate_tool.transform = compute_translate_matrix(
-                        translate_tool.origin, translate_tool.x_point, translate_tool.y_hint);
-                    translate_tool.has_transform = true;
-                    translate_tool.step = TranslateTool::Step::Ready;
-                    break;
-                default:
-                    break;
+            case TranslateTool::Step::PickOrigin:
+                translate_tool.origin = p;
+                translate_tool.step = TranslateTool::Step::PickXAxis;
+                break;
+            case TranslateTool::Step::PickXAxis:
+                translate_tool.x_point = p;
+                translate_tool.step = TranslateTool::Step::PickYHint;
+                break;
+            case TranslateTool::Step::PickYHint:
+                translate_tool.y_hint = p;
+                translate_tool.transform = compute_translate_matrix(translate_tool.origin, translate_tool.x_point, translate_tool.y_hint);
+                translate_tool.has_transform = true;
+                translate_tool.step = TranslateTool::Step::Ready;
+                break;
+            default:
+                break;
             }
 
             mouse_old_x = x;

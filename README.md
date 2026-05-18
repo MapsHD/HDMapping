@@ -231,6 +231,7 @@ ToDo
 - https://github.com/gisbi-kim/SC-LeGO-LOAM (2018, IEEE/RSJ, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SC-LeGO-LOAM.bib))
 - https://github.com/xuankuzcr/Global-LVBA
 - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=11419773
+- https://github.com/chengwei0427/ct-lio
 
 ToDo: Deep learning
 - https://www.sciencedirect.com/science/article/abs/pii/S0921889025001903 (2025, Elsevier RAS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MFS-LO.bib), no source code)

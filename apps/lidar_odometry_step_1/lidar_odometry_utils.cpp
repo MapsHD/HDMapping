@@ -532,7 +532,8 @@ std::vector<Point3Di> load_point_cloud(
         {
             if (!calibrations.contains(id))
             {
-                std::cout << 1;
+                std::cout << "Point with lidar id " << id << " does not have calibration, skipping point (maybe data is corrupted)"
+                          << std::endl;
                 continue;
             }
         }

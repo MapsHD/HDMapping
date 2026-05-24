@@ -3755,6 +3755,109 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
                     }
                     std::cout << "Finished saving all trajectories to TUM TXT files." << std::endl;
                 }
+                if (ImGui::MenuItem("Save all as TUM TXT (single folder)"))
+                {
+                    for (size_t i = 0; i < project_settings.session_file_names.size(); ++i)
+                    {
+                        const auto& session_path = project_settings.session_file_names[i];
+
+                        if (i >= sessions.size())
+                        {
+                            std::cerr << "No loaded session for: "
+                                    << session_path << std::endl;
+                            continue;
+                        }
+
+                        Session& session = sessions[i];
+
+                        std::filesystem::path session_dir =
+                            std::filesystem::path(session_path).parent_path();
+
+                        std::filesystem::path base_dir =
+                            session_dir.parent_path();
+
+                        std::filesystem::path output_dir =
+                            base_dir / "all_tum_files";
+
+                        try
+                        {
+                            std::filesystem::create_directories(output_dir);
+                        }
+                        catch (const std::exception& e)
+                        {
+                            std::cerr << "Failed to create export directory: "
+                                    << e.what() << std::endl;
+                            continue;
+                        }
+
+                        std::string folder_name =
+                            session_dir.filename().string();
+
+                        std::filesystem::path txt_path =
+                            output_dir / (folder_name + "_trajectory_tum.txt");
+
+                        std::cout << "Saving trajectory to TUM TXT: "
+                                << txt_path << std::endl;
+
+                        try
+                        {
+                            std::ofstream outfile(txt_path);
+
+                            if (!outfile.is_open())
+                            {
+                                std::cerr << "Failed to create file: "
+                                        << txt_path << std::endl;
+                                continue;
+                            }
+
+                            for (const auto& pc : session.point_clouds_container.point_clouds)
+                            {
+                                if (!pc.visible)
+                                    continue;
+
+                                for (const auto& traj : pc.local_trajectory)
+                                {
+                                    Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
+
+                                    Eigen::Vector3d pos = pose.translation();
+
+                                    Eigen::Quaterniond q(pose.rotation());
+
+                                    double t_s =
+                                        static_cast<double>(traj.timestamps.first) / 1e9;
+
+                                    outfile << std::fixed
+                                            << std::setprecision(9)
+                                            << t_s << " "
+                                            << std::setprecision(10)
+                                            << pos.x() << " "
+                                            << pos.y() << " "
+                                            << pos.z() << " "
+                                            << q.x() << " "
+                                            << q.y() << " "
+                                            << q.z() << " "
+                                            << q.w()
+                                            << "\n";
+                                }
+                            }
+
+                            outfile.close();
+
+                            std::cout << "Saved: "
+                                    << txt_path << std::endl;
+                        }
+                        catch (const std::exception& e)
+                        {
+                            std::cerr << "Error creating "
+                                    << txt_path
+                                    << ": "
+                                    << e.what()
+                                    << std::endl;
+                        }
+                    }
+                    std::cout << "Finished saving all trajectories to single folder."
+                            << std::endl;
+                }
 
                 ImGui::EndMenu();
             }

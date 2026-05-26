@@ -204,6 +204,7 @@ Algorithms with unsolved issues
 - https://github.com/thisparticle/btsa (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/A-Dynamic-Aware-LIO.bib), dynamic scenes) unsolved issue https://github.com/thisparticle/btsa/issues/4
 - https://github.com/BrenYi/Light-LOAM (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Light-LOAM.bib)) (issue) https://github.com/BrenYi/Light-LOAM/issues/6
 - https://github.com/clegenti/2fast2lamaa (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/2FAST-2LAMAA.bib)) (issue) https://github.com/clegenti/2fast2lamaa/issues/4
+- https://github.com/Livox-SDK/LIO-Livox (2026, Livox proprietary, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-Livox.bib)) (doesn't support non-repetitive lidar https://github.com/Livox-SDK/LIO-Livox/issues/81)
 
 
   
@@ -211,7 +212,7 @@ Not supported algorithm
 - https://ieeexplore.ieee.org/document/10900461, https://github.com/kafeiyin00/UA-MPC (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/UA-MPC.bib), we do not support rotary LiDAR)
 
 ToDo
-- https://github.com/Livox-SDK/LIO-Livox (2026, Livox proprietary, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-Livox.bib)) - Piotr
+- https://github.com/v4rl-ucy/ellipselio (2026, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/EllipseLIO.bib)) - Piotr
 - https://github.com/DCSI2022/DALI_SLAM (2025, Elsevier ISPRS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DALI-SLAM.bib))
 - https://github.com/KTH-RPL/dufomap (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)- Marcin
 - https://github.com/KTH-RPL/DynamicMap_Benchmark (2023, ITSC, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
@@ -235,7 +236,6 @@ ToDo
 - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=11419773
 - https://github.com/chengwei0427/ct-lio
 - https://github.com/sjtuyinjie/Ground-Fusion2
-- https://github.com/v4rl-ucy/ellipselio
 
 ToDo: Deep learning
 - https://www.sciencedirect.com/science/article/abs/pii/S0921889025001903 (2025, Elsevier RAS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MFS-LO.bib), no source code)

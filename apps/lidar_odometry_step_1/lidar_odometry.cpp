@@ -1,6 +1,6 @@
 #include "lidar_odometry.h"
 #include "tbb/tbb.h"
-#include <UTL/profiler.hpp>
+#include "hdmapping_profiler.hpp"
 #include <mutex>
 
 #include <Core/system_info.hpp>
@@ -15,7 +15,7 @@ bool load_data(
     Imu& imu_data,
     bool debugMsg)
 {
-    UTL_PROFILER_SCOPE("load_data");
+    HDMAP_ZONE_SCOPE("load_data");
     std::sort(input_file_names.begin(), input_file_names.end());
     std::vector<std::string> csv_files, laz_files;
     std::string sn_file;
@@ -304,7 +304,7 @@ bool load_data(
 
 void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryParams& params, bool debugMsg)
 {
-    UTL_PROFILER_SCOPE("calculate_trajectory");
+    HDMAP_ZONE_SCOPE("calculate_trajectory");
 
     const float RAD_TO_DEG = 180.0f / static_cast<float>(M_PI);
     int counter = 1;
@@ -462,7 +462,7 @@ bool compute_step_1(
     std::vector<WorkerData>& worker_data,
     const std::atomic<bool>& pause)
 {
-    UTL_PROFILER_SCOPE("compute_step_1");
+    HDMAP_ZONE_SCOPE("compute_step_1");
     int number_of_initial_points = 0;
     double timestamp_begin = 0.0;
 
@@ -697,7 +697,7 @@ void run_consistency(std::vector<WorkerData>& worker_data, const LidarOdometryPa
 
 void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& params, fs::path outwd, double elapsed_time_s)
 {
-    UTL_PROFILER_SCOPE("save_result");
+    HDMAP_ZONE_SCOPE("save_result");
     std::filesystem::create_directory(outwd);
     // concatenate data
     std::vector<WorkerData> worker_data_concatenated;
@@ -1066,7 +1066,7 @@ std::string save_results_automatic(
 
 std::vector<WorkerData> run_lidar_odometry(const std::string& input_dir, LidarOdometryParams& params)
 {
-    UTL_PROFILER_SCOPE("run_lidar_odometry");
+    HDMAP_ZONE_SCOPE("run_lidar_odometry");
     Session session;
     std::vector<WorkerData> worker_data;
     std::vector<std::string> input_file_names;

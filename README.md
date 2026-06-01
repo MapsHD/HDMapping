@@ -213,6 +213,7 @@ Not supported algorithm
 - https://ieeexplore.ieee.org/document/10900461, https://github.com/kafeiyin00/UA-MPC (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/UA-MPC.bib), we do not support rotary LiDAR)
 
 ToDo
+- https://github.com/url-kaist/se3-lio (2026, ICRA)
 - https://github.com/DCSI2022/DALI_SLAM (2025, Elsevier ISPRS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DALI-SLAM.bib))
 - https://github.com/KTH-RPL/dufomap (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)- Marcin
 - https://github.com/KTH-RPL/DynamicMap_Benchmark (2023, ITSC, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
@@ -236,6 +237,7 @@ ToDo
 - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=11419773
 - https://github.com/chengwei0427/ct-lio
 - https://github.com/sjtuyinjie/Ground-Fusion2
+  
 
 ToDo: Deep learning
 - https://www.sciencedirect.com/science/article/abs/pii/S0921889025001903 (2025, Elsevier RAS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MFS-LO.bib), no source code)

@@ -535,6 +535,15 @@ For example on WSL2 Ubuntu-24.04 following package is required to run GUI applic
 ```bash
 sudo apt install zenity
 ```
+# Profiling
+
+You can use multiple backends to profile the code (UTL, Tracy-Profiler)
+
+- Using Tracy-Profiler requires to install / build from source Tracy-Profiler from https://github.com/wolfpld/tracy/releases/tag/v0.13.1.
+- Build and run the project with `cmake .. -DCMAKE_BUILD_TYPE=ReleaseWithDebInfo -DHDMAPPING_PROFILER=TRACY`
+- Open Tracy Profiler and run e.g. `lidar_odometry_step_1`. Tracy-Profiler should recongnize the code and show the results.
+- 
+To use UTL profiler build and run the project with `cmake .. -DCMAKE_BUILD_TYPE=ReleaseWithDebInfo -DHDMAPPING_PROFILER=UTL`
 
 # Building Debian package.
 
@@ -560,6 +569,7 @@ To install package :
 ```
 sudo dpkg -i hd_mapping-0.*.*-Linux.deb
 ```
+
 
 ![mandeye](images/softwareX1.png)
 

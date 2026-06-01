@@ -28,8 +28,6 @@ target_include_directories(
   ${THIRDPARTY_DIRECTORY}/observation_equations/codes
   ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
 
-target_compile_definitions(quick_start_demo PRIVATE BUILD_WITH_UTL_PROFILER_DISABLED)
-
 target_link_libraries(
   quick_start_demo
   PRIVATE vqf

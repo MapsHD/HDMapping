@@ -1,6 +1,6 @@
 #include "lidar_odometry.h"
-#include "tbb/tbb.h"
 #include "hdmapping_profiler.hpp"
+#include "tbb/tbb.h"
 #include <mutex>
 
 #include <Core/system_info.hpp>

@@ -1,5 +1,5 @@
-#include "lidar_odometry_utils.h"
 #include "hdmapping_profiler.hpp"
+#include "lidar_odometry_utils.h"
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 #include <tbb/combinable.h>

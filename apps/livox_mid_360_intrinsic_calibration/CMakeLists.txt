@@ -28,8 +28,6 @@ target_include_directories(
   ${THIRDPARTY_DIRECTORY}/observation_equations/codes
   ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
 
-target_compile_definitions(livox_mid_360_intrinsic_calibration PRIVATE BUILD_WITH_UTL_PROFILER_DISABLED)
-
 target_link_libraries(
   livox_mid_360_intrinsic_calibration
   PRIVATE vqf

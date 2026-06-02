@@ -2,6 +2,20 @@ cmake_minimum_required(VERSION 4.0.0)
 
 project(lidar_odometry_step_1)
 
+# Apply the chosen profiler backend to a target.
+function(target_apply_hdmapping_profiler TARGET)
+    if(HDMAPPING_PROFILER STREQUAL "TRACY")
+        target_compile_definitions(${TARGET} PRIVATE
+            HDMAPPING_PROFILER_TRACY TRACY_ENABLE TRACY_ON_DEMAND
+            UTL_PROFILER_DISABLE)   # silence any remaining UTL_PROFILER_* calls
+        target_link_libraries(${TARGET} PRIVATE TracyClient)
+    elseif(HDMAPPING_PROFILER STREQUAL "UTL")
+        target_compile_definitions(${TARGET} PRIVATE HDMAPPING_PROFILER_UTL)
+    else()
+        target_compile_definitions(${TARGET} PRIVATE UTL_PROFILER_DISABLE)
+    endif()
+endfunction()
+
 # Source files
 set(SOURCES
   lidar_odometry_utils.h lidar_odometry_utils.cpp
@@ -20,9 +34,8 @@ add_executable(
   lidar_odometry_step_1 lidar_odometry_gui.cpp ${SOURCES}
   )
 
-target_compile_definitions(lidar_odometry_step_1 PRIVATE
-    WITH_GUI=1
-    $<$<BOOL:${BUILD_WITH_UTL_PROFILER_DISABLED}>:BUILD_WITH_UTL_PROFILER_DISABLED>)
+target_compile_definitions(lidar_odometry_step_1 PRIVATE WITH_GUI=1)
+target_apply_hdmapping_profiler(lidar_odometry_step_1)
 
 target_include_directories(
   lidar_odometry_step_1
@@ -79,9 +92,8 @@ add_executable(
   drag_folder_with_mandeye_data_and_drop_here-precision_forestry drag_folder_with_mandeye_data_and_drop_here-precision_forestry.cpp ${SOURCES}
   )
 
-target_compile_definitions(drag_folder_with_mandeye_data_and_drop_here-precision_forestry PRIVATE
-    WITH_GUI=1
-    $<$<BOOL:${BUILD_WITH_UTL_PROFILER_DISABLED}>:BUILD_WITH_UTL_PROFILER_DISABLED>)
+target_compile_definitions(drag_folder_with_mandeye_data_and_drop_here-precision_forestry PRIVATE WITH_GUI=1)
+target_apply_hdmapping_profiler(drag_folder_with_mandeye_data_and_drop_here-precision_forestry)
 
 target_include_directories(
   drag_folder_with_mandeye_data_and_drop_here-precision_forestry

@@ -1,5 +1,5 @@
+#include "hdmapping_profiler.hpp"
 #include "lidar_odometry_utils.h"
-#include <UTL/profiler.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 #include <tbb/combinable.h>
@@ -1807,8 +1807,8 @@ void optimize_lidar_odometry(
     const double& convergence_result,
     const double& convergence_delta_threshold_outer_rgd)
 {
-    UTL_PROFILER_SCOPE("optimize_lidar_odometry");
-    UTL_PROFILER_BEGIN(pre_hessian, "pre_hessian");
+    HDMAP_ZONE_SCOPE("optimize_lidar_odometry");
+    HDMAP_ZONE_BEGIN(pre_hessian, "pre_hessian");
     double sigma_motion_model_om = lidar_odometry_motion_model_om_1_sigma_deg * DEG_TO_RAD;
     double sigma_motion_model_fi = lidar_odometry_motion_model_fi_1_sigma_deg * DEG_TO_RAD;
     double sigma_motion_model_ka = lidar_odometry_motion_model_ka_1_sigma_deg * DEG_TO_RAD;
@@ -1840,9 +1840,9 @@ void optimize_lidar_odometry(
     for (const auto& pose : intermediate_trajectory)
         tait_bryan_poses.emplace_back(pose_tait_bryan_from_affine_matrix(pose));
 
-    UTL_PROFILER_END(pre_hessian);
+    HDMAP_ZONE_END(pre_hessian);
 
-    UTL_PROFILER_BEGIN(hessian_compute, "hessian_compute");
+    HDMAP_ZONE_BEGIN(hessian_compute, "hessian_compute");
     const size_t num_points = intermediate_points.size();
     const size_t num_poses = intermediate_trajectory.size();
     using Mat6x6 = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>;
@@ -1853,7 +1853,7 @@ void optimize_lidar_odometry(
     const size_t chunk_size = (num_points + num_chunks - 1) / num_chunks;
 
     // Per-chunk per-pose accumulators: chunk_AtPA[chunk][pose]
-    UTL_PROFILER_BEGIN(hessian_alloc, "hessian_alloc");
+    HDMAP_ZONE_BEGIN(hessian_alloc, "hessian_alloc");
     static std::vector<std::vector<Mat6x6>> chunk_AtPA;
     static std::vector<std::vector<Vec6x1>> chunk_AtPB;
     chunk_AtPA.resize(num_chunks);
@@ -1864,7 +1864,7 @@ void optimize_lidar_odometry(
         chunk_AtPB[c].resize(num_poses);
     }
     tbb::combinable<LookupStats> thread_local_stats;
-    UTL_PROFILER_END(hessian_alloc);
+    HDMAP_ZONE_END(hessian_alloc);
 
     // Each chunk processes a fixed range of points and accumulates into its own
     // per-pose matrices. Fixed chunk boundaries guarantee identical accumulation
@@ -1913,7 +1913,7 @@ void optimize_lidar_odometry(
             process_chunk(c);
 
     // Reduce chunk accumulators in fixed order
-    UTL_PROFILER_BEGIN(hessian_sum, "hessian_sum");
+    HDMAP_ZONE_BEGIN(hessian_sum, "hessian_sum");
     for (size_t chunk = 0; chunk < num_chunks; ++chunk)
     {
         for (size_t p = 0; p < num_poses; ++p)
@@ -1923,7 +1923,7 @@ void optimize_lidar_odometry(
             AtPBndt.block<6, 1>(c, 0) -= chunk_AtPB[chunk][p];
         }
     }
-    UTL_PROFILER_END(hessian_sum);
+    HDMAP_ZONE_END(hessian_sum);
 
     thread_local_stats.combine_each(
         [&](const LookupStats& s)
@@ -1931,9 +1931,9 @@ void optimize_lidar_odometry(
             lookup_stats.indoor_lookups += s.indoor_lookups;
             lookup_stats.outdoor_lookups += s.outdoor_lookups;
         });
-    UTL_PROFILER_END(hessian_compute);
+    HDMAP_ZONE_END(hessian_compute);
 
-    UTL_PROFILER_BEGIN(post_hessian, "post_hessian");
+    HDMAP_ZONE_BEGIN(post_hessian, "post_hessian");
     std::vector<std::pair<int, int>> odo_edges;
     for (size_t i = 1; i < intermediate_trajectory.size(); i++)
         odo_edges.emplace_back(i - 1, i);
@@ -2154,7 +2154,7 @@ void optimize_lidar_odometry(
         for (int i = 0; i < h_x.size(); i++)
             delta += sqrt(h_x[i] * h_x[i]);
     }
-    UTL_PROFILER_END(post_hessian);
+    HDMAP_ZONE_END(post_hessian);
     return;
 }
 
@@ -2284,12 +2284,12 @@ bool initialize_lidar_odometry(
     bool debugMsg,
     LookupStats& lookup_stats)
 {
-    UTL_PROFILER_SCOPE("initialize_lidar_odometry");
+    HDMAP_ZONE_SCOPE("initialize_lidar_odometry");
 
     bool debug = false;
     bool debug2 = true;
 
-    UTL_PROFILER_SCOPE("compute_step_2");
+    HDMAP_ZONE_SCOPE("compute_step_2");
 
     if (worker_data.size() != 0)
     {
@@ -2362,7 +2362,7 @@ bool process_worker_step_1(
     std::atomic<float>& loProgress,
     double& ts_failure)
 {
-    UTL_PROFILER_SCOPE("process_worker_step_1");
+    HDMAP_ZONE_SCOPE("process_worker_step_1");
 
     {
         static int last_logged_method = -2;
@@ -2523,7 +2523,7 @@ bool process_worker_step_2(
     double& ts_failure,
     std::vector<Point3Di>& intermediate_points)
 {
-    UTL_PROFILER_SCOPE("process_worker_step_2");
+    HDMAP_ZONE_SCOPE("process_worker_step_2");
 
     bool add_pitch_roll_constraint = false;
 
@@ -2678,7 +2678,7 @@ bool process_worker_step_lidar_odometry_core(
 {
     spdlog::stopwatch stopwatch_realtime;
 
-    UTL_PROFILER_SCOPE("process_worker_step_lidar_odometry_core");
+    HDMAP_ZONE_SCOPE("process_worker_step_lidar_odometry_core");
 
     for (int iter = 0; iter < params.nr_iter; iter++)
     {
@@ -2852,7 +2852,7 @@ bool compute_step_2(
     bool debug = false;
     bool debug2 = true;
 
-    UTL_PROFILER_SCOPE("compute_step_2");
+    HDMAP_ZONE_SCOPE("compute_step_2");
 
     spdlog::stopwatch stopwatch_total;
     double acc_distance = 0.0;
@@ -2865,7 +2865,7 @@ bool compute_step_2(
     {
         for (int i = 0; i < worker_data.size(); i++)
         {
-            UTL_PROFILER_BEGIN(before_iter, "before_iterations");
+            HDMAP_ZONE_BEGIN(before_iter, "before_iterations");
 
             std::vector<Point3Di> intermediate_points;
             // = worker_data[i].load_points(worker_data[i].intermediate_points_cache_file_name);
@@ -2924,7 +2924,7 @@ bool compute_step_2(
             double delta = 100000.0;
             double lm_factor = 1.0;
 
-            UTL_PROFILER_END(before_iter);
+            HDMAP_ZONE_END(before_iter);
 
             process_worker_step_lidar_odometry_core(
                 worker_data[i],
@@ -2947,7 +2947,7 @@ bool compute_step_2(
                 delta,
                 lm_factor);
 
-            UTL_PROFILER_BEGIN(after_iter, "after_iterations");
+            HDMAP_ZONE_BEGIN(after_iter, "after_iterations");
             const double elapsed_seconds1 = stopwatch_worker.elapsed().count();
 
             total_iterations += iter_end + 1;
@@ -2978,7 +2978,7 @@ bool compute_step_2(
             loProgress.store((float)(i + 1) / worker_data.size());
 
             // temp save
-            UTL_PROFILER_BEGIN(temp_save, "temp_save_laz");
+            HDMAP_ZONE_BEGIN(temp_save, "temp_save_laz");
             if (i % 100 == 0)
             {
                 std::vector<Eigen::Vector3d> global_pointcloud;
@@ -2997,7 +2997,7 @@ bool compute_step_2(
                 std::string fn = params.working_directory_preview + "/temp_point_cloud_" + std::to_string(i) + ".laz";
                 exportLaz(fn.c_str(), global_pointcloud, intensity, timestamps);
             }
-            UTL_PROFILER_END(temp_save);
+            HDMAP_ZONE_END(temp_save);
 
             auto acc_distance_tmp = acc_distance;
             acc_distance += ((worker_data[i].intermediate_trajectory[0].inverse()) *
@@ -3014,11 +3014,11 @@ bool compute_step_2(
                 ts_failure = worker_data[i].intermediate_trajectory_timestamps[0].first;
                 spdlog::warn(
                     "calculations canceled for TIMESTAMP: {}", (int64_t)worker_data[i].intermediate_trajectory_timestamps[0].first);
-                UTL_PROFILER_END(after_iter);
+                HDMAP_ZONE_END(after_iter);
                 return false;
             }
 
-            UTL_PROFILER_BEGIN(propagate_traj, "propagate_trajectory");
+            HDMAP_ZONE_BEGIN(propagate_traj, "propagate_trajectory");
             for (int j = i + 1; j < worker_data.size(); j++)
             {
                 Eigen::Affine3d m_last = worker_data[j - 1].intermediate_trajectory[worker_data[j - 1].intermediate_trajectory.size() - 1];
@@ -3033,23 +3033,23 @@ bool compute_step_2(
                     worker_data[j].intermediate_trajectory[k] = m_last;
                 }
             }
-            UTL_PROFILER_END(propagate_traj);
+            HDMAP_ZONE_END(propagate_traj);
 
-            UTL_PROFILER_BEGIN(transform_pts, "transform_points_global");
+            HDMAP_ZONE_BEGIN(transform_pts, "transform_points_global");
             for (int j = 0; j < intermediate_points.size(); j++)
             {
                 Point3Di pp = intermediate_points[j];
                 pp.point = worker_data[i].intermediate_trajectory[intermediate_points[j].index_pose] * pp.point;
                 points_global.push_back(pp);
             }
-            UTL_PROFILER_END(transform_pts);
+            HDMAP_ZONE_END(transform_pts);
 
             // if(reference_points.size() == 0){
-            UTL_PROFILER_BEGIN(update_rgd_after, "update_rgd");
+            HDMAP_ZONE_BEGIN(update_rgd_after, "update_rgd");
 
             process_worker_step_update_rgd_after(acc_distance, params, points_global, worker_data[i], lookup_stats, intermediate_points);
 
-            UTL_PROFILER_END(update_rgd_after);
+            HDMAP_ZONE_END(update_rgd_after);
 
             if (i > 1)
             {
@@ -3058,7 +3058,7 @@ bool compute_step_2(
                                          .norm();
                 params.consecutive_distance += translation;
             }
-            UTL_PROFILER_END(after_iter);
+            HDMAP_ZONE_END(after_iter);
         }
 
         for (int i = 0; i < worker_data.size(); i++)

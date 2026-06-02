@@ -3763,41 +3763,32 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
 
                         if (i >= sessions.size())
                         {
-                            std::cerr << "No loaded session for: "
-                                    << session_path << std::endl;
+                            std::cerr << "No loaded session for: " << session_path << std::endl;
                             continue;
                         }
 
                         Session& session = sessions[i];
 
-                        std::filesystem::path session_dir =
-                            std::filesystem::path(session_path).parent_path();
+                        std::filesystem::path session_dir = std::filesystem::path(session_path).parent_path();
 
-                        std::filesystem::path base_dir =
-                            session_dir.parent_path();
+                        std::filesystem::path base_dir = session_dir.parent_path();
 
-                        std::filesystem::path output_dir =
-                            base_dir / "all_tum_files";
+                        std::filesystem::path output_dir = base_dir / "all_tum_files";
 
                         try
                         {
                             std::filesystem::create_directories(output_dir);
-                        }
-                        catch (const std::exception& e)
+                        } catch (const std::exception& e)
                         {
-                            std::cerr << "Failed to create export directory: "
-                                    << e.what() << std::endl;
+                            std::cerr << "Failed to create export directory: " << e.what() << std::endl;
                             continue;
                         }
 
-                        std::string folder_name =
-                            session_dir.filename().string();
+                        std::string folder_name = session_dir.filename().string();
 
-                        std::filesystem::path txt_path =
-                            output_dir / (folder_name + "_trajectory_tum.txt");
+                        std::filesystem::path txt_path = output_dir / (folder_name + "_trajectory_tum.txt");
 
-                        std::cout << "Saving trajectory to TUM TXT: "
-                                << txt_path << std::endl;
+                        std::cout << "Saving trajectory to TUM TXT: " << txt_path << std::endl;
 
                         try
                         {
@@ -3805,8 +3796,7 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
 
                             if (!outfile.is_open())
                             {
-                                std::cerr << "Failed to create file: "
-                                        << txt_path << std::endl;
+                                std::cerr << "Failed to create file: " << txt_path << std::endl;
                                 continue;
                             }
 
@@ -3823,40 +3813,23 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
 
                                     Eigen::Quaterniond q(pose.rotation());
 
-                                    double t_s =
-                                        static_cast<double>(traj.timestamps.first) / 1e9;
+                                    double t_s = static_cast<double>(traj.timestamps.first) / 1e9;
 
-                                    outfile << std::fixed
-                                            << std::setprecision(9)
-                                            << t_s << " "
-                                            << std::setprecision(10)
-                                            << pos.x() << " "
-                                            << pos.y() << " "
-                                            << pos.z() << " "
-                                            << q.x() << " "
-                                            << q.y() << " "
-                                            << q.z() << " "
-                                            << q.w()
+                                    outfile << std::fixed << std::setprecision(9) << t_s << " " << std::setprecision(10) << pos.x() << " "
+                                            << pos.y() << " " << pos.z() << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w()
                                             << "\n";
                                 }
                             }
 
                             outfile.close();
 
-                            std::cout << "Saved: "
-                                    << txt_path << std::endl;
-                        }
-                        catch (const std::exception& e)
+                            std::cout << "Saved: " << txt_path << std::endl;
+                        } catch (const std::exception& e)
                         {
-                            std::cerr << "Error creating "
-                                    << txt_path
-                                    << ": "
-                                    << e.what()
-                                    << std::endl;
+                            std::cerr << "Error creating " << txt_path << ": " << e.what() << std::endl;
                         }
                     }
-                    std::cout << "Finished saving all trajectories to single folder."
-                            << std::endl;
+                    std::cout << "Finished saving all trajectories to single folder." << std::endl;
                 }
 
                 ImGui::EndMenu();

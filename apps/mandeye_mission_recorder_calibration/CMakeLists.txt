@@ -38,8 +38,6 @@ target_include_directories(
   ${THIRDPARTY_DIRECTORY}/observation_equations/codes
   ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
 
-target_compile_definitions(mandeye_mission_recorder_calibration PRIVATE BUILD_WITH_UTL_PROFILER_DISABLED)
-
 target_link_libraries(
   mandeye_mission_recorder_calibration
   PRIVATE vqf

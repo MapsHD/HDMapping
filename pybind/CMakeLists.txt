@@ -35,8 +35,7 @@ endif()
 
 add_library(lidar_odometry_py MODULE lidar_odometry_binding.cpp)
 target_compile_definitions(lidar_odometry_py PRIVATE
-    WITH_GUI=0
-    $<$<BOOL:${BUILD_WITH_UTL_PROFILER_DISABLED}>:BUILD_WITH_UTL_PROFILER_DISABLED>)
+    WITH_GUI=0)
 if (MSVC)
     target_compile_options(lidar_odometry_py PRIVATE /bigobj)
 endif()

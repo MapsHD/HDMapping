@@ -26,7 +26,10 @@ set_property(CACHE HD_CPU_OPTIMIZATION PROPERTY STRINGS AUTO INTEL AMD ARM GENER
 option(BUILD_WITH_CLI_TOOLS "Build with command line tools" ON)
 option(BUILD_WITH_HD_MAPPER_APPLICATION "Build with hd_mapper tool" OFF)
 option(BUILD_WITH_QUICK_START_DEMO "Build with quick_start_demo" OFF)
-option(BUILD_WITH_UTL_PROFILER_DISABLED "Disable UTL profiler (zero overhead when ON)" ON)
+
+# Three-way profiler backend: NONE (zero overhead) | UTL (lightweight) | TRACY (full profiler)
+set(HDMAPPING_PROFILER "NONE" CACHE STRING "Profiler backend: NONE | UTL | TRACY")
+set_property(CACHE HDMAPPING_PROFILER PROPERTY STRINGS NONE UTL TRACY)
 option(BUILD_WITH_BUNDLED_FREEGLUT "Build with bundled FreeGlut" ON)
 option(BUILD_WITH_BUNDLED_GLEW "Build with bundled GLEW" ON)
 option(BUILD_WITH_BUNDLED_LIBLASZIP "Build with bundled Lib LASZIP" ON)
@@ -181,6 +184,24 @@ MESSAGE(STATUS "Using bundled spdlog from: ${THIRDPARTY_DIRECTORY}/spdlog")
 # Add UTL header-only utility library
 add_subdirectory(${THIRDPARTY_DIRECTORY}/UTL)
 MESSAGE(STATUS "Using bundled UTL from: ${THIRDPARTY_DIRECTORY}/UTL")
+
+# ---- Profiler backend ----
+if(HDMAPPING_PROFILER STREQUAL "TRACY")
+    include(FetchContent)
+    FetchContent_Declare(tracy
+        GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+        GIT_TAG        v0.13.1
+        GIT_SHALLOW    TRUE
+    )
+    set(TRACY_ENABLE    ON CACHE BOOL "" FORCE)
+    set(TRACY_ON_DEMAND ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(tracy)
+    message(STATUS "HDMapping profiler: Tracy v0.13.1 (on-demand)")
+elseif(HDMAPPING_PROFILER STREQUAL "UTL")
+    message(STATUS "HDMapping profiler: UTL")
+else()
+    message(STATUS "HDMapping profiler: NONE (disabled)")
+endif()
 
 if(BUILD_WITH_PYBIND)
     message(STATUS "BUILD_WITH_PYBIND is enabled: fetching pybind.")

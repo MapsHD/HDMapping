@@ -16,9 +16,15 @@ namespace mandeye::fd
         "Image files (*.bmp, *.jpg, *.jpeg, *.png)", "*.bmp *.jpg *.jpeg *.png", "All files", "*"
     };
 
-    const std::vector<std::string> Calibration_filter = { "Mandeye JSON Calibration (*.mjc)", "*.mjc", "Generic JSON (*.json)", "*.json", "All files", "*" };
-    const std::vector<std::string> Session_filter = { "Mandeye JSON Session (*.mjs)", "*.mjs", "Generic JSON (*.json)", "*.json", "All files", "*" };
-    const std::vector<std::string> Project_filter = { "Mandeye JSON Project (*.mjp)", "*.mjp", "Generic JSON (*.json)", "*.json", "All files", "*" };
+    const std::vector<std::string> Calibration_filter = {
+        "Mandeye JSON Calibration (*.mjc)", "*.mjc", "Generic JSON (*.json)", "*.json", "All files", "*"
+    };
+    const std::vector<std::string> Session_filter = {
+        "Mandeye JSON Session (*.mjs)", "*.mjs", "Generic JSON (*.json)", "*.json", "All files", "*"
+    };
+    const std::vector<std::string> Project_filter = {
+        "Mandeye JSON Project (*.mjp)", "*.mjp", "Generic JSON (*.json)", "*.json", "All files", "*"
+    };
 
     const std::vector<std::string> IniPoses_filter = {
         "Mandeye REG Initial poses (*.mri)", "*.mri", "Generic REG initial poses (*.reg)", "*.reg"

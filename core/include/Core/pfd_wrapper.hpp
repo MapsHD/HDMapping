@@ -16,16 +16,16 @@ namespace mandeye::fd
         "Image files (*.bmp, *.jpg, *.jpeg, *.png)", "*.bmp *.jpg *.jpeg *.png", "All files", "*"
     };
 
-    const std::vector<std::string> Calibration_filter = { "Mandeye JSON Calibration (*.mjc)", "*.mjc", "Generic JSON (*.json)", "*.json" };
-    const std::vector<std::string> Session_filter = { "Mandeye JSON Session (*.mjs)", "*.mjs", "Generic JSON (*.json)", "*.json" };
-    const std::vector<std::string> Project_filter = { "Mandeye JSON Project (*.mjp)", "*.mjp", "Generic JSON (*.json)", "*.json" };
+    const std::vector<std::string> Calibration_filter = { "Mandeye JSON Calibration (*.mjc)", "*.mjc", "Generic JSON (*.json)", "*.json", "All files", "*" };
+    const std::vector<std::string> Session_filter = { "Mandeye JSON Session (*.mjs)", "*.mjs", "Generic JSON (*.json)", "*.json", "All files", "*" };
+    const std::vector<std::string> Project_filter = { "Mandeye JSON Project (*.mjp)", "*.mjp", "Generic JSON (*.json)", "*.json", "All files", "*" };
 
     const std::vector<std::string> IniPoses_filter = {
         "Mandeye REG Initial poses (*.mri)", "*.mri", "Generic REG initial poses (*.reg)", "*.reg"
     };
     const std::vector<std::string> Poses_filter = { "Mandeye REG Poses (*.mrp)", "*.mrp", "Generic REG poses (*.reg)", "*.reg" };
 
-    const std::vector<std::string> Resso_filter = { "RESSO (*.reg)", "*.reg" };
+    const std::vector<std::string> Resso_filter = { "RESSO (*.reg)", "*.reg", "All files", "*" };
     const std::vector<std::string> Dxf_filter = { "DXF file (*.dxf)", "*.dxf" };
     const std::vector<std::string> Csv_filter = { "CSV file (*.csv)", "*.csv" };
     const std::vector<std::string> Toml_filter = { "TOML file (*.toml)", "*.toml", "All files", "*" };

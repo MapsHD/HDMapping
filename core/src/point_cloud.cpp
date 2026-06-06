@@ -140,8 +140,8 @@ bool PointCloud::load_pc(const std::string& input_file_name, bool load_cache_mod
 
     laszip_I64 npoints = (header->number_of_point_records ? header->number_of_point_records : header->extended_number_of_point_records);
 
-    std::cout << (is_compressed ? "" : "un") << "compressed file '" << (std::filesystem::path(input_file_name).filename().string())
-              << "' contains " << npoints << " points" << std::endl;
+    //std::cout << (is_compressed ? "" : "un") << "compressed file '" << (std::filesystem::path(input_file_name).filename().string())
+    //          << "' contains " << npoints << " points" << std::endl;
 
     laszip_I64 p_count = 0;
 
@@ -202,10 +202,10 @@ bool PointCloud::load_pc(const std::string& input_file_name, bool load_cache_mod
     // laszip_clean(laszip_reader);
     // laszip_destroy(laszip_reader);
 
-    std::cout << std::setprecision(20);
-    std::cout << "min_ts " << min_ts << std::endl;
-    std::cout << "max_ts " << max_ts << std::endl;
-    std::cout << "number_of_points_with_timestamp_eq_0: " << number_of_points_with_timestamp_eq_0 << std::endl;
+    //std::cout << std::setprecision(20);
+    //std::cout << "min_ts " << min_ts << std::endl;
+    //std::cout << "max_ts " << max_ts << std::endl;
+    //std::cout << "number_of_points_with_timestamp_eq_0: " << number_of_points_with_timestamp_eq_0 << std::endl;
     return true;
 }
 

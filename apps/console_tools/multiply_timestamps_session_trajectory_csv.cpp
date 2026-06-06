@@ -153,7 +153,7 @@ int main(int argc, char* argv[])
     }
     else
     {
-        std::cout << "trajectory path: '" << trj_path.string() << "' does not exist" << std::endl;
+        //std::cout << "trajectory path: '" << trj_path.string() << "' does not exist" << std::endl;
         return 2;
     }
 

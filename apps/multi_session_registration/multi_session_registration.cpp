@@ -181,6 +181,7 @@ namespace fs = std::filesystem;
 int num_edge_extended_before = 0;
 int num_edge_extended_after = 0;
 
+int gui_point_size = 2;
 ///////////////////////////////////////////////////////////////////////////////////
 
 void ndt_gui()
@@ -369,6 +370,10 @@ void loop_closure_gui()
 
         //
         auto point_cloud_upper = sessions[first_session_index].point_clouds_container.point_clouds.size() - 1;
+
+        ImGui::InputInt("gui_point_size", &gui_point_size);
+        if (gui_point_size < 1)
+            gui_point_size = 1;
 
         ImGui::Text("Num edge extended:");
 
@@ -625,101 +630,83 @@ void loop_closure_gui()
 
                                 if (icp.compute(source, target, search_radius, number_of_iterations, m_pose))
                                     edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
-
-                                /*PointClouds pcs;
-                                pcs.point_clouds.push_back(sessions[index_session_from].point_clouds_container.point_clouds[index_from]);
-                                pcs.point_clouds.push_back(sessions[index_session_to].point_clouds_container.point_clouds[index_to]);
-                                pcs.point_clouds[0].points_local = ground_truth;
-                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
-                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-
-                                ICP icp;
-                                icp.search_radius = (float)search_radius;
-
-                                for (auto &pc : pcs.point_clouds)
-                                {
-                                    pc.rgd_params.resolution_X = icp.search_radius;
-                                    pc.rgd_params.resolution_Y = icp.search_radius;
-                                    pc.rgd_params.resolution_Z = icp.search_radius;
-                                    pc.build_rgd();
-                                    pc.cout_rgd();
-                                    pc.compute_normal_vectors(0.5);
-                                }
-
-                                icp.number_of_threads = std::thread::hardware_concurrency();
-                                icp.number_of_iterations = 10;
-                                icp.is_adaptive_robust_kernel = false;
-
-                                icp.is_ballanced_horizontal_vs_vertical = false;
-                                icp.is_fix_first_node = true;
-                                icp.is_gauss_newton = true;
-                                icp.is_levenberg_marguardt = false;
-                                icp.is_cw = false;
-                                icp.is_wc = true;
-                                icp.is_tait_bryan_angles = true;
-                                icp.is_quaternion = false;
-                                icp.is_rodrigues = false;
-                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                                icp.optimization_point_to_point_source_to_target(pcs);
-
-                                edges[index_active_edge].relative_pose_tb =
-                                pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
-                                */
                             }
                             else
                             {
-                                /*PointClouds pcs;
-                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from]);
-                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to]);
-                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
-                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                                ICP icp;
-                                icp.search_radius = (float)search_radius;
-
-                                for (auto &pc : pcs.point_clouds)
-                                {
-                                    pc.rgd_params.resolution_X = icp.search_radius;
-                                    pc.rgd_params.resolution_Y = icp.search_radius;
-                                    pc.rgd_params.resolution_Z = icp.search_radius;
-                                    pc.build_rgd();
-                                    pc.cout_rgd();
-                                    pc.compute_normal_vectors(0.5);
-                                }
-
-                                icp.number_of_threads = std::thread::hardware_concurrency();
-                                icp.number_of_iterations = 10;
-                                icp.is_adaptive_robust_kernel = false;
-
-                                icp.is_ballanced_horizontal_vs_vertical = false;
-                                icp.is_fix_first_node = true;
-                                icp.is_gauss_newton = true;
-                                icp.is_levenberg_marguardt = false;
-                                icp.is_cw = false;
-                                icp.is_wc = true;
-                                icp.is_tait_bryan_angles = true;
-                                icp.is_quaternion = false;
-                                icp.is_rodrigues = false;
-                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                                icp.optimization_point_to_point_source_to_target(pcs);
-
-                                edges[index_active_edge].relative_pose_tb =
-                                pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
-                                */
                                 int number_of_iterations = 10;
                                 PairWiseICP icp;
                                 auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
-                                const std::vector<Eigen::Vector3d>& source =
-                                    sessions[edges[index_active_edge].index_session_to]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_to]
-                                        .points_local;
-                                const std::vector<Eigen::Vector3d>& target =
-                                    sessions[edges[index_active_edge].index_session_from]
-                                        .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
-                                        .points_local;
+                                std::vector<Eigen::Vector3d> source;
+                                auto& e = edges[index_active_edge];
+                                for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                                {
+                                    int index_src = e.index_to + i;
+                                    if (index_src >= 0 &&
+                                        index_src <
+                                            sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.size())
+                                    {
+                                        Eigen::Affine3d m_src = sessions[edges[index_active_edge].index_session_to]
+                                                                    .point_clouds_container.point_clouds.at(index_src)
+                                                                    .m_pose;
+                                        for (int k = 0; k < sessions[edges[index_active_edge].index_session_to]
+                                                                .point_clouds_container.point_clouds[index_src]
+                                                                .points_local.size();
+                                             k++)
+                                        {
+                                            Eigen::Vector3d p_g = m_src *
+                                                sessions[edges[index_active_edge].index_session_to]
+                                                    .point_clouds_container.point_clouds[index_src]
+                                                    .points_local[k];
+                                            source.push_back(p_g);
+                                        }
+                                        // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                                    }
+                                }
+                                std::vector<Eigen::Vector3d> target;
+
+                                for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                                {
+                                    int index_trg = e.index_from + i;
+                                    if (index_trg >= 0 &&
+                                        index_trg < sessions[edges[index_active_edge].index_session_from]
+                                                        .point_clouds_container.point_clouds.size())
+                                    {
+                                        Eigen::Affine3d m_trg = sessions[edges[index_active_edge].index_session_from]
+                                                                    .point_clouds_container.point_clouds.at(index_trg)
+                                                                    .m_pose;
+                                        for (int k = 0; k < sessions[edges[index_active_edge].index_session_from]
+                                                                .point_clouds_container.point_clouds[index_trg]
+                                                                .points_local.size();
+                                             k++)
+                                        {
+                                            Eigen::Vector3d p_g = m_trg *
+                                                sessions[edges[index_active_edge].index_session_from]
+                                                    .point_clouds_container.point_clouds[index_trg]
+                                                    .points_local[k];
+                                            target.push_back(p_g);
+                                        }
+                                        // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                                    }
+                                }
+
+                                Eigen::Affine3d m_src_inv = sessions[edges[index_active_edge].index_session_to]
+                                                                .point_clouds_container.point_clouds[e.index_to]
+                                                                .m_pose.inverse();
+
+                                for (auto& p : source)
+                                {
+                                    p = m_src_inv * p;
+                                }
+
+                                Eigen::Affine3d m_trg_inv = sessions[edges[index_active_edge].index_session_from]
+                                                                .point_clouds_container.point_clouds[e.index_from]
+                                                                .m_pose.inverse();
+
+                                for (auto& p : target)
+                                {
+                                    p = m_trg_inv * p;
+                                }
 
                                 if (icp.compute(source, target, search_radius, number_of_iterations, m_pose))
                                     edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
@@ -730,187 +717,6 @@ void loop_closure_gui()
                     ImGui::InputDouble("search_radius", &search_radius);
                     if (search_radius < 0.01)
                         search_radius = 0.01;
-
-                    /*if (ImGui::Button("ICP"))
-                    {
-                        std::cout << "Iterative Closest Point" << std::endl;
-                        if (sessions[edges[index_active_edge].index_session_from].is_ground_truth &&
-                            sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                        {
-                            std::cout << "Two sessions are ground truth!!! ICP is disabled" << std::endl;
-                        }
-                        else
-                        {
-                            bool is_with_ground_truth = false;
-                            if (sessions[edges[index_active_edge].index_session_from].is_ground_truth ||
-                                sessions[edges[index_active_edge].index_session_to].is_ground_truth)
-                            {
-                                is_with_ground_truth = true;
-                            }
-
-                            if (is_with_ground_truth)
-                            {
-                                int index_session_from = -1;
-                                int index_session_to = -1;
-                                int index_from = -1;
-                                int index_to = -1;
-
-                                if (sessions[edges[index_active_edge].index_session_from].is_ground_truth)
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_from;
-                                    index_session_to = edges[index_active_edge].index_session_to;
-                                    index_from = edges[index_active_edge].index_from;
-                                    index_to = edges[index_active_edge].index_to;
-                                }
-                                else
-                                {
-                                    index_session_from = edges[index_active_edge].index_session_to;
-                                    index_session_to = edges[index_active_edge].index_session_from;
-                                    index_from = edges[index_active_edge].index_to;
-                                    index_to = edges[index_active_edge].index_from;
-                                }
-
-                                double x_min = 1000000000000.0;
-                                double y_min = 1000000000000.0;
-                                double z_min = 1000000000000.0;
-                                double x_max = -1000000000000.0;
-                                double y_max = -1000000000000.0;
-                                double z_max = -1000000000000.0;
-
-                                auto &points_to = sessions[index_session_to].point_clouds_container.point_clouds[index_to];
-
-                                for (const auto &p : points_to.points_local)
-                                {
-                                    auto pg = points_to.m_pose * p;
-                                    if (pg.x() < x_min)
-                                    {
-                                        x_min = pg.x();
-                                    }
-                                    if (pg.y() < y_min)
-                                    {
-                                        y_min = pg.y();
-                                    }
-                                    if (pg.z() < z_min)
-                                    {
-                                        z_min = pg.z();
-                                    }
-                                    if (pg.x() > x_max)
-                                    {
-                                        x_max = pg.x();
-                                    }
-                                    if (pg.y() > y_max)
-                                    {
-                                        y_max = pg.y();
-                                    }
-                                    if (pg.z() > z_max)
-                                    {
-                                        z_max = pg.z();
-                                    }
-                                }
-                                auto &points_from = sessions[index_session_from].point_clouds_container.point_clouds[index_from];
-                                std::vector<Eigen::Vector3d> ground_truth;
-                                for (const auto &p : points_from.points_local)
-                                {
-                                    auto pg = points_from.m_pose * p;
-                                    if (pg.x() > x_min && pg.x() < x_max)
-                                    {
-                                        if (pg.y() > y_min && pg.y() < y_max)
-                                        {
-                                            if (pg.z() > z_min && pg.z() < z_max)
-                                            {
-                                                ground_truth.push_back(p);
-                                            }
-                                        }
-                                    }
-                                }
-
-                                PointClouds pcs;
-                                pcs.point_clouds.push_back(sessions[index_session_from].point_clouds_container.point_clouds[index_from]);
-                                pcs.point_clouds.push_back(sessions[index_session_to].point_clouds_container.point_clouds[index_to]);
-                                pcs.point_clouds[0].points_local = ground_truth;
-                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
-                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                                ICP icp;
-                                icp.search_radius = (float)search_radius;
-
-                                for (auto &pc : pcs.point_clouds)
-                                {
-                                    pc.rgd_params.resolution_X = icp.search_radius;
-                                    pc.rgd_params.resolution_Y = icp.search_radius;
-                                    pc.rgd_params.resolution_Z = icp.search_radius;
-                                    pc.build_rgd();
-                                    pc.cout_rgd();
-                                    pc.compute_normal_vectors(0.5);
-                                }
-
-                                icp.number_of_threads = std::thread::hardware_concurrency();
-                                icp.number_of_iterations = 10;
-                                icp.is_adaptive_robust_kernel = false;
-
-                                icp.is_ballanced_horizontal_vs_vertical = false;
-                                icp.is_fix_first_node = true;
-                                icp.is_gauss_newton = true;
-                                icp.is_levenberg_marguardt = false;
-                                icp.is_cw = false;
-                                icp.is_wc = true;
-                                icp.is_tait_bryan_angles = true;
-                                icp.is_quaternion = false;
-                                icp.is_rodrigues = false;
-                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                                icp.optimization_point_to_point_source_to_target(pcs);
-
-                                edges[index_active_edge].relative_pose_tb =
-                    pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
-                            }
-                            else
-                            {
-                                PointClouds pcs;
-                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[edges[index_active_edge].index_from]);
-                                pcs.point_clouds.push_back(sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[edges[index_active_edge].index_to]);
-                                pcs.point_clouds[0].m_pose = Eigen::Affine3d::Identity();
-                                pcs.point_clouds[1].m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-                                ICP icp;
-                                icp.search_radius = (float)search_radius;
-
-                                for (auto &pc : pcs.point_clouds)
-                                {
-                                    pc.rgd_params.resolution_X = icp.search_radius;
-                                    pc.rgd_params.resolution_Y = icp.search_radius;
-                                    pc.rgd_params.resolution_Z = icp.search_radius;
-                                    pc.build_rgd();
-                                    pc.cout_rgd();
-                                    pc.compute_normal_vectors(0.5);
-                                }
-
-                                icp.number_of_threads = std::thread::hardware_concurrency();
-                                icp.number_of_iterations = 10;
-                                icp.is_adaptive_robust_kernel = false;
-
-                                icp.is_ballanced_horizontal_vs_vertical = false;
-                                icp.is_fix_first_node = true;
-                                icp.is_gauss_newton = true;
-                                icp.is_levenberg_marguardt = false;
-                                icp.is_cw = false;
-                                icp.is_wc = true;
-                                icp.is_tait_bryan_angles = true;
-                                icp.is_quaternion = false;
-                                icp.is_rodrigues = false;
-                                std::cout << "optimization_point_to_point_source_to_target" << std::endl;
-
-                                icp.optimization_point_to_point_source_to_target(pcs);
-
-                                edges[index_active_edge].relative_pose_tb =
-                    pose_tait_bryan_from_affine_matrix(pcs.point_clouds[0].m_pose.inverse() * pcs.point_clouds[1].m_pose);
-                            }
-                        }
-                    }
-                    ImGui::SameLine();
-                    ImGui::InputDouble("search_radius", &search_radius);
-                    if (search_radius < 0.01)
-                    {
-                        search_radius = 0.01;
-                    }*/
 
                     /////////////////////////////////
                     if (ImGui::Button("ICP [search radius 2m]"))
@@ -2556,6 +2362,14 @@ void display()
 
     viewLocal = Eigen::Affine3f::Identity();
 
+    for (auto& s : sessions)
+    {
+        for (auto& pc : s.point_clouds_container.point_clouds)
+        {
+            pc.point_size = gui_point_size;
+        }
+    }
+
     if (!is_ortho)
     {
         reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
@@ -2667,7 +2481,63 @@ void display()
                     viewer_reduce_rendered_trajectory,
                     sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_trg).render_color);*/
 
-                // int index_src = edges[index_active_edge].index_from;
+                int index_src = edges[index_active_edge].index_from;
+                int index_trg = edges[index_active_edge].index_to;
+
+                Eigen::Affine3d _m_src =
+                    sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
+                Eigen::Affine3d _m_trg = _m_src * affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                Eigen::Affine3d m_src_0 =
+                    sessions[first_session_index].point_clouds_container.point_clouds.at(index_loop_closure_source).m_pose; // Todo
+
+                for (int i = index_loop_closure_source - num_edge_extended_before; i <= index_loop_closure_source + num_edge_extended_after;
+                     i++)
+                {
+                    if (i >= 0 && i < sessions[first_session_index].point_clouds_container.point_clouds.size() &&
+                        sessions[first_session_index].point_clouds_container.point_clouds.size() > 0)
+                    {
+                        // ObservationPicking observation_picking;
+                        // point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, 1, false, false, false, 10000,
+                        // false);
+
+                        Eigen::Affine3d m_src_curr = sessions[first_session_index].point_clouds_container.point_clouds.at(i).m_pose; // Todo
+                        Eigen::Affine3d m_src = _m_src * (m_src_0.inverse() * m_src_curr);
+
+                        // sessions[first_session_index].point_clouds_container.point_clouds.at(i).point_size = gui_point_size;
+
+                        sessions[first_session_index].point_clouds_container.point_clouds.at(i).render(
+                            m_src,
+                            viewer_decimate_point_cloud,
+                            viewer_reduce_rendered_trajectory,
+                            sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(i).render_color);
+                    }
+                }
+
+                Eigen::Affine3d m_trg_0 =
+                    sessions[second_session_index].point_clouds_container.point_clouds.at(index_loop_closure_target).m_pose; // Todo
+
+                for (int i = index_loop_closure_target - num_edge_extended_before; i <= index_loop_closure_target + num_edge_extended_after;
+                     i++)
+                {
+                    if (i >= 0 && i < sessions[second_session_index].point_clouds_container.point_clouds.size() &&
+                        sessions[second_session_index].point_clouds_container.point_clouds.size() > 0)
+                    {
+                        // ObservationPicking observation_picking;
+                        // point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, 1, false, false, false, 10000,
+                        // false);
+                        Eigen::Affine3d m_trg_curr =
+                            sessions[second_session_index].point_clouds_container.point_clouds.at(i).m_pose; // Todo
+                        Eigen::Affine3d m_trg = _m_trg * (m_trg_0.inverse() * m_trg_curr);
+
+                        // sessions[second_session_index].point_clouds_container.point_clouds.at(i).point_size = gui_point_size;
+                        sessions[second_session_index].point_clouds_container.point_clouds.at(i).render(
+                            m_trg,
+                            viewer_decimate_point_cloud,
+                            viewer_reduce_rendered_trajectory,
+                            sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(i).render_color);
+                    }
+                }
             }
         }
         else

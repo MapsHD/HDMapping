@@ -65,7 +65,7 @@ bool Session::load(const std::string& file_name, bool is_decimate, double bucket
         out_folder_name = getNewPath(project_settings_json.value("out_folder_name", ""));
         poses_file_name = getNewPath(project_settings_json.value("poses_file_name", ""));
         initial_poses_file_name = getNewPath(project_settings_json.value("initial_poses_file_name", ""));
-        //std::cout << "!!" << initial_poses_file_name << std::endl;
+        // std::cout << "!!" << initial_poses_file_name << std::endl;
         out_poses_file_name = getNewPath(project_settings_json.value("out_poses_file_name", ""));
 
         is_ground_truth = project_settings_json.value("ground_truth", false);

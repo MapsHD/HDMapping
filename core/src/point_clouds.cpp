@@ -1130,8 +1130,8 @@ bool PointClouds::load_whu_tls(
 
     for (size_t i = 0; i < input_file_names.size(); i++)
     {
-        //std::cout << "Loading " << i + 1 << "/" << input_file_names.size() << ": data ("
-        //          << (std::filesystem::path(input_file_names[i]).filename().string()) << "), ";
+        // std::cout << "Loading " << i + 1 << "/" << input_file_names.size() << ": data ("
+        //           << (std::filesystem::path(input_file_names[i]).filename().string()) << "), ";
 
         auto& pc = point_clouds_nodata[i]; // reference directly to vector slot
 
@@ -1162,7 +1162,7 @@ bool PointClouds::load_whu_tls(
 
         trj_path /= trj_fn;
 
-        //std::cout << "trajectory (" << (std::filesystem::path(trj_path).filename().string()) << ")";
+        // std::cout << "trajectory (" << (std::filesystem::path(trj_path).filename().string()) << ")";
 
         if (std::filesystem::exists(trj_path))
         {
@@ -1171,7 +1171,7 @@ bool PointClouds::load_whu_tls(
             std::ifstream infile(trj_path.string());
             if (!infile.good())
             {
-                //std::cout << "problem with file: '" << trj_path.string() << "'" << std::endl;
+                // std::cout << "problem with file: '" << trj_path.string() << "'" << std::endl;
                 return false;
             }
 
@@ -1254,13 +1254,14 @@ bool PointClouds::load_whu_tls(
                 }
             }
 
-            //std::cout << ", " << local_trajectory.size() << " local nodes" << std::endl;
+            // std::cout << ", " << local_trajectory.size() << " local nodes" << std::endl;
             infile.close();
 
             pc.local_trajectory = local_trajectory;
         }
-        else{
-            //std::cerr << "trajectory path: '" << trj_path.string() << "' does not exist" << std::endl;
+        else
+        {
+            // std::cerr << "trajectory path: '" << trj_path.string() << "' does not exist" << std::endl;
         }
     }
 
@@ -1286,8 +1287,8 @@ bool PointClouds::load_whu_tls(
                         pc.decimate(bucket_x, bucket_y, bucket_z);
                         size_t sum_points_after_decimation = pc.points_local.size();
 
-                        //std::cout << "downsampling finished, sum_points before/after: " << sum_points_before_decimation << " / "
-                         //        << sum_points_after_decimation << std::endl;
+                        // std::cout << "downsampling finished, sum_points before/after: " << sum_points_before_decimation << " / "
+                        //         << sum_points_after_decimation << std::endl;
                     }
                 }
             }
@@ -1321,12 +1322,12 @@ bool PointClouds::load_whu_tls(
     size_t total_points = 0;
     for (int i = 0; i < point_clouds.size(); i++)
         total_points += point_clouds[i].points_local.size();
-    //std::cout << "total points loaded: " << total_points << std::endl;
+    // std::cout << "total points loaded: " << total_points << std::endl;
 
     print_point_cloud_dimension();
     const auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
-    //std::cout << "Load time: " << std::fixed << std::setprecision(1) << elapsed_seconds.count() << " [s]" << std::endl;
+    // std::cout << "Load time: " << std::fixed << std::setprecision(1) << elapsed_seconds.count() << " [s]" << std::endl;
     return true;
 }
 

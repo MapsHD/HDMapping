@@ -150,6 +150,8 @@ bool is_loop_closure_gui = false;
 bool remove_gui = false;
 NDT ndt;
 
+bool update_rotation_center = false;
+
 bool is_settings_gui = true;
 
 int number_visible_sessions = 0;
@@ -175,6 +177,9 @@ std::vector<Session> sessions;
 
 int viewer_reduce_rendered_trajectory = 1;
 namespace fs = std::filesystem;
+
+int num_edge_extended_before = 0;
+int num_edge_extended_after = 0;
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -360,6 +365,47 @@ void loop_closure_gui()
 {
     if (ImGui::Begin("Manual Pose Graph Loop Closure Mode", &is_loop_closure_gui, ImGuiWindowFlags_AlwaysAutoResize))
     {
+        ImGui::Checkbox("update_rotation_center", &update_rotation_center);
+
+        //
+        auto point_cloud_upper = sessions[first_session_index].point_clouds_container.point_clouds.size() - 1;
+
+        ImGui::Text("Num edge extended:");
+
+        ImGui::Text("before: ");
+        ImGui::SameLine();
+        ImGui::PushItemWidth(ImGuiNumberWidth);
+        ImGui::SliderInt("##fs", &num_edge_extended_before, 0, point_cloud_upper);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("min 0; max %zu", point_cloud_upper);
+        ImGui::SameLine();
+        ImGui::InputInt("##fi", &num_edge_extended_before, 1, 5);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("min 0; max %zu", point_cloud_upper);
+        if (num_edge_extended_before < 0)
+            num_edge_extended_before = 0;
+        if (num_edge_extended_before >= point_cloud_upper)
+            num_edge_extended_before = point_cloud_upper;
+
+        point_cloud_upper = sessions[second_session_index].point_clouds_container.point_clouds.size() - 1;
+
+        ImGui::Text(" after: ");
+        ImGui::SameLine();
+
+        ImGui::SliderInt("##ts", &num_edge_extended_after, index_loop_closure_target, static_cast<int>(point_cloud_upper));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("min 0; max %zu", point_cloud_upper);
+        ImGui::SameLine();
+        ImGui::InputInt("##ti", &num_edge_extended_after, 1, 5);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("min 0; max %zu", point_cloud_upper);
+        if (num_edge_extended_after < 0)
+            num_edge_extended_after = 0;
+        if (num_edge_extended_after >= point_cloud_upper)
+            num_edge_extended_after = point_cloud_upper;
+        ImGui::PopItemWidth();
+        //
+
         if (!manipulate_active_edge)
         {
             ImGui::InputInt("index_loop_closure_source", &index_loop_closure_source);
@@ -2527,12 +2573,21 @@ void display()
 
             if (first_session_index < sessions[first_session_index].point_clouds_container.point_clouds.size())
             {
-                rotation_center.x() =
-                    sessions[first_session_index].point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().x();
-                rotation_center.y() =
-                    sessions[first_session_index].point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().y();
-                rotation_center.z() =
-                    sessions[first_session_index].point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().z();
+                if (update_rotation_center)
+                {
+                    rotation_center.x() = sessions[first_session_index]
+                                              .point_clouds_container.point_clouds[index_loop_closure_source]
+                                              .m_pose.translation()
+                                              .x();
+                    rotation_center.y() = sessions[first_session_index]
+                                              .point_clouds_container.point_clouds[index_loop_closure_source]
+                                              .m_pose.translation()
+                                              .y();
+                    rotation_center.z() = sessions[first_session_index]
+                                              .point_clouds_container.point_clouds[index_loop_closure_source]
+                                              .m_pose.translation()
+                                              .z();
+                }
             }
 
             if (manipulate_active_edge)
@@ -2543,9 +2598,12 @@ void display()
                     Eigen::Affine3d m_src =
                         sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_src).m_pose;
 
-                    rotation_center.x() = m_src(0, 3);
-                    rotation_center.y() = m_src(1, 3);
-                    rotation_center.z() = m_src(2, 3);
+                    if (update_rotation_center)
+                    {
+                        rotation_center.x() = m_src(0, 3);
+                        rotation_center.y() = m_src(1, 3);
+                        rotation_center.z() = m_src(2, 3);
+                    }
                 }
             }
 
@@ -2591,7 +2649,7 @@ void display()
         {
             if (edges.size() > 0)
             {
-                int index_src = edges[index_active_edge].index_from;
+                /*int index_src = edges[index_active_edge].index_from;
                 int index_trg = edges[index_active_edge].index_to;
 
                 Eigen::Affine3d m_src =
@@ -2607,13 +2665,16 @@ void display()
                     m_trg,
                     viewer_decimate_point_cloud,
                     viewer_reduce_rendered_trajectory,
-                    sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_trg).render_color);
+                    sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_trg).render_color);*/
+
+                // int index_src = edges[index_active_edge].index_from;
             }
         }
         else
         {
             ObservationPicking observation_picking;
-            sessions[first_session_index]
+
+            /*sessions[first_session_index]
                 .point_clouds_container.point_clouds.at(index_loop_closure_source)
                 .render(
                     false,
@@ -2624,8 +2685,33 @@ void display()
                     false,
                     false,
                     100000,
-                    false);
-            sessions[second_session_index]
+                    false);*/
+
+            for (int i = index_loop_closure_source - num_edge_extended_before; i <= index_loop_closure_source + num_edge_extended_after;
+                 i++)
+            {
+                if (i >= 0 && i < sessions[first_session_index].point_clouds_container.point_clouds.size() &&
+                    sessions[first_session_index].point_clouds_container.point_clouds.size() > 0)
+                {
+                    // ObservationPicking observation_picking;
+                    // point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, 1, false, false, false, 10000,
+                    // false);
+                    Eigen::Affine3d m_src = sessions[first_session_index].point_clouds_container.point_clouds.at(i).m_pose;
+
+                    sessions[first_session_index].point_clouds_container.point_clouds.at(i).render(
+                        false,
+                        observation_picking,
+                        viewer_decimate_point_cloud,
+                        viewer_reduce_rendered_trajectory,
+                        false,
+                        false,
+                        false,
+                        100000,
+                        false);
+                }
+            }
+
+            /*sessions[second_session_index]
                 .point_clouds_container.point_clouds.at(index_loop_closure_target)
                 .render(
                     false,
@@ -2636,7 +2722,31 @@ void display()
                     false,
                     false,
                     100000,
-                    false);
+                    false);*/
+
+            for (int i = index_loop_closure_target - num_edge_extended_before; i <= index_loop_closure_target + num_edge_extended_after;
+                 i++)
+            {
+                if (i >= 0 && i < sessions[second_session_index].point_clouds_container.point_clouds.size() &&
+                    sessions[second_session_index].point_clouds_container.point_clouds.size() > 0)
+                {
+                    // ObservationPicking observation_picking;
+                    // point_clouds_container.point_clouds.at(i).render(false, observation_picking, 1, 1, false, false, false, 10000,
+                    // false);
+                    Eigen::Affine3d m_src = sessions[second_session_index].point_clouds_container.point_clouds.at(i).m_pose;
+
+                    sessions[second_session_index].point_clouds_container.point_clouds.at(i).render(
+                        false,
+                        observation_picking,
+                        viewer_decimate_point_cloud,
+                        viewer_reduce_rendered_trajectory,
+                        false,
+                        false,
+                        false,
+                        100000,
+                        false);
+                }
+            }
         }
 
         // sessions[first_session_index].point_clouds_container.render();
@@ -4109,7 +4219,7 @@ void mouse(int glut_button, int state, int x, int y)
             !manipulate_active_edge)
         {
             // if (s_loop_closure_gui)
-            if ((sessions.size() > 0) && (number_visible_sessions > 0))
+            if ((sessions.size() > 0) && (number_visible_sessions > 0) && update_rotation_center)
             {
                 getClosestTrajectoriesPoint(
                     sessions,
@@ -4125,7 +4235,10 @@ void mouse(int glut_button, int state, int x, int y)
             }
             else
             {
-                setNewRotationCenter(x, y);
+                if (update_rotation_center)
+                {
+                    setNewRotationCenter(x, y);
+                }
             }
         }
 

@@ -68,7 +68,7 @@ public:
             return false;
         }
 
-        //fprintf(stderr, "writing %scompressed file '%s'\n", (compress ? "" : "un"), filename.c_str());
+        // fprintf(stderr, "writing %scompressed file '%s'\n", (compress ? "" : "un"), filename.c_str());
 
         if (laszip_get_point_pointer(writer_, &point_))
         {

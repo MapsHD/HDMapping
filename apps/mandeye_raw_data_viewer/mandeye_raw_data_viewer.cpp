@@ -118,7 +118,7 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> mean_cov;
 bool show_mean_cov = false;
 bool show_rgd_nn = false;
 bool show_imu_data = false;
-bool show_cameras_data = false;
+bool show_cameras_data = true;
 bool is_settings_gui = false;
 
 namespace photos
@@ -1168,14 +1168,19 @@ void openFolder()
 
     spdlog::info("Selected folder: '{}'", input_folder_name);
 
-    if (fs::exists(input_folder_name))
+    const std::vector<std::filesystem::path> subDirs{ "", "CAMERA_0" };
+    for (const auto& subdir : subDirs)
     {
-        for (const auto& entry : fs::directory_iterator(input_folder_name))
-            if (entry.is_regular_file())
-                input_file_names.push_back(entry.path().string());
-
-        loadFiles(input_file_names);
+        const auto location = std::filesystem::path(input_folder_name) / subdir;
+        if (fs::exists(location))
+        {
+            for (const auto& entry : fs::directory_iterator(location))
+                if (entry.is_regular_file())
+                    input_file_names.push_back(entry.path().string());
+        }
     }
+
+    loadFiles(input_file_names);
 }
 
 void openFiles()

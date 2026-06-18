@@ -18,8 +18,12 @@ set(IMGUI_HEADER_FILES
     ${IMGUI_LIBRARY_BACKEND_DIRECTORY}/imgui_impl_opengl2.h)
 
 set(IMGUI_FILES ${IMGUI_SOURCE_FILES} ${IMGUI_HEADER_FILES})
-add_definitions(-DImDrawIdx=unsigned\ int)
-add_library(imgui STATIC ${IMGUI_FILES})
+
+add_library(imgui STATIC)
+target_sources(imgui PRIVATE ${IMGUI_FILES})
 target_include_directories(
     imgui PRIVATE ${IMGUI_LIBRARY_DIRECTORY} ${IMGUI_LIBRARY_BACKEND_DIRECTORY}
     ${THIRDPARTY_DIRECTORY}/freeglut/include)
+
+# public : projects linking this library will use that definition
+target_compile_definitions(imgui PUBLIC -DImDrawIdx=unsigned\ int)

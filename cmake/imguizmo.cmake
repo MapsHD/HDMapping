@@ -19,7 +19,8 @@ set(IMGUIZMO_HEADER_FILES
 
 set(IMGUIZMO_FILES ${IMGUIZMO_SOURCE_FILES} ${IMGUIZMO_HEADER_FILES})
 
-add_library(imguizmo STATIC ${IMGUIZMO_FILES})
+add_library(imguizmo STATIC)
+target_sources(imguizmo PRIVATE ${IMGUIZMO_FILES})
 target_include_directories(
     imguizmo PRIVATE ${IMGUIZMO_LIBRARY_DIRECTORY}
     ${THIRDPARTY_DIRECTORY}/imgui)

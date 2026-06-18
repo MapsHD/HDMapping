@@ -8,14 +8,15 @@ set(IMPLOT_SOURCE_FILES
         ${IMPLOT_LIBRARY_DIRECTORY}/implot_demo.cpp
 )
 
-set(IMGUI_HEADER_FILES
-        ${IMGUI_LIBRARY_DIRECTORY}/implot.h
-        ${IMGUI_LIBRARY_DIRECTORY}/implot_internal.h
+set(IMPLOT_HEADER_FILES
+        ${IMPLOT_LIBRARY_DIRECTORY}/implot.h
+        ${IMPLOT_LIBRARY_DIRECTORY}/implot_internal.h
 )
 
 set(IMPLOT_FILES ${IMPLOT_SOURCE_FILES} ${IMPLOT_HEADER_FILES})
 
-add_library(implot STATIC ${IMPLOT_FILES})
+add_library(implot STATIC)
+target_sources(implot PRIVATE ${IMPLOT_FILES})
 target_include_directories(
         implot PRIVATE ${IMPLOT_LIBRARY_DIRECTORY} ${IMPLOT_LIBRARY_BACKEND_DIRECTORY}
         ${THIRDPARTY_DIRECTORY}/imgui)

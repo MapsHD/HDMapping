@@ -18,4 +18,4 @@ struct Edge
     bool is_fixed_ka = false;
 };
 
-bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges);
+bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges, TaitBryanPose motion_model_weights);

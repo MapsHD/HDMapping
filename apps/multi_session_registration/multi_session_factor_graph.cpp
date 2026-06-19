@@ -9,7 +9,7 @@
 #include <python-scripts/point-to-feature-metrics/point_to_plane_tait_bryan_wc_jacobian.h>
 #include <python-scripts/point-to-point-metrics/point_to_point_source_to_target_tait_bryan_wc_jacobian.h>
 
-bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
+bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges, TaitBryanPose motion_model_weights)
 {
     for (auto& session : sessions)
     {
@@ -89,8 +89,8 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
     std::vector<Edge> all_edges;
 
     // motion model edges;
-    double angle = 0.1 * DEG_TO_RAD;
-    double wangle = 1.0 / (angle * angle);
+    //double angle =  * DEG_TO_RAD;
+    //double wangle = 1.0 / (angle * angle);
 
     for (size_t i = 1; i < poses_motion_model.size(); i++)
     {
@@ -103,12 +103,12 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
             edge.index_session_from = -1;
             edge.index_session_to = -1;
             edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_rel);
-            edge.relative_pose_tb_weights.om = wangle;
-            edge.relative_pose_tb_weights.fi = wangle;
-            edge.relative_pose_tb_weights.ka = wangle;
-            edge.relative_pose_tb_weights.px = 1000000.0;
-            edge.relative_pose_tb_weights.py = 1000000.0;
-            edge.relative_pose_tb_weights.pz = 1000000.0;
+            edge.relative_pose_tb_weights.om = 1.0 / (motion_model_weights.om * DEG_TO_RAD * motion_model_weights.om * DEG_TO_RAD);
+            edge.relative_pose_tb_weights.fi = 1.0 / (motion_model_weights.fi * DEG_TO_RAD * motion_model_weights.fi * DEG_TO_RAD);
+            edge.relative_pose_tb_weights.ka = 1.0 / (motion_model_weights.ka * DEG_TO_RAD * motion_model_weights.ka * DEG_TO_RAD);
+            edge.relative_pose_tb_weights.px = motion_model_weights.px > 0 ? 1.0 / (motion_model_weights.px * motion_model_weights.px) : 1000000.0;
+            edge.relative_pose_tb_weights.py = motion_model_weights.py > 0 ? 1.0 / (motion_model_weights.py * motion_model_weights.py) : 1000000.0;
+            edge.relative_pose_tb_weights.pz = motion_model_weights.pz > 0 ? 1.0 / (motion_model_weights.pz * motion_model_weights.pz) : 1000000.0;
             all_edges.push_back(edge);
         }
     }
@@ -253,12 +253,12 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges)
             tripletListB.emplace_back(ir + 4, 0, normalize_angle(delta(4, 0)));
             tripletListB.emplace_back(ir + 5, 0, normalize_angle(delta(5, 0)));
 
-            tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px);
-            tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py);
-            tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz);
-            tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om);
-            tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi);
-            tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka);
+            tripletListP.emplace_back(ir, ir, all_edges[i].relative_pose_tb_weights.px * get_cauchy_w(delta(0, 0), 1));
+            tripletListP.emplace_back(ir + 1, ir + 1, all_edges[i].relative_pose_tb_weights.py * get_cauchy_w(delta(1, 0), 1));
+            tripletListP.emplace_back(ir + 2, ir + 2, all_edges[i].relative_pose_tb_weights.pz * get_cauchy_w(delta(2, 0), 1));
+            tripletListP.emplace_back(ir + 3, ir + 3, all_edges[i].relative_pose_tb_weights.om * get_cauchy_w(delta(3, 0), 1));
+            tripletListP.emplace_back(ir + 4, ir + 4, all_edges[i].relative_pose_tb_weights.fi * get_cauchy_w(delta(4, 0), 1));
+            tripletListP.emplace_back(ir + 5, ir + 5, all_edges[i].relative_pose_tb_weights.ka * get_cauchy_w(delta(5, 0), 1));
         }
 
         if (is_fix_first_node)

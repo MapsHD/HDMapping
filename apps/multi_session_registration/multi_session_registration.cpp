@@ -182,6 +182,8 @@ int num_edge_extended_before = 0;
 int num_edge_extended_after = 0;
 
 int gui_point_size = 2;
+
+TaitBryanPose motion_model_weights = { 0.01, 0.01, 0.01, 0.1, 0.1, 0.1 };
 ///////////////////////////////////////////////////////////////////////////////////
 
 void ndt_gui()
@@ -1678,6 +1680,16 @@ bool revert(std::vector<Session>& sessions)
     return true;
 }
 
+bool revert_to_initial(std::vector<Session>& sessions)
+{
+    for (auto& session : sessions)
+    {
+        for (auto& pc : session.point_clouds_container.point_clouds)
+            pc.m_pose = pc.m_initial_pose;
+    }
+    return true;
+}
+
 bool save_results(std::vector<Session>& sessions)
 {
     for (auto& session : sessions)
@@ -1907,6 +1919,149 @@ void loadSessions()
         }
     }
 }
+
+void generate_loop_closures(const std::vector<Session>& sessions, std::vector<Edge>& edges)
+{
+    edges.clear();
+        // Implementation for generating loop closures
+
+        // bool found_edge = false;
+
+        for (int i1 = 0; i1 < sessions.size(); i1++)
+    {
+        for(int j1 = 0; j1 < sessions[i1].point_clouds_container.point_clouds.size(); j1++)
+        {
+            Eigen::Affine3d pose_i = sessions[i1].point_clouds_container.point_clouds[j1].m_pose;
+
+            for(int i2 = i1 + 1; i2 < sessions.size(); i2++)
+            {
+                for(int j2 = 0; j2 < sessions[i2].point_clouds_container.point_clouds.size(); j2++)
+                {
+                    Eigen::Affine3d pose_j = sessions[i2].point_clouds_container.point_clouds[j2].m_pose;
+
+                    if ((pose_i.translation() - pose_j.translation()).norm() < 10.0) // Example threshold for proximity
+                    {
+                        //found_edge = true;
+                        // Create a loop closure edge between pose_i and pose_j
+                        /*Edge edge;
+                        edge.index_session_from = i1;
+                        edge.index_from = j1;
+                        edge.index_session_to = i2;
+                        edge.index_to = j2;
+                        
+                            // Initialize other edge parameters as needed
+                            edges.push_back(edge);*/
+
+                        Edge edge;
+                        
+                        edge.index_session_from = i1;
+                        edge.index_session_to = i2;
+
+                        edge.index_from = j1;
+                        edge.index_to = j2;
+
+                        std::cout << "Found loop closure edge between session " << i1 << " (pose " << j1 << ") and session " << i2 << " (pose " << j2 << ")" << std::endl;
+
+                        edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(
+                            sessions[edge.index_session_from].point_clouds_container.point_clouds[edge.index_from].m_pose.inverse() *
+                            sessions[edge.index_session_to].point_clouds_container.point_clouds[edge.index_to].m_pose);
+
+                        edge.relative_pose_tb_weights.px = 1.0;
+                        edge.relative_pose_tb_weights.py = 1.0;
+                        edge.relative_pose_tb_weights.pz = 1.0;
+                        edge.relative_pose_tb_weights.om = 1.0;
+                        edge.relative_pose_tb_weights.fi = 1.0;
+                        edge.relative_pose_tb_weights.ka = 1.0;
+
+                        edges.push_back(edge);
+
+                        //j1 += 20;
+                        //j2 += 20;
+                    }
+                }
+            } // for(int i2 = i1 + 1; i2 < sessions.size(); i2++)
+        } // for(int j1 = 0; j1 < sessions[i1].point_clouds_container.point_clouds.size(); j1++)
+    } // for(int i1 = 0; i1 < sessions.size(); i1++)
+}
+
+void icp_all_edges(std::vector<Session>& sessions, std::vector<Edge>& edges, float sr)
+{
+    std::cout << "icp_all_edges" << std::endl;
+
+    int number_of_iterations = 10;
+
+    for(size_t index_active_edge = 0; index_active_edge < edges.size(); index_active_edge++)
+    {
+        
+        PairWiseICP icp;
+        auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+        std::vector<Eigen::Vector3d> source;
+        auto& e = edges[index_active_edge];
+        for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+        {
+            int index_src = e.index_to + i;
+            if (index_src >= 0 &&
+                index_src < sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.size())
+            {
+                Eigen::Affine3d m_src =
+                    sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds.at(index_src).m_pose;
+                for (int k = 0; k <
+                     sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[index_src].points_local.size();
+                     k++)
+                {
+                    Eigen::Vector3d p_g = m_src *
+                        sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[index_src].points_local[k];
+                    source.push_back(p_g);
+                }
+                // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+            }
+        }
+        std::vector<Eigen::Vector3d> target;
+
+        for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+        {
+            int index_trg = e.index_from + i;
+            if (index_trg >= 0 &&
+                index_trg < sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.size())
+            {
+                Eigen::Affine3d m_trg =
+                    sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds.at(index_trg).m_pose;
+                for (int k = 0; k < sessions[edges[index_active_edge].index_session_from]
+                                        .point_clouds_container.point_clouds[index_trg]
+                                        .points_local.size();
+                     k++)
+                {
+                    Eigen::Vector3d p_g = m_trg *
+                        sessions[edges[index_active_edge].index_session_from]
+                            .point_clouds_container.point_clouds[index_trg]
+                            .points_local[k];
+                    target.push_back(p_g);
+                }
+                // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+            }
+        }
+
+        Eigen::Affine3d m_src_inv =
+            sessions[edges[index_active_edge].index_session_to].point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
+
+        for (auto& p : source)
+        {
+            p = m_src_inv * p;
+        }
+
+        Eigen::Affine3d m_trg_inv =
+            sessions[edges[index_active_edge].index_session_from].point_clouds_container.point_clouds[e.index_from].m_pose.inverse();
+
+        for (auto& p : target)
+        {
+            p = m_trg_inv * p;
+        }
+
+        if (icp.compute(source, target, sr, number_of_iterations, m_pose))
+            edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
+    }
+}        
 
 void settings_gui()
 {
@@ -2311,6 +2466,14 @@ void settings_gui()
                     if (nr_iter < 1)
                         nr_iter = 1;
 
+
+                    ImGui::InputDouble("Motion Model Weight (1 sigma m): position x [px]", &motion_model_weights.px, 0.0, 0.0, "%.3f");
+                    ImGui::InputDouble("Motion Model Weight (1 sigma m): position y [py]", &motion_model_weights.py, 0.0, 0.0, "%.3f");
+                    ImGui::InputDouble("Motion Model Weight (1 sigma m): position z [pz]", &motion_model_weights.pz, 0.0, 0.0, "%.3f");
+                    ImGui::InputDouble("Motion Model Weight (1 sigma degree): orientation om [om]", &motion_model_weights.om, 0.0, 0.0, "%.3f");
+                    ImGui::InputDouble("Motion Model Weight (1 sigma degree): orientation fi [fi]", &motion_model_weights.fi, 0.0, 0.0, "%.3f");
+                    ImGui::InputDouble("Motion Model Weight (1 sigma degree): orientation ka [ka]", &motion_model_weights.ka, 0.0, 0.0, "%.3f");
+
                     std::string bn = "Optimize (number of iterations: " + std::to_string(nr_iter) + ")";
 
                     if (ImGui::Button(bn.c_str()))
@@ -2318,7 +2481,7 @@ void settings_gui()
                         for (int i = 0; i < nr_iter; i++)
                         {
                             std::cout << "Iteration [" << i + 1 << "] of: " << nr_iter << std::endl;
-                            optimize(sessions, edges);
+                            optimize(sessions, edges, motion_model_weights);
                         }
                         optimized = true;
                     }
@@ -2331,7 +2494,25 @@ void settings_gui()
                     ImGui::SameLine();
                     if (ImGui::Button("Save results"))
                         save_results(sessions);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Revert to initial"))
+                        revert_to_initial(sessions);
                     //}
+
+
+                    if(ImGui::Button("Generate loop closures"))
+                    {
+                        generate_loop_closures(sessions, edges);
+                    }
+
+                    if(ImGui::Button("ICP all edges"))
+                    {
+                        icp_all_edges(sessions, edges, search_radius);  
+                    }
+                    ImGui::SameLine();
+                    ImGui::InputDouble("search_radius", &search_radius);
+                    if (search_radius < 0.01)
+                        search_radius = 0.01;
                 }
 
                 // if (!is_loop_closure_gui && prev_is_loop_closure_gui)

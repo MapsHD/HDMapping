@@ -89,8 +89,8 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges, Ta
     std::vector<Edge> all_edges;
 
     // motion model edges;
-    //double angle =  * DEG_TO_RAD;
-    //double wangle = 1.0 / (angle * angle);
+    // double angle =  * DEG_TO_RAD;
+    // double wangle = 1.0 / (angle * angle);
 
     for (size_t i = 1; i < poses_motion_model.size(); i++)
     {
@@ -106,9 +106,12 @@ bool optimize(std::vector<Session>& sessions, const std::vector<Edge>& edges, Ta
             edge.relative_pose_tb_weights.om = 1.0 / (motion_model_weights.om * DEG_TO_RAD * motion_model_weights.om * DEG_TO_RAD);
             edge.relative_pose_tb_weights.fi = 1.0 / (motion_model_weights.fi * DEG_TO_RAD * motion_model_weights.fi * DEG_TO_RAD);
             edge.relative_pose_tb_weights.ka = 1.0 / (motion_model_weights.ka * DEG_TO_RAD * motion_model_weights.ka * DEG_TO_RAD);
-            edge.relative_pose_tb_weights.px = motion_model_weights.px > 0 ? 1.0 / (motion_model_weights.px * motion_model_weights.px) : 1000000.0;
-            edge.relative_pose_tb_weights.py = motion_model_weights.py > 0 ? 1.0 / (motion_model_weights.py * motion_model_weights.py) : 1000000.0;
-            edge.relative_pose_tb_weights.pz = motion_model_weights.pz > 0 ? 1.0 / (motion_model_weights.pz * motion_model_weights.pz) : 1000000.0;
+            edge.relative_pose_tb_weights.px =
+                motion_model_weights.px > 0 ? 1.0 / (motion_model_weights.px * motion_model_weights.px) : 1000000.0;
+            edge.relative_pose_tb_weights.py =
+                motion_model_weights.py > 0 ? 1.0 / (motion_model_weights.py * motion_model_weights.py) : 1000000.0;
+            edge.relative_pose_tb_weights.pz =
+                motion_model_weights.pz > 0 ? 1.0 / (motion_model_weights.pz * motion_model_weights.pz) : 1000000.0;
             all_edges.push_back(edge);
         }
     }

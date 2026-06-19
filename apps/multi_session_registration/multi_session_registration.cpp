@@ -1923,44 +1923,45 @@ void loadSessions()
 void generate_loop_closures(const std::vector<Session>& sessions, std::vector<Edge>& edges)
 {
     edges.clear();
-        // Implementation for generating loop closures
+    // Implementation for generating loop closures
 
-        // bool found_edge = false;
+    // bool found_edge = false;
 
-        for (int i1 = 0; i1 < sessions.size(); i1++)
+    for (int i1 = 0; i1 < sessions.size(); i1++)
     {
-        for(int j1 = 0; j1 < sessions[i1].point_clouds_container.point_clouds.size(); j1++)
+        for (int j1 = 0; j1 < sessions[i1].point_clouds_container.point_clouds.size(); j1++)
         {
             Eigen::Affine3d pose_i = sessions[i1].point_clouds_container.point_clouds[j1].m_pose;
 
-            for(int i2 = i1 + 1; i2 < sessions.size(); i2++)
+            for (int i2 = i1 + 1; i2 < sessions.size(); i2++)
             {
-                for(int j2 = 0; j2 < sessions[i2].point_clouds_container.point_clouds.size(); j2++)
+                for (int j2 = 0; j2 < sessions[i2].point_clouds_container.point_clouds.size(); j2++)
                 {
                     Eigen::Affine3d pose_j = sessions[i2].point_clouds_container.point_clouds[j2].m_pose;
 
                     if ((pose_i.translation() - pose_j.translation()).norm() < 10.0) // Example threshold for proximity
                     {
-                        //found_edge = true;
-                        // Create a loop closure edge between pose_i and pose_j
+                        // found_edge = true;
+                        //  Create a loop closure edge between pose_i and pose_j
                         /*Edge edge;
                         edge.index_session_from = i1;
                         edge.index_from = j1;
                         edge.index_session_to = i2;
                         edge.index_to = j2;
-                        
+
                             // Initialize other edge parameters as needed
                             edges.push_back(edge);*/
 
                         Edge edge;
-                        
+
                         edge.index_session_from = i1;
                         edge.index_session_to = i2;
 
                         edge.index_from = j1;
                         edge.index_to = j2;
 
-                        std::cout << "Found loop closure edge between session " << i1 << " (pose " << j1 << ") and session " << i2 << " (pose " << j2 << ")" << std::endl;
+                        std::cout << "Found loop closure edge between session " << i1 << " (pose " << j1 << ") and session " << i2
+                                  << " (pose " << j2 << ")" << std::endl;
 
                         edge.relative_pose_tb = pose_tait_bryan_from_affine_matrix(
                             sessions[edge.index_session_from].point_clouds_container.point_clouds[edge.index_from].m_pose.inverse() *
@@ -1975,8 +1976,8 @@ void generate_loop_closures(const std::vector<Session>& sessions, std::vector<Ed
 
                         edges.push_back(edge);
 
-                        //j1 += 20;
-                        //j2 += 20;
+                        // j1 += 20;
+                        // j2 += 20;
                     }
                 }
             } // for(int i2 = i1 + 1; i2 < sessions.size(); i2++)
@@ -1990,9 +1991,8 @@ void icp_all_edges(std::vector<Session>& sessions, std::vector<Edge>& edges, flo
 
     int number_of_iterations = 10;
 
-    for(size_t index_active_edge = 0; index_active_edge < edges.size(); index_active_edge++)
+    for (size_t index_active_edge = 0; index_active_edge < edges.size(); index_active_edge++)
     {
-        
         PairWiseICP icp;
         auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
 
@@ -2061,7 +2061,7 @@ void icp_all_edges(std::vector<Session>& sessions, std::vector<Edge>& edges, flo
         if (icp.compute(source, target, sr, number_of_iterations, m_pose))
             edges[index_active_edge].relative_pose_tb = pose_tait_bryan_from_affine_matrix(m_pose);
     }
-}        
+}
 
 void settings_gui()
 {
@@ -2466,13 +2466,15 @@ void settings_gui()
                     if (nr_iter < 1)
                         nr_iter = 1;
 
-
                     ImGui::InputDouble("Motion Model Weight (1 sigma m): position x [px]", &motion_model_weights.px, 0.0, 0.0, "%.3f");
                     ImGui::InputDouble("Motion Model Weight (1 sigma m): position y [py]", &motion_model_weights.py, 0.0, 0.0, "%.3f");
                     ImGui::InputDouble("Motion Model Weight (1 sigma m): position z [pz]", &motion_model_weights.pz, 0.0, 0.0, "%.3f");
-                    ImGui::InputDouble("Motion Model Weight (1 sigma degree): orientation om [om]", &motion_model_weights.om, 0.0, 0.0, "%.3f");
-                    ImGui::InputDouble("Motion Model Weight (1 sigma degree): orientation fi [fi]", &motion_model_weights.fi, 0.0, 0.0, "%.3f");
-                    ImGui::InputDouble("Motion Model Weight (1 sigma degree): orientation ka [ka]", &motion_model_weights.ka, 0.0, 0.0, "%.3f");
+                    ImGui::InputDouble(
+                        "Motion Model Weight (1 sigma degree): orientation om [om]", &motion_model_weights.om, 0.0, 0.0, "%.3f");
+                    ImGui::InputDouble(
+                        "Motion Model Weight (1 sigma degree): orientation fi [fi]", &motion_model_weights.fi, 0.0, 0.0, "%.3f");
+                    ImGui::InputDouble(
+                        "Motion Model Weight (1 sigma degree): orientation ka [ka]", &motion_model_weights.ka, 0.0, 0.0, "%.3f");
 
                     std::string bn = "Optimize (number of iterations: " + std::to_string(nr_iter) + ")";
 
@@ -2499,15 +2501,14 @@ void settings_gui()
                         revert_to_initial(sessions);
                     //}
 
-
-                    if(ImGui::Button("Generate loop closures"))
+                    if (ImGui::Button("Generate loop closures"))
                     {
                         generate_loop_closures(sessions, edges);
                     }
 
-                    if(ImGui::Button("ICP all edges"))
+                    if (ImGui::Button("ICP all edges"))
                     {
-                        icp_all_edges(sessions, edges, search_radius);  
+                        icp_all_edges(sessions, edges, search_radius);
                     }
                     ImGui::SameLine();
                     ImGui::InputDouble("search_radius", &search_radius);

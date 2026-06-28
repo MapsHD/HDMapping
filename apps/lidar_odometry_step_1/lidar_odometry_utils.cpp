@@ -251,11 +251,11 @@ void update_rgd(
 
         direction.normalize();
 
-        steps -= 5;
+        steps -= 1;
 
-        if (steps > 5)
+        if (steps > 1)
         {
-            for (int j = 2; j < steps; ++j)
+            for (int j = 1; j < steps; ++j)
             {
                 Eigen::Vector3d b_front = points_global[i].point + direction * (b_norm * (j + 1));
 

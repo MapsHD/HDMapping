@@ -1716,7 +1716,7 @@ static void compute_hessian(
 
     if (indoor_it != buckets_indoor.end())
     {
-        if (indoor_it->second.number_of_points != -1)
+        if (indoor_it->second.number_of_points != -1 && indoor_it->second.number_of_hits < 20)
         {
             add_indoor_hessian_contribution(
                 indoor_it->second,
@@ -1756,7 +1756,7 @@ static void compute_hessian(
 
         if (outdoor_it != buckets_outdoor.end())
         {
-            if (outdoor_it->second.number_of_points != -1)
+            if (outdoor_it->second.number_of_points != -1 && outdoor_it->second.number_of_hits < 20)
             {
                 add_outdoor_hessian_contribution(
                     outdoor_it->second,
@@ -3322,6 +3322,8 @@ void Consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams
             {
                 if (intermediate_points_i.point.norm() < 1.0)
                     return;
+
+                   
 
                 Eigen::Vector3d point_global = trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
                 auto index_of_bucket = get_rgd_index_3d(point_global, b);

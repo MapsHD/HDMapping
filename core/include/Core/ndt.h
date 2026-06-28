@@ -44,6 +44,8 @@ public:
         uint64_t number_of_points = 0;
         uint64_t index_begin = 0;
         uint64_t index_end = 0;
+
+        char number_of_hits = 0; 
     };
 
     struct BucketCoef
@@ -53,6 +55,8 @@ public:
         Eigen::Vector3d normal_vector = Eigen::Vector3d::Zero();
         std::vector<uint64_t> point_indexes;
         bool valid = false;
+
+        char number_of_hits = 0;
     };
 
     struct Bucket2

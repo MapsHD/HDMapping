@@ -237,6 +237,46 @@ void update_rgd(
             if (lookup_count)
                 ++(*lookup_count);*/
         }
+    
+    /////////
+        //number_of_hits
+        //Eigen::Vector3d direction = points_global[i].point - viewport;
+        //direction.normalize();
+        //double bucket_norm = b.norm();
+
+        Eigen::Vector3d direction = viewport - points_global[i].point;
+        double distance = direction.norm();
+        double b_norm = b.norm();
+        int steps = static_cast<int>(std::ceil(distance / b_norm));
+
+        direction.normalize();
+
+        steps -= 5;
+
+        if (steps > 5)
+        {
+            for(int j = 2; j < steps; ++j){
+                
+                Eigen::Vector3d b_front = points_global[i].point + direction * (b_norm * (j + 1));
+
+                auto index_of_bucket = get_rgd_index_3d(b_front, b);
+
+                auto bucket_it = buckets.find(index_of_bucket);
+                
+                if (bucket_it != buckets.end()){
+                    auto& this_bucket = bucket_it->second;
+                    char noh = this_bucket.number_of_hits;
+
+                    if(noh < 30){
+                        this_bucket.number_of_hits++;
+
+                        //std::cout << "bucket: " << index_of_bucket << " number_of_hits: " << static_cast<int>(this_bucket.number_of_hits) << std::endl;
+                    }
+                }
+            }
+        }
+
+        /////////
     }
 }
 

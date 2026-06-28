@@ -154,6 +154,7 @@ bool step_1_done = false;
 bool step_2_done = false;
 bool step_3_done = false;
 bool calculations_failed = false;
+bool show_without_filtered_buckets  = false;
 
 int lastPar = 1;
 
@@ -1754,7 +1755,7 @@ void progress_window()
     ImGui::Checkbox("Show trajectory as axes", &show_trajectory_as_axes);
     ImGui::Checkbox("Show prediction vectors", &show_prediction_vectors);
     ImGui::Checkbox("Show intermediate trajectory prediction axes", &intermediate_trajectory_prediction_axes);
-
+    ImGui::Checkbox("Show without filtered buckets", &show_without_filtered_buckets);
     // ImGui::Checkbox("Show covs indoor", &show_covs_indoor);
     // ImGui::Checkbox("Show covs outdoor", &show_covs_outdoor);
 
@@ -2071,7 +2072,13 @@ void display()
             {
                 glColor3f(1, 0, 0);
             }
-            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            if (!show_without_filtered_buckets){
+                glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            }else{
+                if (b.second.number_of_hits < 20){
+                    glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+                }
+            }
         }
         glEnd();
     }
@@ -2091,7 +2098,14 @@ void display()
             {
                 glColor3f(0, 0, 1);
             }
-            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            //glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            if (!show_without_filtered_buckets){
+                glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            }else{
+                if (b.second.number_of_hits < 20){
+                    glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+                }
+            }
         }
         glEnd();
     }

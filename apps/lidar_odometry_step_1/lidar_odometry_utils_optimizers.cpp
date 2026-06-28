@@ -2321,8 +2321,7 @@ bool initialize_lidar_odometry(
                 params.m_g.translation(),
                 params.in_out_params_outdoor,
                 params.buckets_outdoor,
-                lookup_stats,
-                false);
+                lookup_stats);
         }
         else
         {
@@ -2787,8 +2786,7 @@ bool process_worker_step_update_rgd_after(
                 worker_data.intermediate_trajectory[0].translation(),
                 params.in_out_params_outdoor,
                 params.buckets_outdoor,
-                lookup_stats,
-                false);
+                lookup_stats);
         }
         else
         {
@@ -2824,8 +2822,7 @@ bool process_worker_step_update_rgd_after(
                 worker_data.intermediate_trajectory[0].translation(),
                 params.in_out_params_outdoor,
                 params.buckets_outdoor,
-                lookup_stats,
-                true);
+                lookup_stats);
         }
         else
         {

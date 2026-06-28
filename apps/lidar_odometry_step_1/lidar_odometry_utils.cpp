@@ -125,8 +125,7 @@ void update_rgd(
     NDTBucketMapType& buckets,
     const std::vector<Point3Di>& points_global,
     const Eigen::Vector3d& viewport,
-    size_t* lookup_count,
-    bool filter_movable_objects)
+    size_t* lookup_count)
 {
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
@@ -244,7 +243,7 @@ void update_rgd(
         // Eigen::Vector3d direction = points_global[i].point - viewport;
         // direction.normalize();
         // double bucket_norm = b.norm();
-        if (filter_movable_objects)
+        if (points_global.size() < 100000)
         {
             Eigen::Vector3d direction = viewport - points_global[i].point;
             double distance = direction.norm();
@@ -288,17 +287,16 @@ void update_rgd_hierarchy(
     const Eigen::Vector3d& viewport,
     const NDT::GridParameters& rgd_params_outdoor,
     NDTBucketMapType& buckets_outdoor,
-    LookupStats& stats,
-    bool filter_movable_objects)
+    LookupStats& stats)
 {
     tbb::parallel_invoke(
         [&]()
         {
-            update_rgd(rgd_params_indoor, buckets_indoor, points_global, viewport, &stats.indoor_lookups, filter_movable_objects);
+            update_rgd(rgd_params_indoor, buckets_indoor, points_global, viewport, &stats.indoor_lookups);
         },
         [&]()
         {
-            update_rgd(rgd_params_outdoor, buckets_outdoor, points_global, viewport, &stats.outdoor_lookups, filter_movable_objects);
+            update_rgd(rgd_params_outdoor, buckets_outdoor, points_global, viewport, &stats.outdoor_lookups);
         });
 }
 

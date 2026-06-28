@@ -267,8 +267,7 @@ void update_rgd_hierarchy(
     const Eigen::Vector3d& viewport,
     const NDT::GridParameters& rgd_params_outdoor,
     NDTBucketMapType& buckets_outdoor,
-    LookupStats& stats,
-    bool filter_movable_objects);
+    LookupStats& stats);
 
 void update_rgd_spherical_coordinates(
     const NDT::GridParameters& rgd_params,

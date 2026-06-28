@@ -45,7 +45,7 @@ public:
         uint64_t index_begin = 0;
         uint64_t index_end = 0;
 
-        char number_of_hits = 0; 
+        char number_of_hits = 0;
     };
 
     struct BucketCoef

@@ -3323,8 +3323,6 @@ void Consistency(std::vector<WorkerData>& worker_data, const LidarOdometryParams
                 if (intermediate_points_i.point.norm() < 1.0)
                     return;
 
-                   
-
                 Eigen::Vector3d point_global = trajectory[intermediate_points_i.index_pose] * intermediate_points_i.point;
                 auto index_of_bucket = get_rgd_index_3d(point_global, b);
 

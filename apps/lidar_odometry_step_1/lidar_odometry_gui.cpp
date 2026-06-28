@@ -154,7 +154,7 @@ bool step_1_done = false;
 bool step_2_done = false;
 bool step_3_done = false;
 bool calculations_failed = false;
-bool show_without_filtered_buckets  = false;
+bool show_without_filtered_buckets = false;
 
 int lastPar = 1;
 
@@ -2072,10 +2072,14 @@ void display()
             {
                 glColor3f(1, 0, 0);
             }
-            if (!show_without_filtered_buckets){
+            if (!show_without_filtered_buckets)
+            {
                 glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            }else{
-                if (b.second.number_of_hits < 20){
+            }
+            else
+            {
+                if (b.second.number_of_hits < 20)
+                {
                     glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
                 }
             }
@@ -2098,11 +2102,15 @@ void display()
             {
                 glColor3f(0, 0, 1);
             }
-            //glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            if (!show_without_filtered_buckets){
+            // glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            if (!show_without_filtered_buckets)
+            {
                 glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            }else{
-                if (b.second.number_of_hits < 20){
+            }
+            else
+            {
+                if (b.second.number_of_hits < 20)
+                {
                     glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
                 }
             }

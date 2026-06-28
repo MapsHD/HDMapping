@@ -236,10 +236,10 @@ ToDo
 - https://github.com/DCSI2022/DALI_SLAM (2025, Elsevier ISPRS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DALI-SLAM.bib)) - Piotr
 - https://github.com/KTH-RPL/DynamicMap_Benchmark (2023, ITSC, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
 - https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib), with loop closures)
-- https://github.com/ZikangYuan/sr_lio (2024, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sr-lio.bib))
+- https://github.com/ZikangYuan/sr_lio (2024, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sr-lio.bib)) - Piotr
 - https://github.com/dhchung/nv_liom (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/NV-LIOM.bib))- Marcin
 - https://github.com/hku-mars/Voxel-SLAM (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Voxel-SLAM.bib), 2nd place ICRA HILTI 2023 SLAM Challenge, 1st place ICCV 2023 SLAM Challenge) - Piotr
-- https://github.com/PRBonn/PIN_SLAM (2024, TRO, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/PIN-SLAM.bib))
+- https://github.com/PRBonn/PIN_SLAM (2024, TRO, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/PIN-SLAM.bib)) - Piotr
 - https://github.com/StephLin/LIO-SEGMOT (2023, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SEGMOT.bib))
 - https://github.com/XikunLiu-huskit/GLIO (2023, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIO.bib))
 - https://github.com/tiev-tongji/LOG-LIO (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LOG-LIO.bib))

@@ -125,7 +125,8 @@ void update_rgd(
     NDTBucketMapType& buckets,
     const std::vector<Point3Di>& points_global,
     const Eigen::Vector3d& viewport,
-    size_t* lookup_count)
+    size_t* lookup_count,
+    bool filter_movable_objects)
 {
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
@@ -243,43 +244,40 @@ void update_rgd(
         // Eigen::Vector3d direction = points_global[i].point - viewport;
         // direction.normalize();
         // double bucket_norm = b.norm();
-
-        Eigen::Vector3d direction = viewport - points_global[i].point;
-        double distance = direction.norm();
-        double b_norm = b.norm();
-        int steps = static_cast<int>(std::ceil(distance / b_norm));
-
-        direction.normalize();
-
-        steps -= 1;
-
-        if (steps > 1)
+        if (filter_movable_objects)
         {
-            for (int j = 1; j < steps; ++j)
+            Eigen::Vector3d direction = viewport - points_global[i].point;
+            double distance = direction.norm();
+            double b_norm = b.norm();
+            int steps = static_cast<int>(std::ceil(distance / b_norm));
+
+            direction.normalize();
+
+            steps -= 1;
+
+            if (steps > 1)
             {
-                Eigen::Vector3d b_front = points_global[i].point + direction * (b_norm * (j + 1));
-
-                auto index_of_bucket = get_rgd_index_3d(b_front, b);
-
-                auto bucket_it = buckets.find(index_of_bucket);
-
-                if (bucket_it != buckets.end())
+                for (int j = 1; j < steps; ++j)
                 {
-                    auto& this_bucket = bucket_it->second;
-                    char noh = this_bucket.number_of_hits;
+                    Eigen::Vector3d b_front = points_global[i].point + direction * (b_norm * (j + 1));
 
-                    if (noh < 30)
+                    auto index_of_bucket = get_rgd_index_3d(b_front, b);
+
+                    auto bucket_it = buckets.find(index_of_bucket);
+
+                    if (bucket_it != buckets.end())
                     {
-                        this_bucket.number_of_hits++;
+                        auto& this_bucket = bucket_it->second;
+                        char noh = this_bucket.number_of_hits;
 
-                        // std::cout << "bucket: " << index_of_bucket << " number_of_hits: " << static_cast<int>(this_bucket.number_of_hits)
-                        // << std::endl;
+                        if (noh < 30)
+                        {
+                            this_bucket.number_of_hits++;
+                        }
                     }
                 }
             }
         }
-
-        /////////
     }
 }
 
@@ -290,16 +288,17 @@ void update_rgd_hierarchy(
     const Eigen::Vector3d& viewport,
     const NDT::GridParameters& rgd_params_outdoor,
     NDTBucketMapType& buckets_outdoor,
-    LookupStats& stats)
+    LookupStats& stats,
+    bool filter_movable_objects)
 {
     tbb::parallel_invoke(
         [&]()
         {
-            update_rgd(rgd_params_indoor, buckets_indoor, points_global, viewport, &stats.indoor_lookups);
+            update_rgd(rgd_params_indoor, buckets_indoor, points_global, viewport, &stats.indoor_lookups, filter_movable_objects);
         },
         [&]()
         {
-            update_rgd(rgd_params_outdoor, buckets_outdoor, points_global, viewport, &stats.outdoor_lookups);
+            update_rgd(rgd_params_outdoor, buckets_outdoor, points_global, viewport, &stats.outdoor_lookups, filter_movable_objects);
         });
 }
 

@@ -278,7 +278,6 @@ ToDo: check if addressed
 - https://github.com/ethz-asl/COIN-LIO
 - https://github.com/HxCa1/BEV-LIO-LC
 - https://github.com/YangSiri/OR-LIM
-- https://github.com/TixiaoShan/LVI-SAM
 - https://github.com/hku-mars/fast-livo2
 - https://github.com/dongjae0107/LAPS
 - https://github.com/eugeniu1994/MAP_LIO

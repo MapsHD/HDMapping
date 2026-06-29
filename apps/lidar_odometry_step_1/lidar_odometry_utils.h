@@ -206,6 +206,11 @@ struct LidarOdometryParams
     // treated as dynamic/movable and exported with LAS classification 7 (static points stay class 0)
     bool classify_moving_objects = true;
     int moving_object_hits_threshold = 20;
+    // Union of moving bucket keys (indexed by get_rgd_index_3d) accumulated across the whole trajectory
+    // during compute_step_2. The RGD grids are transient (cleared each sliding window), so we snapshot
+    // the moving buckets before each clear; these sets persist until save_result() classifies points.
+    ankerl::unordered_dense::set<uint64_t> moving_buckets_indoor;
+    ankerl::unordered_dense::set<uint64_t> moving_buckets_outdoor;
 };
 
 inline VQFParams buildVQFParams(const LidarOdometryParams& p)

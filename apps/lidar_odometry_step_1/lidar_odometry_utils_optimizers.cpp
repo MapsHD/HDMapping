@@ -2743,6 +2743,22 @@ bool process_worker_step_lidar_odometry_core(
     return true;
 }
 
+// The RGD grids are transient (cleared each sliding window), so we record the keys of all buckets that
+// reached the moving-object hit threshold into persistent sets on params. Their union over the whole
+// trajectory is later used by save_result() to assign LAS classification 7. Bucket keys are the map keys
+// (get_rgd_index_3d), deterministic for a given resolution and world coordinates.
+static void snapshot_moving_buckets(LidarOdometryParams& params)
+{
+    const int threshold = params.moving_object_hits_threshold;
+    std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
+    for (const auto& [key, bucket] : params.buckets_indoor)
+        if (static_cast<int>(bucket.number_of_hits) >= threshold)
+            params.moving_buckets_indoor.insert(key);
+    for (const auto& [key, bucket] : params.buckets_outdoor)
+        if (static_cast<int>(bucket.number_of_hits) >= threshold)
+            params.moving_buckets_outdoor.insert(key);
+}
+
 bool process_worker_step_update_rgd_after(
     double& acc_distance,
     LidarOdometryParams& params,
@@ -2754,6 +2770,10 @@ bool process_worker_step_update_rgd_after(
     if (acc_distance > params.sliding_window_trajectory_length_threshold)
     {
         spdlog::stopwatch stopwatch_update;
+
+        // Capture moving buckets at the segment peak, before the grids are cleared for the next window.
+        if (params.classify_moving_objects)
+            snapshot_moving_buckets(params);
 
         if (params.reference_points.size() == 0)
         {
@@ -2859,6 +2879,10 @@ bool compute_step_2(
     double total_optimization_time_seconds = 0.0;
     LookupStats lookup_stats;
     std::vector<Point3Di> points_global;
+
+    // Fresh run: drop moving-bucket keys accumulated by a previous compute_step_2().
+    params.moving_buckets_indoor.clear();
+    params.moving_buckets_outdoor.clear();
 
     if (initialize_lidar_odometry(worker_data, params, ts_failure, loProgress, pause, debugMsg, lookup_stats))
     {
@@ -3059,6 +3083,10 @@ bool compute_step_2(
             }
             HDMAP_ZONE_END(after_iter);
         }
+
+        // Last sliding window is never cleared after the loop: capture its moving buckets too.
+        if (params.classify_moving_objects)
+            snapshot_moving_buckets(params);
 
         for (int i = 0; i < worker_data.size(); i++)
             worker_data[i].intermediate_trajectory_motion_model = worker_data[i].intermediate_trajectory;

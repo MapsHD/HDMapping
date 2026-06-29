@@ -855,8 +855,13 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
             true,
             params.save_index_pose);
 
-        // Classify moving objects: points whose indoor RGD bucket was hit through (number_of_hits >=
-        // threshold) are dynamic and get LAS classification 7; everything else stays class 0.
+        // Classify moving objects: a point is dynamic (LAS class 7) if its indoor OR outdoor RGD bucket
+        // reached the moving-object hit threshold anywhere along the trajectory. compute_step_2 accumulated
+        // those bucket keys into params.moving_buckets_* (the live grids are transient per sliding window,
+        // so they can't be queried here). The key must use WORLD coordinates (trajectory[index_pose]*point),
+        // matching how the grids were built - not the first-pose-relative coords written to the .laz. This
+        // loop mirrors the threshould_output_filter of points_to_vector so it stays index-aligned with
+        // global_pointcloud.
         std::vector<unsigned char> classifications;
         if (params.classify_moving_objects)
         {
@@ -864,15 +869,20 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
                 params.in_out_params_indoor.resolution_X,
                 params.in_out_params_indoor.resolution_Y,
                 params.in_out_params_indoor.resolution_Z);
-            classifications.assign(global_pointcloud.size(), 0);
-            std::lock_guard<std::mutex> lck(params.mutex_buckets_indoor);
-            for (size_t k = 0; k < global_pointcloud.size(); ++k)
+            const Eigen::Vector3d b_outdoor(
+                params.in_out_params_outdoor.resolution_X,
+                params.in_out_params_outdoor.resolution_Y,
+                params.in_out_params_outdoor.resolution_Z);
+            const auto& traj = worker_data_concatenated[i].intermediate_trajectory;
+            classifications.reserve(global_pointcloud.size());
+            for (const auto& org_p : original_points_to_save)
             {
-                const auto key = get_rgd_index_3d(global_pointcloud[k], b_indoor);
-                const auto it = params.buckets_indoor.find(key);
-                if (it != params.buckets_indoor.end() && static_cast<int>(it->second.number_of_hits) >= params.moving_object_hits_threshold)
+                if (org_p.point.norm() > params.threshould_output_filter)
                 {
-                    classifications[k] = 7;
+                    const Eigen::Vector3d world = traj[org_p.index_pose] * org_p.point;
+                    const bool moving = params.moving_buckets_indoor.count(get_rgd_index_3d(world, b_indoor)) != 0 ||
+                        params.moving_buckets_outdoor.count(get_rgd_index_3d(world, b_outdoor)) != 0;
+                    classifications.push_back(moving ? 7 : 0);
                 }
             }
         }

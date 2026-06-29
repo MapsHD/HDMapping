@@ -111,7 +111,9 @@ public:
         { "current_output_dir", &LidarOdometryParams::current_output_dir },
         { "working_directory_preview", &LidarOdometryParams::working_directory_preview },
         { "use_imu_preintegration", &LidarOdometryParams::use_imu_preintegration },
-        { "imu_preintegration_method", &LidarOdometryParams::imu_preintegration_method }
+        { "imu_preintegration_method", &LidarOdometryParams::imu_preintegration_method },
+        { "classify_moving_objects", &LidarOdometryParams::classify_moving_objects },
+        { "moving_object_hits_threshold", &LidarOdometryParams::moving_object_hits_threshold }
     };
 
     // Special handling for TaitBryanPose members
@@ -205,6 +207,7 @@ public:
             "rgd_sf_sigma_fi_deg",
             "rgd_sf_sigma_ka_deg" } },
         { "imu_preintegration", { "use_imu_preintegration", "imu_preintegration_method" } },
+        { "moving_objects", { "classify_moving_objects", "moving_object_hits_threshold" } },
         { "paths", { "current_output_dir", "working_directory_preview" } },
         { "misc", { "clear_color" } }
     };

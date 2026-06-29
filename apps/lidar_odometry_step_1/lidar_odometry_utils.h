@@ -201,6 +201,11 @@ struct LidarOdometryParams
     bool ablation_study_use_view_point_and_normal_vectors = true;
     bool ablation_study_use_threshold_outer_rgd = false;
     bool save_index_pose = false;
+
+    // moving objects: points whose RGD bucket has number_of_hits >= moving_object_hits_threshold are
+    // treated as dynamic/movable and exported with LAS classification 7 (static points stay class 0)
+    bool classify_moving_objects = true;
+    int moving_object_hits_threshold = 20;
 };
 
 inline VQFParams buildVQFParams(const LidarOdometryParams& p)

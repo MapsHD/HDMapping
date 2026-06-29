@@ -86,13 +86,15 @@ public:
         double offset_x,
         double offset_y,
         double offset_z,
-        unsigned short point_source_id = 0)
+        unsigned short point_source_id = 0,
+        unsigned char classification = 0)
     {
         point_->intensity = intensity;
         point_->return_number = 1;
         point_->number_of_returns = 1;
         point_->gps_time = timestamp * 1e9;
         point_->point_source_ID = point_source_id;
+        point_->classification = classification;
 
         laszip_F64 coordinates[3];
         coordinates[0] = position.x() + offset_x;
@@ -164,7 +166,8 @@ inline bool exportLaz(
     double offset_x = 0.0,
     double offset_y = 0.0,
     double offset_alt = 0.0,
-    const std::vector<unsigned short>* point_source_ids = nullptr)
+    const std::vector<unsigned short>* point_source_ids = nullptr,
+    const std::vector<unsigned char>* classifications = nullptr)
 {
     LazWriter writer;
     if (!writer.open(filename, offset_x, offset_y, offset_alt))
@@ -173,7 +176,8 @@ inline bool exportLaz(
     for (size_t i = 0; i < pointcloud.size(); i++)
     {
         const unsigned short psid = (point_source_ids && i < point_source_ids->size()) ? (*point_source_ids)[i] : 0;
-        if (!writer.writePoint(pointcloud[i], intensity[i], timestamps[i], offset_x, offset_y, offset_alt, psid))
+        const unsigned char classification = (classifications && i < classifications->size()) ? (*classifications)[i] : 0;
+        if (!writer.writePoint(pointcloud[i], intensity[i], timestamps[i], offset_x, offset_y, offset_alt, psid, classification))
             return false;
     }
 

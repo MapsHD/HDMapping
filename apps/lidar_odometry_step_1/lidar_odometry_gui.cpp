@@ -2323,6 +2323,17 @@ void display()
 
                 ImGui::Separator();
 
+                ImGui::MenuItem("Classify moving objects (LAS class 7)", nullptr, &params.classify_moving_objects);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Export points detected as moving (dynamic) with LAS classification 7; static points stay class 0");
+                if (params.classify_moving_objects)
+                {
+                    ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                    ImGui::InputInt("Moving object hits threshold", &params.moving_object_hits_threshold);
+                }
+
+                ImGui::Separator();
+
                 ImGui::MenuItem("Saving results with index pose", nullptr, &params.save_index_pose);
 
                 ImGui::Separator();

@@ -3,6 +3,7 @@
 #include "tbb/tbb.h"
 #include <mutex>
 
+#include <Core/hash_utils.h>
 #include <Core/system_info.hpp>
 #include <Fusion.h>
 
@@ -853,7 +854,39 @@ void save_result(std::vector<WorkerData>& worker_data, LidarOdometryParams& para
             timestamps,
             true,
             params.save_index_pose);
-        exportLaz(path.string(), global_pointcloud, intensity, timestamps);
+
+        // Classify moving objects: points whose indoor RGD bucket was hit through (number_of_hits >=
+        // threshold) are dynamic and get LAS classification 7; everything else stays class 0.
+        std::vector<unsigned char> classifications;
+        if (params.classify_moving_objects)
+        {
+            const Eigen::Vector3d b_indoor(
+                params.in_out_params_indoor.resolution_X,
+                params.in_out_params_indoor.resolution_Y,
+                params.in_out_params_indoor.resolution_Z);
+            classifications.assign(global_pointcloud.size(), 0);
+            std::lock_guard<std::mutex> lck(params.mutex_buckets_indoor);
+            for (size_t k = 0; k < global_pointcloud.size(); ++k)
+            {
+                const auto key = get_rgd_index_3d(global_pointcloud[k], b_indoor);
+                const auto it = params.buckets_indoor.find(key);
+                if (it != params.buckets_indoor.end() && static_cast<int>(it->second.number_of_hits) >= params.moving_object_hits_threshold)
+                {
+                    classifications[k] = 7;
+                }
+            }
+        }
+
+        exportLaz(
+            path.string(),
+            global_pointcloud,
+            intensity,
+            timestamps,
+            0.0,
+            0.0,
+            0.0,
+            nullptr,
+            params.classify_moving_objects ? &classifications : nullptr);
 
         if (params.save_index_pose)
         {

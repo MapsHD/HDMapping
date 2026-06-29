@@ -72,3 +72,6 @@ imgui.ini
 /.gitmodules
 /build2
 /build3
+
+# conda env for COPC/E57 conversion (untwine + libpdal-e57), created out-of-band
+/3rdpartyBinary/untwine_env/

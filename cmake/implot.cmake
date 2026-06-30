@@ -20,3 +20,4 @@ target_sources(implot PRIVATE ${IMPLOT_FILES})
 target_include_directories(
         implot PRIVATE ${IMPLOT_LIBRARY_DIRECTORY} ${IMPLOT_LIBRARY_BACKEND_DIRECTORY}
         ${THIRDPARTY_DIRECTORY}/imgui)
+target_link_libraries(implot PRIVATE imgui)

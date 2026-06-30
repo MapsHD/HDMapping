@@ -24,3 +24,4 @@ target_sources(imguizmo PRIVATE ${IMGUIZMO_FILES})
 target_include_directories(
     imguizmo PRIVATE ${IMGUIZMO_LIBRARY_DIRECTORY}
     ${THIRDPARTY_DIRECTORY}/imgui)
+target_link_libraries(imguizmo PRIVATE imgui)

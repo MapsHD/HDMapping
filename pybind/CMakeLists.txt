@@ -46,8 +46,21 @@ if (MSVC)
     target_compile_options(multi_view_tls_registration_py PRIVATE /bigobj)
 endif()
 
+add_library(multi_session_registration_py MODULE
+    multi_session_registration_binding.cpp
+    ${CMAKE_SOURCE_DIR}/apps/multi_session_registration/multi_session_registration_no_gui.cpp
+)
+
+if (MSVC)
+    target_compile_options(multi_session_registration_py PRIVATE /bigobj)
+endif()
+
 add_custom_target(pybind_all
-    DEPENDS core_py lidar_odometry_py multi_view_tls_registration_py
+    DEPENDS 
+        core_py 
+        lidar_odometry_py 
+        multi_view_tls_registration_py
+        multi_session_registration_py
     COMMENT "Building all Python bindings"
 )
 
@@ -67,6 +80,25 @@ target_sources(lidar_odometry_py
 target_sources(multi_view_tls_registration_py
     PRIVATE
         ${CMAKE_SOURCE_DIR}/apps/multi_view_tls_registration/multi_view_tls_registration.cpp
+)
+
+target_sources(multi_session_registration_py
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/apps/multi_session_registration/multi_session_registration_no_gui.cpp
+        ${CMAKE_SOURCE_DIR}/core/src/pfd_wrapper.cpp
+)
+
+target_include_directories(multi_session_registration_py
+    PRIVATE
+        ${pybind11_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/apps/multi_session_registration
+        ${REPOSITORY_DIRECTORY}/core/include
+        ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
+        ${EIGEN3_INCLUDE_DIR}
+        ${LASZIP_INCLUDE_DIR}/LASzip/include
+        ${THIRDPARTY_DIRECTORY}/json/include
+        ${THIRDPARTY_DIRECTORY}
+        ${THIRDPARTY_DIRECTORY}/glm
 )
 
 target_include_directories(core_py
@@ -111,6 +143,28 @@ target_include_directories(multi_view_tls_registration_py
             ${THIRDPARTY_DIRECTORY}/glm
             ${THIRDPARTY_DIRECTORY}/observation_equations/codes
 )
+target_include_directories(multi_session_registration_py PRIVATE
+
+    ${pybind11_SOURCE_DIR}/include
+
+    ${CMAKE_SOURCE_DIR}/apps/multi_session_registration
+
+    ${REPOSITORY_DIRECTORY}/core/include
+    ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
+
+    ${EIGEN3_INCLUDE_DIR}
+
+    ${LASZIP_INCLUDE_DIR}/LASzip/include
+
+    ${THIRDPARTY_DIRECTORY}
+    ${THIRDPARTY_DIRECTORY}/glm
+
+    ${THIRDPARTY_DIRECTORY}/json/include
+
+
+    ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
+
+)
 
 target_link_libraries(core_py
     PRIVATE pybind11::module 
@@ -120,7 +174,21 @@ target_link_libraries(core_py
             ${PLATFORM_MISCELLANEOUS_LIBS}
 )
 
+target_link_libraries(
+    multi_session_registration_py
 
+    PRIVATE
+
+    pybind11::module
+
+    core_no_gui
+
+    ${PLATFORM_LASZIP_LIB}
+
+    vqf
+
+    ${PLATFORM_MISCELLANEOUS_LIBS}
+)
 target_link_libraries(lidar_odometry_py
     PRIVATE pybind11::module
             core_no_gui
@@ -141,10 +209,30 @@ target_link_libraries(multi_view_tls_registration_py
             ${PLATFORM_MISCELLANEOUS_LIBS}
 )
 
+
+target_link_libraries(
+    multi_session_registration_py
+    PRIVATE
+
+    pybind11::module
+
+    core_no_gui
+
+    ${FREEGLUT_LIBRARY}
+    ${OPENGL_gl_LIBRARY}
+    OpenGL::GLU
+
+    ${PLATFORM_LASZIP_LIB}
+    vqf
+    ${PLATFORM_MISCELLANEOUS_LIBS}
+)
+
+
 if(WIN32)
     set_target_properties(core_py PROPERTIES SUFFIX ".pyd")
     set_target_properties(lidar_odometry_py PROPERTIES SUFFIX ".pyd")
     set_target_properties(multi_view_tls_registration_py PROPERTIES SUFFIX ".pyd")
+    set_target_properties(multi_session_registration_py PROPERTIES SUFFIX ".pyd")
 else()
     set_target_properties(core_py PROPERTIES 
         PREFIX ""
@@ -153,6 +241,9 @@ else()
         PREFIX ""
         SUFFIX ".so")
     set_target_properties(multi_view_tls_registration_py PROPERTIES 
+        PREFIX ""
+        SUFFIX ".so")
+    set_target_properties(multi_session_registration_py PROPERTIES
         PREFIX ""
         SUFFIX ".so")
 endif()
@@ -168,6 +259,11 @@ set_target_properties(lidar_odometry_py PROPERTIES
 )
 
 set_target_properties(multi_view_tls_registration_py PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
+)
+
+set_target_properties(multi_session_registration_py PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
 )
@@ -196,5 +292,12 @@ if(WIN32)
                 "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
         COMMAND_EXPAND_LISTS
     )
+    add_custom_command(
+    TARGET multi_session_registration_py
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_RUNTIME_DLLS:multi_session_registration_py>
+        "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
+    COMMAND_EXPAND_LISTS
+    )
 endif()
-

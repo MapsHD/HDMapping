@@ -1,7 +1,6 @@
 #include <cmath>
 #include <filesystem>
 
-#include <GL/freeglut.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <nlohmann/json.hpp>

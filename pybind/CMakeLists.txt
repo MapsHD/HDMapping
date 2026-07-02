@@ -174,18 +174,21 @@ target_link_libraries(core_py
             ${PLATFORM_MISCELLANEOUS_LIBS}
 )
 
-target_link_libraries(multi_session_registration_py
+target_link_libraries(
+    multi_session_registration_py
+
     PRIVATE
+
     pybind11::module
+
     core_no_gui
-    OpenGL::GL
-    OpenGL::GLU
-    GLUT::GLUT
+
     ${PLATFORM_LASZIP_LIB}
+
     vqf
+
     ${PLATFORM_MISCELLANEOUS_LIBS}
 )
-
 target_link_libraries(lidar_odometry_py
     PRIVATE pybind11::module
             core_no_gui
@@ -208,22 +211,12 @@ target_link_libraries(multi_view_tls_registration_py
 
 
 target_link_libraries(
-    multi_session_registration_py
-    PRIVATE
-
-    pybind11::module
-
-    core_no_gui
-
-    ${FREEGLUT_LIBRARY}
-    ${OPENGL_gl_LIBRARY}
-    OpenGL::GLU
-
-    ${PLATFORM_LASZIP_LIB}
-    vqf
-    ${PLATFORM_MISCELLANEOUS_LIBS}
+    PRIVATE pybind11::module 
+            core_no_gui
+            ${PLATFORM_LASZIP_LIB} 
+            vqf
+            ${PLATFORM_MISCELLANEOUS_LIBS}
 )
-
 
 if(WIN32)
     set_target_properties(core_py PROPERTIES SUFFIX ".pyd")

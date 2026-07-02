@@ -95,7 +95,6 @@ int gui_point_size = 2;
 
 TaitBryanPose motion_model_weights = { 0.01, 0.01, 0.01, 0.1, 0.1, 0.1 };
 
-
 // void save_trajectories_to_laz(
 //     const Session& session,
 //     const std::string& output_file_name,
@@ -277,7 +276,6 @@ void save_trajectories(
 
                         Eigen::Vector3d v1 = position_curr - position_prev;
                         Eigen::Vector3d v2 = position_next - position_curr;
-
                     }
                     double tol = not_curve_consecutive_distance_meters;
 
@@ -425,8 +423,6 @@ bool save_results(std::vector<Session>& sessions)
     return true;
 }
 
-
-
 bool loadProject(const std::string& file_name, ProjectSettings& _project_settings)
 {
     std::cout << "Opening project file: '" << file_name << "'\n";
@@ -507,7 +503,6 @@ void openProject()
         loadProject(fs::path(input_file_name).string(), project_settings);
     }
 }
-
 
 void addSession()
 {
@@ -618,37 +613,21 @@ void save_all_sessions_as_tum_cli()
         if (i >= sessions.size())
             continue;
 
-
         Session& session = sessions[i];
 
+        std::filesystem::path session_path = std::filesystem::path(project_settings.session_file_names[i]);
 
-        std::filesystem::path session_path =
-            std::filesystem::path(project_settings.session_file_names[i]);
+        std::filesystem::path parent = session_path.parent_path().parent_path().parent_path();
 
-
-        std::filesystem::path parent =
-            session_path.parent_path()
-                        .parent_path()
-                        .parent_path();
-
-
-        std::filesystem::path tum_dir =
-            parent / "tum";
-
+        std::filesystem::path tum_dir = parent / "tum";
 
         std::filesystem::create_directories(tum_dir);
 
+        std::string name = session_path.parent_path().filename().string();
 
-        std::string name =
-            session_path.parent_path().filename().string();
-
-
-        std::filesystem::path out =
-            tum_dir / (name + "_trajectory_tum.txt");
-
+        std::filesystem::path out = tum_dir / (name + "_trajectory_tum.txt");
 
         std::cout << "Saving: " << out << std::endl;
-
 
         std::ofstream file(out);
 
@@ -658,57 +637,31 @@ void save_all_sessions_as_tum_cli()
             continue;
         }
 
-
-        for (const auto& pc :
-             session.point_clouds_container.point_clouds)
+        for (const auto& pc : session.point_clouds_container.point_clouds)
         {
             if (!pc.visible)
                 continue;
 
-
-            for (const auto& traj :
-                 pc.local_trajectory)
+            for (const auto& traj : pc.local_trajectory)
             {
-                Eigen::Affine3d pose =
-                    pc.m_pose * traj.m_pose;
+                Eigen::Affine3d pose = pc.m_pose * traj.m_pose;
 
+                Eigen::Vector3d p = pose.translation();
 
-                Eigen::Vector3d p =
-                    pose.translation();
+                Eigen::Quaterniond q(pose.rotation());
 
+                double t = double(traj.timestamps.first) / 1e9;
 
-                Eigen::Quaterniond q(
-                    pose.rotation()
-                );
-
-
-                double t =
-                    double(traj.timestamps.first) / 1e9;
-
-
-                file
-                    << std::fixed
-                    << std::setprecision(9)
-                    << t << " "
-                    << std::setprecision(10)
-                    << p.x() << " "
-                    << p.y() << " "
-                    << p.z() << " "
-                    << q.x() << " "
-                    << q.y() << " "
-                    << q.z() << " "
-                    << q.w()
-                    << "\n";
+                file << std::fixed << std::setprecision(9) << t << " " << std::setprecision(10) << p.x() << " " << p.y() << " " << p.z()
+                     << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
             }
         }
-
 
         file.close();
 
         std::cout << "DONE: " << out << std::endl;
     }
 }
-
 
 void set_sessions_to_origin()
 {
@@ -717,9 +670,7 @@ void set_sessions_to_origin()
     if (!sessions.empty() && sessions[0].is_ground_truth)
         is_first_gt = true;
 
-
     Eigen::Affine3d m_gt = Eigen::Affine3d::Identity();
-
 
     if (!sessions.empty())
     {
@@ -742,25 +693,20 @@ void set_sessions_to_origin()
                 break;
         }
 
-
         if (ipc != -1)
         {
-            m_gt =
-                sessions[0].point_clouds_container.point_clouds[ipc].m_pose *
+            m_gt = sessions[0].point_clouds_container.point_clouds[ipc].m_pose *
                 sessions[0].point_clouds_container.point_clouds[ipc].local_trajectory[ilt].m_pose;
         }
     }
-
 
     for (auto& session : sessions)
     {
         if (is_first_gt && session.is_ground_truth)
             continue;
 
-
         int ipc = -1;
         int ilt = -1;
-
 
         for (size_t a = 0; a < session.point_clouds_container.point_clouds.size(); a++)
         {
@@ -778,20 +724,15 @@ void set_sessions_to_origin()
                 break;
         }
 
-
         if (ipc != -1)
         {
-            auto m =
-                session.point_clouds_container.point_clouds[ipc].m_pose *
+            auto m = session.point_clouds_container.point_clouds[ipc].m_pose *
                 session.point_clouds_container.point_clouds[ipc].local_trajectory[ilt].m_pose;
-
 
             auto inv = m.inverse();
 
-
             for (auto& pc : session.point_clouds_container.point_clouds)
                 pc.m_pose = inv * pc.m_pose;
-
 
             for (auto& pc : session.point_clouds_container.point_clouds)
                 pc.m_pose = m_gt * pc.m_pose;
@@ -799,8 +740,7 @@ void set_sessions_to_origin()
     }
 }
 
-int run_multi_session_registration(
-    const std::vector<std::string>& session_files)
+int run_multi_session_registration(const std::vector<std::string>& session_files)
 {
     try
     {
@@ -811,10 +751,7 @@ int run_multi_session_registration(
         // odpowiednik addSession()
         for (const auto& input_file_name : session_files)
         {
-            std::cout 
-                << "Adding session file: '"
-                << input_file_name
-                << "'\n";
+            std::cout << "Adding session file: '" << input_file_name << "'\n";
 
             project_settings.session_file_names.push_back(input_file_name);
         }
@@ -822,22 +759,15 @@ int run_multi_session_registration(
         loaded_sessions = false;
         time_stamp_offset = 0.0;
 
-
         // odpowiednik przycisku Load Sessions
         loadSessions();
 
-
         if (!loaded_sessions)
         {
-            throw std::runtime_error(
-                "Sessions loading failed");
+            throw std::runtime_error("Sessions loading failed");
         }
 
-
-        std::cout
-            << "Loaded "
-            << sessions.size()
-            << " sessions\n";
+        std::cout << "Loaded " << sessions.size() << " sessions\n";
 
         std::cout << "=== Applying set_sessions_to_origin ===" << std::endl;
 
@@ -849,10 +779,7 @@ int run_multi_session_registration(
         {
             if (!session.is_ground_truth)
             {
-                std::cout 
-                    << "Saving poses to: "
-                    << session.point_clouds_container.poses_file_name
-                    << std::endl;
+                std::cout << "Saving poses to: " << session.point_clouds_container.poses_file_name << std::endl;
             }
         }
 
@@ -863,40 +790,29 @@ int run_multi_session_registration(
         std::cout << "Export finished\n";
 
         return 0;
-    }
-    catch (const std::exception& e)
+    } catch (const std::exception& e)
     {
-        std::cerr
-            << "ERROR: "
-            << e.what()
-            << std::endl;
+        std::cerr << "ERROR: " << e.what() << std::endl;
 
         return -1;
     }
 }
 
-
 int main(int argc, char* argv[])
 {
-    if(argc < 2)
+    if (argc < 2)
     {
-        std::cout
-            << "Usage: "
-            << argv[0]
-            << " session1.mjs session2.mjs ...\n";
+        std::cout << "Usage: " << argv[0] << " session1.mjs session2.mjs ...\n";
 
         return 1;
     }
 
-
     std::vector<std::string> session_files;
 
-
-    for(int i = 1; i < argc; i++)
+    for (int i = 1; i < argc; i++)
     {
         session_files.push_back(argv[i]);
     }
-
 
     return run_multi_session_registration(session_files);
 }

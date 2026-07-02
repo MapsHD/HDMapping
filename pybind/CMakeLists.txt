@@ -211,12 +211,14 @@ target_link_libraries(multi_view_tls_registration_py
 
 
 target_link_libraries(
+    multi_session_registration_py
     PRIVATE pybind11::module 
             core_no_gui
             ${PLATFORM_LASZIP_LIB} 
             vqf
             ${PLATFORM_MISCELLANEOUS_LIBS}
 )
+
 
 if(WIN32)
     set_target_properties(core_py PROPERTIES SUFFIX ".pyd")

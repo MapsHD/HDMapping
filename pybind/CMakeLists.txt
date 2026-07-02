@@ -174,21 +174,18 @@ target_link_libraries(core_py
             ${PLATFORM_MISCELLANEOUS_LIBS}
 )
 
-target_link_libraries(
-    multi_session_registration_py
-
+target_link_libraries(multi_session_registration_py
     PRIVATE
-
     pybind11::module
-
     core_no_gui
-
+    OpenGL::GL
+    OpenGL::GLU
+    GLUT::GLUT
     ${PLATFORM_LASZIP_LIB}
-
     vqf
-
     ${PLATFORM_MISCELLANEOUS_LIBS}
 )
+
 target_link_libraries(lidar_odometry_py
     PRIVATE pybind11::module
             core_no_gui

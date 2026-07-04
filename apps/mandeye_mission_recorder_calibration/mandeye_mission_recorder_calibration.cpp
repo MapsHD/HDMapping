@@ -26,6 +26,8 @@
 #include <Core/transformations.h>
 #include <Core/utils.hpp>
 
+#include "portable-file-dialogs.h"
+
 #ifdef _WIN32
 #include "resource.h"
 #include <shellapi.h> // <-- Required for ShellExecuteA
@@ -91,6 +93,8 @@ double search_radius = 0.1;
 
 bool show_grid = true;
 bool manual_calibration = false;
+bool show_gizmo = false;
+float m_gizmo[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -229,9 +233,26 @@ void settings_gui()
                 {
                     const auto input_file_name = mandeye::fd::OpenFileDialogOneFile("Serial number file", mandeye::fd::sn_filter);
                     idToSn = MLvxCalib::GetIdToSnMapping(input_file_name);
+                    if (idToSn.size() > 0)
+                    {
+                        calibration_file_name = "";
+                        calibrations.clear();
+                        imuSnToUse = idToSn.at(0);
+                        spdlog::info("Loaded LiDAR serial numbers:");
+                        for (const auto& [id, sn] : idToSn)
+                            spdlog::info(" - ID: {} --> SN: {}", id, sn.c_str());
+                        if (idToSn.size() <= 1)
+                        {
+                            [[maybe_unused]] pfd::message message(
+                                "Warning",
+                                "Only one LiDAR detected. Calibration is not possible with a single LiDAR unit.",
+                                pfd::choice::ok,
+                                pfd::icon::warning);
+                        }
+                    }
                 }
 
-                if (idToSn.size() == 1)
+                if (idToSn.size() <= 1)
                     ImGui::Text("No need for calibration when only 1 LiDAR available (Load other file or quit)");
             }
             else
@@ -251,7 +272,7 @@ void settings_gui()
                         const auto input_file_name = mandeye::fd::SaveFileDialog(
                             "Save calibration file", mandeye::fd::Calibration_filter, ".mjc", "calibration.mjc");
 
-                        if (input_file_name.size() > 0)
+                        if (input_file_name.size() >= 1)
                         {
                             std::string l1 = idToSn.at(0);
                             std::string l2 = idToSn.at(1);
@@ -285,6 +306,14 @@ void settings_gui()
                                 return;
                             fs << j.dump(2);
                             fs.close();
+                        }
+                        else
+                        {
+                            [[maybe_unused]] pfd::message message(
+                                "Warning",
+                                "Only one LiDAR detected. Calibration is not possible with a single LiDAR unit. ",
+                                pfd::choice::ok,
+                                pfd::icon::warning);
                         }
                     }
                     if (ImGui::IsItemHovered())
@@ -512,6 +541,18 @@ void settings_gui()
 
                         Eigen::Affine3d m_pose = affine_matrix_from_pose_tait_bryan(tb_pose);
                         calibrations.at(chosen_lidar) = m_pose;
+                    }
+
+                    ImGui::Checkbox("Show gizmo", &show_gizmo);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Drag the gizmo in the 3D view to adjust the pose of the selected LiDAR");
+
+                    if (show_gizmo)
+                    {
+                        const Eigen::Affine3d& m = calibrations.at(chosen_lidar);
+                        for (int c = 0; c < 4; c++)
+                            for (int r = 0; r < 4; r++)
+                                m_gizmo[c * 4 + r] = static_cast<float>(m(r, c));
                     }
                 }
 
@@ -846,6 +887,32 @@ void display()
         ImGui::PopStyleColor(3);
 
         ImGui::EndMainMenuBar();
+    }
+
+    if (manual_calibration && show_gizmo && chosen_lidar != -1)
+    {
+        ImGuizmo::BeginFrame();
+        ImGuizmo::Enable(true);
+        ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+        GLfloat projection[16];
+        glGetFloatv(GL_PROJECTION_MATRIX, projection);
+
+        GLfloat modelview[16];
+        glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+
+        ImGuizmo::Manipulate(
+            &modelview[0],
+            &projection[0],
+            ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y,
+            ImGuizmo::WORLD,
+            m_gizmo,
+            NULL);
+
+        Eigen::Affine3d& m = calibrations.at(chosen_lidar);
+        for (int c = 0; c < 4; c++)
+            for (int r = 0; r < 4; r++)
+                m(r, c) = static_cast<double>(m_gizmo[c * 4 + r]);
     }
 
     cor_window();

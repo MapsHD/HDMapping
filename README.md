@@ -193,11 +193,11 @@ Benchmark Orchestration
 
 Datasets
 - https://charleshamesse.github.io/bunker-dvi-dataset/
-- https://github.com/Jakubach/kitti_to_ros
-- https://github.com/Jakubach/kitti_to_hdmapping
+- https://github.com/Jakubach/kitti_to_ros (Michal W)
+- https://github.com/Jakubach/kitti_to_hdmapping (Michal W)
 - M2DGR https://github.com/SJTU-ViSYS/M2DGR
 - NCLT https://robots.engin.umich.edu/nclt/
-- Hilti SLAM Challenge https://hilti-challenge.com/dataset-2023
+- Hilti SLAM Challenge https://hilti-challenge.com/dataset-2023 (Michal P)
 - Complex Urban https://sites.google.com/view/complex-urban-dataset
 - NTU VIRAL https://ntu-aris.github.io/ntu_viral_dataset/
 - HeRCULES

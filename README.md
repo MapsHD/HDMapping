@@ -257,7 +257,7 @@ ToDo
 - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=11419773 (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Dynamic-ICP.bib), no source code)
 - https://github.com/chengwei0427/ct-lio
 - https://github.com/sjtuyinjie/Ground-Fusion2 (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Ground-Fusion2.bib))
-- https://github.com/minwoo0611/MA-LIO
+- https://github.com/minwoo0611/MA-LIO (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MA-LIO.bib))
 - https://github.com/herrmy86/Voxel-SLAM-intensity/tree/main
 - https://github.com/deepuav/AdaTrajLo
 - https://github.com/chengwei0427/hm-lio

@@ -232,6 +232,7 @@ Algorithms with unsolved issues
   
 Not supported algorithm
 - https://ieeexplore.ieee.org/document/10900461, https://github.com/kafeiyin00/UA-MPC (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/UA-MPC.bib), we do not support rotary LiDAR)
+- https://github.com/YangSiri/OR-LIM (2022, we do not support rotary LiDAR)
 
 Required PCD format:
 - https://github.com/KTH-RPL/dufomap (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
@@ -283,7 +284,6 @@ ToDo: check if addressed
 - https://github.com/hku-mars/fast-livo
 - https://github.com/TixiaoShan/LVI-SAM
 - https://github.com/HxCa1/BEV-LIO-LC
-- https://github.com/YangSiri/OR-LIM
 - https://github.com/hku-mars/fast-livo2
 - https://github.com/dongjae0107/LAPS
 - https://github.com/eugeniu1994/MAP_LIO

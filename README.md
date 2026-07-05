@@ -263,6 +263,7 @@ ToDo
 - https://github.com/chengwei0427/hm-lio (2023, no publication)
 - https://github.com/HViktorTsoi/PV-LIO (2023, no publication)
 - https://github.com/RoboFeng/RI-LIO (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RI-LIO.bib))
+- https://github.com/ethz-asl/COIN-LIO (2024, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/COIN-LIO.bib))
 
 ToDo: Deep learning
 - https://www.sciencedirect.com/science/article/abs/pii/S0921889025001903 (2025, Elsevier RAS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MFS-LO.bib), no source code)
@@ -281,7 +282,6 @@ ToDo: check if addressed
 - https://arxiv.org/pdf/1907.02233 - LINS-SLAM
 - https://github.com/hku-mars/fast-livo
 - https://github.com/TixiaoShan/LVI-SAM
-- https://github.com/ethz-asl/COIN-LIO
 - https://github.com/HxCa1/BEV-LIO-LC
 - https://github.com/YangSiri/OR-LIM
 - https://github.com/hku-mars/fast-livo2

@@ -163,7 +163,7 @@ It is designed for a benchmark.
 - https://github.com/MapsHD/benchmark-lidar_odometry_ros_wrapper-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/lidar_odometry_ros_wrapper.bib), [[movie]](https://youtu.be/w233P_MZMWk))
 - https://github.com/MapsHD/benchmark-SuperOdometry-to-HDMapping (2021, IROS, 2025, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SuperOdometry.bib), [[movie]](https://youtu.be/2bRunzG43sw))
 - https://github.com/MapsHD/benchmark-mola_lidar_odometry-to-HDMapping (2025, IJRR, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/mola-lidar-odometry.bib), [[movie]](https://youtu.be/KcVTTurel44)) 
-- https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RESPLE.bib), [[movie]](https://youtu.be/5PAB4xJmMoo))
+- https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RESPLE.bib), [[movie]](https://youtu.be/5PAB4xJmMoo)) (Todo --> add to automated benchmark)
 - https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GenZ-ICP.bib), [[movie]](https://youtu.be/vgGkucOBVg4))
 - https://github.com/MapsHD/benchmark-MM-LINS-to-HDMapping (2025, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MM-LINS.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-Voxel-SLAM-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Voxel-SLAM.bib), 2nd place ICRA HILTI 2023 SLAM Challenge, 1st place ICCV 2023 SLAM Challenge, movie ToDo)

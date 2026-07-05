@@ -1,3 +1,5 @@
+!!! Recent benchmark results (24 LIO algorithms) [Bunker-DVI-Dataset-reg-1](https://github.com/MapsHD/benchmark-HDMapping-Orchestration/tree/Bunker-DVI-Dataset-reg-1)
+
 # PROJECT ONBOARDING VIDEOS - OPENING MEASUREMENT SEASON 2026
 
 [![MANDEYE-D](https://img.youtube.com/vi/ntF8kO8r8MM/default.jpg)](https://youtu.be/ntF8kO8r8MM)
@@ -155,13 +157,13 @@ It is designed for a benchmark.
 - https://github.com/MapsHD/benchmark-SE3-LIO-to-HDMapping (2026, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SE3-LIO.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-EllipseLIO-to-HDMapping (2026, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/EllipseLIO.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-D-LIO-to-HDMapping (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/D-LIO.bib), movie ToDo)
-- https://github.com/MapsHD/benchmark-FORM-to-HDMapping (2026, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib), [[movie]](https://youtu.be/2c2ySFIncyA))
-- https://github.com/MapsHD/benchmark-Super-LIO-to-HDMapping (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/form.bib), [[movie]](https://youtu.be/CQmLOdV_mQA))
+- https://github.com/MapsHD/benchmark-FORM-to-HDMapping (2026, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/form.bib), [[movie]](https://youtu.be/2c2ySFIncyA))
+- https://github.com/MapsHD/benchmark-Super-LIO-to-HDMapping (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib), [[movie]](https://youtu.be/CQmLOdV_mQA))
 - https://github.com/MapsHD/benchmark-DALI_SLAM-to-HDMapping (2025, Elsevier ISPRS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DALI-SLAM.bib))
 - https://github.com/MapsHD/benchmark-lidar_odometry_ros_wrapper-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/lidar_odometry_ros_wrapper.bib), [[movie]](https://youtu.be/w233P_MZMWk))
 - https://github.com/MapsHD/benchmark-SuperOdometry-to-HDMapping (2021, IROS, 2025, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SuperOdometry.bib), [[movie]](https://youtu.be/2bRunzG43sw))
 - https://github.com/MapsHD/benchmark-mola_lidar_odometry-to-HDMapping (2025, IJRR, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/mola-lidar-odometry.bib), [[movie]](https://youtu.be/KcVTTurel44)) 
-- https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RESPLE.bib), [[movie]](https://youtu.be/5PAB4xJmMoo))
+- https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RESPLE.bib), [[movie]](https://youtu.be/5PAB4xJmMoo)) (ToDo --> add to automated benchmark)
 - https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GenZ-ICP.bib), [[movie]](https://youtu.be/vgGkucOBVg4))
 - https://github.com/MapsHD/benchmark-MM-LINS-to-HDMapping (2025, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MM-LINS.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-Voxel-SLAM-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Voxel-SLAM.bib), 2nd place ICRA HILTI 2023 SLAM Challenge, 1st place ICCV 2023 SLAM Challenge, movie ToDo)
@@ -193,11 +195,11 @@ Benchmark Orchestration
 
 Datasets
 - https://charleshamesse.github.io/bunker-dvi-dataset/
-- https://github.com/Jakubach/kitti_to_ros
-- https://github.com/Jakubach/kitti_to_hdmapping
+- https://github.com/Jakubach/kitti_to_ros (Michal W)
+- https://github.com/Jakubach/kitti_to_hdmapping (Michal W)
 - M2DGR https://github.com/SJTU-ViSYS/M2DGR
 - NCLT https://robots.engin.umich.edu/nclt/
-- Hilti SLAM Challenge https://hilti-challenge.com/dataset-2023
+- Hilti SLAM Challenge https://hilti-challenge.com/dataset-2023 (Michal P)
 - Complex Urban https://sites.google.com/view/complex-urban-dataset
 - NTU VIRAL https://ntu-aris.github.io/ntu_viral_dataset/
 - HeRCULES
@@ -235,7 +237,7 @@ Required PCD format:
 - https://github.com/KTH-RPL/dufomap (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
 
 ToDo
-- https://github.com/NKU-MobFly-Robotics/R-VoxelMap (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/R-VoxelMap.bib), no source code)
+- https://github.com/NKU-MobFly-Robotics/R-VoxelMap (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/R-VoxelMap.bib))
 - https://github.com/KTH-RPL/DynamicMap_Benchmark (2023, ITSC, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
 - https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib), with loop closures)
 - https://github.com/ZikangYuan/sr_lio (2024, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sr-lio.bib)) - Piotr
@@ -256,7 +258,8 @@ ToDo
 - https://github.com/chengwei0427/ct-lio
 - https://github.com/sjtuyinjie/Ground-Fusion2
 - https://github.com/minwoo0611/MA-LIO
-- https://github.com/herrmy86/Voxel-SLAM-intensity/tree/main 
+- https://github.com/herrmy86/Voxel-SLAM-intensity/tree/main
+- https://github.com/deepuav/AdaTrajLo
 
 ToDo: Deep learning
 - https://www.sciencedirect.com/science/article/abs/pii/S0921889025001903 (2025, Elsevier RAS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MFS-LO.bib), no source code)

@@ -262,6 +262,7 @@ ToDo
 - https://github.com/deepuav/AdaTrajLo (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Traj-LO.bib))
 - https://github.com/chengwei0427/hm-lio
 - https://github.com/HViktorTsoi/PV-LIO
+- https://github.com/RoboFeng/RI-LIO (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RI-LIO.bib))
 
 ToDo: Deep learning
 - https://www.sciencedirect.com/science/article/abs/pii/S0921889025001903 (2025, Elsevier RAS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MFS-LO.bib), no source code)
@@ -278,7 +279,6 @@ ToDo: check if addressed
 - https://arxiv.org/pdf/2204.04932 - SC-F-LOAM
 - https://www.mdpi.com/1424-8220/22/2/520 - LEGO-LOAM-SC
 - https://arxiv.org/pdf/1907.02233 - LINS-SLAM
-- https://github.com/RoboFeng/RI-LIO
 - https://github.com/hku-mars/fast-livo
 - https://github.com/TixiaoShan/LVI-SAM
 - https://github.com/ethz-asl/COIN-LIO

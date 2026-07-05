@@ -260,6 +260,7 @@ ToDo
 - https://github.com/minwoo0611/MA-LIO
 - https://github.com/herrmy86/Voxel-SLAM-intensity/tree/main
 - https://github.com/deepuav/AdaTrajLo
+- https://github.com/chengwei0427/hm-lio
 
 ToDo: Deep learning
 - https://www.sciencedirect.com/science/article/abs/pii/S0921889025001903 (2025, Elsevier RAS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MFS-LO.bib), no source code)

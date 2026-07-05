@@ -157,7 +157,7 @@ It is designed for a benchmark.
 - https://github.com/MapsHD/benchmark-SE3-LIO-to-HDMapping (2026, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SE3-LIO.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-EllipseLIO-to-HDMapping (2026, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/EllipseLIO.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-D-LIO-to-HDMapping (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/D-LIO.bib), movie ToDo)
-- https://github.com/MapsHD/benchmark-FORM-to-HDMapping (2026, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Super-LIO.bib), [[movie]](https://youtu.be/2c2ySFIncyA))
+- https://github.com/MapsHD/benchmark-FORM-to-HDMapping (2026, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/form.bib), [[movie]](https://youtu.be/2c2ySFIncyA))
 - https://github.com/MapsHD/benchmark-Super-LIO-to-HDMapping (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/form.bib), [[movie]](https://youtu.be/CQmLOdV_mQA))
 - https://github.com/MapsHD/benchmark-DALI_SLAM-to-HDMapping (2025, Elsevier ISPRS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DALI-SLAM.bib))
 - https://github.com/MapsHD/benchmark-lidar_odometry_ros_wrapper-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/lidar_odometry_ros_wrapper.bib), [[movie]](https://youtu.be/w233P_MZMWk))

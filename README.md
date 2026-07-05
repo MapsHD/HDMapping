@@ -253,15 +253,15 @@ ToDo
 - https://neufs-ma.github.io/M3DSS/index.html (benchmark, dataset)
 - https://github.com/PRBonn/semantic_suma/ (2019, IEEE/RSJ, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SuMa.bib))
 - https://github.com/gisbi-kim/SC-LeGO-LOAM (2018, IEEE/RSJ, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SC-LeGO-LOAM.bib))
-- https://github.com/xuankuzcr/Global-LVBA
+- https://github.com/xuankuzcr/Global-LVBA (2025, no publication)
 - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=11419773 (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Dynamic-ICP.bib), no source code)
-- https://github.com/chengwei0427/ct-lio
+- https://github.com/chengwei0427/ct-lio (2023, no publication)
 - https://github.com/sjtuyinjie/Ground-Fusion2 (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Ground-Fusion2.bib))
 - https://github.com/minwoo0611/MA-LIO (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MA-LIO.bib))
 - https://github.com/herrmy86/Voxel-SLAM-intensity/tree/main
 - https://github.com/deepuav/AdaTrajLo (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Traj-LO.bib))
-- https://github.com/chengwei0427/hm-lio
-- https://github.com/HViktorTsoi/PV-LIO
+- https://github.com/chengwei0427/hm-lio (2023, no publication)
+- https://github.com/HViktorTsoi/PV-LIO (2023, no publication)
 - https://github.com/RoboFeng/RI-LIO (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RI-LIO.bib))
 
 ToDo: Deep learning

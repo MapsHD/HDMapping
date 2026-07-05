@@ -259,7 +259,7 @@ ToDo
 - https://github.com/sjtuyinjie/Ground-Fusion2 (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Ground-Fusion2.bib))
 - https://github.com/minwoo0611/MA-LIO (2023, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MA-LIO.bib))
 - https://github.com/herrmy86/Voxel-SLAM-intensity/tree/main
-- https://github.com/deepuav/AdaTrajLo
+- https://github.com/deepuav/AdaTrajLo (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Traj-LO.bib))
 - https://github.com/chengwei0427/hm-lio
 - https://github.com/HViktorTsoi/PV-LIO
 

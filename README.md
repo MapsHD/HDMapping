@@ -252,7 +252,7 @@ ToDo
 - https://github.com/PRBonn/semantic_suma/ (2019, IEEE/RSJ, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SuMa.bib))
 - https://github.com/gisbi-kim/SC-LeGO-LOAM (2018, IEEE/RSJ, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SC-LeGO-LOAM.bib))
 - https://github.com/xuankuzcr/Global-LVBA
-- https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=11419773
+- https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=11419773 (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Dynamic-ICP.bib), no source code)
 - https://github.com/chengwei0427/ct-lio
 - https://github.com/sjtuyinjie/Ground-Fusion2
 - https://github.com/minwoo0611/MA-LIO

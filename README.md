@@ -1,4 +1,4 @@
-!!! Recent benchmark results (24 LIO algorithms) [Bunker-DVI-Dataset-reg-1](https://github.com/MapsHD/benchmark-HDMapping-Orchestration/tree/Bunker-DVI-Dataset-reg-1)
+!!! Recent benchmark results (27 LIO algorithms) [Bunker-DVI-Dataset-reg-1](https://github.com/MapsHD/benchmark-HDMapping-Orchestration/tree/Bunker-DVI-Dataset-reg-1)
 
 # PROJECT ONBOARDING VIDEOS - OPENING MEASUREMENT SEASON 2026
 

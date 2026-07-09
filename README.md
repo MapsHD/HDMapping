@@ -238,14 +238,14 @@ Required PCD format:
 - https://github.com/KTH-RPL/dufomap (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
 
 ToDo
-- https://github.com/ethz-asl/bievr-lio
+- https://github.com/ethz-asl/bievr-lio - Piotr 1
 - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=11419773 (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Dynamic-ICP.bib), no source code)
 - https://github.com/NKU-MobFly-Robotics/R-VoxelMap (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/R-VoxelMap.bib))
 - https://github.com/xuankuzcr/Global-LVBA (2025, no publication)
 - https://github.com/sjtuyinjie/Ground-Fusion2 (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Ground-Fusion2.bib))
 - https://github.com/ethz-asl/COIN-LIO (2024, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/COIN-LIO.bib))
-- https://github.com/ZikangYuan/sr_lio (2024, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sr-lio.bib)) - Piotr
-- https://github.com/PRBonn/PIN_SLAM (2024, TRO, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/PIN-SLAM.bib)) - Piotr
+- https://github.com/ZikangYuan/sr_lio (2024, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sr-lio.bib)) - Piotr 2
+- https://github.com/PRBonn/PIN_SLAM (2024, TRO, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/PIN-SLAM.bib)) - Piotr 3
 - https://github.com/deepuav/AdaTrajLo (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Traj-LO.bib))
 - https://github.com/KTH-RPL/DynamicMap_Benchmark (2023, ITSC, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
 - https://github.com/StephLin/LIO-SEGMOT (2023, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SEGMOT.bib))

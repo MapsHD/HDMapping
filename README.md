@@ -205,6 +205,7 @@ Datasets
 - HeRCULES
 - He-LiPR
 - AevaScene
+- https://thisparticle.github.io/geode/
 
 Algorithms without code
 - https://kafeiyin00.github.io/AEOS/ (2026, ISPRS-Elsevier, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/AEOS.bib), no source code)

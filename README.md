@@ -240,7 +240,6 @@ Required PCD format:
 
 ToDo
 - https://github.com/ethz-asl/bievr-lio (2026, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/bievr-lio.bib)) - Piotr 1
-- https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=11419773 (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Dynamic-ICP.bib), no source code)
 - https://github.com/NKU-MobFly-Robotics/R-VoxelMap (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/R-VoxelMap.bib))
 - https://github.com/xuankuzcr/Global-LVBA (2025, no publication)
 - https://github.com/sjtuyinjie/Ground-Fusion2 (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Ground-Fusion2.bib))

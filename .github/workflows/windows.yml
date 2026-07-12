@@ -49,5 +49,7 @@ jobs:
           name: HDMapping-windows
           path: ${{github.workspace}}/build/HDMapping_windows.zip
           retention-days: 90
+          # The source is already a ZIP so additional compression has no effect;
+          # disabling it avoids redundant work during the upload step.
           compression-level: 0
 

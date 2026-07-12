@@ -112,7 +112,10 @@ try {
     Write-Host "  + egm96_15.gtx  ($sizeMb MB)"
 } catch {
     Write-Warning "Could not download geoid from $GeoidUrl`n$_"
-    Write-Warning "Geoid will not be included in the release."
+    Write-Warning "Geoid will not be included in the release bundle."
+    Write-Warning "Note: Without a geoid file, applications that perform height"
+    Write-Warning "corrections (e.g. GNSS-based workflows) will use the WGS84"
+    Write-Warning "ellipsoid instead of a gravimetric model."
 }
 
 # ── Step 4: Copy BAT launcher ─────────────────────────────────────────────────

@@ -239,7 +239,7 @@ Required PCD format:
 - https://github.com/KTH-RPL/dufomap (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
 
 ToDo
-- https://github.com/ethz-asl/bievr-lio - Piotr 1
+- https://github.com/ethz-asl/bievr-lio (2026, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/bievr-lio.bib) - Piotr 1
 - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=11419773 (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Dynamic-ICP.bib), no source code)
 - https://github.com/NKU-MobFly-Robotics/R-VoxelMap (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/R-VoxelMap.bib))
 - https://github.com/xuankuzcr/Global-LVBA (2025, no publication)

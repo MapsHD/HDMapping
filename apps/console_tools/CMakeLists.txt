@@ -43,3 +43,13 @@ target_include_directories(pcd_to_laz PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/inclu
 add_executable(laz_to_txt laz_to_txt.cpp)
 target_link_libraries(laz_to_txt PRIVATE ${PLATFORM_LASZIP_LIB} spdlog::spdlog)
 target_include_directories(laz_to_txt PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/include ${PROJECT_BINARY_DIR}/include)
+
+install(TARGETS
+    matrix_mul
+    multiply_timestamps_session_point_cloud_laz
+    multiply_timestamps_session_trajectory_csv
+    laz_to_ply
+    laz_to_pcd
+    pcd_to_laz
+    laz_to_txt
+    DESTINATION bin)

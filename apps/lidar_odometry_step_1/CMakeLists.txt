@@ -88,6 +88,8 @@ if (MSVC)
     target_compile_options(lidar_odometry_step_1 PRIVATE /bigobj)
 endif()
 
+install(TARGETS lidar_odometry_step_1 DESTINATION bin)
+
 add_executable(
   drag_folder_with_mandeye_data_and_drop_here-precision_forestry drag_folder_with_mandeye_data_and_drop_here-precision_forestry.cpp ${SOURCES}
   )

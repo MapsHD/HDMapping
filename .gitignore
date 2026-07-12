@@ -72,3 +72,6 @@ imgui.ini
 /.gitmodules
 /build2
 /build3
+
+# deploy_mandeye.bat output
+/deploy

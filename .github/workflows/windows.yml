@@ -47,3 +47,13 @@ jobs:
           name: hd_mapping-zip-windows
           path: ${{github.workspace}}/build/*.zip
 
+      - name: Deploy mandeye package
+        shell: cmd
+        run: deploy_mandeye.bat "${{github.workspace}}\deploy\mandeye"
+
+      - name: Upload mandeye ZIP as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mandeye-zip-windows
+          path: ${{github.workspace}}/deploy/*.zip
+

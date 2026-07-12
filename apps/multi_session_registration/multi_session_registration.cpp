@@ -368,6 +368,16 @@ void loop_closure_gui()
 {
     if (ImGui::Begin("Manual Pose Graph Loop Closure Mode", &is_loop_closure_gui, ImGuiWindowFlags_AlwaysAutoResize))
     {
+        if (ImGui::Button("Optimize GRAPH"))
+        {
+            for (int i = 0; i < 100; i++)
+            {
+                std::cout << "Iteration [" << i + 1 << "] of: " << 100 << std::endl;
+                optimize(sessions, edges, motion_model_weights);
+            }
+            optimized = true;
+        }
+
         ImGui::Checkbox("update_rotation_center", &update_rotation_center);
 
         //

@@ -3215,15 +3215,6 @@ void display()
                     }
                     ImGui::Separator();
 
-                    if (ImGui::MenuItem("Save metascan points in WGS84 LLA (PROJ)"))
-                    {
-                        const auto output_file_name = mandeye::fd::SaveFileDialog(out_fn.c_str(), mandeye::fd::LAS_LAZ_filter, ".laz");
-                        const auto [pointcloud, intensity, timestamps] = prepareVisibleData();
-
-                        const auto lla_points = tls_registration.gnss.unproject_using_proj(pointcloud);
-
-                        exportLaz(output_file_name, lla_points, intensity, timestamps, 0, 0, 0);
-                    }
                     for (const auto& crtName : CRTs::SupportedCRTs)
                     {
                         std::string itemName = "Save metascan points in " + crtName + " (PROJ)";

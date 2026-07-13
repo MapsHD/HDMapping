@@ -41,9 +41,14 @@ jobs:
         # Build your program with the given configuration
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target package
 
-      - name: Upload ZIP package as artifact
+
+      - name: Deploy mandeye package
+        shell: cmd
+        run: deploy_mandeye.bat "${{github.workspace}}\deploy\mandeye"
+
+      - name: Upload mandeye ZIP as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hd_mapping-zip-windows
-          path: ${{github.workspace}}/build/*.zip
+          name: mandeye-zip-windows
+          path: ${{github.workspace}}/deploy/*.zip
 

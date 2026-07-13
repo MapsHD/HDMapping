@@ -82,10 +82,10 @@ echo Fetching sample geoid grid (EGM96 15', NGA, public domain)...
 if exist "%DEPLOY_DIR%\%GEOID_NAME%" (
     echo   already present, skipping download.
 ) else (
-    curl -fsSL -o "%DEPLOY_DIR%\proj\%GEOID_NAME%" "%GEOID_URL%"
+    curl -fsSL -o "%DEPLOY_DIR%\%GEOID_NAME%" "%GEOID_URL%"
     if errorlevel 1 (
         echo   WARNING: failed to download %GEOID_NAME%.
-        echo   Add a geoid grid manually to %DEPLOY_DIR%\proj if you need geoid correction.
+        echo   Add a geoid grid manually to %DEPLOY_DIR% if you need geoid correction.
     )
 )
 

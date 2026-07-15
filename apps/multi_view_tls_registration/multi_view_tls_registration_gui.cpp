@@ -1698,16 +1698,16 @@ void openLaz(bool fillInSession)
                 Eigen::Affine3d m = Eigen::Affine3d::Identity();
                 if (pc.points_local.size() > 100)
                 {
-                    //int counter = 1;
+                    // int counter = 1;
 
                     // spdlog::info("mean " << mean << std::endl;
-                    //for (size_t i = 100; i < pc.points_local.size(); i += 100)
+                    // for (size_t i = 100; i < pc.points_local.size(); i += 100)
                     //{
                     //    mean += pc.points_local[i];
                     //    counter++;
                     //}
 
-                    //mean /= counter;
+                    // mean /= counter;
                     m.translation() = mean;
 
                     PointCloud::LocalTrajectoryNode node;

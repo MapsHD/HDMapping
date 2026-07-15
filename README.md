@@ -27,7 +27,7 @@ Movie how to use it is available at [prepare training dataset movie](https://you
 [![GROUND-TRUTH-EDGE-ANNOTATION-TOOL](https://img.youtube.com/vi/tJdNNfBubeM/default.jpg)](https://youtu.be/tJdNNfBubeM)
 [![MANUAL-LOOP_CLOSURE-TOOL](https://img.youtube.com/vi/6SNvrZ2ROKg/default.jpg)](https://youtu.be/6SNvrZ2ROKg)
 
-# DOWNLOAD SOFTWARE USING THIS LINK -> [v0.101](https://github.com/MapsHD/HDMapping/releases/tag/v0.101)
+# DOWNLOAD SOFTWARE USING THIS LINK -> [v0.102](https://github.com/MapsHD/HDMapping/releases/tag/v0.102)
 
 # DOWNLOAD DEMO FROM THIS LINK -> [DEMO](https://github.com/MapsHD/HDMapping/blob/main/quick_start_demo/quick_start_demo.7z)
 
@@ -273,6 +273,7 @@ ToDo: Deep learning
 - https://github.com/IRMVLab/TransLO (2023, AAAI, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/TransLO.bib))
 - https://github.com/IRMVLab/PWCLONet (2021, IEEE/CVF CVPR, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/PWCLO-Net.bib))
 - https://github.com/IRMVLab/DSLO (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/DSLO.bib), DNN model not available)
+- https://superodometry.com/supermap
 
 ToDo: check if addressed
 - https://arxiv.org/pdf/2503.12660 - KISS-SLAM

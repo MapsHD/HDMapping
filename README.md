@@ -292,7 +292,8 @@ ToDo: check if addressed
 - https://research.buaa.edu.cn/en/publications/ve-liom-a-versatile-and-efficient-lidar-inertial-odometry-and-map/
 - https://www.mdpi.com/2072-4292/15/20/5074
 - https://www.mdpi.com/2072-4292/17/15/2656
-
+- https://ieeexplore.ieee.org/document/10237251
+  
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
 - Wang, Z., Trybała, P., Wieser, A., and Remondino, F.: MultiChange3D: A Multi-Scene, Multi-Sensor Dataset for Benchmarking 3D Geometric Change Detection (2026, ISPRS Ann. Photogramm. Remote Sens. Spatial Inf. Sci., [[PDF]](https://isprs-annals.copernicus.org/articles/XI-2-2026/639/2026/index.html), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/isprs-annals-XI-2-2026-639-2026.bib))
 - Janusz Będkowski et al., "MapsHD: A benchmark suite for LiDAR odometry frameworks", SoftwareX Volume 35, September 2026, 102822 (2026, SoftwareX, [[PDF]](https://www.sciencedirect.com/science/article/pii/S2352711026003146), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SoftwareX2026.bib))

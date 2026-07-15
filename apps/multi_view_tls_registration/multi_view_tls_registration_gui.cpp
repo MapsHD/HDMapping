@@ -1677,21 +1677,37 @@ void openLaz(bool fillInSession)
 
         if (fillInSession)
         {
+            int counter = 1;
+            Eigen::Vector3d mean(session.point_clouds_container.point_clouds[0].points_local[0]);
             for (auto& pc : session.point_clouds_container.point_clouds)
             {
-                Eigen::Affine3d m = Eigen::Affine3d::Identity();
                 if (pc.points_local.size() > 100)
                 {
-                    int counter = 1;
-                    Eigen::Vector3d mean(pc.points_local[0]);
                     // spdlog::info("mean " << mean << std::endl;
                     for (size_t i = 100; i < pc.points_local.size(); i += 100)
                     {
                         mean += pc.points_local[i];
                         counter++;
                     }
+                }
+            }
+            mean /= counter;
 
-                    mean /= counter;
+            for (auto& pc : session.point_clouds_container.point_clouds)
+            {
+                Eigen::Affine3d m = Eigen::Affine3d::Identity();
+                if (pc.points_local.size() > 100)
+                {
+                    //int counter = 1;
+
+                    // spdlog::info("mean " << mean << std::endl;
+                    //for (size_t i = 100; i < pc.points_local.size(); i += 100)
+                    //{
+                    //    mean += pc.points_local[i];
+                    //    counter++;
+                    //}
+
+                    //mean /= counter;
                     m.translation() = mean;
 
                     PointCloud::LocalTrajectoryNode node;
@@ -1773,8 +1789,10 @@ void openLaz(bool fillInSession)
 
             [[maybe_unused]] pfd::message message(
                 "Information",
-                "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates should be "
-                "small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later on "
+                "If you can not see point cloud --> 1. Change 'Points render subsampling', 2. Check console 'min max coordinates "
+                "should be "
+                "small numbers to see points in our local coordinate system'. 3. Set checkbox 'calculate_offset for WHU-TLS'. 4. Later "
+                "on "
                 "You can change offset directly in session json file.",
                 pfd::choice::ok,
                 pfd::icon::info);

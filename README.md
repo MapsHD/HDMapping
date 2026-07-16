@@ -154,7 +154,7 @@ It is designed for a benchmark.
 
 - https://github.com/MapsHD/benchmark-HDMapping-ground-truth (2026, 'under review', [[movie]](https://youtu.be/8sHyUNC3mZs))
 - https://github.com/MapsHD/benchmark-HDMapping_LIO-to-HDMapping (2026, 'under review', [[movie]](https://youtu.be/9AUvPTLUcos))
-- https://github.com/ethz-asl/bievr-lio (2026, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/bievr-lio.bib))
+- https://github.com/ethz-asl/bievr-lio (2026, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/bievr-lio.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-SE3-LIO-to-HDMapping (2026, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SE3-LIO.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-EllipseLIO-to-HDMapping (2026, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/EllipseLIO.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-D-LIO-to-HDMapping (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/D-LIO.bib), movie ToDo)

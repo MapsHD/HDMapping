@@ -199,6 +199,7 @@ Datasets
 - https://github.com/Jakubach/kitti_to_ros (Michal W)
 - https://github.com/Jakubach/kitti_to_hdmapping (Michal W)
 - M2DGR https://github.com/SJTU-ViSYS/M2DGR
+- M3DSS https://neufs-ma.github.io/M3DSS/index.html (benchmark, dataset)
 - NCLT https://robots.engin.umich.edu/nclt/
 - Hilti SLAM Challenge https://hilti-challenge.com/dataset-2023 (Michal P)
 - Complex Urban https://sites.google.com/view/complex-urban-dataset
@@ -230,26 +231,23 @@ Algorithms with unsolved issues
 - https://github.com/clegenti/2fast2lamaa (2025, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/2FAST-2LAMAA.bib)) (issue) https://github.com/clegenti/2fast2lamaa/issues/4
 - https://github.com/Livox-SDK/LIO-Livox (2026, Livox proprietary, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-Livox.bib)) (doesn't support non-repetitive lidar https://github.com/Livox-SDK/LIO-Livox/issues/81)
 
-
-  
 Not supported algorithm
 - https://ieeexplore.ieee.org/document/10900461, https://github.com/kafeiyin00/UA-MPC (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/UA-MPC.bib), we do not support rotary LiDAR)
 - https://github.com/YangSiri/OR-LIM (2022, we do not support rotary LiDAR)
 
 Required PCD format:
 - https://github.com/KTH-RPL/dufomap (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
+- https://github.com/KTH-RPL/DynamicMap_Benchmark (2023, ITSC, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes) 
 
 ToDo Build Success:
-- https://github.com/NKU-MobFly-Robotics/R-VoxelMap (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/R-VoxelMap.bib))
+- https://github.com/NKU-MobFly-Robotics/R-VoxelMap (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/R-VoxelMap.bib)) - Marcin
 - https://github.com/ZikangYuan/sr_lio (2024, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sr-lio.bib)) - Piotr 2
 - https://github.com/PRBonn/PIN_SLAM (2024, TRO, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/PIN-SLAM.bib)) - Piotr 3
-- https://github.com/KTH-RPL/DynamicMap_Benchmark (2023, ITSC, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes) 
-- https://github.com/HViktorTsoi/PV-LIO (2023, no publication)
+- https://github.com/HViktorTsoi/PV-LIO (2023, no publication) - Marcin
 - https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022) (extrinsic calibration)
 - https://github.com/SlamCabbage/Optimized-SC-F-LOAM (2022, CVCI, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SC-F-LOAM.bib))
 - https://github.com/wh200720041/floam (2021, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/F-LOAM.bib))
 - https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib), with loop closures) 
-- https://neufs-ma.github.io/M3DSS/index.html (benchmark, dataset)
 - https://github.com/herrmy86/Voxel-SLAM-intensity/tree/main
   
 ToDo Build issues:

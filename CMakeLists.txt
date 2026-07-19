@@ -25,7 +25,6 @@ set_property(CACHE HD_CPU_OPTIMIZATION PROPERTY STRINGS AUTO INTEL AMD ARM GENER
 # Options to enable / disable specific components
 option(BUILD_WITH_CLI_TOOLS "Build with command line tools" ON)
 option(BUILD_WITH_HD_MAPPER_APPLICATION "Build with hd_mapper tool" OFF)
-option(BUILD_WITH_QUICK_START_DEMO "Build with quick_start_demo" OFF)
 
 # Three-way profiler backend: NONE (zero overhead) | UTL (lightweight) | TRACY (full profiler)
 set(HDMAPPING_PROFILER "NONE" CACHE STRING "Profiler backend: NONE | UTL | TRACY")
@@ -105,10 +104,6 @@ endif()
 
 if(BUILD_WITH_HD_MAPPER_APPLICATION)
     add_subdirectory(apps/hd_mapper)
-endif()
-
-if(BUILD_WITH_QUICK_START_DEMO)
-    add_subdirectory(apps/quick_start_demo)
 endif()
 
 add_subdirectory(apps/lidar_odometry_step_1)    

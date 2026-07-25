@@ -294,7 +294,7 @@ ToDo: check if addressed
 - CMLGF-LIO https://isprs-archives.copernicus.org/articles/XLIX-B1-2026/71/2026/
     
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
-- Cosme Hernanz-Gilbert, Carlos Cabo, Álvaro Moreno-Martínez, and Mónica Herrero-Huerta, "Exploring the Potential of the MandEye Handheld LiDAR System for Mediterranean Understorey Characterisation", https://isprs-archives.copernicus.org/articles/XLIX-B2-2026/413/2026/
+- Cosme Hernanz-Gilbert, Carlos Cabo, Álvaro Moreno-Martínez, and Mónica Herrero-Huerta, "Exploring the Potential of the MandEye Handheld LiDAR System for Mediterranean Understorey Characterisation", [[PDF]](https://isprs-archives.copernicus.org/articles/XLIX-B2-2026/413/2026/)
 - Wang, Z., Trybała, P., Wieser, A., and Remondino, F.: MultiChange3D: A Multi-Scene, Multi-Sensor Dataset for Benchmarking 3D Geometric Change Detection (2026, ISPRS Ann. Photogramm. Remote Sens. Spatial Inf. Sci., [[PDF]](https://isprs-annals.copernicus.org/articles/XI-2-2026/639/2026/index.html), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/isprs-annals-XI-2-2026-639-2026.bib))
 - Janusz Będkowski et al., "MapsHD: A benchmark suite for LiDAR odometry frameworks", SoftwareX Volume 35, September 2026, 102822 (2026, SoftwareX, [[PDF]](https://www.sciencedirect.com/science/article/pii/S2352711026003146), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SoftwareX2026.bib))
 - Janusz Będkowski et al., "Wearable Mobile Mapping System for Cave Surveying - Part 1 (3-6)", CREG Journal (ISSN 1361-4800), 134, (2026, CREG Journal, [[PDF]](https://bcra.org.uk/pub/docs/downloads.html?f=j134003), [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Creg2026.bib))

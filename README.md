@@ -61,7 +61,13 @@ cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release -j
 ```
 
-**Laptops with hybrid NVIDIA/Intel graphics:** the raylib-based apps (e.g. `multi_view_tls_registration_step_2`) may default to the integrated GPU. If `nvidia-prime` is installed, launch with `prime-run` to force the discrete NVIDIA GPU instead, e.g.:
+**Laptops with hybrid NVIDIA/Intel graphics:** the raylib-based apps (e.g. `multi_view_tls_registration_step_2`) may default to the integrated GPU even with `prime-select nvidia` set, since PRIME's on-demand/offload mode is a per-launch choice, not a system default. Force the discrete NVIDIA GPU with:
+
+```bash
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./build/bin/multi_view_tls_registration_step_2
+```
+
+If the `nvidia-prime` package is installed, `prime-run` wraps the same env vars:
 
 ```bash
 prime-run ./build/bin/multi_view_tls_registration_step_2

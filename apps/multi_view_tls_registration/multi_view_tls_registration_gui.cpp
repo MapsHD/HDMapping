@@ -16,32 +16,11 @@
 // shared with GLUT apps, so they can't be changed either) are replaced with
 // Core/raylib_render.hpp's ScanRenderer instead. See each local
 // function/global below for what it replaces.
-#ifdef _WIN32
-// raylib.h declares CloseWindow(void)/ShowCursor(void), which collide with
-// windows.h's CloseWindow(HWND)/ShowCursor(BOOL) once portable-file-dialogs.h
-// (included below) pulls in real windows.h later in this translation unit
-// -- since both are extern "C" declarations of the same name with different
-// signatures, this is a hard error regardless of include order, not just a
-// macro-textual issue. Unlike rl_utils.cpp (which only needs ShellExecuteA,
-// so NOGDI/NOUSER before its own windows.h include is enough), this file
-// also needs portable-file-dialogs.h's real winuser.h functionality
-// (SendMessage/DispatchMessage/MessageBoxW/GetActiveWindow), so NOUSER
-// isn't an option here -- raylib's versions are renamed instead, just
-// around this include, so windows.h's later declarations don't collide.
-// The one call site (CloseWindow() in main()) uses the renamed identifier
-// on Windows; ShowCursor() isn't called anywhere in this file.
-#define CloseWindow CloseWindow_rl
-#define ShowCursor ShowCursor_rl
-#endif
 #include "external/glad.h"
 #include "raylib.h"
 #include "raymath.h"
 #include "rlImGui.h"
 #include "rlgl.h"
-#ifdef _WIN32
-#undef CloseWindow
-#undef ShowCursor
-#endif
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -70,7 +49,29 @@
 #include <Core/structures.h>
 #include <Core/transformations.h>
 
+#ifdef _WIN32
+// portable-file-dialogs.h pulls in real windows.h, whose CloseWindow(HWND)/
+// ShowCursor(BOOL) collide with raylib.h's already-declared CloseWindow(void)/
+// ShowCursor(void) (both extern "C", so this is a hard redeclaration error,
+// not just a macro-textual one -- and unlike rl_utils.cpp, which only needs
+// ShellExecuteA, this file also needs portable-file-dialogs.h's own
+// winuser.h functionality, i.e. SendMessage/DispatchMessage/MessageBoxW/
+// GetActiveWindow, so suppressing all of winuser.h via NOUSER isn't an
+// option here). Renaming raylib's versions doesn't work either: the
+// compiled raylib library still only exports the symbol under its real
+// name, so a renamed *declaration* just becomes an unresolved symbol at
+// link time. windows.h's versions are renamed instead -- safe because
+// portable-file-dialogs.h itself never calls CloseWindow/ShowCursor
+// (verified: neither name appears in its source) -- leaving raylib's
+// real CloseWindow/ShowCursor callable normally everywhere in this file.
+#define CloseWindow CloseWindow_win32
+#define ShowCursor ShowCursor_win32
+#endif
 #include <portable-file-dialogs.h>
+#ifdef _WIN32
+#undef CloseWindow
+#undef ShowCursor
+#endif
 
 #include <laszip/laszip_api.h>
 
@@ -4781,11 +4782,7 @@ int main(int argc, char* argv[])
         }
 
         rlImGuiShutdown();
-#ifdef _WIN32
-        CloseWindow_rl(); // raylib's CloseWindow(), renamed -- see the include block's comment
-#else
         CloseWindow();
-#endif
     } catch (const std::bad_alloc& e)
     {
         spdlog::error("System is out of memory : {}", e.what());

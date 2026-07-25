@@ -16,11 +16,32 @@
 // shared with GLUT apps, so they can't be changed either) are replaced with
 // Core/raylib_render.hpp's ScanRenderer instead. See each local
 // function/global below for what it replaces.
+#ifdef _WIN32
+// raylib.h declares CloseWindow(void)/ShowCursor(void), which collide with
+// windows.h's CloseWindow(HWND)/ShowCursor(BOOL) once portable-file-dialogs.h
+// (included below) pulls in real windows.h later in this translation unit
+// -- since both are extern "C" declarations of the same name with different
+// signatures, this is a hard error regardless of include order, not just a
+// macro-textual issue. Unlike rl_utils.cpp (which only needs ShellExecuteA,
+// so NOGDI/NOUSER before its own windows.h include is enough), this file
+// also needs portable-file-dialogs.h's real winuser.h functionality
+// (SendMessage/DispatchMessage/MessageBoxW/GetActiveWindow), so NOUSER
+// isn't an option here -- raylib's versions are renamed instead, just
+// around this include, so windows.h's later declarations don't collide.
+// The one call site (CloseWindow() in main()) uses the renamed identifier
+// on Windows; ShowCursor() isn't called anywhere in this file.
+#define CloseWindow CloseWindow_rl
+#define ShowCursor ShowCursor_rl
+#endif
 #include "external/glad.h"
 #include "raylib.h"
 #include "raymath.h"
 #include "rlImGui.h"
 #include "rlgl.h"
+#ifdef _WIN32
+#undef CloseWindow
+#undef ShowCursor
+#endif
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -69,10 +90,11 @@
 #include <proj.h>
 #ifdef _WIN32
 // Just numeric resource IDs (IDI_ICON1 etc.) -- no windows.h needed to parse
-// it, and this file makes no direct WinAPI calls, so windows.h isn't
-// included here (unlike the original): raylib.h's DrawText/CloseWindow/
-// ShowCursor collide with identically-named windows.h macros/functions
-// (see rl_utils.cpp's comment, which does need windows.h, for the fix).
+// it, and this file makes no direct WinAPI calls itself, so windows.h isn't
+// included directly here (it still arrives transitively, via
+// portable-file-dialogs.h above -- see the CloseWindow/ShowCursor rename
+// near the top of this file, and the #undef DrawText below, for how that's
+// handled).
 #include "resource.h"
 #endif
 
@@ -80,6 +102,16 @@
 // from <Core/utils.hpp> (see rl_utils.h's top comment for why it's now a
 // local header instead).
 #include "rl_utils.h"
+
+#ifdef _WIN32
+// windows.h (pulled in transitively above, via portable-file-dialogs.h)
+// #defines DrawText as DrawTextA -- undefining it restores plain DrawText
+// calls below to mean raylib's function again (its declaration, parsed
+// before windows.h's macro existed, is unaffected either way; this only
+// affects how later *source text* that writes the identifier "DrawText"
+// gets preprocessed).
+#undef DrawText
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -4749,7 +4781,11 @@ int main(int argc, char* argv[])
         }
 
         rlImGuiShutdown();
+#ifdef _WIN32
+        CloseWindow_rl(); // raylib's CloseWindow(), renamed -- see the include block's comment
+#else
         CloseWindow();
+#endif
     } catch (const std::bad_alloc& e)
     {
         spdlog::error("System is out of memory : {}", e.what());

@@ -4692,7 +4692,13 @@ bool initGL(int* argc, char** argv, const std::string& winTitleArg, void (*)(), 
     (void)argc;
     (void)argv;
 
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
+    // No FLAG_MSAA_4X_HINT: on some GPU/driver combinations (seen with an
+    // NVIDIA PRIME-offloaded context) GLFW's GLX context request for a
+    // 4x-multisample framebuffer fails outright ("GLX: Failed to create
+    // context: BadValue"), and raylib/GLFW then segfaults using the broken
+    // context instead of falling back cleanly. Not worth the crash risk for
+    // a cosmetic antialiasing hint.
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(static_cast<int>(window_width), static_cast<int>(window_height), winTitleArg.c_str());
     SetTargetFPS(60);
 

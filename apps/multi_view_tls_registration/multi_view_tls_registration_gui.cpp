@@ -68,9 +68,12 @@
 
 #include <proj.h>
 #ifdef _WIN32
+// Just numeric resource IDs (IDI_ICON1 etc.) -- no windows.h needed to parse
+// it, and this file makes no direct WinAPI calls, so windows.h isn't
+// included here (unlike the original): raylib.h's DrawText/CloseWindow/
+// ShowCursor collide with identically-named windows.h macros/functions
+// (see rl_utils.cpp's comment, which does need windows.h, for the fix).
 #include "resource.h"
-#include <windows.h>
-
 #endif
 
 // Camera/picking/mini-compass/misc-ImGui-widget API this app used to get

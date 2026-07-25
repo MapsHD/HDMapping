@@ -22,8 +22,25 @@
 #include <limits>
 
 #ifdef _WIN32
-#include <shellapi.h>
+// NOGDI/NOUSER: windows.h's wingdi.h/winuser.h #define (or, for CloseWindow/
+// ShowCursor, directly declare) identifiers that collide with raylib.h's
+// own DrawText/CloseWindow/ShowCursor -- without these, windows.h wins and
+// every call to raylib's DrawText() above silently becomes a call to the
+// Win32 GDI DrawTextA() instead, which doesn't compile against raylib's
+// arguments. NOUSER also strips SW_SHOWNORMAL (a windows.h macro), so
+// ImGuiHyperlink's ShellExecuteA call below uses its literal value (1, a
+// stable, decades-unchanged Win32 constant) instead.
+//
+// windows.h must come before shellapi.h -- shellapi.h depends on macros/
+// types windows.h defines, and this file (unlike core/src/utils.cpp, which
+// gets windows.h transitively via its precompiled header before this same
+// ordering matters) has nothing else pulling windows.h in first.
+#define NOGDI
+#define NOUSER
+// clang-format off
 #include <windows.h>
+#include <shellapi.h>
+// clang-format on
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -752,7 +769,7 @@ void ImGuiHyperlink(const char* url, ImVec4 color)
     if (ImGui::IsItemClicked())
     {
 #ifdef _WIN32
-        ShellExecuteA(0, "open", url, 0, 0, SW_SHOWNORMAL);
+        ShellExecuteA(0, "open", url, 0, 0, 1 /* SW_SHOWNORMAL, unavailable under NOUSER -- see this file's top comment */);
 #elif __APPLE__
         std::string cmd = std::string("open ") + url;
         system(cmd.c_str());

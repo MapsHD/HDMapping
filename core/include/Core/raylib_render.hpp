@@ -42,10 +42,10 @@
 // per-scan flat colors.
 enum class ScanColorMode
 {
-    Flat,      // pc.render_color, uniform per scan (the original app's only mode)
+    Flat, // pc.render_color, uniform per scan (the original app's only mode)
     Intensity, // jet colormap by normalized LAS/LAZ intensity
     Elevation, // jet colormap by world-space Z, normalized over [elevationMin, elevationMax]
-    Distance,  // jet colormap by distance from distanceCenter, normalized over [0, distanceMax]
+    Distance, // jet colormap by distance from distanceCenter, normalized over [0, distanceMax]
 };
 
 class ScanRenderer
@@ -144,7 +144,8 @@ public:
     // colorByIntensity uses; otherwise every point draws flat in color
     // (color.a is used as alpha either way). Does nothing if index is out
     // of range or the scan has no cached buffer yet.
-    void drawCachedWithTransform(size_t index, const Eigen::Affine3d& extraTransform, Color color, float pointSize, bool useIntensityColor) const;
+    void drawCachedWithTransform(
+        size_t index, const Eigen::Affine3d& extraTransform, Color color, float pointSize, bool useIntensityColor) const;
 
 private:
     struct CloudGPU

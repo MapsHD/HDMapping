@@ -1,9 +1,9 @@
 #include "rl_utils.h"
 
-#include "raylib.h"
-#include "rlgl.h"
-#include "raymath.h"
 #include "external/glad.h"
+#include "raylib.h"
+#include "raymath.h"
+#include "rlgl.h"
 
 #include <imgui_internal.h>
 
@@ -984,16 +984,16 @@ void drawMiniCompassWithRuler()
         Color color;
     };
     const Axis axes[3] = {
-        {Eigen::Vector3f::UnitX(), "X (long.)", RED},
-        {Eigen::Vector3f::UnitY(), "Y (lat.)", GREEN},
-        {Eigen::Vector3f::UnitZ(), "Z (vert.)", BLUE},
+        { Eigen::Vector3f::UnitX(), "X (long.)", RED },
+        { Eigen::Vector3f::UnitY(), "Y (lat.)", GREEN },
+        { Eigen::Vector3f::UnitZ(), "Z (vert.)", BLUE },
     };
 
     for (const auto& axis : axes)
     {
         Eigen::Vector3f eyeDir = viewLocal.rotation() * axis.dir;
-        Vector2 tip = {originX + eyeDir.x() * axisPixelLength, originY - eyeDir.y() * axisPixelLength};
-        DrawLineEx(Vector2{originX, originY}, tip, 2.f, axis.color);
+        Vector2 tip = { originX + eyeDir.x() * axisPixelLength, originY - eyeDir.y() * axisPixelLength };
+        DrawLineEx(Vector2{ originX, originY }, tip, 2.f, axis.color);
         DrawText(axis.label, (int)tip.x + 4, (int)tip.y - 6, 12, axis.color);
     }
 
@@ -1017,10 +1017,10 @@ void drawMiniCompassWithRuler()
         snprintf(label, sizeof(label), "<1 [cm]");
 
     float rulerY = originY + compassSize * 0.45f;
-    Color rulerColor = ColorFromNormalized(Vector4{1.0f - bg_color.x, 1.0f - bg_color.y, 1.0f - bg_color.z, 1.0f});
-    DrawLineEx(Vector2{originX - 40.f, rulerY}, Vector2{originX + 40.f, rulerY}, 2.f, rulerColor);
-    DrawLineEx(Vector2{originX - 40.f, rulerY - 5.f}, Vector2{originX - 40.f, rulerY + 5.f}, 2.f, rulerColor);
-    DrawLineEx(Vector2{originX + 40.f, rulerY - 5.f}, Vector2{originX + 40.f, rulerY + 5.f}, 2.f, rulerColor);
+    Color rulerColor = ColorFromNormalized(Vector4{ 1.0f - bg_color.x, 1.0f - bg_color.y, 1.0f - bg_color.z, 1.0f });
+    DrawLineEx(Vector2{ originX - 40.f, rulerY }, Vector2{ originX + 40.f, rulerY }, 2.f, rulerColor);
+    DrawLineEx(Vector2{ originX - 40.f, rulerY - 5.f }, Vector2{ originX - 40.f, rulerY + 5.f }, 2.f, rulerColor);
+    DrawLineEx(Vector2{ originX + 40.f, rulerY - 5.f }, Vector2{ originX + 40.f, rulerY + 5.f }, 2.f, rulerColor);
     DrawText(label, (int)originX - 20, (int)rulerY + 6, 14, rulerColor);
 }
 
@@ -1075,8 +1075,8 @@ LaserBeam GetLaserBeam(int x, int y)
     Matrix matView = rlGetMatrixModelview();
     Matrix matProj = rlGetMatrixProjection();
 
-    Vector3 nearPoint = Vector3Unproject(Vector3{ndcX, ndcY, 0.0f}, matProj, matView);
-    Vector3 farPoint = Vector3Unproject(Vector3{ndcX, ndcY, 1.0f}, matProj, matView);
+    Vector3 nearPoint = Vector3Unproject(Vector3{ ndcX, ndcY, 0.0f }, matProj, matView);
+    Vector3 farPoint = Vector3Unproject(Vector3{ ndcX, ndcY, 1.0f }, matProj, matView);
 
     LaserBeam laser_beam;
     laser_beam.position = Eigen::Vector3d(nearPoint.x, nearPoint.y, nearPoint.z);

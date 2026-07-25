@@ -16,11 +16,11 @@
 // shared with GLUT apps, so they can't be changed either) are replaced with
 // Core/raylib_render.hpp's ScanRenderer instead. See each local
 // function/global below for what it replaces.
+#include "external/glad.h"
 #include "raylib.h"
+#include "raymath.h"
 #include "rlImGui.h"
 #include "rlgl.h"
-#include "raymath.h"
-#include "external/glad.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -101,7 +101,8 @@ Matrix frame_mvp_3d{};
 // by rl_utils.h, included above) -- panel functions earlier in this file
 // call some of these.
 void observationPickingRender(const ObservationPicking& observation_picking);
-void renderLoopClosure(PointClouds& point_clouds_container, int index_loop_closure_source, int index_loop_closure_target, int before, int after);
+void renderLoopClosure(
+    PointClouds& point_clouds_container, int index_loop_closure_source, int index_loop_closure_target, int before, int after);
 void renderLoopClosureLabels(PointClouds& point_clouds_container);
 void display();
 void mouse(int glut_button, int state, int x, int y);
@@ -282,7 +283,6 @@ int index_end = 0;
 
 ColorScheme csPointCloud = CS_GRAD_INTENS;
 ColorScheme csTrajectory = CS_SOLID;
-
 
 // New (not in the original GLUT app): CS_GRAD_INTENS/CS_GRAD_ELEV/CS_GRAD_DIST
 // were declared in the original's ColorScheme enum but never actually wired
@@ -2344,7 +2344,7 @@ void observationPickingRender(const ObservationPicking& observation_picking)
     // point-mode immediate drawing), so point markers use small spheres.
     for (const auto& [key, value] : observation_picking.current_observation)
     {
-        DrawSphere(Vector3{static_cast<float>(value.x()), static_cast<float>(value.y()), static_cast<float>(value.z())}, 0.05f, WHITE);
+        DrawSphere(Vector3{ static_cast<float>(value.x()), static_cast<float>(value.y()), static_cast<float>(value.z()) }, 0.05f, WHITE);
     }
 
     rlColor3f(1.0f, 0.2f, 0.2f);
@@ -2372,7 +2372,8 @@ void observationPickingRender(const ObservationPicking& observation_picking)
 // work against whatever rlgl projection/modelview is currently active, same
 // as this app's own manually-driven matrix stack -- no BeginMode3D needed).
 // Coordinates are used directly (Z-up, no remap -- see raylib_render.hpp).
-void renderLoopClosure(PointClouds& point_clouds_container, int index_loop_closure_source, int index_loop_closure_target, int before, int after)
+void renderLoopClosure(
+    PointClouds& point_clouds_container, int index_loop_closure_source, int index_loop_closure_target, int before, int after)
 {
     auto& pointClouds = point_clouds_container.point_clouds;
     if (pointClouds.empty())
@@ -2441,11 +2442,12 @@ void renderLoopClosure(PointClouds& point_clouds_container, int index_loop_closu
                 Eigen::Affine3d delta = mTrg * pointClouds[idx].m_pose.inverse();
                 Color c = session.pose_graph_loop_closure.render_source_as_red_target_as_blue
                     ? BLUE
-                    : Color{static_cast<unsigned char>(pointClouds[idx].render_color[0] * 255.f),
-                            static_cast<unsigned char>(pointClouds[idx].render_color[1] * 255.f),
-                            static_cast<unsigned char>(pointClouds[idx].render_color[2] * 255.f),
-                            255};
-                scan_renderer.drawCachedWithTransform(static_cast<size_t>(idx), delta, c, static_cast<float>(pointClouds[idx].point_size), false);
+                    : Color{ static_cast<unsigned char>(pointClouds[idx].render_color[0] * 255.f),
+                             static_cast<unsigned char>(pointClouds[idx].render_color[1] * 255.f),
+                             static_cast<unsigned char>(pointClouds[idx].render_color[2] * 255.f),
+                             255 };
+                scan_renderer.drawCachedWithTransform(
+                    static_cast<size_t>(idx), delta, c, static_cast<float>(pointClouds[idx].point_size), false);
             }
         }
     }
@@ -2453,9 +2455,14 @@ void renderLoopClosure(PointClouds& point_clouds_container, int index_loop_closu
     // The marked/visible-restricted range set above (source/target or
     // active-edge scans, at their normal stored pose).
     scan_renderer.draw(
-        pointClouds, static_cast<float>(point_size), scanColorModeFromScheme(csPointCloud), static_cast<float>(session_dims.z_min),
-        static_cast<float>(session_dims.z_max), Eigen::Vector3d(rotation_center.x(), rotation_center.y(), rotation_center.z()),
-        static_cast<float>(std::max({session_dims.length, session_dims.width, session_dims.height, 1.0})), 1);
+        pointClouds,
+        static_cast<float>(point_size),
+        scanColorModeFromScheme(csPointCloud),
+        static_cast<float>(session_dims.z_min),
+        static_cast<float>(session_dims.z_max),
+        Eigen::Vector3d(rotation_center.x(), rotation_center.y(), rotation_center.z()),
+        static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
+        1);
 
     // Pose-sequence trail across the whole session, as a chain of thick
     // green cylinders (sphere at each joint), sized relative to the current
@@ -2465,9 +2472,9 @@ void renderLoopClosure(PointClouds& point_clouds_container, int index_loop_closu
     Vector3 prev{};
     for (const auto& pc : pointClouds)
     {
-        Vector3 p = Vector3{
-            static_cast<float>(pc.m_pose.translation().x()), static_cast<float>(pc.m_pose.translation().y()),
-            static_cast<float>(pc.m_pose.translation().z())};
+        Vector3 p = Vector3{ static_cast<float>(pc.m_pose.translation().x()),
+                             static_cast<float>(pc.m_pose.translation().y()),
+                             static_cast<float>(pc.m_pose.translation().z()) };
         DrawSphere(p, tubeRadius, GREEN);
         if (!first)
         {
@@ -2491,14 +2498,14 @@ void renderLoopClosure(PointClouds& point_clouds_container, int index_loop_closu
 
         Eigen::Vector3d worldSrc = pointClouds[edge.index_from].m_pose.translation();
         Eigen::Vector3d worldTrg = pointClouds[edge.index_to].m_pose.translation();
-        Vector3 pSrc = Vector3{static_cast<float>(worldSrc.x()), static_cast<float>(worldSrc.y()), static_cast<float>(worldSrc.z())};
-        Vector3 pTrg = Vector3{static_cast<float>(worldTrg.x()), static_cast<float>(worldTrg.y()), static_cast<float>(worldTrg.z())};
+        Vector3 pSrc = Vector3{ static_cast<float>(worldSrc.x()), static_cast<float>(worldSrc.y()), static_cast<float>(worldSrc.z()) };
+        Vector3 pTrg = Vector3{ static_cast<float>(worldTrg.x()), static_cast<float>(worldTrg.y()), static_cast<float>(worldTrg.z()) };
         DrawCylinderEx(pSrc, pTrg, tubeRadius, tubeRadius, 8, c);
 
         Eigen::Vector3d mid = (worldSrc + worldTrg) * 0.5;
         Eigen::Vector3d midUp = mid + Eigen::Vector3d(0, 0, 10);
-        Vector3 pMid = Vector3{static_cast<float>(mid.x()), static_cast<float>(mid.y()), static_cast<float>(mid.z())};
-        Vector3 pMidUp = Vector3{static_cast<float>(midUp.x()), static_cast<float>(midUp.y()), static_cast<float>(midUp.z())};
+        Vector3 pMid = Vector3{ static_cast<float>(mid.x()), static_cast<float>(mid.y()), static_cast<float>(mid.z()) };
+        Vector3 pMidUp = Vector3{ static_cast<float>(midUp.x()), static_cast<float>(midUp.y()), static_cast<float>(midUp.z()) };
         DrawCylinderEx(pMid, pMidUp, tubeRadius, tubeRadius, 8, c);
     }
 }
@@ -2513,26 +2520,26 @@ void renderLoopClosure(PointClouds& point_clouds_container, int index_loop_closu
 // end3DMatrixStack() (2D screen-space drawing).
 namespace
 {
-// Plain DrawText at a point sitting exactly on top of a same-size, often
-// same-color trajectory marker is easy to lose visually -- outlined in
-// black and nudged up-right of the anchor so it reads clearly regardless
-// of what's directly underneath.
-void drawOutlinedText(const char* text, Vector2 anchor, int fontSize, Color color)
-{
-    int x = static_cast<int>(anchor.x) + 6;
-    int y = static_cast<int>(anchor.y) - fontSize - 6;
-    for (int dx = -1; dx <= 1; ++dx)
+    // Plain DrawText at a point sitting exactly on top of a same-size, often
+    // same-color trajectory marker is easy to lose visually -- outlined in
+    // black and nudged up-right of the anchor so it reads clearly regardless
+    // of what's directly underneath.
+    void drawOutlinedText(const char* text, Vector2 anchor, int fontSize, Color color)
     {
-        for (int dy = -1; dy <= 1; ++dy)
+        int x = static_cast<int>(anchor.x) + 6;
+        int y = static_cast<int>(anchor.y) - fontSize - 6;
+        for (int dx = -1; dx <= 1; ++dx)
         {
-            if (dx != 0 || dy != 0)
+            for (int dy = -1; dy <= 1; ++dy)
             {
-                DrawText(text, x + dx, y + dy, fontSize, BLACK);
+                if (dx != 0 || dy != 0)
+                {
+                    DrawText(text, x + dx, y + dy, fontSize, BLACK);
+                }
             }
         }
+        DrawText(text, x, y, fontSize, color);
     }
-    DrawText(text, x, y, fontSize, color);
-}
 } // namespace
 
 void renderLoopClosureLabels(PointClouds& point_clouds_container)
@@ -2561,11 +2568,11 @@ void renderLoopClosureLabels(PointClouds& point_clouds_container)
         float clipW = m.m3 * x + m.m7 * y + m.m11 * z + m.m15;
         if (fabsf(clipW) < 1e-6f)
         {
-            return Vector2{-1000.f, -1000.f};
+            return Vector2{ -1000.f, -1000.f };
         }
         float ndcX = clipX / clipW;
         float ndcY = clipY / clipW;
-        return Vector2{(ndcX * 0.5f + 0.5f) * screenW, (1.0f - (ndcY * 0.5f + 0.5f)) * screenH};
+        return Vector2{ (ndcX * 0.5f + 0.5f) * screenW, (1.0f - (ndcY * 0.5f + 0.5f)) * screenH };
     };
 
     for (size_t i = 0; i < pointClouds.size(); ++i)
@@ -2605,8 +2612,7 @@ void display()
     ImGuiIO& io = ImGui::GetIO();
     rlViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
 
-    ClearBackground(ColorFromNormalized(
-        Vector4{bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w}));
+    ClearBackground(ColorFromNormalized(Vector4{ bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w }));
     rlEnableDepthTest();
 
     rlMatrixMode(RL_PROJECTION);
@@ -2709,7 +2715,10 @@ void display()
     {
         if (is_loop_closure_gui)
             renderLoopClosure(
-                session.point_clouds_container, index_loop_closure_source, index_loop_closure_target, num_edge_extended_before,
+                session.point_clouds_container,
+                index_loop_closure_source,
+                index_loop_closure_target,
+                num_edge_extended_before,
                 num_edge_extended_after);
     }
 
@@ -2784,12 +2793,12 @@ void display()
                         // m0..m15 column-major numbering its names imply.
                         Matrix projMat = rlGetMatrixProjection();
                         Matrix modelMat = rlGetMatrixModelview();
-                        float projection[16] = {
-                            projMat.m0, projMat.m1, projMat.m2, projMat.m3, projMat.m4, projMat.m5, projMat.m6, projMat.m7,
-                            projMat.m8, projMat.m9, projMat.m10, projMat.m11, projMat.m12, projMat.m13, projMat.m14, projMat.m15};
-                        float modelview[16] = {
-                            modelMat.m0, modelMat.m1, modelMat.m2, modelMat.m3, modelMat.m4, modelMat.m5, modelMat.m6, modelMat.m7,
-                            modelMat.m8, modelMat.m9, modelMat.m10, modelMat.m11, modelMat.m12, modelMat.m13, modelMat.m14, modelMat.m15};
+                        float projection[16] = { projMat.m0,  projMat.m1,  projMat.m2,  projMat.m3, projMat.m4,  projMat.m5,
+                                                 projMat.m6,  projMat.m7,  projMat.m8,  projMat.m9, projMat.m10, projMat.m11,
+                                                 projMat.m12, projMat.m13, projMat.m14, projMat.m15 };
+                        float modelview[16] = { modelMat.m0,  modelMat.m1,  modelMat.m2,  modelMat.m3, modelMat.m4,  modelMat.m5,
+                                                modelMat.m6,  modelMat.m7,  modelMat.m8,  modelMat.m9, modelMat.m10, modelMat.m11,
+                                                modelMat.m12, modelMat.m13, modelMat.m14, modelMat.m15 };
 
                         ImGuizmo::Manipulate(
                             &modelview[0],
@@ -2874,12 +2883,16 @@ void display()
             // sync via rebuildAll()/syncPoses() at session-load/pose-change
             // sites and each frame (see main()/loadSession() below).
             scan_renderer.draw(
-                session.point_clouds_container.point_clouds, static_cast<float>(point_size), scanColorModeFromScheme(csPointCloud),
-                static_cast<float>(session_dims.z_min), static_cast<float>(session_dims.z_max),
+                session.point_clouds_container.point_clouds,
+                static_cast<float>(point_size),
+                scanColorModeFromScheme(csPointCloud),
+                static_cast<float>(session_dims.z_min),
+                static_cast<float>(session_dims.z_max),
                 Eigen::Vector3d(rotation_center.x(), rotation_center.y(), rotation_center.z()),
-                static_cast<float>(std::max({session_dims.length, session_dims.width, session_dims.height, 1.0})),
+                static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
                 viewer_decimate_point_cloud);
-            scan_renderer.drawTrajectories(session.point_clouds_container.point_clouds, 1, session.point_clouds_container.show_imu_to_lio_diff);
+            scan_renderer.drawTrajectories(
+                session.point_clouds_container.point_clouds, 1, session.point_clouds_container.show_imu_to_lio_diff);
 
             observationPickingRender(observation_picking);
 
@@ -2902,8 +2915,14 @@ void display()
                                 p1 = session.point_clouds_container.point_clouds[key1].m_pose * value1;
                                 p2 = session.point_clouds_container.point_clouds[key2].m_pose * value2;
                             }
-                            DrawSphere(Vector3{static_cast<float>(p1.x()), static_cast<float>(p1.y()), static_cast<float>(p1.z())}, 0.05f, GREEN);
-                            DrawSphere(Vector3{static_cast<float>(p2.x()), static_cast<float>(p2.y()), static_cast<float>(p2.z())}, 0.05f, GREEN);
+                            DrawSphere(
+                                Vector3{ static_cast<float>(p1.x()), static_cast<float>(p1.y()), static_cast<float>(p1.z()) },
+                                0.05f,
+                                GREEN);
+                            DrawSphere(
+                                Vector3{ static_cast<float>(p2.x()), static_cast<float>(p2.y()), static_cast<float>(p2.z()) },
+                                0.05f,
+                                GREEN);
                             rlColor3f(1, 0, 0);
                             rlBegin(RL_LINES);
                             rlVertex3f(p1.x(), p1.y(), p1.z());
@@ -2946,7 +2965,7 @@ void display()
 
             for (auto p : picked_points)
             {
-                DrawSphere(Vector3{static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z())}, 0.05f, MAGENTA);
+                DrawSphere(Vector3{ static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()) }, 0.05f, MAGENTA);
             }
         }
         else
@@ -2962,12 +2981,12 @@ void display()
                 {
                     Matrix projMat = rlGetMatrixProjection();
                     Matrix modelMat = rlGetMatrixModelview();
-                    float projection[16] = {
-                        projMat.m0, projMat.m1, projMat.m2, projMat.m3, projMat.m4, projMat.m5, projMat.m6, projMat.m7,
-                        projMat.m8, projMat.m9, projMat.m10, projMat.m11, projMat.m12, projMat.m13, projMat.m14, projMat.m15};
-                    float modelview[16] = {
-                        modelMat.m0, modelMat.m1, modelMat.m2, modelMat.m3, modelMat.m4, modelMat.m5, modelMat.m6, modelMat.m7,
-                        modelMat.m8, modelMat.m9, modelMat.m10, modelMat.m11, modelMat.m12, modelMat.m13, modelMat.m14, modelMat.m15};
+                    float projection[16] = { projMat.m0,  projMat.m1,  projMat.m2,  projMat.m3, projMat.m4,  projMat.m5,
+                                             projMat.m6,  projMat.m7,  projMat.m8,  projMat.m9, projMat.m10, projMat.m11,
+                                             projMat.m12, projMat.m13, projMat.m14, projMat.m15 };
+                    float modelview[16] = { modelMat.m0,  modelMat.m1,  modelMat.m2,  modelMat.m3, modelMat.m4,  modelMat.m5,
+                                            modelMat.m6,  modelMat.m7,  modelMat.m8,  modelMat.m9, modelMat.m10, modelMat.m11,
+                                            modelMat.m12, modelMat.m13, modelMat.m14, modelMat.m15 };
 
                     ImGuizmo::Manipulate(
                         &modelview[0],

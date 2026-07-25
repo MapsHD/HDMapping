@@ -1,9 +1,9 @@
 #include <Core/raylib_render.hpp>
 #include <Core/transformations.h>
 
+#include "external/glad.h"
 #include "raymath.h"
 #include "rlgl.h"
-#include "external/glad.h"
 
 #include <algorithm>
 #include <cmath>
@@ -12,12 +12,12 @@
 
 namespace
 {
-// Points/poses are used in HDMapping's native Z-up world frame directly (no
-// Y-up remap) -- see the header comment for why.
-inline Vector3 toVec3(const Eigen::Vector3d& p)
-{
-    return Vector3{static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z())};
-}
+    // Points/poses are used in HDMapping's native Z-up world frame directly (no
+    // Y-up remap) -- see the header comment for why.
+    inline Vector3 toVec3(const Eigen::Vector3d& p)
+    {
+        return Vector3{ static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()) };
+    }
 } // namespace
 
 // ============================================================================
@@ -25,15 +25,15 @@ inline Vector3 toVec3(const Eigen::Vector3d& p)
 // ============================================================================
 namespace
 {
-// vertexIntensity is per-point LAS/LAZ intensity, normalized to [0,1] per
-// scan at upload time (see ScanRenderer::rebuild). vertexPosition is
-// already world-space (rebuild() applies pc.m_pose before uploading), so
-// it doubles as the Elevation/Distance color modes' input with no extra
-// per-vertex data needed. colorMode selects between the flat per-scan
-// pointColor (0, the original app's only mode) and the ScanColorMode
-// gradients (1/2/3), matching the enum's Intensity/Elevation/Distance
-// ordering exactly (see ScanRenderer::draw()'s static_cast below).
-const char* kPointVS = R"(
+    // vertexIntensity is per-point LAS/LAZ intensity, normalized to [0,1] per
+    // scan at upload time (see ScanRenderer::rebuild). vertexPosition is
+    // already world-space (rebuild() applies pc.m_pose before uploading), so
+    // it doubles as the Elevation/Distance color modes' input with no extra
+    // per-vertex data needed. colorMode selects between the flat per-scan
+    // pointColor (0, the original app's only mode) and the ScanColorMode
+    // gradients (1/2/3), matching the enum's Intensity/Elevation/Distance
+    // ordering exactly (see ScanRenderer::draw()'s static_cast below).
+    const char* kPointVS = R"(
 #version 330
 in vec3 vertexPosition;
 in float vertexIntensity;
@@ -50,7 +50,7 @@ void main()
 }
 )";
 
-const char* kPointFS = R"(
+    const char* kPointFS = R"(
 #version 330
 uniform vec4 pointColor;
 uniform int colorMode;
@@ -94,8 +94,8 @@ void main()
 }
 )";
 
-// Bytes per vertex in the uploaded buffer (xyz position + intensity).
-constexpr int kVertexStride = 4 * sizeof(float);
+    // Bytes per vertex in the uploaded buffer (xyz position + intensity).
+    constexpr int kVertexStride = 4 * sizeof(float);
 } // namespace
 
 ScanRenderer::~ScanRenderer()
@@ -287,8 +287,9 @@ void ScanRenderer::draw(
     rlSetUniform(locPointSize_, &pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locElevMin_, &elevationMin, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locElevMax_, &elevationMax, RL_SHADER_UNIFORM_FLOAT, 1);
-    float distCenterF[3] = {
-        static_cast<float>(distanceCenter.x()), static_cast<float>(distanceCenter.y()), static_cast<float>(distanceCenter.z())};
+    float distCenterF[3] = { static_cast<float>(distanceCenter.x()),
+                             static_cast<float>(distanceCenter.y()),
+                             static_cast<float>(distanceCenter.z()) };
     rlSetUniform(locDistCenter_, distCenterF, RL_SHADER_UNIFORM_VEC3, 1);
     rlSetUniform(locDistMax_, &distanceMax, RL_SHADER_UNIFORM_FLOAT, 1);
 
@@ -382,37 +383,38 @@ void ScanRenderer::clearMarks()
 
 namespace
 {
-// Converts an Eigen::Affine3d (in HDMapping's native Z-up world frame, used
-// as-is -- see the header comment) to the equivalent raylib Matrix. No
-// coordinate remap needed (unlike an earlier version of this function),
-// since points/poses are no longer converted to a separate Y-up space.
-Matrix toRaylibMatrix(const Eigen::Affine3d& t)
-{
-    const Eigen::Matrix3d& r = t.linear();
-    const Eigen::Vector3d& tr = t.translation();
+    // Converts an Eigen::Affine3d (in HDMapping's native Z-up world frame, used
+    // as-is -- see the header comment) to the equivalent raylib Matrix. No
+    // coordinate remap needed (unlike an earlier version of this function),
+    // since points/poses are no longer converted to a separate Y-up space.
+    Matrix toRaylibMatrix(const Eigen::Affine3d& t)
+    {
+        const Eigen::Matrix3d& r = t.linear();
+        const Eigen::Vector3d& tr = t.translation();
 
-    Matrix m{};
-    m.m0 = static_cast<float>(r(0, 0));
-    m.m4 = static_cast<float>(r(0, 1));
-    m.m8 = static_cast<float>(r(0, 2));
-    m.m12 = static_cast<float>(tr.x());
-    m.m1 = static_cast<float>(r(1, 0));
-    m.m5 = static_cast<float>(r(1, 1));
-    m.m9 = static_cast<float>(r(1, 2));
-    m.m13 = static_cast<float>(tr.y());
-    m.m2 = static_cast<float>(r(2, 0));
-    m.m6 = static_cast<float>(r(2, 1));
-    m.m10 = static_cast<float>(r(2, 2));
-    m.m14 = static_cast<float>(tr.z());
-    m.m3 = 0.f;
-    m.m7 = 0.f;
-    m.m11 = 0.f;
-    m.m15 = 1.f;
-    return m;
-}
+        Matrix m{};
+        m.m0 = static_cast<float>(r(0, 0));
+        m.m4 = static_cast<float>(r(0, 1));
+        m.m8 = static_cast<float>(r(0, 2));
+        m.m12 = static_cast<float>(tr.x());
+        m.m1 = static_cast<float>(r(1, 0));
+        m.m5 = static_cast<float>(r(1, 1));
+        m.m9 = static_cast<float>(r(1, 2));
+        m.m13 = static_cast<float>(tr.y());
+        m.m2 = static_cast<float>(r(2, 0));
+        m.m6 = static_cast<float>(r(2, 1));
+        m.m10 = static_cast<float>(r(2, 2));
+        m.m14 = static_cast<float>(tr.z());
+        m.m3 = 0.f;
+        m.m7 = 0.f;
+        m.m11 = 0.f;
+        m.m15 = 1.f;
+        return m;
+    }
 } // namespace
 
-void ScanRenderer::drawCachedWithTransform(size_t index, const Eigen::Affine3d& extraTransform, Color color, float pointSize, bool useIntensityColor) const
+void ScanRenderer::drawCachedWithTransform(
+    size_t index, const Eigen::Affine3d& extraTransform, Color color, float pointSize, bool useIntensityColor) const
 {
     if (!shaderValid_ || index >= clouds_.size())
     {
@@ -433,7 +435,7 @@ void ScanRenderer::drawCachedWithTransform(size_t index, const Eigen::Affine3d& 
     // transform to the cached points first, then the normal view/projection.
     Matrix mvp = MatrixMultiply(toRaylibMatrix(extraTransform), mvpBase);
 
-    float colorF[4] = {color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f};
+    float colorF[4] = { color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f };
     int colorMode = useIntensityColor ? 1 : 0;
 
     rlEnableShader(shader_.id);
@@ -460,52 +462,52 @@ void ScanRenderer::drawCachedWithTransform(size_t index, const Eigen::Affine3d& 
 
 namespace
 {
-constexpr double RAD_TO_DEG = 180.0 / M_PI;
+    constexpr double RAD_TO_DEG = 180.0 / M_PI;
 
-// Ported from the "fuse_inclination_from_IMU" / "fixed_om && fixed_fi" /
-// "show_IMU" / "show_pose" quad-and-cross markers in
-// core/src/point_cloud.cpp's PointCloud::render().
-void drawSquareOutline(const Eigen::Affine3d& m, double half, Color color)
-{
-    Eigen::Vector3d a1 = m * Eigen::Vector3d(-half, -half, 0);
-    Eigen::Vector3d a2 = m * Eigen::Vector3d(half, -half, 0);
-    Eigen::Vector3d a3 = m * Eigen::Vector3d(half, half, 0);
-    Eigen::Vector3d a4 = m * Eigen::Vector3d(-half, half, 0);
+    // Ported from the "fuse_inclination_from_IMU" / "fixed_om && fixed_fi" /
+    // "show_IMU" / "show_pose" quad-and-cross markers in
+    // core/src/point_cloud.cpp's PointCloud::render().
+    void drawSquareOutline(const Eigen::Affine3d& m, double half, Color color)
+    {
+        Eigen::Vector3d a1 = m * Eigen::Vector3d(-half, -half, 0);
+        Eigen::Vector3d a2 = m * Eigen::Vector3d(half, -half, 0);
+        Eigen::Vector3d a3 = m * Eigen::Vector3d(half, half, 0);
+        Eigen::Vector3d a4 = m * Eigen::Vector3d(-half, half, 0);
 
-    Vector3 p1 = toVec3(a1);
-    Vector3 p2 = toVec3(a2);
-    Vector3 p3 = toVec3(a3);
-    Vector3 p4 = toVec3(a4);
+        Vector3 p1 = toVec3(a1);
+        Vector3 p2 = toVec3(a2);
+        Vector3 p3 = toVec3(a3);
+        Vector3 p4 = toVec3(a4);
 
-    DrawLine3D(p1, p2, color);
-    DrawLine3D(p2, p3, color);
-    DrawLine3D(p3, p4, color);
-    DrawLine3D(p4, p1, color);
-}
+        DrawLine3D(p1, p2, color);
+        DrawLine3D(p2, p3, color);
+        DrawLine3D(p3, p4, color);
+        DrawLine3D(p4, p1, color);
+    }
 
-void drawOrientationCross(const Eigen::Affine3d& m)
-{
-    Vector3 origin = toVec3(m.translation());
-    DrawLine3D(origin, toVec3(m.translation() + m.linear().col(0)), RED);
-    DrawLine3D(origin, toVec3(m.translation() + m.linear().col(1)), GREEN);
-    DrawLine3D(origin, toVec3(m.translation() + m.linear().col(2)), BLUE);
-}
+    void drawOrientationCross(const Eigen::Affine3d& m)
+    {
+        Vector3 origin = toVec3(m.translation());
+        DrawLine3D(origin, toVec3(m.translation() + m.linear().col(0)), RED);
+        DrawLine3D(origin, toVec3(m.translation() + m.linear().col(1)), GREEN);
+        DrawLine3D(origin, toVec3(m.translation() + m.linear().col(2)), BLUE);
+    }
 
-// The IMU-fused orientation (used by both the fuse-inclination quad marker
-// and show_IMU) mirrors the local pose's translation with orientation taken
-// from the first local_trajectory node's raw IMU om/fi/ka instead of the
-// LIO-optimized pose.
-Eigen::Affine3d imuOrientationAtPose(const PointCloud& pc)
-{
-    TaitBryanPose tb;
-    tb.px = pc.m_pose(0, 3);
-    tb.py = pc.m_pose(1, 3);
-    tb.pz = pc.m_pose(2, 3);
-    tb.om = pc.local_trajectory[0].imu_om_fi_ka.x();
-    tb.fi = pc.local_trajectory[0].imu_om_fi_ka.y();
-    tb.ka = pc.local_trajectory[0].imu_om_fi_ka.z();
-    return affine_matrix_from_pose_tait_bryan(tb);
-}
+    // The IMU-fused orientation (used by both the fuse-inclination quad marker
+    // and show_IMU) mirrors the local pose's translation with orientation taken
+    // from the first local_trajectory node's raw IMU om/fi/ka instead of the
+    // LIO-optimized pose.
+    Eigen::Affine3d imuOrientationAtPose(const PointCloud& pc)
+    {
+        TaitBryanPose tb;
+        tb.px = pc.m_pose(0, 3);
+        tb.py = pc.m_pose(1, 3);
+        tb.pz = pc.m_pose(2, 3);
+        tb.om = pc.local_trajectory[0].imu_om_fi_ka.x();
+        tb.fi = pc.local_trajectory[0].imu_om_fi_ka.y();
+        tb.ka = pc.local_trajectory[0].imu_om_fi_ka.z();
+        return affine_matrix_from_pose_tait_bryan(tb);
+    }
 } // namespace
 
 void ScanRenderer::drawTrajectories(const std::vector<PointCloud>& pointClouds, int reduceRenderedTrajectory, bool visibleImuDiff) const
@@ -534,11 +536,10 @@ void ScanRenderer::drawTrajectories(const std::vector<PointCloud>& pointClouds, 
 
         if (pc.line_width > 0 && pc.local_trajectory.size() >= 2)
         {
-            Color c = Color{
-                static_cast<unsigned char>(pc.traj_color[0] * 255.f),
-                static_cast<unsigned char>(pc.traj_color[1] * 255.f),
-                static_cast<unsigned char>(pc.traj_color[2] * 255.f),
-                255};
+            Color c = Color{ static_cast<unsigned char>(pc.traj_color[0] * 255.f),
+                             static_cast<unsigned char>(pc.traj_color[1] * 255.f),
+                             static_cast<unsigned char>(pc.traj_color[2] * 255.f),
+                             255 };
 
             Vector3 prev = toVec3((pc.m_pose * pc.local_trajectory[0].m_pose).translation());
             for (size_t i = stride; i < pc.local_trajectory.size(); i += stride)

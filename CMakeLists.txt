@@ -90,6 +90,13 @@ include(cmake/implot.cmake)
 # ============================================================================
 include(cmake/dependencies.cmake)
 
+# raylib/imgui_raylib/rlimgui/imguizmo_raylib targets, needed before
+# add_subdirectory(core) below since core's own CMakeLists.txt defines a
+# core_raylib target (holding shared raylib rendering/camera/picking code,
+# e.g. core/include/Core/raylib_render.hpp) that links against them. Required
+# unconditionally: apps/multi_view_tls_registration (step2) is raylib-based.
+include(cmake/raylib.cmake)
+
 # ============================================================================
 # Core Library
 # ============================================================================
@@ -106,7 +113,7 @@ if(BUILD_WITH_HD_MAPPER_APPLICATION)
     add_subdirectory(apps/hd_mapper)
 endif()
 
-add_subdirectory(apps/lidar_odometry_step_1)    
+add_subdirectory(apps/lidar_odometry_step_1)
 add_subdirectory(apps/manual_color)
 add_subdirectory(apps/multi_session_registration)
 add_subdirectory(apps/multi_view_tls_registration)

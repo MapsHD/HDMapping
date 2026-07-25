@@ -4224,9 +4224,23 @@ void display()
                 viewer_decimate_point_cloud = 1;
 
             ImGui::SameLine();
-            ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
+            // GetFPS()/point-cloud draw-call/vertex count via raylib/ScanRenderer,
+            // rather than ImGui's own Framerate tracker -- raylib doesn't
+            // expose a general "draw calls" counter (rlgl's own internal one
+            // only tracks its immediate-mode batch renderer, not custom
+            // glDrawArrays calls like ScanRenderer's), so these are scan_renderer's
+            // own per-frame counts of the calls/points it issued in draw().
+            ImGui::Text("(%d FPS, %d draw calls, %d vertices)", GetFPS(), scan_renderer.lastDrawCallCount(),
+                scan_renderer.lastVertexCount());
         }
         ImGui::EndDisabled();
+
+        ImGui::SameLine();
+        // GL_RENDERER has no raylib wrapper (raylib doesn't expose GPU
+        // vendor/renderer strings), so this is the same plain GL query
+        // info_window()'s tooltip already uses, just surfaced directly in
+        // the bar instead of hidden behind a hover.
+        ImGui::TextDisabled("| %s", reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
 
         ImGui::SameLine(
             ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 -

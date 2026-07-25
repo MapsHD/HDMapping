@@ -107,6 +107,24 @@ public:
         float distanceMax = 1.f,
         int decimateStride = 1) const;
 
+    // Number of glDrawArrays calls draw() issued the last time it ran (one
+    // per visible scan) -- raylib/rlgl don't expose a draw-call counter for
+    // custom, non-batched GL calls like these (rlgl's own internal
+    // drawCounter only tracks its immediate-mode batch renderer), so this
+    // app-level count is the closest equivalent for a "draw calls" stat.
+    int lastDrawCallCount() const
+    {
+        return lastDrawCallCount_;
+    }
+
+    // Total points actually submitted to the GPU across all draw() calls
+    // last frame (i.e. sum of each visible scan's decimated drawCount) --
+    // the vertex-count counterpart to lastDrawCallCount() above.
+    int lastVertexCount() const
+    {
+        return lastVertexCount_;
+    }
+
     // Overrides a scan's draw() color with a flat mark color -- e.g. to
     // highlight the loop-closure source/target scans in red/blue -- drawn
     // from the same cached full-resolution GPU buffer as a normal scan
@@ -172,4 +190,6 @@ private:
     int locElevMax_ = -1;
     int locDistCenter_ = -1;
     int locDistMax_ = -1;
+    mutable int lastDrawCallCount_ = 0;
+    mutable int lastVertexCount_ = 0;
 };

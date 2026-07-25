@@ -271,6 +271,9 @@ void ScanRenderer::draw(
     float distanceMax,
     int decimateStride) const
 {
+    lastDrawCallCount_ = 0;
+    lastVertexCount_ = 0;
+
     if (!shaderValid_)
     {
         return;
@@ -350,6 +353,8 @@ void ScanRenderer::draw(
 
         const int drawCount = (gpu.count + stride - 1) / stride;
         glDrawArrays(GL_POINTS, 0, drawCount);
+        ++lastDrawCallCount_;
+        lastVertexCount_ += drawCount;
         rlDisableVertexArray();
     }
 

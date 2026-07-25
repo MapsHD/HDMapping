@@ -4230,8 +4230,8 @@ void display()
             // only tracks its immediate-mode batch renderer, not custom
             // glDrawArrays calls like ScanRenderer's), so these are scan_renderer's
             // own per-frame counts of the calls/points it issued in draw().
-            ImGui::Text("(%d FPS, %d draw calls, %d vertices)", GetFPS(), scan_renderer.lastDrawCallCount(),
-                scan_renderer.lastVertexCount());
+            ImGui::Text(
+                "(%d FPS, %d draw calls, %d vertices)", GetFPS(), scan_renderer.lastDrawCallCount(), scan_renderer.lastVertexCount());
         }
         ImGui::EndDisabled();
 

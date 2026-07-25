@@ -13,6 +13,16 @@ include(FetchContent)
 
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
+if(WIN32)
+    # Makes GLFW's Win32 backend export NvOptimusEnablement/
+    # AmdPowerXpressRequestHighPerformance (see glfw/src/win32_init.c), the
+    # standard hint NVIDIA Optimus/AMD PowerXpress drivers read from an EXE's
+    # exports to prefer the discrete GPU on hybrid-graphics laptops. Win32-only
+    # (GLFW_USE_HYBRID_HPG is a no-op on X11/Wayland/macOS) -- Linux hybrid
+    # offload is a runtime env-var choice instead (__NV_PRIME_RENDER_OFFLOAD=1
+    # __GLX_VENDOR_LIBRARY_NAME=nvidia, or prime-run), not a build-time one.
+    set(GLFW_USE_HYBRID_HPG ON CACHE BOOL "" FORCE)
+endif()
 FetchContent_Declare(
     raylib
     GIT_REPOSITORY https://github.com/raysan5/raylib.git

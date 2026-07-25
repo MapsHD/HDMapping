@@ -61,6 +61,12 @@ cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release -j
 ```
 
+**Laptops with hybrid NVIDIA/Intel graphics:** the raylib-based apps (e.g. `multi_view_tls_registration_step_2`) may default to the integrated GPU. If `nvidia-prime` is installed, launch with `prime-run` to force the discrete NVIDIA GPU instead, e.g.:
+
+```bash
+prime-run ./build/bin/multi_view_tls_registration_step_2
+```
+
 ## Quick Start (macOS)
 
 **Prerequisites:**

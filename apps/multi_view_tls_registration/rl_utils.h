@@ -15,6 +15,8 @@
 // is multi_view_tls_registration's own local header, analogous to how
 // core/src/utils.cpp served the same role for the GLUT apps.
 
+#include "raylib.h"
+
 #include <imgui.h>
 
 #include <Core/registration_plane_feature.h>
@@ -108,6 +110,17 @@ extern float new_translate_z;
 
 // Transition timing
 extern bool camera_transition_active;
+
+// The 3D view/projection rlgl had active during this frame's scene render,
+// cached by display() right before end3DMatrixStack() resets rlgl's matrix
+// stack to the 2D screen-space ortho used for the mini-compass/ImGui pass.
+// GetLaserBeam() (called from mouse(), which runs *before* display() each
+// frame -- see main()) needs these: querying rlGetMatrixModelview()/
+// rlGetMatrixProjection() live at that point would still see the previous
+// frame's post-end3DMatrixStack() state (identity modelview, 2D ortho
+// projection), not the 3D camera, producing a meaningless pick ray.
+extern Matrix frame_view_3d;
+extern Matrix frame_proj_3d;
 
 // Unlike the original (which probed GL_LINE_WIDTH_RANGE), rlgl's line width
 // support is uniform enough here not to need a runtime check -- always true.

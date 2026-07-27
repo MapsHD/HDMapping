@@ -101,6 +101,9 @@ bool glLineWidthSupport = true;
 float m_ortho_projection[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
+Matrix frame_view_3d = MatrixIdentity();
+Matrix frame_proj_3d = MatrixIdentity();
+
 // ============================================================================
 // Formerly core/src/utils.cpp -- local now (see the big comment at the top
 // of this file for why). Everywhere the original was pure ImGui/Eigen/GLM
@@ -1089,8 +1092,8 @@ LaserBeam GetLaserBeam(int x, int y)
     float ndcX = (2.0f * (float)x) / (float)width - 1.0f;
     float ndcY = 1.0f - (2.0f * (float)y) / (float)height;
 
-    Matrix matView = rlGetMatrixModelview();
-    Matrix matProj = rlGetMatrixProjection();
+    Matrix matView = frame_view_3d;
+    Matrix matProj = frame_proj_3d;
 
     Vector3 nearPoint = Vector3Unproject(Vector3{ ndcX, ndcY, 0.0f }, matProj, matView);
     Vector3 farPoint = Vector3Unproject(Vector3{ ndcX, ndcY, 1.0f }, matProj, matView);
@@ -1098,6 +1101,7 @@ LaserBeam GetLaserBeam(int x, int y)
     LaserBeam laser_beam;
     laser_beam.position = Eigen::Vector3d(nearPoint.x, nearPoint.y, nearPoint.z);
     laser_beam.direction = Eigen::Vector3d(farPoint.x - nearPoint.x, farPoint.y - nearPoint.y, farPoint.z - nearPoint.z);
+
     return laser_beam;
 }
 

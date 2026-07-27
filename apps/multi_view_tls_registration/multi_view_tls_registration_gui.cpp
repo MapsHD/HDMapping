@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 
 // This app used to be built on GLUT + legacy immediate-mode OpenGL
@@ -140,6 +141,11 @@ void observationPickingRender(const ObservationPicking& observation_picking);
 void renderLoopClosure(
     PointClouds& point_clouds_container, int index_loop_closure_source, int index_loop_closure_target, int before, int after);
 void renderLoopClosureLabels(PointClouds& point_clouds_container);
+void renderGroundControlPoints(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container);
+void renderGroundControlPointsLabels(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container);
+void renderGNSS(const GNSS& gnss, const PointClouds& point_clouds_container);
+void renderControlPoints(const ControlPoints& control_points, PointClouds& point_clouds_container);
+void renderControlPointsLabels(const ControlPoints& control_points, const PointClouds& point_clouds_container);
 void display();
 void mouse(int glut_button, int state, int x, int y);
 
@@ -2546,6 +2552,291 @@ void renderLoopClosure(
     }
 }
 
+// Was GroundControlPoints::draw_ellipse() (core/src/ground_control_points.cpp)
+// -- a GL_LINE_LOOP quad per lat/long grid cell. rlgl's rlBegin() has no
+// LOOP/STRIP mode (only RL_LINES/RL_TRIANGLES/RL_QUADS -- see
+// renderLoopClosureLabels()'s comment for the same constraint elsewhere in
+// this file), so each cell's 4-vertex loop is emitted as 4 independent line
+// segments instead. nstd is dropped: the only caller always passed 1.0.
+void drawUncertaintyEllipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Color color)
+{
+    Eigen::LLT<Eigen::Matrix<double, 3, 3>> cholSolver(covar);
+    Eigen::Matrix3d transform = cholSolver.matrixL();
+
+    const double pi = 3.141592;
+    const double di = 0.02;
+    const double dj = 0.04;
+    const double du = di * 2 * pi;
+    const double dv = dj * pi;
+
+    rlBegin(RL_LINES);
+    rlColor4ub(color.r, color.g, color.b, color.a);
+
+    for (double i = 0; i < 1.0; i += di) // horizontal
+    {
+        for (double j = 0; j < 1.0; j += dj) // vertical
+        {
+            double u = i * 2 * pi; // 0     to  2pi
+            double v = (j - 0.5) * pi; //-pi/2 to pi/2
+
+            const Eigen::Vector3d pp0(cos(v) * cos(u), cos(v) * sin(u), sin(v));
+            const Eigen::Vector3d pp1(cos(v) * cos(u + du), cos(v) * sin(u + du), sin(v));
+            const Eigen::Vector3d pp2(cos(v + dv) * cos(u + du), cos(v + dv) * sin(u + du), sin(v + dv));
+            const Eigen::Vector3d pp3(cos(v + dv) * cos(u), cos(v + dv) * sin(u), sin(v + dv));
+            Eigen::Vector3d tp0 = transform * pp0 + mean;
+            Eigen::Vector3d tp1 = transform * pp1 + mean;
+            Eigen::Vector3d tp2 = transform * pp2 + mean;
+            Eigen::Vector3d tp3 = transform * pp3 + mean;
+
+            rlVertex3f(static_cast<float>(tp0.x()), static_cast<float>(tp0.y()), static_cast<float>(tp0.z()));
+            rlVertex3f(static_cast<float>(tp1.x()), static_cast<float>(tp1.y()), static_cast<float>(tp1.z()));
+
+            rlVertex3f(static_cast<float>(tp1.x()), static_cast<float>(tp1.y()), static_cast<float>(tp1.z()));
+            rlVertex3f(static_cast<float>(tp2.x()), static_cast<float>(tp2.y()), static_cast<float>(tp2.z()));
+
+            rlVertex3f(static_cast<float>(tp2.x()), static_cast<float>(tp2.y()), static_cast<float>(tp2.z()));
+            rlVertex3f(static_cast<float>(tp3.x()), static_cast<float>(tp3.y()), static_cast<float>(tp3.z()));
+
+            rlVertex3f(static_cast<float>(tp3.x()), static_cast<float>(tp3.y()), static_cast<float>(tp3.z()));
+            rlVertex3f(static_cast<float>(tp0.x()), static_cast<float>(tp0.y()), static_cast<float>(tp0.z()));
+        }
+    }
+
+    rlEnd();
+}
+
+// Was GroundControlPoints::render() (core/src/ground_control_points.cpp) --
+// legacy-GL, compiled once into `core` and shared with the remaining GLUT
+// apps, so it can't be touched; reimplemented here with raylib's own
+// DrawLine3D (works against whatever rlgl projection/modelview is currently
+// active, same as renderLoopClosure()'s DrawSphere/DrawCylinderEx calls --
+// no BeginMode3D needed). Name/height text labels are handled separately by
+// renderGroundControlPointsLabels() (2D screen-space DrawText, same
+// reasoning as renderLoopClosureLabels()).
+void renderGroundControlPoints(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container)
+{
+    for (const auto& gcp : ground_control_points.gpcs)
+    {
+        if (gcp.index_to_node_inner < 0 ||
+            static_cast<size_t>(gcp.index_to_node_inner) >= point_clouds_container.point_clouds.size())
+        {
+            continue;
+        }
+        const auto& pc = point_clouds_container.point_clouds[gcp.index_to_node_inner];
+        if (gcp.index_to_node_outer < 0 || static_cast<size_t>(gcp.index_to_node_outer) >= pc.local_trajectory.size())
+        {
+            continue;
+        }
+
+        Eigen::Vector3d c = pc.m_pose * pc.local_trajectory[gcp.index_to_node_outer].m_pose.translation();
+        float h = static_cast<float>(gcp.lidar_height_above_ground);
+        Vector3 g{ static_cast<float>(gcp.x), static_cast<float>(gcp.y), static_cast<float>(gcp.z) };
+
+        const Color markColor{ 179, 77, 128, 255 }; // was glColor3f(0.7f, 0.3f, 0.5f)
+
+        DrawLine3D(Vector3{ g.x - 0.05f, g.y, g.z }, Vector3{ g.x + 0.05f, g.y, g.z }, markColor);
+        DrawLine3D(Vector3{ g.x, g.y - 0.05f, g.z }, Vector3{ g.x, g.y + 0.05f, g.z }, markColor);
+
+        DrawLine3D(Vector3{ g.x - 0.01f, g.y, g.z + h }, Vector3{ g.x + 0.01f, g.y, g.z + h }, markColor);
+        DrawLine3D(Vector3{ g.x, g.y - 0.01f, g.z + h }, Vector3{ g.x, g.y + 0.01f, g.z + h }, markColor);
+
+        DrawLine3D(g, Vector3{ g.x, g.y, g.z + h }, markColor);
+
+        const Color connectorColor{ 0, 77, 153, 255 }; // was glColor3f(0.0f, 0.3f, 0.6f)
+        DrawLine3D(
+            Vector3{ static_cast<float>(c.x()), static_cast<float>(c.y()), static_cast<float>(c.z()) },
+            Vector3{ g.x, g.y, g.z + h },
+            connectorColor);
+
+        if (ground_control_points.draw_uncertainty)
+        {
+            Eigen::Matrix3d covar = Eigen::Matrix3d::Zero();
+            covar(0, 0) = gcp.sigma_x * gcp.sigma_x;
+            covar(1, 1) = gcp.sigma_y * gcp.sigma_y;
+            covar(2, 2) = gcp.sigma_z * gcp.sigma_z;
+
+            Eigen::Vector3d mean(gcp.x, gcp.y, gcp.z + h);
+            drawUncertaintyEllipse(covar, mean, GRAY); // was Eigen::Vector3f(0.5, 0.5, 0.5)
+        }
+    }
+}
+
+// Was GNSS::render() (core/src/gnss.cpp) -- legacy-GL, compiled once into
+// `core` and shared with the remaining GLUT apps, so it can't be touched;
+// reimplemented here with rlgl's rl*() legacy-emulation API. GL_LINE_STRIP
+// has no rlBegin() equivalent (only RL_LINES/RL_TRIANGLES/RL_QUADS -- see
+// drawUncertaintyEllipse()'s comment for the same constraint elsewhere in
+// this file), so the polyline is emitted as one RL_LINES segment per
+// consecutive pair of poses instead. No text labels here (the original had
+// none), so unlike GroundControlPoints this needs no separate 2D-pass
+// function.
+void renderGNSS(const GNSS& gnss, const PointClouds& point_clouds_container)
+{
+    if (gnss.gnss_poses.size() >= 2)
+    {
+        rlBegin(RL_LINES);
+        rlColor3f(1.0f, 1.0f, 1.0f);
+        for (size_t i = 0; i + 1 < gnss.gnss_poses.size(); ++i)
+        {
+            const auto& a = gnss.gnss_poses[i];
+            const auto& b = gnss.gnss_poses[i + 1];
+            rlVertex3f(
+                static_cast<float>(a.enu_x - point_clouds_container.offset.x()),
+                static_cast<float>(a.enu_y - point_clouds_container.offset.y()),
+                static_cast<float>(a.enu_z - point_clouds_container.offset.z()));
+            rlVertex3f(
+                static_cast<float>(b.enu_x - point_clouds_container.offset.x()),
+                static_cast<float>(b.enu_y - point_clouds_container.offset.y()),
+                static_cast<float>(b.enu_z - point_clouds_container.offset.z()));
+        }
+        rlEnd();
+    }
+
+    if (gnss.show_correspondences)
+    {
+        rlBegin(RL_LINES);
+        rlColor3f(1.0f, 0.0f, 0.0f);
+        for (const auto& pc : point_clouds_container.point_clouds)
+        {
+            for (size_t i = 0; i < gnss.gnss_poses.size(); ++i)
+            {
+                double time_stamp = gnss.gnss_poses[i].timestamp;
+
+                auto it = std::lower_bound(
+                    pc.local_trajectory.begin(),
+                    pc.local_trajectory.end(),
+                    time_stamp,
+                    [](const PointCloud::LocalTrajectoryNode& lhs, const double& time) -> bool
+                    { return lhs.timestamps.first < time; });
+
+                size_t index = static_cast<size_t>(it - pc.local_trajectory.begin());
+
+                if (index > 0 && index < pc.local_trajectory.size())
+                {
+                    if (fabs(time_stamp - pc.local_trajectory[index].timestamps.first) < 10e12)
+                    {
+                        auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
+                        rlVertex3f(static_cast<float>(m(0, 3)), static_cast<float>(m(1, 3)), static_cast<float>(m(2, 3)));
+
+                        rlVertex3f(
+                            static_cast<float>(gnss.gnss_poses[i].enu_x - point_clouds_container.offset.x()),
+                            static_cast<float>(gnss.gnss_poses[i].enu_y - point_clouds_container.offset.y()),
+                            static_cast<float>(gnss.gnss_poses[i].enu_z - point_clouds_container.offset.z()));
+                    }
+                }
+            }
+        }
+        rlEnd();
+    }
+}
+
+// Was ControlPoints::render() (core/src/control_points.cpp) -- legacy-GL,
+// compiled once into `core` and shared with the remaining GLUT apps, so it
+// can't be touched; reimplemented here. Two parts, like the original's
+// show_pc flag:
+//  - While editing (control_points.is_imgui), the bulk multi-scan
+//    scan_renderer.draw() call in display() is skipped entirely (see this
+//    function's caller), so the original's per-point GL_POINTS draw of just
+//    the active (index_pose) scan, colored by intensity, is replaced here
+//    by restricting a scan_renderer.draw() call to that one scan instead of
+//    reimplementing per-point immediate-mode drawing (rlBegin() has no
+//    RL_POINTS mode -- see drawUncertaintyEllipse()'s comment for the same
+//    rlBegin() constraint elsewhere in this file). Its GL_LINE_STRIP
+//    trajectory becomes RL_LINES segments, same reasoning.
+//  - The per-control-point crosshair/connector/ellipse markers, drawn
+//    unconditionally in the original (both show_pc branches called this),
+//    are always drawn regardless of is_imgui -- text labels are handled
+//    separately by renderControlPointsLabels().
+void renderControlPoints(const ControlPoints& control_points, PointClouds& point_clouds_container)
+{
+    auto& pointClouds = point_clouds_container.point_clouds;
+
+    if (control_points.is_imgui && control_points.index_pose >= 0 &&
+        static_cast<size_t>(control_points.index_pose) < pointClouds.size())
+    {
+        std::vector<bool> wasVisible(pointClouds.size());
+        for (size_t i = 0; i < pointClouds.size(); ++i)
+        {
+            wasVisible[i] = pointClouds[i].visible;
+            pointClouds[i].visible = (static_cast<int>(i) == control_points.index_pose);
+        }
+
+        scan_renderer.draw(
+            pointClouds,
+            static_cast<float>(point_size),
+            ScanColorMode::Intensity,
+            static_cast<float>(session_dims.z_min),
+            static_cast<float>(session_dims.z_max),
+            Eigen::Vector3d(rotation_center.x(), rotation_center.y(), rotation_center.z()),
+            static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
+            1);
+
+        for (size_t i = 0; i < pointClouds.size(); ++i)
+        {
+            pointClouds[i].visible = wasVisible[i];
+        }
+
+        const auto& activePc = pointClouds[control_points.index_pose];
+        if (activePc.local_trajectory.size() >= 2)
+        {
+            rlBegin(RL_LINES);
+            rlColor3f(0.0f, 1.0f, 0.0f);
+            for (size_t i = 0; i + 1 < activePc.local_trajectory.size(); ++i)
+            {
+                auto poseA = activePc.m_pose * activePc.local_trajectory[i].m_pose;
+                auto poseB = activePc.m_pose * activePc.local_trajectory[i + 1].m_pose;
+                rlVertex3f(static_cast<float>(poseA(0, 3)), static_cast<float>(poseA(1, 3)), static_cast<float>(poseA(2, 3)));
+                rlVertex3f(static_cast<float>(poseB(0, 3)), static_cast<float>(poseB(1, 3)), static_cast<float>(poseB(2, 3)));
+            }
+            rlEnd();
+        }
+    }
+
+    const Color markColor{ 179, 77, 128, 255 }; // was glColor3f(0.7f, 0.3f, 0.5f)
+    const Color connectorColor{ 0, 77, 153, 255 }; // was glColor3f(0.0f, 0.3f, 0.6f)
+
+    for (const auto& cp : control_points.cps)
+    {
+        if (cp.index_to_pose < 0 || static_cast<size_t>(cp.index_to_pose) >= pointClouds.size())
+        {
+            continue;
+        }
+
+        Eigen::Vector3d p(cp.x_source_local, cp.y_source_local, cp.z_source_local);
+        Eigen::Vector3d c = pointClouds[cp.index_to_pose].m_pose * p;
+        Vector3 g{ static_cast<float>(cp.x_target_global), static_cast<float>(cp.y_target_global),
+                   static_cast<float>(cp.z_target_global) };
+
+        DrawLine3D(Vector3{ g.x - 0.05f, g.y, g.z }, Vector3{ g.x + 0.05f, g.y, g.z }, markColor);
+        DrawLine3D(Vector3{ g.x, g.y - 0.05f, g.z }, Vector3{ g.x, g.y + 0.05f, g.z }, markColor);
+        DrawLine3D(Vector3{ g.x - 0.01f, g.y, g.z }, Vector3{ g.x + 0.01f, g.y, g.z }, markColor);
+        DrawLine3D(Vector3{ g.x, g.y - 0.01f, g.z }, Vector3{ g.x, g.y + 0.01f, g.z }, markColor);
+        // Original's 5th line pair was glVertex3f(g,g) twice -- a
+        // degenerate zero-length segment that draws nothing. Dropped.
+
+        DrawLine3D(Vector3{ static_cast<float>(c.x()), static_cast<float>(c.y()), static_cast<float>(c.z()) }, g, connectorColor);
+
+        if (control_points.draw_uncertainty)
+        {
+            Eigen::Matrix3d covar = Eigen::Matrix3d::Zero();
+            if (cp.is_z_0)
+            {
+                covar(0, 0) = 0.01 * 0.01;
+                covar(1, 1) = 0.01 * 0.01;
+            }
+            else
+            {
+                covar(0, 0) = cp.sigma_x * cp.sigma_x;
+                covar(1, 1) = cp.sigma_y * cp.sigma_y;
+            }
+            covar(2, 2) = cp.sigma_z * cp.sigma_z;
+
+            Eigen::Vector3d mean(cp.x_target_global, cp.y_target_global, cp.z_target_global);
+            drawUncertaintyEllipse(covar, mean, GRAY); // was Eigen::Vector3f(0.5, 0.5, 0.5)
+        }
+    }
+}
+
 // Was ManualPoseGraphLoopClosure::Render()'s per-pose glRasterPos3f +
 // glutBitmapString(std::to_string(i)) labels (one per point cloud, plus one
 // per edge at its flagpole top) -- neither has an rlgl/raylib equivalent
@@ -2559,11 +2850,15 @@ namespace
     // Plain DrawText at a point sitting exactly on top of a same-size, often
     // same-color trajectory marker is easy to lose visually -- outlined in
     // black and nudged up-right of the anchor so it reads clearly regardless
-    // of what's directly underneath.
-    void drawOutlinedText(const char* text, Vector2 anchor, int fontSize, Color color)
+    // of what's directly underneath. `line` stacks additional labels above
+    // the same anchor (one line height per unit) -- needed wherever several
+    // labels sit at world points too close together to separate on screen
+    // by their 3D position alone (e.g. GCP's LiDAR-center/ground-plane/name
+    // labels, which differ by only lidar_height_above_ground/0.1m).
+    void drawOutlinedText(const char* text, Vector2 anchor, int fontSize, Color color, int line = 0)
     {
         int x = static_cast<int>(anchor.x) + 6;
-        int y = static_cast<int>(anchor.y) - fontSize - 6;
+        int y = static_cast<int>(anchor.y) - fontSize - 6 - line * (fontSize + 4);
         for (int dx = -1; dx <= 1; ++dx)
         {
             for (int dy = -1; dy <= 1; ++dy)
@@ -2575,6 +2870,27 @@ namespace
             }
         }
         DrawText(text, x, y, fontSize, color);
+    }
+
+    // Manual clip-space transform (mat * [x,y,z,1]^T) -- raymath's
+    // Vector3Transform computes the same x/y/z but drops w, which the
+    // perspective divide below needs, so it can't be reused here.
+    Vector2 worldToScreen(const Eigen::Vector3d& world, float screenW, float screenH)
+    {
+        const Matrix& m = frame_mvp_3d;
+        float x = static_cast<float>(world.x());
+        float y = static_cast<float>(world.y());
+        float z = static_cast<float>(world.z());
+        float clipX = m.m0 * x + m.m4 * y + m.m8 * z + m.m12;
+        float clipY = m.m1 * x + m.m5 * y + m.m9 * z + m.m13;
+        float clipW = m.m3 * x + m.m7 * y + m.m11 * z + m.m15;
+        if (fabsf(clipW) < 1e-6f)
+        {
+            return Vector2{ -1000.f, -1000.f };
+        }
+        float ndcX = clipX / clipW;
+        float ndcY = clipY / clipW;
+        return Vector2{ (ndcX * 0.5f + 0.5f) * screenW, (1.0f - (ndcY * 0.5f + 0.5f)) * screenH };
     }
 } // namespace
 
@@ -2590,30 +2906,9 @@ void renderLoopClosureLabels(PointClouds& point_clouds_container)
     float screenW = io.DisplaySize.x;
     float screenH = io.DisplaySize.y;
 
-    auto worldToScreen = [screenW, screenH](const Eigen::Vector3d& world) -> Vector2
-    {
-        // Manual clip-space transform (mat * [x,y,z,1]^T) -- raymath's
-        // Vector3Transform computes the same x/y/z but drops w, which the
-        // perspective divide below needs, so it can't be reused here.
-        const Matrix& m = frame_mvp_3d;
-        float x = static_cast<float>(world.x());
-        float y = static_cast<float>(world.y());
-        float z = static_cast<float>(world.z());
-        float clipX = m.m0 * x + m.m4 * y + m.m8 * z + m.m12;
-        float clipY = m.m1 * x + m.m5 * y + m.m9 * z + m.m13;
-        float clipW = m.m3 * x + m.m7 * y + m.m11 * z + m.m15;
-        if (fabsf(clipW) < 1e-6f)
-        {
-            return Vector2{ -1000.f, -1000.f };
-        }
-        float ndcX = clipX / clipW;
-        float ndcY = clipY / clipW;
-        return Vector2{ (ndcX * 0.5f + 0.5f) * screenW, (1.0f - (ndcY * 0.5f + 0.5f)) * screenH };
-    };
-
     for (size_t i = 0; i < pointClouds.size(); ++i)
     {
-        Vector2 screen = worldToScreen(pointClouds[i].m_pose.translation());
+        Vector2 screen = worldToScreen(pointClouds[i].m_pose.translation(), screenW, screenH);
         drawOutlinedText(TextFormat("%d", static_cast<int>(i)), screen, 20, WHITE);
     }
 
@@ -2630,9 +2925,100 @@ void renderLoopClosureLabels(PointClouds& point_clouds_container)
         Eigen::Vector3d worldTrg = pointClouds[edge.index_to].m_pose.translation();
         Eigen::Vector3d midUp = (worldSrc + worldTrg) * 0.5 + Eigen::Vector3d(0, 0, 10);
 
-        Vector2 screen = worldToScreen(midUp);
+        Vector2 screen = worldToScreen(midUp, screenW, screenH);
         Color c = (static_cast<int>(i) == session.pose_graph_loop_closure.index_active_edge) ? RED : SKYBLUE;
         drawOutlinedText(TextFormat("%d", static_cast<int>(i)), screen, 22, c);
+    }
+}
+
+// Was GroundControlPoints::render()'s glRasterPos3f + glutBitmapString
+// calls (core/src/ground_control_points.cpp) -- same reasoning as
+// renderLoopClosureLabels() (no matrix-anchored bitmap fonts under core
+// profile), projected to screen space and drawn with DrawText instead.
+// Must run after end3DMatrixStack(), like renderLoopClosureLabels().
+void renderGroundControlPointsLabels(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    float screenW = io.DisplaySize.x;
+    float screenH = io.DisplaySize.y;
+
+    const Color markColor{ 179, 77, 128, 255 }; // was glColor3f(0.7f, 0.3f, 0.5f)
+    const Color connectorColor{ 0, 77, 153, 255 }; // was glColor3f(0.0f, 0.3f, 0.6f)
+
+    for (size_t i = 0; i < ground_control_points.gpcs.size(); ++i)
+    {
+        const auto& gcp = ground_control_points.gpcs[i];
+
+        // LiDAR center (z+h), ground plane (z) and name (z+h+0.1) sit
+        // world-space centimeters apart -- at any normal zoom that's the
+        // same handful of screen pixels, so unlike renderLoopClosureLabels()
+        // (one label per anchor) these three share a single screen anchor
+        // and stack via drawOutlinedText's `line` instead of relying on
+        // their (invisible-on-screen) 3D separation.
+        Vector2 anchor = worldToScreen(Eigen::Vector3d(gcp.x, gcp.y, gcp.z), screenW, screenH);
+
+        // was glColor3f(0, 0, 0) -- plain black text with no outline in the
+        // GLUT original; drawOutlinedText always outlines in black, so
+        // black text would vanish. WHITE instead, matching
+        // renderLoopClosureLabels()'s index labels.
+        drawOutlinedText(gcp.name, anchor, 22, WHITE, 2);
+        drawOutlinedText(TextFormat("GCP_%d: LiDAR center", static_cast<int>(i)), anchor, 14, markColor, 1);
+        drawOutlinedText(TextFormat("GCP_%d: 'plane on the ground'", static_cast<int>(i)), anchor, 14, markColor, 0);
+
+        if (gcp.index_to_node_inner < 0 ||
+            static_cast<size_t>(gcp.index_to_node_inner) >= point_clouds_container.point_clouds.size())
+        {
+            continue;
+        }
+        const auto& pc = point_clouds_container.point_clouds[gcp.index_to_node_inner];
+        if (gcp.index_to_node_outer < 0 || static_cast<size_t>(gcp.index_to_node_outer) >= pc.local_trajectory.size())
+        {
+            continue;
+        }
+
+        Eigen::Vector3d c = pc.m_pose * pc.local_trajectory[gcp.index_to_node_outer].m_pose.translation();
+        Vector2 nodeScreen = worldToScreen(c, screenW, screenH);
+        drawOutlinedText(TextFormat("GCP_%d: assigned trajectory node", static_cast<int>(i)), nodeScreen, 14, connectorColor);
+    }
+}
+
+// Was ControlPoints::render()'s glRasterPos3f + glutBitmapString calls
+// (core/src/control_points.cpp) -- same reasoning as
+// renderGroundControlPointsLabels() (no matrix-anchored bitmap fonts under
+// core profile, and name/"CP_i" sit only 0.1m apart in world space -- too
+// close to separate on screen at normal zoom -- so they share one anchor
+// and stack via drawOutlinedText's `line`). Must run after
+// end3DMatrixStack(), like renderGroundControlPointsLabels().
+void renderControlPointsLabels(const ControlPoints& control_points, const PointClouds& point_clouds_container)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    float screenW = io.DisplaySize.x;
+    float screenH = io.DisplaySize.y;
+
+    const Color markColor{ 179, 77, 128, 255 }; // was glColor3f(0.7f, 0.3f, 0.5f)
+
+    for (size_t i = 0; i < control_points.cps.size(); ++i)
+    {
+        const auto& cp = control_points.cps[i];
+
+        Vector2 anchor = worldToScreen(Eigen::Vector3d(cp.x_target_global, cp.y_target_global, cp.z_target_global), screenW, screenH);
+
+        // was glColor3f(0, 0, 0) -- plain black text with no outline in the
+        // GLUT original; drawOutlinedText always outlines in black, so
+        // black text would vanish. WHITE instead, matching
+        // renderGroundControlPointsLabels()'s name label.
+        drawOutlinedText(cp.name, anchor, 22, WHITE, 1);
+        drawOutlinedText(TextFormat("CP_%d", static_cast<int>(i)), anchor, 14, WHITE, 0);
+
+        if (cp.index_to_pose < 0 || static_cast<size_t>(cp.index_to_pose) >= point_clouds_container.point_clouds.size())
+        {
+            continue;
+        }
+
+        Eigen::Vector3d p(cp.x_source_local, cp.y_source_local, cp.z_source_local);
+        Eigen::Vector3d c = point_clouds_container.point_clouds[cp.index_to_pose].m_pose * p;
+        Vector2 sourceScreen = worldToScreen(c, screenW, screenH);
+        drawOutlinedText(TextFormat("CP_%d: initial location", static_cast<int>(i)), sourceScreen, 14, markColor);
     }
 }
 
@@ -2737,18 +3123,41 @@ void display()
     else
         updateOrthoView();
 
-    frame_mvp_3d = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+    frame_view_3d = rlGetMatrixModelview();
+    frame_proj_3d = rlGetMatrixProjection();
+    frame_mvp_3d = MatrixMultiply(frame_view_3d, frame_proj_3d);
 
     showAxes();
 
-    // GNSS/GroundControlPoints/ControlPoints 3D rendering (.render()) is
-    // legacy-GL, compiled once into `core` and shared with the remaining
-    // GLUT apps -- not yet ported to raylib (their ImGui panels below,
-    // .imgui()/.Gui(), are pure ImGui/data and still fully work). Loop
-    // closure's 3D rendering (below) is ported since it was this session's
-    // actual focus.
+    // renderLoopClosure() hides every scan except the current source/target
+    // range while loop closure editing is active (see its comment) --
+    // restore full visibility the moment the panel closes (X button, menu
+    // toggle, or Ctrl+L), or every scan but that last-shown range stays
+    // hidden. Checked unconditionally (not just when the below block runs)
+    // so this still fires even if control_points.is_imgui happens to be
+    // true on the closing frame.
+    static bool was_loop_closure_gui = false;
+    if (was_loop_closure_gui && !is_loop_closure_gui)
+    {
+        for (auto& pc : session.point_clouds_container.point_clouds)
+        {
+            pc.visible = true;
+        }
+    }
+    was_loop_closure_gui = is_loop_closure_gui;
+
+    // renderControlPoints() draws its markers regardless of is_imgui (like
+    // the original's render() -- both its show_pc=true/false call sites
+    // drew them) and, while is_imgui is true, also substitutes for the bulk
+    // scan_renderer.draw() call below (skipped entirely in that case -- see
+    // its own comment).
+    renderControlPoints(session.control_points, session.point_clouds_container);
+
     if (!session.control_points.is_imgui)
     {
+        renderGroundControlPoints(session.ground_control_points, session.point_clouds_container);
+        renderGNSS(tls_registration.gnss, session.point_clouds_container);
+
         if (is_loop_closure_gui)
             renderLoopClosure(
                 session.point_clouds_container,
@@ -4307,6 +4716,11 @@ void display()
     if (is_loop_closure_gui)
         renderLoopClosureLabels(session.point_clouds_container);
 
+    if (!session.control_points.is_imgui)
+        renderGroundControlPointsLabels(session.ground_control_points, session.point_clouds_container);
+
+    renderControlPointsLabels(session.control_points, session.point_clouds_container);
+
     if (compass_ruler)
         drawMiniCompassWithRuler();
 
@@ -4609,7 +5023,7 @@ void mouse(int glut_button, int state, int x, int y)
 
                         double dist = distance_point_to_line(vp, laser_beam);
 
-                        if (dist < min_distance && dist < 0.1)
+                        if (dist < min_distance)
                         {
                             min_distance = dist;
 

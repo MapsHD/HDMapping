@@ -2617,8 +2617,7 @@ void renderGroundControlPoints(const GroundControlPoints& ground_control_points,
 {
     for (const auto& gcp : ground_control_points.gpcs)
     {
-        if (gcp.index_to_node_inner < 0 ||
-            static_cast<size_t>(gcp.index_to_node_inner) >= point_clouds_container.point_clouds.size())
+        if (gcp.index_to_node_inner < 0 || static_cast<size_t>(gcp.index_to_node_inner) >= point_clouds_container.point_clouds.size())
         {
             continue;
         }
@@ -2707,7 +2706,9 @@ void renderGNSS(const GNSS& gnss, const PointClouds& point_clouds_container)
                     pc.local_trajectory.end(),
                     time_stamp,
                     [](const PointCloud::LocalTrajectoryNode& lhs, const double& time) -> bool
-                    { return lhs.timestamps.first < time; });
+                    {
+                        return lhs.timestamps.first < time;
+                    });
 
                 size_t index = static_cast<size_t>(it - pc.local_trajectory.begin());
 
@@ -2751,8 +2752,7 @@ void renderControlPoints(const ControlPoints& control_points, PointClouds& point
 {
     auto& pointClouds = point_clouds_container.point_clouds;
 
-    if (control_points.is_imgui && control_points.index_pose >= 0 &&
-        static_cast<size_t>(control_points.index_pose) < pointClouds.size())
+    if (control_points.is_imgui && control_points.index_pose >= 0 && static_cast<size_t>(control_points.index_pose) < pointClouds.size())
     {
         std::vector<bool> wasVisible(pointClouds.size());
         for (size_t i = 0; i < pointClouds.size(); ++i)
@@ -2804,8 +2804,7 @@ void renderControlPoints(const ControlPoints& control_points, PointClouds& point
 
         Eigen::Vector3d p(cp.x_source_local, cp.y_source_local, cp.z_source_local);
         Eigen::Vector3d c = pointClouds[cp.index_to_pose].m_pose * p;
-        Vector3 g{ static_cast<float>(cp.x_target_global), static_cast<float>(cp.y_target_global),
-                   static_cast<float>(cp.z_target_global) };
+        Vector3 g{ static_cast<float>(cp.x_target_global), static_cast<float>(cp.y_target_global), static_cast<float>(cp.z_target_global) };
 
         DrawLine3D(Vector3{ g.x - 0.05f, g.y, g.z }, Vector3{ g.x + 0.05f, g.y, g.z }, markColor);
         DrawLine3D(Vector3{ g.x, g.y - 0.05f, g.z }, Vector3{ g.x, g.y + 0.05f, g.z }, markColor);
@@ -2965,8 +2964,7 @@ void renderGroundControlPointsLabels(const GroundControlPoints& ground_control_p
         drawOutlinedText(TextFormat("GCP_%d: LiDAR center", static_cast<int>(i)), anchor, 14, markColor, 1);
         drawOutlinedText(TextFormat("GCP_%d: 'plane on the ground'", static_cast<int>(i)), anchor, 14, markColor, 0);
 
-        if (gcp.index_to_node_inner < 0 ||
-            static_cast<size_t>(gcp.index_to_node_inner) >= point_clouds_container.point_clouds.size())
+        if (gcp.index_to_node_inner < 0 || static_cast<size_t>(gcp.index_to_node_inner) >= point_clouds_container.point_clouds.size())
         {
             continue;
         }

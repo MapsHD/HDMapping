@@ -292,6 +292,7 @@ ToDo: check if addressed
 - https://www.mdpi.com/2072-4292/17/15/2656
 - https://ieeexplore.ieee.org/document/10237251
 - CMLGF-LIO https://isprs-archives.copernicus.org/articles/XLIX-B1-2026/71/2026/
+- https://github.com/MIT-SPARK/spark-fast-lio
     
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
 - Cosme Hernanz-Gilbert, Carlos Cabo, Álvaro Moreno-Martínez, and Mónica Herrero-Huerta, "Exploring the Potential of the MandEye Handheld LiDAR System for Mediterranean Understorey Characterisation", [[PDF]](https://isprs-archives.copernicus.org/articles/XLIX-B2-2026/413/2026/)

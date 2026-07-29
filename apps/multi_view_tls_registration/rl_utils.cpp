@@ -205,7 +205,10 @@ void wheel(int button, int dir, int x, int y)
 // rlFrustum() call by hand (standard fovy -> frustum-bounds formula).
 void reshape(int w, int h)
 {
-    rlViewport(0, 0, (int)w, (int)h);
+    // GetRenderWidth/Height(), not w/h: see display()'s matching comment --
+    // w/h are logical points (window size), the GL viewport needs actual
+    // framebuffer pixels.
+    rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
     rlMatrixMode(RL_PROJECTION);
     rlLoadIdentity();
     if (!is_ortho)

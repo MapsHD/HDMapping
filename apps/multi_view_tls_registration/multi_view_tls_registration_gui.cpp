@@ -3030,7 +3030,13 @@ void display()
     scan_renderer.syncPoses(session.point_clouds_container.point_clouds);
 
     ImGuiIO& io = ImGui::GetIO();
-    rlViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+    // GetRenderWidth/Height(), not io.DisplaySize: the GL viewport must be
+    // sized in actual framebuffer pixels, which on a Retina Mac are a
+    // multiple of io.DisplaySize's logical points (see initGL()'s
+    // FLAG_WINDOW_HIGHDPI comment) -- using io.DisplaySize directly here
+    // left the 3D scene rendered only into the bottom-left quarter of the
+    // window, the rest showing just the clear color.
+    rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
 
     ClearBackground(ColorFromNormalized(Vector4{ bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w }));
     rlEnableDepthTest();
@@ -5124,9 +5130,41 @@ bool initGL(int* argc, char** argv, const std::string& winTitleArg, void (*)(), 
     // context: BadValue"), and raylib/GLFW then segfaults using the broken
     // context instead of falling back cleanly. Not worth the crash risk for
     // a cosmetic antialiasing hint.
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    //
+    // FLAG_WINDOW_HIGHDPI: macOS/GLFW always backs the window with a
+    // full-resolution Retina framebuffer (rglfw.c's _GLFW_USE_RETINA),
+    // regardless of this flag -- but rlImGui only reads that real scale
+    // factor into io.DisplayFramebufferScale (and scales its font atlas
+    // and mouse coordinates to match) when FLAG_WINDOW_HIGHDPI is set.
+    // Without it, on a Retina display ImGui assumes 1:1 and everything it
+    // draws ends up scaled/positioned for a framebuffer a quarter the
+    // actual size -- menus stretched into oversized black bars, widgets
+    // rendered as solid blocks from a mis-sampled font atlas.
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI);
     InitWindow(static_cast<int>(window_width), static_cast<int>(window_height), winTitleArg.c_str());
     SetTargetFPS(60);
+
+    // The hardcoded window_width/window_height default (1600x900) can be
+    // wider and/or taller than the actual screen (e.g. a 13" MacBook's
+    // 1470x956-point default-scaled display) -- when it doesn't fit, macOS
+    // shifts the window up/left to keep it on screen, which can tuck the
+    // very top of the content area (where ImGui's main menu bar lives)
+    // behind the OS menu bar/title bar instead of below it. Shrinking to
+    // fit the monitor's work area and recentering avoids that; on screens
+    // that already fit the default size this is a no-op.
+    {
+        const int monitor = GetCurrentMonitor();
+        const int monitorWidth = GetMonitorWidth(monitor);
+        const int monitorHeight = GetMonitorHeight(monitor);
+        const int margin = 100; // room for the OS title bar, menu bar and dock
+        const int fitWidth = (monitorWidth > 0) ? std::min(static_cast<int>(window_width), monitorWidth - margin) : static_cast<int>(window_width);
+        const int fitHeight = (monitorHeight > 0) ? std::min(static_cast<int>(window_height), monitorHeight - margin) : static_cast<int>(window_height);
+        if (fitWidth != static_cast<int>(window_width) || fitHeight != static_cast<int>(window_height))
+        {
+            SetWindowSize(fitWidth, fitHeight);
+            SetWindowPosition((monitorWidth - fitWidth) / 2, (monitorHeight - fitHeight) / 2);
+        }
+    }
 
     rlImGuiSetup(true);
     ImGuiIO& io = ImGui::GetIO();

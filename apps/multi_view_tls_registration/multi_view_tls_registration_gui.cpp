@@ -4462,8 +4462,8 @@ void display()
 
                         if (tmp < 0)
                             tmp = 0;
-                        else if (tmp > 5)
-                            tmp = 5;
+                        else if (tmp > 50)
+                            tmp = 50;
 
                         if (tmp != session.point_clouds_container.point_clouds[0].line_width)
                             for (auto& point_cloud : session.point_clouds_container.point_clouds)

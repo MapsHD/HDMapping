@@ -154,7 +154,7 @@ It is designed for a benchmark.
 
 - https://github.com/MapsHD/benchmark-HDMapping-ground-truth (2026, 'under review', [[movie]](https://youtu.be/8sHyUNC3mZs))
 - https://github.com/MapsHD/benchmark-HDMapping_LIO-to-HDMapping (2026, 'under review', [[movie]](https://youtu.be/9AUvPTLUcos))
-- https://github.com/ethz-asl/bievr-lio (2026, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/bievr-lio.bib), movie ToDo)
+- https://github.com/MapsHD/benchmark-BIEVR-LIO-to-HDMapping (2026, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/bievr-lio.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-SE3-LIO-to-HDMapping (2026, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SE3-LIO.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-EllipseLIO-to-HDMapping (2026, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/EllipseLIO.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-D-LIO-to-HDMapping (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/D-LIO.bib), movie ToDo)
@@ -167,6 +167,7 @@ It is designed for a benchmark.
 - https://github.com/MapsHD/benchmark-RESPLE-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/RESPLE.bib), [[movie]](https://youtu.be/5PAB4xJmMoo)) (ToDo --> add to automated benchmark)
 - https://github.com/MapsHD/benchmark-GenZ-ICP-to-HDMapping (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GenZ-ICP.bib), [[movie]](https://youtu.be/vgGkucOBVg4))
 - https://github.com/MapsHD/benchmark-MM-LINS-to-HDMapping (2025, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/MM-LINS.bib), movie ToDo)
+- https://github.com/MapsHD/benchmark-SR-LIO-to-HDMapping (2024, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sr-lio.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-Voxel-SLAM-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Voxel-SLAM.bib), 2nd place ICRA HILTI 2023 SLAM Challenge, 1st place ICCV 2023 SLAM Challenge, movie ToDo)
 - https://github.com/MapsHD/benchmark-NV-LIOM-to-HDMapping (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/NV-LIOM.bib), movie ToDo)
 - https://github.com/MapsHD/benchmark-c3p-voxelmap-to-HDMapping (2024, arXiv, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/c3p-voxelmap.bib), movie ToDo)
@@ -241,7 +242,6 @@ Required PCD format:
 
 ToDo Build Success:
 - https://github.com/NKU-MobFly-Robotics/R-VoxelMap (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/R-VoxelMap.bib)) - Marcin
-- https://github.com/ZikangYuan/sr_lio (2024, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/sr-lio.bib)) - Piotr 2
 - https://github.com/PRBonn/PIN_SLAM (2024, TRO, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/PIN-SLAM.bib)) - Piotr 3
 - https://github.com/HViktorTsoi/PV-LIO (2023, no publication) - Marcin
 - https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022) (extrinsic calibration)

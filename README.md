@@ -31,9 +31,23 @@ Movie how to use it is available at [prepare training dataset movie](https://you
 
 If You are looking for end-to-end mobile mapping framework You can start from this project.
 We provide a benchmark for other approaches: BIEVR-LIO (2026), SE3-LIO (2026), EllipseLIO(2026), D-LIO (2026), FORM (2026), Super-LIO (2026), DALI_SLAM (2025), lidar_odometry_ros_wrapper (2025), SuperOdometry (2021), mola_lidar_odometry (2025), RESPLE (2025), GenZ-ICP (2025), MM-LINS (2025), Voxel-SLAM (2024), NV-LIOM (2024), c3p-voxelmap (2024), I2EKF-LO (2024), LIO-EKF (2024), iG-LIO (2024), GLIM (2024), Point-LIO (2024), LOG-LIO2 (2024), DLIO (2023), SLICT (2023), RA-L, KISS-ICP (2023), Faster-LIO (2022), VoxelMap (2022), DLO (2022), CT-ICP (2021), FAST-LIO (2020), LOAM-Livox (2019), LeGO-LOAM (2018)
-
 **Our goal is to find/develop/discover best end-to-end mobile mapping framework.**
-
+To cite benchmark suite please use as follows:
+```
+@article{BEDKOWSKI2026102822,
+title = {MapsHD: A benchmark suite for LiDAR odometry frameworks},
+journal = {SoftwareX},
+volume = {35},
+pages = {102822},
+year = {2026},
+issn = {2352-7110},
+doi = {https://doi.org/10.1016/j.softx.2026.102822},
+url = {https://www.sciencedirect.com/science/article/pii/S2352711026003146},
+author = {Janusz Bȩdkowski and Michał Pełka and Karol Majek and Marcin Matecki and Adrian Radulescu and Charles Hamesse and Ethan Decleyn and Przemysław Lekston and Tomasz Owerko and Przemysław Kuras and Michał Ciszewski and Jakub Kolecki and Karolina Tomaszkiewicz and Łukasz Ambroziński and Joanna Koszyk and Bartosz Hyla and Karolina Pargieła and Anna Malczewska and Tomasz Lipecki and Artur Adamek and Bartosz Mitka and Klapa Przemysław and Pelagia Gawronek and Martin Mokros and Jozef Výboštok and Juliána Chudá and Michal Skladan and Carlos Cabo and Kim André Anstensen and Craciun Daniel-Marian and Antun Jakopec and Michal Wlasiuk and Kornel Mrozowski and Maksymilian Kulicki and Krzysztof Stereńczak and Oskar Bartosz and Jakub Markiewicz and Sławomir Łapiński and Adam Kostrzewa and Mariana Campos and Machi Zawidzki and Jacek Szklarski and Rami Faraj and Loris Redovniković and Jurica Jagetić and Samer Karam and Răzvan Dumbravă and Milosz Mielcarek and Grzegorz Krok and Michal Laszkowski and Jaroslaw Wajs and Jakub Chudziński},
+keywords = {LiDAR odometry, LiDAR-inertial odometry, Benchmarking},
+abstract = {This paper describes a software toolbox for LiDAR (Light Detection and Ranging) and LiDAR-Inertial Odometry qualitative and quantitative evaluation. We provide software as https://github.com/MapsHD organization with all necessary information at https://github.com/MapsHD/HDMapping. Our software contributions are a) ground truth data processing tool, b) dockerized state-of-the-art LO and LIO algorithms, c) multi-session data registration to common coordinate system, d) Absolute Pose Error (APE) and Relative Pose Error (RPE) metrics, e) import/export tools for easier 3D data handling and visualizing, e.g., in Cloud Compare software. This software is compatible with ROS1 (Robot Operating System) and ROS2 data formats. We show an example benchmark of LeGO-LOAM, LIO-SAM, FAST-LIO, DLO, VoxelMap, Faster-LIO, KISS-ICP, CT-ICP, SLICT, DLIO, GLIM, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE, odometry_ros_wrapper, Point-LIO, and LOAM-Livox algorithms. For all experiments we provide movies. The contribution of the paper is software-oriented LO/LIO algorithm benchmark suite. The novelty lies in the integration of multiple benchmarking steps into a unified framework, thus overall effort needed for qualitative and quantitative evaluation is reduced.}
+}
+```
 ## Quick Start (Ubuntu / Ubuntu 24.04 @ WSL2)
 
 ### CMake 4.0.0 or Higher
@@ -136,22 +150,6 @@ Our MANDEYE is designed for freedom in motion. You can also climb and crawl in m
 - Lidar odometry for HDMapping project utilizing KISS-ICP https://github.com/michalpelka/kiss-lidarodometry
 
 # Compatible other SOTA algorithms (benchmark)
-To cite benchmark suite please use as follows:
-```
-@article{BEDKOWSKI2026102822,
-title = {MapsHD: A benchmark suite for LiDAR odometry frameworks},
-journal = {SoftwareX},
-volume = {35},
-pages = {102822},
-year = {2026},
-issn = {2352-7110},
-doi = {https://doi.org/10.1016/j.softx.2026.102822},
-url = {https://www.sciencedirect.com/science/article/pii/S2352711026003146},
-author = {Janusz Bȩdkowski and Michał Pełka and Karol Majek and Marcin Matecki and Adrian Radulescu and Charles Hamesse and Ethan Decleyn and Przemysław Lekston and Tomasz Owerko and Przemysław Kuras and Michał Ciszewski and Jakub Kolecki and Karolina Tomaszkiewicz and Łukasz Ambroziński and Joanna Koszyk and Bartosz Hyla and Karolina Pargieła and Anna Malczewska and Tomasz Lipecki and Artur Adamek and Bartosz Mitka and Klapa Przemysław and Pelagia Gawronek and Martin Mokros and Jozef Výboštok and Juliána Chudá and Michal Skladan and Carlos Cabo and Kim André Anstensen and Craciun Daniel-Marian and Antun Jakopec and Michal Wlasiuk and Kornel Mrozowski and Maksymilian Kulicki and Krzysztof Stereńczak and Oskar Bartosz and Jakub Markiewicz and Sławomir Łapiński and Adam Kostrzewa and Mariana Campos and Machi Zawidzki and Jacek Szklarski and Rami Faraj and Loris Redovniković and Jurica Jagetić and Samer Karam and Răzvan Dumbravă and Milosz Mielcarek and Grzegorz Krok and Michal Laszkowski and Jaroslaw Wajs and Jakub Chudziński},
-keywords = {LiDAR odometry, LiDAR-inertial odometry, Benchmarking},
-abstract = {This paper describes a software toolbox for LiDAR (Light Detection and Ranging) and LiDAR-Inertial Odometry qualitative and quantitative evaluation. We provide software as https://github.com/MapsHD organization with all necessary information at https://github.com/MapsHD/HDMapping. Our software contributions are a) ground truth data processing tool, b) dockerized state-of-the-art LO and LIO algorithms, c) multi-session data registration to common coordinate system, d) Absolute Pose Error (APE) and Relative Pose Error (RPE) metrics, e) import/export tools for easier 3D data handling and visualizing, e.g., in Cloud Compare software. This software is compatible with ROS1 (Robot Operating System) and ROS2 data formats. We show an example benchmark of LeGO-LOAM, LIO-SAM, FAST-LIO, DLO, VoxelMap, Faster-LIO, KISS-ICP, CT-ICP, SLICT, DLIO, GLIM, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE, odometry_ros_wrapper, Point-LIO, and LOAM-Livox algorithms. For all experiments we provide movies. The contribution of the paper is software-oriented LO/LIO algorithm benchmark suite. The novelty lies in the integration of multiple benchmarking steps into a unified framework, thus overall effort needed for qualitative and quantitative evaluation is reduced.}
-}
-```
 
 Download the dataset from [Bunker DVI Dataset](https://charleshamesse.github.io/bunker-dvi-dataset/)
 

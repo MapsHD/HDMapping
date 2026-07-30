@@ -30,7 +30,7 @@ Movie how to use it is available at [prepare training dataset movie](https://you
 # DOWNLOAD SOFTWARE USING THIS LINK -> [v0.102](https://github.com/MapsHD/HDMapping/releases/tag/v0.102)
 
 If You are looking for end-to-end mobile mapping framework You can start from this project.
-We provide a benchmark for other approaches: BIEVR-LIO (2026), SE3-LIO (2026), EllipseLIO(2026), D-LIO (2026), FORM (2026), Super-LIO (2026), DALI_SLAM (2025), lidar_odometry_ros_wrapper (2025), SuperOdometry (2021), mola_lidar_odometry (2025), RESPLE (2025), GenZ-ICP (2025), MM-LINS (2025), Voxel-SLAM (2024), NV-LIOM (2024), c3p-voxelmap (2024), I2EKF-LO (2024), LIO-EKF (2024), iG-LIO (2024), GLIM (2024), Point-LIO (2024), LOG-LIO2 (2024), DLIO (2023), SLICT (2023), RA-L, KISS-ICP (2023), Faster-LIO (2022), VoxelMap (2022), DLO (2022), CT-ICP (2021), FAST-LIO (2020), LOAM-Livox (2019), LeGO-LOAM (2018)
+We provide a benchmark for other approaches: BIEVR-LIO (2026), SE3-LIO (2026), EllipseLIO(2026), D-LIO (2026), FORM (2026), Super-LIO (2026), DALI_SLAM (2025), lidar_odometry_ros_wrapper (2025), SuperOdometry (2021), mola_lidar_odometry (2025), RESPLE (2025), GenZ-ICP (2025), MM-LINS (2025), Voxel-SLAM (2024), NV-LIOM (2024), c3p-voxelmap (2024), I2EKF-LO (2024), LIO-EKF (2024), iG-LIO (2024), GLIM (2024), Point-LIO (2024), LOG-LIO2 (2024), DLIO (2023), SLICT (2023), RA-L, KISS-ICP (2023), Faster-LIO (2022), VoxelMap (2022), DLO (2022), CT-ICP (2021), FAST-LIO (2020), LOAM-Livox (2019), LeGO-LOAM (2018).
 **Our goal is to find/develop/discover best end-to-end mobile mapping framework.**
 To cite benchmark suite please use as follows:
 ```

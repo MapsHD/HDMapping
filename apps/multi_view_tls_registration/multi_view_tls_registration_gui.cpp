@@ -5157,8 +5157,10 @@ bool initGL(int* argc, char** argv, const std::string& winTitleArg, void (*)(), 
         const int monitorWidth = GetMonitorWidth(monitor);
         const int monitorHeight = GetMonitorHeight(monitor);
         const int margin = 100; // room for the OS title bar, menu bar and dock
-        const int fitWidth = (monitorWidth > 0) ? std::min(static_cast<int>(window_width), monitorWidth - margin) : static_cast<int>(window_width);
-        const int fitHeight = (monitorHeight > 0) ? std::min(static_cast<int>(window_height), monitorHeight - margin) : static_cast<int>(window_height);
+        const int fitWidth =
+            (monitorWidth > 0) ? std::min(static_cast<int>(window_width), monitorWidth - margin) : static_cast<int>(window_width);
+        const int fitHeight =
+            (monitorHeight > 0) ? std::min(static_cast<int>(window_height), monitorHeight - margin) : static_cast<int>(window_height);
         if (fitWidth != static_cast<int>(window_width) || fitHeight != static_cast<int>(window_height))
         {
             SetWindowSize(fitWidth, fitHeight);

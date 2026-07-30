@@ -80,3 +80,42 @@ target_precompile_headers(core_no_gui
 
 set_target_properties(core_no_gui PROPERTIES
     POSITION_INDEPENDENT_CODE ON)
+
+# ============================================================================
+# core_raylib -- shared raylib rendering/camera/picking infrastructure
+# (ScanRenderer, OrbitCamera, picking, the compass overlay), used by
+# apps/multi_view_tls_registration (step2, raylib-based) and any future
+# raylib-based HDMapping GUI. This is the raylib-app equivalent of
+# core/src/utils.cpp's role for the remaining GLUT apps. Kept as a separate
+# target (not merged into `core`/`core_no_gui` above) so that raylib is never
+# a dependency of apps that still use GLUT.
+# ============================================================================
+add_library(core_raylib STATIC src/raylib_render.cpp)
+target_compile_definitions(core_raylib PRIVATE WITH_GUI=1)
+target_include_directories(core_raylib PRIVATE
+    include
+    ${EIGEN3_INCLUDE_DIR}
+    ${LASZIP_INCLUDE_DIR}/LASzip/include
+    ${THIRDPARTY_DIRECTORY}/json/include
+    ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+    ${EXTERNAL_LIBRARIES_DIRECTORY}/include
+    ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+    ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+)
+# PUBLIC: consumers (apps/multi_view_tls_registration) get core's
+# Session/PointCloud types and raylib/rlgl/raymath transitively just by
+# linking core_raylib. This target only needs raylib itself (rlgl,
+# raymath, glad) -- rlImGui/Dear ImGui are used by the app's own panel
+# code, not by raylib_render.cpp, so they're linked by the app directly.
+#
+# FREEGLUT_LIBRARY is linked here (not by the consuming app) so that
+# CMake's link-order computation places it immediately alongside `core`:
+# core.a's own object files (manual_pose_graph_loop_closure.cpp.o,
+# observation_picking.cpp.o) reference glutBitmap*() symbols transitively
+# (same translation unit as the Gui()/data methods raylib consumers do
+# call, even though the ::Render() methods that use GLUT text are never
+# actually invoked at runtime here -- no glutInit/window exists). Linking
+# it as a separate PRIVATE entry on the final executable instead let
+# CMake's static-library dependency reordering sort libglut.so before
+# libcore.a, leaving those symbols unresolved.
+target_link_libraries(core_raylib PUBLIC core raylib ${FREEGLUT_LIBRARY})

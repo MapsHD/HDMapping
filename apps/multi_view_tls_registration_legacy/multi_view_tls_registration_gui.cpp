@@ -1,29 +1,10 @@
-#include <algorithm>
 #include <cmath>
 
-// This app used to be built on GLUT + legacy immediate-mode OpenGL
-// (glBegin/glVertex/gluPerspective/gluUnProject/glMatrixMode/...) via
-// core/src/utils.cpp. utils.cpp is shared by several other GLUT apps and
-// can't be changed, and raylib's context here is OpenGL 3.3 core profile
-// (no fixed-function pipeline), so this file no longer includes
-// <Core/utils.hpp> -- instead it locally re-declares the same globals and
-// re-implements the same functions it used to get from there (same names,
-// same call sites throughout this file), backed by rlgl's rl*() legacy-GL
-// emulation API (rlMatrixMode/rlBegin/rlVertex3f/... -- a software matrix
-// stack + immediate-mode layer that works under core profile) instead of
-// real gl*() calls. The handful of call sites that used to reach into
-// core's own legacy-GL .render()/::Render() methods (PointClouds::render(),
-// ManualPoseGraphLoopClosure::Render(), etc. -- compiled once into `core`,
-// shared with GLUT apps, so they can't be changed either) are replaced with
-// Core/raylib_render.hpp's ScanRenderer instead. See each local
-// function/global below for what it replaces.
-#include "external/glad.h"
-#include "raylib.h"
-#include "raymath.h"
-#include "rlImGui.h"
-#include "rlgl.h"
+#include <GL/freeglut.h>
 
 #include <imgui.h>
+#include <imgui_impl_glut.h>
+#include <imgui_impl_opengl2.h>
 #include <imgui_internal.h>
 
 #include <ImGuizmo.h>
@@ -44,35 +25,12 @@
 #include <Core/observation_picking.h>
 #include <Core/pfd_wrapper.hpp>
 #include <Core/pose_graph_slam.h>
-#include <Core/raylib_render.hpp>
 #include <Core/registration_plane_feature.h>
 #include <Core/session.h>
-#include <Core/structures.h>
 #include <Core/transformations.h>
+#include <Core/utils.hpp>
 
-#ifdef _WIN32
-// portable-file-dialogs.h pulls in real windows.h, whose CloseWindow(HWND)/
-// ShowCursor(BOOL) collide with raylib.h's already-declared CloseWindow(void)/
-// ShowCursor(void) (both extern "C", so this is a hard redeclaration error,
-// not just a macro-textual one -- and unlike rl_utils.cpp, which only needs
-// ShellExecuteA, this file also needs portable-file-dialogs.h's own
-// winuser.h functionality, i.e. SendMessage/DispatchMessage/MessageBoxW/
-// GetActiveWindow, so suppressing all of winuser.h via NOUSER isn't an
-// option here). Renaming raylib's versions doesn't work either: the
-// compiled raylib library still only exports the symbol under its real
-// name, so a renamed *declaration* just becomes an unresolved symbol at
-// link time. windows.h's versions are renamed instead -- safe because
-// portable-file-dialogs.h itself never calls CloseWindow/ShowCursor
-// (verified: neither name appears in its source) -- leaving raylib's
-// real CloseWindow/ShowCursor callable normally everywhere in this file.
-#define CloseWindow CloseWindow_win32
-#define ShowCursor ShowCursor_win32
-#endif
 #include <portable-file-dialogs.h>
-#ifdef _WIN32
-#undef CloseWindow
-#undef ShowCursor
-#endif
 
 #include <laszip/laszip_api.h>
 
@@ -91,63 +49,10 @@
 
 #include <proj.h>
 #ifdef _WIN32
-// Just numeric resource IDs (IDI_ICON1 etc.) -- no windows.h needed to parse
-// it, and this file makes no direct WinAPI calls itself, so windows.h isn't
-// included directly here (it still arrives transitively, via
-// portable-file-dialogs.h above -- see the CloseWindow/ShowCursor rename
-// near the top of this file, and the #undef DrawText below, for how that's
-// handled).
 #include "resource.h"
+#include <windows.h>
+
 #endif
-
-// Camera/picking/mini-compass/misc-ImGui-widget API this app used to get
-// from <Core/utils.hpp> (see rl_utils.h's top comment for why it's now a
-// local header instead).
-#include "rl_utils.h"
-
-#ifdef _WIN32
-// windows.h (pulled in transitively above, via portable-file-dialogs.h)
-// #defines DrawText as DrawTextA -- undefining it restores plain DrawText
-// calls below to mean raylib's function again (its declaration, parsed
-// before windows.h's macro existed, is unaffected either way; this only
-// affects how later *source text* that writes the identifier "DrawText"
-// gets preprocessed).
-#undef DrawText
-#endif
-
-///////////////////////////////////////////////////////////////////////////////////
-
-// GPU (rlgl-based) point cloud renderer -- replaces core's legacy-GL
-// PointCloud::render()/PointClouds::render() (see Core/raylib_render.hpp).
-// Rebuilt on session load and whenever a scan's pose changes; syncPoses()
-// is called once per frame in display() as a safety net for pose-mutating
-// code paths that don't explicitly call rebuild().
-ScanRenderer scan_renderer;
-
-// This frame's 3D model-view-projection matrix, captured right after the
-// camera transform is set up in display() (before the projection/modelview
-// stack gets reset to the 2D screen ortho for ImGui -- see
-// end3DMatrixStack()). renderLoopClosureLabels() uses it to project pose
-// world positions to screen space for DrawText, since it runs after that
-// reset (2D text needs the 2D ortho active, but still needs to know where
-// each 3D point landed on screen).
-Matrix frame_mvp_3d{};
-
-// Forward declarations for this file's own functions defined near
-// display() below (everything else that used to be here is now declared
-// by rl_utils.h, included above) -- panel functions earlier in this file
-// call some of these.
-void observationPickingRender(const ObservationPicking& observation_picking);
-void renderLoopClosure(
-    PointClouds& point_clouds_container, int index_loop_closure_source, int index_loop_closure_target, int before, int after);
-void renderLoopClosureLabels(PointClouds& point_clouds_container);
-void renderGroundControlPoints(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container);
-void renderGroundControlPointsLabels(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container);
-void renderGNSS(const GNSS& gnss, const PointClouds& point_clouds_container);
-void renderControlPoints(const ControlPoints& control_points, PointClouds& point_clouds_container);
-void renderControlPointsLabels(const ControlPoints& control_points, const PointClouds& point_clouds_container);
-void display();
-void mouse(int glut_button, int state, int x, int y);
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -323,29 +228,8 @@ int index_loop_closure_target = 0;
 int index_begin = 0;
 int index_end = 0;
 
-ColorScheme csPointCloud = CS_GRAD_INTENS;
+ColorScheme csPointCloud = CS_SOLID;
 ColorScheme csTrajectory = CS_SOLID;
-
-// New (not in the original GLUT app): CS_GRAD_INTENS/CS_GRAD_ELEV/CS_GRAD_DIST
-// were declared in the original's ColorScheme enum but never actually wired
-// to a menu item or the renderer -- this hooks them up to scan_renderer's
-// per-point jet-colormap shader modes (see Core/raylib_render.hpp's
-// ScanColorMode), alongside the two modes (Solid/Random) the original did
-// implement.
-ScanColorMode scanColorModeFromScheme(ColorScheme cs)
-{
-    switch (cs)
-    {
-    case CS_GRAD_INTENS:
-        return ScanColorMode::Intensity;
-    case CS_GRAD_ELEV:
-        return ScanColorMode::Elevation;
-    case CS_GRAD_DIST:
-        return ScanColorMode::Distance;
-    default:
-        return ScanColorMode::Flat;
-    }
-}
 
 float m_gizmo[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
@@ -1644,14 +1528,12 @@ void loadSession(const std::string& session_file_name)
         index_end = session.point_clouds_container.point_clouds.size() - 1;
 
         std::string newTitle = winTitle + " - " + truncPath(session_file_name);
-        SetWindowTitle(newTitle.c_str());
+        glutSetWindowTitle(newTitle.c_str());
 
         for (const auto& pc : session.point_clouds_container.point_clouds)
             session_total_number_of_points += pc.points_local.size();
 
         session_dims = session.point_clouds_container.compute_point_cloud_dimension();
-
-        scan_renderer.rebuildAll(session.point_clouds_container.point_clouds);
     }
 }
 
@@ -1786,7 +1668,7 @@ void openLaz(bool fillInSession)
         index_end = session.point_clouds_container.point_clouds.size() - 1;
 
         std::string newTitle = winTitle + " - " + fs::path(input_file_names[0]).parent_path().string();
-        SetWindowTitle(newTitle.c_str());
+        glutSetWindowTitle(newTitle.c_str());
 
         for (const auto& pc : session.point_clouds_container.point_clouds)
             session_total_number_of_points += pc.points_local.size();
@@ -2335,714 +2217,17 @@ void settings_gui()
     ImGui::End();
 }
 
-// Camera/picking/mini-compass/misc-ImGui-widget functions (truncPath,
-// wheel/reshape/motion, showAxes, updateCameraTransition/breakCameraTransition/
-// setCameraPreset, camMenu/view_kbd_shortcuts/cor_window/ImGuiHyperlink/
-// ShowShortcutsTable/info_window, drawMiniCompassWithRuler, rayIntersection/
-// GetLaserBeam/distance_point_to_line/getClosestTrajectoryPoint/
-// setNewRotationCenter, checkClHelp, updateOrthoView, end3DMatrixStack) now
-// live in rl_utils.cpp/rl_utils.h -- see rl_utils.h's top comment.
-
-// Was ObservationPicking::render() (core/src/observation_picking.cpp) --
-// legacy-GL, compiled once into `core`, shared with the remaining GLUT
-// apps, so it can't be changed. Reimplemented here via rl* renames (the
-// original is pure immediate-mode grid/point/line drawing, no matrix-stack
-// work of its own). The per-intersection wireframe boxes (Intersection::
-// render(), also in `core`) and the GLUT-bitmap-font index labels are not
-// ported (a niche sub-feature of an already-niche picking mode) -- picking
-// itself and the current/committed observation markers below are.
-void observationPickingRender(const ObservationPicking& observation_picking)
-{
-    if (observation_picking.is_observation_picking_mode)
-    {
-        auto drawGrid = [&](float step, float r, float g, float b)
-        {
-            rlColor3f(r, g, b);
-            rlBegin(RL_LINES);
-            for (float x = -observation_picking.max_xy; x <= observation_picking.max_xy; x += step)
-            {
-                rlVertex3f(x, -observation_picking.max_xy, observation_picking.picking_plane_height);
-                rlVertex3f(x, observation_picking.max_xy, observation_picking.picking_plane_height);
-            }
-            for (float y = -observation_picking.max_xy; y <= observation_picking.max_xy; y += step)
-            {
-                rlVertex3f(-observation_picking.max_xy, y, observation_picking.picking_plane_height);
-                rlVertex3f(observation_picking.max_xy, y, observation_picking.picking_plane_height);
-            }
-            rlEnd();
-        };
-
-        if (observation_picking.grid10x10m)
-            drawGrid(10.0f, 0.7f, 0.7f, 0.7f);
-        if (observation_picking.grid1x1m)
-            drawGrid(1.0f, 0.3f, 0.3f, 0.3f);
-        if (observation_picking.grid01x01m)
-            drawGrid(0.1f, 0.1f, 0.1f, 0.1f);
-        if (observation_picking.grid001x001m)
-            drawGrid(0.01f, 0.8f, 0.8f, 0.8f);
-    }
-
-    // rlgl's rlBegin() only supports RL_LINES/RL_TRIANGLES/RL_QUADS (no
-    // point-mode immediate drawing), so point markers use small spheres.
-    for (const auto& [key, value] : observation_picking.current_observation)
-    {
-        DrawSphere(Vector3{ static_cast<float>(value.x()), static_cast<float>(value.y()), static_cast<float>(value.z()) }, 0.05f, WHITE);
-    }
-
-    rlColor3f(1.0f, 0.2f, 0.2f);
-    rlBegin(RL_LINES);
-    for (const auto& [key1, value1] : observation_picking.current_observation)
-    {
-        for (const auto& [key2, value2] : observation_picking.current_observation)
-        {
-            if (key1 != key2)
-            {
-                rlVertex3f(value1.x(), value1.y(), value1.z());
-                rlVertex3f(value2.x(), value2.y(), value2.z());
-            }
-        }
-    }
-    rlEnd();
-}
-
-// Was ManualPoseGraphLoopClosure::Render() (core/src/manual_pose_graph_loop_closure.cpp) --
-// legacy-GL, compiled once into `core`, shared with the remaining GLUT
-// apps, so it can't be changed. Reimplemented here using scan_renderer
-// (marks for source/target highlighting, straight from each scan's already-
-// cached GPU buffer) plus DrawSphere/DrawCylinderEx/DrawLine3D for the
-// green pose-sequence trail and the per-edge lines/flagpole markers (these
-// work against whatever rlgl projection/modelview is currently active, same
-// as this app's own manually-driven matrix stack -- no BeginMode3D needed).
-// Coordinates are used directly (Z-up, no remap -- see raylib_render.hpp).
-void renderLoopClosure(
-    PointClouds& point_clouds_container, int index_loop_closure_source, int index_loop_closure_target, int before, int after)
-{
-    auto& pointClouds = point_clouds_container.point_clouds;
-    if (pointClouds.empty())
-    {
-        return;
-    }
-
-    scan_renderer.clearMarks();
-
-    // Matches the original: while loop closure editing is active, only the
-    // source/target (or active-edge) range renders -- not the whole
-    // session -- since ManualPoseGraphLoopClosure::Render() drew just those
-    // scans directly rather than going through the bulk point-cloud render
-    // call (which display() only makes when !is_loop_closure_gui).
-    for (auto& pc : pointClouds)
-    {
-        pc.visible = false;
-    }
-
-    auto markRange = [&](int center, Color color)
-    {
-        for (int i = center - before; i <= center + after; ++i)
-        {
-            if (i >= 0 && static_cast<size_t>(i) < pointClouds.size())
-            {
-                pointClouds[i].visible = true;
-                if (session.pose_graph_loop_closure.render_source_as_red_target_as_blue)
-                {
-                    scan_renderer.setMarkColor(static_cast<size_t>(i), color);
-                }
-            }
-        }
-    };
-
-    if (!session.pose_graph_loop_closure.manipulate_active_edge)
-    {
-        markRange(index_loop_closure_source, RED);
-        markRange(index_loop_closure_target, BLUE);
-    }
-    else if (!session.pose_graph_loop_closure.edges.empty())
-    {
-        const auto& activeEdge = session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge];
-        markRange(activeEdge.index_from, RED);
-
-        // Live preview of the target side at the edge's in-progress
-        // (not-yet-committed) relative_pose_tb, drawn straight from each
-        // scan's cached GPU buffer with the delta folded into the MVP
-        // rather than re-transforming points on the CPU.
-        int indexSrcEdge = activeEdge.index_from;
-        int indexTrgEdge = activeEdge.index_to;
-        if (indexSrcEdge >= 0 && static_cast<size_t>(indexSrcEdge) < pointClouds.size() && indexTrgEdge >= 0 &&
-            static_cast<size_t>(indexTrgEdge) < pointClouds.size())
-        {
-            const Eigen::Affine3d& mSrc = pointClouds[indexSrcEdge].m_pose;
-            for (int i = -before; i <= after; ++i)
-            {
-                int idx = indexTrgEdge + i;
-                if (idx < 0 || static_cast<size_t>(idx) >= pointClouds.size())
-                {
-                    continue;
-                }
-                Eigen::Affine3d mTrg = mSrc * affine_matrix_from_pose_tait_bryan(activeEdge.relative_pose_tb);
-                Eigen::Affine3d mRel = pointClouds[indexTrgEdge].m_pose.inverse() * pointClouds[idx].m_pose;
-                mTrg = mTrg * mRel;
-
-                Eigen::Affine3d delta = mTrg * pointClouds[idx].m_pose.inverse();
-                Color c = session.pose_graph_loop_closure.render_source_as_red_target_as_blue
-                    ? BLUE
-                    : Color{ static_cast<unsigned char>(pointClouds[idx].render_color[0] * 255.f),
-                             static_cast<unsigned char>(pointClouds[idx].render_color[1] * 255.f),
-                             static_cast<unsigned char>(pointClouds[idx].render_color[2] * 255.f),
-                             255 };
-                scan_renderer.drawCachedWithTransform(
-                    static_cast<size_t>(idx), delta, c, static_cast<float>(pointClouds[idx].point_size), false);
-            }
-        }
-    }
-
-    // The marked/visible-restricted range set above (source/target or
-    // active-edge scans, at their normal stored pose).
-    scan_renderer.draw(
-        pointClouds,
-        static_cast<float>(point_size),
-        scanColorModeFromScheme(csPointCloud),
-        static_cast<float>(session_dims.z_min),
-        static_cast<float>(session_dims.z_max),
-        Eigen::Vector3d(rotation_center.x(), rotation_center.y(), rotation_center.z()),
-        static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
-        1);
-
-    // Pose-sequence trail across the whole session, as a chain of thick
-    // green cylinders (sphere at each joint), sized relative to the current
-    // zoom (translate_z) so it stays visible next to the point cloud.
-    const float tubeRadius = std::max(0.005f, fabsf(translate_z) * 0.001f);
-    bool first = true;
-    Vector3 prev{};
-    for (const auto& pc : pointClouds)
-    {
-        Vector3 p = Vector3{ static_cast<float>(pc.m_pose.translation().x()),
-                             static_cast<float>(pc.m_pose.translation().y()),
-                             static_cast<float>(pc.m_pose.translation().z()) };
-        DrawSphere(p, tubeRadius, GREEN);
-        if (!first)
-        {
-            DrawCylinderEx(prev, p, tubeRadius, tubeRadius, 8, GREEN);
-        }
-        prev = p;
-        first = false;
-    }
-
-    // Edge lines + flagpole markers (red = active edge, blue = others).
-    for (size_t i = 0; i < session.pose_graph_loop_closure.edges.size(); ++i)
-    {
-        const auto& edge = session.pose_graph_loop_closure.edges[i];
-        if (edge.index_from < 0 || static_cast<size_t>(edge.index_from) >= pointClouds.size() || edge.index_to < 0 ||
-            static_cast<size_t>(edge.index_to) >= pointClouds.size())
-        {
-            continue;
-        }
-
-        Color c = (static_cast<int>(i) == session.pose_graph_loop_closure.index_active_edge) ? RED : BLUE;
-
-        Eigen::Vector3d worldSrc = pointClouds[edge.index_from].m_pose.translation();
-        Eigen::Vector3d worldTrg = pointClouds[edge.index_to].m_pose.translation();
-        Vector3 pSrc = Vector3{ static_cast<float>(worldSrc.x()), static_cast<float>(worldSrc.y()), static_cast<float>(worldSrc.z()) };
-        Vector3 pTrg = Vector3{ static_cast<float>(worldTrg.x()), static_cast<float>(worldTrg.y()), static_cast<float>(worldTrg.z()) };
-        DrawCylinderEx(pSrc, pTrg, tubeRadius, tubeRadius, 8, c);
-
-        Eigen::Vector3d mid = (worldSrc + worldTrg) * 0.5;
-        Eigen::Vector3d midUp = mid + Eigen::Vector3d(0, 0, 10);
-        Vector3 pMid = Vector3{ static_cast<float>(mid.x()), static_cast<float>(mid.y()), static_cast<float>(mid.z()) };
-        Vector3 pMidUp = Vector3{ static_cast<float>(midUp.x()), static_cast<float>(midUp.y()), static_cast<float>(midUp.z()) };
-        DrawCylinderEx(pMid, pMidUp, tubeRadius, tubeRadius, 8, c);
-    }
-}
-
-// Was GroundControlPoints::draw_ellipse() (core/src/ground_control_points.cpp)
-// -- a GL_LINE_LOOP quad per lat/long grid cell. rlgl's rlBegin() has no
-// LOOP/STRIP mode (only RL_LINES/RL_TRIANGLES/RL_QUADS -- see
-// renderLoopClosureLabels()'s comment for the same constraint elsewhere in
-// this file), so each cell's 4-vertex loop is emitted as 4 independent line
-// segments instead. nstd is dropped: the only caller always passed 1.0.
-void drawUncertaintyEllipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, Color color)
-{
-    Eigen::LLT<Eigen::Matrix<double, 3, 3>> cholSolver(covar);
-    Eigen::Matrix3d transform = cholSolver.matrixL();
-
-    const double pi = 3.141592;
-    const double di = 0.02;
-    const double dj = 0.04;
-    const double du = di * 2 * pi;
-    const double dv = dj * pi;
-
-    rlBegin(RL_LINES);
-    rlColor4ub(color.r, color.g, color.b, color.a);
-
-    for (double i = 0; i < 1.0; i += di) // horizontal
-    {
-        for (double j = 0; j < 1.0; j += dj) // vertical
-        {
-            double u = i * 2 * pi; // 0     to  2pi
-            double v = (j - 0.5) * pi; //-pi/2 to pi/2
-
-            const Eigen::Vector3d pp0(cos(v) * cos(u), cos(v) * sin(u), sin(v));
-            const Eigen::Vector3d pp1(cos(v) * cos(u + du), cos(v) * sin(u + du), sin(v));
-            const Eigen::Vector3d pp2(cos(v + dv) * cos(u + du), cos(v + dv) * sin(u + du), sin(v + dv));
-            const Eigen::Vector3d pp3(cos(v + dv) * cos(u), cos(v + dv) * sin(u), sin(v + dv));
-            Eigen::Vector3d tp0 = transform * pp0 + mean;
-            Eigen::Vector3d tp1 = transform * pp1 + mean;
-            Eigen::Vector3d tp2 = transform * pp2 + mean;
-            Eigen::Vector3d tp3 = transform * pp3 + mean;
-
-            rlVertex3f(static_cast<float>(tp0.x()), static_cast<float>(tp0.y()), static_cast<float>(tp0.z()));
-            rlVertex3f(static_cast<float>(tp1.x()), static_cast<float>(tp1.y()), static_cast<float>(tp1.z()));
-
-            rlVertex3f(static_cast<float>(tp1.x()), static_cast<float>(tp1.y()), static_cast<float>(tp1.z()));
-            rlVertex3f(static_cast<float>(tp2.x()), static_cast<float>(tp2.y()), static_cast<float>(tp2.z()));
-
-            rlVertex3f(static_cast<float>(tp2.x()), static_cast<float>(tp2.y()), static_cast<float>(tp2.z()));
-            rlVertex3f(static_cast<float>(tp3.x()), static_cast<float>(tp3.y()), static_cast<float>(tp3.z()));
-
-            rlVertex3f(static_cast<float>(tp3.x()), static_cast<float>(tp3.y()), static_cast<float>(tp3.z()));
-            rlVertex3f(static_cast<float>(tp0.x()), static_cast<float>(tp0.y()), static_cast<float>(tp0.z()));
-        }
-    }
-
-    rlEnd();
-}
-
-// Was GroundControlPoints::render() (core/src/ground_control_points.cpp) --
-// legacy-GL, compiled once into `core` and shared with the remaining GLUT
-// apps, so it can't be touched; reimplemented here with raylib's own
-// DrawLine3D (works against whatever rlgl projection/modelview is currently
-// active, same as renderLoopClosure()'s DrawSphere/DrawCylinderEx calls --
-// no BeginMode3D needed). Name/height text labels are handled separately by
-// renderGroundControlPointsLabels() (2D screen-space DrawText, same
-// reasoning as renderLoopClosureLabels()).
-void renderGroundControlPoints(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container)
-{
-    for (const auto& gcp : ground_control_points.gpcs)
-    {
-        if (gcp.index_to_node_inner < 0 || static_cast<size_t>(gcp.index_to_node_inner) >= point_clouds_container.point_clouds.size())
-        {
-            continue;
-        }
-        const auto& pc = point_clouds_container.point_clouds[gcp.index_to_node_inner];
-        if (gcp.index_to_node_outer < 0 || static_cast<size_t>(gcp.index_to_node_outer) >= pc.local_trajectory.size())
-        {
-            continue;
-        }
-
-        Eigen::Vector3d c = pc.m_pose * pc.local_trajectory[gcp.index_to_node_outer].m_pose.translation();
-        float h = static_cast<float>(gcp.lidar_height_above_ground);
-        Vector3 g{ static_cast<float>(gcp.x), static_cast<float>(gcp.y), static_cast<float>(gcp.z) };
-
-        const Color markColor{ 179, 77, 128, 255 }; // was glColor3f(0.7f, 0.3f, 0.5f)
-
-        DrawLine3D(Vector3{ g.x - 0.05f, g.y, g.z }, Vector3{ g.x + 0.05f, g.y, g.z }, markColor);
-        DrawLine3D(Vector3{ g.x, g.y - 0.05f, g.z }, Vector3{ g.x, g.y + 0.05f, g.z }, markColor);
-
-        DrawLine3D(Vector3{ g.x - 0.01f, g.y, g.z + h }, Vector3{ g.x + 0.01f, g.y, g.z + h }, markColor);
-        DrawLine3D(Vector3{ g.x, g.y - 0.01f, g.z + h }, Vector3{ g.x, g.y + 0.01f, g.z + h }, markColor);
-
-        DrawLine3D(g, Vector3{ g.x, g.y, g.z + h }, markColor);
-
-        const Color connectorColor{ 0, 77, 153, 255 }; // was glColor3f(0.0f, 0.3f, 0.6f)
-        DrawLine3D(
-            Vector3{ static_cast<float>(c.x()), static_cast<float>(c.y()), static_cast<float>(c.z()) },
-            Vector3{ g.x, g.y, g.z + h },
-            connectorColor);
-
-        if (ground_control_points.draw_uncertainty)
-        {
-            Eigen::Matrix3d covar = Eigen::Matrix3d::Zero();
-            covar(0, 0) = gcp.sigma_x * gcp.sigma_x;
-            covar(1, 1) = gcp.sigma_y * gcp.sigma_y;
-            covar(2, 2) = gcp.sigma_z * gcp.sigma_z;
-
-            Eigen::Vector3d mean(gcp.x, gcp.y, gcp.z + h);
-            drawUncertaintyEllipse(covar, mean, GRAY); // was Eigen::Vector3f(0.5, 0.5, 0.5)
-        }
-    }
-}
-
-// Was GNSS::render() (core/src/gnss.cpp) -- legacy-GL, compiled once into
-// `core` and shared with the remaining GLUT apps, so it can't be touched;
-// reimplemented here with rlgl's rl*() legacy-emulation API. GL_LINE_STRIP
-// has no rlBegin() equivalent (only RL_LINES/RL_TRIANGLES/RL_QUADS -- see
-// drawUncertaintyEllipse()'s comment for the same constraint elsewhere in
-// this file), so the polyline is emitted as one RL_LINES segment per
-// consecutive pair of poses instead. No text labels here (the original had
-// none), so unlike GroundControlPoints this needs no separate 2D-pass
-// function.
-void renderGNSS(const GNSS& gnss, const PointClouds& point_clouds_container)
-{
-    if (gnss.gnss_poses.size() >= 2)
-    {
-        rlBegin(RL_LINES);
-        rlColor3f(1.0f, 1.0f, 1.0f);
-        for (size_t i = 0; i + 1 < gnss.gnss_poses.size(); ++i)
-        {
-            const auto& a = gnss.gnss_poses[i];
-            const auto& b = gnss.gnss_poses[i + 1];
-            rlVertex3f(
-                static_cast<float>(a.enu_x - point_clouds_container.offset.x()),
-                static_cast<float>(a.enu_y - point_clouds_container.offset.y()),
-                static_cast<float>(a.enu_z - point_clouds_container.offset.z()));
-            rlVertex3f(
-                static_cast<float>(b.enu_x - point_clouds_container.offset.x()),
-                static_cast<float>(b.enu_y - point_clouds_container.offset.y()),
-                static_cast<float>(b.enu_z - point_clouds_container.offset.z()));
-        }
-        rlEnd();
-    }
-
-    if (gnss.show_correspondences)
-    {
-        rlBegin(RL_LINES);
-        rlColor3f(1.0f, 0.0f, 0.0f);
-        for (const auto& pc : point_clouds_container.point_clouds)
-        {
-            for (size_t i = 0; i < gnss.gnss_poses.size(); ++i)
-            {
-                double time_stamp = gnss.gnss_poses[i].timestamp;
-
-                auto it = std::lower_bound(
-                    pc.local_trajectory.begin(),
-                    pc.local_trajectory.end(),
-                    time_stamp,
-                    [](const PointCloud::LocalTrajectoryNode& lhs, const double& time) -> bool
-                    {
-                        return lhs.timestamps.first < time;
-                    });
-
-                size_t index = static_cast<size_t>(it - pc.local_trajectory.begin());
-
-                if (index > 0 && index < pc.local_trajectory.size())
-                {
-                    if (fabs(time_stamp - pc.local_trajectory[index].timestamps.first) < 10e12)
-                    {
-                        auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
-                        rlVertex3f(static_cast<float>(m(0, 3)), static_cast<float>(m(1, 3)), static_cast<float>(m(2, 3)));
-
-                        rlVertex3f(
-                            static_cast<float>(gnss.gnss_poses[i].enu_x - point_clouds_container.offset.x()),
-                            static_cast<float>(gnss.gnss_poses[i].enu_y - point_clouds_container.offset.y()),
-                            static_cast<float>(gnss.gnss_poses[i].enu_z - point_clouds_container.offset.z()));
-                    }
-                }
-            }
-        }
-        rlEnd();
-    }
-}
-
-// Was ControlPoints::render() (core/src/control_points.cpp) -- legacy-GL,
-// compiled once into `core` and shared with the remaining GLUT apps, so it
-// can't be touched; reimplemented here. Two parts, like the original's
-// show_pc flag:
-//  - While editing (control_points.is_imgui), the bulk multi-scan
-//    scan_renderer.draw() call in display() is skipped entirely (see this
-//    function's caller), so the original's per-point GL_POINTS draw of just
-//    the active (index_pose) scan, colored by intensity, is replaced here
-//    by restricting a scan_renderer.draw() call to that one scan instead of
-//    reimplementing per-point immediate-mode drawing (rlBegin() has no
-//    RL_POINTS mode -- see drawUncertaintyEllipse()'s comment for the same
-//    rlBegin() constraint elsewhere in this file). Its GL_LINE_STRIP
-//    trajectory becomes RL_LINES segments, same reasoning.
-//  - The per-control-point crosshair/connector/ellipse markers, drawn
-//    unconditionally in the original (both show_pc branches called this),
-//    are always drawn regardless of is_imgui -- text labels are handled
-//    separately by renderControlPointsLabels().
-void renderControlPoints(const ControlPoints& control_points, PointClouds& point_clouds_container)
-{
-    auto& pointClouds = point_clouds_container.point_clouds;
-
-    if (control_points.is_imgui && control_points.index_pose >= 0 && static_cast<size_t>(control_points.index_pose) < pointClouds.size())
-    {
-        std::vector<bool> wasVisible(pointClouds.size());
-        for (size_t i = 0; i < pointClouds.size(); ++i)
-        {
-            wasVisible[i] = pointClouds[i].visible;
-            pointClouds[i].visible = (static_cast<int>(i) == control_points.index_pose);
-        }
-
-        scan_renderer.draw(
-            pointClouds,
-            static_cast<float>(point_size),
-            ScanColorMode::Intensity,
-            static_cast<float>(session_dims.z_min),
-            static_cast<float>(session_dims.z_max),
-            Eigen::Vector3d(rotation_center.x(), rotation_center.y(), rotation_center.z()),
-            static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
-            1);
-
-        for (size_t i = 0; i < pointClouds.size(); ++i)
-        {
-            pointClouds[i].visible = wasVisible[i];
-        }
-
-        const auto& activePc = pointClouds[control_points.index_pose];
-        if (activePc.local_trajectory.size() >= 2)
-        {
-            rlBegin(RL_LINES);
-            rlColor3f(0.0f, 1.0f, 0.0f);
-            for (size_t i = 0; i + 1 < activePc.local_trajectory.size(); ++i)
-            {
-                auto poseA = activePc.m_pose * activePc.local_trajectory[i].m_pose;
-                auto poseB = activePc.m_pose * activePc.local_trajectory[i + 1].m_pose;
-                rlVertex3f(static_cast<float>(poseA(0, 3)), static_cast<float>(poseA(1, 3)), static_cast<float>(poseA(2, 3)));
-                rlVertex3f(static_cast<float>(poseB(0, 3)), static_cast<float>(poseB(1, 3)), static_cast<float>(poseB(2, 3)));
-            }
-            rlEnd();
-        }
-    }
-
-    const Color markColor{ 179, 77, 128, 255 }; // was glColor3f(0.7f, 0.3f, 0.5f)
-    const Color connectorColor{ 0, 77, 153, 255 }; // was glColor3f(0.0f, 0.3f, 0.6f)
-
-    for (const auto& cp : control_points.cps)
-    {
-        if (cp.index_to_pose < 0 || static_cast<size_t>(cp.index_to_pose) >= pointClouds.size())
-        {
-            continue;
-        }
-
-        Eigen::Vector3d p(cp.x_source_local, cp.y_source_local, cp.z_source_local);
-        Eigen::Vector3d c = pointClouds[cp.index_to_pose].m_pose * p;
-        Vector3 g{ static_cast<float>(cp.x_target_global), static_cast<float>(cp.y_target_global), static_cast<float>(cp.z_target_global) };
-
-        DrawLine3D(Vector3{ g.x - 0.05f, g.y, g.z }, Vector3{ g.x + 0.05f, g.y, g.z }, markColor);
-        DrawLine3D(Vector3{ g.x, g.y - 0.05f, g.z }, Vector3{ g.x, g.y + 0.05f, g.z }, markColor);
-        DrawLine3D(Vector3{ g.x - 0.01f, g.y, g.z }, Vector3{ g.x + 0.01f, g.y, g.z }, markColor);
-        DrawLine3D(Vector3{ g.x, g.y - 0.01f, g.z }, Vector3{ g.x, g.y + 0.01f, g.z }, markColor);
-        // Original's 5th line pair was glVertex3f(g,g) twice -- a
-        // degenerate zero-length segment that draws nothing. Dropped.
-
-        DrawLine3D(Vector3{ static_cast<float>(c.x()), static_cast<float>(c.y()), static_cast<float>(c.z()) }, g, connectorColor);
-
-        if (control_points.draw_uncertainty)
-        {
-            Eigen::Matrix3d covar = Eigen::Matrix3d::Zero();
-            if (cp.is_z_0)
-            {
-                covar(0, 0) = 0.01 * 0.01;
-                covar(1, 1) = 0.01 * 0.01;
-            }
-            else
-            {
-                covar(0, 0) = cp.sigma_x * cp.sigma_x;
-                covar(1, 1) = cp.sigma_y * cp.sigma_y;
-            }
-            covar(2, 2) = cp.sigma_z * cp.sigma_z;
-
-            Eigen::Vector3d mean(cp.x_target_global, cp.y_target_global, cp.z_target_global);
-            drawUncertaintyEllipse(covar, mean, GRAY); // was Eigen::Vector3f(0.5, 0.5, 0.5)
-        }
-    }
-}
-
-// Was ManualPoseGraphLoopClosure::Render()'s per-pose glRasterPos3f +
-// glutBitmapString(std::to_string(i)) labels (one per point cloud, plus one
-// per edge at its flagpole top) -- neither has an rlgl/raylib equivalent
-// (no matrix-anchored bitmap fonts under core profile), so this projects
-// each world position to screen space by hand (using frame_mvp_3d, captured
-// in display() while the 3D projection/modelview was still active -- see
-// its declaration) and draws with DrawText instead. Must run after
-// end3DMatrixStack() (2D screen-space drawing).
-namespace
-{
-    // Plain DrawText at a point sitting exactly on top of a same-size, often
-    // same-color trajectory marker is easy to lose visually -- outlined in
-    // black and nudged up-right of the anchor so it reads clearly regardless
-    // of what's directly underneath. `line` stacks additional labels above
-    // the same anchor (one line height per unit) -- needed wherever several
-    // labels sit at world points too close together to separate on screen
-    // by their 3D position alone (e.g. GCP's LiDAR-center/ground-plane/name
-    // labels, which differ by only lidar_height_above_ground/0.1m).
-    void drawOutlinedText(const char* text, Vector2 anchor, int fontSize, Color color, int line = 0)
-    {
-        int x = static_cast<int>(anchor.x) + 6;
-        int y = static_cast<int>(anchor.y) - fontSize - 6 - line * (fontSize + 4);
-        for (int dx = -1; dx <= 1; ++dx)
-        {
-            for (int dy = -1; dy <= 1; ++dy)
-            {
-                if (dx != 0 || dy != 0)
-                {
-                    DrawText(text, x + dx, y + dy, fontSize, BLACK);
-                }
-            }
-        }
-        DrawText(text, x, y, fontSize, color);
-    }
-
-    // Manual clip-space transform (mat * [x,y,z,1]^T) -- raymath's
-    // Vector3Transform computes the same x/y/z but drops w, which the
-    // perspective divide below needs, so it can't be reused here.
-    Vector2 worldToScreen(const Eigen::Vector3d& world, float screenW, float screenH)
-    {
-        const Matrix& m = frame_mvp_3d;
-        float x = static_cast<float>(world.x());
-        float y = static_cast<float>(world.y());
-        float z = static_cast<float>(world.z());
-        float clipX = m.m0 * x + m.m4 * y + m.m8 * z + m.m12;
-        float clipY = m.m1 * x + m.m5 * y + m.m9 * z + m.m13;
-        float clipW = m.m3 * x + m.m7 * y + m.m11 * z + m.m15;
-        if (fabsf(clipW) < 1e-6f)
-        {
-            return Vector2{ -1000.f, -1000.f };
-        }
-        float ndcX = clipX / clipW;
-        float ndcY = clipY / clipW;
-        return Vector2{ (ndcX * 0.5f + 0.5f) * screenW, (1.0f - (ndcY * 0.5f + 0.5f)) * screenH };
-    }
-} // namespace
-
-void renderLoopClosureLabels(PointClouds& point_clouds_container)
-{
-    auto& pointClouds = point_clouds_container.point_clouds;
-
-    // io.DisplaySize, not GetScreenWidth()/GetScreenHeight(): must match
-    // whatever reshape() last set the actual GL viewport to (see
-    // end3DMatrixStack()'s comment) -- the two can differ under DPI
-    // scaling, which would silently throw this off-screen.
-    ImGuiIO& io = ImGui::GetIO();
-    float screenW = io.DisplaySize.x;
-    float screenH = io.DisplaySize.y;
-
-    for (size_t i = 0; i < pointClouds.size(); ++i)
-    {
-        Vector2 screen = worldToScreen(pointClouds[i].m_pose.translation(), screenW, screenH);
-        drawOutlinedText(TextFormat("%d", static_cast<int>(i)), screen, 20, WHITE);
-    }
-
-    for (size_t i = 0; i < session.pose_graph_loop_closure.edges.size(); ++i)
-    {
-        const auto& edge = session.pose_graph_loop_closure.edges[i];
-        if (edge.index_from < 0 || static_cast<size_t>(edge.index_from) >= pointClouds.size() || edge.index_to < 0 ||
-            static_cast<size_t>(edge.index_to) >= pointClouds.size())
-        {
-            continue;
-        }
-
-        Eigen::Vector3d worldSrc = pointClouds[edge.index_from].m_pose.translation();
-        Eigen::Vector3d worldTrg = pointClouds[edge.index_to].m_pose.translation();
-        Eigen::Vector3d midUp = (worldSrc + worldTrg) * 0.5 + Eigen::Vector3d(0, 0, 10);
-
-        Vector2 screen = worldToScreen(midUp, screenW, screenH);
-        Color c = (static_cast<int>(i) == session.pose_graph_loop_closure.index_active_edge) ? RED : SKYBLUE;
-        drawOutlinedText(TextFormat("%d", static_cast<int>(i)), screen, 22, c);
-    }
-}
-
-// Was GroundControlPoints::render()'s glRasterPos3f + glutBitmapString
-// calls (core/src/ground_control_points.cpp) -- same reasoning as
-// renderLoopClosureLabels() (no matrix-anchored bitmap fonts under core
-// profile), projected to screen space and drawn with DrawText instead.
-// Must run after end3DMatrixStack(), like renderLoopClosureLabels().
-void renderGroundControlPointsLabels(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    float screenW = io.DisplaySize.x;
-    float screenH = io.DisplaySize.y;
-
-    const Color markColor{ 179, 77, 128, 255 }; // was glColor3f(0.7f, 0.3f, 0.5f)
-    const Color connectorColor{ 0, 77, 153, 255 }; // was glColor3f(0.0f, 0.3f, 0.6f)
-
-    for (size_t i = 0; i < ground_control_points.gpcs.size(); ++i)
-    {
-        const auto& gcp = ground_control_points.gpcs[i];
-
-        // LiDAR center (z+h), ground plane (z) and name (z+h+0.1) sit
-        // world-space centimeters apart -- at any normal zoom that's the
-        // same handful of screen pixels, so unlike renderLoopClosureLabels()
-        // (one label per anchor) these three share a single screen anchor
-        // and stack via drawOutlinedText's `line` instead of relying on
-        // their (invisible-on-screen) 3D separation.
-        Vector2 anchor = worldToScreen(Eigen::Vector3d(gcp.x, gcp.y, gcp.z), screenW, screenH);
-
-        // was glColor3f(0, 0, 0) -- plain black text with no outline in the
-        // GLUT original; drawOutlinedText always outlines in black, so
-        // black text would vanish. WHITE instead, matching
-        // renderLoopClosureLabels()'s index labels.
-        drawOutlinedText(gcp.name, anchor, 22, WHITE, 2);
-        drawOutlinedText(TextFormat("GCP_%d: LiDAR center", static_cast<int>(i)), anchor, 14, markColor, 1);
-        drawOutlinedText(TextFormat("GCP_%d: 'plane on the ground'", static_cast<int>(i)), anchor, 14, markColor, 0);
-
-        if (gcp.index_to_node_inner < 0 || static_cast<size_t>(gcp.index_to_node_inner) >= point_clouds_container.point_clouds.size())
-        {
-            continue;
-        }
-        const auto& pc = point_clouds_container.point_clouds[gcp.index_to_node_inner];
-        if (gcp.index_to_node_outer < 0 || static_cast<size_t>(gcp.index_to_node_outer) >= pc.local_trajectory.size())
-        {
-            continue;
-        }
-
-        Eigen::Vector3d c = pc.m_pose * pc.local_trajectory[gcp.index_to_node_outer].m_pose.translation();
-        Vector2 nodeScreen = worldToScreen(c, screenW, screenH);
-        drawOutlinedText(TextFormat("GCP_%d: assigned trajectory node", static_cast<int>(i)), nodeScreen, 14, connectorColor);
-    }
-}
-
-// Was ControlPoints::render()'s glRasterPos3f + glutBitmapString calls
-// (core/src/control_points.cpp) -- same reasoning as
-// renderGroundControlPointsLabels() (no matrix-anchored bitmap fonts under
-// core profile, and name/"CP_i" sit only 0.1m apart in world space -- too
-// close to separate on screen at normal zoom -- so they share one anchor
-// and stack via drawOutlinedText's `line`). Must run after
-// end3DMatrixStack(), like renderGroundControlPointsLabels().
-void renderControlPointsLabels(const ControlPoints& control_points, const PointClouds& point_clouds_container)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    float screenW = io.DisplaySize.x;
-    float screenH = io.DisplaySize.y;
-
-    const Color markColor{ 179, 77, 128, 255 }; // was glColor3f(0.7f, 0.3f, 0.5f)
-
-    for (size_t i = 0; i < control_points.cps.size(); ++i)
-    {
-        const auto& cp = control_points.cps[i];
-
-        Vector2 anchor = worldToScreen(Eigen::Vector3d(cp.x_target_global, cp.y_target_global, cp.z_target_global), screenW, screenH);
-
-        // was glColor3f(0, 0, 0) -- plain black text with no outline in the
-        // GLUT original; drawOutlinedText always outlines in black, so
-        // black text would vanish. WHITE instead, matching
-        // renderGroundControlPointsLabels()'s name label.
-        drawOutlinedText(cp.name, anchor, 22, WHITE, 1);
-        drawOutlinedText(TextFormat("CP_%d", static_cast<int>(i)), anchor, 14, WHITE, 0);
-
-        if (cp.index_to_pose < 0 || static_cast<size_t>(cp.index_to_pose) >= point_clouds_container.point_clouds.size())
-        {
-            continue;
-        }
-
-        Eigen::Vector3d p(cp.x_source_local, cp.y_source_local, cp.z_source_local);
-        Eigen::Vector3d c = point_clouds_container.point_clouds[cp.index_to_pose].m_pose * p;
-        Vector2 sourceScreen = worldToScreen(c, screenW, screenH);
-        drawOutlinedText(TextFormat("CP_%d: initial location", static_cast<int>(i)), sourceScreen, 14, markColor);
-    }
-}
-
 void display()
 {
-    // Safety net: rebuilds any scan whose m_pose no longer matches its
-    // cached GPU buffer, regardless of what changed it (registration
-    // panels, gizmo, translate tool, settings, scan editor, loop closure
-    // Gui() -- which can move point cloud poses through paths that don't
-    // individually call scan_renderer.rebuild()).
-    scan_renderer.syncPoses(session.point_clouds_container.point_clouds);
-
     ImGuiIO& io = ImGui::GetIO();
-    // GetRenderWidth/Height(), not io.DisplaySize: the GL viewport must be
-    // sized in actual framebuffer pixels, which on a Retina Mac are a
-    // multiple of io.DisplaySize's logical points (see initGL()'s
-    // FLAG_WINDOW_HIGHDPI comment) -- using io.DisplaySize directly here
-    // left the 3D scene rendered only into the bottom-left quarter of the
-    // window, the rest showing just the clear color.
-    rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
+    glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
 
-    ClearBackground(ColorFromNormalized(Vector4{ bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w }));
-    rlEnableDepthTest();
+    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
 
-    rlMatrixMode(RL_PROJECTION);
-    rlLoadIdentity();
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
     updateCameraTransition();
@@ -3122,53 +2307,28 @@ void display()
 
         viewLocal.translate(-rotation_center);
 
-        rlMultMatrixf(viewLocal.matrix().data());
+        glLoadMatrixf(viewLocal.matrix().data());
     }
     else
         updateOrthoView();
 
-    frame_view_3d = rlGetMatrixModelview();
-    frame_proj_3d = rlGetMatrixProjection();
-    frame_mvp_3d = MatrixMultiply(frame_view_3d, frame_proj_3d);
-
     showAxes();
 
-    // renderLoopClosure() hides every scan except the current source/target
-    // range while loop closure editing is active (see its comment) --
-    // restore full visibility the moment the panel closes (X button, menu
-    // toggle, or Ctrl+L), or every scan but that last-shown range stays
-    // hidden. Checked unconditionally (not just when the below block runs)
-    // so this still fires even if control_points.is_imgui happens to be
-    // true on the closing frame.
-    static bool was_loop_closure_gui = false;
-    if (was_loop_closure_gui && !is_loop_closure_gui)
+    if (session.control_points.is_imgui)
+        session.control_points.render(session.point_clouds_container, true);
+    else
     {
-        for (auto& pc : session.point_clouds_container.point_clouds)
-        {
-            pc.visible = true;
-        }
-    }
-    was_loop_closure_gui = is_loop_closure_gui;
-
-    // renderControlPoints() draws its markers regardless of is_imgui (like
-    // the original's render() -- both its show_pc=true/false call sites
-    // drew them) and, while is_imgui is true, also substitutes for the bulk
-    // scan_renderer.draw() call below (skipped entirely in that case -- see
-    // its own comment).
-    renderControlPoints(session.control_points, session.point_clouds_container);
-
-    if (!session.control_points.is_imgui)
-    {
-        renderGroundControlPoints(session.ground_control_points, session.point_clouds_container);
-        renderGNSS(tls_registration.gnss, session.point_clouds_container);
-
         if (is_loop_closure_gui)
-            renderLoopClosure(
+            session.pose_graph_loop_closure.Render(
                 session.point_clouds_container,
                 index_loop_closure_source,
                 index_loop_closure_target,
                 num_edge_extended_before,
                 num_edge_extended_after);
+
+        tls_registration.gnss.render(session.point_clouds_container);
+        session.ground_control_points.render(session.point_clouds_container);
+        session.control_points.render(session.point_clouds_container, false);
     }
 
     int prev_index_pose = session.control_points.index_pose;
@@ -3197,15 +2357,9 @@ void display()
         camera_transition_active = true;
     }
 
-    // rlImGuiBegin() only polls raylib input into ImGui's IO and calls
-    // ImGui::NewFrame() -- it doesn't touch rlgl's matrix stack, so the 3D
-    // projection/modelview set up above stays active through all the
-    // interleaved 3D drawing + ImGui panel-building code below, exactly
-    // like the original (glBegin/glVertex calls and ImGui:: calls building
-    // up a draw list are independent of each other either way -- the ImGui
-    // draw list only actually hits the GPU once, at rlImGuiEnd() near the
-    // end of this function).
-    rlImGuiBegin();
+    ImGui_ImplOpenGL2_NewFrame();
+    ImGui_ImplGLUT_NewFrame();
+    ImGui::NewFrame();
 
     ShowMainDockSpace();
 
@@ -3237,17 +2391,11 @@ void display()
 
                     if (!is_ortho)
                     {
-                        // Named-field copy (not a raw struct memcpy): Matrix's
-                        // declared field order isn't guaranteed to match the
-                        // m0..m15 column-major numbering its names imply.
-                        Matrix projMat = rlGetMatrixProjection();
-                        Matrix modelMat = rlGetMatrixModelview();
-                        float projection[16] = { projMat.m0,  projMat.m1,  projMat.m2,  projMat.m3, projMat.m4,  projMat.m5,
-                                                 projMat.m6,  projMat.m7,  projMat.m8,  projMat.m9, projMat.m10, projMat.m11,
-                                                 projMat.m12, projMat.m13, projMat.m14, projMat.m15 };
-                        float modelview[16] = { modelMat.m0,  modelMat.m1,  modelMat.m2,  modelMat.m3, modelMat.m4,  modelMat.m5,
-                                                modelMat.m6,  modelMat.m7,  modelMat.m8,  modelMat.m9, modelMat.m10, modelMat.m11,
-                                                modelMat.m12, modelMat.m13, modelMat.m14, modelMat.m15 };
+                        GLfloat projection[16];
+                        glGetFloatv(GL_PROJECTION_MATRIX, projection);
+
+                        GLfloat modelview[16];
+                        glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
                         ImGuizmo::Manipulate(
                             &modelview[0],
@@ -3327,24 +2475,15 @@ void display()
                 }
             }
 
-            // Was PointClouds::render() (legacy-GL, in `core`, shared with
-            // GLUT apps) -- replaced with scan_renderer, which is kept in
-            // sync via rebuildAll()/syncPoses() at session-load/pose-change
-            // sites and each frame (see main()/loadSession() below).
-            scan_renderer.draw(
-                session.point_clouds_container.point_clouds,
-                static_cast<float>(point_size),
-                scanColorModeFromScheme(csPointCloud),
-                static_cast<float>(session_dims.z_min),
-                static_cast<float>(session_dims.z_max),
-                Eigen::Vector3d(rotation_center.x(), rotation_center.y(), rotation_center.z()),
-                static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
-                viewer_decimate_point_cloud);
-            scan_renderer.drawTrajectories(
-                session.point_clouds_container.point_clouds, 1, session.point_clouds_container.show_imu_to_lio_diff);
+            session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, 1, session_dims);
 
-            observationPickingRender(observation_picking);
+            // spdlog::info("session.point_clouds_container.xy_grid_10x10 " << (int)session.point_clouds_container.xy_grid_10x10 <<
+            // std::endl;
 
+            observation_picking.render();
+
+            glPushAttrib(GL_ALL_ATTRIB_BITS);
+            glPointSize(5);
             for (const auto& obs : observation_picking.observations)
             {
                 for (const auto& [key1, value1] : obs)
@@ -3364,23 +2503,21 @@ void display()
                                 p1 = session.point_clouds_container.point_clouds[key1].m_pose * value1;
                                 p2 = session.point_clouds_container.point_clouds[key2].m_pose * value2;
                             }
-                            DrawSphere(
-                                Vector3{ static_cast<float>(p1.x()), static_cast<float>(p1.y()), static_cast<float>(p1.z()) },
-                                0.05f,
-                                GREEN);
-                            DrawSphere(
-                                Vector3{ static_cast<float>(p2.x()), static_cast<float>(p2.y()), static_cast<float>(p2.z()) },
-                                0.05f,
-                                GREEN);
-                            rlColor3f(1, 0, 0);
-                            rlBegin(RL_LINES);
-                            rlVertex3f(p1.x(), p1.y(), p1.z());
-                            rlVertex3f(p2.x(), p2.y(), p2.z());
-                            rlEnd();
+                            glColor3f(0, 1, 0);
+                            glBegin(GL_POINTS);
+                            glVertex3f(p1.x(), p1.y(), p1.z());
+                            glVertex3f(p2.x(), p2.y(), p2.z());
+                            glEnd();
+                            glColor3f(1, 0, 0);
+                            glBegin(GL_LINES);
+                            glVertex3f(p1.x(), p1.y(), p1.z());
+                            glVertex3f(p2.x(), p2.y(), p2.z());
+                            glEnd();
                         }
                     }
                 }
             }
+            glPopAttrib();
 
             for (const auto& obs : observation_picking.observations)
             {
@@ -3395,27 +2532,24 @@ void display()
                 {
                     mean /= counter;
 
-                    // RL_LINE_STRIP isn't supported by rlBegin() (only
-                    // RL_LINES/RL_TRIANGLES/RL_QUADS are) -- each edge of
-                    // the square drawn as its own line segment instead.
-                    rlColor3f(1, 0, 0);
-                    rlBegin(RL_LINES);
-                    rlVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
-                    rlVertex3f(mean.x() + 1, mean.y() - 1, mean.z());
-                    rlVertex3f(mean.x() + 1, mean.y() - 1, mean.z());
-                    rlVertex3f(mean.x() + 1, mean.y() + 1, mean.z());
-                    rlVertex3f(mean.x() + 1, mean.y() + 1, mean.z());
-                    rlVertex3f(mean.x() - 1, mean.y() + 1, mean.z());
-                    rlVertex3f(mean.x() - 1, mean.y() + 1, mean.z());
-                    rlVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
-                    rlEnd();
+                    glColor3f(1, 0, 0);
+                    glBegin(GL_LINE_STRIP);
+                    glVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
+                    glVertex3f(mean.x() + 1, mean.y() - 1, mean.z());
+                    glVertex3f(mean.x() + 1, mean.y() + 1, mean.z());
+                    glVertex3f(mean.x() - 1, mean.y() + 1, mean.z());
+                    glVertex3f(mean.x() - 1, mean.y() - 1, mean.z());
+                    glEnd();
                 }
             }
 
+            glColor3f(1, 0, 1);
+            glBegin(GL_POINTS);
             for (auto p : picked_points)
             {
-                DrawSphere(Vector3{ static_cast<float>(p.x()), static_cast<float>(p.y()), static_cast<float>(p.z()) }, 0.05f, MAGENTA);
+                glVertex3f(p.x(), p.y(), p.z());
             }
+            glEnd();
         }
         else
         {
@@ -3428,14 +2562,11 @@ void display()
 
                 if (!is_ortho)
                 {
-                    Matrix projMat = rlGetMatrixProjection();
-                    Matrix modelMat = rlGetMatrixModelview();
-                    float projection[16] = { projMat.m0,  projMat.m1,  projMat.m2,  projMat.m3, projMat.m4,  projMat.m5,
-                                             projMat.m6,  projMat.m7,  projMat.m8,  projMat.m9, projMat.m10, projMat.m11,
-                                             projMat.m12, projMat.m13, projMat.m14, projMat.m15 };
-                    float modelview[16] = { modelMat.m0,  modelMat.m1,  modelMat.m2,  modelMat.m3, modelMat.m4,  modelMat.m5,
-                                            modelMat.m6,  modelMat.m7,  modelMat.m8,  modelMat.m9, modelMat.m10, modelMat.m11,
-                                            modelMat.m12, modelMat.m13, modelMat.m14, modelMat.m15 };
+                    GLfloat projection[16];
+                    glGetFloatv(GL_PROJECTION_MATRIX, projection);
+
+                    GLfloat modelview[16];
+                    glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
                     ImGuizmo::Manipulate(
                         &modelview[0],
@@ -4423,27 +3554,6 @@ void display()
                         }
                     }
 
-                    ImGui::Separator();
-
-                    // Gradient modes -- declared in ColorScheme since the
-                    // original, but never actually wired to a menu item or
-                    // the renderer there; hooked up here to
-                    // scan_renderer's per-point jet-colormap shader.
-                    if (ImGui::MenuItem("> By intensity (gradient)", nullptr, (csPointCloud == CS_GRAD_INTENS)))
-                        csPointCloud = CS_GRAD_INTENS;
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Per-point jet colormap from LAS/LAZ intensity");
-
-                    if (ImGui::MenuItem("> By height (gradient)", nullptr, (csPointCloud == CS_GRAD_ELEV)))
-                        csPointCloud = CS_GRAD_ELEV;
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Per-point jet colormap from world Z, over the session's [z_min, z_max]");
-
-                    if (ImGui::MenuItem("> By distance (gradient)", nullptr, (csPointCloud == CS_GRAD_DIST)))
-                        csPointCloud = CS_GRAD_DIST;
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Per-point jet colormap from distance to the rotation center");
-
                     ImGui::EndMenu();
                 }
 
@@ -4613,7 +3723,7 @@ void display()
             ImGui::SameLine();
 
             ImGui::SetNextItemWidth(ImGuiNumberWidth);
-            ImGui::InputInt("Points render downsampling", &viewer_decimate_point_cloud, 2, 10);
+            ImGui::InputInt("Points render downsampling", &viewer_decimate_point_cloud, 10, 100);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("increase for better performance, decrease for rendering more points");
             ImGui::SameLine();
@@ -4637,23 +3747,9 @@ void display()
                 viewer_decimate_point_cloud = 1;
 
             ImGui::SameLine();
-            // GetFPS()/point-cloud draw-call/vertex count via raylib/ScanRenderer,
-            // rather than ImGui's own Framerate tracker -- raylib doesn't
-            // expose a general "draw calls" counter (rlgl's own internal one
-            // only tracks its immediate-mode batch renderer, not custom
-            // glDrawArrays calls like ScanRenderer's), so these are scan_renderer's
-            // own per-frame counts of the calls/points it issued in draw().
-            ImGui::Text(
-                "(%d FPS, %d draw calls, %d vertices)", GetFPS(), scan_renderer.lastDrawCallCount(), scan_renderer.lastVertexCount());
+            ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
         }
         ImGui::EndDisabled();
-
-        ImGui::SameLine();
-        // GL_RENDERER has no raylib wrapper (raylib doesn't expose GPU
-        // vendor/renderer strings), so this is the same plain GL query
-        // info_window()'s tooltip already uses, just surfaced directly in
-        // the bar instead of hidden behind a hover.
-        ImGui::TextDisabled("| %s", reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
 
         ImGui::SameLine(
             ImGui::GetWindowWidth() - ImGui::CalcTextSize("Info").x - ImGui::GetStyle().ItemSpacing.x * 2 -
@@ -4703,7 +3799,7 @@ void display()
         translate_tool.step = TranslateTool::Step::Idle;
         translate_tool.has_transform = false;
         translate_tool.transform = Eigen::Affine3d::Identity();
-        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+        glutSetCursor(GLUT_CURSOR_INHERIT);
     }
 
     cor_window();
@@ -4712,23 +3808,14 @@ void display()
 
     draw_translate_preview();
 
-    // 3D drawing is done -- switch to the 2D screen-space projection the
-    // mini-compass (DrawLineEx/DrawText) and rlImGuiEnd()'s UI render both
-    // need (see end3DMatrixStack()'s comment).
-    end3DMatrixStack();
-
-    if (is_loop_closure_gui)
-        renderLoopClosureLabels(session.point_clouds_container);
-
-    if (!session.control_points.is_imgui)
-        renderGroundControlPointsLabels(session.ground_control_points, session.point_clouds_container);
-
-    renderControlPointsLabels(session.control_points, session.point_clouds_container);
-
     if (compass_ruler)
         drawMiniCompassWithRuler();
 
-    rlImGuiEnd();
+    ImGui::Render();
+    ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+
+    glutSwapBuffers();
+    glutPostRedisplay();
 }
 
 void draw_translate_preview()
@@ -4772,21 +3859,21 @@ void draw_translate_preview()
     double y_len = x_len * 0.5;
     double z_len = x_len * 0.25;
 
-    rlSetLineWidth(3.0f);
-    rlBegin(RL_LINES);
-    rlColor3f(1.0f, 0.0f, 0.0f);
-    rlVertex3f(O.x(), O.y(), O.z());
-    rlVertex3f(O.x() + x_n.x() * x_len, O.y() + x_n.y() * x_len, O.z());
+    glLineWidth(3.0f);
+    glBegin(GL_LINES);
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glVertex3d(O.x(), O.y(), O.z());
+    glVertex3d(O.x() + x_n.x() * x_len, O.y() + x_n.y() * x_len, O.z());
 
-    rlColor3f(0.0f, 1.0f, 0.0f);
-    rlVertex3f(O.x(), O.y(), O.z());
-    rlVertex3f(O.x() + y_n.x() * y_len, O.y() + y_n.y() * y_len, O.z());
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glVertex3d(O.x(), O.y(), O.z());
+    glVertex3d(O.x() + y_n.x() * y_len, O.y() + y_n.y() * y_len, O.z());
 
-    rlColor3f(0.0f, 0.0f, 1.0f);
-    rlVertex3f(O.x(), O.y(), O.z());
-    rlVertex3f(O.x(), O.y(), O.z() + z_len);
-    rlEnd();
-    rlSetLineWidth(1.0f);
+    glColor3f(0.0f, 0.0f, 1.0f);
+    glVertex3d(O.x(), O.y(), O.z());
+    glVertex3d(O.x(), O.y(), O.z() + z_len);
+    glEnd();
+    glLineWidth(1.0f);
 }
 
 Eigen::Affine3d compute_translate_matrix(const Eigen::Vector3d& O, const Eigen::Vector3d& X, const Eigen::Vector3d& Y_hint)
@@ -4840,7 +3927,7 @@ void translate_gui()
         new_translate_z = translate_z;
         camera_transition_active = true;
 
-        SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);
+        glutSetCursor(GLUT_CURSOR_CROSSHAIR);
     }
     ImGui::SameLine();
     if (ImGui::Button("Reset"))
@@ -4848,7 +3935,7 @@ void translate_gui()
         translate_tool.step = TranslateTool::Step::Idle;
         translate_tool.has_transform = false;
         translate_tool.transform = Eigen::Affine3d::Identity();
-        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+        glutSetCursor(GLUT_CURSOR_INHERIT);
     }
 
     const char* step_text = "Idle";
@@ -4904,7 +3991,7 @@ void translate_gui()
             translate_tool.step = TranslateTool::Step::Idle;
             translate_tool.has_transform = false;
             translate_tool.transform = Eigen::Affine3d::Identity();
-            SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            glutSetCursor(GLUT_CURSOR_INHERIT);
         }
     }
     ImGui::EndDisabled();
@@ -4930,17 +4017,6 @@ Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observ
     return pos;
 }
 
-// Button/state constants formerly from <GL/freeglut.h> (matching GLUT's own
-// values), so mouse()'s body below -- ported verbatim from GLUT's
-// glutMouseFunc callback shape -- needed no changes. Called manually from
-// the main loop on raylib button-state transitions (see main() below)
-// instead of via glutMouseFunc registration.
-constexpr int GLUT_LEFT_BUTTON = 0;
-constexpr int GLUT_MIDDLE_BUTTON = 1;
-constexpr int GLUT_RIGHT_BUTTON = 2;
-constexpr int GLUT_DOWN = 0;
-constexpr int GLUT_UP = 1;
-
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -4958,9 +4034,9 @@ void mouse(int glut_button, int state, int x, int y)
     if (button != -1 && state == GLUT_UP)
         io.MouseDown[button] = false;
 
-    // The GLUT-version-gated legacy mouse-wheel-as-button-3/4 fallback is
-    // dropped -- raylib's GetMouseWheelMove() (polled in main()'s loop,
-    // calling wheel() directly) covers this unconditionally.
+    static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
+    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) && glutMajorVersion < 3)
+        wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
 
     if (!io.WantCaptureMouse)
     {
@@ -5027,7 +4103,7 @@ void mouse(int glut_button, int state, int x, int y)
 
                         double dist = distance_point_to_line(vp, laser_beam);
 
-                        if (dist < min_distance)
+                        if (dist < min_distance && dist < 0.1)
                         {
                             min_distance = dist;
 
@@ -5109,77 +4185,6 @@ void mouse(int glut_button, int state, int x, int y)
     }
 }
 
-// Was glutInit/glutInitDisplayMode/glutInitWindowSize/glutCreateWindow +
-// ImGui_ImplGLUT_Init/ImGui_ImplOpenGL2_Init + glutDisplayFunc/glutMouseFunc/
-// glutMotionFunc/glutMouseWheelFunc/glutKeyboardFunc/glutKeyboardUpFunc --
-// rewritten with raylib's InitWindow + rlImGuiSetup. Kept as a same-named,
-// same-signature function (called the same way from main() below) even
-// though the display/mouse function pointers are no longer registered as
-// GLUT callbacks -- main()'s own loop calls display()/mouse() directly
-// instead (see below), and rlImGuiSetup()/raylib's input polling already
-// cover what keyboardDown/keyboardUp/motion/wheel used to need GLUT
-// callback registration for.
-bool initGL(int* argc, char** argv, const std::string& winTitleArg, void (*)(), void (*)(int, int, int, int))
-{
-    (void)argc;
-    (void)argv;
-
-    // No FLAG_MSAA_4X_HINT: on some GPU/driver combinations (seen with an
-    // NVIDIA PRIME-offloaded context) GLFW's GLX context request for a
-    // 4x-multisample framebuffer fails outright ("GLX: Failed to create
-    // context: BadValue"), and raylib/GLFW then segfaults using the broken
-    // context instead of falling back cleanly. Not worth the crash risk for
-    // a cosmetic antialiasing hint.
-    //
-    // FLAG_WINDOW_HIGHDPI: macOS/GLFW always backs the window with a
-    // full-resolution Retina framebuffer (rglfw.c's _GLFW_USE_RETINA),
-    // regardless of this flag -- but rlImGui only reads that real scale
-    // factor into io.DisplayFramebufferScale (and scales its font atlas
-    // and mouse coordinates to match) when FLAG_WINDOW_HIGHDPI is set.
-    // Without it, on a Retina display ImGui assumes 1:1 and everything it
-    // draws ends up scaled/positioned for a framebuffer a quarter the
-    // actual size -- menus stretched into oversized black bars, widgets
-    // rendered as solid blocks from a mis-sampled font atlas.
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI);
-    InitWindow(static_cast<int>(window_width), static_cast<int>(window_height), winTitleArg.c_str());
-    SetTargetFPS(60);
-
-    // The hardcoded window_width/window_height default (1600x900) can be
-    // wider and/or taller than the actual screen (e.g. a 13" MacBook's
-    // 1470x956-point default-scaled display) -- when it doesn't fit, macOS
-    // shifts the window up/left to keep it on screen, which can tuck the
-    // very top of the content area (where ImGui's main menu bar lives)
-    // behind the OS menu bar/title bar instead of below it. Shrinking to
-    // fit the monitor's work area and recentering avoids that; on screens
-    // that already fit the default size this is a no-op.
-    {
-        const int monitor = GetCurrentMonitor();
-        const int monitorWidth = GetMonitorWidth(monitor);
-        const int monitorHeight = GetMonitorHeight(monitor);
-        const int margin = 100; // room for the OS title bar, menu bar and dock
-        const int fitWidth =
-            (monitorWidth > 0) ? std::min(static_cast<int>(window_width), monitorWidth - margin) : static_cast<int>(window_width);
-        const int fitHeight =
-            (monitorHeight > 0) ? std::min(static_cast<int>(window_height), monitorHeight - margin) : static_cast<int>(window_height);
-        if (fitWidth != static_cast<int>(window_width) || fitHeight != static_cast<int>(window_height))
-        {
-            SetWindowSize(fitWidth, fitHeight);
-            SetWindowPosition((monitorWidth - fitWidth) / 2, (monitorHeight - fitHeight) / 2);
-        }
-    }
-
-    rlImGuiSetup(true);
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad | ImGuiConfigFlags_DockingEnable;
-    io.ConfigDockingWithShift = true;
-
-    scan_renderer.init();
-
-    reshape(static_cast<int>(window_width), static_cast<int>(window_height));
-
-    return true;
-}
-
 int main(int argc, char* argv[])
 {
     try
@@ -5217,44 +4222,11 @@ int main(int argc, char* argv[])
             }
         }
 
-        // Was glutMainLoop() -- which repeatedly invoked the registered
-        // display/mouse/motion/wheel/keyboard callbacks. Those are called
-        // directly here instead: mouse() on raylib button-state transitions
-        // (mirroring glutMouseFunc's fire-on-transition semantics), motion()
-        // every frame (mirroring glutMotionFunc -- motion() itself only acts
-        // when mouse_buttons is set, so this is safe unconditionally), wheel()
-        // when GetMouseWheelMove() is nonzero, and display() once per frame.
-        while (!WindowShouldClose())
-        {
-            int mx = static_cast<int>(GetMouseX());
-            int my = static_cast<int>(GetMouseY());
+        glutMainLoop();
 
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
-                mouse(GLUT_LEFT_BUTTON, GLUT_DOWN, mx, my);
-            if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
-                mouse(GLUT_LEFT_BUTTON, GLUT_UP, mx, my);
-            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
-                mouse(GLUT_RIGHT_BUTTON, GLUT_DOWN, mx, my);
-            if (IsMouseButtonReleased(MOUSE_BUTTON_RIGHT))
-                mouse(GLUT_RIGHT_BUTTON, GLUT_UP, mx, my);
-            if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE))
-                mouse(GLUT_MIDDLE_BUTTON, GLUT_DOWN, mx, my);
-            if (IsMouseButtonReleased(MOUSE_BUTTON_MIDDLE))
-                mouse(GLUT_MIDDLE_BUTTON, GLUT_UP, mx, my);
-
-            motion(mx, my);
-
-            float wheelMove = GetMouseWheelMove();
-            if (wheelMove != 0.0f)
-                wheel(0, wheelMove > 0.0f ? 1 : -1, mx, my);
-
-            BeginDrawing();
-            display();
-            EndDrawing();
-        }
-
-        rlImGuiShutdown();
-        CloseWindow();
+        ImGui_ImplOpenGL2_Shutdown();
+        ImGui_ImplGLUT_Shutdown();
+        ImGui::DestroyContext();
     } catch (const std::bad_alloc& e)
     {
         spdlog::error("System is out of memory : {}", e.what());

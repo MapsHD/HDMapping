@@ -627,7 +627,7 @@ void ScanRenderer::drawTrajectories(const std::vector<PointCloud>& pointClouds, 
         {
             TrajGPU& traj = trajClouds_[idx];
             bool stale = !traj.hasPose || !traj.lastPose.isApprox(pc.m_pose, 1e-9) || traj.builtStride != stride ||
-                         traj.builtPointCount != pc.local_trajectory.size();
+                traj.builtPointCount != pc.local_trajectory.size();
             if (stale)
             {
                 rebuildTrajectoryGPU(traj, pc, stride);

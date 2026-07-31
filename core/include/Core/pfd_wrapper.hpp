@@ -45,6 +45,9 @@ namespace mandeye::fd
     const std::vector<std::string> json_filter = { "Calibration file (*.json)", "*.json", "All files", "*" };
     const std::vector<std::string> sn_filter = { "SN file (*.sn)", "*.sn", "All files", "*" };
 
+    const std::vector<std::string> Nmea_filter = { "NMEA file (*.nmea)", "*.nmea", "All files", "*" };
+    const std::vector<std::string> Gnss_filter = { "GNSS file (*.gnss)", "*.gnss", "All files", "*" };
+
     std::string OpenFileDialogOneFile(const std::string& title, const std::vector<std::string>& filter);
     std::vector<std::string> OpenFileDialog(const std::string& title, const std::vector<std::string>& filter, bool multiselect);
     std::string SaveFileDialog(

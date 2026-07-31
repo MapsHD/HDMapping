@@ -139,14 +139,19 @@ public:
     void clearMarks();
 
     // Ported from PointCloud::render()'s trajectory section (core/src/point_cloud.cpp):
-    // draws each visible scan's local_trajectory (posed by m_pose) as a line
-    // strip in its traj_color (skipped if pc.line_width <= 0), decimated by
-    // reduceRenderedTrajectory (mirrors "viewer_reduce_rendered_trajectory"),
-    // plus the fuse-inclination-from-IMU quad markers, the fixed-om/fi rings,
-    // and the show_IMU/show_pose orientation crosses. If visibleImuDiff is
-    // set, also draws the IMU-vs-LIO angular-difference debug lines.
-    // Intersection-slab gating (xz/yz/xy) is not implemented so these always
-    // draw when the relevant per-scan flag is set.
+    // draws each visible scan's local_trajectory (posed by m_pose) as points
+    // (GL_POINTS, sized via pc.line_width -- skipped entirely if
+    // pc.line_width <= 0) in its traj_color, decimated by
+    // reduceRenderedTrajectory (mirrors "viewer_reduce_rendered_trajectory").
+    // Positions are cached per scan (see TrajGPU below) and only rebuilt
+    // when a scan's pose, trajectory point count or the stride changes --
+    // line_width only affects the draw call's point-size uniform, not the
+    // cached geometry, so changing it alone needs no rebuild.
+    // Also draws the fuse-inclination-from-IMU quad markers, the fixed-om/fi
+    // rings, and the show_IMU/show_pose orientation crosses. If
+    // visibleImuDiff is set, also draws the IMU-vs-LIO angular-difference
+    // debug lines. Intersection-slab gating (xz/yz/xy) is not implemented so
+    // these always draw when the relevant per-scan flag is set.
     void drawTrajectories(const std::vector<PointCloud>& pointClouds, int reduceRenderedTrajectory, bool visibleImuDiff) const;
 
     // Draws a single already-cached scan (see rebuild()) straight from its
@@ -178,6 +183,29 @@ private:
     };
 
     void unload(CloudGPU& cloud);
+
+    // GPU cache for one scan's trajectory point positions (drawTrajectories())
+    // -- a position-only VBO drawn with GL_POINTS, rebuilt only when stale.
+    struct TrajGPU
+    {
+        unsigned int vao = 0;
+        unsigned int vbo = 0;
+        int vertexCount = 0;
+        Eigen::Affine3d lastPose = Eigen::Affine3d::Identity();
+        bool hasPose = false;
+        int builtStride = -1;
+        size_t builtPointCount = 0;
+    };
+
+    // Both take the cache entry by reference rather than an index so they
+    // can be called from the const drawTrajectories() (lazy rebuild-if-stale
+    // on an otherwise-const draw path, same rationale as lastDrawCallCount_/
+    // lastVertexCount_ below being mutable) without needing non-const
+    // access to *this itself.
+    void unloadTraj(TrajGPU& traj) const;
+    void rebuildTrajectoryGPU(TrajGPU& traj, const PointCloud& pc, int stride) const;
+
+    mutable std::vector<TrajGPU> trajClouds_;
 
     std::vector<CloudGPU> clouds_;
     Shader shader_{};

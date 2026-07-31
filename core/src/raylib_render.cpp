@@ -136,6 +136,12 @@ void ScanRenderer::shutdown()
     }
     clouds_.clear();
 
+    for (auto& t : trajClouds_)
+    {
+        unloadTraj(t);
+    }
+    trajClouds_.clear();
+
     if (shaderValid_)
     {
         UnloadShader(shader_);
@@ -515,12 +521,90 @@ namespace
     }
 } // namespace
 
+void ScanRenderer::unloadTraj(TrajGPU& traj) const
+{
+    if (traj.vao)
+    {
+        rlUnloadVertexArray(traj.vao);
+        traj.vao = 0;
+    }
+    if (traj.vbo)
+    {
+        rlUnloadVertexBuffer(traj.vbo);
+        traj.vbo = 0;
+    }
+    traj.vertexCount = 0;
+}
+
+void ScanRenderer::rebuildTrajectoryGPU(TrajGPU& traj, const PointCloud& pc, int stride) const
+{
+    unloadTraj(traj);
+
+    traj.lastPose = pc.m_pose;
+    traj.hasPose = true;
+    traj.builtStride = stride;
+    traj.builtPointCount = pc.local_trajectory.size();
+
+    if (pc.local_trajectory.empty())
+    {
+        return;
+    }
+
+    // Drawn as points (GL_POINTS, sized via gl_PointSize in the shared point
+    // shader) rather than a line/ribbon/cylinder between them -- simplest
+    // possible trajectory geometry, one vertex per decimated pose, no
+    // connecting geometry to regenerate or to zigzag with sensor jitter.
+    std::vector<float> data;
+    data.reserve((pc.local_trajectory.size() / stride + 1) * 3);
+    for (size_t i = 0; i < pc.local_trajectory.size(); i += stride)
+    {
+        Vector3 p = toVec3((pc.m_pose * pc.local_trajectory[i].m_pose).translation());
+        data.push_back(p.x);
+        data.push_back(p.y);
+        data.push_back(p.z);
+    }
+
+    if (data.empty())
+    {
+        return;
+    }
+
+    traj.vao = rlLoadVertexArray();
+    rlEnableVertexArray(traj.vao);
+    traj.vbo = rlLoadVertexBuffer(data.data(), static_cast<int>(data.size() * sizeof(float)), false);
+    rlSetVertexAttribute(0, 3, RL_FLOAT, false, 3 * sizeof(float), 0);
+    rlEnableVertexAttribute(0);
+    rlDisableVertexArray();
+
+    traj.vertexCount = static_cast<int>(data.size() / 3);
+}
+
 void ScanRenderer::drawTrajectories(const std::vector<PointCloud>& pointClouds, int reduceRenderedTrajectory, bool visibleImuDiff) const
 {
     int stride = reduceRenderedTrajectory < 1 ? 1 : reduceRenderedTrajectory;
 
-    for (const auto& pc : pointClouds)
+    if (trajClouds_.size() > pointClouds.size())
     {
+        for (size_t i = pointClouds.size(); i < trajClouds_.size(); ++i)
+        {
+            unloadTraj(trajClouds_[i]);
+        }
+    }
+    trajClouds_.resize(pointClouds.size());
+
+    if (shaderValid_)
+    {
+        rlDrawRenderBatchActive();
+        Matrix mvp = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+        rlEnableShader(shader_.id);
+        rlSetUniformMatrix(locMVP_, mvp);
+        int colorModeFlat = 0;
+        rlSetUniform(locColorMode_, &colorModeFlat, RL_SHADER_UNIFORM_INT, 1);
+    }
+
+    for (size_t idx = 0; idx < pointClouds.size(); ++idx)
+    {
+        const PointCloud& pc = pointClouds[idx];
         if (!pc.visible || pc.local_trajectory.empty())
         {
             continue;
@@ -539,19 +623,25 @@ void ScanRenderer::drawTrajectories(const std::vector<PointCloud>& pointClouds, 
             }
         }
 
-        if (pc.line_width > 0 && pc.local_trajectory.size() >= 2)
+        if (shaderValid_ && pc.line_width > 0)
         {
-            Color c = Color{ static_cast<unsigned char>(pc.traj_color[0] * 255.f),
-                             static_cast<unsigned char>(pc.traj_color[1] * 255.f),
-                             static_cast<unsigned char>(pc.traj_color[2] * 255.f),
-                             255 };
-
-            Vector3 prev = toVec3((pc.m_pose * pc.local_trajectory[0].m_pose).translation());
-            for (size_t i = stride; i < pc.local_trajectory.size(); i += stride)
+            TrajGPU& traj = trajClouds_[idx];
+            bool stale = !traj.hasPose || !traj.lastPose.isApprox(pc.m_pose, 1e-9) || traj.builtStride != stride ||
+                traj.builtPointCount != pc.local_trajectory.size();
+            if (stale)
             {
-                Vector3 cur = toVec3((pc.m_pose * pc.local_trajectory[i].m_pose).translation());
-                DrawLine3D(prev, cur, c);
-                prev = cur;
+                rebuildTrajectoryGPU(traj, pc, stride);
+            }
+
+            if (traj.vertexCount > 0)
+            {
+                float colorF[4] = { pc.traj_color[0], pc.traj_color[1], pc.traj_color[2], 1.0f };
+                rlSetUniform(locColor_, colorF, RL_SHADER_UNIFORM_VEC4, 1);
+                float pointSize = static_cast<float>(pc.line_width);
+                rlSetUniform(locPointSize_, &pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
+                rlEnableVertexArray(traj.vao);
+                glDrawArrays(GL_POINTS, 0, traj.vertexCount);
+                rlDisableVertexArray();
             }
         }
 
@@ -578,6 +668,11 @@ void ScanRenderer::drawTrajectories(const std::vector<PointCloud>& pointClouds, 
         {
             drawOrientationCross(pc.m_pose);
         }
+    }
+
+    if (shaderValid_)
+    {
+        rlDisableShader();
     }
 }
 

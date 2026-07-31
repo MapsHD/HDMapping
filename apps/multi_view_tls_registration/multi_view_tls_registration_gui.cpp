@@ -3941,7 +3941,7 @@ void display()
                     if (ImGui::MenuItem("Load GNSS files and convert WGS84 to PUWG92"))
                     {
                         std::vector<std::string> input_file_names;
-                        input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", { "GNSS", "*.gnss" }, true);
+                        input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", mandeye::fd::Gnss_filter, true);
 
                         if (input_file_names.size() > 0)
                         {
@@ -3964,7 +3964,7 @@ void display()
                     if (ImGui::MenuItem("Load GNSS (deprecated)"))
                     {
                         std::vector<std::string> input_file_names;
-                        input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", { "GNSS", "*.gnss" }, true);
+                        input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", mandeye::fd::Gnss_filter, true);
 
                         if (input_file_names.size() > 0)
                         {
@@ -3981,7 +3981,7 @@ void display()
                     if (ImGui::MenuItem("Load GNSS"))
                     {
                         std::vector<std::string> input_file_names;
-                        input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", { "GNSS", "*.gnss" }, true);
+                        input_file_names = mandeye::fd::OpenFileDialog("Load gnss files", mandeye::fd::Gnss_filter, true);
 
                         if (input_file_names.size() > 0)
                         {
@@ -4001,7 +4001,7 @@ void display()
                     if (ImGui::MenuItem("Load NMEA (deprecated)"))
                     {
                         std::vector<std::string> input_file_names;
-                        input_file_names = mandeye::fd::OpenFileDialog("Load nmea files", { "NMEA", "*.nmea" }, true);
+                        input_file_names = mandeye::fd::OpenFileDialog("Load nmea files", mandeye::fd::Nmea_filter, true);
 
                         if (input_file_names.size() > 0)
                         {
@@ -4018,7 +4018,7 @@ void display()
                     if (ImGui::MenuItem("Load NMEA"))
                     {
                         std::vector<std::string> input_file_names;
-                        input_file_names = mandeye::fd::OpenFileDialog("Load nmea files", { "NMEA", "*.nmea" }, true);
+                        input_file_names = mandeye::fd::OpenFileDialog("Load nmea files", mandeye::fd::Nmea_filter, true);
 
                         if (input_file_names.size() > 0)
                         {
@@ -4462,8 +4462,8 @@ void display()
 
                         if (tmp < 0)
                             tmp = 0;
-                        else if (tmp > 5)
-                            tmp = 5;
+                        else if (tmp > 50)
+                            tmp = 50;
 
                         if (tmp != session.point_clouds_container.point_clouds[0].line_width)
                             for (auto& point_cloud : session.point_clouds_container.point_clouds)

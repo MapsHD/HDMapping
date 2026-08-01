@@ -101,6 +101,7 @@ include(cmake/raylib.cmake)
 # Core Library
 # ============================================================================
 add_subdirectory(core)
+add_subdirectory(calib_core)
 
 set(CORE_LIBRARIES core)
 set(GUI_LIBRARIES imgui imguizmo implot)
@@ -127,6 +128,9 @@ add_subdirectory(apps/mandeye_single_session_viewer)
 add_subdirectory(apps/livox_mid_360_intrinsic_calibration)
 add_subdirectory(apps/single_session_manual_coloring)
 add_subdirectory(apps/concatenate_multi_livox)
+add_subdirectory(apps/camera_lidar_calibration)
+add_subdirectory(apps/camera_lidar_trajectory_viewer)
+add_subdirectory(apps/camera_lidar_intrinsics_calib)
 
 # NOTE(mwlasiuk) : disable warnings for third party libraries so they do not pollute build logs
 

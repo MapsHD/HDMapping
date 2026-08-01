@@ -10,7 +10,6 @@ set(CORE_BASE_SOURCES
     src/hash_utils.cpp
     src/imu_preintegration.cpp
     src/nmea.cpp
-    src/pair_wise_iterative_closest_point.cpp
     src/point_cloud.cpp
     src/point_clouds.cpp
     src/session.cpp
@@ -26,6 +25,7 @@ set(CORE_MATH_SOURCES
     src/optimize_plane_to_plane_source_to_target.cpp
     src/optimize_point_to_plane_source_to_target.cpp
     src/optimize_point_to_projection_onto_plane_source_to_target.cpp
+    src/pair_wise_iterative_closest_point.cpp
     src/pose_graph_loop_closure.cpp
     src/pose_graph_slam.cpp
     src/registration_plane_feature.cpp

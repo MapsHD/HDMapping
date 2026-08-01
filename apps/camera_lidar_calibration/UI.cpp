@@ -2,23 +2,37 @@
 #include "App.h"
 #include "imgui.h"
 #include "rlImGui.h"
-#include <nlohmann/json.hpp>
-#include <fstream>
-#include <cmath>
+#include <CalibCore/FileDialog.h>
 #include <algorithm>
+#include <cmath>
 #include <cstring>
+#include <fstream>
+#include <nlohmann/json.hpp>
+
+// Copies `path` into `buf` (truncating to fit), for wiring a native-dialog
+// result back into the same fixed-size char[] the text field edits.
+static void setBuf(char* buf, size_t bufSize, const std::string& path)
+{
+    if (path.empty())
+        return;
+    std::strncpy(buf, path.c_str(), bufSize - 1);
+    buf[bufSize - 1] = '\0';
+}
 
 // DragFloat with Shift=fine mode (10x smaller step)
-static bool dragFloat(const char* label, float* v, float speed,
-                      float lo, float hi, const char* fmt = "%.3f") {
-    if (ImGui::GetIO().KeyShift) speed *= 0.01f;
+static bool dragFloat(const char* label, float* v, float speed, float lo, float hi, const char* fmt = "%.3f")
+{
+    if (ImGui::GetIO().KeyShift)
+        speed *= 0.01f;
     return ImGui::DragFloat(label, v, speed, lo, hi, fmt);
 }
 
-static void helpMarker(const char* desc) {
+static void helpMarker(const char* desc)
+{
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
-    if (ImGui::IsItemHovered()) {
+    if (ImGui::IsItemHovered())
+    {
         ImGui::BeginTooltip();
         ImGui::TextUnformatted(desc);
         ImGui::EndTooltip();
@@ -26,25 +40,30 @@ static void helpMarker(const char* desc) {
 }
 
 // ── Main draw ────────────────────────────────────────────────────────────────
-void UI::draw(AppState& state) {
+void UI::draw(AppState& state)
+{
     ImGuiIO& io = ImGui::GetIO();
     float panelW = 340.f;
     float panelH = (float)GetScreenHeight();
 
     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - panelW, 0), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(panelW, panelH), ImGuiCond_Always);
-    ImGui::Begin("Controls", nullptr,
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
+    ImGui::Begin(
+        "Controls",
+        nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
 
-    ImGui::TextColored(ImVec4(0.4f,0.8f,1.f,1.f), "LiDAR-Camera Calibration");
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.f, 1.f), "LiDAR-Camera Calibration");
     ImGui::Separator();
 
     // Alt = toggle Camera RGB ↔ Intensity (works anywhere in the window)
-    if (ImGui::IsKeyPressed(ImGuiKey_LeftAlt) || ImGui::IsKeyPressed(ImGuiKey_RightAlt)) {
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftAlt) || ImGui::IsKeyPressed(ImGuiKey_RightAlt))
+    {
         auto& cm = state.vizParams.colorMode;
-        if (cm == 3) cm = 1;       // RGB → Intensity
-        else         cm = 3;       // anything → RGB
+        if (cm == 3)
+            cm = 1; // RGB → Intensity
+        else
+            cm = 3; // anything → RGB
     }
 
     panelStatus(state);
@@ -62,14 +81,16 @@ void UI::draw(AppState& state) {
     ImGui::End();
 
     // ── Image view window (pan + zoom) ────────────────────────────────────
-    if (state.renderer.imageTexValid) {
-        float viewW  = io.DisplaySize.x - panelW;
-        float viewH  = io.DisplaySize.y * 0.5f;
+    if (state.renderer.imageTexValid)
+    {
+        float viewW = io.DisplaySize.x - panelW;
+        float viewH = io.DisplaySize.y * 0.5f;
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(viewW, viewH), ImGuiCond_Always);
-        ImGui::Begin("Image View", nullptr,
-            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoTitleBar);
+        ImGui::Begin(
+            "Image View",
+            nullptr,
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoTitleBar);
         drawImageView(state);
         ImGui::End();
     }
@@ -79,20 +100,26 @@ void UI::draw(AppState& state) {
 // zoom = 1 means "fit to window". offX/offY = image coords of the top-left
 // visible pixel. Wheel zooms anchored at the cursor, LMB-drag pans,
 // double-click resets.
-void UI::drawImageView(AppState& state) {
+void UI::drawImageView(AppState& state)
+{
     const float imgW = (float)state.imageW;
     const float imgH = (float)state.imageH;
-    if (imgW <= 0 || imgH <= 0) return;
+    if (imgW <= 0 || imgH <= 0)
+        return;
 
     // Reset view when a different image is loaded
-    if (state.imageW != viewImgW || state.imageH != viewImgH) {
-        viewImgW = state.imageW; viewImgH = state.imageH;
-        zoom2D = 1.f; offX = offY = 0.f;
+    if (state.imageW != viewImgW || state.imageH != viewImgH)
+    {
+        viewImgW = state.imageW;
+        viewImgH = state.imageH;
+        zoom2D = 1.f;
+        offX = offY = 0.f;
     }
 
-    ImVec2 origin = ImGui::GetCursorScreenPos();  // content region top-left
-    ImVec2 avail  = ImGui::GetContentRegionAvail();
-    if (avail.x < 16 || avail.y < 16) return;
+    ImVec2 origin = ImGui::GetCursorScreenPos(); // content region top-left
+    ImVec2 avail = ImGui::GetContentRegionAvail();
+    if (avail.x < 16 || avail.y < 16)
+        return;
 
     const float fitScale = std::min(avail.x / imgW, avail.y / imgH);
     float scale = fitScale * zoom2D;
@@ -100,23 +127,23 @@ void UI::drawImageView(AppState& state) {
     // Displayed size and the visible sub-rect of the image
     float dispW = std::min(avail.x, imgW * scale);
     float dispH = std::min(avail.y, imgH * scale);
-    float srcW  = dispW / scale;
-    float srcH  = dispH / scale;
+    float srcW = dispW / scale;
+    float srcH = dispH / scale;
 
-    ImVec2 imgScreenPos = ImVec2(origin.x + (avail.x - dispW) * 0.5f,
-                                 origin.y + (avail.y - dispH) * 0.5f);
+    ImVec2 imgScreenPos = ImVec2(origin.x + (avail.x - dispW) * 0.5f, origin.y + (avail.y - dispH) * 0.5f);
 
     ImGui::SetCursorScreenPos(imgScreenPos);
     // Render textures are y-flipped: select the sub-rect with negative height
-    Rectangle src = {offX, imgH - offY, srcW, -srcH};
-    rlImGuiImageRect(&state.renderer.imageTex.texture,
-                     (int)dispW, (int)dispH, src);
+    Rectangle src = { offX, imgH - offY, srcW, -srcH };
+    rlImGuiImageRect(&state.renderer.imageTex.texture, (int)dispW, (int)dispH, src);
 
     // ── input ──────────────────────────────────────────────────────────────
-    if (ImGui::IsWindowHovered()) {
+    if (ImGui::IsWindowHovered())
+    {
         ImGuiIO& io = ImGui::GetIO();
 
-        if (io.MouseWheel != 0.f) {
+        if (io.MouseWheel != 0.f)
+        {
             // image point under the cursor stays put while zooming
             // float mx = io.MousePos.x - imgScreenPos.x;
             // float my = io.MousePos.y - imgScreenPos.y;
@@ -124,39 +151,46 @@ void UI::drawImageView(AppState& state) {
             // float iy = offY + my / scale;
 
             zoom2D = std::max(1.f, std::min(zoom2D * std::exp(io.MouseWheel * 0.15f), 100.f));
-            scale  = fitScale * zoom2D;
+            scale = fitScale * zoom2D;
             // offX = ix - mx / scale;
             // offY = iy - my / scale;
         }
 
-        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+        {
             offX -= io.MouseDelta.x / scale;
             offY -= io.MouseDelta.y / scale;
         }
 
-        if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-            zoom2D = 1.f; offX = offY = 0.f;
+        if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        {
+            zoom2D = 1.f;
+            offX = offY = 0.f;
         }
     }
 
     // zoom indicator
     ImGui::SetCursorScreenPos(ImVec2(origin.x + 6, origin.y + 4));
-    ImGui::TextColored(ImVec4(1, 1, 0, 0.8f), "%.0f%%  [wheel: zoom | drag: pan | dbl-click: reset]",
-                       zoom2D * fitScale * 100.f);
+    ImGui::TextColored(ImVec4(1, 1, 0, 0.8f), "%.0f%%  [wheel: zoom | drag: pan | dbl-click: reset]", zoom2D * fitScale * 100.f);
 }
 
 // ── Files ────────────────────────────────────────────────────────────────────
-void UI::panelFiles(AppState& state) {
+void UI::panelFiles(AppState& state)
+{
     ImGui::PushItemWidth(-1);
 
     ImGui::Text("JPG image:");
     ImGui::InputText("##img", imagePathBuf, sizeof(imagePathBuf));
+    if (ImGui::Button("Browse...##img", ImVec2(-1, 0)))
+        setBuf(imagePathBuf, sizeof(imagePathBuf), calib::fd::OpenFileDialogOneFile("Select camera image", calib::fd::ImageFilter));
     if (ImGui::Button("Load Image##btn", ImVec2(-1, 0)))
         state.loadImage(imagePathBuf);
 
     ImGui::Spacing();
     ImGui::Text("LAZ/LAS point cloud:");
     ImGui::InputText("##laz", cloudPathBuf, sizeof(cloudPathBuf));
+    if (ImGui::Button("Browse...##laz", ImVec2(-1, 0)))
+        setBuf(cloudPathBuf, sizeof(cloudPathBuf), calib::fd::OpenFileDialogOneFile("Select point cloud", calib::fd::LazFilter));
     {
         float hw = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         if (ImGui::Button("Load##laz", ImVec2(hw, 0)))
@@ -169,12 +203,16 @@ void UI::panelFiles(AppState& state) {
     ImGui::Spacing();
     ImGui::Text("Intrinsics JSON/YAML (optional):");
     ImGui::InputText("##intr", intrPathBuf, sizeof(intrPathBuf));
+    if (ImGui::Button("Browse...##intr", ImVec2(-1, 0)))
+        setBuf(intrPathBuf, sizeof(intrPathBuf), calib::fd::OpenFileDialogOneFile("Select intrinsics file", calib::fd::IntrinsicsFilter));
     if (ImGui::Button("Load Intrinsics##btn", ImVec2(-1, 0)))
         state.loadIntrinsics(intrPathBuf);
 
     ImGui::Separator();
     ImGui::Text("Calibration JSON:");
     ImGui::InputText("##save", savePath, sizeof(savePath));
+    if (ImGui::Button("Browse...##calib", ImVec2(-1, 0)))
+        setBuf(savePath, sizeof(savePath), calib::fd::OpenFileDialogOneFile("Select calibration file", calib::fd::CalibJsonFilter));
     float hw = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     if (ImGui::Button("Load##calib", ImVec2(hw, 0)))
         state.loadCalibration(savePath);
@@ -186,13 +224,14 @@ void UI::panelFiles(AppState& state) {
 }
 
 // ── Intrinsics ────────────────────────────────────────────────────────────────
-void UI::panelIntrinsics(AppState& state) {
+void UI::panelIntrinsics(AppState& state)
+{
     Intrinsics& K = state.intrinsics;
     // Re-rectify only when an edit completes — remap on a full-res image
     // is too slow to run on every drag tick.
     bool edited = false;
-    auto drag = [&](const char* label, float* v, float speed,
-                    float lo, float hi, const char* fmt) {
+    auto drag = [&](const char* label, float* v, float speed, float lo, float hi, const char* fmt)
+    {
         dragFloat(label, v, speed, lo, hi, fmt);
         edited |= ImGui::IsItemDeactivatedAfterEdit();
     };
@@ -221,7 +260,8 @@ void UI::panelIntrinsics(AppState& state) {
 }
 
 // ── Extrinsics ────────────────────────────────────────────────────────────────
-void UI::panelExtrinsics(AppState& state) {
+void UI::panelExtrinsics(AppState& state)
+{
     Extrinsics& E = state.extrinsics;
 
     ImGui::PushItemWidth(-80.f);
@@ -239,53 +279,57 @@ void UI::panelExtrinsics(AppState& state) {
     helpMarker("R_wc = Rz*Ry*Rx: camera orientation in LiDAR world.\nT_lidar2cam = R_wc^T * (p - C).");
 
     ImGui::Spacing();
-    if (ImGui::Button("Reset Extrinsics", ImVec2(-1,0)))
+    if (ImGui::Button("Reset Extrinsics", ImVec2(-1, 0)))
         E = Extrinsics{};
     ImGui::PopItemWidth();
 
     // Show current rotation matrix
-    if (ImGui::TreeNode("Rotation matrix")) {
+    if (ImGui::TreeNode("Rotation matrix"))
+    {
         Eigen::Matrix3f R = eulerZYXtoMat3(E.rx, E.ry, E.rz);
-        for (int r = 0; r < 3; r++) {
-            ImGui::Text("[ %6.3f  %6.3f  %6.3f ]",
-                R(r,0), R(r,1), R(r,2));
+        for (int r = 0; r < 3; r++)
+        {
+            ImGui::Text("[ %6.3f  %6.3f  %6.3f ]", R(r, 0), R(r, 1), R(r, 2));
         }
         ImGui::TreePop();
     }
 }
 
 // ── Visualization ──────────────────────────────────────────────────────────
-void UI::panelVisualization(AppState& state) {
+void UI::panelVisualization(AppState& state)
+{
     VisualizationParams& vp = state.vizParams;
 
     ImGui::PushItemWidth(-1);
-    ImGui::SliderFloat("Point size",  &vp.pointSize, 1.f, 20.f);
-    ImGui::SliderFloat("Depth min",   &vp.depthMin,  0.f, vp.depthMax);
-    ImGui::SliderFloat("Depth max",   &vp.depthMax,  vp.depthMin + 0.1f, 200.f);
-    ImGui::SliderFloat("Opacity",     &vp.opacity,   0.f, 1.f);
+    ImGui::SliderFloat("Point size", &vp.pointSize, 1.f, 20.f);
+    ImGui::SliderFloat("Depth min", &vp.depthMin, 0.f, vp.depthMax);
+    ImGui::SliderFloat("Depth max", &vp.depthMax, vp.depthMin + 0.1f, 200.f);
+    ImGui::SliderFloat("Opacity", &vp.opacity, 0.f, 1.f);
 
-    const char* modes[] = {"Jet (depth)", "Jet (intensity)", "Jet (height)", "Camera RGB"};
+    const char* modes[] = { "Jet (depth)", "Jet (intensity)", "Jet (height)", "Camera RGB" };
     ImGui::Combo("Color mode", &vp.colorMode, modes, 4);
     ImGui::PopItemWidth();
 }
 
 // ── Status bar ────────────────────────────────────────────────────────────────
-void UI::panelStatus(const AppState& state) {
+void UI::panelStatus(const AppState& state)
+{
     if (!state.imagePath.empty())
-        ImGui::TextColored(ImVec4(0,1,0,1), "IMG: %s (%dx%d)",
-            state.imagePath.c_str(), state.imageW, state.imageH);
+        ImGui::TextColored(ImVec4(0, 1, 0, 1), "IMG: %s (%dx%d)", state.imagePath.c_str(), state.imageW, state.imageH);
     else
-        ImGui::TextColored(ImVec4(1,0.5f,0,1), "No image loaded");
+        ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "No image loaded");
 
-    if (!state.cloudPaths.empty()) {
-        ImGui::TextColored(ImVec4(0,1,0,1), "LAZ: %d file(s), %zu pts",
-            (int)state.cloudPaths.size(), state.cloud.points.size());
+    if (!state.cloudPaths.empty())
+    {
+        ImGui::TextColored(ImVec4(0, 1, 0, 1), "LAZ: %d file(s), %zu pts", (int)state.cloudPaths.size(), state.cloud.points.size());
         for (auto& p : state.cloudPaths)
             ImGui::TextDisabled("  %s", p.c_str());
-    } else {
-        ImGui::TextColored(ImVec4(1,0.5f,0,1), "No point cloud loaded");
+    }
+    else
+    {
+        ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "No point cloud loaded");
     }
 
     if (!state.statusMsg.empty())
-        ImGui::TextColored(ImVec4(1,1,0,1), "%s", state.statusMsg.c_str());
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "%s", state.statusMsg.c_str());
 }

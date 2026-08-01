@@ -19,6 +19,7 @@ add_library(calib_core STATIC
     src/PointCloud.cpp
     src/Trajectory.cpp
     src/CliArgs.cpp
+    src/FileDialog.cpp
 )
 
 target_include_directories(calib_core PUBLIC
@@ -35,6 +36,7 @@ target_include_directories(calib_core PRIVATE
     # classes instead and never needed this path, so nothing else in the repo
     # wires it up.
     ${CMAKE_BINARY_DIR}/3rdparty/LASzip/include
+    ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
 )
 
 target_link_libraries(calib_core PUBLIC ${PLATFORM_LASZIP_LIB})

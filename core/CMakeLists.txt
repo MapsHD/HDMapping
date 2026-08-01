@@ -7,25 +7,49 @@ set(CORE_BASE_SOURCES
     src/control_points.cpp
     src/gnss.cpp
     src/ground_control_points.cpp
+    src/imu_preintegration.cpp
+    src/nmea.cpp
+    src/point_cloud.cpp
+    src/point_clouds.cpp
+    src/session.cpp
+   # # src/utils.cpp # TODO(mwlasiuk) : broken AF ...
+)
+
+# core_math holds the registration/optimization sources with auto-generated Jacobian headers (up to ~24k chars/line, expensive to compile); built once as a static lib shared by core and core_no_gui since none of it branches on WITH_GUI.
+# hash_utils.cpp lives here (not CORE_BASE_SOURCES) because pair_wise_iterative_closest_point.cpp needs get_rgd_index_3d() from it -- keeping both in the same archive avoids a circular static-lib link dependency between core_math and core/core_no_gui.
+set(CORE_MATH_SOURCES
     src/hash_utils.cpp
     src/icp.cpp
-    src/imu_preintegration.cpp
     src/ndt.cpp
-    src/nmea.cpp
     src/optimization_point_to_point_source_to_target.cpp
     src/optimize_distance_point_to_plane_source_to_target.cpp
     src/optimize_plane_to_plane_source_to_target.cpp
     src/optimize_point_to_plane_source_to_target.cpp
     src/optimize_point_to_projection_onto_plane_source_to_target.cpp
     src/pair_wise_iterative_closest_point.cpp
-    src/point_cloud.cpp
-    src/point_clouds.cpp
     src/pose_graph_loop_closure.cpp
     src/pose_graph_slam.cpp
     src/registration_plane_feature.cpp
-    src/session.cpp
-   # # src/utils.cpp # TODO(mwlasiuk) : broken AF ...
 )
+
+add_library(core_math STATIC ${CORE_MATH_SOURCES})
+target_compile_definitions(core_math PRIVATE WITH_GUI=0)
+target_link_libraries(core_math PRIVATE PROJ::proj spdlog::spdlog vqf Fusion wgs84_do_puwg92 plycpp WGS84toCartesian)
+target_include_directories(core_math PRIVATE
+    include
+    ${EIGEN3_INCLUDE_DIR}
+    ${LASZIP_INCLUDE_DIR}/LASzip/include
+    ${THIRDPARTY_DIRECTORY}/json/include
+    ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+    ${EXTERNAL_LIBRARIES_DIRECTORY}/include
+    ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+    ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+)
+set_target_properties(core_math PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(NOT MSVC)
+    # DWARF generation for these auto-generated Jacobian expression trees dominates -g compile time far more than -O2 codegen, so RelWithDebInfo builds this target without -g.
+    target_compile_options(core_math PRIVATE $<$<CONFIG:RelWithDebInfo>:-g0>)
+endif()
 
 set(CORE_GUI_SOURCES
     src/manual_pose_graph_loop_closure.cpp
@@ -44,7 +68,7 @@ function(add_core_target target_name with_gui)
 
     add_library(${target_name} STATIC ${SOURCES})
     target_compile_definitions(${target_name} PRIVATE ${DEFINES})
-    target_link_libraries(${target_name} PRIVATE ${PLATFORM_LASZIP_LIB} ${PLATFORM_MISCELLANEOUS_LIBS} PROJ::proj spdlog::spdlog vqf Fusion wgs84_do_puwg92 plycpp WGS84toCartesian)
+    target_link_libraries(${target_name} PRIVATE core_math ${PLATFORM_LASZIP_LIB} ${PLATFORM_MISCELLANEOUS_LIBS} PROJ::proj spdlog::spdlog vqf Fusion wgs84_do_puwg92 plycpp WGS84toCartesian)
     target_include_directories(${target_name} PRIVATE
         include
         ${EIGEN3_INCLUDE_DIR}

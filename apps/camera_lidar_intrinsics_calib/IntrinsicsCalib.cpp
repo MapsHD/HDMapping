@@ -35,6 +35,51 @@ static void setBuf(char* buf, size_t bufSize, const std::string& path)
     buf[bufSize - 1] = '\0';
 }
 
+// Shrinks/repositions the just-created window so it fits within the current
+// monitor's usable area. Without this, a fixed-size window can be taller
+// than the screen once the OS menu bar + title bar are accounted for,
+// silently pushing the top of the window off-screen behind the menu bar
+// instead of erroring or scrolling.
+static void fitWindowToScreen()
+{
+    int monitor = GetCurrentMonitor();
+    // GetMonitorWidth/Height return the monitor's native PIXEL resolution
+    // (GLFW's glfwGetVideoMode), while GetScreenWidth/Height, SetWindowSize
+    // and SetWindowPosition all operate in logical points -- on a 2x Retina
+    // display that's a 2x unit mismatch. Divide by the DPI scale to bring
+    // the monitor size into the same points space everything else uses;
+    // without this, SetWindowPosition computes an X centered on a monitor
+    // twice too wide, pushing most of the window off the right edge of the
+    // actual (points-sized) screen.
+    Vector2 dpi = GetWindowScaleDPI();
+    if (dpi.x <= 0.f)
+        dpi.x = 1.f;
+    if (dpi.y <= 0.f)
+        dpi.y = 1.f;
+    int monW = (int)(GetMonitorWidth(monitor) / dpi.x);
+    int monH = (int)(GetMonitorHeight(monitor) / dpi.y);
+    if (monW <= 0 || monH <= 0)
+        return; // monitor info unavailable, leave as-is
+
+    const int marginW = 40; // side breathing room
+    const int marginH = 100; // OS menu bar + window title bar headroom
+
+    int w = std::min(GetScreenWidth(), monW - marginW);
+    int h = std::min(GetScreenHeight(), monH - marginH);
+    if (w != GetScreenWidth() || h != GetScreenHeight())
+        SetWindowSize(w, h);
+
+    SetWindowPosition(std::max(0, (monW - w) / 2), 30);
+
+    // SetWindowSize/SetWindowPosition only update GLFW's window state; raylib's
+    // cached mouse/window geometry (what rlImGui reads into io.MousePos every
+    // frame) isn't refreshed until the next PollInputEvents(), which otherwise
+    // wouldn't happen until the first EndDrawing() -- after rlImGuiSetup() has
+    // already run. Without this, every click lands offset from the cursor by
+    // however far this function just moved/resized the window.
+    PollInputEvents();
+}
+
 // ── per-image state ───────────────────────────────────────────────────────────
 struct CalibImage
 {
@@ -322,6 +367,10 @@ int main(int argc, char* argv[])
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(1280, 800, "Intrinsics Calibration");
+    fitWindowToScreen();
+    // PANEL_W below (330) is fixed; below this the image view and panel
+    // start overlapping instead of scrolling.
+    SetWindowMinSize(800, 500);
     SetTargetFPS(60);
     rlImGuiSetup(true);
 

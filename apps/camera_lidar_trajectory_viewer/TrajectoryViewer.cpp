@@ -33,20 +33,154 @@
 using namespace calib;
 namespace fs = std::filesystem;
 
+// Copies `path` into `buf` (truncating to fit), for wiring a native-dialog
+// result back into the same fixed-size char[] the matching text field edits.
+static void setBuf(char* buf, size_t bufSize, const std::string& path)
+{
+    if (path.empty())
+        return;
+    std::strncpy(buf, path.c_str(), bufSize - 1);
+    buf[bufSize - 1] = '\0';
+}
+
+// Shrinks/repositions the just-created window so it fits within the current
+// monitor's usable area. Without this, a fixed 1400x900 window can be taller
+// than the screen once the OS menu bar + title bar are accounted for (e.g. a
+// 956pt-tall MacBook display leaves ~0 spare px at H=900), silently pushing
+// the top of the window (and the first Session panel controls) off-screen
+// behind the menu bar instead of erroring or scrolling.
+static void fitWindowToScreen()
+{
+    int monitor = GetCurrentMonitor();
+    // GetMonitorWidth/Height return the monitor's native PIXEL resolution
+    // (GLFW's glfwGetVideoMode), while GetScreenWidth/Height, SetWindowSize
+    // and SetWindowPosition all operate in logical points -- on a 2x Retina
+    // display that's a 2x unit mismatch. Divide by the DPI scale to bring
+    // the monitor size into the same points space everything else uses;
+    // without this, SetWindowPosition computes an X centered on a monitor
+    // twice too wide, pushing most of the window off the right edge of the
+    // actual (points-sized) screen.
+    Vector2 dpi = GetWindowScaleDPI();
+    if (dpi.x <= 0.f)
+        dpi.x = 1.f;
+    if (dpi.y <= 0.f)
+        dpi.y = 1.f;
+    int monW = (int)(GetMonitorWidth(monitor) / dpi.x);
+    int monH = (int)(GetMonitorHeight(monitor) / dpi.y);
+    if (monW <= 0 || monH <= 0)
+        return; // monitor info unavailable, leave as-is
+
+    const int marginW = 40; // side breathing room
+    const int marginH = 100; // OS menu bar + window title bar headroom
+
+    int w = std::min(GetScreenWidth(), monW - marginW);
+    int h = std::min(GetScreenHeight(), monH - marginH);
+    if (w != GetScreenWidth() || h != GetScreenHeight())
+        SetWindowSize(w, h);
+
+    SetWindowPosition(std::max(0, (monW - w) / 2), 30);
+
+    // SetWindowSize/SetWindowPosition only update GLFW's window state; raylib's
+    // cached mouse/window geometry (what rlImGui reads into io.MousePos every
+    // frame) isn't refreshed until the next PollInputEvents(), which otherwise
+    // wouldn't happen until the first EndDrawing() -- after rlImGuiSetup() has
+    // already run. Without this, every click lands offset from the cursor by
+    // however far this function just moved/resized the window.
+    PollInputEvents();
+}
+
+Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& trajectory, double query_time)
+{
+    Eigen::Matrix4d ret(Eigen::Matrix4d::Zero());
+    auto it_lower = trajectory.lower_bound(query_time);
+    auto it_next = it_lower;
+
+    if (it_lower == trajectory.begin())
+    {
+        return ret;
+    }
+    if (it_lower->first > query_time)
+    {
+        it_lower = std::prev(it_lower);
+    }
+    if (it_lower == trajectory.begin())
+    {
+        return ret;
+    }
+    if (it_lower == trajectory.end())
+    {
+        return ret;
+    }
+
+    double t1 = it_lower->first;
+    double t2 = it_next->first;
+    double difft1 = t1 - query_time;
+    double difft2 = t2 - query_time;
+    if (t1 == t2 && std::fabs(difft1) < 0.1)
+    {
+        ret = Eigen::Matrix4d::Identity();
+        ret.col(3).head<3>() = it_next->second.col(3).head<3>();
+        ret.topLeftCorner(3, 3) = it_lower->second.topLeftCorner(3, 3);
+        return ret;
+    }
+
+    // if (std::fabs(difft1) < 0.15 && std::fabs(difft2) < 0.15)
+    {
+        assert(t2 > t1);
+        assert(query_time > t1);
+        assert(query_time < t2);
+        ret = Eigen::Matrix4d::Identity();
+        double res = (query_time - t1) / (t2 - t1);
+        Eigen::Vector3d diff = it_next->second.col(3).head<3>() - it_lower->second.col(3).head<3>();
+        ret.col(3).head<3>() = it_next->second.col(3).head<3>() + diff * res;
+        Eigen::Matrix3d r1 = it_lower->second.topLeftCorner(3, 3).matrix();
+        Eigen::Matrix3d r2 = it_next->second.topLeftCorner(3, 3).matrix();
+        Eigen::Quaterniond q1(r1);
+        Eigen::Quaterniond q2(r2);
+        Eigen::Quaterniond qt = q1.slerp(res, q2);
+        ret.topLeftCorner(3, 3) = qt.toRotationMatrix();
+        return ret;
+    }
+
+    return ret;
+}
+
+// Build a time(seconds) -> T_world_lidar map suitable for getInterpolatedPose().
+static std::map<double, Eigen::Matrix4d> buildTrajMap(const Trajectory& traj)
+{
+    std::map<double, Eigen::Matrix4d> m;
+    for (const auto& p : traj.poses)
+        m[p.ts_ns * 1e-9] = p.T.matrix().cast<double>();
+    return m;
+}
+
+// Interpolated T_world_lidar at ts_ns. Returns false when ts_ns lies outside the
+// trajectory range — getInterpolatedPose() signals that with a zero matrix.
+static bool interpPose(const std::map<double, Eigen::Matrix4d>& trajMap, int64_t ts_ns, Eigen::Affine3f& out)
+{
+    Eigen::Matrix4d T = getInterpolatedPose(trajMap, ts_ns * 1e-9);
+    if (T(3, 3) == 0.0)
+        return false;
+    out.matrix() = T.cast<float>();
+    return true;
+}
+
 // ── GPU point cloud shader ────────────────────────────────────────────────────
-// colorPacked: float bits = 0x00RRGGBB; colorMode: 0=jet depth, 1=RGB
+// colorPacked: float bits = 0x00RRGGBB; colorMode: 0=jet depth, 1=RGB, 2=camera id, 3=in ROI
 static const char* kVS = R"(
 #version 330
 layout(location = 0) in vec3  pos;
 layout(location = 1) in float colorPacked;
 layout(location = 2) in float lidarIntensity;
 layout(location = 3) in float colorCameraId;   // global image index that colored this point, or -1
+layout(location = 4) in float inRoi;           // 1=inside ROI, 0=outside ROI, -1=projects into no image
 uniform mat4  mvp;
 uniform float pointSize;
 uniform int   drawDecim;
 out float fragIntensity;
 out vec4 vertColor;
 flat out float fragColorCameraId;
+flat out float fragInRoi;
 void main() {
     if (drawDecim > 1 && (gl_VertexID % drawDecim) != 0) {
         gl_Position  = vec4(2.0, 2.0, 2.0, 1.0);
@@ -62,6 +196,7 @@ void main() {
     fragIntensity = lidarIntensity;
     vertColor = vec4(r, g, b, 1.0);
     fragColorCameraId = colorCameraId;
+    fragInRoi = inRoi;
 }
 )";
 static const char* kFS = R"(
@@ -69,6 +204,7 @@ static const char* kFS = R"(
 in float fragIntensity;
 in vec4 vertColor;
 flat in float fragColorCameraId;
+flat in float fragInRoi;
 uniform int colorMode;
 uniform int selectedCamera;   // -1 = show all, else keep only points from this image
 out vec4 finalColor;
@@ -78,20 +214,45 @@ vec3 jet(float t) {
                       1.5 - abs(4.0*t - 2.0),
                       1.5 - abs(4.0*t - 1.0)), 0.0, 1.0);
 }
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+// deterministic, well-spread color per integer camera id
+vec3 idColor(float idf) {
+    float id = floor(idf + 0.5);
+    float hue = fract(id * 0.61803398875); // golden ratio
+    return hsv2rgb(vec3(hue, 0.85, 1.0));
+}
 void main() {
+    if (selectedCamera >= 0)
+    {
+        if (selectedCamera != int(fragColorCameraId))
+            discard; // do not draw
+    }
+
     if (colorMode == 1)
     {
-        if (selectedCamera < 0)
-        {
-            finalColor = vertColor;
-        }
+        if (fragColorCameraId < 0.0)
+            discard; // not colored by any image — draw only colored points
+        finalColor = vertColor;
+    }
+    else if (colorMode == 2)
+    {
+        if (fragColorCameraId < 0.0)
+            discard; // not colored by any image — draw only colored points
+        finalColor = vec4(idColor(fragColorCameraId), 1.0);
+    }
+    else if (colorMode == 3)
+    {
+        // ROI membership: green = inside ROI, red = projects into an image but
+        // outside ROI, dim gray = projects into no image (spatial context).
+        if (fragInRoi < 0.0)
+            finalColor = vec4(0.28, 0.28, 0.28, 1.0);
         else
-        {
-            if (selectedCamera == int(fragColorCameraId))
-                finalColor = vertColor;
-            else
-                discard;   // render only points colored from the selected camera
-        }
+            finalColor = (fragInRoi > 0.5) ? vec4(0.15, 0.9, 0.2, 1.0)
+                                           : vec4(0.9, 0.15, 0.15, 1.0);
     }
     else finalColor = vec4(jet(fragIntensity), 1.0);
 }
@@ -112,7 +273,7 @@ struct GpuCloud
         vao = rlLoadVertexArray();
         rlEnableVertexArray(vao);
         vbo = rlLoadVertexBuffer(data.data(), (int)(data.size() * sizeof(float)), false);
-        const int stride = 6 * sizeof(float);
+        const int stride = 7 * sizeof(float);
         rlSetVertexAttribute(0, 3, RL_FLOAT, false, stride, 0);
         rlEnableVertexAttribute(0);
         rlSetVertexAttribute(1, 1, RL_FLOAT, false, stride, 3 * sizeof(float));
@@ -121,8 +282,10 @@ struct GpuCloud
         rlEnableVertexAttribute(2);
         rlSetVertexAttribute(3, 1, RL_FLOAT, false, stride, 5 * sizeof(float));
         rlEnableVertexAttribute(3);
+        rlSetVertexAttribute(4, 1, RL_FLOAT, false, stride, 6 * sizeof(float));
+        rlEnableVertexAttribute(4);
         rlDisableVertexArray();
-        count = (int)(data.size() / 6);
+        count = (int)(data.size() / 7);
     }
     void unload()
     {
@@ -201,6 +364,7 @@ struct State
     std::vector<int64_t> imageTsNs;
     Intrinsics K;
     Extrinsics E;
+    Roi roi;
     bool calibLoaded = false;
     int imgW = 4656, imgH = 3496;
 
@@ -220,10 +384,20 @@ struct State
     bool isolateCamera = false; // render only points colored by the selected (preview) image
     float frustumScale = 0.5f;
     float pointSize = 2.f;
-    int cloudDecim = 1;
+    int cloudDecim = 5;
     int drawDecim = 1;
     bool multiImgColoring = true; // false = single image per chunk (midpoint)
-    bool useImageColor = false;
+    // How each point is matched to a camera image:
+    //   0 = temporal  — image nearest in time (± maxWiggle frames, within maxTemporalDist)
+    //   1 = geometry  — among all chunk images the point projects into, the one
+    //                   with the smallest depth (closest camera)
+    int colorStrategy = 0;
+    float maxTemporalDist = 0.5f; // s: skip images farther than this from the point (temporal)
+    int maxWiggle = 1; // frames: search startIdx ± maxWiggle for a frustum hit (temporal)
+    bool useImageColor = false; // true once a colorize pass produced RGB data
+    int colorMode = 0; // 0=intensity (jet), 1=RGB by image, 2=camera id
+    int coloredPts = 0; // points that received RGB from an image
+    int uncoloredPts = 0; // points left as intensity-gray (no image / out of frustum / outside ROI)
 
     char sessionBuf[512] = {};
     char calibBuf[512] = {};
@@ -261,16 +435,6 @@ struct State
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-// Copies `path` into `buf` (truncating to fit), for wiring a native-dialog
-// result back into the same fixed-size char[] the matching text field edits.
-static void setBuf(char* buf, size_t bufSize, const std::string& path)
-{
-    if (path.empty())
-        return;
-    std::strncpy(buf, path.c_str(), bufSize - 1);
-    buf[bufSize - 1] = '\0';
-}
-
 static Vector3 toRL(float x, float y, float z)
 {
     return { x, z, -y };
@@ -441,6 +605,20 @@ static void loadCloud(State& s)
     Eigen::Vector3f C(s.E.tx, s.E.ty, s.E.tz);
     float K_fx = s.K.fx * s.imgScale, K_fy = s.K.fy * s.imgScale;
     float K_cx = s.K.cx * s.imgScale, K_cy = s.K.cy * s.imgScale;
+    // OpenCV rational + tangential distortion applied to each projected point, so
+    // colours are sampled from the raw (distorted) images at the right pixel.
+    // With all-zero coefficients this reduces exactly to the pinhole model.
+    const float d_k1 = s.K.k1, d_k2 = s.K.k2, d_k3 = s.K.k3;
+    const float d_k4 = s.K.k4, d_k5 = s.K.k5, d_k6 = s.K.k6;
+    const float d_p1 = s.K.p1, d_p2 = s.K.p2;
+    // (x, y) = normalized camera coords (X/Z, Y/Z) → distorted normalized coords.
+    auto distort = [=](float x, float y, float& xd, float& yd)
+    {
+        float r2 = x * x + y * y;
+        float radial = (1.f + (d_k1 + (d_k2 + d_k3 * r2) * r2) * r2) / (1.f + (d_k4 + (d_k5 + d_k6 * r2) * r2) * r2);
+        xd = x * radial + 2.f * d_p1 * x * y + d_p2 * (r2 + 2.f * x * x);
+        yd = y * radial + d_p1 * (r2 + 2.f * y * y) + 2.f * d_p2 * x * y;
+    };
 
     auto packGray = [](float intensity) -> float
     {
@@ -454,10 +632,13 @@ static void loadCloud(State& s)
     struct ImgEntry
     {
         int64_t ts;
-        const TrajPose* pose;
+        Eigen::Affine3f pose; // T_world_lidar at the image time (interpolated)
         cv::Mat img;
         int globalIdx; // index into s.imageTsNs (== imgViewIdx / selectedCamera)
     };
+
+    // time(s) -> T_world_lidar, for interpolating the pose at each image time.
+    std::map<double, Eigen::Matrix4d> trajMap = buildTrajMap(s.traj);
 
     std::vector<float> gpuData;
     float mx = 0.f;
@@ -465,6 +646,7 @@ static void loadCloud(State& s)
     int cnt = 0;
     int step = std::max(1, s.cloudDecim);
     int coloredChunks = 0;
+    int coloredPts = 0, uncoloredPts = 0;
 
     for (auto& lp : lazPaths)
     {
@@ -512,8 +694,8 @@ static void loadCloud(State& s)
                     auto fnIt = s.imagesFilenamesInTime.find(imgTs);
                     if (fnIt == s.imagesFilenamesInTime.end())
                         continue;
-                    const TrajPose* pose = s.traj.nearest(imgTs);
-                    if (!pose)
+                    Eigen::Affine3f pose;
+                    if (!interpPose(trajMap, imgTs, pose))
                         continue;
                     cv::Mat img = cv::imread(fnIt->second);
                     if (img.empty())
@@ -525,7 +707,7 @@ static void loadCloud(State& s)
             else
             {
                 // legacy: single image nearest to chunk midpoint
-                int64_t mid = (chunkFirst + chunkLast) / 2;
+                int64_t mid = chunkFirst;
                 auto it = std::lower_bound(s.imageTsNs.begin(), s.imageTsNs.end(), mid);
                 if (it == s.imageTsNs.end())
                     --it;
@@ -537,8 +719,8 @@ static void loadCloud(State& s)
                 }
                 int64_t imgTs = *it;
                 auto fnIt = s.imagesFilenamesInTime.find(imgTs);
-                const TrajPose* pose = s.traj.nearest(imgTs);
-                if (fnIt != s.imagesFilenamesInTime.end() && pose)
+                Eigen::Affine3f pose;
+                if (fnIt != s.imagesFilenamesInTime.end() && interpPose(trajMap, imgTs, pose))
                 {
                     cv::Mat img = cv::imread(fnIt->second);
                     int gidx = (int)(it - s.imageTsNs.begin());
@@ -575,6 +757,7 @@ static void loadCloud(State& s)
             const float rawIntensity = pt.intensity;
             float colorF = packGray(rawIntensity);
             float camIdF = -1.f; // which image colored this point (global index), -1 = none
+            float inRoiF = -1.f; // 1=inside ROI, 0=outside ROI, -1=projects into no image
 
             if (nImgs > 0)
             {
@@ -600,43 +783,117 @@ static void loadCloud(State& s)
                     }
                     startIdx = (int)(it - chunkImgs.begin());
                 }
-
-                // try images expanding outward from startIdx; first frustum hit wins
-                auto tryImg = [&](int idx) -> bool
+                // Result of projecting the point into one image.
+                struct Hit
                 {
+                    bool ok = false; // projects into frustum AND passes ROI filter
+                    float depth = 0.f; // z in camera frame (only when ok)
+                    float colorF = 0.f; // packed RGB (only when ok)
+                    float inRoiF = -1.f; // 1 inside ROI, 0 outside, -1 not in frustum
+                    int globalIdx = -1;
+                };
+                auto probe = [&](int idx) -> Hit
+                {
+                    Hit h;
                     if (idx < 0 || idx >= nImgs)
-                        return false;
+                        return h;
                     auto& e = chunkImgs[idx];
-                    Eigen::Vector3f pl = e.pose->T.inverse() * pw;
+                    Eigen::Vector3f pl = e.pose.inverse() * pw;
                     Eigen::Vector3f pc_ = R_wc.transpose() * (pl - C);
                     if (pc_.z() <= 0.05f)
-                        return false;
-                    int iu = (int)std::round(K_fx * pc_.x() / pc_.z() + K_cx);
-                    int iv = (int)std::round(K_fy * pc_.y() / pc_.z() + K_cy);
+                        return h;
+                    float xd, yd;
+                    distort(pc_.x() / pc_.z(), pc_.y() / pc_.z(), xd, yd);
+                    int iu = (int)std::round(K_fx * xd + K_cx);
+                    int iv = (int)std::round(K_fy * yd + K_cy);
                     if (iu < 0 || iu >= e.img.cols || iv < 0 || iv >= e.img.rows)
-                        return false;
+                        return h;
+                    // point projects into this image — record ROI membership so
+                    // the "In ROI" render mode can show it, independent of whether
+                    // the ROI filter is currently enabled.
+                    bool haveRoi = s.roi.w > 0 && s.roi.h > 0;
+                    bool insideRoi = !haveRoi || (iu >= s.roi.x && iu < s.roi.x + s.roi.w && iv >= s.roi.y && iv < s.roi.y + s.roi.h);
+                    h.inRoiF = insideRoi ? 1.f : 0.f;
+                    // outside the region of interest? leave the point uncolored
+                    if (s.roi.enabled && !insideRoi)
+                        return h;
                     cv::Vec3b bgr = e.img.at<cv::Vec3b>(iv, iu);
                     uint32_t p = (uint32_t(bgr[2]) << 16) | (uint32_t(bgr[1]) << 8) | uint32_t(bgr[0]);
-                    std::memcpy(&colorF, &p, 4);
-                    camIdF = (float)e.globalIdx;
-                    return true;
+                    std::memcpy(&h.colorF, &p, 4);
+                    h.globalIdx = e.globalIdx;
+                    h.depth = pc_.z();
+                    h.ok = true;
+                    return h;
+                };
+                // Record frustum/ROI membership even for images that don't win, so
+                // the "In ROI" render mode stays meaningful. Latest wins.
+                auto note = [&](const Hit& h)
+                {
+                    if (h.inRoiF >= 0.f)
+                        inRoiF = h.inRoiF;
+                };
+                auto commit = [&](const Hit& h)
+                {
+                    colorF = h.colorF;
+                    camIdF = (float)h.globalIdx;
+                    inRoiF = h.inRoiF;
                 };
 
-                if (!tryImg(startIdx))
+                if (s.colorStrategy == 1)
                 {
-                    for (int delta = 1; delta < nImgs; ++delta)
+                    // Geometry: among every image the point projects into, keep the
+                    // one with the smallest depth (closest camera → best resolution).
+                    Hit best;
+                    for (int idx = 0; idx < nImgs; ++idx)
                     {
-                        if (tryImg(startIdx + delta))
-                            break;
-                        if (tryImg(startIdx - delta))
-                            break;
+                        Hit h = probe(idx);
+                        note(h);
+                        if (h.ok && (!best.ok || h.depth < best.depth))
+                            best = h;
+                    }
+                    if (best.ok)
+                        commit(best);
+                }
+                else
+                {
+                    // Temporal: search the temporally-nearest image, then its
+                    // neighbours outward (±1, ±2, … ±maxWiggle), taking the first
+                    // frustum hit. Only if the nearest image is within
+                    // maxTemporalDist of the point.
+                    const int64_t maxDtNs = (int64_t)(s.maxTemporalDist * 1e9);
+                    if (std::abs(pt.ts_ns - chunkImgs[startIdx].ts) <= maxDtNs)
+                    {
+                        for (int w = 0; w <= s.maxWiggle && camIdF < 0.f; ++w)
+                        {
+                            Hit h = probe(startIdx - w);
+                            note(h);
+                            if (h.ok)
+                            {
+                                commit(h);
+                                break;
+                            }
+                            if (w == 0)
+                                continue;
+                            h = probe(startIdx + w);
+                            note(h);
+                            if (h.ok)
+                            {
+                                commit(h);
+                                break;
+                            }
+                        }
                     }
                 }
             }
+            if (camIdF >= 0.f)
+                ++coloredPts;
+            else
+                ++uncoloredPts;
 
             gpuData.push_back(colorF);
             gpuData.push_back(rawIntensity);
             gpuData.push_back(camIdF);
+            gpuData.push_back(inRoiF);
 
             uint32_t packed;
             std::memcpy(&packed, &colorF, 4);
@@ -661,6 +918,10 @@ static void loadCloud(State& s)
         // chunkImgs and their cv::Mat memory are released here
     }
     s.useImageColor = canColor && (coloredChunks > 0);
+    if (s.useImageColor)
+        s.colorMode = 1; // default to RGB display once RGB data is available
+    s.coloredPts = coloredPts;
+    s.uncoloredPts = uncoloredPts;
 
     if (cnt > 0)
     {
@@ -671,6 +932,12 @@ static void loadCloud(State& s)
 
     s.status = "Pts: " + std::to_string(s.cloud.count) + "  Poses: " + std::to_string(s.traj.poses.size()) +
         "  Imgs/chunk: " + std::to_string(coloredChunks > 0 ? coloredChunks : 0) + (s.useImageColor ? "  +RGB" : "");
+    if (s.useImageColor && cnt > 0)
+    {
+        double pct = 100.0 * coloredPts / cnt;
+        s.status += "  | Colored: " + std::to_string(coloredPts) + "  Uncolored: " + std::to_string(uncoloredPts) + "  (" +
+            std::to_string((int)std::lround(pct)) + "%)";
+    }
 }
 
 static void loadCalib(State& s)
@@ -715,6 +982,19 @@ static void loadCalib(State& s)
             s.E.ry = je["camera_rotation_in_world_euler_zyx_deg"][1];
             s.E.rx = je["camera_rotation_in_world_euler_zyx_deg"][2];
         }
+    }
+    // Optional region of interest, in full-resolution image pixels:
+    //   "roi": { "x": 0, "y": 0, "w": 4656, "h": 3496, "enabled": true }
+    // "enabled" defaults to true when the object is present; it only takes
+    // effect once w and h are positive.
+    if (j.contains("roi"))
+    {
+        auto& jr = j["roi"];
+        s.roi.x = jr.value("x", 0);
+        s.roi.y = jr.value("y", 0);
+        s.roi.w = jr.value("w", 0);
+        s.roi.h = jr.value("h", 0);
+        s.roi.enabled = jr.value("enabled", true) && s.roi.w > 0 && s.roi.h > 0;
     }
     s.calibLoaded = true;
     s.status = "Calibration loaded";
@@ -855,13 +1135,14 @@ static void exportColmap(State& s)
         f << "# Image list with two lines of data per image:\n"
              "#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\n"
              "#   POINTS2D[] as (X, Y, POINT3D_ID)\n";
+        auto trajMap = buildTrajMap(s.traj);
         int id = 1;
         for (auto& [ts, path] : s.imagesFilenamesInTime)
         {
-            const TrajPose* pose = s.traj.nearest(ts);
-            if (!pose)
+            Eigen::Affine3f pose;
+            if (!interpPose(trajMap, ts, pose))
                 continue;
-            Eigen::Affine3f T_wc = pose->T * T_lc; // camera in world
+            Eigen::Affine3f T_wc = pose * T_lc; // camera in world
             Eigen::Affine3f T_cw = T_wc.inverse(); // world -> camera
             Eigen::Quaternionf q(T_cw.linear());
             q.normalize();
@@ -1074,10 +1355,9 @@ static void drawScene(State& s)
         rlEnableShader(s.shader.id);
         rlSetUniformMatrix(s.locMVP, mvp);
         rlSetUniform(s.locPS, &s.pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
-        int cm = s.useImageColor ? 1 : 0;
-        rlSetUniform(s.locCM, &cm, RL_SHADER_UNIFORM_INT, 1);
+        rlSetUniform(s.locCM, &s.colorMode, RL_SHADER_UNIFORM_INT, 1);
         rlSetUniform(s.locDecim, &s.drawDecim, RL_SHADER_UNIFORM_INT, 1);
-        int sel = (s.isolateCamera && s.useImageColor && s.imgViewIdx >= 0 && s.imgViewIdx < (int)s.imageTsNs.size()) ? s.imgViewIdx : -1;
+        int sel = (s.isolateCamera && s.imgViewIdx >= 0 && s.imgViewIdx < (int)s.imageTsNs.size()) ? s.imgViewIdx : -1;
         rlSetUniform(s.locSel, &sel, RL_SHADER_UNIFORM_INT, 1);
         rlEnableVertexArray(s.cloud.vao);
         glDrawArrays(GL_POINTS, 0, s.cloud.count);
@@ -1132,6 +1412,9 @@ int main(int argc, char* argv[])
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(1400, 900, "Trajectory Viewer");
+    fitWindowToScreen();
+    // panelW below is user-resizable but the 3D view still needs room.
+    SetWindowMinSize(900, 500);
     SetTargetFPS(60);
     rlImGuiSetup(true);
 
@@ -1208,7 +1491,7 @@ int main(int argc, char* argv[])
         if (!ImGui::GetIO().WantCaptureKeyboard)
         {
             if (IsKeyPressed(KEY_LEFT_CONTROL) || IsKeyPressed(KEY_RIGHT_CONTROL))
-                s.useImageColor = !s.useImageColor;
+                s.colorMode = (s.colorMode == 1) ? 0 : 1;
 
             if (IsKeyPressed(KEY_LEFT))
             {
@@ -1283,11 +1566,38 @@ int main(int argc, char* argv[])
             if (!s.imagesFilenamesInTime.empty())
                 ImGui::TextDisabled("%d images found", (int)s.imagesFilenamesInTime.size());
             ImGui::Separator();
+            // Scoped narrower width: -1 (the block's default) gives this
+            // trailing-label widget the full row and clips its label off
+            // the right edge of the panel.
+            ImGui::PopItemWidth();
+            ImGui::PushItemWidth(-140.f);
             ImGui::InputInt("Load decimation", &s.cloudDecim);
+            ImGui::PopItemWidth();
+            ImGui::PushItemWidth(-1);
             s.cloudDecim = std::max(1, s.cloudDecim);
             ImGui::Checkbox("Multi-image coloring", &s.multiImgColoring);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("ON: all images per chunk, per-point assignment\nOFF: single image per chunk (midpoint)");
+            ImGui::Text("Coloring strategy:");
+            ImGui::RadioButton("Temporal", &s.colorStrategy, 0);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Match each point to the image nearest in time\n(searched outward up to 'Wiggle' frames, within 'Max time').");
+            ImGui::SameLine();
+            ImGui::RadioButton("Geometry", &s.colorStrategy, 1);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Match each point to the chunk image it projects into\nwith the smallest depth (closest camera).");
+            if (s.colorStrategy == 0)
+            {
+                ImGui::PopItemWidth();
+                ImGui::PushItemWidth(-140.f);
+                ImGui::InputInt("Wiggle (frames)", &s.maxWiggle);
+                s.maxWiggle = std::max(0, s.maxWiggle);
+                ImGui::InputFloat("Max time (s)", &s.maxTemporalDist, 0.05f, 0.5f, "%.2f");
+                s.maxTemporalDist = std::max(0.f, s.maxTemporalDist);
+                ImGui::PopItemWidth();
+                ImGui::PushItemWidth(-1);
+            }
             if (ImGui::Button("Load cloud", ImVec2(-1, 0)))
                 loadCloud(s);
             ImGui::PopItemWidth();
@@ -1309,8 +1619,38 @@ int main(int argc, char* argv[])
             {
                 ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
                 ImGui::Text("cx=%.0f cy=%.0f", s.K.cx, s.K.cy);
+                // Scoped narrower width -- see the "Load decimation" comment above.
+                ImGui::PopItemWidth();
+                ImGui::PushItemWidth(-140.f);
                 ImGui::InputInt("Image W", &s.imgW);
                 ImGui::InputInt("Image H", &s.imgH);
+                ImGui::PopItemWidth();
+                ImGui::PushItemWidth(-1);
+                ImGui::Separator();
+                if (ImGui::Checkbox("Region of interest", &s.roi.enabled))
+                {
+                    // first enable with an empty ROI: default to the full image
+                    if (s.roi.enabled && (s.roi.w <= 0 || s.roi.h <= 0))
+                    {
+                        s.roi.x = 0;
+                        s.roi.y = 0;
+                        s.roi.w = s.imgW;
+                        s.roi.h = s.imgH;
+                    }
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Only points projecting inside the ROI get colored.\nDrawn on the image preview.");
+                if (s.roi.enabled)
+                {
+                    ImGui::PopItemWidth();
+                    ImGui::PushItemWidth(-140.f);
+                    ImGui::InputInt("ROI x", &s.roi.x);
+                    ImGui::InputInt("ROI y", &s.roi.y);
+                    ImGui::InputInt("ROI w", &s.roi.w);
+                    ImGui::InputInt("ROI h", &s.roi.h);
+                    ImGui::PopItemWidth();
+                    ImGui::PushItemWidth(-1);
+                }
             }
             ImGui::PopItemWidth();
         }
@@ -1325,9 +1665,20 @@ int main(int argc, char* argv[])
             if (!s.imagesFilenamesInTime.empty())
             {
                 ImGui::Separator();
-                ImGui::Checkbox("Color by image (RGB)", &s.useImageColor);
+                ImGui::Text("Point color:");
+                ImGui::RadioButton("Intensity", &s.colorMode, 0);
+                ImGui::SameLine();
+                ImGui::RadioButton("RGB (image)", &s.colorMode, 1);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Ctrl toggles intensity (jet) <-> RGB");
+                ImGui::SameLine();
+                ImGui::RadioButton("Camera ID", &s.colorMode, 2);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Colors each point by the image that colored it");
+                ImGui::SameLine();
+                ImGui::RadioButton("In ROI", &s.colorMode, 3);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Green = projects inside the ROI, red = outside.\nPoints projecting into no image are hidden.");
             }
         }
 
@@ -1389,7 +1740,12 @@ int main(int argc, char* argv[])
             ImGui::InputText("##rosout", s.rosOutBuf, sizeof(s.rosOutBuf));
             if (ImGui::Button("Browse...##rosout", ImVec2(-1, 0)))
                 setBuf(s.rosOutBuf, sizeof(s.rosOutBuf), calib::fd::SelectFolder("Select ROS 2 bag output directory"));
+            // Scoped narrower width -- see the "Load decimation" comment above.
+            ImGui::PopItemWidth();
+            ImGui::PushItemWidth(-140.f);
             ImGui::Combo("Storage", &s.rosStorageIdx, "mcap\0sqlite3\0");
+            ImGui::PopItemWidth();
+            ImGui::PushItemWidth(-1);
 
             ImGui::Separator();
             ImGui::Checkbox("TF + static TF", &s.ros.exportTf);
@@ -1411,10 +1767,15 @@ int main(int argc, char* argv[])
                 ImGui::SetTooltip("Re-projects points into the lidar frame per-point\nusing the trajectory (needs poses loaded).");
 
             ImGui::Separator();
+            // Scoped narrower width -- see the "Load decimation" comment above.
+            ImGui::PopItemWidth();
+            ImGui::PushItemWidth(-140.f);
             ImGui::InputDouble("Aggregation (s)", &s.ros.aggregationSec, 0.01, 0.1, "%.3f");
             s.ros.aggregationSec = std::max(0.001, s.ros.aggregationSec);
             ImGui::InputInt("LiDAR decimation", &s.ros.lidarDecim);
             s.ros.lidarDecim = std::max(1, s.ros.lidarDecim);
+            ImGui::PopItemWidth();
+            ImGui::PushItemWidth(-1);
 
             if (s.rosBusy.load())
             {
@@ -1441,7 +1802,12 @@ int main(int argc, char* argv[])
             if (ImGui::Button("Browse...##colmapout", ImVec2(-1, 0)))
                 setBuf(s.colmapBuf, sizeof(s.colmapBuf), calib::fd::SelectFolder("Select COLMAP output directory"));
             ImGui::Checkbox("Copy images into project", &s.colmapCopyImages);
+            // Scoped narrower width -- see the "Load decimation" comment above.
+            ImGui::PopItemWidth();
+            ImGui::PushItemWidth(-140.f);
             ImGui::InputInt("Point decimation", &s.colmapPtDecim);
+            ImGui::PopItemWidth();
+            ImGui::PushItemWidth(-1);
             s.colmapPtDecim = std::max(1, s.colmapPtDecim);
             if (ImGui::Button("Export COLMAP model", ImVec2(-1, 0)))
                 exportColmap(s);
@@ -1479,7 +1845,22 @@ int main(int argc, char* argv[])
                 dispH = (int)avail.y;
                 dispW = (int)(avail.y / aspect);
             }
+            ImVec2 imgPos = ImGui::GetCursorScreenPos();
             rlImGuiImageSize(&s.imgViewTex, dispW, dispH);
+            // overlay the ROI, mapping full-res image pixels to the displayed rect
+            if (s.roi.enabled && s.imgViewTex.width > 0 && s.imgViewTex.height > 0)
+            {
+                float sx = (float)dispW / s.imgViewTex.width;
+                float sy = (float)dispH / s.imgViewTex.height;
+                ImVec2 a(imgPos.x + s.roi.x * sx, imgPos.y + s.roi.y * sy);
+                ImVec2 b(imgPos.x + (s.roi.x + s.roi.w) * sx, imgPos.y + (s.roi.y + s.roi.h) * sy);
+                ImGui::GetWindowDrawList()->AddRect(
+                    a,
+                    b,
+                    IM_COL32(0, 255, 0, 255),
+                    /*rounding=*/0.f,
+                    /*thickness=*/2.f);
+            }
             ImGui::End();
         }
 

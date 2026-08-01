@@ -300,7 +300,10 @@ void UI::panelVisualization(AppState& state)
 {
     VisualizationParams& vp = state.vizParams;
 
-    ImGui::PushItemWidth(-1);
+    // -140 (not -1): every widget here has a trailing label; -1 gives the
+    // slider/combo box the full row width and pushes the label off the
+    // right edge of the panel instead of leaving it room to draw.
+    ImGui::PushItemWidth(-140.f);
     ImGui::SliderFloat("Point size", &vp.pointSize, 1.f, 20.f);
     ImGui::SliderFloat("Depth min", &vp.depthMin, 0.f, vp.depthMax);
     ImGui::SliderFloat("Depth max", &vp.depthMax, vp.depthMin + 0.1f, 200.f);

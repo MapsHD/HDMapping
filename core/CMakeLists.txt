@@ -7,7 +7,6 @@ set(CORE_BASE_SOURCES
     src/control_points.cpp
     src/gnss.cpp
     src/ground_control_points.cpp
-    src/hash_utils.cpp
     src/imu_preintegration.cpp
     src/nmea.cpp
     src/point_cloud.cpp
@@ -17,7 +16,9 @@ set(CORE_BASE_SOURCES
 )
 
 # core_math holds the registration/optimization sources with auto-generated Jacobian headers (up to ~24k chars/line, expensive to compile); built once as a static lib shared by core and core_no_gui since none of it branches on WITH_GUI.
+# hash_utils.cpp lives here (not CORE_BASE_SOURCES) because pair_wise_iterative_closest_point.cpp needs get_rgd_index_3d() from it -- keeping both in the same archive avoids a circular static-lib link dependency between core_math and core/core_no_gui.
 set(CORE_MATH_SOURCES
+    src/hash_utils.cpp
     src/icp.cpp
     src/ndt.cpp
     src/optimization_point_to_point_source_to_target.cpp

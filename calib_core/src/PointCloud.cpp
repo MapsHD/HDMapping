@@ -57,7 +57,9 @@ bool PointCloud::load(const std::string& path) {
         p.y = static_cast<float>(coords[1]);
         p.z = static_cast<float>(coords[2]);
         p.intensity = static_cast<float>(point->intensity);
-        p.ts_ns     = static_cast<int64_t>(point->gps_time);
+        // gps_time is GPS time in seconds (LAS spec); ts_ns is nanoseconds
+        // everywhere else it's used (Trajectory, image matching), so convert here.
+        p.ts_ns     = static_cast<int64_t>(point->gps_time * 1e9);
 
         if (p.x < xmin) xmin = p.x; if (p.x > xmax) xmax = p.x;
         if (p.y < ymin) ymin = p.y; if (p.y > ymax) ymax = p.y;

@@ -8,6 +8,7 @@
 #include <CalibCore/Camera.h>
 #include <CalibCore/CliArgs.h>
 #include <Core/pfd_wrapper.hpp>
+#include <HDMapping/Version.hpp>
 #include <CalibCore/PointCloud.h>
 #include <CalibCore/Trajectory.h>
 #include <algorithm>
@@ -1411,7 +1412,7 @@ int main(int argc, char* argv[])
         strncpy(s.calibBuf, calib.c_str(), sizeof(s.calibBuf) - 1);
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(1400, 900, "Trajectory Viewer");
+    InitWindow(1400, 900, ("Trajectory Viewer " HDMAPPING_VERSION_STRING));
     fitWindowToScreen();
     // panelW below is user-resizable but the 3D view still needs room.
     SetWindowMinSize(900, 500);

@@ -3,6 +3,7 @@
 #include "rlImGui.h"
 #include <CalibCore/CliArgs.h>
 #include <Core/pfd_wrapper.hpp>
+#include <HDMapping/Version.hpp>
 #include <cstdio>
 #include <nlohmann/json.hpp>
 #include <opencv2/calib3d.hpp>
@@ -366,7 +367,7 @@ int main(int argc, char* argv[])
     }
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(1280, 800, "Intrinsics Calibration");
+    InitWindow(1280, 800, ("Intrinsics Calibration " HDMAPPING_VERSION_STRING));
     fitWindowToScreen();
     // PANEL_W below (330) is fixed; below this the image view and panel
     // start overlapping instead of scrolling.

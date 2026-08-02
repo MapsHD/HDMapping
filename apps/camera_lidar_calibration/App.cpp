@@ -1,6 +1,7 @@
 #include "App.h"
 #include "imgui.h"
 #include "rlImGui.h"
+#include <HDMapping/Version.hpp>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
@@ -477,7 +478,7 @@ void App::run()
 {
     const int W = 1400, H = 900;
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(W, H, "LiDAR-Camera Calibration");
+    InitWindow(W, H, ("LiDAR-Camera Calibration " HDMAPPING_VERSION_STRING));
     fitWindowToScreen();
     // The 340px-wide side panel is fixed-width; below this the 3D/image
     // views and the panel start overlapping instead of scrolling.

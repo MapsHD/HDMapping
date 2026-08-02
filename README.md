@@ -256,8 +256,8 @@ ToDo Build Success:
 - https://github.com/HViktorTsoi/PV-LIO (2023, no publication) - Marcin
 - https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022) (extrinsic calibration)
 - https://github.com/SlamCabbage/Optimized-SC-F-LOAM (2022, CVCI, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SC-F-LOAM.bib))
-- https://github.com/wh200720041/floam (2021, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/F-LOAM.bib))
-- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib), with loop closures) 
+- https://github.com/wh200720041/floam (2021, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/F-LOAM.bib)) - Piotr 1
+- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib), with loop closures) - Piotr 2
 - https://github.com/herrmy86/Voxel-SLAM-intensity/tree/main
   
 ToDo Build issues:

@@ -7,7 +7,7 @@
 #include "rlgl.h"
 #include <CalibCore/Camera.h>
 #include <CalibCore/CliArgs.h>
-#include <CalibCore/FileDialog.h>
+#include <Core/pfd_wrapper.hpp>
 #include <CalibCore/PointCloud.h>
 #include <CalibCore/Trajectory.h>
 #include <algorithm>
@@ -1556,11 +1556,11 @@ int main(int argc, char* argv[])
             ImGui::Text("LIO result directory:");
             ImGui::InputText("##sess", s.sessionBuf, sizeof(s.sessionBuf));
             if (ImGui::Button("Browse...##sess", ImVec2(-1, 0)))
-                setBuf(s.sessionBuf, sizeof(s.sessionBuf), calib::fd::SelectFolder("Select LIO result directory"));
+                setBuf(s.sessionBuf, sizeof(s.sessionBuf), mandeye::fd::SelectFolder("Select LIO result directory"));
             ImGui::Text("CAMERA_0 directory (empty = auto):");
             ImGui::InputText("##cam", s.cameraBuf, sizeof(s.cameraBuf));
             if (ImGui::Button("Browse...##cam", ImVec2(-1, 0)))
-                setBuf(s.cameraBuf, sizeof(s.cameraBuf), calib::fd::SelectFolder("Select CAMERA_0 directory"));
+                setBuf(s.cameraBuf, sizeof(s.cameraBuf), mandeye::fd::SelectFolder("Select CAMERA_0 directory"));
             if (ImGui::Button("Load session", ImVec2(-1, 0)))
                 loadSession(s);
             if (!s.imagesFilenamesInTime.empty())
@@ -1612,7 +1612,7 @@ int main(int argc, char* argv[])
                 setBuf(
                     s.calibBuf,
                     sizeof(s.calibBuf),
-                    calib::fd::OpenFileDialogOneFile("Select calibration file", calib::fd::CalibJsonFilter));
+                    mandeye::fd::OpenFileDialogOneFile("Select calibration file", mandeye::fd::json_filter));
             if (ImGui::Button("Load calibration", ImVec2(-1, 0)))
                 loadCalib(s);
             if (s.calibLoaded)
@@ -1723,7 +1723,7 @@ int main(int argc, char* argv[])
                 setBuf(
                     s.exportBuf,
                     sizeof(s.exportBuf),
-                    calib::fd::SaveFileDialog("Export colored point cloud", calib::fd::LazFilter, ".laz", defaultName));
+                    mandeye::fd::SaveFileDialog("Export colored point cloud", mandeye::fd::LazFilter, ".laz", defaultName));
             }
             if (ImGui::Button("Export colored LAZ", ImVec2(-1, 0)))
                 exportLAZ(s);
@@ -1739,7 +1739,7 @@ int main(int argc, char* argv[])
             ImGui::Text("Output bag directory:");
             ImGui::InputText("##rosout", s.rosOutBuf, sizeof(s.rosOutBuf));
             if (ImGui::Button("Browse...##rosout", ImVec2(-1, 0)))
-                setBuf(s.rosOutBuf, sizeof(s.rosOutBuf), calib::fd::SelectFolder("Select ROS 2 bag output directory"));
+                setBuf(s.rosOutBuf, sizeof(s.rosOutBuf), mandeye::fd::SelectFolder("Select ROS 2 bag output directory"));
             // Scoped narrower width -- see the "Load decimation" comment above.
             ImGui::PopItemWidth();
             ImGui::PushItemWidth(-140.f);
@@ -1800,7 +1800,7 @@ int main(int argc, char* argv[])
             ImGui::Text("Output project dir:");
             ImGui::InputText("##colmapout", s.colmapBuf, sizeof(s.colmapBuf));
             if (ImGui::Button("Browse...##colmapout", ImVec2(-1, 0)))
-                setBuf(s.colmapBuf, sizeof(s.colmapBuf), calib::fd::SelectFolder("Select COLMAP output directory"));
+                setBuf(s.colmapBuf, sizeof(s.colmapBuf), mandeye::fd::SelectFolder("Select COLMAP output directory"));
             ImGui::Checkbox("Copy images into project", &s.colmapCopyImages);
             // Scoped narrower width -- see the "Load decimation" comment above.
             ImGui::PopItemWidth();

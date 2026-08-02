@@ -2,7 +2,7 @@
 #include "raylib.h"
 #include "rlImGui.h"
 #include <CalibCore/CliArgs.h>
-#include <CalibCore/FileDialog.h>
+#include <Core/pfd_wrapper.hpp>
 #include <cstdio>
 #include <nlohmann/json.hpp>
 #include <opencv2/calib3d.hpp>
@@ -434,7 +434,7 @@ int main(int argc, char* argv[])
             ImGui::Text("Image directory:");
             ImGui::InputText("##dir", state.dirBuf, sizeof(state.dirBuf));
             if (ImGui::Button("Browse...##dir", ImVec2(-1, 0)))
-                setBuf(state.dirBuf, sizeof(state.dirBuf), calib::fd::SelectFolder("Select checkerboard image directory"));
+                setBuf(state.dirBuf, sizeof(state.dirBuf), mandeye::fd::SelectFolder("Select checkerboard image directory"));
             if (ImGui::Button("Load", ImVec2(-1, 0)))
                 loadDir(state);
             ImGui::Text("%zu images", state.images.size());
@@ -554,7 +554,7 @@ int main(int argc, char* argv[])
                     setBuf(
                         state.outPath,
                         sizeof(state.outPath),
-                        calib::fd::SaveFileDialog("Save intrinsics JSON", calib::fd::CalibJsonFilter, ".json", defaultName));
+                        mandeye::fd::SaveFileDialog("Save intrinsics JSON", mandeye::fd::json_filter, ".json", defaultName));
                 }
                 if (ImGui::Button("Save JSON", ImVec2(-1, 0)))
                 {

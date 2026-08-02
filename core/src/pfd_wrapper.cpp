@@ -1,8 +1,10 @@
-#include <pch/pch.h>
-
 #include <Core/pfd_wrapper.hpp>
 
 #include <portable-file-dialogs.h>
+
+#include <filesystem>
+#include <iostream>
+#include <memory>
 
 namespace mandeye::fd
 {

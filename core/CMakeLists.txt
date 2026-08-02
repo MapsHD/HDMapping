@@ -54,8 +54,18 @@ endif()
 set(CORE_GUI_SOURCES
     src/manual_pose_graph_loop_closure.cpp
     src/observation_picking.cpp
-    src/pfd_wrapper.cpp
 )
+
+# core_pfd -- native file/folder picker dialogs (mandeye::fd, wrapping
+# portable-file-dialogs), split out of CORE_GUI_SOURCES into its own minimal
+# target so non-core GUI consumers (the camera_lidar_* apps, via calib_core)
+# can reuse it without linking core_math/PROJ/spdlog/vqf/Fusion/plycpp/
+# WGS84toCartesian/imgui/ImGuizmo/freeglut, none of which pfd_wrapper.cpp
+# actually needs.
+add_library(core_pfd STATIC src/pfd_wrapper.cpp)
+target_include_directories(core_pfd PUBLIC include)
+target_include_directories(core_pfd PRIVATE ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master)
+set_target_properties(core_pfd PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 function(add_core_target target_name with_gui)
     if(${with_gui})
@@ -93,6 +103,7 @@ endfunction()
 
 add_core_target(core_no_gui FALSE)
 add_core_target(core TRUE)
+target_link_libraries(core PUBLIC core_pfd)
 
 target_precompile_headers(core_no_gui
     PRIVATE include/pch/pch.h

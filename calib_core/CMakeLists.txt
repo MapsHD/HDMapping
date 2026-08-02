@@ -9,6 +9,8 @@ project(calib_core)
 # parsing. Deliberately depends on nothing but Eigen/LASzip/std -- no
 # raylib/imgui/OpenCV here -- so it stays reusable and cheap to build for
 # tools (like camera_lidar_intrinsics_calib) that don't need the others.
+# File dialogs are a GUI concern, not calibration logic, so they live in
+# core's core_pfd target (mandeye::fd) instead -- apps link it directly.
 #
 # All public types live in namespace calib (see include/CalibCore/*.h) to
 # avoid colliding with core's own global (non-namespaced) PointCloud
@@ -19,7 +21,6 @@ add_library(calib_core STATIC
     src/PointCloud.cpp
     src/Trajectory.cpp
     src/CliArgs.cpp
-    src/FileDialog.cpp
 )
 
 target_include_directories(calib_core PUBLIC
@@ -36,7 +37,6 @@ target_include_directories(calib_core PRIVATE
     # classes instead and never needed this path, so nothing else in the repo
     # wires it up.
     ${CMAKE_BINARY_DIR}/3rdparty/LASzip/include
-    ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
 )
 
 target_link_libraries(calib_core PUBLIC ${PLATFORM_LASZIP_LIB})

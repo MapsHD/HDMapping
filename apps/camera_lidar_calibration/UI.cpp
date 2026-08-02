@@ -2,7 +2,7 @@
 #include "App.h"
 #include "imgui.h"
 #include "rlImGui.h"
-#include <CalibCore/FileDialog.h>
+#include <Core/pfd_wrapper.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -182,7 +182,7 @@ void UI::panelFiles(AppState& state)
     ImGui::Text("JPG image:");
     ImGui::InputText("##img", imagePathBuf, sizeof(imagePathBuf));
     if (ImGui::Button("Browse...##img", ImVec2(-1, 0)))
-        setBuf(imagePathBuf, sizeof(imagePathBuf), calib::fd::OpenFileDialogOneFile("Select camera image", calib::fd::ImageFilter));
+        setBuf(imagePathBuf, sizeof(imagePathBuf), mandeye::fd::OpenFileDialogOneFile("Select camera image", mandeye::fd::ImageFilter));
     if (ImGui::Button("Load Image##btn", ImVec2(-1, 0)))
         state.loadImage(imagePathBuf);
 
@@ -190,7 +190,7 @@ void UI::panelFiles(AppState& state)
     ImGui::Text("LAZ/LAS point cloud:");
     ImGui::InputText("##laz", cloudPathBuf, sizeof(cloudPathBuf));
     if (ImGui::Button("Browse...##laz", ImVec2(-1, 0)))
-        setBuf(cloudPathBuf, sizeof(cloudPathBuf), calib::fd::OpenFileDialogOneFile("Select point cloud", calib::fd::LazFilter));
+        setBuf(cloudPathBuf, sizeof(cloudPathBuf), mandeye::fd::OpenFileDialogOneFile("Select point cloud", mandeye::fd::LazFilter));
     {
         float hw = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         if (ImGui::Button("Load##laz", ImVec2(hw, 0)))
@@ -204,7 +204,7 @@ void UI::panelFiles(AppState& state)
     ImGui::Text("Intrinsics JSON/YAML (optional):");
     ImGui::InputText("##intr", intrPathBuf, sizeof(intrPathBuf));
     if (ImGui::Button("Browse...##intr", ImVec2(-1, 0)))
-        setBuf(intrPathBuf, sizeof(intrPathBuf), calib::fd::OpenFileDialogOneFile("Select intrinsics file", calib::fd::IntrinsicsFilter));
+        setBuf(intrPathBuf, sizeof(intrPathBuf), mandeye::fd::OpenFileDialogOneFile("Select intrinsics file", mandeye::fd::IntrinsicsFilter));
     if (ImGui::Button("Load Intrinsics##btn", ImVec2(-1, 0)))
         state.loadIntrinsics(intrPathBuf);
 
@@ -212,7 +212,7 @@ void UI::panelFiles(AppState& state)
     ImGui::Text("Calibration JSON:");
     ImGui::InputText("##save", savePath, sizeof(savePath));
     if (ImGui::Button("Browse...##calib", ImVec2(-1, 0)))
-        setBuf(savePath, sizeof(savePath), calib::fd::OpenFileDialogOneFile("Select calibration file", calib::fd::CalibJsonFilter));
+        setBuf(savePath, sizeof(savePath), mandeye::fd::OpenFileDialogOneFile("Select calibration file", mandeye::fd::json_filter));
     float hw = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     if (ImGui::Button("Load##calib", ImVec2(hw, 0)))
         state.loadCalibration(savePath);

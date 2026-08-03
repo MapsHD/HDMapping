@@ -4952,19 +4952,6 @@ constexpr int GLUT_UP = 1;
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO& io = ImGui::GetIO();
-    io.MousePos = ImVec2((float)x, (float)y);
-
-    int button = -1;
-    if (glut_button == GLUT_LEFT_BUTTON)
-        button = 0;
-    if (glut_button == GLUT_RIGHT_BUTTON)
-        button = 1;
-    if (glut_button == GLUT_MIDDLE_BUTTON)
-        button = 2;
-    if (button != -1 && state == GLUT_DOWN)
-        io.MouseDown[button] = true;
-    if (button != -1 && state == GLUT_UP)
-        io.MouseDown[button] = false;
 
     // The GLUT-version-gated legacy mouse-wheel-as-button-3/4 fallback is
     // dropped -- raylib's GetMouseWheelMove() (polled in main()'s loop,

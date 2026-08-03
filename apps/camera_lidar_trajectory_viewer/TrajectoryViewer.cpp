@@ -9,11 +9,14 @@
 #include <CalibCore/CliArgs.h>
 #include <Core/pfd_wrapper.hpp>
 #include <HDMapping/Version.hpp>
+#include <RaylibWidgets/CenterOfRotationWindow.h>
 #include <RaylibWidgets/CompassRuler.h>
+#include <RaylibWidgets/OrbitCamera.h>
 #include <RaylibWidgets/ShortcutsTable.h>
 #include <RaylibWidgets/WindowFit.h>
 #include <CalibCore/PointCloud.h>
 #include <CalibCore/Trajectory.h>
+#include "TrajectoryViewerShaders.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -33,7 +36,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-
 using namespace calib;
 namespace fs = std::filesystem;
 
@@ -54,6 +56,9 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "Mouse related", "Left click + drag", "Orbit camera" },
     { "", "Right click + drag", "Pan camera" },
     { "", "Scroll", "Zoom camera" },
+    { "", "Ctrl+Right click", "Set center of rotation (ground plane)" },
+    { "", "Middle click", "Set center of rotation (ground plane)" },
+    { "", "Shift+R", "Open 'Center of rotation' dialog" },
 };
 
 // Copies `path` into `buf` (truncating to fit), for wiring a native-dialog
@@ -143,98 +148,8 @@ static bool interpPose(const std::map<double, Eigen::Matrix4d>& trajMap, int64_t
     return true;
 }
 
-// ── GPU point cloud shader ────────────────────────────────────────────────────
-// colorPacked: float bits = 0x00RRGGBB; colorMode: 0=jet depth, 1=RGB, 2=camera id, 3=in ROI
-static const char* kVS = R"(
-#version 330
-layout(location = 0) in vec3  pos;
-layout(location = 1) in float colorPacked;
-layout(location = 2) in float lidarIntensity;
-layout(location = 3) in float colorCameraId;   // global image index that colored this point, or -1
-layout(location = 4) in float inRoi;           // 1=inside ROI, 0=outside ROI, -1=projects into no image
-uniform mat4  mvp;
-uniform float pointSize;
-uniform int   drawDecim;
-out float fragIntensity;
-out vec4 vertColor;
-flat out float fragColorCameraId;
-flat out float fragInRoi;
-void main() {
-    if (drawDecim > 1 && (gl_VertexID % drawDecim) != 0) {
-        gl_Position  = vec4(2.0, 2.0, 2.0, 1.0);
-        gl_PointSize = 0.0;
-        return;
-    }
-    gl_Position  = mvp * vec4(pos, 1.0);
-    gl_PointSize = pointSize;
-    uint p = floatBitsToUint(colorPacked);
-    float r = float((p >> 16) & 0xFFu) / 255.0;
-    float g = float((p >>  8) & 0xFFu) / 255.0;
-    float b = float( p        & 0xFFu) / 255.0;
-    fragIntensity = lidarIntensity;
-    vertColor = vec4(r, g, b, 1.0);
-    fragColorCameraId = colorCameraId;
-    fragInRoi = inRoi;
-}
-)";
-static const char* kFS = R"(
-#version 330
-in float fragIntensity;
-in vec4 vertColor;
-flat in float fragColorCameraId;
-flat in float fragInRoi;
-uniform int colorMode;
-uniform int selectedCamera;   // -1 = show all, else keep only points from this image
-out vec4 finalColor;
-vec3 jet(float t) {
-    t = clamp(t, 0.0, 1.0);
-    return clamp(vec3(1.5 - abs(4.0*t - 3.0),
-                      1.5 - abs(4.0*t - 2.0),
-                      1.5 - abs(4.0*t - 1.0)), 0.0, 1.0);
-}
-vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-// deterministic, well-spread color per integer camera id
-vec3 idColor(float idf) {
-    float id = floor(idf + 0.5);
-    float hue = fract(id * 0.61803398875); // golden ratio
-    return hsv2rgb(vec3(hue, 0.85, 1.0));
-}
-void main() {
-    if (selectedCamera >= 0)
-    {
-        if (selectedCamera != int(fragColorCameraId))
-            discard; // do not draw
-    }
-
-    if (colorMode == 1)
-    {
-        if (fragColorCameraId < 0.0)
-            discard; // not colored by any image — draw only colored points
-        finalColor = vertColor;
-    }
-    else if (colorMode == 2)
-    {
-        if (fragColorCameraId < 0.0)
-            discard; // not colored by any image — draw only colored points
-        finalColor = vec4(idColor(fragColorCameraId), 1.0);
-    }
-    else if (colorMode == 3)
-    {
-        // ROI membership: green = inside ROI, red = projects into an image but
-        // outside ROI, dim gray = projects into no image (spatial context).
-        if (fragInRoi < 0.0)
-            finalColor = vec4(0.28, 0.28, 0.28, 1.0);
-        else
-            finalColor = (fragInRoi > 0.5) ? vec4(0.15, 0.9, 0.2, 1.0)
-                                           : vec4(0.9, 0.15, 0.15, 1.0);
-    }
-    else finalColor = vec4(jet(fragIntensity), 1.0);
-}
-)";
+using trajectory_viewer_shaders::kVS;
+using trajectory_viewer_shaders::kFS;
 
 struct GpuCloud
 {
@@ -281,53 +196,6 @@ struct GpuCloud
     }
 };
 
-// ── Orbit camera (same as CalibrationApp) ─────────────────────────────────────
-struct Orbit
-{
-    float az = 30.f, el = 25.f, dist = 30.f;
-    Vector3 target = {};
-    Camera3D toRaylib() const
-    {
-        float a = az * (float)DEG2RAD, e = el * (float)DEG2RAD;
-        Camera3D c;
-        c.position = { target.x + dist * std::cos(e) * std::sin(a),
-                       target.y + dist * std::sin(e),
-                       target.z + dist * std::cos(e) * std::cos(a) };
-        c.target = target;
-        c.up = { 0, 1, 0 };
-        c.fovy = 45.f;
-        c.projection = CAMERA_PERSPECTIVE;
-        return c;
-    }
-    void update(bool active)
-    {
-        if (!active)
-            return;
-        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
-        {
-            Vector2 d = GetMouseDelta();
-            az -= d.x * 0.4f;
-            el += d.y * 0.4f;
-            el = std::max(-89.f, std::min(89.f, el));
-        }
-        if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT))
-        {
-            Camera3D cam = toRaylib();
-            Vector3 fwd = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
-            Vector3 right = Vector3Normalize(Vector3CrossProduct(fwd, cam.up));
-            Vector3 up = Vector3CrossProduct(right, fwd);
-            Vector2 d = GetMouseDelta();
-            float sp = dist * 0.002f;
-            target = Vector3Add(target, Vector3Scale(right, -d.x * sp));
-            target = Vector3Add(target, Vector3Scale(up, d.y * sp));
-        }
-        float w = GetMouseWheelMove();
-        if (w != 0.f)
-            dist = std::max(0.5f, dist - w * dist * 0.1f);
-    }
-};
-
-
 struct ColorPt
 {
     float x, y, z;
@@ -337,7 +205,7 @@ struct ColorPt
 };
 
 // ── Application state ─────────────────────────────────────────────────────────
-struct State
+struct AppState
 {
     Trajectory traj;
     std::vector<int64_t> imageTsNs;
@@ -355,7 +223,8 @@ struct State
     bool shaderOk = false;
     int locMVP = -1, locPS = -1, locCM = -1, locDecim = -1, locSel = -1;
 
-    Orbit orbit;
+    raylib_widgets::OrbitCamera orbit;
+    bool showCenterOfRotationWindow = false;
 
     // controls
     bool showPath = true;
@@ -426,7 +295,7 @@ static Vector3 toRL(const Eigen::Vector3f& v)
 }
 
 // Load all cam0_*.jpg from CAMERA_0 (sibling of session dir) into s.images, resized by s.imgScale.
-static void loadImages(State& s)
+static void loadImages(AppState& s)
 {
     s.imagesFilenamesInTime.clear();
     fs::path camDir;
@@ -492,7 +361,7 @@ static std::map<std::string, Eigen::Affine3f> parseMRP(const fs::path& mrpPath)
     return result;
 }
 
-static void loadSession(State& s)
+static void loadSession(AppState& s)
 {
     s.traj.poses.clear();
     s.imageTsNs.clear();
@@ -556,7 +425,7 @@ static void loadSession(State& s)
         (mrp.empty() ? "  (no MRP)" : "  +MRP") + "  — press Load cloud";
 }
 
-static void loadCloud(State& s)
+static void loadCloud(AppState& s)
 {
     s.exportCloud.clear();
     s.cloud.unload();
@@ -908,7 +777,7 @@ static void loadCloud(State& s)
     {
         s.cloud.upload(gpuData, mx);
         s.orbit.target = { sumX / cnt, sumY / cnt, sumZ / cnt };
-        s.orbit.dist = std::max(5.f, mx * 0.3f);
+        s.orbit.distance = std::max(5.f, mx * 0.3f);
     }
 
     s.status = "Pts: " + std::to_string(s.cloud.count) + "  Poses: " + std::to_string(s.traj.poses.size()) +
@@ -921,7 +790,7 @@ static void loadCloud(State& s)
     }
 }
 
-static void loadCalib(State& s)
+static void loadCalib(AppState& s)
 {
     std::ifstream f(s.calibBuf);
     if (!f)
@@ -981,7 +850,7 @@ static void loadCalib(State& s)
     s.status = "Calibration loaded";
 }
 
-static void exportLAZ(State& s)
+static void exportLAZ(AppState& s)
 {
     if (s.exportCloud.empty())
     {
@@ -1071,17 +940,17 @@ static void exportLAZ(State& s)
 // Factored out so the File menu items and their keyboard shortcuts (in the
 // main loop below) call the exact same code, matching the openSession()-style
 // convention used by mandeye_single_session_viewer/multi_view_tls_registration.
-static void actionSelectLioResultDir(State& s)
+static void actionSelectLioResultDir(AppState& s)
 {
     setBuf(s.sessionBuf, sizeof(s.sessionBuf), mandeye::fd::SelectFolder("Select LIO result directory"));
 }
 
-static void actionSelectCamera0Dir(State& s)
+static void actionSelectCamera0Dir(AppState& s)
 {
     setBuf(s.cameraBuf, sizeof(s.cameraBuf), mandeye::fd::SelectFolder("Select CAMERA_0 directory"));
 }
 
-static void actionOpenCalibration(State& s)
+static void actionOpenCalibration(AppState& s)
 {
     std::string path = mandeye::fd::OpenFileDialogOneFile("Select calibration file", mandeye::fd::json_filter);
     if (!path.empty())
@@ -1091,7 +960,7 @@ static void actionOpenCalibration(State& s)
     }
 }
 
-static void actionExportColoredPointCloud(State& s)
+static void actionExportColoredPointCloud(AppState& s)
 {
     std::string defaultName = fs::path(s.exportBuf).filename().string();
     std::string path = mandeye::fd::SaveFileDialog("Export colored point cloud", mandeye::fd::LazFilter, ".laz", defaultName);
@@ -1102,19 +971,19 @@ static void actionExportColoredPointCloud(State& s)
     }
 }
 
-static void actionSelectRosOutputDir(State& s)
+static void actionSelectRosOutputDir(AppState& s)
 {
     setBuf(s.rosOutBuf, sizeof(s.rosOutBuf), mandeye::fd::SelectFolder("Select ROS 2 bag output directory"));
 }
 
-static void actionSelectColmapOutputDir(State& s)
+static void actionSelectColmapOutputDir(AppState& s)
 {
     setBuf(s.colmapBuf, sizeof(s.colmapBuf), mandeye::fd::SelectFolder("Select COLMAP output directory"));
 }
 
 // Export a COLMAP sparse text model (cameras/images/points3D) from the current
 // state. Poses are world->camera; the colored cloud becomes points3D.
-static void exportColmap(State& s)
+static void exportColmap(AppState& s)
 {
     if (!s.calibLoaded)
     {
@@ -1231,7 +1100,7 @@ static void exportColmap(State& s)
 }
 
 // Gather everything the ROS exporter needs from current viewer state.
-static void buildRosInput(State& s, RosExportInput& in)
+static void buildRosInput(AppState& s, RosExportInput& in)
 {
     in.traj = s.traj;
     in.imageFiles = s.imagesFilenamesInTime;
@@ -1269,7 +1138,7 @@ static void buildRosInput(State& s, RosExportInput& in)
     }
 }
 
-static void exportRos(State& s)
+static void exportRos(AppState& s)
 {
     if (s.rosBusy.load())
         return;
@@ -1300,7 +1169,7 @@ static void exportRos(State& s)
         });
 }
 
-static void drawScene(State& s)
+static void drawScene(AppState& s)
 {
     // ── trajectory path ───────────────────────────────────────────────────────
     if (s.showPath)
@@ -1410,7 +1279,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    State s;
+    AppState s;
     // --mjs gives the session manifest; the session directory is its parent.
     std::string sessionDir;
     if (args.has("mjs"))
@@ -1444,7 +1313,7 @@ int main(int argc, char* argv[])
     SetTargetFPS(60);
     rlImGuiSetup(true);
 
-    s.shader = LoadShaderFromMemory(kVS, kFS);
+    s.shader = LoadShaderFromMemory(kVS, kFS.c_str());
     s.shaderOk = s.shader.id > 0;
     if (s.shaderOk)
     {
@@ -1502,6 +1371,8 @@ int main(int argc, char* argv[])
     {
         bool imguiWants = ImGui::GetIO().WantCaptureMouse;
         s.orbit.update(!imguiWants);
+        s.orbit.updateTransition(GetFrameTime());
+        Camera3D cam = s.orbit.toRaylib();
 
         // pick up the ROS export result from the worker thread (if any)
         {
@@ -1543,6 +1414,13 @@ int main(int argc, char* argv[])
             if (!ctrlDown && IsKeyPressed(KEY_C))
                 s.showCompassRuler = !s.showCompassRuler;
 
+            if (shiftDown && IsKeyPressed(KEY_R))
+                s.showCenterOfRotationWindow = true;
+            if (!imguiWants && ctrlDown && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
+                s.orbit.pickGroundPlaneTarget(GetMousePosition(), cam);
+            if (!imguiWants && IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE))
+                s.orbit.pickGroundPlaneTarget(GetMousePosition(), cam);
+
             if (IsKeyPressed(KEY_LEFT))
             {
                 s.imgViewIdx = std::max(s.imgViewIdx - 1, 0);
@@ -1558,7 +1436,6 @@ int main(int argc, char* argv[])
         BeginDrawing();
         ClearBackground(Color{ 25, 25, 25, 255 });
 
-        Camera3D cam = s.orbit.toRaylib();
         BeginMode3D(cam);
         drawScene(s);
         DrawGrid(20, 1.f);
@@ -1566,6 +1443,7 @@ int main(int argc, char* argv[])
         DrawLine3D({ 0, 0, 0 }, { 2, 0, 0 }, RED);
         DrawLine3D({ 0, 0, 0 }, { 0, 2, 0 }, GREEN);
         DrawLine3D({ 0, 0, 0 }, { 0, 0, -2 }, BLUE);
+        raylib_widgets::drawRotationCenterCross(s.orbit.target, s.orbit.distance * 0.05f, WHITE);
         EndMode3D();
 
         if (s.showCompassRuler)
@@ -1573,7 +1451,7 @@ int main(int argc, char* argv[])
                 Vector3 fwd = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
                 Vector3 right = Vector3Normalize(Vector3CrossProduct(fwd, cam.up));
                 Vector3 up = Vector3CrossProduct(right, fwd);
-                raylib_widgets::drawCompassRuler(right, up, s.orbit.dist, LIGHTGRAY);
+                raylib_widgets::drawCompassRuler(right, up, s.orbit.distance, LIGHTGRAY);
             }
 
         // ── upload image viewer texture if worker produced one ────────────────
@@ -1628,6 +1506,8 @@ int main(int argc, char* argv[])
                 ImGui::MenuItem("Show path", "P", &s.showPath);
                 ImGui::MenuItem("Show frustums", "V", &s.showFrustums);
                 ImGui::MenuItem("Show compass/ruler", "C", &s.showCompassRuler);
+                if (ImGui::MenuItem("Center of rotation...", "Shift+R"))
+                    s.showCenterOfRotationWindow = true;
                 ImGui::Separator();
                 ImGui::SetNextItemWidth(140.f);
                 ImGui::SliderFloat("Frustum scale", &s.frustumScale, 0.05f, 5.f, "%.2f");
@@ -1941,6 +1821,8 @@ int main(int argc, char* argv[])
         ImGui::TextDisabled("LMB: orbit  RMB: pan  Scroll: zoom");
 
         ImGui::End();
+
+        raylib_widgets::showCenterOfRotationWindow(s.showCenterOfRotationWindow, s.orbit);
 
         // ── shortcuts help window ───────────────────────────────────────────────
         if (s.showHelp)

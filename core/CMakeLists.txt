@@ -136,6 +136,11 @@ target_include_directories(core_raylib PRIVATE
     ${EXTERNAL_LIBRARIES_DIRECTORY}/include
     ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
     ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+    # raylib_widgets/include/RaylibWidgets/Shaders.h -- shared GLSL colormap
+    # snippet spliced into raylib_render.cpp's fragment shader. Header-only,
+    # so just the include dir is needed here, not a full raylib_widgets link
+    # (which would add imgui_raylib as a new transitive core_raylib dependency).
+    ${REPOSITORY_DIRECTORY}/raylib_widgets/include
 )
 # PUBLIC: consumers (apps/multi_view_tls_registration) get core's
 # Session/PointCloud types and raylib/rlgl/raymath transitively just by

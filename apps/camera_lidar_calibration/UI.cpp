@@ -60,8 +60,11 @@ void UI::draw(AppState& state)
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.f, 1.f), "LiDAR-Camera Calibration");
     ImGui::Separator();
 
-    // Alt = toggle Camera RGB ↔ Intensity (works anywhere in the window)
-    if (ImGui::IsKeyPressed(ImGuiKey_LeftAlt) || ImGui::IsKeyPressed(ImGuiKey_RightAlt))
+    // Alt/Cmd = toggle Camera RGB ↔ Intensity (works anywhere in the window).
+    // Cmd (Super) alongside Alt for macOS, where Option is awkward to use as
+    // a modifier (it composes special characters).
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftAlt) || ImGui::IsKeyPressed(ImGuiKey_RightAlt) ||
+        ImGui::IsKeyPressed(ImGuiKey_LeftSuper) || ImGui::IsKeyPressed(ImGuiKey_RightSuper))
     {
         auto& cm = state.vizParams.colorMode;
         if (cm == 3)
@@ -209,8 +212,8 @@ void UI::actionOpenPointCloud(AppState& state)
 
 void UI::actionAddPointCloud(AppState& state)
 {
-    std::string path = mandeye::fd::OpenFileDialogOneFile("Select point cloud", mandeye::fd::LazFilter);
-    if (!path.empty())
+    std::vector<std::string> paths = mandeye::fd::OpenFileDialog("Select point cloud(s)", mandeye::fd::LazFilter, true);
+    for (const std::string& path : paths)
     {
         setBuf(cloudPathBuf, sizeof(cloudPathBuf), path);
         state.addCloud(cloudPathBuf);

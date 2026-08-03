@@ -1,21 +1,12 @@
 #pragma once
 #include "raylib.h"
+#include <RaylibWidgets/OrbitCamera.h>
 #include <CalibCore/Camera.h>
 #include <CalibCore/PointCloud.h>
 #include <vector>
 
 using namespace calib;
-
-struct OrbitCamera {
-    float azimuth   =  30.f;  // degrees
-    float elevation =  25.f;  // degrees
-    float distance  =  30.f;
-    Vector3 target  = {0.f, 0.f, 0.f};
-
-    Camera3D toRaylib() const;
-    // Processes mouse input when active (mouse not over ImGui)
-    void update(bool active);
-};
+using raylib_widgets::OrbitCamera;
 
 struct VisualizationParams {
     float pointSize   = 2.f;

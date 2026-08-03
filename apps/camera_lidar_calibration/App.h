@@ -28,6 +28,7 @@ struct AppState {
 
     // ── visualization ─────────────────────────────────────────────────────────
     VisualizationParams vizParams;
+    bool showCompassRuler = true;
 
     // ── 3D camera ─────────────────────────────────────────────────────────────
     OrbitCamera orbit;

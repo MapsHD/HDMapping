@@ -102,6 +102,7 @@ include(cmake/raylib.cmake)
 # ============================================================================
 add_subdirectory(core)
 add_subdirectory(calib_core)
+add_subdirectory(raylib_widgets)
 
 set(CORE_LIBRARIES core)
 set(GUI_LIBRARIES imgui imguizmo implot)

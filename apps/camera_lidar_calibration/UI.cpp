@@ -42,11 +42,15 @@ static void helpMarker(const char* desc)
 // ── Main draw ────────────────────────────────────────────────────────────────
 void UI::draw(AppState& state)
 {
-    ImGuiIO& io = ImGui::GetIO();
-    float panelW = 340.f;
-    float panelH = (float)GetScreenHeight();
+    panelMenuBar(state);
+    handleShortcuts(state);
 
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - panelW, 0), ImGuiCond_Always);
+    ImGuiIO& io = ImGui::GetIO();
+    float menuBarH = ImGui::GetFrameHeight();
+    float panelW = 340.f;
+    float panelH = (float)GetScreenHeight() - menuBarH;
+
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - panelW, menuBarH), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(panelW, panelH), ImGuiCond_Always);
     ImGui::Begin(
         "Controls",
@@ -84,8 +88,8 @@ void UI::draw(AppState& state)
     if (state.renderer.imageTexValid)
     {
         float viewW = io.DisplaySize.x - panelW;
-        float viewH = io.DisplaySize.y * 0.5f;
-        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+        float viewH = (io.DisplaySize.y - menuBarH) * 0.5f;
+        ImGui::SetNextWindowPos(ImVec2(0, menuBarH), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(viewW, viewH), ImGuiCond_Always);
         ImGui::Begin(
             "Image View",
@@ -174,6 +178,141 @@ void UI::drawImageView(AppState& state)
     ImGui::TextColored(ImVec4(1, 1, 0, 0.8f), "%.0f%%  [wheel: zoom | drag: pan | dbl-click: reset]", zoom2D * fitScale * 100.f);
 }
 
+// ── Menu bar ─────────────────────────────────────────────────────────────────
+// File actions moved here from the side panel's Browse buttons, matching the
+// File-menu convention used by the rest of HDMapping's apps (e.g.
+// mandeye_single_session_viewer). The side panel keeps its path textboxes and
+// Load/Add/Save buttons for the manual-path-entry workflow.
+// ── File actions ─────────────────────────────────────────────────────────────
+// Factored out of panelMenuBar so the File menu items and their keyboard
+// shortcuts (handleShortcuts) call the exact same code, matching the
+// openSession()-style convention used by mandeye_single_session_viewer etc.
+void UI::actionOpenImage(AppState& state)
+{
+    std::string path = mandeye::fd::OpenFileDialogOneFile("Select camera image", mandeye::fd::ImageFilter);
+    if (!path.empty())
+    {
+        setBuf(imagePathBuf, sizeof(imagePathBuf), path);
+        state.loadImage(imagePathBuf);
+    }
+}
+
+void UI::actionOpenPointCloud(AppState& state)
+{
+    std::string path = mandeye::fd::OpenFileDialogOneFile("Select point cloud", mandeye::fd::LazFilter);
+    if (!path.empty())
+    {
+        setBuf(cloudPathBuf, sizeof(cloudPathBuf), path);
+        state.loadCloud(cloudPathBuf);
+    }
+}
+
+void UI::actionAddPointCloud(AppState& state)
+{
+    std::string path = mandeye::fd::OpenFileDialogOneFile("Select point cloud", mandeye::fd::LazFilter);
+    if (!path.empty())
+    {
+        setBuf(cloudPathBuf, sizeof(cloudPathBuf), path);
+        state.addCloud(cloudPathBuf);
+    }
+}
+
+void UI::actionOpenIntrinsics(AppState& state)
+{
+    std::string path = mandeye::fd::OpenFileDialogOneFile("Select intrinsics file", mandeye::fd::IntrinsicsFilter);
+    if (!path.empty())
+    {
+        setBuf(intrPathBuf, sizeof(intrPathBuf), path);
+        state.loadIntrinsics(intrPathBuf);
+    }
+}
+
+void UI::actionOpenCalibration(AppState& state)
+{
+    std::string path = mandeye::fd::OpenFileDialogOneFile("Select calibration file", mandeye::fd::json_filter);
+    if (!path.empty())
+    {
+        setBuf(savePath, sizeof(savePath), path);
+        state.loadCalibration(savePath);
+    }
+}
+
+void UI::actionSaveCalibration(AppState& state)
+{
+    std::string path = mandeye::fd::SaveFileDialog("Save calibration file", mandeye::fd::json_filter, ".json", "calibration.json");
+    if (!path.empty())
+    {
+        setBuf(savePath, sizeof(savePath), path);
+        state.saveCalibration(savePath);
+    }
+}
+
+// ── Keyboard shortcuts ───────────────────────────────────────────────────────
+// Ctrl-combos follow the io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_X, false)
+// + io.AddKeyEvent(...) reset convention used by mandeye_single_session_viewer
+// and multi_view_tls_registration_gui.cpp. Guarded by !WantCaptureKeyboard so
+// they don't fire while a path textbox has focus.
+void UI::handleShortcuts(AppState& state)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureKeyboard)
+        return;
+
+    auto ctrlPressed = [&io](ImGuiKey key)
+    {
+        bool pressed = io.KeyCtrl && ImGui::IsKeyPressed(key, false);
+        if (pressed)
+        {
+            io.AddKeyEvent(key, false);
+            io.AddKeyEvent(ImGuiMod_Ctrl, false);
+        }
+        return pressed;
+    };
+
+    if (ctrlPressed(ImGuiKey_I))
+        actionOpenImage(state);
+    if (io.KeyShift && ctrlPressed(ImGuiKey_O))
+        actionAddPointCloud(state);
+    else if (ctrlPressed(ImGuiKey_O))
+        actionOpenPointCloud(state);
+    if (ctrlPressed(ImGuiKey_K))
+        actionOpenIntrinsics(state);
+    if (ctrlPressed(ImGuiKey_L))
+        actionOpenCalibration(state);
+    if (ctrlPressed(ImGuiKey_S))
+        actionSaveCalibration(state);
+
+    if (ImGui::IsKeyPressed(ImGuiKey_C, false))
+        state.showCompassRuler = !state.showCompassRuler;
+}
+
+void UI::panelMenuBar(AppState& state)
+{
+    if (!ImGui::BeginMainMenuBar())
+        return;
+
+    if (ImGui::BeginMenu("File"))
+    {
+        if (ImGui::MenuItem("Open Image...", "Ctrl+I"))
+            actionOpenImage(state);
+        if (ImGui::MenuItem("Open Point Cloud...", "Ctrl+O"))
+            actionOpenPointCloud(state);
+        if (ImGui::MenuItem("Add Point Cloud...", "Ctrl+Shift+O"))
+            actionAddPointCloud(state);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Open Intrinsics...", "Ctrl+K"))
+            actionOpenIntrinsics(state);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Open Calibration...", "Ctrl+L"))
+            actionOpenCalibration(state);
+        if (ImGui::MenuItem("Save Calibration...", "Ctrl+S"))
+            actionSaveCalibration(state);
+        ImGui::EndMenu();
+    }
+
+    ImGui::EndMainMenuBar();
+}
+
 // ── Files ────────────────────────────────────────────────────────────────────
 void UI::panelFiles(AppState& state)
 {
@@ -181,16 +320,12 @@ void UI::panelFiles(AppState& state)
 
     ImGui::Text("JPG image:");
     ImGui::InputText("##img", imagePathBuf, sizeof(imagePathBuf));
-    if (ImGui::Button("Browse...##img", ImVec2(-1, 0)))
-        setBuf(imagePathBuf, sizeof(imagePathBuf), mandeye::fd::OpenFileDialogOneFile("Select camera image", mandeye::fd::ImageFilter));
     if (ImGui::Button("Load Image##btn", ImVec2(-1, 0)))
         state.loadImage(imagePathBuf);
 
     ImGui::Spacing();
     ImGui::Text("LAZ/LAS point cloud:");
     ImGui::InputText("##laz", cloudPathBuf, sizeof(cloudPathBuf));
-    if (ImGui::Button("Browse...##laz", ImVec2(-1, 0)))
-        setBuf(cloudPathBuf, sizeof(cloudPathBuf), mandeye::fd::OpenFileDialogOneFile("Select point cloud", mandeye::fd::LazFilter));
     {
         float hw = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         if (ImGui::Button("Load##laz", ImVec2(hw, 0)))
@@ -203,16 +338,12 @@ void UI::panelFiles(AppState& state)
     ImGui::Spacing();
     ImGui::Text("Intrinsics JSON/YAML (optional):");
     ImGui::InputText("##intr", intrPathBuf, sizeof(intrPathBuf));
-    if (ImGui::Button("Browse...##intr", ImVec2(-1, 0)))
-        setBuf(intrPathBuf, sizeof(intrPathBuf), mandeye::fd::OpenFileDialogOneFile("Select intrinsics file", mandeye::fd::IntrinsicsFilter));
     if (ImGui::Button("Load Intrinsics##btn", ImVec2(-1, 0)))
         state.loadIntrinsics(intrPathBuf);
 
     ImGui::Separator();
     ImGui::Text("Calibration JSON:");
     ImGui::InputText("##save", savePath, sizeof(savePath));
-    if (ImGui::Button("Browse...##calib", ImVec2(-1, 0)))
-        setBuf(savePath, sizeof(savePath), mandeye::fd::OpenFileDialogOneFile("Select calibration file", mandeye::fd::json_filter));
     float hw = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     if (ImGui::Button("Load##calib", ImVec2(hw, 0)))
         state.loadCalibration(savePath);
@@ -312,6 +443,8 @@ void UI::panelVisualization(AppState& state)
     const char* modes[] = { "Jet (depth)", "Jet (intensity)", "Jet (height)", "Camera RGB" };
     ImGui::Combo("Color mode", &vp.colorMode, modes, 4);
     ImGui::PopItemWidth();
+
+    ImGui::Checkbox("Show compass/ruler (C)", &state.showCompassRuler);
 }
 
 // ── Status bar ────────────────────────────────────────────────────────────────

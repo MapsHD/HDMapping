@@ -1,7 +1,10 @@
 #include "App.h"
 #include "imgui.h"
+#include "raymath.h"
 #include "rlImGui.h"
 #include <HDMapping/Version.hpp>
+#include <RaylibWidgets/CompassRuler.h>
+#include <RaylibWidgets/WindowFit.h>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
@@ -427,59 +430,13 @@ void AppState::saveCalibration(const char* path)
     printf("Calibration saved to %s\n", path);
 }
 
-// Shrinks/repositions the just-created window so it fits within the current
-// monitor's usable area. Without this, a fixed 1400x900 window can be taller
-// than the screen once the OS menu bar + title bar are accounted for (e.g. a
-// 956pt-tall MacBook display leaves ~0 spare px at H=900), silently pushing
-// the top of the window (and the first Files panel controls) off-screen
-// behind the menu bar instead of erroring or scrolling.
-static void fitWindowToScreen()
-{
-    int monitor = GetCurrentMonitor();
-    // GetMonitorWidth/Height return the monitor's native PIXEL resolution
-    // (GLFW's glfwGetVideoMode), while GetScreenWidth/Height, SetWindowSize
-    // and SetWindowPosition all operate in logical points -- on a 2x Retina
-    // display that's a 2x unit mismatch. Divide by the DPI scale to bring
-    // the monitor size into the same points space everything else uses;
-    // without this, SetWindowPosition computes an X centered on a monitor
-    // twice too wide, pushing most of the window off the right edge of the
-    // actual (points-sized) screen.
-    Vector2 dpi = GetWindowScaleDPI();
-    if (dpi.x <= 0.f)
-        dpi.x = 1.f;
-    if (dpi.y <= 0.f)
-        dpi.y = 1.f;
-    int monW = (int)(GetMonitorWidth(monitor) / dpi.x);
-    int monH = (int)(GetMonitorHeight(monitor) / dpi.y);
-    if (monW <= 0 || monH <= 0)
-        return; // monitor info unavailable, leave as-is
-
-    const int marginW = 40; // side breathing room
-    const int marginH = 100; // OS menu bar + window title bar headroom
-
-    int w = std::min(GetScreenWidth(), monW - marginW);
-    int h = std::min(GetScreenHeight(), monH - marginH);
-    if (w != GetScreenWidth() || h != GetScreenHeight())
-        SetWindowSize(w, h);
-
-    SetWindowPosition(std::max(0, (monW - w) / 2), 30);
-
-    // SetWindowSize/SetWindowPosition only update GLFW's window state; raylib's
-    // cached mouse/window geometry (what rlImGui reads into io.MousePos every
-    // frame) isn't refreshed until the next PollInputEvents(), which otherwise
-    // wouldn't happen until the first EndDrawing() -- after rlImGuiSetup() has
-    // already run. Without this, every click lands offset from the cursor by
-    // however far this function just moved/resized the window.
-    PollInputEvents();
-}
-
 // ── App::run ──────────────────────────────────────────────────────────────────
 void App::run()
 {
     const int W = 1400, H = 900;
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(W, H, ("LiDAR-Camera Calibration " HDMAPPING_VERSION_STRING));
-    fitWindowToScreen();
+    raylib_widgets::fitWindowToScreen();
     // The 340px-wide side panel is fixed-width; below this the 3D/image
     // views and the panel start overlapping instead of scrolling.
     SetWindowMinSize(900, 500);
@@ -522,10 +479,11 @@ void App::update()
 // ── App::draw ─────────────────────────────────────────────────────────────────
 void App::draw()
 {
+    float menuBarH = ImGui::GetFrameHeight();
     float panelW = 340.f;
     float viewW = (float)GetScreenWidth() - panelW;
-    float viewH = (float)GetScreenHeight();
-    float view3DY = viewH * 0.5f; // 3D starts at middle
+    float viewH = (float)GetScreenHeight() - menuBarH;
+    float view3DY = menuBarH + viewH * 0.5f; // 3D starts at middle, below the menu bar
 
     // ── Image + projection overlay (GPU, into render texture)
     if (state.imageLoaded)
@@ -538,7 +496,7 @@ void App::draw()
 
     // Clipping for 3D region (bottom-left)
     // Note: raylib scissor is in screen coords (y-down)
-    BeginScissorMode(0, (int)view3DY, (int)viewW, (int)(viewH - view3DY));
+    BeginScissorMode(0, (int)view3DY, (int)viewW, (int)(viewH * 0.5f));
 
     Camera3D cam3d = state.orbit.toRaylib();
     BeginMode3D(cam3d);
@@ -561,6 +519,14 @@ void App::draw()
 
     EndMode3D();
     EndScissorMode();
+
+    if (state.showCompassRuler)
+    {
+        Vector3 fwd = Vector3Normalize(Vector3Subtract(cam3d.target, cam3d.position));
+        Vector3 right = Vector3Normalize(Vector3CrossProduct(fwd, cam3d.up));
+        Vector3 up = Vector3CrossProduct(right, fwd);
+        raylib_widgets::drawCompassRuler(right, up, state.orbit.distance, LIGHTGRAY);
+    }
 
     // ── 3D label
     DrawText("3D View  [LMB: orbit | RMB: pan | Scroll: zoom]", 8, (int)view3DY + 4, 14, LIGHTGRAY);

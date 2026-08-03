@@ -24,9 +24,20 @@ private:
     int   viewImgW = 0, viewImgH = 0;
 
     void drawImageView(AppState& state);
+    void panelMenuBar(AppState& state);
     void panelFiles(AppState& state);
     void panelIntrinsics(AppState& state);
     void panelExtrinsics(AppState& state);
     void panelVisualization(AppState& state);
     void panelStatus(const AppState& state);
+
+    // File actions -- shared by the File menu items and their keyboard
+    // shortcuts (handleShortcuts).
+    void actionOpenImage(AppState& state);
+    void actionOpenPointCloud(AppState& state);
+    void actionAddPointCloud(AppState& state);
+    void actionOpenIntrinsics(AppState& state);
+    void actionOpenCalibration(AppState& state);
+    void actionSaveCalibration(AppState& state);
+    void handleShortcuts(AppState& state);
 };

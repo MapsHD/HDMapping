@@ -21,6 +21,7 @@ target_compile_definitions(camera_lidar_intrinsics_calib PRIVATE WITH_GUI=1)
 target_link_libraries(camera_lidar_intrinsics_calib PRIVATE
     calib_core
     core_pfd
+    raylib_widgets
     raylib
     imgui_raylib
     rlimgui

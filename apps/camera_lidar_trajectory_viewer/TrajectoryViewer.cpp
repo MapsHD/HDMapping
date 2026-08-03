@@ -9,6 +9,9 @@
 #include <CalibCore/CliArgs.h>
 #include <Core/pfd_wrapper.hpp>
 #include <HDMapping/Version.hpp>
+#include <RaylibWidgets/CompassRuler.h>
+#include <RaylibWidgets/ShortcutsTable.h>
+#include <RaylibWidgets/WindowFit.h>
 #include <CalibCore/PointCloud.h>
 #include <CalibCore/Trajectory.h>
 #include <algorithm>
@@ -34,6 +37,25 @@
 using namespace calib;
 namespace fs = std::filesystem;
 
+// Shortcuts help table (Help menu). Only lists this app's actual bindings --
+// no A-Z scaffold like multi_view_tls_registration_step_2's, since
+// ShowShortcutsTable() just renders whatever it's given.
+static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
+    { "Normal keys", "C", "Toggle compass/ruler" },
+    { "", "P", "Toggle show path" },
+    { "", "V", "Toggle show frustums" },
+    { "", "Ctrl (tap)", "Toggle Intensity <-> RGB point color" },
+    { "", "Ctrl+O", "Select LIO result directory" },
+    { "", "Ctrl+Shift+O", "Select CAMERA_0 directory" },
+    { "", "Ctrl+Shift+C", "Open calibration" },
+    { "", "Ctrl+S", "Export colored point cloud" },
+    { "Special keys", "Left arrow", "Previous image (image preview)" },
+    { "", "Right arrow", "Next image (image preview)" },
+    { "Mouse related", "Left click + drag", "Orbit camera" },
+    { "", "Right click + drag", "Pan camera" },
+    { "", "Scroll", "Zoom camera" },
+};
+
 // Copies `path` into `buf` (truncating to fit), for wiring a native-dialog
 // result back into the same fixed-size char[] the matching text field edits.
 static void setBuf(char* buf, size_t bufSize, const std::string& path)
@@ -44,51 +66,6 @@ static void setBuf(char* buf, size_t bufSize, const std::string& path)
     buf[bufSize - 1] = '\0';
 }
 
-// Shrinks/repositions the just-created window so it fits within the current
-// monitor's usable area. Without this, a fixed 1400x900 window can be taller
-// than the screen once the OS menu bar + title bar are accounted for (e.g. a
-// 956pt-tall MacBook display leaves ~0 spare px at H=900), silently pushing
-// the top of the window (and the first Session panel controls) off-screen
-// behind the menu bar instead of erroring or scrolling.
-static void fitWindowToScreen()
-{
-    int monitor = GetCurrentMonitor();
-    // GetMonitorWidth/Height return the monitor's native PIXEL resolution
-    // (GLFW's glfwGetVideoMode), while GetScreenWidth/Height, SetWindowSize
-    // and SetWindowPosition all operate in logical points -- on a 2x Retina
-    // display that's a 2x unit mismatch. Divide by the DPI scale to bring
-    // the monitor size into the same points space everything else uses;
-    // without this, SetWindowPosition computes an X centered on a monitor
-    // twice too wide, pushing most of the window off the right edge of the
-    // actual (points-sized) screen.
-    Vector2 dpi = GetWindowScaleDPI();
-    if (dpi.x <= 0.f)
-        dpi.x = 1.f;
-    if (dpi.y <= 0.f)
-        dpi.y = 1.f;
-    int monW = (int)(GetMonitorWidth(monitor) / dpi.x);
-    int monH = (int)(GetMonitorHeight(monitor) / dpi.y);
-    if (monW <= 0 || monH <= 0)
-        return; // monitor info unavailable, leave as-is
-
-    const int marginW = 40; // side breathing room
-    const int marginH = 100; // OS menu bar + window title bar headroom
-
-    int w = std::min(GetScreenWidth(), monW - marginW);
-    int h = std::min(GetScreenHeight(), monH - marginH);
-    if (w != GetScreenWidth() || h != GetScreenHeight())
-        SetWindowSize(w, h);
-
-    SetWindowPosition(std::max(0, (monW - w) / 2), 30);
-
-    // SetWindowSize/SetWindowPosition only update GLFW's window state; raylib's
-    // cached mouse/window geometry (what rlImGui reads into io.MousePos every
-    // frame) isn't refreshed until the next PollInputEvents(), which otherwise
-    // wouldn't happen until the first EndDrawing() -- after rlImGuiSetup() has
-    // already run. Without this, every click lands offset from the cursor by
-    // however far this function just moved/resized the window.
-    PollInputEvents();
-}
 
 Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& trajectory, double query_time)
 {
@@ -350,6 +327,7 @@ struct Orbit
     }
 };
 
+
 struct ColorPt
 {
     float x, y, z;
@@ -382,6 +360,8 @@ struct State
     // controls
     bool showPath = true;
     bool showFrustums = true;
+    bool showCompassRuler = true;
+    bool showHelp = false;
     bool isolateCamera = false; // render only points colored by the selected (preview) image
     float frustumScale = 0.5f;
     float pointSize = 2.f;
@@ -1087,6 +1067,51 @@ static void exportLAZ(State& s)
     s.status = "Exported " + std::to_string(s.exportCloud.size()) + " pts → " + s.exportBuf;
 }
 
+// ── File actions ─────────────────────────────────────────────────────────────
+// Factored out so the File menu items and their keyboard shortcuts (in the
+// main loop below) call the exact same code, matching the openSession()-style
+// convention used by mandeye_single_session_viewer/multi_view_tls_registration.
+static void actionSelectLioResultDir(State& s)
+{
+    setBuf(s.sessionBuf, sizeof(s.sessionBuf), mandeye::fd::SelectFolder("Select LIO result directory"));
+}
+
+static void actionSelectCamera0Dir(State& s)
+{
+    setBuf(s.cameraBuf, sizeof(s.cameraBuf), mandeye::fd::SelectFolder("Select CAMERA_0 directory"));
+}
+
+static void actionOpenCalibration(State& s)
+{
+    std::string path = mandeye::fd::OpenFileDialogOneFile("Select calibration file", mandeye::fd::json_filter);
+    if (!path.empty())
+    {
+        setBuf(s.calibBuf, sizeof(s.calibBuf), path);
+        loadCalib(s);
+    }
+}
+
+static void actionExportColoredPointCloud(State& s)
+{
+    std::string defaultName = fs::path(s.exportBuf).filename().string();
+    std::string path = mandeye::fd::SaveFileDialog("Export colored point cloud", mandeye::fd::LazFilter, ".laz", defaultName);
+    if (!path.empty())
+    {
+        setBuf(s.exportBuf, sizeof(s.exportBuf), path);
+        exportLAZ(s);
+    }
+}
+
+static void actionSelectRosOutputDir(State& s)
+{
+    setBuf(s.rosOutBuf, sizeof(s.rosOutBuf), mandeye::fd::SelectFolder("Select ROS 2 bag output directory"));
+}
+
+static void actionSelectColmapOutputDir(State& s)
+{
+    setBuf(s.colmapBuf, sizeof(s.colmapBuf), mandeye::fd::SelectFolder("Select COLMAP output directory"));
+}
+
 // Export a COLMAP sparse text model (cameras/images/points3D) from the current
 // state. Poses are world->camera; the colored cloud becomes points3D.
 static void exportColmap(State& s)
@@ -1413,7 +1438,7 @@ int main(int argc, char* argv[])
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(1400, 900, ("Trajectory Viewer " HDMAPPING_VERSION_STRING));
-    fitWindowToScreen();
+    raylib_widgets::fitWindowToScreen();
     // panelW below is user-resizable but the 3D view still needs room.
     SetWindowMinSize(900, 500);
     SetTargetFPS(60);
@@ -1494,6 +1519,30 @@ int main(int argc, char* argv[])
             if (IsKeyPressed(KEY_LEFT_CONTROL) || IsKeyPressed(KEY_RIGHT_CONTROL))
                 s.colorMode = (s.colorMode == 1) ? 0 : 1;
 
+            // Chord choices avoid colliding in MEANING with
+            // multi_view_tls_registration_step_2's shortcuts (Ctrl+L there
+            // is manual loop closure, Ctrl+E is the lio segments editor;
+            // bare F there is the "camera Front" preset). Ctrl+O and bare
+            // C/P are kept aligned with step2 (Ctrl+O = open/load session,
+            // C = compass/ruler).
+            bool ctrlDown = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+            bool shiftDown = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+            if (ctrlDown && shiftDown && IsKeyPressed(KEY_O))
+                actionSelectCamera0Dir(s);
+            else if (ctrlDown && IsKeyPressed(KEY_O))
+                actionSelectLioResultDir(s);
+            if (ctrlDown && shiftDown && IsKeyPressed(KEY_C))
+                actionOpenCalibration(s);
+            if (ctrlDown && IsKeyPressed(KEY_S))
+                actionExportColoredPointCloud(s);
+
+            if (!ctrlDown && IsKeyPressed(KEY_P))
+                s.showPath = !s.showPath;
+            if (!ctrlDown && IsKeyPressed(KEY_V))
+                s.showFrustums = !s.showFrustums;
+            if (!ctrlDown && IsKeyPressed(KEY_C))
+                s.showCompassRuler = !s.showCompassRuler;
+
             if (IsKeyPressed(KEY_LEFT))
             {
                 s.imgViewIdx = std::max(s.imgViewIdx - 1, 0);
@@ -1519,6 +1568,14 @@ int main(int argc, char* argv[])
         DrawLine3D({ 0, 0, 0 }, { 0, 0, -2 }, BLUE);
         EndMode3D();
 
+        if (s.showCompassRuler)
+            {
+                Vector3 fwd = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
+                Vector3 right = Vector3Normalize(Vector3CrossProduct(fwd, cam.up));
+                Vector3 up = Vector3CrossProduct(right, fwd);
+                raylib_widgets::drawCompassRuler(right, up, s.orbit.dist, LIGHTGRAY);
+            }
+
         // ── upload image viewer texture if worker produced one ────────────────
         {
             cv::Mat toUpload;
@@ -1542,9 +1599,111 @@ int main(int argc, char* argv[])
 
         // ── ImGui panel ───────────────────────────────────────────────────────
         rlImGuiBegin();
+
+        if (ImGui::BeginMainMenuBar())
+        {
+            if (ImGui::BeginMenu("File"))
+            {
+                if (ImGui::MenuItem("Select LIO Result Directory...", "Ctrl+O"))
+                    actionSelectLioResultDir(s);
+                if (ImGui::MenuItem("Select CAMERA_0 Directory...", "Ctrl+Shift+O"))
+                    actionSelectCamera0Dir(s);
+                ImGui::Separator();
+                if (ImGui::MenuItem("Open Calibration...", "Ctrl+Shift+C"))
+                    actionOpenCalibration(s);
+                ImGui::Separator();
+                if (ImGui::MenuItem("Export Colored Point Cloud...", "Ctrl+S"))
+                    actionExportColoredPointCloud(s);
+                ImGui::Separator();
+                if (ImGui::MenuItem("Select ROS 2 Bag Output Directory..."))
+                    actionSelectRosOutputDir(s);
+                ImGui::Separator();
+                if (ImGui::MenuItem("Select COLMAP Output Directory..."))
+                    actionSelectColmapOutputDir(s);
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::BeginMenu("View"))
+            {
+                ImGui::MenuItem("Show path", "P", &s.showPath);
+                ImGui::MenuItem("Show frustums", "V", &s.showFrustums);
+                ImGui::MenuItem("Show compass/ruler", "C", &s.showCompassRuler);
+                ImGui::Separator();
+                ImGui::SetNextItemWidth(140.f);
+                ImGui::SliderFloat("Frustum scale", &s.frustumScale, 0.05f, 5.f, "%.2f");
+                ImGui::SetNextItemWidth(140.f);
+                ImGui::SliderFloat("Point size", &s.pointSize, 1.f, 20.f, "%.1f");
+                ImGui::SetNextItemWidth(140.f);
+                ImGui::SliderInt("Draw decimation", &s.drawDecim, 1, 64);
+                if (!s.imagesFilenamesInTime.empty())
+                {
+                    ImGui::Separator();
+                    ImGui::TextDisabled("Point color:");
+                    if (ImGui::MenuItem("Intensity", nullptr, s.colorMode == 0))
+                        s.colorMode = 0;
+                    if (ImGui::MenuItem("RGB (image)", "Ctrl", s.colorMode == 1))
+                        s.colorMode = 1;
+                    if (ImGui::MenuItem("Camera ID", nullptr, s.colorMode == 2))
+                        s.colorMode = 2;
+                    if (ImGui::MenuItem("In ROI", nullptr, s.colorMode == 3))
+                        s.colorMode = 3;
+                }
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::BeginMenu("Help"))
+            {
+                ImGui::MenuItem("Shortcuts...", nullptr, &s.showHelp);
+                ImGui::EndMenu();
+            }
+
+            ImGui::SameLine();
+            ImGui::Dummy(ImVec2(20, 0));
+            ImGui::SameLine();
+
+            constexpr float ImGuiNumberWidth = 120.0f;
+            ImGui::SetNextItemWidth(ImGuiNumberWidth);
+
+            ImGui::InputInt("Points render downsampling", &s.drawDecim, 2, 10);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("increase for better performance, decrease for rendering more points");
+            ImGui::SameLine();
+
+            // fps_avg = fps_avg * 0.7f + ImGui::GetIO().Framerate * 0.3f;  // exponential smoothing
+
+            // double now = ImGui::GetTime();  // ImGui’s built-in timer (in seconds)
+
+            // ImGui::Checkbox("dynamic", &dynamicSubsampling);
+            // if (ImGui::IsItemHovered())
+            //    ImGui::SetTooltip("automatically control subsampling vs FPS: increase bellow 10, decrease above 60");
+            // if (dynamicSubsampling && (fps_avg < 15) && (now - lastAdjustTime > cooldownSeconds))
+            //{
+            //    app_state.viewer_decimate_point_cloud += 1;
+            //    lastAdjustTime = now;
+            //}
+            // ImGui::SameLine();
+            // ImGui::Text("(avg %.1f)", fps_avg);
+
+            if (s.drawDecim < 1)
+                s.drawDecim = 1;
+
+            ImGui::SameLine();
+            // GetFPS()/point-cloud draw-call/vertex count via raylib/ScanRenderer,
+            // rather than ImGui's own Framerate tracker -- raylib doesn't
+            // expose a general "draw calls" counter (rlgl's own internal one
+            // only tracks its immediate-mode batch renderer, not custom
+            // glDrawArrays calls like ScanRenderer's), so these are scan_renderer's
+            // own per-frame counts of the calls/points it issued in draw().
+            ImGui::Text(
+                "(%d FPS)", GetFPS());
+
+            ImGui::EndMainMenuBar();
+        }
+
         ImGuiIO& io = ImGui::GetIO();
-        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - panelW, 0), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(panelW, io.DisplaySize.y), ImGuiCond_Always);
+        float menuBarH = ImGui::GetFrameHeight();
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - panelW, menuBarH), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(panelW, io.DisplaySize.y - menuBarH), ImGuiCond_Always);
         ImGui::Begin("##panel", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
         panelW = ImGui::GetWindowWidth();
 
@@ -1556,12 +1715,8 @@ int main(int argc, char* argv[])
             ImGui::PushItemWidth(-1);
             ImGui::Text("LIO result directory:");
             ImGui::InputText("##sess", s.sessionBuf, sizeof(s.sessionBuf));
-            if (ImGui::Button("Browse...##sess", ImVec2(-1, 0)))
-                setBuf(s.sessionBuf, sizeof(s.sessionBuf), mandeye::fd::SelectFolder("Select LIO result directory"));
             ImGui::Text("CAMERA_0 directory (empty = auto):");
             ImGui::InputText("##cam", s.cameraBuf, sizeof(s.cameraBuf));
-            if (ImGui::Button("Browse...##cam", ImVec2(-1, 0)))
-                setBuf(s.cameraBuf, sizeof(s.cameraBuf), mandeye::fd::SelectFolder("Select CAMERA_0 directory"));
             if (ImGui::Button("Load session", ImVec2(-1, 0)))
                 loadSession(s);
             if (!s.imagesFilenamesInTime.empty())
@@ -1609,11 +1764,6 @@ int main(int argc, char* argv[])
             ImGui::PushItemWidth(-1);
             ImGui::Text("Calibration JSON:");
             ImGui::InputText("##cal", s.calibBuf, sizeof(s.calibBuf));
-            if (ImGui::Button("Browse...##cal", ImVec2(-1, 0)))
-                setBuf(
-                    s.calibBuf,
-                    sizeof(s.calibBuf),
-                    mandeye::fd::OpenFileDialogOneFile("Select calibration file", mandeye::fd::json_filter));
             if (ImGui::Button("Load calibration", ImVec2(-1, 0)))
                 loadCalib(s);
             if (s.calibLoaded)
@@ -1656,33 +1806,6 @@ int main(int argc, char* argv[])
             ImGui::PopItemWidth();
         }
 
-        if (ImGui::CollapsingHeader("Visualization", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            ImGui::Checkbox("Show path", &s.showPath);
-            ImGui::Checkbox("Show frustums", &s.showFrustums);
-            ImGui::SliderFloat("Frustum scale", &s.frustumScale, 0.05f, 5.f, "%.2f");
-            ImGui::SliderFloat("Point size", &s.pointSize, 1.f, 20.f, "%.1f");
-            ImGui::SliderInt("Draw decimation", &s.drawDecim, 1, 64);
-            if (!s.imagesFilenamesInTime.empty())
-            {
-                ImGui::Separator();
-                ImGui::Text("Point color:");
-                ImGui::RadioButton("Intensity", &s.colorMode, 0);
-                ImGui::SameLine();
-                ImGui::RadioButton("RGB (image)", &s.colorMode, 1);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Ctrl toggles intensity (jet) <-> RGB");
-                ImGui::SameLine();
-                ImGui::RadioButton("Camera ID", &s.colorMode, 2);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Colors each point by the image that colored it");
-                ImGui::SameLine();
-                ImGui::RadioButton("In ROI", &s.colorMode, 3);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Green = projects inside the ROI, red = outside.\nPoints projecting into no image are hidden.");
-            }
-        }
-
         if (ImGui::CollapsingHeader("Image Preview", ImGuiTreeNodeFlags_DefaultOpen))
         {
             if (s.imageTsNs.empty())
@@ -1718,14 +1841,6 @@ int main(int argc, char* argv[])
             ImGui::PushItemWidth(-1);
             ImGui::Text("Output file (.laz / .las):");
             ImGui::InputText("##out", s.exportBuf, sizeof(s.exportBuf));
-            if (ImGui::Button("Browse...##out", ImVec2(-1, 0)))
-            {
-                std::string defaultName = fs::path(s.exportBuf).filename().string();
-                setBuf(
-                    s.exportBuf,
-                    sizeof(s.exportBuf),
-                    mandeye::fd::SaveFileDialog("Export colored point cloud", mandeye::fd::LazFilter, ".laz", defaultName));
-            }
             if (ImGui::Button("Export colored LAZ", ImVec2(-1, 0)))
                 exportLAZ(s);
             if (!s.exportCloud.empty())
@@ -1739,8 +1854,6 @@ int main(int argc, char* argv[])
             ImGui::PushItemWidth(-1);
             ImGui::Text("Output bag directory:");
             ImGui::InputText("##rosout", s.rosOutBuf, sizeof(s.rosOutBuf));
-            if (ImGui::Button("Browse...##rosout", ImVec2(-1, 0)))
-                setBuf(s.rosOutBuf, sizeof(s.rosOutBuf), mandeye::fd::SelectFolder("Select ROS 2 bag output directory"));
             // Scoped narrower width -- see the "Load decimation" comment above.
             ImGui::PopItemWidth();
             ImGui::PushItemWidth(-140.f);
@@ -1800,8 +1913,6 @@ int main(int argc, char* argv[])
             ImGui::PushItemWidth(-1);
             ImGui::Text("Output project dir:");
             ImGui::InputText("##colmapout", s.colmapBuf, sizeof(s.colmapBuf));
-            if (ImGui::Button("Browse...##colmapout", ImVec2(-1, 0)))
-                setBuf(s.colmapBuf, sizeof(s.colmapBuf), mandeye::fd::SelectFolder("Select COLMAP output directory"));
             ImGui::Checkbox("Copy images into project", &s.colmapCopyImages);
             // Scoped narrower width -- see the "Load decimation" comment above.
             ImGui::PopItemWidth();
@@ -1830,6 +1941,15 @@ int main(int argc, char* argv[])
         ImGui::TextDisabled("LMB: orbit  RMB: pan  Scroll: zoom");
 
         ImGui::End();
+
+        // ── shortcuts help window ───────────────────────────────────────────────
+        if (s.showHelp)
+        {
+            ImGui::SetNextWindowSize(ImVec2(420, 320), ImGuiCond_FirstUseEver);
+            if (ImGui::Begin("Shortcuts", &s.showHelp))
+                raylib_widgets::ShowShortcutsTable(appShortcuts);
+            ImGui::End();
+        }
 
         // ── floating image viewer window ──────────────────────────────────────
         if (s.imgViewTexValid)

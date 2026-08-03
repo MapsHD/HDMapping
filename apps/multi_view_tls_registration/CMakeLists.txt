@@ -68,6 +68,7 @@ target_include_directories(
           # ordered relative to libcore.a on the final link line -- see the
           # comment there for why.
           core_raylib
+          raylib_widgets
           imgui_raylib
           rlimgui
           imguizmo_raylib

@@ -18,7 +18,7 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 
 ![workflow](images/workflow.png)
 
-# We start working on automatic loop closure
+# Automatic loop closure
 
 We provide easy tool that will help You annotating ground truth SLAM loop closures. You mark pair of point clouds that forms edge, then use ICP like pair wise registration to generatie ground truth for AI training.
 Annotated ground truth edges for LiDAR pose graph slam are available at [ground truth edges](https://zenodo.org/records/18527593).
@@ -26,6 +26,10 @@ Movie how to use it is available at [prepare training dataset movie](https://you
 
 [![GROUND-TRUTH-EDGE-ANNOTATION-TOOL](https://img.youtube.com/vi/tJdNNfBubeM/default.jpg)](https://youtu.be/tJdNNfBubeM)
 [![MANUAL-LOOP_CLOSURE-TOOL](https://img.youtube.com/vi/6SNvrZ2ROKg/default.jpg)](https://youtu.be/6SNvrZ2ROKg)
+
+## loop closure benchmark [https://github.com/MapsHD/benchmark-HDMapping-AILoopClosure-Orchestration](https://github.com/MapsHD/benchmark-HDMapping-AILoopClosure-Orchestration)
+- [1] https://github.com/MapsHD/benchmark-HDMapping-AILoopClosure-LCR-Net (in progress)
+- [2] https://github.com/MapsHD/benchmark-HDMapping-AILoopClosure-TransLO (in progress)
 
 # DOWNLOAD SOFTWARE USING THIS LINK -> [v0.102](https://github.com/MapsHD/HDMapping/releases/tag/v0.102)
 
@@ -246,7 +250,8 @@ Algorithms with unsolved issues
 Not supported algorithm
 - https://ieeexplore.ieee.org/document/10900461, https://github.com/kafeiyin00/UA-MPC (2025, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/UA-MPC.bib), we do not support rotary LiDAR)
 - https://github.com/YangSiri/OR-LIM (2022, we do not support rotary LiDAR)
-
+- https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022) (extrinsic calibration)
+  
 Required PCD format:
 - https://github.com/KTH-RPL/dufomap (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes)
 - https://github.com/KTH-RPL/DynamicMap_Benchmark (2023, ITSC, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes) 
@@ -254,10 +259,9 @@ Required PCD format:
 ToDo Build Success:
 - https://github.com/NKU-MobFly-Robotics/R-VoxelMap (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/R-VoxelMap.bib)) - Marcin
 - https://github.com/HViktorTsoi/PV-LIO (2023, no publication) - Marcin
-- https://github.com/MapsHD/benchmark-LiDAR-IMU-Init-to-HDMapping (2022) (extrinsic calibration)
-- https://github.com/SlamCabbage/Optimized-SC-F-LOAM (2022, CVCI, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SC-F-LOAM.bib))
-- https://github.com/wh200720041/floam (2021, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/F-LOAM.bib))
-- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib), with loop closures) 
+- https://github.com/SlamCabbage/Optimized-SC-F-LOAM (2022, CVCI, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SC-F-LOAM.bib)) - Marcin
+- https://github.com/wh200720041/floam (2021, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/F-LOAM.bib)) - Piotr 1
+- https://github.com/MapsHD/benchmark-LIO-SAM-to-HDMapping (2020, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SAM.bib), with loop closures) - Piotr 2
 - https://github.com/herrmy86/Voxel-SLAM-intensity/tree/main
   
 ToDo Build issues:
@@ -307,6 +311,15 @@ ToDo: check if addressed
 - https://github.com/MIT-SPARK/spark-fast-lio
 - https://github.com/HViktorTsoi/PV-LIO
 - https://xiaofan4122.github.io/Elevator_LIO_Page/
+- https://github.com/lovelyyoshino/FAST_LIO2_Noted
+- https://github.com/zlwang7/S-FAST_LIO
+- https://github.com/HesaiTechnology-Spatial-Perception/FAST_LIO_Hesai
+
+ToDo: LIO+ benchmark
+- https://github.com/ethz-asl/COIN-LIO
+- https://github.com/hku-mars/r3live
+- https://github.com/TixiaoShan/LVI-SAM
+- RELEAD: Resilient Localization with Enhanced LiDAR Odometry in Adverse Environments (https://arxiv.org/pdf/2402.18934)
     
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
 - Cosme Hernanz-Gilbert, Carlos Cabo, Álvaro Moreno-Martínez, and Mónica Herrero-Huerta, "Exploring the Potential of the MandEye Handheld LiDAR System for Mediterranean Understorey Characterisation", [[PDF]](https://isprs-archives.copernicus.org/articles/XLIX-B2-2026/413/2026/)

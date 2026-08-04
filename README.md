@@ -134,7 +134,7 @@ More information can be found here:
 
 # Camera-LiDAR calibration tools
 
-Three tools (`apps/camera_lidar_*`) supporting the spherical-camera-to-3D-LiDAR calibration/coloring workflow described in Będkowski et al., "Method for spherical camera to 3D LiDAR calibration and synchronization with example on Insta360 X4 and LiVOX MID 360" (2025, EuroCOW, [[PDF]](https://isprs-archives.copernicus.org/articles/XLVIII-1-W4-2025/13/2025/isprs-archives-XLVIII-1-W4-2025-13-2025.pdf)):
+Three tools (`apps/camera_lidar_*`) supports camera calibration with LIDAR and perofming applying colors to data from session.
 
 - **camera_lidar_intrinsics_calib** -- checkerboard-based camera intrinsic calibration (OpenCV rational distortion model).
 - **camera_lidar_calibration** -- interactive LiDAR-camera extrinsic calibration: aligns a LAZ/LAS point cloud to a camera image with live GPU-shader reprojection feedback.

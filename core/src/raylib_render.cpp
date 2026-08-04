@@ -28,8 +28,8 @@ namespace
 // ============================================================================
 namespace
 {
-    using raylib_render_shaders::kPointVS;
     using raylib_render_shaders::kPointFS;
+    using raylib_render_shaders::kPointVS;
 
     // Bytes per vertex in the uploaded buffer (xyz position + intensity).
     constexpr int kVertexStride = 4 * sizeof(float);

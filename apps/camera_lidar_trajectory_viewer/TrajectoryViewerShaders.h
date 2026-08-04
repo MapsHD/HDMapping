@@ -9,8 +9,8 @@
 
 namespace trajectory_viewer_shaders
 {
-// colorPacked: float bits = 0x00RRGGBB; colorMode: 0=jet depth, 1=RGB, 2=camera id, 3=in ROI
-inline constexpr const char* kVS = R"(
+    // colorPacked: float bits = 0x00RRGGBB; colorMode: 0=jet depth, 1=RGB, 2=camera id, 3=in ROI
+    inline constexpr const char* kVS = R"(
 #version 330
 layout(location = 0) in vec3  pos;
 layout(location = 1) in float colorPacked;
@@ -43,7 +43,7 @@ void main() {
 }
 )";
 
-inline const std::string kFS = std::string(R"(
+    inline const std::string kFS = std::string(R"(
 #version 330
 in float fragIntensity;
 in vec4 vertColor;
@@ -52,7 +52,8 @@ flat in float fragInRoi;
 uniform int colorMode;
 uniform int selectedCamera;   // -1 = show all, else keep only points from this image
 out vec4 finalColor;
-)") + raylib_widgets::kJetColormapGLSL + R"(
+)") + raylib_widgets::kJetColormapGLSL +
+        R"(
 vec3 hsv2rgb(vec3 c) {
     vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
     vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);

@@ -9,10 +9,10 @@
 
 namespace renderer_shaders
 {
-// ── GPU point cloud shaders ──────────────────────────────────────────────────
-// Explicit attribute locations so one VAO works with both programs:
-// location 0 = position (raylib coords), location 1 = intensity.
-inline constexpr const char* kPointVS = R"(
+    // ── GPU point cloud shaders ──────────────────────────────────────────────────
+    // Explicit attribute locations so one VAO works with both programs:
+    // location 0 = position (raylib coords), location 1 = intensity.
+    inline constexpr const char* kPointVS = R"(
 #version 330
 layout(location = 0) in vec3 vertexPosition;
 layout(location = 1) in float vertexIntensity;
@@ -40,7 +40,7 @@ void main() {
 }
 )";
 
-inline const std::string kPointFS = std::string(R"(
+    inline const std::string kPointFS = std::string(R"(
 #version 330
 in vec3 fragPos;
 in float fragIntensity;
@@ -52,7 +52,8 @@ uniform float maxDist;
 uniform float opacity;
 uniform sampler2D imageTex;
 out vec4 finalColor;
-)") + raylib_widgets::kJetColormapGLSL + R"(
+)") + raylib_widgets::kJetColormapGLSL +
+        R"(
 void main() {
     if (colorMode == 3) {
         bool seen = fragCamDepth > 0.0
@@ -74,11 +75,11 @@ void main() {
 }
 )";
 
-// Projects lidar points directly onto the image plane. Position attribute is
-// in raylib coords, converted back to lidar frame here. With w = z_cam the
-// hardware clip rejects points behind the camera; optional rational+tangential
-// distortion handles non-rectified images (pass zeros when rectified).
-inline constexpr const char* kProjVS = R"(
+    // Projects lidar points directly onto the image plane. Position attribute is
+    // in raylib coords, converted back to lidar frame here. With w = z_cam the
+    // hardware clip rejects points behind the camera; optional rational+tangential
+    // distortion handles non-rectified images (pass zeros when rectified).
+    inline constexpr const char* kProjVS = R"(
 #version 330
 layout(location = 0) in vec3 vertexPosition;
 layout(location = 1) in float vertexIntensity;
@@ -116,7 +117,7 @@ void main() {
 }
 )";
 
-inline const std::string kProjFS = std::string(R"(
+    inline const std::string kProjFS = std::string(R"(
 #version 330
 in float fragDepth;
 in float fragIntensity;
@@ -124,7 +125,8 @@ uniform vec2 depthRange;
 uniform float opacity;
 uniform int colorMode;
 out vec4 finalColor;
-)") + raylib_widgets::kJetColormapGLSL + R"(
+)") + raylib_widgets::kJetColormapGLSL +
+        R"(
 void main() {
     if (fragDepth < depthRange.x || fragDepth > depthRange.y) discard;
     float t = (colorMode == 1)

@@ -1,4 +1,5 @@
 #include "RosExport.h"
+#include "TrajectoryViewerShaders.h"
 #include "external/glad.h"
 #include "imgui.h"
 #include "raylib.h"
@@ -7,6 +8,8 @@
 #include "rlgl.h"
 #include <CalibCore/Camera.h>
 #include <CalibCore/CliArgs.h>
+#include <CalibCore/PointCloud.h>
+#include <CalibCore/Trajectory.h>
 #include <Core/pfd_wrapper.hpp>
 #include <HDMapping/PoseInterpolation.h>
 #include <HDMapping/Version.hpp>
@@ -15,9 +18,6 @@
 #include <RaylibWidgets/OrbitCamera.h>
 #include <RaylibWidgets/ShortcutsTable.h>
 #include <RaylibWidgets/WindowFit.h>
-#include <CalibCore/PointCloud.h>
-#include <CalibCore/Trajectory.h>
-#include "TrajectoryViewerShaders.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -72,7 +72,6 @@ static void setBuf(char* buf, size_t bufSize, const std::string& path)
     buf[bufSize - 1] = '\0';
 }
 
-
 // Build a time(seconds) -> T_world_lidar map suitable for getInterpolatedPose().
 static std::map<double, Eigen::Matrix4d> buildTrajMap(const Trajectory& traj)
 {
@@ -93,8 +92,8 @@ static bool interpPose(const std::map<double, Eigen::Matrix4d>& trajMap, int64_t
     return true;
 }
 
-using trajectory_viewer_shaders::kVS;
 using trajectory_viewer_shaders::kFS;
+using trajectory_viewer_shaders::kVS;
 
 struct GpuCloud
 {
@@ -1392,12 +1391,12 @@ int main(int argc, char* argv[])
         EndMode3D();
 
         if (s.showCompassRuler)
-            {
-                Vector3 fwd = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
-                Vector3 right = Vector3Normalize(Vector3CrossProduct(fwd, cam.up));
-                Vector3 up = Vector3CrossProduct(right, fwd);
-                raylib_widgets::drawCompassRuler(right, up, s.orbit.distance, LIGHTGRAY);
-            }
+        {
+            Vector3 fwd = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
+            Vector3 right = Vector3Normalize(Vector3CrossProduct(fwd, cam.up));
+            Vector3 up = Vector3CrossProduct(right, fwd);
+            raylib_widgets::drawCompassRuler(right, up, s.orbit.distance, LIGHTGRAY);
+        }
 
         // ── upload image viewer texture if worker produced one ────────────────
         {
@@ -1519,8 +1518,7 @@ int main(int argc, char* argv[])
             // only tracks its immediate-mode batch renderer, not custom
             // glDrawArrays calls like ScanRenderer's), so these are scan_renderer's
             // own per-frame counts of the calls/points it issued in draw().
-            ImGui::Text(
-                "(%d FPS)", GetFPS());
+            ImGui::Text("(%d FPS)", GetFPS());
 
             ImGui::EndMainMenuBar();
         }

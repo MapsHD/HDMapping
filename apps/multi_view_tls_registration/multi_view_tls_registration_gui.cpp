@@ -3046,7 +3046,11 @@ void display()
     // window, the rest showing just the clear color.
     rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
 
-    ClearBackground(ColorFromNormalized(Vector4{ app_state.bg_color.x * app_state.bg_color.w, app_state.bg_color.y * app_state.bg_color.w, app_state.bg_color.z * app_state.bg_color.w, app_state.bg_color.w }));
+    ClearBackground(ColorFromNormalized(
+        Vector4{ app_state.bg_color.x * app_state.bg_color.w,
+                 app_state.bg_color.y * app_state.bg_color.w,
+                 app_state.bg_color.z * app_state.bg_color.w,
+                 app_state.bg_color.w }));
     rlEnableDepthTest();
 
     rlMatrixMode(RL_PROJECTION);
@@ -3185,9 +3189,12 @@ void display()
     {
         session.control_points.index_picked_point = -1; // reset picked point when pose changes
 
-        app_state.new_rotation_center.x() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().x();
-        app_state.new_rotation_center.y() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().y();
-        app_state.new_rotation_center.z() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().z();
+        app_state.new_rotation_center.x() =
+            session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().x();
+        app_state.new_rotation_center.y() =
+            session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().y();
+        app_state.new_rotation_center.z() =
+            session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().z();
 
         app_state.new_rotate_x = app_state.rotate_x;
         app_state.new_rotate_y = app_state.rotate_y;

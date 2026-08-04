@@ -57,7 +57,7 @@ inline Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4
         assert(query_time > t1);
         assert(query_time < t2);
         ret = Eigen::Matrix4d::Identity();
-        const double res = (query_time - t1) / (t2 - t1); //residual
+        const double res = (query_time - t1) / (t2 - t1); // residual
         const Eigen::Vector3d diff = it_next->second.col(3).head<3>() - it_lower->second.col(3).head<3>();
         ret.col(3).head<3>() = it_lower->second.col(3).head<3>() + diff * res;
         Eigen::Matrix3d r1 = it_lower->second.topLeftCorner(3, 3).matrix();

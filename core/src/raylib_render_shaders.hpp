@@ -8,15 +8,15 @@
 
 namespace raylib_render_shaders
 {
-// vertexIntensity is per-point LAS/LAZ intensity, normalized to [0,1] per
-// scan at upload time (see ScanRenderer::rebuild). vertexPosition is
-// already world-space (rebuild() applies pc.m_pose before uploading), so
-// it doubles as the Elevation/Distance color modes' input with no extra
-// per-vertex data needed. colorMode selects between the flat per-scan
-// pointColor (0, the original app's only mode) and the ScanColorMode
-// gradients (1/2/3), matching the enum's Intensity/Elevation/Distance
-// ordering exactly (see ScanRenderer::draw()'s static_cast below).
-inline constexpr const char* kPointVS = R"(
+    // vertexIntensity is per-point LAS/LAZ intensity, normalized to [0,1] per
+    // scan at upload time (see ScanRenderer::rebuild). vertexPosition is
+    // already world-space (rebuild() applies pc.m_pose before uploading), so
+    // it doubles as the Elevation/Distance color modes' input with no extra
+    // per-vertex data needed. colorMode selects between the flat per-scan
+    // pointColor (0, the original app's only mode) and the ScanColorMode
+    // gradients (1/2/3), matching the enum's Intensity/Elevation/Distance
+    // ordering exactly (see ScanRenderer::draw()'s static_cast below).
+    inline constexpr const char* kPointVS = R"(
 #version 330
 in vec3 vertexPosition;
 in float vertexIntensity;
@@ -33,10 +33,10 @@ void main()
 }
 )";
 
-// jet() is shared (raylib_widgets/Shaders.h) with camera_lidar_calibration's
-// and camera_lidar_trajectory_viewer's point shaders -- was byte-for-byte
-// duplicated here.
-inline const std::string kPointFS = std::string(R"(
+    // jet() is shared (raylib_widgets/Shaders.h) with camera_lidar_calibration's
+    // and camera_lidar_trajectory_viewer's point shaders -- was byte-for-byte
+    // duplicated here.
+    inline const std::string kPointFS = std::string(R"(
 #version 330
 uniform vec4 pointColor;
 uniform int colorMode;
@@ -47,7 +47,8 @@ uniform float distMax;
 in float fragIntensity;
 in vec3 fragWorldPos;
 out vec4 finalColor;
-)") + raylib_widgets::kJetColormapGLSL + R"(
+)") + raylib_widgets::kJetColormapGLSL +
+        R"(
 void main()
 {
     if (colorMode == 1)

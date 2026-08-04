@@ -37,7 +37,6 @@ static void setBuf(char* buf, size_t bufSize, const std::string& path)
     buf[bufSize - 1] = '\0';
 }
 
-
 // ── per-image state ───────────────────────────────────────────────────────────
 struct CalibImage
 {

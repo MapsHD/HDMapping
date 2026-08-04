@@ -63,8 +63,8 @@ void UI::draw(AppState& state)
     // Alt/Cmd = toggle Camera RGB ↔ Intensity (works anywhere in the window).
     // Cmd (Super) alongside Alt for macOS, where Option is awkward to use as
     // a modifier (it composes special characters).
-    if (ImGui::IsKeyPressed(ImGuiKey_LeftAlt) || ImGui::IsKeyPressed(ImGuiKey_RightAlt) ||
-        ImGui::IsKeyPressed(ImGuiKey_LeftSuper) || ImGui::IsKeyPressed(ImGuiKey_RightSuper))
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftAlt) || ImGui::IsKeyPressed(ImGuiKey_RightAlt) || ImGui::IsKeyPressed(ImGuiKey_LeftSuper) ||
+        ImGui::IsKeyPressed(ImGuiKey_RightSuper))
     {
         auto& cm = state.vizParams.colorMode;
         if (cm == 3)

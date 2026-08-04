@@ -1,13 +1,14 @@
 #pragma once
-#include <CalibCore/Camera.h>
 #include "Renderer.h"
+#include <CalibCore/Camera.h>
 #include <CalibCore/PointCloud.h>
-#include <string>
 #include <functional>
+#include <string>
 
 struct AppState;
 
-class UI {
+class UI
+{
 public:
     // Called once per frame inside rlImGuiBegin()/rlImGuiEnd()
     void draw(AppState& state);
@@ -15,13 +16,13 @@ public:
 private:
     char imagePathBuf[512] = {};
     char cloudPathBuf[512] = {};
-    char intrPathBuf[512]  = {};
-    char savePath[512]     = "calibration.json";
+    char intrPathBuf[512] = {};
+    char savePath[512] = "calibration.json";
 
     // 2D image view pan/zoom state
-    float zoom2D = 1.f;          // 1 = fit to window
+    float zoom2D = 1.f; // 1 = fit to window
     float offX = 0.f, offY = 0.f; // image coords of top-left visible pixel
-    int   viewImgW = 0, viewImgH = 0;
+    int viewImgW = 0, viewImgH = 0;
 
     void drawImageView(AppState& state);
     void panelMenuBar(AppState& state);

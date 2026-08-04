@@ -7,18 +7,18 @@
 
 namespace
 {
-Eigen::Matrix4d makePose(double tx, double ty, double tz, double yawRad = 0.0)
-{
-    Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
-    T.topLeftCorner<3, 3>() = Eigen::AngleAxisd(yawRad, Eigen::Vector3d::UnitZ()).toRotationMatrix();
-    T.col(3).head<3>() = Eigen::Vector3d(tx, ty, tz);
-    return T;
-}
+    Eigen::Matrix4d makePose(double tx, double ty, double tz, double yawRad = 0.0)
+    {
+        Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
+        T.topLeftCorner<3, 3>() = Eigen::AngleAxisd(yawRad, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+        T.col(3).head<3>() = Eigen::Vector3d(tx, ty, tz);
+        return T;
+    }
 
-bool isZeroMatrix(const Eigen::Matrix4d& m)
-{
-    return m.isZero(0.0);
-}
+    bool isZeroMatrix(const Eigen::Matrix4d& m)
+    {
+        return m.isZero(0.0);
+    }
 } // namespace
 
 TEST_CASE("getInterpolatedPose: empty trajectory returns a zero matrix")

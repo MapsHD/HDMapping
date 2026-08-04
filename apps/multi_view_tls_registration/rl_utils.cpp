@@ -828,7 +828,8 @@ void drawMiniCompassWithRuler()
     const Eigen::Matrix3f& R = app_state.viewLocal.rotation();
     Vector3 right = { R(0, 0), R(0, 1), R(0, 2) };
     Vector3 up = { R(1, 0), R(1, 1), R(1, 2) };
-    Color rulerColor = ColorFromNormalized(Vector4{ 1.0f - app_state.bg_color.x, 1.0f - app_state.bg_color.y, 1.0f - app_state.bg_color.z, 1.0f });
+    Color rulerColor =
+        ColorFromNormalized(Vector4{ 1.0f - app_state.bg_color.x, 1.0f - app_state.bg_color.y, 1.0f - app_state.bg_color.z, 1.0f });
     raylib_widgets::drawCompassRuler(
         right, up, app_state.translate_z, rulerColor, raylib_widgets::CompassAxisLabels{ "X (long.)", "Y (lat.)", "Z (vert.)" });
 }
@@ -1018,8 +1019,10 @@ void updateOrthoView()
 
     std::copy(&proj[0][0], &proj[3][3], app_state.m_ortho_projection);
 
-    Eigen::Vector3d v_eye_t(-app_state.camera_ortho_xy_view_shift_x, app_state.camera_ortho_xy_view_shift_y, app_state.camera_mode_ortho_z_center_h + 10);
-    Eigen::Vector3d v_center_t(-app_state.camera_ortho_xy_view_shift_x, app_state.camera_ortho_xy_view_shift_y, app_state.camera_mode_ortho_z_center_h);
+    Eigen::Vector3d v_eye_t(
+        -app_state.camera_ortho_xy_view_shift_x, app_state.camera_ortho_xy_view_shift_y, app_state.camera_mode_ortho_z_center_h + 10);
+    Eigen::Vector3d v_center_t(
+        -app_state.camera_ortho_xy_view_shift_x, app_state.camera_ortho_xy_view_shift_y, app_state.camera_mode_ortho_z_center_h);
     Eigen::Vector3d v(0, 1, 0);
 
     TaitBryanPose pose_tb;

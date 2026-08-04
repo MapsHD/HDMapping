@@ -121,10 +121,8 @@ struct AppStateBase
     // rlGetMatrixProjection() live at that point would still see the previous
     // frame's post-end3DMatrixStack() state (identity modelview, 2D ortho
     // projection), not the 3D camera, producing a meaningless pick ray.
-    Matrix frame_view_3d = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-                              0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
-    Matrix frame_proj_3d = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-                              0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+    Matrix frame_view_3d = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+    Matrix frame_proj_3d = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
     // Unlike the original (which probed GL_LINE_WIDTH_RANGE), rlgl's line width
     // support is uniform enough here not to need a runtime check -- always true.

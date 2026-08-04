@@ -11,6 +11,7 @@
 #include <ankerl/unordered_dense.h>
 
 #include <Eigen/Dense>
+#include <HDMapping/PoseInterpolation.h>
 #include <common/include/cauchy.h>
 #include <laszip/laszip_api.h>
 #include <nlohmann/json.hpp>
@@ -237,9 +238,6 @@ inline VQFParams buildVQFParams(const LidarOdometryParams& p)
     vp.magRejectionFactor = p.vqf_magRejectionFactor;
     return vp;
 }
-
-// this function finds interpolated pose between two poses according to query_time
-Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& trajectory, double query_time);
 
 // this function reduces number of points by preserving only first point for each bucket {bucket_x, bucket_y, bucket_z}
 std::vector<Point3Di> decimate(const std::vector<Point3Di>& points, double bucket_x, double bucket_y, double bucket_z);

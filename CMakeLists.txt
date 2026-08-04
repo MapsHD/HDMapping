@@ -104,6 +104,15 @@ add_subdirectory(core)
 add_subdirectory(calib_core)
 add_subdirectory(raylib_widgets)
 
+# ============================================================================
+# Unit tests (opt-in: cmake -DBUILD_TESTING=ON)
+# ============================================================================
+option(BUILD_TESTING "Build HDMapping unit tests" OFF)
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(shared/tests)
+endif()
+
 set(CORE_LIBRARIES core)
 set(GUI_LIBRARIES imgui imguizmo implot)
 

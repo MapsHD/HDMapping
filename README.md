@@ -314,6 +314,12 @@ ToDo: check if addressed
 - https://github.com/lovelyyoshino/FAST_LIO2_Noted
 - https://github.com/zlwang7/S-FAST_LIO
 - https://github.com/HesaiTechnology-Spatial-Perception/FAST_LIO_Hesai
+
+ToDo: LIO+ benchmark
+- https://github.com/ethz-asl/COIN-LIO
+- https://github.com/hku-mars/r3live
+- https://github.com/TixiaoShan/LVI-SAM
+- RELEAD: Resilient Localization with Enhanced LiDAR Odometry in Adverse Environments (https://arxiv.org/pdf/2402.18934)
     
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
 - Cosme Hernanz-Gilbert, Carlos Cabo, Álvaro Moreno-Martínez, and Mónica Herrero-Huerta, "Exploring the Potential of the MandEye Handheld LiDAR System for Mediterranean Understorey Characterisation", [[PDF]](https://isprs-archives.copernicus.org/articles/XLIX-B2-2026/413/2026/)

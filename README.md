@@ -307,6 +307,7 @@ ToDo: check if addressed
 - https://github.com/MIT-SPARK/spark-fast-lio
 - https://github.com/HViktorTsoi/PV-LIO
 - https://xiaofan4122.github.io/Elevator_LIO_Page/
+- https://github.com/lovelyyoshino/FAST_LIO2_Noted
     
 # Knowledge base (accuracy, precision, benchmarks, comparison to other mobile mapping systems, etc.)
 - Cosme Hernanz-Gilbert, Carlos Cabo, Álvaro Moreno-Martínez, and Mónica Herrero-Huerta, "Exploring the Potential of the MandEye Handheld LiDAR System for Mediterranean Understorey Characterisation", [[PDF]](https://isprs-archives.copernicus.org/articles/XLIX-B2-2026/413/2026/)

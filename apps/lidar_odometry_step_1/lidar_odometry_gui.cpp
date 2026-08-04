@@ -155,6 +155,8 @@ bool step_2_done = false;
 bool step_3_done = false;
 bool calculations_failed = false;
 bool show_without_filtered_buckets = false;
+bool show_normal_vectors_indoor = false;
+bool show_normal_vectors_outdoor = false;
 
 int lastPar = 1;
 
@@ -1756,6 +1758,8 @@ void progress_window()
     ImGui::Checkbox("Show prediction vectors", &show_prediction_vectors);
     ImGui::Checkbox("Show intermediate trajectory prediction axes", &intermediate_trajectory_prediction_axes);
     ImGui::Checkbox("Show without filtered buckets", &show_without_filtered_buckets);
+    ImGui::Checkbox("Show normal vectors indoor", &show_normal_vectors_indoor);
+    ImGui::Checkbox("Show normal vectors outdoor", &show_normal_vectors_outdoor);
     // ImGui::Checkbox("Show covs indoor", &show_covs_indoor);
     // ImGui::Checkbox("Show covs outdoor", &show_covs_outdoor);
 
@@ -2118,6 +2122,42 @@ void display()
         glEnd();
     }
 
+    if (show_normal_vectors_indoor)
+    {
+        std::scoped_lock lock2(params.mutex_buckets_indoor);
+        glColor3f(0, 0, 1);
+        glBegin(GL_LINES);
+        for (const auto& b : params.buckets_indoor)
+        {
+            glColor3f(fabs(b.second.normal_vector.x()), fabs(b.second.normal_vector.y()), fabs(b.second.normal_vector.z()));
+
+            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            glVertex3f(
+                b.second.mean.x() + b.second.normal_vector.x(),
+                b.second.mean.y() + b.second.normal_vector.y(),
+                b.second.mean.z() + b.second.normal_vector.z());
+        }
+        glEnd();
+    }
+
+    if (show_normal_vectors_outdoor)
+    {
+        std::scoped_lock lock2(params.mutex_buckets_outdoor);
+        glColor3f(0, 0, 1);
+        glBegin(GL_LINES);
+        for (const auto& b : params.buckets_outdoor)
+        {
+            glColor3f(fabs(b.second.normal_vector.x()), fabs(b.second.normal_vector.y()), fabs(b.second.normal_vector.z()));
+
+            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
+            glVertex3f(
+                b.second.mean.x() + b.second.normal_vector.x(),
+                b.second.mean.y() + b.second.normal_vector.y(),
+                b.second.mean.z() + b.second.normal_vector.z());
+        }
+        glEnd();
+    }
+
     if (show_covs_indoor)
     {
         std::scoped_lock lock(params.mutex_buckets_indoor);
@@ -2317,7 +2357,7 @@ void display()
                     ImGui::MenuItem("Use hierarchical RGD (outer RGD turned on)", nullptr, &params.ablation_study_use_hierarchical_rgd);
                     ImGui::MenuItem("Use view point and normal vectors", nullptr, &params.ablation_study_use_view_point_and_normal_vectors);
                     ImGui::MenuItem("Use threshold '1e-6' outer RGD", nullptr, &params.ablation_study_use_threshold_outer_rgd);
-
+                    ImGui::MenuItem("Use anisotropic weighting", nullptr, &params.ablation_study_use_anisotropic_weighting);
                     ImGui::EndMenu();
                 }
 

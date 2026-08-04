@@ -1475,8 +1475,10 @@ static void add_indoor_hessian_contribution(
     const bool ablation_study_use_view_point_and_normal_vectors,
     const bool ablation_study_use_planarity,
     const bool ablation_study_use_norm,
+    const std::vector<double>& table_buckets_nv,
     Eigen::Matrix<double, 6, 6, Eigen::RowMajor>& out_AtPA,
-    Eigen::Matrix<double, 6, 1>& out_AtPB)
+    Eigen::Matrix<double, 6, 1>& out_AtPB,
+    bool ablation_study_use_anisotropic_weighting)
 {
     // Use precomputed cov_inverse from update_rgd
     const Eigen::Matrix3d& infm = indoor_bucket.cov_inverse;
@@ -1570,6 +1572,34 @@ static void add_indoor_hessian_contribution(
         AtPB *= w;
     }
 
+    /////
+    if (ablation_study_use_anisotropic_weighting)
+    {
+        double x = indoor_bucket.normal_vector.x();
+        double y = indoor_bucket.normal_vector.y();
+        double z = indoor_bucket.normal_vector.z();
+
+        if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
+        {
+            int index_bucket_indoor = (x + 1.0) * 0.5 * 100.0 + (y + 1.0) * 0.5 * 100.0 * 100.0 + (z + 1.0) * 0.5 * 100.0 * 100.0 * 100.0;
+
+            double w1 = table_buckets_nv[index_bucket_indoor];
+            // std::cout << "w1: " << w1 << std::endl;
+            if (w1 > 0.0)
+            {
+                AtPA /= w1;
+                AtPB /= w1;
+            }
+            // std::cout <<"!";
+        }
+    }
+
+    // int index_bucket_indoor = (indoor_bucket.normal_vector.x() + 1.0) * 0.5 * 255.0;
+
+    // indoor_bucket.number_of_hits
+    // indoor_bucket.numb
+    /////
+
     out_AtPA += AtPA;
     out_AtPB += AtPB;
 }
@@ -1583,7 +1613,9 @@ static void add_outdoor_hessian_contribution(
     const bool ablation_study_use_view_point_and_normal_vectors,
     const bool ablation_study_use_planarity,
     Eigen::Matrix<double, 6, 6, Eigen::RowMajor>& out_AtPA,
-    Eigen::Matrix<double, 6, 1>& out_AtPB)
+    Eigen::Matrix<double, 6, 1>& out_AtPB,
+    const std::vector<double>& table_buckets_nv_outdoor,
+    bool ablation_study_use_anisotropic_weighting)
 {
     // Use precomputed cov_inverse from update_rgd
     const Eigen::Matrix3d& infm = outdoor_bucket.cov_inverse;
@@ -1670,6 +1702,27 @@ static void add_outdoor_hessian_contribution(
         AtPB *= planarity;
     }
 
+    if (ablation_study_use_anisotropic_weighting)
+    {
+        double x = outdoor_bucket.normal_vector.x();
+        double y = outdoor_bucket.normal_vector.y();
+        double z = outdoor_bucket.normal_vector.z();
+
+        if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
+        {
+            int index_bucket_outdoor = (x + 1.0) * 0.5 * 100.0 + (y + 1.0) * 0.5 * 100.0 * 100.0 + (z + 1.0) * 0.5 * 100.0 * 100.0 * 100.0;
+
+            double w1 = table_buckets_nv_outdoor[index_bucket_outdoor];
+            // std::cout << "w1: " << w1 << std::endl;
+            if (w1 > 0.0)
+            {
+                AtPA /= w1;
+                AtPB /= w1;
+            }
+            // std::cout <<"!";
+        }
+    }
+
     out_AtPA += AtPA;
     out_AtPB += AtPB;
 }
@@ -1693,7 +1746,10 @@ static void compute_hessian(
     LookupStats& stats,
     const bool& ablation_study_use_threshold_outer_rgd,
     const double& convergence_result,
-    const double& convergence_delta_threshold_outer_rgd)
+    const double& convergence_delta_threshold_outer_rgd,
+    const std::vector<double>& table_buckets_nv,
+    const std::vector<double>& table_buckets_nv_outdoor,
+    bool ablation_study_use_anisotropic_weighting)
 {
     const double range_squared = point.point.squaredNorm();
 
@@ -1726,8 +1782,10 @@ static void compute_hessian(
                 ablation_study_use_view_point_and_normal_vectors,
                 ablation_study_use_planarity,
                 ablation_study_use_norm,
+                table_buckets_nv,
                 out_AtPA,
-                out_AtPB);
+                out_AtPB,
+                ablation_study_use_anisotropic_weighting);
         }
     }
 
@@ -1766,7 +1824,9 @@ static void compute_hessian(
                     ablation_study_use_view_point_and_normal_vectors,
                     ablation_study_use_planarity,
                     out_AtPA,
-                    out_AtPB);
+                    out_AtPB,
+                    table_buckets_nv_outdoor,
+                    ablation_study_use_anisotropic_weighting);
             }
         }
     }
@@ -1801,10 +1861,13 @@ void optimize_lidar_odometry(
     bool ablation_study_use_norm,
     bool ablation_study_use_hierarchical_rgd,
     bool ablation_study_use_view_point_and_normal_vectors,
+    bool ablation_study_use_anisotropic_weighting,
     LookupStats& lookup_stats,
     const bool& ablation_study_use_threshold_outer_rgd,
     const double& convergence_result,
-    const double& convergence_delta_threshold_outer_rgd)
+    const double& convergence_delta_threshold_outer_rgd,
+    std::vector<double>& table_buckets_nv,
+    std::vector<double>& table_buckets_nv_outdoor)
 {
     HDMAP_ZONE_SCOPE("optimize_lidar_odometry");
     HDMAP_ZONE_BEGIN(pre_hessian, "pre_hessian");
@@ -1865,6 +1928,24 @@ void optimize_lidar_odometry(
     tbb::combinable<LookupStats> thread_local_stats;
     HDMAP_ZONE_END(hessian_alloc);
 
+    // table_buckets_nv.resize(256 * 256 * 256, 0.0);
+
+    /*for(int i = 0; i < buckets_indoor.size(); i++)
+    {
+        const auto& bucket = buckets_indoor[i];
+        //const int idx = static_cast<int>(bucket.x) + static_cast<int>(bucket.y) * 256 + static_cast<int>(bucket.z) * 256 * 256;
+
+        double x = bucket.normal_vector.x();
+        double y = bucket.normal_vector.y();
+        double z = bucket.normal_vector.z();
+
+        if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
+        {
+            int index_bucket_indoor = (x + 1.0) * 0.5 * 256.0 + (y + 1.0) * 0.5 * 256.0 * 256.0 + (z + 1.0) * 0.5 * 256.0 * 256.0 * 256.0;
+            table_buckets_nv[index_bucket_indoor] += 1.0;
+        }
+    }*/
+
     // Each chunk processes a fixed range of points and accumulates into its own
     // per-pose matrices. Fixed chunk boundaries guarantee identical accumulation
     // order for both ST and MT paths.
@@ -1901,7 +1982,10 @@ void optimize_lidar_odometry(
                 stats,
                 ablation_study_use_threshold_outer_rgd,
                 convergence_result,
-                convergence_delta_threshold_outer_rgd);
+                convergence_delta_threshold_outer_rgd,
+                table_buckets_nv,
+                table_buckets_nv_outdoor,
+                ablation_study_use_anisotropic_weighting);
         }
     };
 
@@ -1997,7 +2081,7 @@ void optimize_lidar_odometry(
             w_motion_model_x,
             w_motion_model_y,
             w_motion_model_z,
-            w_motion_model_om * cauchy(relative_pose_measurement_odo(3, 0), 1), // 100000000, //
+            w_motion_model_om * cauchy(relative_pose_measurement_odo(3, 0), 1), // 100000000, // ToDo????
             w_motion_model_fi * cauchy(relative_pose_measurement_odo(4, 0), 1), // 100000000, //
             w_motion_model_ka * cauchy(relative_pose_measurement_odo(5, 0), 1)); // 100000000);
         Eigen::Matrix<double, 12, 1> AtPBodo;
@@ -2679,9 +2763,120 @@ bool process_worker_step_lidar_odometry_core(
 
     HDMAP_ZONE_SCOPE("process_worker_step_lidar_odometry_core");
 
+    std::vector<double> table_buckets_nv;
+    table_buckets_nv.resize(101 * 101 * 101, 0.0);
+
+    std::vector<double> table_buckets_nv_outdoor;
+    table_buckets_nv_outdoor.resize(101 * 101 * 101, 0.0);
+
+    /*for (int i = 0; i < intermediate_points.size(); i++)
+    {
+        const int pose = intermediate_points[i].index_pose;
+
+        const Eigen::Vector3d point_global = worker_data.intermediate_trajectory[pose] * intermediate_points[i].point;
+        const auto indoor_key = get_rgd_index_3d(point_global, {params.in_out_params_indoor.resolution_X,
+    params.in_out_params_indoor.resolution_Y, params.in_out_params_indoor.resolution_Z}); const auto indoor_it =
+    params.buckets_indoor.find(indoor_key);
+
+        if (indoor_it != params.buckets_indoor.end())
+        {
+            double x = indoor_it->second.normal_vector.x();
+            double y = indoor_it->second.normal_vector.y();
+            double z = indoor_it->second.normal_vector.z();
+
+            if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
+            {
+                int index_bucket_indoor =
+                    (x + 1.0) * 0.5 * 256.0 + (y + 1.0) * 0.5 * 256.0 * 256.0 + (z + 1.0) * 0.5 * 256.0 * 256.0 * 256.0;
+                table_buckets_nv[index_bucket_indoor] += 1.0;
+            }
+        }
+    }*/
+
     for (int iter = 0; iter < params.nr_iter; iter++)
     {
         std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
+
+        if (params.ablation_study_use_anisotropic_weighting)
+        {
+            for (int i = 0; i < table_buckets_nv.size(); i++)
+            {
+                table_buckets_nv[i] = 0;
+            }
+            for (int i = 0; i < table_buckets_nv_outdoor.size(); i++)
+            {
+                table_buckets_nv_outdoor[i] = 0;
+            }
+        }
+        ///////////////
+        if (params.ablation_study_use_anisotropic_weighting)
+        {
+            for (int i = 0; i < intermediate_points.size(); i++)
+            {
+                const int pose = intermediate_points[i].index_pose;
+
+                const Eigen::Vector3d point_global = worker_data.intermediate_trajectory[pose] * intermediate_points[i].point;
+                const auto indoor_key = get_rgd_index_3d(
+                    point_global,
+                    { params.in_out_params_indoor.resolution_X,
+                      params.in_out_params_indoor.resolution_Y,
+                      params.in_out_params_indoor.resolution_Z });
+                const auto indoor_it = params.buckets_indoor.find(indoor_key);
+
+                if (indoor_it != params.buckets_indoor.end())
+                {
+                    double x = indoor_it->second.normal_vector.x();
+                    double y = indoor_it->second.normal_vector.y();
+                    double z = indoor_it->second.normal_vector.z();
+
+                    if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
+                    {
+                        int index_bucket_indoor =
+                            (x + 1.0) * 0.5 * 100.0 + (y + 1.0) * 0.5 * 100.0 * 100.0 + (z + 1.0) * 0.5 * 100.0 * 100.0 * 100.0;
+
+                        // if (index_bucket_indoor > 100* 100*100 || index_bucket_indoor < 0)
+                        //{
+                        //     spdlog::warn("index_bucket_indoor out of bounds: {}", index_bucket_indoor);
+                        //     continue;
+                        // }
+
+                        table_buckets_nv[index_bucket_indoor] += 1.0;
+                    }
+                }
+            }
+        }
+        ///////////////
+        ///////////////
+        if (params.ablation_study_use_anisotropic_weighting)
+        {
+            for (int i = 0; i < intermediate_points.size(); i++)
+            {
+                const int pose = intermediate_points[i].index_pose;
+
+                const Eigen::Vector3d point_global = worker_data.intermediate_trajectory[pose] * intermediate_points[i].point;
+                const auto outdoor_key = get_rgd_index_3d(
+                    point_global,
+                    { params.in_out_params_outdoor.resolution_X,
+                      params.in_out_params_outdoor.resolution_Y,
+                      params.in_out_params_outdoor.resolution_Z });
+                const auto outdoor_it = params.buckets_outdoor.find(outdoor_key);
+
+                if (outdoor_it != params.buckets_outdoor.end())
+                {
+                    double x = outdoor_it->second.normal_vector.x();
+                    double y = outdoor_it->second.normal_vector.y();
+                    double z = outdoor_it->second.normal_vector.z();
+
+                    if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
+                    {
+                        int index_bucket_outdoor =
+                            (x + 1.0) * 0.5 * 100.0 + (y + 1.0) * 0.5 * 100.0 * 100.0 + (z + 1.0) * 0.5 * 100.0 * 100.0 * 100.0;
+
+                        table_buckets_nv[index_bucket_outdoor] += 1.0;
+                    }
+                }
+            }
+        }
 
         iter_end = iter;
         delta = 100000.0;
@@ -2714,10 +2909,13 @@ bool process_worker_step_lidar_odometry_core(
             params.ablation_study_use_norm,
             params.ablation_study_use_hierarchical_rgd,
             params.ablation_study_use_view_point_and_normal_vectors,
+            params.ablation_study_use_anisotropic_weighting,
             lookup_stats,
             params.ablation_study_use_threshold_outer_rgd,
             delta,
-            params.convergence_delta_threshold_outer_rgd);
+            params.convergence_delta_threshold_outer_rgd,
+            table_buckets_nv,
+            table_buckets_nv_outdoor);
         if (delta < params.convergence_delta_threshold)
         {
             // spdlog::info("finished at iteration {}/{}", iter + 1, params.nr_iter);

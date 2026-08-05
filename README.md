@@ -323,6 +323,7 @@ ToDo: check if addressed
 - https://github.com/zlwang7/S-FAST_LIO
 - https://github.com/HesaiTechnology-Spatial-Perception/FAST_LIO_Hesai
 - https://github.com/rsasaki0109/li_slam_ros2
+- https://github.com/APRIL-ZJU/Coco-LIC
 
 ToDo: LIO+ benchmark
 - https://github.com/ethz-asl/COIN-LIO

@@ -44,62 +44,6 @@ std::vector<Point3Di> decimate(const std::vector<Point3Di>& points, double bucke
     return out;
 }
 
-Eigen::Matrix4d getInterpolatedPose(const std::map<double, Eigen::Matrix4d>& trajectory, double query_time)
-{
-    Eigen::Matrix4d ret(Eigen::Matrix4d::Zero());
-    auto it_lower = trajectory.lower_bound(query_time);
-    auto it_next = it_lower;
-
-    if (it_lower == trajectory.begin())
-    {
-        return ret;
-    }
-    if (it_lower->first > query_time)
-    {
-        it_lower = std::prev(it_lower);
-    }
-    if (it_lower == trajectory.begin())
-    {
-        return ret;
-    }
-    if (it_lower == trajectory.end())
-    {
-        return ret;
-    }
-
-    double t1 = it_lower->first;
-    double t2 = it_next->first;
-    double difft1 = t1 - query_time;
-    double difft2 = t2 - query_time;
-    if (t1 == t2 && std::fabs(difft1) < 0.1)
-    {
-        ret = Eigen::Matrix4d::Identity();
-        ret.col(3).head<3>() = it_next->second.col(3).head<3>();
-        ret.topLeftCorner(3, 3) = it_lower->second.topLeftCorner(3, 3);
-        return ret;
-    }
-
-    // if (std::fabs(difft1) < 0.15 && std::fabs(difft2) < 0.15)
-    {
-        assert(t2 > t1);
-        assert(query_time > t1);
-        assert(query_time < t2);
-        ret = Eigen::Matrix4d::Identity();
-        double res = (query_time - t1) / (t2 - t1);
-        Eigen::Vector3d diff = it_next->second.col(3).head<3>() - it_lower->second.col(3).head<3>();
-        ret.col(3).head<3>() = it_next->second.col(3).head<3>() + diff * res;
-        Eigen::Matrix3d r1 = it_lower->second.topLeftCorner(3, 3).matrix();
-        Eigen::Matrix3d r2 = it_next->second.topLeftCorner(3, 3).matrix();
-        Eigen::Quaterniond q1(r1);
-        Eigen::Quaterniond q2(r2);
-        Eigen::Quaterniond qt = q1.slerp(res, q2);
-        ret.topLeftCorner(3, 3) = qt.toRotationMatrix();
-        return ret;
-    }
-
-    return ret;
-}
-
 void limit_covariance(Eigen::Matrix3d& io_cov)
 {
     return;

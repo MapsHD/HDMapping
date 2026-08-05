@@ -44,6 +44,9 @@ namespace mandeye::fd
 
     const std::vector<std::string> json_filter = { "Calibration file (*.json)", "*.json", "All files", "*" };
     const std::vector<std::string> sn_filter = { "SN file (*.sn)", "*.sn", "All files", "*" };
+    const std::vector<std::string> IntrinsicsFilter = {
+        "Camera intrinsics (*.json, *.yml, *.yaml)", "*.json *.yml *.yaml", "All files", "*"
+    };
 
     const std::vector<std::string> Nmea_filter = { "NMEA file (*.nmea)", "*.nmea", "All files", "*" };
     const std::vector<std::string> Gnss_filter = { "GNSS file (*.gnss)", "*.gnss", "All files", "*" };

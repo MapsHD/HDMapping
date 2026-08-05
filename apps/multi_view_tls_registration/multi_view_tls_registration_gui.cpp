@@ -49,6 +49,7 @@
 #include <Core/session.h>
 #include <Core/structures.h>
 #include <Core/transformations.h>
+#include <RaylibWidgets/WindowFit.h>
 
 #ifdef _WIN32
 // portable-file-dialogs.h pulls in real windows.h, whose CloseWindow(HWND)/
@@ -167,87 +168,94 @@ std::vector<std::string> infoLines = {
     "LAZ files are the product of MANDEYE process (open them with Cloud Compare)",
 };
 
-// App specific shortcuts (Type and Shortcut are just for easy reference)
+// App specific shortcuts. Used to be two overlaid lists (this one, plus a
+// "generic" scaffold in rl_utils.cpp that ShowShortcutsTable() fell back to
+// for blank descriptions) -- merged into one here since raylib_widgets'
+// shared ShowShortcutsTable() just takes a single complete list. The merge
+// also fixes two bugs the old indirection was hiding: this list was missing
+// a "Ctrl+J" entry, silently shifting every entry after "J" by one row
+// against the generic list's descriptions; and "Right click + drag" had a
+// stray "n" instead of its real "camera pan" description.
 static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "" },
                                                          { "", "Ctrl+A", "point cloud Alignment" },
-                                                         { "", "B", "" },
+                                                         { "", "B", "camera Back" },
                                                          { "", "Ctrl+B", "" },
-                                                         { "", "C", "" },
+                                                         { "", "C", "Compass/ruler" },
                                                          { "", "Ctrl+C", "Control points" },
                                                          { "", "D", "" },
                                                          { "", "Ctrl+D", "" },
                                                          { "", "E", "" },
                                                          { "", "Ctrl+E", "lio segments Editor" },
-                                                         { "", "F", "" },
+                                                         { "", "F", "camera Front" },
                                                          { "", "Ctrl+F", "" },
                                                          { "", "G", "" },
                                                          { "", "Ctrl+G", "Ground control points" },
                                                          { "", "H", "" },
                                                          { "", "Ctrl+H", "" },
-                                                         { "", "I", "" },
+                                                         { "", "I", "camera Isometric" },
                                                          { "", "Ctrl+I", "" },
                                                          { "", "J", "" },
-                                                         { "", "Ctrl+K", "" },
+                                                         { "", "Ctrl+J", "" },
                                                          { "", "K", "" },
                                                          { "", "Ctrl+K", "" },
-                                                         { "", "L", "" },
+                                                         { "", "L", "camera Left" },
                                                          { "", "Ctrl+L", "manual Loop closure" },
                                                          { "", "M", "" },
                                                          { "", "Ctrl+M", "" },
                                                          { "", "N", "" },
                                                          { "", "Ctrl+N", "" },
-                                                         { "", "O", "" },
-                                                         { "", "Ctrl+O", "Open session" },
+                                                         { "", "O", "Ortographic view" },
+                                                         { "", "Ctrl+O", "Open/load session/data" },
                                                          { "", "P", "" },
                                                          { "", "Ctrl+P", "Pose graph slam" },
                                                          { "", "Q", "" },
                                                          { "", "Ctrl+Q", "" },
-                                                         { "", "R", "" },
+                                                         { "", "R", "camera Right" },
                                                          { "", "Ctrl+R", "Random cloud colors" },
-                                                         { "", "Shift+R", "" },
+                                                         { "", "Shift+R", "Rotation center" },
                                                          { "", "S", "" },
                                                          { "", "Ctrl+S", "Save session" },
                                                          { "", "Ctrl+Shift+S", "Save subsession" },
-                                                         { "", "T", "" },
+                                                         { "", "T", "camera Top" },
                                                          { "", "Ctrl+T", "Solid cloud color" },
-                                                         { "", "U", "" },
+                                                         { "", "U", "camera bottom (Under)" },
                                                          { "", "Ctrl+U", "" },
                                                          { "", "V", "" },
                                                          { "", "Ctrl+V", "" },
                                                          { "", "W", "" },
                                                          { "", "Ctrl+W", "" },
-                                                         { "", "X", "" },
+                                                         { "", "X", "show aXes" },
                                                          { "", "Ctrl+X", "" },
                                                          { "", "Y", "" },
                                                          { "", "Ctrl+Y", "" },
-                                                         { "", "Z", "" },
+                                                         { "", "Z", "camera reset" },
                                                          { "", "Ctrl+Z", "" },
-                                                         { "", "Shift+Z", "" },
-                                                         { "", "1-9", "" },
+                                                         { "", "Shift+Z", "Lock Z" },
+                                                         { "", "1-9", "point size" },
                                                          { "Special keys", "Up arrow", "" },
-                                                         { "", "Shift + up arrow", "" },
+                                                         { "", "Shift + up arrow", "camera translate Up" },
                                                          { "", "Ctrl + up arrow", "" },
                                                          { "", "Down arrow", "" },
-                                                         { "", "Shift + down arrow", "" },
+                                                         { "", "Shift + down arrow", "camera translate Down" },
                                                          { "", "Ctrl + down arrow", "" },
                                                          { "", "Left arrow", "" },
-                                                         { "", "Shift + left arrow", "" },
+                                                         { "", "Shift + left arrow", "camera translate Left" },
                                                          { "", "Ctrl + left arrow", "" },
                                                          { "", "Right arrow", "" },
-                                                         { "", "Shift + right arrow", "" },
+                                                         { "", "Shift + right arrow", "camera translate Right" },
                                                          { "", "Ctrl + right arrow", "" },
                                                          { "", "Pg down", "" },
                                                          { "", "Pg up", "" },
                                                          { "", "- key", "" },
                                                          { "", "+ key", "" },
-                                                         { "Mouse related", "Left click + drag", "" },
-                                                         { "", "Right click + drag", "n" },
-                                                         { "", "Scroll", "" },
-                                                         { "", "Shift + scroll", "" },
-                                                         { "", "Shift + drag", "" },
+                                                         { "Mouse related", "Left click + drag", "camera rotate" },
+                                                         { "", "Right click + drag", "camera pan" },
+                                                         { "", "Scroll", "camera zoom" },
+                                                         { "", "Shift + scroll", "camera 5x zoom" },
+                                                         { "", "Shift + drag", "Dock window to screen edges" },
                                                          { "", "Ctrl + left click", "" },
-                                                         { "", "Ctrl + right click", "" },
-                                                         { "", "Ctrl + middle click", "" } };
+                                                         { "", "Ctrl + right click", "change center of rotation" },
+                                                         { "", "Ctrl + middle click", "change center of rotation (if no CP GUI active)" } };
 
 namespace fs = std::filesystem;
 
@@ -1021,13 +1029,13 @@ void observation_picking_gui()
 
             if (ImGui::Button("Reset view"))
             {
-                new_rotation_center = rotation_center;
-                new_rotate_x = 0.0;
-                new_rotate_y = 0.0;
-                new_translate_x = translate_x;
-                new_translate_y = translate_y;
-                new_translate_z = translate_z;
-                camera_transition_active = true;
+                app_state.new_rotation_center = app_state.rotation_center;
+                app_state.new_rotate_x = 0.0;
+                app_state.new_rotate_y = 0.0;
+                app_state.new_translate_x = app_state.translate_x;
+                app_state.new_translate_y = app_state.translate_y;
+                app_state.new_translate_z = app_state.translate_z;
+                app_state.camera_transition_active = true;
             }
         }
         ImGui::EndDisabled();
@@ -1253,9 +1261,9 @@ void lio_segments_gui()
             if (index_end < 0)
                 index_end = 0;
 
-            rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
-            rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
-            rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
+            app_state.rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
+            app_state.rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
+            app_state.rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
             session.point_clouds_container.show_all_from_range(index_begin, index_end);
         }
         ImGui::SameLine();
@@ -1270,9 +1278,9 @@ void lio_segments_gui()
             if (index_end > session.point_clouds_container.point_clouds.size() - 1)
                 index_end = session.point_clouds_container.point_clouds.size() - 1;
 
-            rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
-            rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
-            rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
+            app_state.rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
+            app_state.rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
+            app_state.rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
             session.point_clouds_container.show_all_from_range(index_begin, index_end);
         }
         ImGui::SameLine();
@@ -1992,18 +2000,18 @@ void settings_gui()
 
         ImGui::NewLine();
 
-        ImGui::InputFloat("camera_x", &new_rotation_center.x());
-        ImGui::InputFloat("camera_y", &new_rotation_center.y());
-        ImGui::InputFloat("camera_z", &new_rotation_center.z());
+        ImGui::InputFloat("camera_x", &app_state.new_rotation_center.x());
+        ImGui::InputFloat("camera_y", &app_state.new_rotation_center.y());
+        ImGui::InputFloat("camera_z", &app_state.new_rotation_center.z());
 
         if (ImGui::Button("set camera"))
         {
-            // new_rotate_x = rotate_x;
-            // new_rotate_y = rotate_y;
-            // new_translate_x = -new_rotation_center.x();
-            // new_translate_y = -new_rotation_center.y();
-            // new_translate_z = -new_rotation_center.z();
-            camera_transition_active = true;
+            // app_state.new_rotate_x = app_state.rotate_x;
+            // app_state.new_rotate_y = app_state.rotate_y;
+            // app_state.new_translate_x = -app_state.new_rotation_center.x();
+            // app_state.new_translate_y = -app_state.new_rotation_center.y();
+            // app_state.new_translate_z = -app_state.new_rotation_center.z();
+            app_state.camera_transition_active = true;
         }
 
         if (ImGui::Button("Set initial pose to Identity and update other poses"))
@@ -2498,18 +2506,18 @@ void renderLoopClosure(
     // active-edge scans, at their normal stored pose).
     scan_renderer.draw(
         pointClouds,
-        static_cast<float>(point_size),
+        static_cast<float>(app_state.point_size),
         scanColorModeFromScheme(csPointCloud),
         static_cast<float>(session_dims.z_min),
         static_cast<float>(session_dims.z_max),
-        Eigen::Vector3d(rotation_center.x(), rotation_center.y(), rotation_center.z()),
+        Eigen::Vector3d(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z()),
         static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
         1);
 
     // Pose-sequence trail across the whole session, as a chain of thick
     // green cylinders (sphere at each joint), sized relative to the current
-    // zoom (translate_z) so it stays visible next to the point cloud.
-    const float tubeRadius = std::max(0.005f, fabsf(translate_z) * 0.001f);
+    // zoom (app_state.translate_z) so it stays visible next to the point cloud.
+    const float tubeRadius = std::max(0.005f, fabsf(app_state.translate_z) * 0.001f);
     bool first = true;
     Vector3 prev{};
     for (const auto& pc : pointClouds)
@@ -2763,11 +2771,11 @@ void renderControlPoints(const ControlPoints& control_points, PointClouds& point
 
         scan_renderer.draw(
             pointClouds,
-            static_cast<float>(point_size),
+            static_cast<float>(app_state.point_size),
             ScanColorMode::Intensity,
             static_cast<float>(session_dims.z_min),
             static_cast<float>(session_dims.z_max),
-            Eigen::Vector3d(rotation_center.x(), rotation_center.y(), rotation_center.z()),
+            Eigen::Vector3d(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z()),
             static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
             1);
 
@@ -3038,7 +3046,11 @@ void display()
     // window, the rest showing just the clear color.
     rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
 
-    ClearBackground(ColorFromNormalized(Vector4{ bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w }));
+    ClearBackground(ColorFromNormalized(
+        Vector4{ app_state.bg_color.x * app_state.bg_color.w,
+                 app_state.bg_color.y * app_state.bg_color.w,
+                 app_state.bg_color.z * app_state.bg_color.w,
+                 app_state.bg_color.w }));
     rlEnableDepthTest();
 
     rlMatrixMode(RL_PROJECTION);
@@ -3047,9 +3059,9 @@ void display()
 
     updateCameraTransition();
 
-    viewLocal = Eigen::Affine3f::Identity();
+    app_state.viewLocal = Eigen::Affine3f::Identity();
 
-    if (!is_ortho)
+    if (!app_state.is_ortho)
     {
         reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
 
@@ -3060,16 +3072,16 @@ void display()
             {
                 // if (index_loop_closure_source < session.point_clouds_container.point_clouds.size())
                 //{
-                //    new_rotation_center.x() =
+                //    app_state.new_rotation_center.x() =
                 //    session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().x();
-                //    new_rotation_center.y() =
+                //    app_state.new_rotation_center.y() =
                 //    session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().y();
-                //    new_rotation_center.z() =
+                //    app_state.new_rotation_center.z() =
                 //    session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().z();
                 //
-                //    new_translate_x = -new_rotation_center.x();
-                //    new_translate_y = -new_rotation_center.y();
-                //    camera_transition_active = true;
+                //    app_state.new_translate_x = -app_state.new_rotation_center.x();
+                //    app_state.new_translate_y = -app_state.new_rotation_center.y();
+                //    app_state.camera_transition_active = true;
                 //}
 
                 if (session.pose_graph_loop_closure.manipulate_active_edge)
@@ -3078,19 +3090,19 @@ void display()
                     {
                         if (session.pose_graph_loop_closure.index_active_edge < session.pose_graph_loop_closure.edges.size())
                         {
-                            new_rotation_center.x() =
+                            app_state.new_rotation_center.x() =
                                 session.point_clouds_container
                                     .point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge]
                                                       .index_from]
                                     .m_pose.translation()
                                     .x();
-                            new_rotation_center.y() =
+                            app_state.new_rotation_center.y() =
                                 session.point_clouds_container
                                     .point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge]
                                                       .index_from]
                                     .m_pose.translation()
                                     .y();
-                            new_rotation_center.z() =
+                            app_state.new_rotation_center.z() =
                                 session.point_clouds_container
                                     .point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge]
                                                       .index_from]
@@ -3099,37 +3111,37 @@ void display()
                         }
                     }
 
-                    new_rotate_x = rotate_x;
-                    new_rotate_y = rotate_y;
-                    new_translate_x = -new_rotation_center.x();
-                    new_translate_y = -new_rotation_center.y();
-                    new_translate_z = translate_z;
-                    camera_transition_active = true;
+                    app_state.new_rotate_x = app_state.rotate_x;
+                    app_state.new_rotate_y = app_state.rotate_y;
+                    app_state.new_translate_x = -app_state.new_rotation_center.x();
+                    app_state.new_translate_y = -app_state.new_rotation_center.y();
+                    app_state.new_translate_z = app_state.translate_z;
+                    app_state.camera_transition_active = true;
                 }
 
                 new_loop_closure_index = false;
             }
         }
 
-        viewLocal.translate(rotation_center);
+        app_state.viewLocal.translate(app_state.rotation_center);
 
-        viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-        if (!lock_z)
-            viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        app_state.viewLocal.translate(Eigen::Vector3f(app_state.translate_x, app_state.translate_y, app_state.translate_z));
+        if (!app_state.lock_z)
+            app_state.viewLocal.rotate(Eigen::AngleAxisf(app_state.rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
         else
-            viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
-        viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+            app_state.viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        app_state.viewLocal.rotate(Eigen::AngleAxisf(app_state.rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
 
-        viewLocal.translate(-rotation_center);
+        app_state.viewLocal.translate(-app_state.rotation_center);
 
-        rlMultMatrixf(viewLocal.matrix().data());
+        rlMultMatrixf(app_state.viewLocal.matrix().data());
     }
     else
         updateOrthoView();
 
-    frame_view_3d = rlGetMatrixModelview();
-    frame_proj_3d = rlGetMatrixProjection();
-    frame_mvp_3d = MatrixMultiply(frame_view_3d, frame_proj_3d);
+    app_state.frame_view_3d = rlGetMatrixModelview();
+    app_state.frame_proj_3d = rlGetMatrixProjection();
+    frame_mvp_3d = MatrixMultiply(app_state.frame_view_3d, app_state.frame_proj_3d);
 
     showAxes();
 
@@ -3177,24 +3189,27 @@ void display()
     {
         session.control_points.index_picked_point = -1; // reset picked point when pose changes
 
-        new_rotation_center.x() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().x();
-        new_rotation_center.y() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().y();
-        new_rotation_center.z() = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().z();
+        app_state.new_rotation_center.x() =
+            session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().x();
+        app_state.new_rotation_center.y() =
+            session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().y();
+        app_state.new_rotation_center.z() =
+            session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().z();
 
-        new_rotate_x = rotate_x;
-        new_rotate_y = rotate_y;
+        app_state.new_rotate_x = app_state.rotate_x;
+        app_state.new_rotate_y = app_state.rotate_y;
         if (session.control_points.track_pose_with_camera)
         {
-            new_translate_x = -new_rotation_center.x();
-            new_translate_y = -new_rotation_center.y();
+            app_state.new_translate_x = -app_state.new_rotation_center.x();
+            app_state.new_translate_y = -app_state.new_rotation_center.y();
         }
         else
         {
-            new_translate_x = translate_x;
-            new_translate_y = translate_y;
+            app_state.new_translate_x = app_state.translate_x;
+            app_state.new_translate_y = app_state.translate_y;
         }
-        new_translate_z = translate_z;
-        camera_transition_active = true;
+        app_state.new_translate_z = app_state.translate_z;
+        app_state.camera_transition_active = true;
     }
 
     // rlImGuiBegin() only polls raylib input into ImGui's IO and calls
@@ -3210,7 +3225,7 @@ void display()
     ShowMainDockSpace();
 
     if (session.control_points.is_imgui)
-        session.control_points.imgui(session.point_clouds_container, rotation_center);
+        session.control_points.imgui(session.point_clouds_container, app_state.rotation_center);
 
     if (session.ground_control_points.is_imgui)
         session.ground_control_points.imgui(session.point_clouds_container);
@@ -3235,7 +3250,7 @@ void display()
                     ImGuizmo::Enable(true);
                     ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-                    if (!is_ortho)
+                    if (!app_state.is_ortho)
                     {
                         // Named-field copy (not a raw struct memcpy): Matrix's
                         // declared field order isn't guaranteed to match the
@@ -3259,8 +3274,8 @@ void display()
                     }
                     else
                         ImGuizmo::Manipulate(
-                            m_ortho_gizmo_view,
-                            m_ortho_projection,
+                            app_state.m_ortho_gizmo_view,
+                            app_state.m_ortho_projection,
                             ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
                             ImGuizmo::WORLD,
                             m_gizmo,
@@ -3333,13 +3348,13 @@ void display()
             // sites and each frame (see main()/loadSession() below).
             scan_renderer.draw(
                 session.point_clouds_container.point_clouds,
-                static_cast<float>(point_size),
+                static_cast<float>(app_state.point_size),
                 scanColorModeFromScheme(csPointCloud),
                 static_cast<float>(session_dims.z_min),
                 static_cast<float>(session_dims.z_max),
-                Eigen::Vector3d(rotation_center.x(), rotation_center.y(), rotation_center.z()),
+                Eigen::Vector3d(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z()),
                 static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
-                viewer_decimate_point_cloud);
+                app_state.viewer_decimate_point_cloud);
             scan_renderer.drawTrajectories(
                 session.point_clouds_container.point_clouds, 1, session.point_clouds_container.show_imu_to_lio_diff);
 
@@ -3426,7 +3441,7 @@ void display()
                 ImGuizmo::Enable(true);
                 ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-                if (!is_ortho)
+                if (!app_state.is_ortho)
                 {
                     Matrix projMat = rlGetMatrixProjection();
                     Matrix modelMat = rlGetMatrixModelview();
@@ -3447,8 +3462,8 @@ void display()
                 }
                 else
                     ImGuizmo::Manipulate(
-                        m_ortho_gizmo_view,
-                        m_ortho_projection,
+                        app_state.m_ortho_gizmo_view,
+                        app_state.m_ortho_projection,
                         ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
                         ImGuizmo::WORLD,
                         m_gizmo,
@@ -4356,19 +4371,19 @@ void display()
             {
                 if (ImGui::BeginMenu("Point cloud"))
                 {
-                    auto tmp = point_size;
+                    auto tmp = app_state.point_size;
                     ImGui::SetNextItemWidth(ImGuiNumberWidth);
-                    ImGui::InputInt("Points size", &point_size);
+                    ImGui::InputInt("Points size", &app_state.point_size);
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("keyboard 1-9 keys");
-                    if (point_size < 1)
-                        point_size = 1;
-                    else if (point_size > 10)
-                        point_size = 10;
+                    if (app_state.point_size < 1)
+                        app_state.point_size = 1;
+                    else if (app_state.point_size > 10)
+                        app_state.point_size = 10;
 
-                    if (tmp != point_size)
+                    if (tmp != app_state.point_size)
                         for (auto& point_cloud : session.point_clouds_container.point_clouds)
-                            point_cloud.point_size = point_size;
+                            point_cloud.point_size = app_state.point_size;
 
                     ImGui::Separator();
 
@@ -4453,7 +4468,7 @@ void display()
                     {
                         auto tmp = session.point_clouds_container.point_clouds[0].line_width;
 
-                        ImGui::BeginDisabled(!glLineWidthSupport);
+                        ImGui::BeginDisabled(!app_state.glLineWidthSupport);
                         {
                             ImGui::SetNextItemWidth(ImGuiNumberWidth);
                             ImGui::InputInt("Line width", &tmp);
@@ -4526,7 +4541,7 @@ void display()
                     ImGui::EndMenu();
                 }
 
-                ImGui::ColorEdit3("Background color", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
+                ImGui::ColorEdit3("Background color", (float*)&app_state.bg_color, ImGuiColorEditFlags_NoInputs);
 
                 ImGui::BeginDisabled(tls_registration.gnss.gnss_poses.size() <= 0);
                 {
@@ -4538,26 +4553,26 @@ void display()
             }
             ImGui::EndDisabled();
 
-            if (ImGui::MenuItem("Orthographic", "key O", &is_ortho))
+            if (ImGui::MenuItem("Orthographic", "key O", &app_state.is_ortho))
             {
-                if (is_ortho)
+                if (app_state.is_ortho)
                 {
-                    new_rotation_center = rotation_center;
-                    new_rotate_x = 0.0;
-                    new_rotate_y = 0.0;
-                    new_translate_x = translate_x;
-                    new_translate_y = translate_y;
-                    new_translate_z = translate_z;
-                    camera_transition_active = true;
+                    app_state.new_rotation_center = app_state.rotation_center;
+                    app_state.new_rotate_x = 0.0;
+                    app_state.new_rotate_y = 0.0;
+                    app_state.new_translate_x = app_state.translate_x;
+                    app_state.new_translate_y = app_state.translate_y;
+                    app_state.new_translate_z = app_state.translate_z;
+                    app_state.camera_transition_active = true;
                 }
             }
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Switch between perspective view (3D) and orthographic view (2D/flat)");
 
-            ImGui::MenuItem("Show axes", "key X", &show_axes);
-            ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
+            ImGui::MenuItem("Show axes", "key X", &app_state.show_axes);
+            ImGui::MenuItem("Show compass/ruler", "key C", &app_state.compass_ruler);
 
-            ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);
+            ImGui::MenuItem("Lock Z", "Shift + Z", &app_state.lock_z, !app_state.is_ortho);
 
             ImGui::Separator();
 
@@ -4613,7 +4628,7 @@ void display()
             ImGui::SameLine();
 
             ImGui::SetNextItemWidth(ImGuiNumberWidth);
-            ImGui::InputInt("Points render downsampling", &viewer_decimate_point_cloud, 2, 10);
+            ImGui::InputInt("Points render downsampling", &app_state.viewer_decimate_point_cloud, 2, 10);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("increase for better performance, decrease for rendering more points");
             ImGui::SameLine();
@@ -4627,14 +4642,14 @@ void display()
             //    ImGui::SetTooltip("automatically control subsampling vs FPS: increase bellow 10, decrease above 60");
             // if (dynamicSubsampling && (fps_avg < 15) && (now - lastAdjustTime > cooldownSeconds))
             //{
-            //    viewer_decimate_point_cloud += 1;
+            //    app_state.viewer_decimate_point_cloud += 1;
             //    lastAdjustTime = now;
             //}
             // ImGui::SameLine();
             // ImGui::Text("(avg %.1f)", fps_avg);
 
-            if (viewer_decimate_point_cloud < 1)
-                viewer_decimate_point_cloud = 1;
+            if (app_state.viewer_decimate_point_cloud < 1)
+                app_state.viewer_decimate_point_cloud = 1;
 
             ImGui::SameLine();
             // GetFPS()/point-cloud draw-call/vertex count via raylib/ScanRenderer,
@@ -4666,7 +4681,7 @@ void display()
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
 
         if (ImGui::SmallButton("Info"))
-            info_gui = !info_gui;
+            app_state.info_gui = !app_state.info_gui;
 
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(3);
@@ -4725,7 +4740,7 @@ void display()
 
     renderControlPointsLabels(session.control_points, session.point_clouds_container);
 
-    if (compass_ruler)
+    if (app_state.compass_ruler)
         drawMiniCompassWithRuler();
 
     rlImGuiEnd();
@@ -4831,14 +4846,14 @@ void translate_gui()
         translate_tool.has_transform = false;
         translate_tool.transform = Eigen::Affine3d::Identity();
 
-        is_ortho = true;
-        new_rotation_center = rotation_center;
-        new_rotate_x = 0.0;
-        new_rotate_y = 0.0;
-        new_translate_x = translate_x;
-        new_translate_y = translate_y;
-        new_translate_z = translate_z;
-        camera_transition_active = true;
+        app_state.is_ortho = true;
+        app_state.new_rotation_center = app_state.rotation_center;
+        app_state.new_rotate_x = 0.0;
+        app_state.new_rotate_y = 0.0;
+        app_state.new_translate_x = app_state.translate_x;
+        app_state.new_translate_y = app_state.translate_y;
+        app_state.new_translate_z = app_state.translate_z;
+        app_state.camera_transition_active = true;
 
         SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);
     }
@@ -4944,19 +4959,6 @@ constexpr int GLUT_UP = 1;
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO& io = ImGui::GetIO();
-    io.MousePos = ImVec2((float)x, (float)y);
-
-    int button = -1;
-    if (glut_button == GLUT_LEFT_BUTTON)
-        button = 0;
-    if (glut_button == GLUT_RIGHT_BUTTON)
-        button = 1;
-    if (glut_button == GLUT_MIDDLE_BUTTON)
-        button = 2;
-    if (button != -1 && state == GLUT_DOWN)
-        io.MouseDown[button] = true;
-    if (button != -1 && state == GLUT_UP)
-        io.MouseDown[button] = false;
 
     // The GLUT-version-gated legacy mouse-wheel-as-button-3/4 fallback is
     // dropped -- raylib's GetMouseWheelMove() (polled in main()'s loop,
@@ -4995,8 +4997,8 @@ void mouse(int glut_button, int state, int x, int y)
                 break;
             }
 
-            mouse_old_x = x;
-            mouse_old_y = y;
+            app_state.mouse_old_x = x;
+            app_state.mouse_old_y = y;
             return;
         }
 
@@ -5031,20 +5033,20 @@ void mouse(int glut_button, int state, int x, int y)
                         {
                             min_distance = dist;
 
-                            new_rotation_center.x() = vp.x();
-                            new_rotation_center.y() = vp.y();
-                            new_rotation_center.z() = vp.z();
+                            app_state.new_rotation_center.x() = vp.x();
+                            app_state.new_rotation_center.y() = vp.y();
+                            app_state.new_rotation_center.z() = vp.z();
 
                             session.control_points.index_picked_point = j;
                         }
                     }
 
-                    new_rotate_x = rotate_x;
-                    new_rotate_y = rotate_y;
-                    new_translate_x = -new_rotation_center.x();
-                    new_translate_y = -new_rotation_center.y();
-                    new_translate_z = translate_z;
-                    camera_transition_active = true;
+                    app_state.new_rotate_x = app_state.rotate_x;
+                    app_state.new_rotate_y = app_state.rotate_y;
+                    app_state.new_translate_x = -app_state.new_rotation_center.x();
+                    app_state.new_translate_y = -app_state.new_rotation_center.y();
+                    app_state.new_translate_z = app_state.translate_z;
+                    app_state.camera_transition_active = true;
                 }
             }
             else
@@ -5082,7 +5084,7 @@ void mouse(int glut_button, int state, int x, int y)
 
         if (state == GLUT_DOWN)
         {
-            mouse_buttons |= 1 << glut_button;
+            app_state.mouse_buttons |= 1 << glut_button;
 
             if (observation_picking.is_observation_picking_mode)
             {
@@ -5102,10 +5104,10 @@ void mouse(int glut_button, int state, int x, int y)
             }
         }
         else if (state == GLUT_UP)
-            mouse_buttons = 0;
+            app_state.mouse_buttons = 0;
 
-        mouse_old_x = x;
-        mouse_old_y = y;
+        app_state.mouse_old_x = x;
+        app_state.mouse_old_y = y;
     }
 }
 
@@ -5151,22 +5153,9 @@ bool initGL(int* argc, char** argv, const std::string& winTitleArg, void (*)(), 
     // very top of the content area (where ImGui's main menu bar lives)
     // behind the OS menu bar/title bar instead of below it. Shrinking to
     // fit the monitor's work area and recentering avoids that; on screens
-    // that already fit the default size this is a no-op.
-    {
-        const int monitor = GetCurrentMonitor();
-        const int monitorWidth = GetMonitorWidth(monitor);
-        const int monitorHeight = GetMonitorHeight(monitor);
-        const int margin = 100; // room for the OS title bar, menu bar and dock
-        const int fitWidth =
-            (monitorWidth > 0) ? std::min(static_cast<int>(window_width), monitorWidth - margin) : static_cast<int>(window_width);
-        const int fitHeight =
-            (monitorHeight > 0) ? std::min(static_cast<int>(window_height), monitorHeight - margin) : static_cast<int>(window_height);
-        if (fitWidth != static_cast<int>(window_width) || fitHeight != static_cast<int>(window_height))
-        {
-            SetWindowSize(fitWidth, fitHeight);
-            SetWindowPosition((monitorWidth - fitWidth) / 2, (monitorHeight - fitHeight) / 2);
-        }
-    }
+    // that already fit the default size this is a no-op. DPI-aware and
+    // shared with the camera_lidar_* apps -- see raylib_widgets.
+    raylib_widgets::fitWindowToScreen(/*marginW=*/100, /*marginH=*/100, /*centerVertically=*/true);
 
     rlImGuiSetup(true);
     ImGuiIO& io = ImGui::GetIO();
@@ -5222,7 +5211,7 @@ int main(int argc, char* argv[])
         // directly here instead: mouse() on raylib button-state transitions
         // (mirroring glutMouseFunc's fire-on-transition semantics), motion()
         // every frame (mirroring glutMotionFunc -- motion() itself only acts
-        // when mouse_buttons is set, so this is safe unconditionally), wheel()
+        // when app_state.mouse_buttons is set, so this is safe unconditionally), wheel()
         // when GetMouseWheelMove() is nonzero, and display() once per frame.
         while (!WindowShouldClose())
         {

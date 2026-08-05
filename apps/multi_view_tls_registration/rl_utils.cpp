@@ -8,6 +8,7 @@
 #include <imgui_internal.h>
 
 #include <Core/transformations.h>
+#include <RaylibWidgets/CompassRuler.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -44,49 +45,11 @@
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////
-// Formerly <Core/utils.hpp>'s extern globals -- defined here now (see
-// rl_utils.h's top comment for why).
+// Formerly <Core/utils.hpp>'s extern globals -- now members of AppStateBase,
+// defined in rl_utils.h (see its top comment for why).
 ///////////////////////////////////////////////////////////////////////////////////
 
-int viewer_decimate_point_cloud = 2;
-
-int mouse_old_x, mouse_old_y;
-int mouse_buttons = 0;
-float mouse_sensitivity = 1.0;
-
-bool is_ortho = false;
-bool lock_z = false;
-bool show_axes = true;
-ImVec4 bg_color = ImVec4(0.65f, 0.65f, 0.65f, 1.00f);
-int point_size = 1;
-
-bool info_gui = false;
-bool compass_ruler = true;
-
-Eigen::Affine3f viewLocal;
-
-Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
-float rotate_x = -35.264f, rotate_y = 135.0f;
-float translate_x, translate_y = 0.0;
-float translate_z = -50.0;
-
-double camera_ortho_xy_view_zoom = 10;
-double camera_ortho_xy_view_shift_x = 0.0;
-double camera_ortho_xy_view_shift_y = 0.0;
-double camera_mode_ortho_z_center_h = 0.0;
-
-// Target camera state for smooth transitions
-Eigen::Vector3f new_rotation_center = rotation_center;
-float new_rotate_x = rotate_x;
-float new_rotate_y = rotate_y;
-float new_translate_x = translate_x;
-float new_translate_y = translate_y;
-float new_translate_z = translate_z;
-
 bool cor_gui = false;
-
-// Transition timing
-bool camera_transition_active = false;
 
 bool scroll_hint_enabled = true;
 bool scroll_hint_active = false;
@@ -95,14 +58,6 @@ float scroll_hint_accu = 0.0f;
 double scroll_hint_lastT = 0.0;
 
 bool show_about = false;
-
-bool glLineWidthSupport = true;
-
-float m_ortho_projection[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
-float m_ortho_gizmo_view[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
-
-Matrix frame_view_3d = MatrixIdentity();
-Matrix frame_proj_3d = MatrixIdentity();
 
 // ============================================================================
 // Formerly core/src/utils.cpp -- local now (see the big comment at the top
@@ -138,38 +93,38 @@ void wheel(int button, int dir, int x, int y)
     {
         if (dir > 0)
         {
-            if (is_ortho)
+            if (app_state.is_ortho)
             {
-                camera_ortho_xy_view_zoom -= 0.1f * camera_ortho_xy_view_zoom;
+                app_state.camera_ortho_xy_view_zoom -= 0.1f * app_state.camera_ortho_xy_view_zoom;
 
-                if (camera_ortho_xy_view_zoom < 0.1)
+                if (app_state.camera_ortho_xy_view_zoom < 0.1)
                 {
-                    camera_ortho_xy_view_zoom = 0.1;
+                    app_state.camera_ortho_xy_view_zoom = 0.1;
                 }
             }
             else
             {
                 if (io.KeyShift)
-                    translate_z += 5.0f;
+                    app_state.translate_z += 5.0f;
                 else
-                    translate_z += 1.0f;
+                    app_state.translate_z += 1.0f;
             }
         }
         else
         {
-            if (is_ortho)
-                camera_ortho_xy_view_zoom += 0.1 * camera_ortho_xy_view_zoom;
+            if (app_state.is_ortho)
+                app_state.camera_ortho_xy_view_zoom += 0.1 * app_state.camera_ortho_xy_view_zoom;
             else
             {
                 if (io.KeyShift)
-                    translate_z -= 5.0f;
+                    app_state.translate_z -= 5.0f;
                 else
-                    translate_z -= 1.0f;
+                    app_state.translate_z -= 1.0f;
             }
         }
 
-        mouse_sensitivity = fabs(translate_z) / 100; // 1 for translate_z 50 (default zoom)
-        camera_transition_active = false;
+        app_state.mouse_sensitivity = fabs(app_state.translate_z) / 100; // 1 for app_state.translate_z 50 (default zoom)
+        app_state.camera_transition_active = false;
 
         if (scroll_hint_enabled)
         {
@@ -211,7 +166,7 @@ void reshape(int w, int h)
     rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
     rlMatrixMode(RL_PROJECTION);
     rlLoadIdentity();
-    if (!is_ortho)
+    if (!app_state.is_ortho)
     {
         const double fovy = 60.0;
         const double aspect = (double)w / (double)h;
@@ -228,10 +183,10 @@ void reshape(int w, int h)
         float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
         rlOrtho(
-            -camera_ortho_xy_view_zoom,
-            camera_ortho_xy_view_zoom,
-            -camera_ortho_xy_view_zoom / ratio,
-            camera_ortho_xy_view_zoom / ratio,
+            -app_state.camera_ortho_xy_view_zoom,
+            app_state.camera_ortho_xy_view_zoom,
+            -app_state.camera_ortho_xy_view_zoom / ratio,
+            app_state.camera_ortho_xy_view_zoom / ratio,
             -100000,
             100000);
     }
@@ -249,24 +204,24 @@ void motion(int x, int y)
     if (!io.WantCaptureMouse)
     {
         float dx, dy;
-        dx = (float)(x - mouse_old_x);
-        dy = (float)(y - mouse_old_y);
+        dx = (float)(x - app_state.mouse_old_x);
+        dy = (float)(y - app_state.mouse_old_y);
 
-        if (mouse_buttons & 1) // left button
+        if (app_state.mouse_buttons & 1) // left button
         {
-            rotate_x += dy * 0.2f;
-            rotate_y += dx * 0.2f;
+            app_state.rotate_x += dy * 0.2f;
+            app_state.rotate_y += dx * 0.2f;
             breakCameraTransition();
         }
 
-        if (mouse_buttons & 4) // right button
+        if (app_state.mouse_buttons & 4) // right button
         {
-            if (is_ortho)
+            if (app_state.is_ortho)
             {
                 float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
                 Eigen::Vector3d v(
-                    dx * (camera_ortho_xy_view_zoom / (float)io.DisplaySize.x * 2),
-                    dy * (camera_ortho_xy_view_zoom / (float)io.DisplaySize.y * 2 / ratio),
+                    dx * (app_state.camera_ortho_xy_view_zoom / (float)io.DisplaySize.x * 2),
+                    dy * (app_state.camera_ortho_xy_view_zoom / (float)io.DisplaySize.y * 2 / ratio),
                     0);
                 TaitBryanPose pose_tb;
                 pose_tb.px = 0.0;
@@ -274,22 +229,22 @@ void motion(int x, int y)
                 pose_tb.pz = 0.0;
                 pose_tb.om = 0.0;
                 pose_tb.fi = 0.0;
-                pose_tb.ka = (rotate_x + rotate_y) * M_PI / 180.0;
+                pose_tb.ka = (app_state.rotate_x + app_state.rotate_y) * M_PI / 180.0;
                 auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
                 Eigen::Vector3d v_t = m * v;
-                camera_ortho_xy_view_shift_x += v_t.x();
-                camera_ortho_xy_view_shift_y += v_t.y();
+                app_state.camera_ortho_xy_view_shift_x += v_t.x();
+                app_state.camera_ortho_xy_view_shift_y += v_t.y();
             }
             else
             {
-                translate_x += dx * 0.1f * mouse_sensitivity;
-                translate_y -= dy * 0.1f * mouse_sensitivity;
+                app_state.translate_x += dx * 0.1f * app_state.mouse_sensitivity;
+                app_state.translate_y -= dy * 0.1f * app_state.mouse_sensitivity;
                 breakCameraTransition();
             }
         }
 
-        mouse_old_x = x;
-        mouse_old_y = y;
+        app_state.mouse_old_x = x;
+        app_state.mouse_old_y = y;
     }
 }
 
@@ -335,26 +290,26 @@ void ShowMainDockSpace()
 // Was glBegin(GL_LINES)/glColor3f/glVertex3f/glEnd -- rl* rename.
 void showAxes()
 {
-    if (show_axes || ImGui::GetIO().KeyCtrl) // rotation center axes
+    if (app_state.show_axes || ImGui::GetIO().KeyCtrl) // rotation center axes
     {
         rlBegin(RL_LINES);
         rlColor3f(1.f, 1.f, 1.f);
-        rlVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z());
-        rlVertex3f(rotation_center.x() + 1.f, rotation_center.y(), rotation_center.z());
-        rlVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z());
-        rlVertex3f(rotation_center.x() - 1.f, rotation_center.y(), rotation_center.z());
-        rlVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z());
-        rlVertex3f(rotation_center.x(), rotation_center.y() - 1.f, rotation_center.z());
-        rlVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z());
-        rlVertex3f(rotation_center.x(), rotation_center.y() + 1.f, rotation_center.z());
-        rlVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z());
-        rlVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() - 1.f);
-        rlVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z());
-        rlVertex3f(rotation_center.x(), rotation_center.y(), rotation_center.z() + 1.f);
+        rlVertex3f(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z());
+        rlVertex3f(app_state.rotation_center.x() + 1.f, app_state.rotation_center.y(), app_state.rotation_center.z());
+        rlVertex3f(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z());
+        rlVertex3f(app_state.rotation_center.x() - 1.f, app_state.rotation_center.y(), app_state.rotation_center.z());
+        rlVertex3f(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z());
+        rlVertex3f(app_state.rotation_center.x(), app_state.rotation_center.y() - 1.f, app_state.rotation_center.z());
+        rlVertex3f(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z());
+        rlVertex3f(app_state.rotation_center.x(), app_state.rotation_center.y() + 1.f, app_state.rotation_center.z());
+        rlVertex3f(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z());
+        rlVertex3f(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z() - 1.f);
+        rlVertex3f(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z());
+        rlVertex3f(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z() + 1.f);
         rlEnd();
     }
 
-    if (show_axes || ImGui::GetIO().KeyCtrl) // origin axes
+    if (app_state.show_axes || ImGui::GetIO().KeyCtrl) // origin axes
     {
         rlBegin(RL_LINES);
         rlColor3f(1.0f, 0.0f, 0.0f);
@@ -375,57 +330,57 @@ void showAxes()
 // GL-free -- copied verbatim.
 void updateCameraTransition()
 {
-    if (!camera_transition_active)
+    if (!app_state.camera_transition_active)
         return;
 
     float t = 1.0f - powf(1.0f - std::min(ImGui::GetIO().DeltaTime * camera_transition_speed, 1.0f), 3.0f);
 
-    bool doneXrc = fabs(new_rotation_center.x() - rotation_center.x()) < 0.01f;
-    bool doneYrc = fabs(new_rotation_center.y() - rotation_center.y()) < 0.01f;
-    bool doneZrc = fabs(new_rotation_center.z() - rotation_center.z()) < 0.01f;
-    bool doneXr = fabs(new_rotate_x - rotate_x) < 0.01f;
-    bool doneYr = fabs(new_rotate_y - rotate_y) < 0.01f;
-    bool doneXt = fabs(new_translate_x - translate_x) < 0.01f;
-    bool doneYt = fabs(new_translate_y - translate_y) < 0.01f;
-    bool doneZt = fabs(new_translate_z - translate_z) < 0.01f;
+    bool doneXrc = fabs(app_state.new_rotation_center.x() - app_state.rotation_center.x()) < 0.01f;
+    bool doneYrc = fabs(app_state.new_rotation_center.y() - app_state.rotation_center.y()) < 0.01f;
+    bool doneZrc = fabs(app_state.new_rotation_center.z() - app_state.rotation_center.z()) < 0.01f;
+    bool doneXr = fabs(app_state.new_rotate_x - app_state.rotate_x) < 0.01f;
+    bool doneYr = fabs(app_state.new_rotate_y - app_state.rotate_y) < 0.01f;
+    bool doneXt = fabs(app_state.new_translate_x - app_state.translate_x) < 0.01f;
+    bool doneYt = fabs(app_state.new_translate_y - app_state.translate_y) < 0.01f;
+    bool doneZt = fabs(app_state.new_translate_z - app_state.translate_z) < 0.01f;
 
     if (!doneXrc)
-        rotation_center.x() += (new_rotation_center.x() - rotation_center.x()) * t;
+        app_state.rotation_center.x() += (app_state.new_rotation_center.x() - app_state.rotation_center.x()) * t;
     if (!doneYrc)
-        rotation_center.y() += (new_rotation_center.y() - rotation_center.y()) * t;
+        app_state.rotation_center.y() += (app_state.new_rotation_center.y() - app_state.rotation_center.y()) * t;
     if (!doneZrc)
-        rotation_center.z() += (new_rotation_center.z() - rotation_center.z()) * t;
+        app_state.rotation_center.z() += (app_state.new_rotation_center.z() - app_state.rotation_center.z()) * t;
     if (!doneXr)
-        rotate_x += (new_rotate_x - rotate_x) * t;
+        app_state.rotate_x += (app_state.new_rotate_x - app_state.rotate_x) * t;
     if (!doneYr)
-        rotate_y += (new_rotate_y - rotate_y) * t;
+        app_state.rotate_y += (app_state.new_rotate_y - app_state.rotate_y) * t;
     if (!doneXt)
-        translate_x += (new_translate_x - translate_x) * t;
+        app_state.translate_x += (app_state.new_translate_x - app_state.translate_x) * t;
     if (!doneYt)
-        translate_y += (new_translate_y - translate_y) * t;
+        app_state.translate_y += (app_state.new_translate_y - app_state.translate_y) * t;
     if (!doneZt)
-        translate_z += (new_translate_z - translate_z) * t;
+        app_state.translate_z += (app_state.new_translate_z - app_state.translate_z) * t;
 
-    camera_transition_active = !(doneXrc && doneYrc && doneZrc && doneXr && doneYr && doneXt && doneYt && doneZt);
+    app_state.camera_transition_active = !(doneXrc && doneYrc && doneZrc && doneXr && doneYr && doneXt && doneYt && doneZt);
 
-    if (!camera_transition_active)
+    if (!app_state.camera_transition_active)
     {
-        rotation_center = new_rotation_center;
-        rotate_x = new_rotate_x;
-        rotate_y = new_rotate_y;
-        translate_x = new_translate_x;
-        translate_y = new_translate_y;
-        translate_z = new_translate_z;
+        app_state.rotation_center = app_state.new_rotation_center;
+        app_state.rotate_x = app_state.new_rotate_x;
+        app_state.rotate_y = app_state.new_rotate_y;
+        app_state.translate_x = app_state.new_translate_x;
+        app_state.translate_y = app_state.new_translate_y;
+        app_state.translate_z = app_state.new_translate_z;
     }
 }
 
 // GL-free -- copied verbatim.
 void breakCameraTransition()
 {
-    if (camera_transition_active == false)
+    if (app_state.camera_transition_active == false)
         return;
-    rotation_center = new_rotation_center;
-    camera_transition_active = false;
+    app_state.rotation_center = app_state.new_rotation_center;
+    app_state.camera_transition_active = false;
 }
 
 // GL-free -- copied verbatim.
@@ -436,68 +391,68 @@ void setCameraPreset(CameraPreset preset)
     switch (preset)
     {
     case CAMERA_FRONT:
-        new_rotate_x = -90.0f;
-        new_rotate_y = +90.0f;
+        app_state.new_rotate_x = -90.0f;
+        app_state.new_rotate_y = +90.0f;
         triggered = true;
         break;
     case CAMERA_BACK:
-        new_rotate_x = -90.0f;
-        new_rotate_y = -90.0f;
+        app_state.new_rotate_x = -90.0f;
+        app_state.new_rotate_y = -90.0f;
         triggered = true;
         break;
     case CAMERA_LEFT:
-        new_rotate_x = -90.0f;
-        new_rotate_y = 180.0f;
+        app_state.new_rotate_x = -90.0f;
+        app_state.new_rotate_y = 180.0f;
         triggered = true;
         break;
     case CAMERA_RIGHT:
-        new_rotate_x = -90.0f;
-        new_rotate_y = 0.0f;
+        app_state.new_rotate_x = -90.0f;
+        app_state.new_rotate_y = 0.0f;
         triggered = true;
         break;
     case CAMERA_TOP:
-        new_rotate_x = 0.0f;
-        new_rotate_y = 90.0f;
+        app_state.new_rotate_x = 0.0f;
+        app_state.new_rotate_y = 90.0f;
         triggered = true;
         break;
     case CAMERA_BOTTOM:
-        new_rotate_x = 180.0f;
-        new_rotate_y = -90.0f;
+        app_state.new_rotate_x = 180.0f;
+        app_state.new_rotate_y = -90.0f;
         triggered = true;
         break;
     case CAMERA_ISO:
-        new_rotate_x = -35.264f;
-        new_rotate_y = 135.0f;
+        app_state.new_rotate_x = -35.264f;
+        app_state.new_rotate_y = 135.0f;
         triggered = true;
         break;
     case CAMERA_RESET:
-        new_rotation_center = Eigen::Vector3f::Zero();
-        new_rotate_x = 0;
-        new_rotate_y = 0;
-        new_translate_x = 0;
-        new_translate_y = 0;
-        new_translate_z = -50.0f;
-        mouse_sensitivity = fabs(translate_z) / 100;
+        app_state.new_rotation_center = Eigen::Vector3f::Zero();
+        app_state.new_rotate_x = 0;
+        app_state.new_rotate_y = 0;
+        app_state.new_translate_x = 0;
+        app_state.new_translate_y = 0;
+        app_state.new_translate_z = -50.0f;
+        app_state.mouse_sensitivity = fabs(app_state.translate_z) / 100;
 
-        camera_ortho_xy_view_zoom = 10;
-        camera_ortho_xy_view_shift_x = 0.0;
-        camera_ortho_xy_view_shift_y = 0.0;
-        camera_mode_ortho_z_center_h = 0.0;
+        app_state.camera_ortho_xy_view_zoom = 10;
+        app_state.camera_ortho_xy_view_shift_x = 0.0;
+        app_state.camera_ortho_xy_view_shift_y = 0.0;
+        app_state.camera_mode_ortho_z_center_h = 0.0;
 
-        viewer_decimate_point_cloud = 1000;
+        app_state.viewer_decimate_point_cloud = 1000;
         triggered = false;
         break;
     }
 
     if (triggered)
     {
-        new_rotation_center = rotation_center;
-        new_translate_x = translate_x;
-        new_translate_y = translate_y;
-        new_translate_z = translate_z;
+        app_state.new_rotation_center = app_state.rotation_center;
+        app_state.new_translate_x = app_state.translate_x;
+        app_state.new_translate_y = app_state.translate_y;
+        app_state.new_translate_z = app_state.translate_z;
     }
 
-    camera_transition_active = true;
+    app_state.camera_transition_active = true;
 }
 
 // GL-free -- copied verbatim.
@@ -548,11 +503,11 @@ void camMenu()
             ImGui::Text("X");
 
             ImGui::TableSetColumnIndex(1);
-            ImGui::Text("%.3f", rotate_x);
+            ImGui::Text("%.3f", app_state.rotate_x);
             ImGui::TableSetColumnIndex(2);
-            ImGui::Text("%.3f", translate_x);
+            ImGui::Text("%.3f", app_state.translate_x);
             ImGui::TableSetColumnIndex(3);
-            ImGui::Text("%.3f", rotation_center.x());
+            ImGui::Text("%.3f", app_state.rotation_center.x());
 
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
@@ -560,11 +515,11 @@ void camMenu()
             ImGui::Text("Y");
 
             ImGui::TableSetColumnIndex(1);
-            ImGui::Text("%.3f", rotate_y);
+            ImGui::Text("%.3f", app_state.rotate_y);
             ImGui::TableSetColumnIndex(2);
-            ImGui::Text("%.3f", translate_y);
+            ImGui::Text("%.3f", app_state.translate_y);
             ImGui::TableSetColumnIndex(3);
-            ImGui::Text("%.3f", rotation_center.y());
+            ImGui::Text("%.3f", app_state.rotation_center.y());
 
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
@@ -572,13 +527,13 @@ void camMenu()
             ImGui::Text("Z");
 
             ImGui::TableSetColumnIndex(2);
-            ImGui::Text("%.3f", translate_z);
+            ImGui::Text("%.3f", app_state.translate_z);
             ImGui::TableSetColumnIndex(3);
-            ImGui::Text("%.3f", rotation_center.y());
+            ImGui::Text("%.3f", app_state.rotation_center.y());
 
             ImGui::EndTable();
         }
-        ImGui::Text("Mouse sensitivity: %.4f", mouse_sensitivity);
+        ImGui::Text("Mouse sensitivity: %.4f", app_state.mouse_sensitivity);
 
         ImGui::EndTooltip();
     }
@@ -607,53 +562,53 @@ void view_kbd_shortcuts()
 
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
     {
-        translate_x += 0.5f * mouse_sensitivity;
+        app_state.translate_x += 0.5f * app_state.mouse_sensitivity;
         breakCameraTransition();
     }
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
     {
-        translate_x -= 0.5f * mouse_sensitivity;
+        app_state.translate_x -= 0.5f * app_state.mouse_sensitivity;
         breakCameraTransition();
     }
 
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
     {
-        translate_y += 0.5f * mouse_sensitivity;
+        app_state.translate_y += 0.5f * app_state.mouse_sensitivity;
         breakCameraTransition();
     }
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
     {
-        translate_y -= 0.5f * mouse_sensitivity;
+        app_state.translate_y -= 0.5f * app_state.mouse_sensitivity;
         breakCameraTransition();
     }
 
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
     {
-        rotate_y -= 0.6;
+        app_state.rotate_y -= 0.6;
         breakCameraTransition();
     }
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
     {
-        rotate_y += 0.6;
+        app_state.rotate_y += 0.6;
         breakCameraTransition();
     }
 
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
     {
-        rotate_x -= 0.6;
+        app_state.rotate_x -= 0.6;
         breakCameraTransition();
     }
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
     {
-        rotate_x += 0.6;
+        app_state.rotate_x += 0.6;
         breakCameraTransition();
     }
 
     if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_R, false))
         cor_gui = true;
 
-    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false) && !is_ortho)
-        lock_z = !lock_z;
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false) && !app_state.is_ortho)
+        app_state.lock_z = !app_state.lock_z;
 
     if (io.KeyCtrl || io.KeyAlt || io.KeyShift)
         return;
@@ -676,30 +631,30 @@ void view_kbd_shortcuts()
         setCameraPreset(CAMERA_RESET);
 
     if (ImGui::IsKeyPressed(ImGuiKey_C, false))
-        compass_ruler = !compass_ruler;
+        app_state.compass_ruler = !app_state.compass_ruler;
     if (ImGui::IsKeyPressed(ImGuiKey_O, false))
-        is_ortho = !is_ortho;
+        app_state.is_ortho = !app_state.is_ortho;
     if (ImGui::IsKeyPressed(ImGuiKey_X, false))
-        show_axes = !show_axes;
+        app_state.show_axes = !app_state.show_axes;
 
     if (ImGui::IsKeyPressed(ImGuiKey_1))
-        point_size = 1;
+        app_state.point_size = 1;
     if (ImGui::IsKeyPressed(ImGuiKey_2))
-        point_size = 2;
+        app_state.point_size = 2;
     if (ImGui::IsKeyPressed(ImGuiKey_3))
-        point_size = 3;
+        app_state.point_size = 3;
     if (ImGui::IsKeyPressed(ImGuiKey_4))
-        point_size = 4;
+        app_state.point_size = 4;
     if (ImGui::IsKeyPressed(ImGuiKey_5))
-        point_size = 5;
+        app_state.point_size = 5;
     if (ImGui::IsKeyPressed(ImGuiKey_6))
-        point_size = 6;
+        app_state.point_size = 6;
     if (ImGui::IsKeyPressed(ImGuiKey_7))
-        point_size = 7;
+        app_state.point_size = 7;
     if (ImGui::IsKeyPressed(ImGuiKey_8))
-        point_size = 8;
+        app_state.point_size = 8;
     if (ImGui::IsKeyPressed(ImGuiKey_9))
-        point_size = 9;
+        app_state.point_size = 9;
 }
 
 // GL-free -- copied verbatim.
@@ -715,15 +670,15 @@ void cor_window()
     {
         ImGui::Text("Select new center of rotation [m]:");
         ImGui::PushItemWidth(ImGuiNumberWidth);
-        ImGui::InputFloat("X", &new_rotation_center.x(), 0.0, 0.0, "%.3f");
+        ImGui::InputFloat("X", &app_state.new_rotation_center.x(), 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(xText);
         ImGui::SameLine();
-        ImGui::InputFloat("Y", &new_rotation_center.y(), 0.0, 0.0, "%.3f");
+        ImGui::InputFloat("Y", &app_state.new_rotation_center.y(), 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(yText);
         ImGui::SameLine();
-        ImGui::InputFloat("Z", &new_rotation_center.z(), 0.0, 0.0, "%.3f");
+        ImGui::InputFloat("Z", &app_state.new_rotation_center.z(), 0.0, 0.0, "%.3f");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(zText);
         ImGui::PopItemWidth();
@@ -732,13 +687,13 @@ void cor_window()
 
         if (ImGui::Button("Set"))
         {
-            new_rotate_x = rotate_x;
-            new_rotate_y = rotate_y;
-            new_translate_x = -new_rotation_center.x();
-            new_translate_y = -new_rotation_center.y();
-            new_translate_z = translate_z;
+            app_state.new_rotate_x = app_state.rotate_x;
+            app_state.new_rotate_y = app_state.rotate_y;
+            app_state.new_translate_x = -app_state.new_rotation_center.x();
+            app_state.new_translate_y = -app_state.new_rotation_center.y();
+            app_state.new_translate_z = app_state.translate_z;
 
-            camera_transition_active = true;
+            app_state.camera_transition_active = true;
 
             ImGui::CloseCurrentPopup();
         }
@@ -786,147 +741,23 @@ void ImGuiHyperlink(const char* url, ImVec4 color)
     }
 }
 
-// General shortcuts applicable to any app -- GL-free, copied verbatim.
-static const std::vector<ShortcutEntry> shortcuts = { { "Normal keys", "A", "" },
-                                                      { "", "Ctrl+A", "" },
-                                                      { "", "B", "camera Back" },
-                                                      { "", "Ctrl+B", "" },
-                                                      { "", "C", "Compass/ruler" },
-                                                      { "", "Ctrl+C", "" },
-                                                      { "", "D", "" },
-                                                      { "", "Ctrl+D", "" },
-                                                      { "", "E", "" },
-                                                      { "", "Ctrl+E", "" },
-                                                      { "", "F", "camera Front" },
-                                                      { "", "Ctrl+F", "" },
-                                                      { "", "G", "" },
-                                                      { "", "Ctrl+G", "" },
-                                                      { "", "H", "" },
-                                                      { "", "Ctrl+H", "" },
-                                                      { "", "I", "camera Isometric" },
-                                                      { "", "Ctrl+I", "" },
-                                                      { "", "J", "" },
-                                                      { "", "Ctrl+J", "" },
-                                                      { "", "K", "" },
-                                                      { "", "Ctrl+K", "" },
-                                                      { "", "L", "camera Left" },
-                                                      { "", "Ctrl+L", "" },
-                                                      { "", "M", "" },
-                                                      { "", "Ctrl+M", "" },
-                                                      { "", "N", "" },
-                                                      { "", "Ctrl+N", "" },
-                                                      { "", "O", "Ortographic view" },
-                                                      { "", "Ctrl+O", "Open/load session/data" },
-                                                      { "", "P", "" },
-                                                      { "", "Ctrl+P", "" },
-                                                      { "", "Q", "" },
-                                                      { "", "Ctrl+Q", "" },
-                                                      { "", "R", "camera Right" },
-                                                      { "", "Ctrl+R", "" },
-                                                      { "", "Shift+R", "Rotation center" },
-                                                      { "", "S", "" },
-                                                      { "", "Ctrl+S", "" },
-                                                      { "", "Ctrl+Shift+S", "" },
-                                                      { "", "T", "camera Top" },
-                                                      { "", "Ctrl+T", "" },
-                                                      { "", "U", "camera bottom (Under)" },
-                                                      { "", "Ctrl+U", "" },
-                                                      { "", "V", "" },
-                                                      { "", "Ctrl+V", "" },
-                                                      { "", "W", "" },
-                                                      { "", "Ctrl+W", "" },
-                                                      { "", "X", "show aXes" },
-                                                      { "", "Ctrl+X", "" },
-                                                      { "", "Y", "" },
-                                                      { "", "Ctrl+Y", "" },
-                                                      { "", "Z", "camera reset" },
-                                                      { "", "Ctrl+Z", "" },
-                                                      { "", "Shift+Z", "Lock Z" },
-                                                      { "", "1-9", "point size" },
-                                                      { "Special keys", "Up arrow", "" },
-                                                      { "", "Shift + up arrow", "camera translate Up" },
-                                                      { "", "Ctrl + up arrow", "" },
-                                                      { "", "Down arrow", "" },
-                                                      { "", "Shift + down arrow", "camera translate Down" },
-                                                      { "", "Ctrl + down arrow", "" },
-                                                      { "", "Left arrow", "" },
-                                                      { "", "Shift + left arrow", "camera translate Left" },
-                                                      { "", "Ctrl + left arrow", "" },
-                                                      { "", "Right arrow", "" },
-                                                      { "", "Shift + right arrow", "camera translate Right" },
-                                                      { "", "Ctrl + right arrow", "" },
-                                                      { "", "Pg down", "" },
-                                                      { "", "Pg up", "" },
-                                                      { "", "- key", "" },
-                                                      { "", "+ key", "" },
-                                                      { "Mouse related", "Left click + drag", "camera rotate" },
-                                                      { "", "Right click + drag", "camera pan" },
-                                                      { "", "Scroll", "camera zoom" },
-                                                      { "", "Shift + scroll", "camera 5x zoom" },
-                                                      { "", "Shift + drag", "Dock window to screen edges" },
-                                                      { "", "Ctrl + left click", "" },
-                                                      { "", "Ctrl + right click", "change center of rotation" },
-                                                      { "", "Ctrl + middle click", "change center of rotation (if no CP GUI active)" } };
-
-// GL-free -- copied verbatim.
-void ShowShortcutsTable(const std::vector<ShortcutEntry> appShortcuts)
-{
-    if (ImGui::BeginTable(
-            "ShortcutsTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY, ImVec2(-FLT_MIN, 200)))
-    {
-        ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthFixed, 120);
-        ImGui::TableSetupColumn("Description");
-        ImGui::TableHeadersRow();
-
-        std::string lastType;
-
-        for (size_t i = 0; i < shortcuts.size(); ++i)
-        {
-            const auto& s = shortcuts[i];
-
-            if (!s.type.empty() && s.type != lastType)
-            {
-                lastType = s.type;
-                ImGui::TableNextRow();
-
-                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32(70, 70, 140, 255));
-
-                ImGui::TableSetColumnIndex(0);
-                ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "%s", lastType.c_str());
-                ImGui::TableSetColumnIndex(1);
-                ImGui::TextUnformatted("");
-            }
-
-            auto description = s.description;
-
-            if (description.empty())
-                description = appShortcuts[i].description;
-
-            if (!description.empty())
-            {
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0);
-                ImGui::TextUnformatted(s.shortcut.c_str());
-                ImGui::TableSetColumnIndex(1);
-                ImGui::TextUnformatted(description.c_str());
-            }
-        }
-
-        ImGui::EndTable();
-    }
-}
+// ShortcutEntry/ShowShortcutsTable moved to raylib_widgets (shared with the
+// camera_lidar_* apps) -- the generic shortcut-label scaffolding that used to
+// live here was merged directly into gui.cpp's appShortcuts (see the comment
+// there), removing the two-list indirection (and a pre-existing off-by-one:
+// gui.cpp's list was missing a "Ctrl+J" entry, silently misaligning every
+// entry after "J" against this list's descriptions).
 
 // GL-free -- copied verbatim (glGetString(GL_RENDERER/...) is a plain
 // string query, still valid under a core-profile context).
 void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts)
 {
-    if (!info_gui)
+    if (!app_state.info_gui)
         return;
 
     if (ImGui::Begin(
             "Info",
-            &info_gui,
+            &app_state.info_gui,
             ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse))
     {
         bool firstLine = true;
@@ -976,7 +807,7 @@ void info_window(const std::vector<std::string>& infoLines, const std::vector<Sh
         ImGui::Separator();
         ImGui::NewLine();
 
-        ShowShortcutsTable(appShortcuts);
+        raylib_widgets::ShowShortcutsTable(appShortcuts);
 
         if (show_about)
             ImGui::ShowAboutWindow(&show_about);
@@ -985,66 +816,22 @@ void info_window(const std::vector<std::string>& infoLines, const std::vector<Sh
     ImGui::End();
 }
 
-// Was a dedicated 200x200 GL sub-viewport with its own glOrtho projection,
-// rotation-only modelview (viewLocal's rotation), and GLUT bitmap-font text
-// (glRasterPos + glutBitmapCharacter). Reimplemented as a pure 2D
-// screen-space overlay instead: project each world axis direction through
-// viewLocal's rotation to get eye-space X/Y (screen right/up), and draw
-// with raylib's DrawLineEx/DrawText -- same bottom-left placement, same
-// "nice number" ruler tied to zoom (translate_z), no sub-viewport or GLUT
-// font needed.
+// Drawing itself now lives in raylib_widgets::drawCompassRuler (shared with
+// the camera_lidar_* apps' identical overlay) -- this just adapts this app's
+// own camera/background state (app_state.viewLocal's rotation matrix,
+// app_state.translate_z zoom, app_state.bg_color) into that function's
+// right/up/zoomDistance/rulerColor parameters. Row 0/1 of a world-to-eye
+// rotation matrix R are exactly the world-space directions that map to
+// eye-space +X/+Y (screen right/up): (R * dir).x() == dot(R.row(0), dir).
 void drawMiniCompassWithRuler()
 {
-    const float compassSize = 200.0f;
-    const float originX = compassSize * 0.5f;
-    const float originY = static_cast<float>(GetScreenHeight()) - compassSize * 0.5f;
-    const float axisPixelLength = compassSize * 0.35f;
-
-    struct Axis
-    {
-        Eigen::Vector3f dir;
-        const char* label;
-        Color color;
-    };
-    const Axis axes[3] = {
-        { Eigen::Vector3f::UnitX(), "X (long.)", RED },
-        { Eigen::Vector3f::UnitY(), "Y (lat.)", GREEN },
-        { Eigen::Vector3f::UnitZ(), "Z (vert.)", BLUE },
-    };
-
-    for (const auto& axis : axes)
-    {
-        Eigen::Vector3f eyeDir = viewLocal.rotation() * axis.dir;
-        Vector2 tip = { originX + eyeDir.x() * axisPixelLength, originY - eyeDir.y() * axisPixelLength };
-        DrawLineEx(Vector2{ originX, originY }, tip, 2.f, axis.color);
-        DrawText(axis.label, (int)tip.x + 4, (int)tip.y - 6, 12, axis.color);
-    }
-
-    // Ruler: "nice" (1/2/5 x 10^n) length, mirroring the original's
-    // 0.1 * fabs(translate_z) heuristic (translate_z is this app's
-    // zoom/dolly distance).
-    float rawUnit = std::max(0.001f, 0.1f * fabsf(translate_z));
-    float base = powf(10.0f, floorf(log10f(rawUnit)));
-    float normalized = rawUnit / base;
-    float niceUnit = normalized < 2.0f ? 1.0f : (normalized < 5.0f ? 2.0f : 5.0f);
-    float worldLength = niceUnit * base;
-
-    char label[32];
-    if (worldLength >= 1000.0f)
-        snprintf(label, sizeof(label), "%.0f [km]", worldLength / 1000.0f);
-    else if (worldLength >= 1.0f)
-        snprintf(label, sizeof(label), "%.0f [m]", worldLength);
-    else if (worldLength >= 0.01f)
-        snprintf(label, sizeof(label), "%.0f [cm]", worldLength * 100.0f);
-    else
-        snprintf(label, sizeof(label), "<1 [cm]");
-
-    float rulerY = originY + compassSize * 0.45f;
-    Color rulerColor = ColorFromNormalized(Vector4{ 1.0f - bg_color.x, 1.0f - bg_color.y, 1.0f - bg_color.z, 1.0f });
-    DrawLineEx(Vector2{ originX - 40.f, rulerY }, Vector2{ originX + 40.f, rulerY }, 2.f, rulerColor);
-    DrawLineEx(Vector2{ originX - 40.f, rulerY - 5.f }, Vector2{ originX - 40.f, rulerY + 5.f }, 2.f, rulerColor);
-    DrawLineEx(Vector2{ originX + 40.f, rulerY - 5.f }, Vector2{ originX + 40.f, rulerY + 5.f }, 2.f, rulerColor);
-    DrawText(label, (int)originX - 20, (int)rulerY + 6, 14, rulerColor);
+    const Eigen::Matrix3f& R = app_state.viewLocal.rotation();
+    Vector3 right = { R(0, 0), R(0, 1), R(0, 2) };
+    Vector3 up = { R(1, 0), R(1, 1), R(1, 2) };
+    Color rulerColor =
+        ColorFromNormalized(Vector4{ 1.0f - app_state.bg_color.x, 1.0f - app_state.bg_color.y, 1.0f - app_state.bg_color.z, 1.0f });
+    raylib_widgets::drawCompassRuler(
+        right, up, app_state.translate_z, rulerColor, raylib_widgets::CompassAxisLabels{ "X (long.)", "Y (lat.)", "Z (vert.)" });
 }
 
 // GL-free -- copied verbatim.
@@ -1095,8 +882,8 @@ LaserBeam GetLaserBeam(int x, int y)
     float ndcX = (2.0f * (float)x) / (float)width - 1.0f;
     float ndcY = 1.0f - (2.0f * (float)y) / (float)height;
 
-    Matrix matView = frame_view_3d;
-    Matrix matProj = frame_proj_3d;
+    Matrix matView = app_state.frame_view_3d;
+    Matrix matProj = app_state.frame_proj_3d;
 
     Vector3 nearPoint = Vector3Unproject(Vector3{ ndcX, ndcY, 0.0f }, matProj, matView);
     Vector3 farPoint = Vector3Unproject(Vector3{ ndcX, ndcY, 1.0f }, matProj, matView);
@@ -1140,9 +927,9 @@ void getClosestTrajectoryPoint(Session& session_, int x, int y, bool gcpPicking,
                 index_i = i;
                 index_j = j;
 
-                new_rotation_center.x() = static_cast<float>(vp.x());
-                new_rotation_center.y() = static_cast<float>(vp.y());
-                new_rotation_center.z() = static_cast<float>(vp.z());
+                app_state.new_rotation_center.x() = static_cast<float>(vp.x());
+                app_state.new_rotation_center.y() = static_cast<float>(vp.y());
+                app_state.new_rotation_center.z() = static_cast<float>(vp.z());
 
                 if (gcpPicking)
                 {
@@ -1155,12 +942,12 @@ void getClosestTrajectoryPoint(Session& session_, int x, int y, bool gcpPicking,
         }
     }
 
-    new_rotate_x = rotate_x;
-    new_rotate_y = rotate_y;
-    new_translate_x = -new_rotation_center.x();
-    new_translate_y = -new_rotation_center.y();
-    new_translate_z = translate_z;
-    camera_transition_active = true;
+    app_state.new_rotate_x = app_state.rotate_x;
+    app_state.new_rotate_y = app_state.rotate_y;
+    app_state.new_translate_x = -app_state.new_rotation_center.x();
+    app_state.new_translate_y = -app_state.new_rotation_center.y();
+    app_state.new_translate_z = app_state.translate_z;
+    app_state.camera_transition_active = true;
 }
 
 // GL-free -- copied verbatim.
@@ -1174,17 +961,17 @@ void setNewRotationCenter(int x, int y)
     pl.b = 0;
     pl.c = 1;
     pl.d = 0;
-    new_rotation_center = rayIntersection(laser_beam, pl).cast<float>();
+    app_state.new_rotation_center = rayIntersection(laser_beam, pl).cast<float>();
 
-    std::cout << "Setting new rotation center to:\n" << new_rotation_center << std::endl;
+    std::cout << "Setting new rotation center to:\n" << app_state.new_rotation_center << std::endl;
 
-    new_rotate_x = rotate_x;
-    new_rotate_y = rotate_y;
-    new_translate_x = -new_rotation_center.x();
-    new_translate_y = -new_rotation_center.y();
-    new_translate_z = translate_z;
+    app_state.new_rotate_x = app_state.rotate_x;
+    app_state.new_rotate_y = app_state.rotate_y;
+    app_state.new_translate_x = -app_state.new_rotation_center.x();
+    app_state.new_translate_y = -app_state.new_rotation_center.y();
+    app_state.new_translate_z = app_state.translate_z;
 
-    camera_transition_active = true;
+    app_state.camera_transition_active = true;
 }
 
 // GL-free -- copied verbatim.
@@ -1205,35 +992,37 @@ bool checkClHelp(int argc, char** argv)
 // Was glOrtho + gluLookAt (folded into GL_PROJECTION, matching the
 // original's call order -- gluLookAt ran before the GL_MODELVIEW switch
 // below) -- rewritten as rlOrtho + rlMultMatrixf with the same lookAt
-// matrix already computed via GLM for m_ortho_gizmo_view just above it.
+// matrix already computed via GLM for app_state.m_ortho_gizmo_view just above it.
 void updateOrthoView()
 {
-    // still updating viewLocal for compass
-    viewLocal.rotate(Eigen::AngleAxisf((rotate_x + rotate_y) * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+    // still updating app_state.viewLocal for compass
+    app_state.viewLocal.rotate(Eigen::AngleAxisf((app_state.rotate_x + app_state.rotate_y) * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
 
     ImGuiIO& io = ImGui::GetIO();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
     rlOrtho(
-        -camera_ortho_xy_view_zoom,
-        camera_ortho_xy_view_zoom,
-        -camera_ortho_xy_view_zoom / ratio,
-        camera_ortho_xy_view_zoom / ratio,
+        -app_state.camera_ortho_xy_view_zoom,
+        app_state.camera_ortho_xy_view_zoom,
+        -app_state.camera_ortho_xy_view_zoom / ratio,
+        app_state.camera_ortho_xy_view_zoom / ratio,
         -100000,
         100000);
 
     glm::mat4 proj = glm::orthoLH_ZO<float>(
-        -camera_ortho_xy_view_zoom,
-        camera_ortho_xy_view_zoom,
-        -camera_ortho_xy_view_zoom / ratio,
-        camera_ortho_xy_view_zoom / ratio,
+        -app_state.camera_ortho_xy_view_zoom,
+        app_state.camera_ortho_xy_view_zoom,
+        -app_state.camera_ortho_xy_view_zoom / ratio,
+        app_state.camera_ortho_xy_view_zoom / ratio,
         -100,
         100);
 
-    std::copy(&proj[0][0], &proj[3][3], m_ortho_projection);
+    std::copy(&proj[0][0], &proj[3][3], app_state.m_ortho_projection);
 
-    Eigen::Vector3d v_eye_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h + 10);
-    Eigen::Vector3d v_center_t(-camera_ortho_xy_view_shift_x, camera_ortho_xy_view_shift_y, camera_mode_ortho_z_center_h);
+    Eigen::Vector3d v_eye_t(
+        -app_state.camera_ortho_xy_view_shift_x, app_state.camera_ortho_xy_view_shift_y, app_state.camera_mode_ortho_z_center_h + 10);
+    Eigen::Vector3d v_center_t(
+        -app_state.camera_ortho_xy_view_shift_x, app_state.camera_ortho_xy_view_shift_y, app_state.camera_mode_ortho_z_center_h);
     Eigen::Vector3d v(0, 1, 0);
 
     TaitBryanPose pose_tb;
@@ -1242,7 +1031,7 @@ void updateOrthoView()
     pose_tb.pz = 0.0;
     pose_tb.om = 0.0;
     pose_tb.fi = 0.0;
-    pose_tb.ka = -(rotate_x + rotate_y) * DEG_TO_RAD;
+    pose_tb.ka = -(app_state.rotate_x + app_state.rotate_y) * DEG_TO_RAD;
     auto m = affine_matrix_from_pose_tait_bryan(pose_tb);
 
     Eigen::Vector3d v_t = m * v;
@@ -1251,7 +1040,7 @@ void updateOrthoView()
         glm::vec3(v_eye_t.x(), v_eye_t.y(), v_eye_t.z()),
         glm::vec3(v_center_t.x(), v_center_t.y(), v_center_t.z()),
         glm::vec3(v_t.x(), v_t.y(), v_t.z()));
-    std::copy(&lookat[0][0], &lookat[3][3], m_ortho_gizmo_view);
+    std::copy(&lookat[0][0], &lookat[3][3], app_state.m_ortho_gizmo_view);
 
     rlMultMatrixf(&lookat[0][0]);
 

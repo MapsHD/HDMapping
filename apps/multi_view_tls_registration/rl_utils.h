@@ -19,6 +19,8 @@
 
 #include <imgui.h>
 
+#include <RaylibWidgets/ShortcutsTable.h>
+
 #include <Core/registration_plane_feature.h>
 #include <Core/session.h>
 #include <Core/structures.h>
@@ -73,68 +75,67 @@ enum ColorScheme
 };
 
 ///////////////////////////////////////////////////////////////////////////////////
-
-extern int viewer_decimate_point_cloud;
-
-extern int mouse_old_x, mouse_old_y;
-extern int mouse_buttons;
-extern float mouse_sensitivity;
-
-extern bool is_ortho;
-extern bool lock_z;
-extern bool show_axes;
-extern ImVec4 bg_color;
-extern int point_size;
-
-extern bool info_gui;
-extern bool compass_ruler;
-
-extern Eigen::Affine3f viewLocal;
-
-extern Eigen::Vector3f rotation_center;
-extern float rotate_x, rotate_y;
-extern float translate_x, translate_y, translate_z;
-
-extern double camera_ortho_xy_view_zoom;
-extern double camera_ortho_xy_view_shift_x;
-extern double camera_ortho_xy_view_shift_y;
-extern double camera_mode_ortho_z_center_h;
-
-// Target camera state for smooth transitions
-extern Eigen::Vector3f new_rotation_center;
-extern float new_rotate_x;
-extern float new_rotate_y;
-extern float new_translate_x;
-extern float new_translate_y;
-extern float new_translate_z;
-
-// Transition timing
-extern bool camera_transition_active;
-
-// The 3D view/projection rlgl had active during this frame's scene render,
-// cached by display() right before end3DMatrixStack() resets rlgl's matrix
-// stack to the 2D screen-space ortho used for the mini-compass/ImGui pass.
-// GetLaserBeam() (called from mouse(), which runs *before* display() each
-// frame -- see main()) needs these: querying rlGetMatrixModelview()/
-// rlGetMatrixProjection() live at that point would still see the previous
-// frame's post-end3DMatrixStack() state (identity modelview, 2D ortho
-// projection), not the 3D camera, producing a meaningless pick ray.
-extern Matrix frame_view_3d;
-extern Matrix frame_proj_3d;
-
-// Unlike the original (which probed GL_LINE_WIDTH_RANGE), rlgl's line width
-// support is uniform enough here not to need a runtime check -- always true.
-extern bool glLineWidthSupport;
-
-extern float m_ortho_projection[];
-extern float m_ortho_gizmo_view[];
-
-struct ShortcutEntry
+struct AppStateBase
 {
-    std::string type;
-    std::string shortcut;
-    std::string description;
+    int viewer_decimate_point_cloud = 2;
+
+    int mouse_old_x = 0, mouse_old_y = 0;
+    int mouse_buttons = 0;
+    float mouse_sensitivity = 1.0f;
+    bool is_ortho = false;
+    bool lock_z = false;
+    bool show_axes = true;
+    ImVec4 bg_color = ImVec4(0.65f, 0.65f, 0.65f, 1.00f);
+    int point_size = 1;
+
+    bool info_gui = false;
+    bool compass_ruler = true;
+
+    Eigen::Affine3f viewLocal;
+
+    Eigen::Vector3f rotation_center = Eigen::Vector3f::Zero();
+    float rotate_x = -35.264f, rotate_y = 135.0f;
+    float translate_x = 0.0f, translate_y = 0.0f, translate_z = -50.0f;
+
+    double camera_ortho_xy_view_zoom = 10;
+    double camera_ortho_xy_view_shift_x = 0.0;
+    double camera_ortho_xy_view_shift_y = 0.0;
+    double camera_mode_ortho_z_center_h = 0.0;
+
+    // Target camera state for smooth transitions
+    Eigen::Vector3f new_rotation_center = rotation_center;
+    float new_rotate_x = rotate_x;
+    float new_rotate_y = rotate_y;
+    float new_translate_x = translate_x;
+    float new_translate_y = translate_y;
+    float new_translate_z = translate_z;
+
+    // Transition timing
+    bool camera_transition_active = false;
+
+    // The 3D view/projection rlgl had active during this frame's scene render,
+    // cached by display() right before end3DMatrixStack() resets rlgl's matrix
+    // stack to the 2D screen-space ortho used for the mini-compass/ImGui pass.
+    // GetLaserBeam() (called from mouse(), which runs *before* display() each
+    // frame -- see main()) needs these: querying rlGetMatrixModelview()/
+    // rlGetMatrixProjection() live at that point would still see the previous
+    // frame's post-end3DMatrixStack() state (identity modelview, 2D ortho
+    // projection), not the 3D camera, producing a meaningless pick ray.
+    Matrix frame_view_3d = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+    Matrix frame_proj_3d = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+
+    // Unlike the original (which probed GL_LINE_WIDTH_RANGE), rlgl's line width
+    // support is uniform enough here not to need a runtime check -- always true.
+    bool glLineWidthSupport = true;
+
+    float m_ortho_projection[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+    float m_ortho_gizmo_view[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 };
+
+inline AppStateBase app_state;
+
+// Now shared with the camera_lidar_* apps -- see raylib_widgets/include/RaylibWidgets/ShortcutsTable.h.
+using raylib_widgets::ShortcutEntry;
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -154,7 +155,6 @@ void view_kbd_shortcuts();
 void cor_window();
 
 void ImGuiHyperlink(const char* url, ImVec4 color = ImVec4(0.2f, 0.4f, 0.8f, 1.0f));
-void ShowShortcutsTable(const std::vector<ShortcutEntry> appShortcuts);
 void info_window(const std::vector<std::string>& infoLines, const std::vector<ShortcutEntry>& appShortcuts);
 
 void drawMiniCompassWithRuler();

@@ -1747,7 +1747,7 @@ static void compute_hessian(
     const bool& ablation_study_use_threshold_outer_rgd,
     const double& convergence_result,
     const double& convergence_delta_threshold_outer_rgd,
-    const std::vector<double>& table_buckets_nv,
+    const std::vector<double>& table_buckets_nv_indoor,
     const std::vector<double>& table_buckets_nv_outdoor,
     bool ablation_study_use_anisotropic_weighting)
 {
@@ -1782,7 +1782,7 @@ static void compute_hessian(
                 ablation_study_use_view_point_and_normal_vectors,
                 ablation_study_use_planarity,
                 ablation_study_use_norm,
-                table_buckets_nv,
+                table_buckets_nv_indoor,
                 out_AtPA,
                 out_AtPB,
                 ablation_study_use_anisotropic_weighting);
@@ -1866,7 +1866,7 @@ void optimize_lidar_odometry(
     const bool& ablation_study_use_threshold_outer_rgd,
     const double& convergence_result,
     const double& convergence_delta_threshold_outer_rgd,
-    std::vector<double>& table_buckets_nv,
+    std::vector<double>& table_buckets_nv_indoor,
     std::vector<double>& table_buckets_nv_outdoor)
 {
     HDMAP_ZONE_SCOPE("optimize_lidar_odometry");
@@ -1983,7 +1983,7 @@ void optimize_lidar_odometry(
                 ablation_study_use_threshold_outer_rgd,
                 convergence_result,
                 convergence_delta_threshold_outer_rgd,
-                table_buckets_nv,
+                table_buckets_nv_indoor,
                 table_buckets_nv_outdoor,
                 ablation_study_use_anisotropic_weighting);
         }
@@ -2763,8 +2763,8 @@ bool process_worker_step_lidar_odometry_core(
 
     HDMAP_ZONE_SCOPE("process_worker_step_lidar_odometry_core");
 
-    std::vector<double> table_buckets_nv;
-    table_buckets_nv.resize(101 * 101 * 101, 0.0);
+    std::vector<double> table_buckets_nv_indoor;
+    table_buckets_nv_indoor.resize(101 * 101 * 101, 0.0);
 
     std::vector<double> table_buckets_nv_outdoor;
     table_buckets_nv_outdoor.resize(101 * 101 * 101, 0.0);
@@ -2799,9 +2799,9 @@ bool process_worker_step_lidar_odometry_core(
 
         if (params.ablation_study_use_anisotropic_weighting)
         {
-            for (int i = 0; i < table_buckets_nv.size(); i++)
+            for (int i = 0; i < table_buckets_nv_indoor.size(); i++)
             {
-                table_buckets_nv[i] = 0;
+                table_buckets_nv_indoor[i] = 0;
             }
             for (int i = 0; i < table_buckets_nv_outdoor.size(); i++)
             {
@@ -2840,7 +2840,7 @@ bool process_worker_step_lidar_odometry_core(
                         //     continue;
                         // }
 
-                        table_buckets_nv[index_bucket_indoor] += 1.0;
+                        table_buckets_nv_indoor[index_bucket_indoor] += 1.0;
                     }
                 }
             }
@@ -2872,7 +2872,7 @@ bool process_worker_step_lidar_odometry_core(
                         int index_bucket_outdoor =
                             (x + 1.0) * 0.5 * 100.0 + (y + 1.0) * 0.5 * 100.0 * 100.0 + (z + 1.0) * 0.5 * 100.0 * 100.0 * 100.0;
 
-                        table_buckets_nv[index_bucket_outdoor] += 1.0;
+                        table_buckets_nv_outdoor[index_bucket_outdoor] += 1.0;
                     }
                 }
             }
@@ -2914,7 +2914,7 @@ bool process_worker_step_lidar_odometry_core(
             params.ablation_study_use_threshold_outer_rgd,
             delta,
             params.convergence_delta_threshold_outer_rgd,
-            table_buckets_nv,
+            table_buckets_nv_indoor,
             table_buckets_nv_outdoor);
         if (delta < params.convergence_delta_threshold)
         {

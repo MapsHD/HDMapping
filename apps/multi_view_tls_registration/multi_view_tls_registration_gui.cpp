@@ -5126,23 +5126,18 @@ bool initGL(int* argc, char** argv, const std::string& winTitleArg, void (*)(), 
     (void)argc;
     (void)argv;
 
-    // No FLAG_MSAA_4X_HINT: on some GPU/driver combinations (seen with an
-    // NVIDIA PRIME-offloaded context) GLFW's GLX context request for a
-    // 4x-multisample framebuffer fails outright ("GLX: Failed to create
-    // context: BadValue"), and raylib/GLFW then segfaults using the broken
-    // context instead of falling back cleanly. Not worth the crash risk for
-    // a cosmetic antialiasing hint.
-    //
-    // FLAG_WINDOW_HIGHDPI: macOS/GLFW always backs the window with a
-    // full-resolution Retina framebuffer (rglfw.c's _GLFW_USE_RETINA),
-    // regardless of this flag -- but rlImGui only reads that real scale
-    // factor into io.DisplayFramebufferScale (and scales its font atlas
-    // and mouse coordinates to match) when FLAG_WINDOW_HIGHDPI is set.
-    // Without it, on a Retina display ImGui assumes 1:1 and everything it
-    // draws ends up scaled/positioned for a framebuffer a quarter the
-    // actual size -- menus stretched into oversized black bars, widgets
-    // rendered as solid blocks from a mis-sampled font atlas.
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI);
+    // FLAG_WINDOW_HIGHDPI on Windows causes issues with the ImGui menu bar and other UI elements being scaled incorrectly, so it's only
+    // enabled on macOS and Linux. On Windows, raylib's default DPI scaling is used instead.
+
+    unsigned int flags = FLAG_WINDOW_RESIZABLE;
+#ifdef __APPLE__
+    flags |= FLAG_WINDOW_HIGHDPI;
+#endif //__APPLE__
+#if __LINUX__
+    flags |= FLAG_WINDOW_HIGHDPI;
+#endif // __LINUX__
+
+    SetConfigFlags(flags);
     InitWindow(static_cast<int>(window_width), static_cast<int>(window_height), winTitleArg.c_str());
     SetTargetFPS(60);
 

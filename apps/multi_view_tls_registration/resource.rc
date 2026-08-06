@@ -13,6 +13,11 @@
 // remains consistent on all systems.
 IDI_ICON1               ICON                    "icon.ico"
 
+// GLFW (used by raylib) only picks up a window/taskbar icon from a
+// resource named exactly GLFW_ICON on Windows; without it GLFW falls
+// back to the generic IDI_WINLOGO icon at runtime.
+GLFW_ICON               ICON                    "icon.ico"
+
 
 /////////////////////////////////////////////////////////////////////////////
 //

@@ -32,15 +32,22 @@ namespace
             AtPAndt.block<6, 6>(c, c) += block.AtPAndtBlocksToSum;
             AtPBndt.block<6, 1>(c, 0) -= block.AtPBndtBlocksToSum;
         }
-    };
+    }
+
+    inline int normal_vector_bucket_index(double x, double y, double z)
+    {
+        return static_cast<int>((x + 1.0) * 0.5 * 100.0 + (y + 1.0) * 0.5 * 100.0 * 100.0 + (z + 1.0) * 0.5 * 100.0 * 100.0 * 100.0);
+    }
 } // namespace
 std::vector<std::pair<int, int>> nns(const std::vector<Point3Di>& points_global, const std::vector<int>& indexes_for_nn)
 {
     Eigen::Vector3d search_radious = { 0.1, 0.1, 0.1 };
 
     std::vector<std::pair<int, int>> nn;
+    nn.reserve(30);
 
     std::vector<std::pair<uint64_t, uint32_t>> indexes;
+    indexes.reserve(points_global.size());
 
     for (int i = 0; i < points_global.size(); i++)
     {
@@ -73,15 +80,14 @@ std::vector<std::pair<int, int>> nns(const std::vector<Point3Di>& points_global,
     for (size_t i = 0; i < indexes_for_nn.size(); i++)
     {
         int index_element_source = indexes_for_nn[i];
-        auto source = points_global[index_element_source];
+        const auto& source = points_global[index_element_source];
 
-        std::vector<double> min_distances;
-        std::vector<int> indexes_target;
-        for (int j = 0; j < 30; j++)
-        {
-            min_distances.push_back(1000.0);
-            indexes_target.push_back(-1);
-        }
+        static constexpr auto target_size = 30;
+        std::array<double, target_size> min_distances = {};
+        std::array<int, target_size> indexes_target = {};
+
+        min_distances.fill(1000.0);
+        indexes_target.fill(-1);
 
         for (double x = -search_radious.x(); x <= search_radious.x(); x += search_radious.x())
         {
@@ -97,7 +103,7 @@ std::vector<std::pair<int, int>> nns(const std::vector<Point3Di>& points_global,
                         for (int index = buckets[index_of_bucket].first; index < buckets[index_of_bucket].second; index++)
                         {
                             int index_element_target = indexes[index].second;
-                            auto target = points_global[index_element_target];
+                            const auto& target = points_global[index_element_target];
 
                             if (source.index_point != target.index_point)
                             {
@@ -137,7 +143,9 @@ void optimize_icp(
 bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
 )
 {
-    std::vector<Point3Di> all_points_global = points_global;
+    std::vector<Point3Di> all_points_global;
+    all_points_global.reserve(points_global.size() + intermediate_points.size());
+    all_points_global.assign(points_global.begin(), points_global.end());
 
     for (int i = 0; i < all_points_global.size(); i++)
     {
@@ -148,6 +156,7 @@ bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &im
     int size = all_points_global.size();
 
     std::vector<int> indexes_for_nn;
+    indexes_for_nn.reserve(intermediate_points.size());
 
     for (int i = 0; i < intermediate_points.size(); i++)
     {
@@ -180,7 +189,7 @@ bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &im
 
     for (int i = 0; i < nn.size(); i++)
     {
-        auto intermediate_points_i = all_points_global[nn[i].first];
+        const auto& intermediate_points_i = all_points_global[nn[i].first];
         const Eigen::Affine3d& m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
         const Eigen::Vector3d& p_s = intermediate_points[intermediate_points_i.index_point - size].point; // intermediate_points_i.point;
         const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
@@ -241,11 +250,14 @@ bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &im
     }
 
     std::vector<std::pair<int, int>> odo_edges;
+    odo_edges.reserve(intermediate_trajectory.size() > 0 ? intermediate_trajectory.size() - 1 : 0);
     for (size_t i = 1; i < intermediate_trajectory.size(); i++)
         odo_edges.emplace_back(i - 1, i);
 
     std::vector<TaitBryanPose> poses;
     std::vector<TaitBryanPose> poses_desired;
+    poses.reserve(intermediate_trajectory.size());
+    poses_desired.reserve(intermediate_trajectory_motion_model.size());
 
     for (size_t i = 0; i < intermediate_trajectory.size(); i++)
         poses.push_back(pose_tait_bryan_from_affine_matrix(intermediate_trajectory[i]));
@@ -420,6 +432,7 @@ bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &im
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
     Eigen::SparseMatrix<double> x = solver.solve(AtPB);
     std::vector<double> h_x;
+    h_x.reserve(intermediate_trajectory.size() * 6);
     for (int k = 0; k < x.outerSize(); ++k)
         for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
             h_x.push_back(it.value());
@@ -457,13 +470,14 @@ void optimize_sf(
     bool multithread)
 {
     auto int_tr = intermediate_trajectory;
-    auto int_tr_tmp = intermediate_trajectory;
-    auto int_tr_mm = intermediate_trajectory_motion_model;
 
     std::vector<Point3Di> point_cloud_global;
     std::vector<Point3Di> points_local;
 
     std::vector<Eigen::Vector3d> point_cloud_global_sc;
+    point_cloud_global.reserve(intermediate_points.size());
+    points_local.reserve(intermediate_points.size());
+    point_cloud_global_sc.reserve(intermediate_points.size());
     // std::vector<Point3Di> points_local_sc;
 
     for (int i = 0; i < intermediate_points.size(); i++)
@@ -476,7 +490,7 @@ void optimize_sf(
 
             Eigen::Vector3d pp = intermediate_points[i].point;
 
-            Eigen::Affine3d pose = intermediate_trajectory[intermediate_points[i].index_pose];
+            const Eigen::Affine3d& pose = intermediate_trajectory[intermediate_points[i].index_pose];
 
             pp = pose * pp;
 
@@ -515,6 +529,12 @@ void optimize_sf(
     std::vector<Eigen::Triplet<double>> tripletListB;
     std::vector<std::mutex> my_mutex(1);
 
+    const size_t points_local_size = points_local.size();
+    const size_t odo_edges_size_estimate = intermediate_trajectory.size() > 0 ? intermediate_trajectory.size() - 1 : 0;
+    tripletListA.reserve(points_local_size * 18 + odo_edges_size_estimate * 72 + 6);
+    tripletListP.reserve(points_local_size * 9 + odo_edges_size_estimate * 6 + 6);
+    tripletListB.reserve(points_local_size * 3 + odo_edges_size_estimate * 6 + 6);
+
     Eigen::Vector3d b(rgd_params.resolution_X, rgd_params.resolution_Y, rgd_params.resolution_Z);
 
     const auto hessian_fun = [&](const Point3Di& intermediate_points_i)
@@ -524,7 +544,7 @@ void optimize_sf(
         double delta_y;
         double delta_z;
 
-        Eigen::Affine3d m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
+        const Eigen::Affine3d& m_pose = intermediate_trajectory[intermediate_points_i.index_pose];
         Eigen::Vector3d point_local(intermediate_points_i.point.x(), intermediate_points_i.point.y(), intermediate_points_i.point.z());
         Eigen::Vector3d point_global = m_pose * point_local;
 
@@ -544,7 +564,7 @@ void optimize_sf(
 
         auto& this_bucket = bucket_it->second;
 
-        Eigen::Vector3d mean(this_bucket.mean.x(), this_bucket.mean.y(), this_bucket.mean.z());
+        const Eigen::Vector3d& mean = this_bucket.mean;
 
         Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
         TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
@@ -611,11 +631,14 @@ void optimize_sf(
     }
 
     std::vector<std::pair<int, int>> odo_edges;
+    odo_edges.reserve(intermediate_trajectory.size() > 0 ? intermediate_trajectory.size() - 1 : 0);
     for (size_t i = 1; i < intermediate_trajectory.size(); i++)
         odo_edges.emplace_back(i - 1, i);
 
     std::vector<TaitBryanPose> poses;
     std::vector<TaitBryanPose> poses_desired;
+    poses.reserve(intermediate_trajectory.size());
+    poses_desired.reserve(intermediate_trajectory.size());
 
     for (size_t i = 0; i < intermediate_trajectory.size(); i++)
         poses.push_back(pose_tait_bryan_from_affine_matrix(intermediate_trajectory[i]));
@@ -1141,7 +1164,6 @@ void optimize_rigid_sf(
 
     auto _intermediate_trajectory = intermediate_trajectory;
     auto _intermediate_trajectory_motion_model = intermediate_trajectory_motion_model;
-    auto _buckets = buckets;
 
     NDT::GridParameters rgd_params_sc;
 
@@ -1155,21 +1177,20 @@ void optimize_rigid_sf(
     for (auto& t : _intermediate_trajectory_motion_model)
         t.translation() -= shift;
 
-    for (auto& b : _buckets)
-        b.second.mean -= shift;
-
     std::vector<Eigen::Vector3d> points_rgd;
     std::vector<Point3Di> point_cloud_global;
     std::vector<Eigen::Vector3d> point_cloud_global_sc;
 
     auto minv = _intermediate_trajectory[0].inverse();
 
-    for (const auto& b : _buckets)
+    // only the shifted mean is needed, so read directly from buckets instead of copying the whole map
+    for (const auto& b : buckets)
     {
-        auto pinv = minv * b.second.mean;
+        const Eigen::Vector3d mean_shifted = b.second.mean - shift;
+        auto pinv = minv * mean_shifted;
 
         if (pinv.norm() < max_distance_lidar_rigid_sf)
-            points_rgd.push_back(b.second.mean);
+            points_rgd.push_back(mean_shifted);
     }
 
     for (int i = 0; i < points_rgd.size(); i++)
@@ -1581,7 +1602,7 @@ static void add_indoor_hessian_contribution(
 
         if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
         {
-            int index_bucket_indoor = (x + 1.0) * 0.5 * 100.0 + (y + 1.0) * 0.5 * 100.0 * 100.0 + (z + 1.0) * 0.5 * 100.0 * 100.0 * 100.0;
+            int index_bucket_indoor = normal_vector_bucket_index(x, y, z);
 
             double w1 = table_buckets_nv[index_bucket_indoor];
             // std::cout << "w1: " << w1 << std::endl;
@@ -1710,7 +1731,7 @@ static void add_outdoor_hessian_contribution(
 
         if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
         {
-            int index_bucket_outdoor = (x + 1.0) * 0.5 * 100.0 + (y + 1.0) * 0.5 * 100.0 * 100.0 + (z + 1.0) * 0.5 * 100.0 * 100.0 * 100.0;
+            int index_bucket_outdoor = normal_vector_bucket_index(x, y, z);
 
             double w1 = table_buckets_nv_outdoor[index_bucket_outdoor];
             // std::cout << "w1: " << w1 << std::endl;
@@ -1887,6 +1908,10 @@ void optimize_lidar_odometry(
     std::vector<Eigen::Triplet<double>> tripletListP;
     std::vector<Eigen::Triplet<double>> tripletListB;
 
+    tripletListA.reserve(6);
+    tripletListP.reserve(6);
+    tripletListB.reserve(6);
+
     Eigen::MatrixXd AtPAndt(intermediate_trajectory.size() * 6, intermediate_trajectory.size() * 6);
     AtPAndt.setZero();
     Eigen::MatrixXd AtPBndt(intermediate_trajectory.size() * 6, 1);
@@ -1907,10 +1932,11 @@ void optimize_lidar_odometry(
     HDMAP_ZONE_BEGIN(hessian_compute, "hessian_compute");
     const size_t num_points = intermediate_points.size();
     const size_t num_poses = intermediate_trajectory.size();
+
     using Mat6x6 = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>;
     using Vec6x1 = Eigen::Matrix<double, 6, 1>;
 
-    constexpr size_t NUM_CHUNKS = 128; // must be >= max number of CPU cores
+    constexpr size_t NUM_CHUNKS = 64; // must be >= max number of CPU cores
     const size_t num_chunks = std::min(NUM_CHUNKS, num_points);
     const size_t chunk_size = (num_points + num_chunks - 1) / num_chunks;
 
@@ -2018,11 +2044,14 @@ void optimize_lidar_odometry(
 
     HDMAP_ZONE_BEGIN(post_hessian, "post_hessian");
     std::vector<std::pair<int, int>> odo_edges;
+    odo_edges.reserve(intermediate_trajectory.size() > 0 ? intermediate_trajectory.size() - 1 : 0);
     for (size_t i = 1; i < intermediate_trajectory.size(); i++)
         odo_edges.emplace_back(i - 1, i);
 
     std::vector<TaitBryanPose> poses;
     std::vector<TaitBryanPose> poses_desired;
+    poses.reserve(intermediate_trajectory.size());
+    poses_desired.reserve(intermediate_trajectory_motion_model.size());
 
     for (size_t i = 0; i < intermediate_trajectory.size(); i++)
         poses.push_back(pose_tait_bryan_from_affine_matrix(intermediate_trajectory[i]));
@@ -2203,6 +2232,8 @@ void optimize_lidar_odometry(
     Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
     Eigen::SparseMatrix<double> x = solver.solve(AtPB);
     std::vector<double> h_x;
+    h_x.reserve(intermediate_trajectory.size() * 6);
+
     for (int k = 0; k < x.outerSize(); ++k)
         for (Eigen::SparseMatrix<double>::InnerIterator it(x, k); it; ++it)
             h_x.push_back(it.value());
@@ -2270,7 +2301,7 @@ void align_to_reference(
         const Eigen::Affine3d& m_pose = m_g;
         const Eigen::Vector3d& p_s = initial_points[i].point;
         const TaitBryanPose pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
-        //
+
         Eigen::Matrix<double, 6, 6, Eigen::RowMajor> AtPA;
         point_to_point_source_to_target_tait_bryan_wc_AtPA_simplified(
             AtPA,
@@ -2612,8 +2643,6 @@ bool process_worker_step_2(
 
     spdlog::stopwatch stopwatch_worker;
 
-    auto tmp_worker_data = worker_data.intermediate_trajectory;
-
     if (params.use_robust_and_accurate_lidar_odometry)
     {
         std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
@@ -2793,89 +2822,111 @@ bool process_worker_step_lidar_odometry_core(
         }
     }*/
 
-    for (int iter = 0; iter < params.nr_iter; iter++)
+    static std::vector<ankerl::unordered_dense::map<int, uint32_t>> chunk_hist_indoor;
+    static std::vector<ankerl::unordered_dense::map<int, uint32_t>> chunk_hist_outdoor;
+
+    constexpr size_t hist_table_size = 101 * 101 * 101;
+    const size_t num_points = intermediate_points.size();
+    const size_t num_hist_chunks =
+        std::max<size_t>(1, std::min<size_t>(std::max(1u, std::thread::hardware_concurrency()), std::max<size_t>(num_points, 1)));
+    const size_t hist_chunk_size = (num_points + num_hist_chunks - 1) / num_hist_chunks;
+
+    chunk_hist_indoor.resize(num_hist_chunks);
+    chunk_hist_outdoor.resize(num_hist_chunks);
+
+    constexpr double min_range_squared = 0.1 * 0.1; // 0.01
+    constexpr double outdoor_range_squared = 5.0 * 5.0; // 25.0
+    const double max_distance_squared = params.max_distance_lidar * params.max_distance_lidar;
+
+    const auto build_normal_vector_histograms = [&]()
     {
-        std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
+        auto process_chunk = [&](size_t chunk)
+        {
+            auto& local_indoor = chunk_hist_indoor[chunk];
+            auto& local_outdoor = chunk_hist_outdoor[chunk];
+            local_indoor.clear();
+            local_outdoor.clear();
 
-        if (params.ablation_study_use_anisotropic_weighting)
-        {
-            for (int i = 0; i < table_buckets_nv_indoor.size(); i++)
+            const size_t begin = chunk * hist_chunk_size;
+            const size_t end = std::min(begin + hist_chunk_size, num_points);
+            for (size_t i = begin; i < end; ++i)
             {
-                table_buckets_nv_indoor[i] = 0;
-            }
-            for (int i = 0; i < table_buckets_nv_outdoor.size(); i++)
-            {
-                table_buckets_nv_outdoor[i] = 0;
-            }
-        }
-        ///////////////
-        if (params.ablation_study_use_anisotropic_weighting)
-        {
-            for (int i = 0; i < intermediate_points.size(); i++)
-            {
+                const double range_squared = intermediate_points[i].point.squaredNorm();
+                if (range_squared < min_range_squared || range_squared > max_distance_squared)
+                    continue;
+
                 const int pose = intermediate_points[i].index_pose;
-
                 const Eigen::Vector3d point_global = worker_data.intermediate_trajectory[pose] * intermediate_points[i].point;
+
                 const auto indoor_key = get_rgd_index_3d(
                     point_global,
                     { params.in_out_params_indoor.resolution_X,
                       params.in_out_params_indoor.resolution_Y,
                       params.in_out_params_indoor.resolution_Z });
                 const auto indoor_it = params.buckets_indoor.find(indoor_key);
-
                 if (indoor_it != params.buckets_indoor.end())
                 {
-                    double x = indoor_it->second.normal_vector.x();
-                    double y = indoor_it->second.normal_vector.y();
-                    double z = indoor_it->second.normal_vector.z();
-
+                    const double x = indoor_it->second.normal_vector.x();
+                    const double y = indoor_it->second.normal_vector.y();
+                    const double z = indoor_it->second.normal_vector.z();
                     if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
                     {
-                        int index_bucket_indoor =
-                            (x + 1.0) * 0.5 * 100.0 + (y + 1.0) * 0.5 * 100.0 * 100.0 + (z + 1.0) * 0.5 * 100.0 * 100.0 * 100.0;
+                        const int index_bucket_indoor = normal_vector_bucket_index(x, y, z);
+                        ++local_indoor[index_bucket_indoor];
+                    }
+                }
 
-                        // if (index_bucket_indoor > 100* 100*100 || index_bucket_indoor < 0)
-                        //{
-                        //     spdlog::warn("index_bucket_indoor out of bounds: {}", index_bucket_indoor);
-                        //     continue;
-                        // }
-
-                        table_buckets_nv_indoor[index_bucket_indoor] += 1.0;
+                if (params.ablation_study_use_hierarchical_rgd && range_squared >= outdoor_range_squared)
+                {
+                    const auto outdoor_key = get_rgd_index_3d(
+                        point_global,
+                        { params.in_out_params_outdoor.resolution_X,
+                          params.in_out_params_outdoor.resolution_Y,
+                          params.in_out_params_outdoor.resolution_Z });
+                    const auto outdoor_it = params.buckets_outdoor.find(outdoor_key);
+                    if (outdoor_it != params.buckets_outdoor.end())
+                    {
+                        const double x = outdoor_it->second.normal_vector.x();
+                        const double y = outdoor_it->second.normal_vector.y();
+                        const double z = outdoor_it->second.normal_vector.z();
+                        if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
+                        {
+                            const int index_bucket_outdoor = normal_vector_bucket_index(x, y, z);
+                            ++local_outdoor[index_bucket_outdoor];
+                        }
                     }
                 }
             }
+        };
+
+        if (params.useMultithread)
+        {
+            tbb::parallel_for(size_t(0), num_hist_chunks, process_chunk);
         }
-        ///////////////
-        ///////////////
+        else
+        {
+            for (size_t c = 0; c < num_hist_chunks; ++c)
+                process_chunk(c);
+        }
+
+        std::fill(table_buckets_nv_indoor.begin(), table_buckets_nv_indoor.end(), 0.0);
+        std::fill(table_buckets_nv_outdoor.begin(), table_buckets_nv_outdoor.end(), 0.0);
+        for (size_t c = 0; c < num_hist_chunks; ++c)
+        {
+            for (const auto& [bin, count] : chunk_hist_indoor[c])
+                table_buckets_nv_indoor[bin] += static_cast<double>(count);
+            for (const auto& [bin, count] : chunk_hist_outdoor[c])
+                table_buckets_nv_outdoor[bin] += static_cast<double>(count);
+        }
+    };
+
+    for (int iter = 0; iter < params.nr_iter; iter++)
+    {
+        std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
+
         if (params.ablation_study_use_anisotropic_weighting)
         {
-            for (int i = 0; i < intermediate_points.size(); i++)
-            {
-                const int pose = intermediate_points[i].index_pose;
-
-                const Eigen::Vector3d point_global = worker_data.intermediate_trajectory[pose] * intermediate_points[i].point;
-                const auto outdoor_key = get_rgd_index_3d(
-                    point_global,
-                    { params.in_out_params_outdoor.resolution_X,
-                      params.in_out_params_outdoor.resolution_Y,
-                      params.in_out_params_outdoor.resolution_Z });
-                const auto outdoor_it = params.buckets_outdoor.find(outdoor_key);
-
-                if (outdoor_it != params.buckets_outdoor.end())
-                {
-                    double x = outdoor_it->second.normal_vector.x();
-                    double y = outdoor_it->second.normal_vector.y();
-                    double z = outdoor_it->second.normal_vector.z();
-
-                    if (fabs(x) < 1.0 && fabs(y) < 1.0 && fabs(z) < 1.0)
-                    {
-                        int index_bucket_outdoor =
-                            (x + 1.0) * 0.5 * 100.0 + (y + 1.0) * 0.5 * 100.0 * 100.0 + (z + 1.0) * 0.5 * 100.0 * 100.0 * 100.0;
-
-                        table_buckets_nv_outdoor[index_bucket_outdoor] += 1.0;
-                    }
-                }
-            }
+            build_normal_vector_histograms();
         }
 
         iter_end = iter;
@@ -2951,7 +3002,7 @@ bool process_worker_step_update_rgd_after(
 {
     if (acc_distance > params.sliding_window_trajectory_length_threshold)
     {
-        spdlog::stopwatch stopwatch_update;
+        // spdlog::stopwatch stopwatch_update;
 
         if (params.reference_points.size() == 0)
         {
@@ -2965,7 +3016,7 @@ bool process_worker_step_update_rgd_after(
             points_global_new.emplace_back(points_global[k]);
 
         acc_distance = 0;
-        points_global = points_global_new;
+        points_global = std::move(points_global_new);
 
         // decimate
         if (params.decimation > 0)

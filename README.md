@@ -425,6 +425,10 @@ Make cave map
 
 [![Make cave map](https://img.youtube.com/vi/k6nysHveoKU/default.jpg)](https://youtu.be/srcf6qu7I08)
 
+Using RTK GNSS / GPS to georeference project
+
+
+[![Make cave map](https://img.youtube.com/vi/7ikkAKHmu0w/default.jpg)](https://youtu.be/7ikkAKHmu0w)
 # 0.94 VIDEOs
 
 IMU inclination prior

@@ -25,8 +25,6 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 
 ![workflow](images/workflow.png)
 
-# DOWNLOAD SOFTWARE USING THIS LINK -> [v0.103](https://github.com/MapsHD/HDMapping/releases/tag/v0.103)
-
 To cite benchmark suite please use as follows:
 ```
 @article{BEDKOWSKI2026102822,
@@ -102,7 +100,7 @@ More information can be found in:
 
 ```Documentation data structure
 <documentation>/
-├── Applications
+├── Applications 
 ├── Benchmarks
 ├── CompatibleCommunityProjects
 ├── Hardware

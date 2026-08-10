@@ -100,7 +100,7 @@ More information can be found in:
 
 ```Documentation data structure
 <documentation>/
-├── Applications 
+├── Applications [[link]](https://github.com/MapsHD/HDMapping/tree/main/documentation/Applications)
 ├── Benchmarks
 ├── CompatibleCommunityProjects
 ├── Hardware

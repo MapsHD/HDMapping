@@ -1,3 +1,11 @@
+# Open-source (Windows, Linux and macOS), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
+This is open-source software for large-scale 3D mapping using an open-hardware hand-held/wearable/mountable measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
+We provide an end-to-end mobile mapping framework that does not require any installation, including:
+
+- **HDMapping_LI0**: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art [[movie]](https://youtu.be/UB-Hx7qgey8).
+- **HDMapping_Pose_GRAPH_SLAM** to create city-level maps.
+- **HDMapping_Georeferencing** (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
+
 # PROJECT ONBOARDING VIDEOS - OPENING MEASUREMENT SEASON 2026
 - Contact email: januszbedkowski@gmail.com
 
@@ -12,14 +20,6 @@
 [![MANDEYE-MR (Precise Forestry)](https://img.youtube.com/vi/i6Xg_vPuqrY/default.jpg)](https://youtu.be/i6Xg_vPuqrY)
 
 Our MANDEYE is designed for freedom in motion. You can also climb and crawl in most challenging scenarios.
-
-# Open-source (Windows, Linux and macOS), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
-This is open-source software for large-scale 3D mapping using an open-hardware hand-held/wearable/mountable measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
-We provide an end-to-end mobile mapping framework that does not require any installation, including:
-
-- **HDMapping_LI0**: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art [[movie]](https://youtu.be/UB-Hx7qgey8).
-- **HDMapping_Pose_GRAPH_SLAM** to create city-level maps.
-- **HDMapping_Georeferencing** (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
 
 # Workflow
 

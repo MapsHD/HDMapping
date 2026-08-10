@@ -15,7 +15,7 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 
 
 # PROJECT ONBOARDING VIDEOS - OPENING MEASUREMENT SEASON 2026
-- Contact email: januszbedkowski@gmail.com
+- Contact email: januszbedkowski [at] gmail [dot] com
 
 
 | | | |

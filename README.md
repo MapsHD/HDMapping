@@ -101,3 +101,16 @@ More information can be found in:
 }
 ```
 
+# Documentation
+
+```Documentation data structure
+<documentation>/
+├── Applications
+├── Benchmarks
+├── CompatibleCommunityProjects
+├── Hardware
+├── InstallationGuide
+├── KnowledgeBase
+├── Tools
+├── VIDEOs
+```

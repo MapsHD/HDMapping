@@ -6,27 +6,39 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 - **HDMapping_Pose_GRAPH_SLAM** to create city-level maps.
 - **HDMapping_Georeferencing** (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
 
+[![Build with bundled libraries on Ubuntu](https://github.com/MapsHD/HDMapping/actions/workflows/cmake-linux.yml/badge.svg?branch=main)](https://github.com/MapsHD/HDMapping/actions/workflows/cmake-linux.yml)
+[![Build on Windows](https://github.com/MapsHD/HDMapping/actions/workflows/windows.yml/badge.svg?branch=main)](https://github.com/MapsHD/HDMapping/actions/workflows/windows.yml)
+[![Build on macOS](https://github.com/MapsHD/HDMapping/actions/workflows/macos.yml/badge.svg?branch=main)](https://github.com/MapsHD/HDMapping/actions/workflows/macos.yml)
+[![Build Debian package](https://github.com/MapsHD/HDMapping/actions/workflows/cmake-linux-deb.yml/badge.svg?branch=main)](https://github.com/MapsHD/HDMapping/actions/workflows/cmake-linux-deb.yml)
+[![Build Python Bindings on Linux](https://github.com/MapsHD/HDMapping/actions/workflows/python-bindings-linux.yml/badge.svg?branch=main)](https://github.com/MapsHD/HDMapping/actions/workflows/python-bindings-linux.yml)
+[![Build Python Bindings on Windows](https://github.com/MapsHD/HDMapping/actions/workflows/python-bindings-windows.yml/badge.svg?branch=main)](https://github.com/MapsHD/HDMapping/actions/workflows/python-bindings-windows.yml)
+
+
 # PROJECT ONBOARDING VIDEOS - OPENING MEASUREMENT SEASON 2026
 - Contact email: januszbedkowski@gmail.com
 
-[![MANDEYE-D](https://img.youtube.com/vi/ntF8kO8r8MM/default.jpg)](https://youtu.be/ntF8kO8r8MM)
-[![MANDEYE-PRO](https://img.youtube.com/vi/Is4IvLiTCyw/default.jpg)](https://youtu.be/Is4IvLiTCyw)
-[![USER FREINDLY SOFTWARE](https://img.youtube.com/vi/rJST0zhNVwc/default.jpg)](https://youtu.be/rJST0zhNVwc)
 
-# MANDEYE is action
+| | | |
+|:--:|:--:|:--:|
+| [<img src="https://img.youtube.com/vi/ntF8kO8r8MM/mqdefault.jpg" width="240">](https://youtu.be/ntF8kO8r8MM) | [<img src="https://img.youtube.com/vi/Is4IvLiTCyw/mqdefault.jpg" width="240">](https://youtu.be/Is4IvLiTCyw) | [<img src="https://img.youtube.com/vi/rJST0zhNVwc/mqdefault.jpg" width="240">](https://youtu.be/rJST0zhNVwc) |
+| **MANDEYE-D**<br>▶ [Watch on YouTube](https://youtu.be/ntF8kO8r8MM) | **MANDEYE-PRO**<br>▶ [Watch on YouTube](https://youtu.be/Is4IvLiTCyw) | **User-friendly software**<br>▶ [Watch on YouTube](https://youtu.be/rJST0zhNVwc) |
 
-[![MANDEYE-K9](https://img.youtube.com/vi/7a_o7ACH0-M/default.jpg)](https://youtu.be/7a_o7ACH0-M)
-[![MANDEYE-MR (Caver)](https://img.youtube.com/vi/Bu9kDF5y39s/default.jpg)](https://youtu.be/Bu9kDF5y39s)
-[![MANDEYE-MR (Precise Forestry)](https://img.youtube.com/vi/i6Xg_vPuqrY/default.jpg)](https://youtu.be/i6Xg_vPuqrY)
+# MANDEYE in action
+
+| | | |
+|:--:|:--:|:--:|
+| [<img src="https://img.youtube.com/vi/7a_o7ACH0-M/mqdefault.jpg" width="240">](https://youtu.be/7a_o7ACH0-M) | [<img src="https://img.youtube.com/vi/Bu9kDF5y39s/mqdefault.jpg" width="240">](https://youtu.be/Bu9kDF5y39s) | [<img src="https://img.youtube.com/vi/i6Xg_vPuqrY/mqdefault.jpg" width="240">](https://youtu.be/i6Xg_vPuqrY) |
+| **MANDEYE-K9**<br>▶ [Watch on YouTube](https://youtu.be/7a_o7ACH0-M) | **MANDEYE-MR — caving**<br>▶ [Watch on YouTube](https://youtu.be/Bu9kDF5y39s) | **MANDEYE-MR — forestry**<br>▶ [Watch on YouTube](https://youtu.be/i6Xg_vPuqrY) |
 
 Our MANDEYE is designed for freedom in motion. You can also climb and crawl in most challenging scenarios.
+
 
 # Workflow
 
 ![workflow](images/workflow.png)
 
 To cite benchmark suite please use as follows:
-```
+```bibtex
 @article{BEDKOWSKI2026102822,
 title = {MapsHD: A benchmark suite for LiDAR odometry frameworks},
 journal = {SoftwareX},
@@ -44,7 +56,7 @@ abstract = {This paper describes a software toolbox for LiDAR (Light Detection a
 
 Mobile mapping system: hardware and software are elaborated in the following paper:
 
-```
+```bibtex
 @article{BEDKOWSKI2024101618,
      title = {Open source, open hardware hand-held mobile mapping system for large scale surveys},
      journal = {SoftwareX},
@@ -62,7 +74,7 @@ Mobile mapping system: hardware and software are elaborated in the following pap
 
 Terrestrial Laser Scanner data registration is elaborated in following paper:
 
-```
+```bibtex
 @article{BEDKOWSKI2023113199,
      title = {Benchmark of multi-view Terrestrial Laser Scanning Point Cloud data registration algorithms},
      journal = {Measurement},
@@ -80,7 +92,7 @@ Terrestrial Laser Scanner data registration is elaborated in following paper:
 The **HDMapping** optimization framework is implemented from scratch https://github.com/JanuszBedkowski/observation_equations using the Eigen library, thus there is no need to install any additional libraries such as **Ceres**, **g2o**, **GTSAM**, **manif**, **Sophus**, etc.
 More information can be found in:
 
-```
+```bibtex
 @book{DBLP:series/cir/Bedkowski22,
   author       = {Janusz Bedkowski},
   title        = {Large-Scale Simultaneous Localization and Mapping},
@@ -98,14 +110,14 @@ More information can be found in:
 
 # Documentation
 
-```Documentation data structure
-<documentation>/
-├── Applications [[link]](https://github.com/MapsHD/HDMapping/tree/main/documentation/Applications)
-├── Benchmarks
-├── CompatibleCommunityProjects
-├── Hardware
-├── InstallationGuide
-├── KnowledgeBase
-├── Tools
-└── VIDEOs
-```
+- [Applications](./documentation/Applications/README.md)
+- [Benchmarks](./documentation/Benchmarks/)
+- [CompatibleCommunityProjects](./documentation/CompatibleCommunityProjects/README.md)
+- [Hardware](./documentation/HARDWARE/README.md)
+- [Build and Installation](./documentation/InstallationGuide/README.md)
+- [KnowledgeBase](./documentation/KnowledgeBase/README.md)
+- [Tools](./documentation/Tools/README.md)
+- [Videos](./documentation/VIDEOs/README.md)
+
+
+

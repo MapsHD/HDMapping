@@ -14,10 +14,9 @@ namespace
     {
     public:
         explicit TempFile(const std::string& content)
-            : m_path(
-                  (std::filesystem::temp_directory_path()
-                   / ("mlvx_calib_test_" + std::to_string(reinterpret_cast<uintptr_t>(this)) + ".tmp"))
-                      .string())
+            : m_path((std::filesystem::temp_directory_path() /
+                      ("mlvx_calib_test_" + std::to_string(reinterpret_cast<uintptr_t>(this)) + ".tmp"))
+                         .string())
         {
             std::ofstream f(m_path);
             f << content;

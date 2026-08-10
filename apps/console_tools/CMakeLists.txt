@@ -43,3 +43,45 @@ target_include_directories(pcd_to_laz PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/inclu
 add_executable(laz_to_txt laz_to_txt.cpp)
 target_link_libraries(laz_to_txt PRIVATE ${PLATFORM_LASZIP_LIB} spdlog::spdlog)
 target_include_directories(laz_to_txt PRIVATE ${LASZIP_INCLUDE_DIR}/LASzip/include ${PROJECT_BINARY_DIR}/include)
+
+# laz_to_mcap: LAZ (+ optional IMU csv, or a whole mandeye session directory)
+# -> MCAP/ROS2 bag exporter. Reuses load_point_cloud()/load_imu() from
+# lidar_odometry_step_1/lidar_odometry_utils.cpp (not load_data(), which
+# additionally drops the first LAZ file's points as part of that app's own
+# odometry preprocessing -- wrong for a lossless exporter), so it needs
+# TBB/spdlog/laszip/core plus that file's own header-only dependencies
+# (glm/toml++/json/observation_equations/vqf), but none of the GUI libs.
+add_executable(
+  laz_to_mcap laz_to_mcap.cpp
+  ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1/lidar_odometry_utils.h
+  ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1/lidar_odometry_utils.cpp
+  ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.h ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.cpp
+  )
+
+target_include_directories(
+  laz_to_mcap
+  PRIVATE ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1
+          ${REPOSITORY_DIRECTORY}/core/include
+          ${REPOSITORY_DIRECTORY}/rosbags
+          ${THIRDPARTY_DIRECTORY} # csv.hpp (used by load_imu)
+          ${THIRDPARTY_DIRECTORY}/glm
+          ${EIGEN3_INCLUDE_DIR}
+          ${THIRDPARTY_DIRECTORY}/tomlplusplus/include
+          ${THIRDPARTY_DIRECTORY}/json/include
+          ${LASZIP_INCLUDE_DIR}/LASzip/include
+          ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+          ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
+
+target_link_libraries(
+          laz_to_mcap
+          PRIVATE
+          mcap
+          unordered_dense::unordered_dense
+          spdlog::spdlog
+          ${PLATFORM_LASZIP_LIB}
+          ${PLATFORM_MISCELLANEOUS_LIBS}
+          ${CORE_LIBRARIES})
+
+if (MSVC)
+    target_compile_options(laz_to_mcap PRIVATE /bigobj)
+endif()

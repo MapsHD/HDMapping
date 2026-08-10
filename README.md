@@ -112,5 +112,5 @@ More information can be found in:
 ├── InstallationGuide
 ├── KnowledgeBase
 ├── Tools
-├── VIDEOs
+└── VIDEOs
 ```

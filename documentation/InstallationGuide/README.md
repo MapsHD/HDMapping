@@ -63,3 +63,103 @@ cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DFREEGLUT_COCOA=ON
 # Build (auto-detects number of cores)
 cmake --build build -j$(sysctl -n hw.ncpu)
 ```
+
+# Building commands
+
+## Requirements
+
+**Installation on Windows:**
+
+- Download the installer from https://cmake.org/download/
+- Run the installer and follow the instructions
+- Ensure CMake is added to your system PATH
+
+### clang-format
+
+**Instalation on Linux:**
+
+```bash
+sudo apt install clang-format
+```
+
+**Installation on Windows**
+
+1. Go to offical llvm-project GitHub [releases page](https://github.com/llvm/llvm-project/releases)
+2. Download Windows x64 installer (for example version [21.1.8](https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-win64.exe)) - browser might flag exe file malware in that case mark it as "Keep it"
+3. Run installer exe
+4. In installation program mark "Add LLVM to the system PATH for all users" or "Add LLVM to the system PATH for all current user"
+5. Restart any terminal or IDE that you want to use clang-format in so it reloads paths from ENV
+
+**Verification**
+
+To verify that clang-format is installed run:
+Verify installation by running:
+
+```bash
+clang-format --version
+```
+
+**Formating codebase**
+
+In order to format code base run:
+
+```bash
+python3 run_clang_fromat.py
+```
+
+_Note that PRs without formatting might be rejected from merging_
+
+## Quick Start (Windows)
+
+```bash
+git clone --recursive https://github.com/MapsHD/HDMapping.git
+cd HDMapping
+
+# Auto-optimized build (detects your CPU automatically)
+cmake  -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+```
+
+## WSL2 GUI
+
+On WSL2 to enable file dialogs in GUI applications you need to install one of the packages used by portable-file-dialogs listed [here](https://github.com/samhocevar/portable-file-dialogs/blob/c12ea8c9a727f5320a2b4570aee863bbede2a204/portable-file-dialogs.h#L539C1-L542C57).
+
+For example on WSL2 Ubuntu-24.04 following package is required to run GUI applications:
+
+```bash
+sudo apt install zenity
+```
+# Profiling
+
+You can use multiple backends to profile the code (UTL, Tracy-Profiler)
+
+- Using Tracy-Profiler requires to install / build from source Tracy-Profiler from https://github.com/wolfpld/tracy/releases/tag/v0.13.1.
+- Build and run the project with `cmake .. -DCMAKE_BUILD_TYPE=ReleaseWithDebInfo -DHDMAPPING_PROFILER=TRACY`
+- Open Tracy Profiler and run e.g. `lidar_odometry_step_1`. Tracy-Profiler should recongnize the code and show the results.
+- 
+To use UTL profiler build and run the project with `cmake .. -DCMAKE_BUILD_TYPE=ReleaseWithDebInfo -DHDMAPPING_PROFILER=UTL`
+
+# Building Debian package.
+
+The standard build contains all necessary libraries compiled with project.
+This approach allows smooth build on Windows platform and guarantee predictable experience.
+If you want to build Debian package, you can depends on system-provided libraries:
+Before build install 3rd party libraries:
+
+```
+sudo apt-get install freeglut3-dev libeigen3-dev liblaszip-dev libopencv-dev
+```
+
+Next build Debian package:
+
+```
+cmake .. -DBUILD_WITH_BUNDLED_FREEGLUT=0 -DBUILD_WITH_BUNDLED_EIGEN=0 -DBUILD_WITH_BUNDLED_LIBLASZIP=0 -DCMAKE_BUILD_TYPE=Release
+make -j16
+make package
+```
+
+To install package :
+
+```
+sudo dpkg -i hd_mapping-0.*.*-Linux.deb
+```

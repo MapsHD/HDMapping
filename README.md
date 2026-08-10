@@ -1,10 +1,17 @@
-!!! Recent benchmark results (28 LIO algorithms) [Bunker-DVI-Dataset-reg-1](https://github.com/MapsHD/benchmark-HDMapping-Orchestration/tree/Bunker-DVI-Dataset-reg-1)
-
 # PROJECT ONBOARDING VIDEOS - OPENING MEASUREMENT SEASON 2026
+- Contact email: januszbedkowski@gmail.com
 
 [![MANDEYE-D](https://img.youtube.com/vi/ntF8kO8r8MM/default.jpg)](https://youtu.be/ntF8kO8r8MM)
 [![MANDEYE-PRO](https://img.youtube.com/vi/Is4IvLiTCyw/default.jpg)](https://youtu.be/Is4IvLiTCyw)
 [![USER FREINDLY SOFTWARE](https://img.youtube.com/vi/rJST0zhNVwc/default.jpg)](https://youtu.be/rJST0zhNVwc)
+
+# MANDEYE is action
+
+[![MANDEYE-K9](https://img.youtube.com/vi/7a_o7ACH0-M/default.jpg)](https://youtu.be/7a_o7ACH0-M)
+[![MANDEYE-MR (Caver)](https://img.youtube.com/vi/Bu9kDF5y39s/default.jpg)](https://youtu.be/Bu9kDF5y39s)
+[![MANDEYE-MR (Precise Forestry)](https://img.youtube.com/vi/i6Xg_vPuqrY/default.jpg)](https://youtu.be/i6Xg_vPuqrY)
+
+Our MANDEYE is designed for freedom in motion. You can also climb and crawl in most challenging scenarios.
 
 # Open-source (Windows, Linux and macOS), open hardware hand-held/wearable/mountable mobile mapping system for large-scale surveys:
 This is open-source software for large-scale 3D mapping using an open-hardware hand-held/wearable/mountable measurement device available at https://github.com/JanuszBedkowski/mandeye_controller. 
@@ -39,34 +46,6 @@ keywords = {LiDAR odometry, LiDAR-inertial odometry, Benchmarking},
 abstract = {This paper describes a software toolbox for LiDAR (Light Detection and Ranging) and LiDAR-Inertial Odometry qualitative and quantitative evaluation. We provide software as https://github.com/MapsHD organization with all necessary information at https://github.com/MapsHD/HDMapping. Our software contributions are a) ground truth data processing tool, b) dockerized state-of-the-art LO and LIO algorithms, c) multi-session data registration to common coordinate system, d) Absolute Pose Error (APE) and Relative Pose Error (RPE) metrics, e) import/export tools for easier 3D data handling and visualizing, e.g., in Cloud Compare software. This software is compatible with ROS1 (Robot Operating System) and ROS2 data formats. We show an example benchmark of LeGO-LOAM, LIO-SAM, FAST-LIO, DLO, VoxelMap, Faster-LIO, KISS-ICP, CT-ICP, SLICT, DLIO, GLIM, iG-LIO, LIO-EKF, I2EKF-LO, GenZ-ICP, RESPLE, odometry_ros_wrapper, Point-LIO, and LOAM-Livox algorithms. For all experiments we provide movies. The contribution of the paper is software-oriented LO/LIO algorithm benchmark suite. The novelty lies in the integration of multiple benchmarking steps into a unified framework, thus overall effort needed for qualitative and quantitative evaluation is reduced.}
 }
 ```
-
-# Supported LiDARs
-
-![lidars](images/IMG_2561.jpeg)
-We support LIVOX AVIA, HAP, MID360, Ouster OS0, OS1, OS2, OSDome, SICK multiScan100, HESAI JT16, HESAI JT128, HESAI XT, Robosense AIRY.
-HESAI XT requires external IMU. We are going to support more LiDARs ASAP.
-
-More information can be found here:
-
-- The introductory paper is available here: https://www.sciencedirect.com/science/article/pii/S235271102300314X
-- Sample data is available at https://github.com/MapsHD/OmniWarsawDataset
-- VIDEO (how to build mobile mapping hardware) https://www.youtube.com/watch?v=BXBbuSJMFEo
-- If you are a ROS user, please visit https://github.com/MapsHD/mandeye_to_bag to convert MANDEYE data to ROSBAG
-- ROS2 wrapper for HDMapping LiDAR Inertial Odometry (HDMapping-LIO) https://github.com/MapsHD/HDMapping-LIO
-- ROSCON 2024 workshop (sample data sets and more ...): https://michalpelka.github.io/RosCon2024_workshop/
-- You can use it also for multi-view Terrestrial Laser Scanner Registration (Faro, Leica, Z+F, Riegl, etc...) https://www.sciencedirect.com/science/article/abs/pii/S0263224123007637
-- Info for Windows users: please use the latest release https://github.com/MapsHD/HDMapping/releases
-- Contact email: januszbedkowski@gmail.com
-
-# MANDEYE is action
-
-[![MANDEYE-K9](https://img.youtube.com/vi/7a_o7ACH0-M/default.jpg)](https://youtu.be/7a_o7ACH0-M)
-[![MANDEYE-MR (Caver)](https://img.youtube.com/vi/Bu9kDF5y39s/default.jpg)](https://youtu.be/Bu9kDF5y39s)
-[![MANDEYE-MR (Precise Forestry)](https://img.youtube.com/vi/i6Xg_vPuqrY/default.jpg)](https://youtu.be/i6Xg_vPuqrY)
-
-Our MANDEYE is designed for freedom in motion. You can also climb and crawl in most challenging scenarios.
-
-# To cite this work please use as follows:
 
 Mobile mapping system: hardware and software are elaborated in the following paper:
 
@@ -122,57 +101,3 @@ More information can be found in:
 }
 ```
 
-![mandeye](images/softwareX1.png)
-
-Mobile mapping systems is based on LiVOX MID360 - laser scanner with non repetetive scanning pattern.
-Specification is available at https://www.livoxtech.com/mid-360/specs. Important parameters:
-
-- weight: less than 1kg,
-- battery life: up to 5 hours,
-- suggested speed during data acquisition: walking speed (4km/h),
-- LiDAR type: Livox MID360,
-- LiDAR non-repetitive scanning pattern,
-- LiDAR range 40m @ 10\% reflectivity, 70 m @ 80\% reflectivity,
-- Range Precision (1 $\sigma$): up to 2cm (@ 10m),
-- Integrated IMU (Inertial Measurement Unit).
-
-# Possible applications:
-- caving
-- speleology
-- surveying
-- culture heritage
-- environmental management
-- geology
-- urban search and rescue
-- urban mapping
-- ground truth for AGV (Automated Guided Vehicle)
-- mobile robot navigation
-- precision forestry
-- agricultural robotics
-- underground mining
-- education
-- entertainment
-- forensics
-- critical infrastructure inspection
-- space exploration
-- protection systems
-- digital twin content generation
-- automation in construction
-- etc...
-
-![largescalemapping1](images/100-2.gif)
-City level survey (perspective view).
-![largescalemapping2](images/100.gif)
-City level survey (top view).
-
-![largescalemapping1](images/a.jpg)
-3D data from aerial LiDAR mapping.
-![largescalemapping2](images/b.jpg)
-Aerial LiDAR fused with ground MANDEYE data (fixed issue with missing elevations).
-
-![largescalemapping1](images/a0.jpg)
-Construction site.
-![largescalemapping2](images/a6.jpg)
-Construction site augmented with MANDEYE 3D data.
-![largescalemapping2](images/change.jpg)
-Construction progress monitoring, scale blue - smallest changes, red - largest changes.

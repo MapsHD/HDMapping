@@ -184,8 +184,3 @@ ToDo: check if addressed
 - https://github.com/APRIL-ZJU/Coco-LIC
 - ieeexplore.ieee.org/document/11264316/
 
-ToDo: LIO+ benchmark
-- https://github.com/ethz-asl/COIN-LIO
-- https://github.com/hku-mars/r3live
-- https://github.com/TixiaoShan/LVI-SAM
-- RELEAD: Resilient Localization with Enhanced LiDAR Odometry in Adverse Environments (https://arxiv.org/pdf/2402.18934)

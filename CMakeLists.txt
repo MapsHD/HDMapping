@@ -111,6 +111,7 @@ option(BUILD_TESTING "Build HDMapping unit tests" OFF)
 if(BUILD_TESTING)
     enable_testing()
     add_subdirectory(shared/tests)
+    add_subdirectory(apps/lidar_odometry_step_1/tests)
 endif()
 
 set(CORE_LIBRARIES core)

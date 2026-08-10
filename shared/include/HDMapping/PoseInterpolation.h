@@ -1,5 +1,6 @@
 #pragma once
 #include <Eigen/Geometry>
+#include <cassert>
 #include <cmath>
 #include <map>
 

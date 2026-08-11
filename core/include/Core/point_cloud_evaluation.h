@@ -4,8 +4,10 @@
 #include <Eigen/Eigen>
 #include <vector>
 
-// other tools https://deepwiki.com/fwilliams/point-cloud-utils/5.3-point-cloud-metrics
+// skills
+// tools https://deepwiki.com/fwilliams/point-cloud-utils/5.3-point-cloud-metrics
 // https://arxiv.org/pdf/2604.18205
+
 class PointCloudEvaluation
 {
 public:

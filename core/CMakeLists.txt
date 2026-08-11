@@ -30,6 +30,7 @@ set(CORE_MATH_SOURCES
     src/pose_graph_loop_closure.cpp
     src/pose_graph_slam.cpp
     src/registration_plane_feature.cpp
+    src/point_cloud_evaluation.cpp
 )
 
 add_library(core_math STATIC ${CORE_MATH_SOURCES})

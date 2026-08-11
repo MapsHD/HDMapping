@@ -670,12 +670,12 @@ std::unordered_map<std::string, Eigen::Affine3d> MLvxCalib::GetCalibrationFromFi
 
             std::transform(order.begin(), order.end(), order.begin(), ::toupper);
             if (order == "COLUMN")
-                value = value.transpose();
+                value.transposeInPlace(); // NOTE: `value = value.transpose()` aliases and corrupts the matrix; must transpose in place.
         }
 
         bool inverted = JsonGetBool(calibrationEntry.value(), "inverted", false);
         if (inverted)
-            value = value.inverse();
+            value = value.inverse().eval(); // `value = value.inverse()` aliases: Eigen needs the eval() to use a temporary here.
 
         Eigen::IOFormat HeavyFmt(Eigen::FullPrecision, 0, ", ", ";\n", "[", "]", "[", "]");
 

@@ -63,8 +63,8 @@ bool TUM::load_data_from_tum(const std::vector<std::string>& input_file_names, b
                 std::istringstream(strs[6]) >> tp.qz;
                 std::istringstream(strs[7]) >> tp.qw;
 
-                if (std::isfinite(tp.x) && std::isfinite(tp.y) && std::isfinite(tp.z) && std::isfinite(tp.qx) &&
-                    std::isfinite(tp.qy) && std::isfinite(tp.qz) && std::isfinite(tp.qw))
+                if (std::isfinite(tp.x) && std::isfinite(tp.y) && std::isfinite(tp.z) && std::isfinite(tp.qx) && std::isfinite(tp.qy) &&
+                    std::isfinite(tp.qz) && std::isfinite(tp.qw))
                 {
                     tum_poses.push_back(tp);
                 }
@@ -113,8 +113,7 @@ bool TUM::load_data_from_tum(const std::vector<std::string>& input_file_names, b
 
     if (!tum_poses.empty())
     {
-        Eigen::Vector3d min_p(
-            std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
+        Eigen::Vector3d min_p(std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
         Eigen::Vector3d max_p(
             std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest());
         for (const auto& p : tum_poses)
@@ -123,13 +122,7 @@ bool TUM::load_data_from_tum(const std::vector<std::string>& input_file_names, b
             max_p = max_p.cwiseMax(Eigen::Vector3d(p.x, p.y, p.z));
         }
         spdlog::info(
-            "TUM bounding box: min=({}, {}, {}) max=({}, {}, {})",
-            min_p.x(),
-            min_p.y(),
-            min_p.z(),
-            max_p.x(),
-            max_p.y(),
-            max_p.z());
+            "TUM bounding box: min=({}, {}, {}) max=({}, {}, {})", min_p.x(), min_p.y(), min_p.z(), max_p.x(), max_p.y(), max_p.z());
     }
 
     ++version;

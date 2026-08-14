@@ -770,15 +770,17 @@ static void loadCalib(AppState& s)
             s.E.ty = je["camera_position_in_world_xyz"][1];
             s.E.tz = je["camera_position_in_world_xyz"][2];
         }
-        // camera_rotation_in_world_tait_bryan_omfika_deg: [om, fi, ka] --
-        // R_wc = Rx(om)*Ry(fi)*Rz(ka), matching calib::Extrinsics' native
-        // rotation representation directly (no reordering/conversion).
-        if (je.contains("camera_rotation_in_world_tait_bryan_omfika_deg") &&
-            je["camera_rotation_in_world_tait_bryan_omfika_deg"].size() >= 3)
+        // camera_rotation_matrix_in_world: 3x3 rows of R_wc. The file's only
+        // rotation representation (convention-independent, portable) --
+        // decomposed into calib::Extrinsics' own om/fi/ka for internal use.
+        if (je.contains("camera_rotation_matrix_in_world") && je["camera_rotation_matrix_in_world"].size() >= 3)
         {
-            s.E.om = je["camera_rotation_in_world_tait_bryan_omfika_deg"][0];
-            s.E.fi = je["camera_rotation_in_world_tait_bryan_omfika_deg"][1];
-            s.E.ka = je["camera_rotation_in_world_tait_bryan_omfika_deg"][2];
+            auto& m = je["camera_rotation_matrix_in_world"];
+            Eigen::Matrix3f R;
+            for (int r = 0; r < 3; r++)
+                for (int c = 0; c < 3; c++)
+                    R(r, c) = m[r][c].get<float>();
+            omFiKaFromMat3(R, s.E.om, s.E.fi, s.E.ka);
         }
     }
     // Optional region of interest, in full-resolution image pixels:

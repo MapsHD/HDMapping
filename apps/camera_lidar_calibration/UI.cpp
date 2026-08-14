@@ -492,6 +492,7 @@ void UI::panelExtrinsics(AppState& state)
     ImGui::Text("Camera orientation in world, om/fi/ka (deg):");
     dragFloat("om", &E.om, 0.1f, -180.f, 180.f, "%.2f");
     dragFloat("fi", &E.fi, 0.1f, -180.f, 180.f, "%.2f");
+    avoidGimbalLock(E.fi);
     dragFloat("ka", &E.ka, 0.1f, -180.f, 180.f, "%.2f");
     helpMarker(
         "R_wc = Rx(om)*Ry(fi)*Rz(ka): camera orientation in LiDAR world.\nT_lidar2cam = R_wc^T * (p - C).\nAt fi=+/-90 deg (gimbal lock), om and ka are not individually\nunique -- only om+ka (or om-ka) is determined.");

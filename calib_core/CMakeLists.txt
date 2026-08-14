@@ -43,6 +43,13 @@ target_include_directories(calib_core PRIVATE
     # of copying the math -- same include-the-generated-header convention
     # core/CMakeLists.txt already uses for its own observation equations.
     ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+    # Camera.cpp reuses core's own pose_tait_bryan_from_affine_matrix /
+    # affine_matrix_from_pose_tait_bryan (core/include/Core/transformations.h)
+    # for the om/fi/ka<->matrix conversion instead of duplicating that math.
+    # Header-only and pulls in nothing but Eigen/std (see structures.h) --
+    # doesn't violate calib_core's no-raylib/imgui/OpenCV rule above, and
+    # nothing here links the core/core_math library, just includes headers.
+    ${REPOSITORY_DIRECTORY}/core/include
 )
 
 target_link_libraries(calib_core PUBLIC ${PLATFORM_LASZIP_LIB})

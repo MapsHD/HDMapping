@@ -475,16 +475,18 @@ void AppState::loadCalibration(const char* path)
             extrinsics.ty = pos[1].get<float>();
             extrinsics.tz = pos[2].get<float>();
         }
-        // camera_rotation_in_world_tait_bryan_omfika_deg: [om, fi, ka]
-        // -- R_wc = Rx(om)*Ry(fi)*Rz(ka), matching calib::Extrinsics'
-        // native rotation representation directly (no reordering/conversion).
-        if (je.contains("camera_rotation_in_world_tait_bryan_omfika_deg") &&
-            je["camera_rotation_in_world_tait_bryan_omfika_deg"].size() >= 3)
+        // camera_rotation_matrix_in_world: 3x3 rows of R_wc. The file's only
+        // rotation representation (convention-independent, portable) --
+        // decomposed into calib::Extrinsics' own om/fi/ka for internal
+        // use (UI sliders, solver initial guess).
+        if (je.contains("camera_rotation_matrix_in_world") && je["camera_rotation_matrix_in_world"].size() >= 3)
         {
-            auto& rot = je["camera_rotation_in_world_tait_bryan_omfika_deg"];
-            extrinsics.om = rot[0].get<float>();
-            extrinsics.fi = rot[1].get<float>();
-            extrinsics.ka = rot[2].get<float>();
+            auto& m = je["camera_rotation_matrix_in_world"];
+            Eigen::Matrix3f R;
+            for (int r = 0; r < 3; r++)
+                for (int c = 0; c < 3; c++)
+                    R(r, c) = m[r][c].get<float>();
+            calib::omFiKaFromMat3(R, extrinsics.om, extrinsics.fi, extrinsics.ka);
         }
         gotExtrinsics = true;
     }
@@ -521,7 +523,10 @@ void AppState::saveCalibration(const char* path)
     j["intrinsics"] = { { "fx", intrinsics.fx }, { "fy", intrinsics.fy }, { "cx", intrinsics.cx }, { "cy", intrinsics.cy },
                         { "k1", intrinsics.k1 }, { "k2", intrinsics.k2 }, { "k3", intrinsics.k3 }, { "k4", intrinsics.k4 },
                         { "k5", intrinsics.k5 }, { "k6", intrinsics.k6 }, { "p1", intrinsics.p1 }, { "p2", intrinsics.p2 } };
-    j["extrinsics"]["camera_rotation_in_world_tait_bryan_omfika_deg"] = { extrinsics.om, extrinsics.fi, extrinsics.ka };
+    // Rotation is stored as a matrix only -- convention-independent (no
+    // Euler/Tait-Bryan angle order or units to document/misread) and
+    // directly portable to any external tool. camera_rotation_matrix_in_world
+    // is the source of truth on load; see AppState::loadCalibration.
     j["extrinsics"]["camera_position_in_world_xyz"] = { C.x(), C.y(), C.z() };
     j["extrinsics"]["camera_rotation_matrix_in_world"] = { { R(0, 0), R(0, 1), R(0, 2) },
                                                            { R(1, 0), R(1, 1), R(1, 2) },

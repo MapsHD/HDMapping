@@ -38,4 +38,4 @@ jobs:
         clang-format --version
 
     - name: Run clang-format check
-      run: python3 check_clang_format.py
+      run: python3 scripts/check_clang_format.py

@@ -3,7 +3,8 @@
 import os
 import subprocess
 
-PROJECT_DIRECTORY = os.path.join(os.path.abspath(os.path.dirname(__file__)))
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+PROJECT_DIRECTORY = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 
 FILE_LOCATIONS = [os.path.join(PROJECT_DIRECTORY, 'core'),
                   os.path.join(PROJECT_DIRECTORY, 'core_hd_mapping'),

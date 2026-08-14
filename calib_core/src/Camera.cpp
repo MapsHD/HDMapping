@@ -2,11 +2,11 @@
 
 namespace calib {
 
-Eigen::Matrix3f eulerZYXtoMat3(float rx_deg, float ry_deg, float rz_deg) {
+Eigen::Matrix3f omFiKaToMat3(float om_deg, float fi_deg, float ka_deg) {
     const float d2r = static_cast<float>(M_PI) / 180.f;
-    return (Eigen::AngleAxisf(rz_deg * d2r, Eigen::Vector3f::UnitZ()) *
-            Eigen::AngleAxisf(ry_deg * d2r, Eigen::Vector3f::UnitY()) *
-            Eigen::AngleAxisf(rx_deg * d2r, Eigen::Vector3f::UnitX()))
+    return (Eigen::AngleAxisf(om_deg * d2r, Eigen::Vector3f::UnitX()) *
+            Eigen::AngleAxisf(fi_deg * d2r, Eigen::Vector3f::UnitY()) *
+            Eigen::AngleAxisf(ka_deg * d2r, Eigen::Vector3f::UnitZ()))
            .toRotationMatrix();
 }
 

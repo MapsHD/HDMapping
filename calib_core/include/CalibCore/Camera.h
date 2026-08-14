@@ -22,9 +22,25 @@ namespace calib
     {
         // Camera position in LiDAR/world frame
         float tx = 0.f, ty = 0.f, tz = 0.f;
-        // Camera orientation in LiDAR/world frame — ZYX Euler, degrees.
-        // Default: standard camera (X=right, Y=down, Z=forward) aligned with LiDAR (X=forward).
-        float rx = -90.f, ry = 0.f, rz = -90.f;
+        // Camera orientation in LiDAR/world frame — Tait-Bryan om/fi/ka,
+        // degrees: R_wc = Rx(om) * Ry(fi) * Rz(ka). This is the SAME
+        // parameterization (and rotation order) as the vendored camera
+        // observation equations CameraCalibrationSolver reuses directly, so
+        // no conversion is needed between "what got picked/solved" and
+        // "what's stored here" -- no rx/ry/rz<->om/fi/ka round-trip.
+        // Default: standard camera (X=right, Y=down, Z=forward) aligned
+        // with LiDAR (X=forward) -- the same physical orientation the old
+        // ZYX-Euler default (rx=-90,ry=0,rz=-90) represented (within 0.1°),
+        // just written in this parameterization. fi is nudged to 89.9° (not
+        // exactly 90°) deliberately: at fi=90° exactly this parameterization
+        // hits gimbal lock -- om and ka become individually non-unique
+        // (only om+ka is determined) -- which made CameraCalibrationSolver's
+        // very first solve of a fresh session start right on top of a rank
+        // -deficient normal-equations block (confirmed in practice: the
+        // solver visibly struggled). 0.1° off is enough to make the (om,ka)
+        // block well-conditioned from the start while being visually
+        // identical to "aligned".
+        float om = -90.f, fi = 89.9f, ka = 0.f;
     };
 
     // Rectangular region of interest, in full-resolution image pixels.
@@ -36,8 +52,9 @@ namespace calib
         int x = 0, y = 0, w = 0, h = 0;
     };
 
-    // R = Rz * Ry * Rx  (ZYX Euler, degrees → rotation matrix)
-    Eigen::Matrix3f eulerZYXtoMat3(float rx_deg, float ry_deg, float rz_deg);
+    // R = Rx * Ry * Rz  (Tait-Bryan om/fi/ka, degrees → rotation matrix).
+    // Matches Extrinsics' own om/fi/ka convention above.
+    Eigen::Matrix3f omFiKaToMat3(float om_deg, float fi_deg, float ka_deg);
 
     // Project a point from LiDAR frame to image pixel (u, v).
     // R_wc = camera orientation in world, t = camera position in world.

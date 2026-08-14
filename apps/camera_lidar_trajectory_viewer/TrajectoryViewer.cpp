@@ -395,7 +395,7 @@ static void loadCloud(AppState& s)
     std::sort(lazPaths.begin(), lazPaths.end());
 
     bool canColor = s.calibLoaded && !s.imagesFilenamesInTime.empty();
-    Eigen::Matrix3f R_wc = canColor ? eulerZYXtoMat3(s.E.rx, s.E.ry, s.E.rz) : Eigen::Matrix3f::Identity();
+    Eigen::Matrix3f R_wc = canColor ? omFiKaToMat3(s.E.om, s.E.fi, s.E.ka) : Eigen::Matrix3f::Identity();
     Eigen::Vector3f C(s.E.tx, s.E.ty, s.E.tz);
     float K_fx = s.K.fx * s.imgScale, K_fy = s.K.fy * s.imgScale;
     float K_cx = s.K.cx * s.imgScale, K_cy = s.K.cy * s.imgScale;
@@ -770,11 +770,15 @@ static void loadCalib(AppState& s)
             s.E.ty = je["camera_position_in_world_xyz"][1];
             s.E.tz = je["camera_position_in_world_xyz"][2];
         }
-        if (je.contains("camera_rotation_in_world_euler_zyx_deg") && je["camera_rotation_in_world_euler_zyx_deg"].size() >= 3)
+        // camera_rotation_in_world_tait_bryan_omfika_deg: [om, fi, ka] --
+        // R_wc = Rx(om)*Ry(fi)*Rz(ka), matching calib::Extrinsics' native
+        // rotation representation directly (no reordering/conversion).
+        if (je.contains("camera_rotation_in_world_tait_bryan_omfika_deg") &&
+            je["camera_rotation_in_world_tait_bryan_omfika_deg"].size() >= 3)
         {
-            s.E.rz = je["camera_rotation_in_world_euler_zyx_deg"][0];
-            s.E.ry = je["camera_rotation_in_world_euler_zyx_deg"][1];
-            s.E.rx = je["camera_rotation_in_world_euler_zyx_deg"][2];
+            s.E.om = je["camera_rotation_in_world_tait_bryan_omfika_deg"][0];
+            s.E.fi = je["camera_rotation_in_world_tait_bryan_omfika_deg"][1];
+            s.E.ka = je["camera_rotation_in_world_tait_bryan_omfika_deg"][2];
         }
     }
     // Optional region of interest, in full-resolution image pixels:
@@ -952,7 +956,7 @@ static void exportColmap(AppState& s)
 
     // T_lidar_camera (camera pose in the LiDAR frame, from the extrinsics)
     Eigen::Affine3f T_lc = Eigen::Affine3f::Identity();
-    T_lc.linear() = eulerZYXtoMat3(s.E.rx, s.E.ry, s.E.rz);
+    T_lc.linear() = omFiKaToMat3(s.E.om, s.E.fi, s.E.ka);
     T_lc.translation() = Eigen::Vector3f(s.E.tx, s.E.ty, s.E.tz);
 
     // cameras.txt — rational OpenCV model == COLMAP FULL_OPENCV (12 params)
@@ -1129,7 +1133,7 @@ static void drawScene(AppState& s)
     // ── camera frustums ───────────────────────────────────────────────────────
     if (s.showFrustums && s.calibLoaded)
     {
-        Eigen::Matrix3f R_wc = eulerZYXtoMat3(s.E.rx, s.E.ry, s.E.rz);
+        Eigen::Matrix3f R_wc = omFiKaToMat3(s.E.om, s.E.fi, s.E.ka);
         Eigen::Vector3f C(s.E.tx, s.E.ty, s.E.tz);
         float fs = s.frustumScale;
         float ncx[4] = {

@@ -21,6 +21,7 @@ add_library(calib_core STATIC
     src/PointCloud.cpp
     src/Trajectory.cpp
     src/CliArgs.cpp
+    src/CameraCalibrationSolver.cpp
 )
 
 target_include_directories(calib_core PUBLIC
@@ -37,6 +38,11 @@ target_include_directories(calib_core PRIVATE
     # classes instead and never needed this path, so nothing else in the repo
     # wires it up.
     ${CMAKE_BINARY_DIR}/3rdparty/LASzip/include
+    # Reuses the vendored analytic camera observation equations directly
+    # (CameraCalibrationSolver.cpp #includes the header from here) instead
+    # of copying the math -- same include-the-generated-header convention
+    # core/CMakeLists.txt already uses for its own observation equations.
+    ${THIRDPARTY_DIRECTORY}/observation_equations/codes
 )
 
 target_link_libraries(calib_core PUBLIC ${PLATFORM_LASZIP_LIB})

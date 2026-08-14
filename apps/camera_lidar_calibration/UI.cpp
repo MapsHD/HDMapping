@@ -5,6 +5,7 @@
 #include <Core/pfd_wrapper.hpp>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -84,29 +85,44 @@ void UI::draw(AppState& state)
         panelExtrinsics(state);
     if (ImGui::CollapsingHeader("Visualization"))
         panelVisualization(state);
+    if (ImGui::CollapsingHeader("Correspondences", ImGuiTreeNodeFlags_DefaultOpen))
+        panelCorrespondences(state);
 
     ImGui::End();
 
     // ── Image view window (pan + zoom) ────────────────────────────────────
+    // A normal floating window (title bar, movable, resizable) that overlaps
+    // the 3D view, which now fills the whole background instead of being
+    // confined to half the screen -- simpler than the old fixed-region
+    // split-screen layout. ImGuiCond_FirstUseEver only sets this starting
+    // pos/size the very first time; the user's own placement afterward
+    // persists.
     if (state.renderer.imageTexValid)
     {
         float viewW = io.DisplaySize.x - panelW;
-        float viewH = (io.DisplaySize.y - menuBarH) * 0.5f;
-        ImGui::SetNextWindowPos(ImVec2(0, menuBarH), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(viewW, viewH), ImGuiCond_Always);
-        ImGui::Begin(
-            "Image View",
-            nullptr,
-            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoTitleBar);
+        float viewH = io.DisplaySize.y - menuBarH;
+        ImGui::SetNextWindowPos(ImVec2(0, menuBarH), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(viewW * 0.6f, viewH * 0.6f), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Image View");
         drawImageView(state);
         ImGui::End();
     }
 }
 
 // ── Image view: pan + zoom ────────────────────────────────────────────────────
-// zoom = 1 means "fit to window". offX/offY = image coords of the top-left
-// visible pixel. Wheel zooms anchored at the cursor, LMB-drag pans,
-// double-click resets.
+// Pan and zoom are both handled by letting ImGui do the work instead of a
+// hand-rolled offX/offY/scale coordinate system: the image is displayed at
+// (imgW*imgZoom, imgH*imgZoom) inside a plain scrollable child region, so
+// dragging just moves the child's own scroll offset (SetScrollX/Y, which
+// ImGui clamps into range for us every frame) and zoom is a bare size
+// multiplier (matching apps/manual_color's PageUp/PageDown zoom -- not
+// anchored to the cursor, kept simple on purpose). This removes an entire
+// class of bugs the previous custom-coordinate version had (invalid
+// offX/offY silently desyncing the sampled crop from where markers were
+// drawn) by construction: there is no separate "crop rectangle" to keep in
+// sync any more, ImGui::GetItemRectMin() after drawing the (full,
+// un-cropped) image *is* the single source of truth every other coordinate
+// in this function is built from.
 void UI::drawImageView(AppState& state)
 {
     const float imgW = (float)state.imageW;
@@ -114,71 +130,119 @@ void UI::drawImageView(AppState& state)
     if (imgW <= 0 || imgH <= 0)
         return;
 
-    // Reset view when a different image is loaded
-    if (state.imageW != viewImgW || state.imageH != viewImgH)
+    // Reset zoom when a different image is loaded
+    if (state.imageW != lastImgW || state.imageH != lastImgH)
     {
-        viewImgW = state.imageW;
-        viewImgH = state.imageH;
-        zoom2D = 1.f;
-        offX = offY = 0.f;
+        lastImgW = state.imageW;
+        lastImgH = state.imageH;
+        imgZoom = 1.f;
     }
 
-    ImVec2 origin = ImGui::GetCursorScreenPos(); // content region top-left
-    ImVec2 avail = ImGui::GetContentRegionAvail();
-    if (avail.x < 16 || avail.y < 16)
-        return;
+    // Shift is the modifier that dedicates the mouse to picking, mirroring
+    // App.cpp's 3D-view picking and the CTRL-to-pick convention
+    // core/src/control_points.cpp already uses elsewhere in this codebase.
+    const bool picking = ImGui::GetIO().KeyShift;
+    ImGui::TextColored(
+        ImVec4(1, 1, 0, 0.8f), picking ? "Shift+click to pick a point" : "Scroll: zoom | Drag: pan | Dbl-click: reset zoom");
 
-    const float fitScale = std::min(avail.x / imgW, avail.y / imgH);
-    float scale = fitScale * zoom2D;
+    ImGui::BeginChild("image_scroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-    // Displayed size and the visible sub-rect of the image
-    float dispW = std::min(avail.x, imgW * scale);
-    float dispH = std::min(avail.y, imgH * scale);
-    float srcW = dispW / scale;
-    float srcH = dispH / scale;
+    ImVec2 dispSize(imgW * imgZoom, imgH * imgZoom);
+    ImGui::Image((ImTextureID)state.renderer.imageTex.texture.id, dispSize, ImVec2(0, 1), ImVec2(1, 0));
+    ImVec2 imgMin = ImGui::GetItemRectMin(); // screen pos of the image's top-left, already scroll-adjusted
+    bool hovered = ImGui::IsItemHovered();
+    ImGuiIO& io = ImGui::GetIO();
 
-    ImVec2 imgScreenPos = ImVec2(origin.x + (avail.x - dispW) * 0.5f, origin.y + (avail.y - dispH) * 0.5f);
-
-    ImGui::SetCursorScreenPos(imgScreenPos);
-    // Render textures are y-flipped: select the sub-rect with negative height
-    Rectangle src = { offX, imgH - offY, srcW, -srcH };
-    rlImGuiImageRect(&state.renderer.imageTex.texture, (int)dispW, (int)dispH, src);
-
-    // ── input ──────────────────────────────────────────────────────────────
-    if (ImGui::IsWindowHovered())
+    // Image pixel <-> screen coordinate conversion, shared by the click
+    // handling below, the magnifier loupe, and the correspondence-pair
+    // markers drawn further down.
+    auto screenToImg = [&](ImVec2 s)
     {
-        ImGuiIO& io = ImGui::GetIO();
+        return ImVec2((s.x - imgMin.x) / imgZoom, (s.y - imgMin.y) / imgZoom);
+    };
+    auto imgToScreen = [&](ImVec2 p)
+    {
+        return ImVec2(imgMin.x + p.x * imgZoom, imgMin.y + p.y * imgZoom);
+    };
 
+    if (hovered)
+    {
         if (io.MouseWheel != 0.f)
-        {
-            // image point under the cursor stays put while zooming
-            // float mx = io.MousePos.x - imgScreenPos.x;
-            // float my = io.MousePos.y - imgScreenPos.y;
-            // float ix = offX + mx / scale;
-            // float iy = offY + my / scale;
+            imgZoom = std::clamp(imgZoom * std::exp(io.MouseWheel * 0.15f), 0.05f, 20.f);
 
-            zoom2D = std::max(1.f, std::min(zoom2D * std::exp(io.MouseWheel * 0.15f), 100.f));
-            scale = fitScale * zoom2D;
-            // offX = ix - mx / scale;
-            // offY = iy - my / scale;
+        if (picking)
+        {
+            // LMB is dedicated to picking here -- dragging must not pan.
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            {
+                ImVec2 p = screenToImg(io.MousePos);
+                state.setPendingImagePoint(std::clamp(p.x, 0.f, imgW), std::clamp(p.y, 0.f, imgH));
+            }
         }
-
-        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+        else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
         {
-            offX -= io.MouseDelta.x / scale;
-            offY -= io.MouseDelta.y / scale;
+            ImGui::SetScrollX(ImGui::GetScrollX() - io.MouseDelta.x);
+            ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseDelta.y);
         }
 
         if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            imgZoom = 1.f;
+    }
+
+    // ── magnifier loupe (precision aid while picking an image pixel) ────────
+    // Tooltip-based, mirroring apps/manual_color's draw_zoom_pick_point
+    // (auto-follows the cursor, crosshair at its center).
+    if (picking && hovered)
+    {
+        ImGui::BeginTooltip();
+
+        const float regionSz = 24.f; // crop size, in image pixels
+        const float loupeZoom = 6.f;
+
+        ImVec2 p = screenToImg(io.MousePos);
+        float srcX = std::clamp(p.x - regionSz * 0.5f, 0.f, std::max(0.f, imgW - regionSz));
+        float srcY = std::clamp(p.y - regionSz * 0.5f, 0.f, std::max(0.f, imgH - regionSz));
+        ImVec2 uv0(srcX / imgW, 1.f - srcY / imgH);
+        ImVec2 uv1((srcX + regionSz) / imgW, 1.f - (srcY + regionSz) / imgH);
+
+        ImGui::Image((ImTextureID)state.renderer.imageTex.texture.id, ImVec2(regionSz * loupeZoom, regionSz * loupeZoom), uv0, uv1);
+
+        ImVec2 lMin = ImGui::GetItemRectMin();
+        ImVec2 lMax = ImGui::GetItemRectMax();
+        ImVec2 c((lMin.x + lMax.x) * 0.5f, (lMin.y + lMax.y) * 0.5f);
+        ImGui::GetForegroundDrawList()->AddLine(ImVec2(c.x - 10, c.y), ImVec2(c.x + 10, c.y), IM_COL32(0, 255, 0, 220), 1.5f);
+        ImGui::GetForegroundDrawList()->AddLine(ImVec2(c.x, c.y - 10), ImVec2(c.x, c.y + 10), IM_COL32(0, 255, 0, 220), 1.5f);
+
+        ImGui::EndTooltip();
+    }
+
+    // ── correspondence-pair markers ─────────────────────────────────────────
+    // No manual "is this on screen" check needed -- the child region clips
+    // its own draw list, so markers scrolled out of view are simply cut off.
+    {
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        for (size_t i = 0; i < state.pairs.size(); i++)
         {
-            zoom2D = 1.f;
-            offX = offY = 0.f;
+            ImVec2 s = imgToScreen(ImVec2(state.pairs[i].u, state.pairs[i].v));
+            dl->AddCircle(s, 6.f, IM_COL32(255, 255, 0, 255), 0, 2.f);
+            dl->AddText(ImVec2(s.x + 8, s.y - 8), IM_COL32(255, 255, 0, 255), std::to_string(i).c_str());
+        }
+        if (state.pendingHasImage)
+        {
+            ImVec2 s = imgToScreen(ImVec2(state.pendingPair.u, state.pendingPair.v));
+            dl->AddCircle(s, 6.f, IM_COL32(255, 140, 0, 255), 0, 2.f);
+        }
+        // Large cross for the pair selected in the Correspondences panel --
+        // matches the magenta cross drawn for it in the 3D view.
+        if (state.selectedPairIndex >= 0 && state.selectedPairIndex < (int)state.pairs.size())
+        {
+            ImVec2 s = imgToScreen(ImVec2(state.pairs[state.selectedPairIndex].u, state.pairs[state.selectedPairIndex].v));
+            dl->AddLine(ImVec2(s.x - 18, s.y), ImVec2(s.x + 18, s.y), IM_COL32(255, 0, 255, 255), 2.f);
+            dl->AddLine(ImVec2(s.x, s.y - 18), ImVec2(s.x, s.y + 18), IM_COL32(255, 0, 255, 255), 2.f);
         }
     }
 
-    // zoom indicator
-    ImGui::SetCursorScreenPos(ImVec2(origin.x + 6, origin.y + 4));
-    ImGui::TextColored(ImVec4(1, 1, 0, 0.8f), "%.0f%%  [wheel: zoom | drag: pan | dbl-click: reset]", zoom2D * fitScale * 100.f);
+    ImGui::EndChild();
 }
 
 // ── Menu bar ─────────────────────────────────────────────────────────────────
@@ -313,6 +377,18 @@ void UI::panelMenuBar(AppState& state)
         ImGui::EndMenu();
     }
 
+    if (ImGui::BeginMenu("View"))
+    {
+        // GPU-side point subsampling (draws only every Nth point) for
+        // large clouds -- matches camera_lidar_trajectory_viewer's "Draw
+        // decimation" slider.
+        ImGui::SetNextItemWidth(140.f);
+        ImGui::SliderInt("Draw decimation", &state.vizParams.drawDecim, 1, 64);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Renders only every Nth point -- raise this if the 3D view is slow with a large cloud.");
+        ImGui::EndMenu();
+    }
+
     ImGui::EndMainMenuBar();
 }
 
@@ -400,27 +476,48 @@ void UI::panelExtrinsics(AppState& state)
 
     ImGui::PushItemWidth(-80.f);
 
+    ImGui::Checkbox("Lock translation", &state.lockTranslation);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip(
+            "Blocks tx/ty/tz from being edited here or changed by\n\"Solve Extrinsics from Pairs\" -- use when the camera\nposition is already known and only orientation needs solving.");
+
     ImGui::Text("Camera position in world (m):");
+    ImGui::BeginDisabled(state.lockTranslation);
     dragFloat("tx", &E.tx, 0.01f, -50.f, 50.f, "%.3f");
     dragFloat("ty", &E.ty, 0.01f, -50.f, 50.f, "%.3f");
     dragFloat("tz", &E.tz, 0.01f, -50.f, 50.f, "%.3f");
+    ImGui::EndDisabled();
 
     ImGui::Spacing();
-    ImGui::Text("Camera orientation in world ZYX (deg):");
-    dragFloat("rx", &E.rx, 0.1f, -180.f, 180.f, "%.2f");
-    dragFloat("ry", &E.ry, 0.1f, -180.f, 180.f, "%.2f");
-    dragFloat("rz", &E.rz, 0.1f, -180.f, 180.f, "%.2f");
-    helpMarker("R_wc = Rz*Ry*Rx: camera orientation in LiDAR world.\nT_lidar2cam = R_wc^T * (p - C).");
+    ImGui::Text("Camera orientation in world, om/fi/ka (deg):");
+    dragFloat("om", &E.om, 0.1f, -180.f, 180.f, "%.2f");
+    dragFloat("fi", &E.fi, 0.1f, -180.f, 180.f, "%.2f");
+    dragFloat("ka", &E.ka, 0.1f, -180.f, 180.f, "%.2f");
+    helpMarker(
+        "R_wc = Rx(om)*Ry(fi)*Rz(ka): camera orientation in LiDAR world.\nT_lidar2cam = R_wc^T * (p - C).\nAt fi=+/-90 deg (gimbal lock), om and ka are not individually\nunique -- only om+ka (or om-ka) is determined.");
 
     ImGui::Spacing();
     if (ImGui::Button("Reset Extrinsics", ImVec2(-1, 0)))
-        E = Extrinsics{};
+    {
+        // Respect the translation lock: only reset orientation while locked.
+        Extrinsics defaults;
+        if (state.lockTranslation)
+        {
+            E.om = defaults.om;
+            E.fi = defaults.fi;
+            E.ka = defaults.ka;
+        }
+        else
+        {
+            E = defaults;
+        }
+    }
     ImGui::PopItemWidth();
 
     // Show current rotation matrix
     if (ImGui::TreeNode("Rotation matrix"))
     {
-        Eigen::Matrix3f R = eulerZYXtoMat3(E.rx, E.ry, E.rz);
+        Eigen::Matrix3f R = omFiKaToMat3(E.om, E.fi, E.ka);
         for (int r = 0; r < 3; r++)
         {
             ImGui::Text("[ %6.3f  %6.3f  %6.3f ]", R(r, 0), R(r, 1), R(r, 2));
@@ -448,6 +545,78 @@ void UI::panelVisualization(AppState& state)
     ImGui::PopItemWidth();
 
     ImGui::Checkbox("Show compass/ruler (C)", &state.showCompassRuler);
+}
+
+// ── Correspondences ──────────────────────────────────────────────────────────
+// Pick image-pixel <-> LiDAR-point pairs, then solve extrinsics from them.
+// Mirrors the list-with-remove-buttons + ">=3 needed" pattern used by
+// ControlPoints::imgui (core/src/control_points.cpp).
+void UI::panelCorrespondences(AppState& state)
+{
+    ImGui::TextWrapped("Hold Shift and click a point in the Image View or the 3D View. Picking both sides completes a pair.");
+
+    ImGui::Text("Pending pair:");
+    ImGui::SameLine();
+    ImGui::TextColored(state.pendingHasImage ? ImVec4(0, 1, 0, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1), "image");
+    ImGui::SameLine();
+    ImGui::TextColored(state.pendingHasCloud ? ImVec4(0, 1, 0, 1) : ImVec4(0.6f, 0.6f, 0.6f, 1), "3D point");
+    if (state.pendingHasImage || state.pendingHasCloud)
+    {
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Clear"))
+            state.clearPending();
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+
+    // R_wc/C for a live per-pair reprojection-error readout, using this
+    // app's own camera model (calib::projectPoint) -- so the numbers reflect
+    // whatever the current extrinsics are, whether from a solve or manual
+    // slider edits.
+    Eigen::Matrix3f R = omFiKaToMat3(state.extrinsics.om, state.extrinsics.fi, state.extrinsics.ka);
+    Eigen::Vector3f C(state.extrinsics.tx, state.extrinsics.ty, state.extrinsics.tz);
+
+    int removeIndex = -1;
+    for (int i = 0; i < (int)state.pairs.size(); i++)
+    {
+        const auto& p = state.pairs[i];
+        ImGui::PushID(i);
+        char label[64];
+        std::snprintf(label, sizeof(label), "#%d px(%.0f,%.0f)", i, p.u, p.v);
+        // Click a row to highlight that pair as a large cross in the 3D
+        // and image views (click again to clear the selection).
+        if (ImGui::Selectable(label, state.selectedPairIndex == i, 0, ImVec2(140, 0)))
+            state.selectedPairIndex = (state.selectedPairIndex == i) ? -1 : i;
+        ImGui::SameLine();
+
+        float u, v, depth;
+        if (projectPoint(p.px, p.py, p.pz, state.intrinsics, R, C, u, v, depth))
+        {
+            float err = std::sqrt((u - p.u) * (u - p.u) + (v - p.v) * (v - p.v));
+            ImGui::TextColored(err < 5.f ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0.4f, 0, 1), "err %.1fpx", err);
+        }
+        else
+        {
+            ImGui::TextColored(ImVec4(1, 0, 0, 1), "behind camera");
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Remove"))
+            removeIndex = i;
+        ImGui::PopID();
+    }
+    if (removeIndex >= 0)
+        state.removePair(removeIndex);
+
+    ImGui::Spacing();
+    ImGui::BeginDisabled(state.pairs.size() < 3);
+    if (ImGui::Button("Solve Extrinsics from Pairs", ImVec2(-1, 0)))
+        state.solvePairs();
+    ImGui::EndDisabled();
+    if (state.pairs.size() < 3)
+        ImGui::TextDisabled("At least 3 pairs needed");
+    if (state.lastSolveRmsPixels >= 0.0)
+        ImGui::Text("Last solve RMS reprojection error: %.2f px", state.lastSolveRmsPixels);
 }
 
 // ── Status bar ────────────────────────────────────────────────────────────────

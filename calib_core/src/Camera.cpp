@@ -8,10 +8,6 @@
 
 namespace calib {
 
-void avoidGimbalLock(float& fi_deg) {
-    if (std::fabs(std::fabs(fi_deg) - 90.f) < kGimbalLockEpsilonDeg)
-        fi_deg = std::copysign(90.f - kGimbalLockEpsilonDeg, fi_deg);
-}
 
 Eigen::Matrix3f omFiKaToMat3(float om_deg, float fi_deg, float ka_deg) {
     TaitBryanPose pose;
@@ -29,7 +25,6 @@ void omFiKaFromMat3(const Eigen::Matrix3f& R, float& om_deg, float& fi_deg, floa
     om_deg = static_cast<float>(rad2deg(pose.om));
     fi_deg = static_cast<float>(rad2deg(pose.fi));
     ka_deg = static_cast<float>(rad2deg(pose.ka));
-    avoidGimbalLock(fi_deg);
 }
 
 bool projectPoint(float px, float py, float pz,

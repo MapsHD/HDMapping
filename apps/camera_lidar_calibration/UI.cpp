@@ -143,7 +143,7 @@ void UI::drawImageView(AppState& state)
     // core/src/control_points.cpp already uses elsewhere in this codebase.
     const bool picking = ImGui::GetIO().KeyShift;
     ImGui::TextColored(
-        ImVec4(1, 1, 0, 0.8f), picking ? "Shift+click to pick a point" : "Scroll: zoom | Drag: pan | Dbl-click: reset zoom");
+        ImVec4(1, 1, 0, 0.8f), picking ? "Shift+click to pick a point" : "Scroll: zoom | Drag: pan with middle | Dbl-click: reset zoom");
 
     ImGui::BeginChild("image_scroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
@@ -179,7 +179,7 @@ void UI::drawImageView(AppState& state)
                 state.setPendingImagePoint(std::clamp(p.x, 0.f, imgW), std::clamp(p.y, 0.f, imgH));
             }
         }
-        else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+        else if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
         {
             ImGui::SetScrollX(ImGui::GetScrollX() - io.MouseDelta.x);
             ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseDelta.y);
@@ -306,7 +306,7 @@ void UI::actionOpenCalibration(AppState& state)
 
 void UI::actionSaveCalibration(AppState& state)
 {
-    std::string path = mandeye::fd::SaveFileDialog("Save calibration file", mandeye::fd::json_filter, ".json", "calibration.json");
+    std::string path = mandeye::fd::SaveFileDialog("Save calibration file", mandeye::fd::json_filter);
     if (!path.empty())
     {
         setBuf(savePath, sizeof(savePath), path);
@@ -479,7 +479,8 @@ void UI::panelExtrinsics(AppState& state)
     ImGui::Checkbox("Lock translation", &state.lockTranslation);
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip(
-            "Blocks tx/ty/tz from being edited here or changed by\n\"Solve Extrinsics from Pairs\" -- use when the camera\nposition is already known and only orientation needs solving.");
+            "Blocks tx/ty/tz from being edited here or changed by\n\"Solve Extrinsics from Pairs\" -- use when the camera\nposition is "
+            "already known and only orientation needs solving.");
 
     ImGui::Text("Camera position in world (m):");
     ImGui::BeginDisabled(state.lockTranslation);
@@ -492,10 +493,10 @@ void UI::panelExtrinsics(AppState& state)
     ImGui::Text("Camera orientation in world, om/fi/ka (deg):");
     dragFloat("om", &E.om, 0.1f, -180.f, 180.f, "%.2f");
     dragFloat("fi", &E.fi, 0.1f, -180.f, 180.f, "%.2f");
-    avoidGimbalLock(E.fi);
     dragFloat("ka", &E.ka, 0.1f, -180.f, 180.f, "%.2f");
     helpMarker(
-        "R_wc = Rx(om)*Ry(fi)*Rz(ka): camera orientation in LiDAR world.\nT_lidar2cam = R_wc^T * (p - C).\nAt fi=+/-90 deg (gimbal lock), om and ka are not individually\nunique -- only om+ka (or om-ka) is determined.");
+        "R_wc = Rx(om)*Ry(fi)*Rz(ka): camera orientation in LiDAR world.\nT_lidar2cam = R_wc^T * (p - C).\nAt fi=+/-90 deg (gimbal lock), "
+        "om and ka are not individually\nunique -- only om+ka (or om-ka) is determined.");
 
     ImGui::Spacing();
     if (ImGui::Button("Reset Extrinsics", ImVec2(-1, 0)))

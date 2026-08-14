@@ -147,7 +147,8 @@ bool AppState::solvePairs()
     }
 
     lastSolveRmsPixels = rms;
-    statusMsg = lockTranslation ? "Solved rotation (translation locked): RMS reprojection error " : "Solved extrinsics: RMS reprojection error ";
+    statusMsg =
+        lockTranslation ? "Solved rotation (translation locked): RMS reprojection error " : "Solved extrinsics: RMS reprojection error ";
     statusMsg += std::to_string(rms) + " px";
     if (!imageRectified && intrinsicsLoaded == false)
         statusMsg += " (no intrinsics loaded -- distortion assumed zero)";

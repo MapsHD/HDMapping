@@ -50,6 +50,7 @@ namespace mandeye::fd
 
     const std::vector<std::string> Nmea_filter = { "NMEA file (*.nmea)", "*.nmea", "All files", "*" };
     const std::vector<std::string> Gnss_filter = { "GNSS file (*.gnss)", "*.gnss", "All files", "*" };
+    const std::vector<std::string> Tum_filter = { "TUM trajectory file (*.tum, *.txt)", "*.tum *.txt", "All files", "*" };
 
     std::string OpenFileDialogOneFile(const std::string& title, const std::vector<std::string>& filter);
     std::vector<std::string> OpenFileDialog(const std::string& title, const std::vector<std::string>& filter, bool multiselect);

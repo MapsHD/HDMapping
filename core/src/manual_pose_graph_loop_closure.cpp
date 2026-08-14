@@ -31,6 +31,7 @@ void ManualPoseGraphLoopClosure::Gui(
     int& index_loop_closure_target,
     float* m_gizmo,
     GNSS& gnss,
+    TUM& tum,
     GroundControlPoints& gcps,
     ControlPoints& cps,
     int num_edge_extended_before,
@@ -150,6 +151,11 @@ void ManualPoseGraphLoopClosure::Gui(
                 if (ImGui::Button("Fuse trajectory with GNSS (trajectory is rigid)"))
                 {
                     FuseTrajectoryWithGNSS(point_clouds_container, gnss);
+                }
+
+                if (ImGui::Button("Fuse trajectory with TUM (trajectory is rigid)"))
+                {
+                    FuseTrajectoryWithTUM(point_clouds_container, tum);
                 }
             }
         }

@@ -49,6 +49,7 @@
 #include <Core/session.h>
 #include <Core/structures.h>
 #include <Core/transformations.h>
+#include <Core/tum.h>
 #include <RaylibWidgets/WindowFit.h>
 
 #ifdef _WIN32
@@ -145,6 +146,7 @@ void renderLoopClosureLabels(PointClouds& point_clouds_container);
 void renderGroundControlPoints(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container);
 void renderGroundControlPointsLabels(const GroundControlPoints& ground_control_points, const PointClouds& point_clouds_container);
 void renderGNSS(const GNSS& gnss, const PointClouds& point_clouds_container);
+void renderTUM(const TUM& tum, const PointClouds& point_clouds_container);
 void renderControlPoints(const ControlPoints& control_points, PointClouds& point_clouds_container);
 void renderControlPointsLabels(const ControlPoints& control_points, const PointClouds& point_clouds_container);
 void display();
@@ -263,6 +265,7 @@ static bool show_demo_window = true;
 static bool show_another_window = false;
 
 bool gnssWithOffset = false;
+bool tumSubtractFirstPose = false;
 
 // radio button selectors
 static int NDTnomSelection = 0;
@@ -1202,6 +1205,7 @@ void loop_closure_gui()
             index_loop_closure_target,
             m_gizmo,
             tls_registration.gnss,
+            tls_registration.tum,
             session.ground_control_points,
             session.control_points,
             num_edge_extended_before,
@@ -2739,6 +2743,94 @@ void renderGNSS(const GNSS& gnss, const PointClouds& point_clouds_container)
     }
 }
 
+// TUM trajectories are treated like a second GNSS-style external track (see
+// renderGNSS() above, whose structure this mirrors): a polyline through
+// tum_poses plus, when show_correspondences is set, lines to the nearest
+// local_trajectory sample of every loaded scan by timestamp. Unlike GNSS,
+// TumPose::x/y/z are already Cartesian in the trajectory's own frame, so
+// only the point_clouds_container offset is subtracted, with no ENU/PROJ
+// conversion.
+void renderTUM(const TUM& tum, const PointClouds& point_clouds_container)
+{
+    // Cached across frames -- re-uploaded only when tum_poses actually
+    // changed (tum.version) or the point cloud recentering offset shifted,
+    // not every frame (see ScanRenderer::PointsGPU's own comment for why
+    // that matters).
+    static ScanRenderer::PointsGPU tumPointsGPU;
+    static size_t tumPointsGPUVersion = SIZE_MAX;
+    static Eigen::Vector3d tumPointsGPUOffset = Eigen::Vector3d::Zero();
+
+    if (!tum.tum_poses.empty())
+    {
+        bool stale = tumPointsGPUVersion != tum.version || !tumPointsGPUOffset.isApprox(point_clouds_container.offset, 1e-9);
+        if (stale)
+        {
+            std::vector<Eigen::Vector3d> positions;
+            positions.reserve(tum.tum_poses.size());
+            for (const auto& p : tum.tum_poses)
+            {
+                positions.emplace_back(
+                    p.x - point_clouds_container.offset.x(),
+                    p.y - point_clouds_container.offset.y(),
+                    p.z - point_clouds_container.offset.z());
+            }
+            scan_renderer.uploadPoints(tumPointsGPU, positions);
+            tumPointsGPUVersion = tum.version;
+            tumPointsGPUOffset = point_clouds_container.offset;
+        }
+        scan_renderer.drawPoints(tumPointsGPU, YELLOW, tum.point_size);
+    }
+
+    if (tum.show_correspondences)
+    {
+        rlBegin(RL_LINES);
+        rlColor3f(1.0f, 0.0f, 0.0f);
+        for (const auto& pc : point_clouds_container.point_clouds)
+        {
+            for (size_t i = 0; i < tum.tum_poses.size(); ++i)
+            {
+                // TUM timestamps are Unix-epoch seconds; local_trajectory's
+                // timestamps.first is the LIO trajectory CSV's
+                // "timestamp_nanoseconds" column -- Unix-epoch nanoseconds,
+                // same epoch, 1e9x the scale. timestamps.second
+                // ("timestampUnix_nanoseconds") looks like the more obvious
+                // match by name, but is 0 for every node unless that column
+                // was actually captured during LIO (commonly isn't), so
+                // matching against it silently finds nothing -- .first with
+                // the unit conversion below is the field that's actually
+                // populated.
+                double time_stamp_ns = tum.tum_poses[i].timestamp * 1.0e9;
+
+                auto it = std::lower_bound(
+                    pc.local_trajectory.begin(),
+                    pc.local_trajectory.end(),
+                    time_stamp_ns,
+                    [](const PointCloud::LocalTrajectoryNode& lhs, const double& time) -> bool
+                    {
+                        return lhs.timestamps.first < time;
+                    });
+
+                size_t index = static_cast<size_t>(it - pc.local_trajectory.begin());
+
+                if (index > 0 && index < pc.local_trajectory.size())
+                {
+                    if (fabs(time_stamp_ns - pc.local_trajectory[index].timestamps.first) < 5.0e8) // 0.5s, in ns
+                    {
+                        auto m = pc.m_pose * pc.local_trajectory[index].m_pose;
+                        rlVertex3f(static_cast<float>(m(0, 3)), static_cast<float>(m(1, 3)), static_cast<float>(m(2, 3)));
+
+                        rlVertex3f(
+                            static_cast<float>(tum.tum_poses[i].x - point_clouds_container.offset.x()),
+                            static_cast<float>(tum.tum_poses[i].y - point_clouds_container.offset.y()),
+                            static_cast<float>(tum.tum_poses[i].z - point_clouds_container.offset.z()));
+                    }
+                }
+            }
+        }
+        rlEnd();
+    }
+}
+
 // Was ControlPoints::render() (core/src/control_points.cpp) -- legacy-GL,
 // compiled once into `core` and shared with the remaining GLUT apps, so it
 // can't be touched; reimplemented here. Two parts, like the original's
@@ -3173,6 +3265,7 @@ void display()
     {
         renderGroundControlPoints(session.ground_control_points, session.point_clouds_container);
         renderGNSS(tls_registration.gnss, session.point_clouds_container);
+        renderTUM(tls_registration.tum, session.point_clouds_container);
 
         if (is_loop_closure_gui)
             renderLoopClosure(
@@ -4168,6 +4261,64 @@ void display()
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("GNSS (GPS, etc.) related open/save commands");
 
+                if (ImGui::BeginMenu("TUM"))
+                {
+                    ImGui::MenuItem("Subtract 1st pose transform -> move to (0,0,0)", nullptr, &tumSubtractFirstPose);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Re-express every pose relative to the first one, so the trajectory starts at "
+                            "identity (0,0,0, no rotation) instead of the file's raw coordinates");
+
+                    if (ImGui::MenuItem("Load TUM trajectory"))
+                    {
+                        std::vector<std::string> input_file_names;
+                        input_file_names = mandeye::fd::OpenFileDialog("Load TUM trajectory files", mandeye::fd::Tum_filter, true);
+
+                        if (input_file_names.size() > 0)
+                        {
+                            if (!tls_registration.tum.load_data_from_tum(input_file_names, tumSubtractFirstPose))
+                            {
+                                spdlog::error("Error loading TUM trajectory files!");
+                            }
+                            else
+                            {
+                                spdlog::info(
+                                    "point_clouds_container.offset = ({}, {}, {})",
+                                    session.point_clouds_container.offset.x(),
+                                    session.point_clouds_container.offset.y(),
+                                    session.point_clouds_container.offset.z());
+                            }
+                        }
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Load a trajectory in the TUM RGB-D format (timestamp tx ty tz qx qy qz qw), treated like a GNSS track");
+
+                    ImGui::BeginDisabled(tls_registration.tum.tum_poses.size() == 0);
+                    if (ImGui::MenuItem("Center camera on TUM trajectory"))
+                    {
+                        Eigen::Vector3d centroid(0, 0, 0);
+                        for (const auto& p : tls_registration.tum.tum_poses)
+                        {
+                            centroid += Eigen::Vector3d(p.x, p.y, p.z);
+                        }
+                        centroid /= static_cast<double>(tls_registration.tum.tum_poses.size());
+                        centroid -= session.point_clouds_container.offset;
+
+                        app_state.new_rotation_center = centroid.cast<float>();
+                        app_state.camera_transition_active = true;
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Jump the camera to the loaded TUM trajectory -- use this if the trajectory doesn't "
+                            "appear where you expect it (e.g. it's far from the loaded point clouds)");
+                    ImGui::EndDisabled();
+
+                    ImGui::EndMenu();
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("TUM-format external trajectory open commands");
+
                 ImGui::EndMenu();
             }
             if (ImGui::IsItemHovered())
@@ -4546,6 +4697,18 @@ void display()
                 ImGui::BeginDisabled(tls_registration.gnss.gnss_poses.size() <= 0);
                 {
                     ImGui::MenuItem("Show GNSS correspondences", nullptr, &tls_registration.gnss.show_correspondences);
+                }
+                ImGui::EndDisabled();
+
+                ImGui::BeginDisabled(tls_registration.tum.tum_poses.size() <= 0);
+                {
+                    if (ImGui::BeginMenu("TUM GT Trajectory"))
+                    {
+                        ImGui::MenuItem("Show TUM correspondences", nullptr, &tls_registration.tum.show_correspondences);
+                        ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                        ImGui::SliderFloat("TUM point size", &tls_registration.tum.point_size, 1.0f, 20.0f);
+                        ImGui::EndMenu();
+                    }
                 }
                 ImGui::EndDisabled();
 

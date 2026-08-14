@@ -1129,6 +1129,136 @@ void PoseGraphLoopClosure::FuseTrajectoryWithGNSS(PointClouds& point_clouds_cont
     }
 }
 
+// Mirrors FuseTrajectoryWithGNSS() above -- same single-rigid-6DOF-transform
+// least-squares fit, applied to every point cloud pose in one shot, just
+// matched against a TUM trajectory instead of a GNSS one. The one real
+// difference is the timestamp comparison: pc.timestamps[0] is Unix-epoch
+// nanoseconds (as GNSS's own .timestamp happens to share, hence
+// FuseTrajectoryWithGNSS's direct comparison), while TUM's timestamp field
+// is Unix-epoch seconds -- scaled up by 1e9 here before comparing, same fix
+// as renderTUM()'s correspondence lines in multi_view_tls_registration_gui.cpp.
+//
+// Unlike FuseTrajectoryWithGNSS, the normal equations here are accumulated
+// as dense 6x6/6x1 blocks (one rank-3 Ai^T*Ai / Ai^T*bi update per
+// observation) rather than via triplet lists into a sparse matA/matP/matB --
+// there are always exactly 6 unknowns (one shared rigid delta-pose) and the
+// observation weight P is always identity, so the sparse machinery buys
+// nothing here.
+void PoseGraphLoopClosure::FuseTrajectoryWithTUM(PointClouds& point_clouds_container, TUM& tum)
+{
+    for (int iter = 0; iter < 30; iter++)
+    {
+        Eigen::Matrix<double, 6, 6> AtPA = Eigen::Matrix<double, 6, 6>::Zero();
+        Eigen::Matrix<double, 6, 1> AtPB = Eigen::Matrix<double, 6, 1>::Zero();
+        Eigen::Affine3d m_pose = Eigen::Affine3d::Identity();
+        int num_observations = 0;
+
+        for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
+        {
+            const auto& pc = point_clouds_container.point_clouds[index_pose];
+
+            double time_stamp_ns = pc.timestamps[0];
+
+            auto it = std::lower_bound(
+                tum.tum_poses.begin(),
+                tum.tum_poses.end(),
+                time_stamp_ns,
+                [](const TUM::TumPose& lhs, const double& time) -> bool
+                {
+                    return lhs.timestamp * 1.0e9 < time;
+                });
+
+            int index = it - tum.tum_poses.begin() - 1;
+
+            if (index > 0 && index < tum.tum_poses.size())
+            {
+                if (fabs(time_stamp_ns - tum.tum_poses[index].timestamp * 1.0e9) < 5.0e8) // 0.5s, in ns
+                {
+                    Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+                    TaitBryanPose pose_s;
+                    pose_s = pose_tait_bryan_from_affine_matrix(m_pose);
+                    Eigen::Vector3d p_s = pc.m_pose.translation();
+                    point_to_point_source_to_target_tait_bryan_wc_jacobian(
+                        jacobian, pose_s.px, pose_s.py, pose_s.pz, pose_s.om, pose_s.fi, pose_s.ka, p_s.x(), p_s.y(), p_s.z());
+
+                    double delta_x;
+                    double delta_y;
+                    double delta_z;
+                    Eigen::Vector3d p_t(
+                        tum.tum_poses[index].x - point_clouds_container.offset.x(),
+                        tum.tum_poses[index].y - point_clouds_container.offset.y(),
+                        tum.tum_poses[index].z - point_clouds_container.offset.z());
+
+                    point_to_point_source_to_target_tait_bryan_wc(
+                        delta_x,
+                        delta_y,
+                        delta_z,
+                        pose_s.px,
+                        pose_s.py,
+                        pose_s.pz,
+                        pose_s.om,
+                        pose_s.fi,
+                        pose_s.ka,
+                        p_s.x(),
+                        p_s.y(),
+                        p_s.z(),
+                        p_t.x(),
+                        p_t.y(),
+                        p_t.z());
+
+                    Eigen::Matrix<double, 3, 6> Ai = -jacobian;
+                    Eigen::Vector3d bi(delta_x, delta_y, delta_z);
+
+                    AtPA += Ai.transpose() * Ai;
+                    AtPB += Ai.transpose() * bi;
+                    ++num_observations;
+                }
+            }
+        }
+
+        bool is_ok = false;
+        TaitBryanPose pose;
+
+        if (num_observations > 0)
+        {
+            Eigen::LDLT<Eigen::Matrix<double, 6, 6>> solver(AtPA);
+            if (solver.info() == Eigen::Success)
+            {
+                Eigen::Matrix<double, 6, 1> x = solver.solve(AtPB);
+                pose.px = x(0);
+                pose.py = x(1);
+                pose.pz = x(2);
+                pose.om = x(3);
+                pose.fi = x(4);
+                pose.ka = x(5);
+                is_ok = true;
+            }
+            else
+            {
+                std::cout << "FuseTrajectoryWithTUM: solving AtPA=AtPB FAILED" << std::endl;
+            }
+        }
+
+        if (is_ok)
+        {
+            m_pose = affine_matrix_from_pose_tait_bryan(pose);
+
+            for (size_t i = 0; i < point_clouds_container.point_clouds.size(); i++)
+            {
+                point_clouds_container.point_clouds[i].m_pose = m_pose * point_clouds_container.point_clouds[i].m_pose;
+                point_clouds_container.point_clouds[i].pose =
+                    pose_tait_bryan_from_affine_matrix(point_clouds_container.point_clouds[i].m_pose);
+                point_clouds_container.point_clouds[i].gui_translation[0] = point_clouds_container.point_clouds[i].pose.px;
+                point_clouds_container.point_clouds[i].gui_translation[1] = point_clouds_container.point_clouds[i].pose.py;
+                point_clouds_container.point_clouds[i].gui_translation[2] = point_clouds_container.point_clouds[i].pose.pz;
+                point_clouds_container.point_clouds[i].gui_rotation[0] = rad2deg(point_clouds_container.point_clouds[i].pose.om);
+                point_clouds_container.point_clouds[i].gui_rotation[1] = rad2deg(point_clouds_container.point_clouds[i].pose.fi);
+                point_clouds_container.point_clouds[i].gui_rotation[2] = rad2deg(point_clouds_container.point_clouds[i].pose.ka);
+            }
+        }
+    }
+}
+
 void PoseGraphLoopClosure::run_icp(
     PointClouds& point_clouds_container,
     int index_active_edge,

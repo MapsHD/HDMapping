@@ -1078,6 +1078,7 @@ void loop_closure_gui()
             index_loop_closure_target,
             m_gizmo,
             tls_registration.gnss,
+            tls_registration.tum,
             session.ground_control_points,
             session.control_points,
             num_edge_extended_before,

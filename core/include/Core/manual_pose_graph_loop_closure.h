@@ -5,6 +5,7 @@
 #include <Core/observation_picking.h>
 #include <Core/point_clouds.h>
 #include <Core/pose_graph_loop_closure.h>
+#include <Core/tum.h>
 
 class ManualPoseGraphLoopClosure : public PoseGraphLoopClosure
 {
@@ -23,6 +24,7 @@ public:
         int& index_loop_closure_target,
         float* m_gizmo,
         GNSS& gnss,
+        TUM& tum,
         GroundControlPoints& gcps,
         ControlPoints& cps,
         int num_edge_extended_before,

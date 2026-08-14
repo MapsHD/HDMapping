@@ -408,6 +408,74 @@ void ScanRenderer::drawCachedWithTransform(
     rlDisableShader();
 }
 
+void ScanRenderer::uploadPoints(PointsGPU& gpu, const std::vector<Eigen::Vector3d>& positions) const
+{
+    unloadPoints(gpu);
+
+    if (positions.empty())
+    {
+        return;
+    }
+
+    std::vector<float> data;
+    data.reserve(positions.size() * 3);
+    for (const auto& p : positions)
+    {
+        data.push_back(static_cast<float>(p.x()));
+        data.push_back(static_cast<float>(p.y()));
+        data.push_back(static_cast<float>(p.z()));
+    }
+
+    gpu.vao = rlLoadVertexArray();
+    rlEnableVertexArray(gpu.vao);
+    gpu.vbo = rlLoadVertexBuffer(data.data(), static_cast<int>(data.size() * sizeof(float)), false);
+    rlSetVertexAttribute(0, 3, RL_FLOAT, false, 3 * sizeof(float), 0);
+    rlEnableVertexAttribute(0);
+    rlDisableVertexArray();
+
+    gpu.vertexCount = static_cast<int>(positions.size());
+}
+
+void ScanRenderer::drawPoints(const PointsGPU& gpu, Color color, float pointSize) const
+{
+    if (!shaderValid_ || gpu.vertexCount == 0)
+    {
+        return;
+    }
+
+    rlDrawRenderBatchActive();
+
+    Matrix mvp = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+    float colorF[4] = { color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f };
+    int colorModeFlat = 0;
+
+    rlEnableShader(shader_.id);
+    rlSetUniformMatrix(locMVP_, mvp);
+    rlSetUniform(locColorMode_, &colorModeFlat, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locColor_, colorF, RL_SHADER_UNIFORM_VEC4, 1);
+    rlSetUniform(locPointSize_, &pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
+
+    rlEnableVertexArray(gpu.vao);
+    glDrawArrays(GL_POINTS, 0, gpu.vertexCount);
+    rlDisableVertexArray();
+    rlDisableShader();
+}
+
+void ScanRenderer::unloadPoints(PointsGPU& gpu) const
+{
+    if (gpu.vao)
+    {
+        rlUnloadVertexArray(gpu.vao);
+        gpu.vao = 0;
+    }
+    if (gpu.vbo)
+    {
+        rlUnloadVertexBuffer(gpu.vbo);
+        gpu.vbo = 0;
+    }
+    gpu.vertexCount = 0;
+}
+
 namespace
 {
     constexpr double RAD_TO_DEG = 180.0 / M_PI;

@@ -11,6 +11,7 @@
 #include <Core/registration_plane_feature.h>
 #include <Core/session.h>
 #include <Core/transformations.h>
+#include <Core/tum.h>
 
 namespace fs = std::filesystem;
 
@@ -103,6 +104,9 @@ struct TLSRegistration
 
     // GNSS
     GNSS gnss;
+
+    // TUM trajectory
+    TUM tum;
 
     // Loading
     bool calculate_offset; // Whether to calculate offset to point cloud on loading

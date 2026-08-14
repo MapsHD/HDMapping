@@ -12,7 +12,6 @@ set(CORE_BASE_SOURCES
     src/point_cloud.cpp
     src/point_clouds.cpp
     src/session.cpp
-    src/tum.cpp
    # # src/utils.cpp # TODO(mwlasiuk) : broken AF ...
 )
 

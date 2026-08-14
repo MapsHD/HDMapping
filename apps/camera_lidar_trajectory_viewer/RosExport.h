@@ -34,7 +34,8 @@ struct RosExportInput
     std::map<int64_t, std::string> imageFiles;
     bool calibLoaded = false;
     Intrinsics K;
-    Extrinsics E;
+    Extrinsics E; // tx/ty/tz (camera position); rotation is R_wc below, not E.om/fi/ka
+    Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); // camera orientation in world/LiDAR frame
 
     // LiDAR chunks: each .laz plus its optional MRP correction (T applied to the
     // points to bring them into the map frame). Points carry per-point ns stamps.

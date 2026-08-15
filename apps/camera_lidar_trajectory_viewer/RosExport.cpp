@@ -162,7 +162,7 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
             writer.create_topic(tm);
 
             Eigen::Affine3f T_lc = Eigen::Affine3f::Identity();
-            T_lc.linear() = eulerZYXtoMat3(in.E.rx, in.E.ry, in.E.rz);
+            T_lc.linear() = in.R_wc;
             T_lc.translation() = Eigen::Vector3f(in.E.tx, in.E.ty, in.E.tz);
 
             geometry_msgs::msg::TransformStamped ts;

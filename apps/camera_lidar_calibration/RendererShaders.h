@@ -18,6 +18,7 @@ layout(location = 0) in vec3 vertexPosition;
 layout(location = 1) in float vertexIntensity;
 uniform mat4 mvp;
 uniform float pointSize;
+uniform int drawDecim;     // draw only every Nth point; 1 = draw all
 uniform mat4 lidarToCam;   // extrinsics (for RGB mode)
 uniform vec4 K;            // fx, fy, cx, cy
 uniform vec2 imgSize;
@@ -26,6 +27,11 @@ out float fragIntensity;
 out vec2 fragUV;
 out float fragCamDepth;
 void main() {
+    if (drawDecim > 1 && (gl_VertexID % drawDecim) != 0) {
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        gl_PointSize = 0.0;
+        return;
+    }
     fragPos = vertexPosition;
     fragIntensity = vertexIntensity;
     gl_Position = mvp * vec4(vertexPosition, 1.0);
@@ -90,9 +96,15 @@ uniform vec3 kRad1;        // k1 k2 k3
 uniform vec3 kRad2;        // k4 k5 k6
 uniform vec2 pTan;         // p1 p2
 uniform float pointSize;
+uniform int drawDecim;     // draw only every Nth point; 1 = draw all
 out float fragDepth;
 out float fragIntensity;
 void main() {
+    if (drawDecim > 1 && (gl_VertexID % drawDecim) != 0) {
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        gl_PointSize = 0.0;
+        return;
+    }
     // raylib coords -> lidar: x = rx, y = -rz, z = ry
     vec3 lidar = vec3(vertexPosition.x, -vertexPosition.z, vertexPosition.y);
     vec3 pc = (lidarToCam * vec4(lidar, 1.0)).xyz;

@@ -19,10 +19,11 @@ private:
     char intrPathBuf[512] = {};
     char savePath[512] = "calibration.json";
 
-    // 2D image view pan/zoom state
-    float zoom2D = 1.f; // 1 = fit to window
-    float offX = 0.f, offY = 0.f; // image coords of top-left visible pixel
-    int viewImgW = 0, viewImgH = 0;
+    // 2D image view zoom -- pan is delegated entirely to ImGui's own child
+    // scroll offset (see drawImageView), so there is no offX/offY to track
+    // or clamp ourselves.
+    float imgZoom = 1.f; // 1 = actual size (1 image px = 1 screen px)
+    int lastImgW = 0, lastImgH = 0; // detects a newly-loaded image, to reset imgZoom
 
     void drawImageView(AppState& state);
     void panelMenuBar(AppState& state);
@@ -30,6 +31,7 @@ private:
     void panelIntrinsics(AppState& state);
     void panelExtrinsics(AppState& state);
     void panelVisualization(AppState& state);
+    void panelCorrespondences(AppState& state);
     void panelStatus(const AppState& state);
 
     // File actions -- shared by the File menu items and their keyboard

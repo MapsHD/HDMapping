@@ -154,7 +154,8 @@ struct AppState
     Trajectory traj;
     std::vector<int64_t> imageTsNs;
     Intrinsics K;
-    Extrinsics E;
+    Extrinsics E; // tx/ty/tz (camera position); rotation lives in R_wc below, not E.om/fi/ka
+    Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); // camera orientation in world/LiDAR frame
     Roi roi;
     bool calibLoaded = false;
     int imgW = 4656, imgH = 3496;
@@ -395,7 +396,7 @@ static void loadCloud(AppState& s)
     std::sort(lazPaths.begin(), lazPaths.end());
 
     bool canColor = s.calibLoaded && !s.imagesFilenamesInTime.empty();
-    Eigen::Matrix3f R_wc = canColor ? eulerZYXtoMat3(s.E.rx, s.E.ry, s.E.rz) : Eigen::Matrix3f::Identity();
+    Eigen::Matrix3f R_wc = canColor ? s.R_wc : Eigen::Matrix3f::Identity();
     Eigen::Vector3f C(s.E.tx, s.E.ty, s.E.tz);
     float K_fx = s.K.fx * s.imgScale, K_fy = s.K.fy * s.imgScale;
     float K_cx = s.K.cx * s.imgScale, K_cy = s.K.cy * s.imgScale;
@@ -770,11 +771,15 @@ static void loadCalib(AppState& s)
             s.E.ty = je["camera_position_in_world_xyz"][1];
             s.E.tz = je["camera_position_in_world_xyz"][2];
         }
-        if (je.contains("camera_rotation_in_world_euler_zyx_deg") && je["camera_rotation_in_world_euler_zyx_deg"].size() >= 3)
+        // camera_rotation_matrix_in_world: 3x3 rows of R_wc, read straight into
+        // s.R_wc -- the viewer only ever consumes this calibration, so there's
+        // no need to round-trip it through Tait-Bryan angles.
+        if (je.contains("camera_rotation_matrix_in_world") && je["camera_rotation_matrix_in_world"].size() >= 3)
         {
-            s.E.rz = je["camera_rotation_in_world_euler_zyx_deg"][0];
-            s.E.ry = je["camera_rotation_in_world_euler_zyx_deg"][1];
-            s.E.rx = je["camera_rotation_in_world_euler_zyx_deg"][2];
+            auto& m = je["camera_rotation_matrix_in_world"];
+            for (int r = 0; r < 3; r++)
+                for (int c = 0; c < 3; c++)
+                    s.R_wc(r, c) = m[r][c].get<float>();
         }
     }
     // Optional region of interest, in full-resolution image pixels:
@@ -952,7 +957,7 @@ static void exportColmap(AppState& s)
 
     // T_lidar_camera (camera pose in the LiDAR frame, from the extrinsics)
     Eigen::Affine3f T_lc = Eigen::Affine3f::Identity();
-    T_lc.linear() = eulerZYXtoMat3(s.E.rx, s.E.ry, s.E.rz);
+    T_lc.linear() = s.R_wc;
     T_lc.translation() = Eigen::Vector3f(s.E.tx, s.E.ty, s.E.tz);
 
     // cameras.txt — rational OpenCV model == COLMAP FULL_OPENCV (12 params)
@@ -1051,6 +1056,7 @@ static void buildRosInput(AppState& s, RosExportInput& in)
     in.calibLoaded = s.calibLoaded;
     in.K = s.K;
     in.E = s.E;
+    in.R_wc = s.R_wc;
 
     fs::path d(s.sessionBuf);
     if (!fs::is_directory(d))
@@ -1129,7 +1135,7 @@ static void drawScene(AppState& s)
     // ── camera frustums ───────────────────────────────────────────────────────
     if (s.showFrustums && s.calibLoaded)
     {
-        Eigen::Matrix3f R_wc = eulerZYXtoMat3(s.E.rx, s.E.ry, s.E.rz);
+        Eigen::Matrix3f R_wc = s.R_wc;
         Eigen::Vector3f C(s.E.tx, s.E.ty, s.E.tz);
         float fs = s.frustumScale;
         float ncx[4] = {

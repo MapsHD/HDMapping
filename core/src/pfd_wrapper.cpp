@@ -50,11 +50,22 @@ namespace mandeye::fd
         static std::shared_ptr<pfd::save_file> save_file;
 
         // build default path (directory + suggested filename)
+        //
+        // portable-file-dialogs' macOS backend shells out to AppleScript's
+        // "choose file name", which only accepts an *existing folder* for
+        // "default location" (it has no separate "default name" parameter
+        // wired up). Appending defaultFileName turns this into a path to a
+        // file that doesn't exist yet, so the folder resolution throws
+        // before any dialog is shown. The zenity/kdialog/Windows backends
+        // are fine with a combined dir+filename path, so only combine them
+        // there.
         std::string defaultPath = internal::lastLocationHint;
+#ifndef __APPLE__
         if (!defaultFileName.empty())
         {
             defaultPath = (std::filesystem::path(internal::lastLocationHint) / defaultFileName).string();
         }
+#endif
 
         file = pfd::save_file(title, defaultPath, filter).result();
 

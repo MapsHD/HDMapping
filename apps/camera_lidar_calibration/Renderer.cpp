@@ -24,11 +24,11 @@ Color jetColor(float t)
 // those definitions, which became a duplicate-symbol link error once
 // raylib_widgets/CMakeLists.txt started actually compiling that .cpp.
 
-// World-frame convention: E.rx/ry/rz = camera orientation in world (R_wc, ZYX Euler).
+// World-frame convention: E.om/fi/ka = camera orientation in world (R_wc = Rx*Ry*Rz).
 // E.tx/ty/tz = camera position in world.  p_cam = R_wc^T * (p_lidar - C).
 static Matrix buildLidarToCamMatrix(const Extrinsics& E)
 {
-    Eigen::Matrix3f R = eulerZYXtoMat3(E.rx, E.ry, E.rz);
+    Eigen::Matrix3f R = omFiKaToMat3(E.om, E.fi, E.ka);
     Eigen::Vector3f ti = -(R.transpose() * Eigen::Vector3f(E.tx, E.ty, E.tz));
     // Raylib Matrix struct fields: m0,m4,m8,m12 / m1,m5,m9,m13 / m2,m6,m10,m14 / m3,m7,m11,m15
     // We store R^T with translation ti (lidar→cam transform).
@@ -80,6 +80,7 @@ void Renderer::initPointShader()
     {
         locMVP = rlGetLocationUniform(pointShader.id, "mvp");
         locPointSize = rlGetLocationUniform(pointShader.id, "pointSize");
+        locDecim = rlGetLocationUniform(pointShader.id, "drawDecim");
         locColorMode = rlGetLocationUniform(pointShader.id, "colorMode");
         locHeightRange = rlGetLocationUniform(pointShader.id, "heightRange");
         locMaxDist = rlGetLocationUniform(pointShader.id, "maxDist");
@@ -108,6 +109,7 @@ void Renderer::initPointShader()
         locPrjOpacity = rlGetLocationUniform(projShader.id, "opacity");
         locPrjPointSize = rlGetLocationUniform(projShader.id, "pointSize");
         locPrjColorMode = rlGetLocationUniform(projShader.id, "colorMode");
+        locPrjDecim = rlGetLocationUniform(projShader.id, "drawDecim");
     }
 
     // Allow gl_PointSize from the vertex shader (core profile requires this)
@@ -162,7 +164,14 @@ void Renderer::unloadCloudGPU()
 }
 
 void Renderer::renderImageOverlay(
-    const Texture2D& img, int imgW, int imgH, const Intrinsics& K, const Extrinsics& E, bool applyDistortion, const VisualizationParams& vp)
+    const Texture2D& img,
+    int imgW,
+    int imgH,
+    const Intrinsics& K,
+    const Extrinsics& E,
+    bool applyDistortion,
+    const VisualizationParams& vp,
+    bool showOverlay)
 {
     if (!imageTexValid)
         return;
@@ -173,7 +182,7 @@ void Renderer::renderImageOverlay(
     DrawTexturePro(
         img, Rectangle{ 0, 0, (float)imgW, (float)imgH }, Rectangle{ 0, 0, (float)texW, (float)texH }, Vector2{ 0, 0 }, 0.f, WHITE);
 
-    if (cloudCount > 0 && projShaderValid)
+    if (showOverlay && cloudCount > 0 && projShaderValid)
     {
         rlDrawRenderBatchActive(); // flush the image quad before raw GL draw
 
@@ -208,6 +217,7 @@ void Renderer::renderImageOverlay(
         rlSetUniform(locPrjOpacity, &vp.opacity, RL_SHADER_UNIFORM_FLOAT, 1);
         rlSetUniform(locPrjPointSize, &vp.pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
         rlSetUniform(locPrjColorMode, &vp.colorMode, RL_SHADER_UNIFORM_INT, 1);
+        rlSetUniform(locPrjDecim, &vp.drawDecim, RL_SHADER_UNIFORM_INT, 1);
 
         rlEnableVertexArray(cloudVAO);
         glDrawArrays(GL_POINTS, 0, cloudCount);
@@ -256,6 +266,7 @@ void Renderer::draw3DCloud(
     rlEnableShader(pointShader.id);
     rlSetUniformMatrix(locMVP, mvp);
     rlSetUniform(locPointSize, &vp.pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
+    rlSetUniform(locDecim, &vp.drawDecim, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locColorMode, &colorMode, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locHeightRange, heightRange, RL_SHADER_UNIFORM_VEC2, 1);
     rlSetUniform(locMaxDist, &maxDist, RL_SHADER_UNIFORM_FLOAT, 1);
@@ -281,7 +292,7 @@ void Renderer::draw3DCloud(
 void Renderer::drawCameraFrustum(const Intrinsics& K, const Extrinsics& E, int imgW, int imgH, float scale)
 {
     // World-frame convention: R_wc = camera orientation in world, C = camera position in world
-    Eigen::Matrix3f R = eulerZYXtoMat3(E.rx, E.ry, E.rz);
+    Eigen::Matrix3f R = omFiKaToMat3(E.om, E.fi, E.ka);
 
     // Camera position in LiDAR frame is directly (E.tx, E.ty, E.tz)
     Vector3 origin = { E.tx, E.tz, -E.ty }; // LiDAR→raylib

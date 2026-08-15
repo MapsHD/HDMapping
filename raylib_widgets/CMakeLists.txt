@@ -17,6 +17,7 @@ add_library(raylib_widgets STATIC
     src/ShortcutsTable.cpp
     src/OrbitCamera.cpp
     src/CenterOfRotationWindow.cpp
+    src/PointPicking.cpp
 )
 
 target_include_directories(raylib_widgets PUBLIC include)

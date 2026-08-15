@@ -1,13 +1,30 @@
 #include <CalibCore/Camera.h>
 
+// Reuses (does not duplicate) core's own om/fi/ka<->matrix conversion --
+// header-only, pulls in nothing but Eigen/std (see structures.h), so this
+// doesn't violate calib_core's no-raylib/imgui/OpenCV design (see
+// calib_core/CMakeLists.txt); nothing here links core/core_math.
+#include <Core/transformations.h>
+
 namespace calib {
 
-Eigen::Matrix3f eulerZYXtoMat3(float rx_deg, float ry_deg, float rz_deg) {
-    const float d2r = static_cast<float>(M_PI) / 180.f;
-    return (Eigen::AngleAxisf(rz_deg * d2r, Eigen::Vector3f::UnitZ()) *
-            Eigen::AngleAxisf(ry_deg * d2r, Eigen::Vector3f::UnitY()) *
-            Eigen::AngleAxisf(rx_deg * d2r, Eigen::Vector3f::UnitX()))
-           .toRotationMatrix();
+
+Eigen::Matrix3f omFiKaToMat3(float om_deg, float fi_deg, float ka_deg) {
+    TaitBryanPose pose;
+    pose.om = deg2rad(om_deg);
+    pose.fi = deg2rad(fi_deg);
+    pose.ka = deg2rad(ka_deg);
+    Eigen::Matrix3f Rdelta = affine_matrix_from_pose_tait_bryan(pose).linear().cast<float>();
+    return kCameraLidarAxisOffset * Rdelta;
+}
+
+void omFiKaFromMat3(const Eigen::Matrix3f& R, float& om_deg, float& fi_deg, float& ka_deg) {
+    Eigen::Affine3d m = Eigen::Affine3d::Identity();
+    m.linear() = (kCameraLidarAxisOffset.transpose() * R).cast<double>();
+    TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(m);
+    om_deg = static_cast<float>(rad2deg(pose.om));
+    fi_deg = static_cast<float>(rad2deg(pose.fi));
+    ka_deg = static_cast<float>(rad2deg(pose.ka));
 }
 
 bool projectPoint(float px, float py, float pz,

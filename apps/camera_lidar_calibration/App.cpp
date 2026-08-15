@@ -2,8 +2,10 @@
 #include "imgui.h"
 #include "raymath.h"
 #include "rlImGui.h"
+#include <CalibCore/CameraCalibrationSolver.h>
 #include <HDMapping/Version.hpp>
 #include <RaylibWidgets/CompassRuler.h>
+#include <RaylibWidgets/PointPicking.h>
 #include <RaylibWidgets/WindowFit.h>
 #include <cctype>
 #include <cmath>
@@ -59,6 +61,100 @@ void AppState::rebuildImageTexture()
     imageLoaded = true;
 }
 
+// ── AppState correspondence picking ───────────────────────────────────────────
+void AppState::setPendingImagePoint(float u, float v)
+{
+    pendingPair.u = u;
+    pendingPair.v = v;
+    pendingHasImage = true;
+
+    if (pendingHasCloud)
+    {
+        pairs.push_back(pendingPair);
+        pendingPair = CorrespondencePair{};
+        pendingHasImage = pendingHasCloud = false;
+        statusMsg = "Pair " + std::to_string(pairs.size()) + " added";
+    }
+    else
+    {
+        statusMsg = "Image point set -- Shift+click the matching point in the 3D View";
+    }
+}
+
+void AppState::setPendingCloudPoint(float px, float py, float pz)
+{
+    pendingPair.px = px;
+    pendingPair.py = py;
+    pendingPair.pz = pz;
+    pendingHasCloud = true;
+
+    if (pendingHasImage)
+    {
+        pairs.push_back(pendingPair);
+        pendingPair = CorrespondencePair{};
+        pendingHasImage = pendingHasCloud = false;
+        statusMsg = "Pair " + std::to_string(pairs.size()) + " added";
+    }
+    else
+    {
+        statusMsg = "3D point set -- Shift+click the matching pixel in the Image View";
+    }
+}
+
+void AppState::clearPending()
+{
+    pendingPair = CorrespondencePair{};
+    pendingHasImage = pendingHasCloud = false;
+    statusMsg = "Pending pick cleared";
+}
+
+void AppState::removePair(int index)
+{
+    if (index < 0 || index >= static_cast<int>(pairs.size()))
+        return;
+    pairs.erase(pairs.begin() + index);
+    if (selectedPairIndex == index)
+        selectedPairIndex = -1;
+    else if (selectedPairIndex > index)
+        selectedPairIndex--;
+}
+
+bool AppState::solvePairs()
+{
+    if (pairs.size() < 3)
+    {
+        statusMsg = "Need at least 3 pairs to solve";
+        return false;
+    }
+
+    std::vector<calib::PointPixelCorrespondence> corr;
+    corr.reserve(pairs.size());
+    for (const auto& p : pairs)
+    {
+        calib::PointPixelCorrespondence c;
+        c.p = Eigen::Vector3d(p.px, p.py, p.pz);
+        c.u = p.u;
+        c.v = p.v;
+        corr.push_back(c);
+    }
+
+    double rms = -1.0;
+    bool ok = calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation);
+    if (!ok)
+    {
+        statusMsg = "Solve failed (degenerate correspondences)";
+        return false;
+    }
+
+    lastSolveRmsPixels = rms;
+    statusMsg =
+        lockTranslation ? "Solved rotation (translation locked): RMS reprojection error " : "Solved extrinsics: RMS reprojection error ";
+    statusMsg += std::to_string(rms) + " px";
+    if (!imageRectified && intrinsicsLoaded == false)
+        statusMsg += " (no intrinsics loaded -- distortion assumed zero)";
+    return true;
+}
+
 // ── AppState::loadImage ───────────────────────────────────────────────────────
 void AppState::loadImage(const char* path)
 {
@@ -85,6 +181,17 @@ static void centerOrbitOnCloud(AppState& s)
     s.orbit.distance = span * 0.8f;
 }
 
+// Keeps AppState::cloudPointsRaylib (used by 3D point picking) 1:1 in sync
+// with AppState::cloud.points -- same LiDAR (x,y,z) -> raylib (x,z,-y)
+// convention as Renderer::uploadCloud.
+static void rebuildCloudPointsRaylib(AppState& s)
+{
+    s.cloudPointsRaylib.clear();
+    s.cloudPointsRaylib.reserve(s.cloud.points.size());
+    for (const auto& p : s.cloud.points)
+        s.cloudPointsRaylib.push_back(Vector3{ p.x, p.z, -p.y });
+}
+
 void AppState::loadCloud(const char* path)
 {
     if (!cloud.load(path))
@@ -94,6 +201,7 @@ void AppState::loadCloud(const char* path)
     }
     cloudPaths = { path };
     renderer.uploadCloud(cloud);
+    rebuildCloudPointsRaylib(*this);
     centerOrbitOnCloud(*this);
     statusMsg = "";
 }
@@ -123,6 +231,7 @@ void AppState::addCloud(const char* path)
     }
     cloudPaths.push_back(path);
     renderer.uploadCloud(cloud);
+    rebuildCloudPointsRaylib(*this);
     centerOrbitOnCloud(*this);
     statusMsg = "";
 }
@@ -367,13 +476,18 @@ void AppState::loadCalibration(const char* path)
             extrinsics.ty = pos[1].get<float>();
             extrinsics.tz = pos[2].get<float>();
         }
-        // camera_rotation_in_world_euler_zyx_deg: [rz, ry, rx]
-        if (je.contains("camera_rotation_in_world_euler_zyx_deg") && je["camera_rotation_in_world_euler_zyx_deg"].size() >= 3)
+        // camera_rotation_matrix_in_world: 3x3 rows of R_wc. The file's only
+        // rotation representation (convention-independent, portable) --
+        // decomposed into calib::Extrinsics' own om/fi/ka for internal
+        // use (UI sliders, solver initial guess).
+        if (je.contains("camera_rotation_matrix_in_world") && je["camera_rotation_matrix_in_world"].size() >= 3)
         {
-            auto& rot = je["camera_rotation_in_world_euler_zyx_deg"];
-            extrinsics.rz = rot[0].get<float>();
-            extrinsics.ry = rot[1].get<float>();
-            extrinsics.rx = rot[2].get<float>();
+            auto& m = je["camera_rotation_matrix_in_world"];
+            Eigen::Matrix3f R;
+            for (int r = 0; r < 3; r++)
+                for (int c = 0; c < 3; c++)
+                    R(r, c) = m[r][c].get<float>();
+            calib::omFiKaFromMat3(R, extrinsics.om, extrinsics.fi, extrinsics.ka);
         }
         gotExtrinsics = true;
     }
@@ -400,9 +514,9 @@ void AppState::loadCalibration(const char* path)
 // ── AppState::saveCalibration ─────────────────────────────────────────────────
 void AppState::saveCalibration(const char* path)
 {
-    // World-frame convention: R = R_wc (camera orientation in world, ZYX Euler)
+    // World-frame convention: R = R_wc (camera orientation in world, om/fi/ka)
     // C = camera position in world.  T_lidar_to_cam = [R_wc^T | -R_wc^T*C]
-    Eigen::Matrix3f R = eulerZYXtoMat3(extrinsics.rx, extrinsics.ry, extrinsics.rz);
+    Eigen::Matrix3f R = omFiKaToMat3(extrinsics.om, extrinsics.fi, extrinsics.ka);
     Eigen::Vector3f C(extrinsics.tx, extrinsics.ty, extrinsics.tz);
     Eigen::Vector3f ti = -(R.transpose() * C); // translation of T_lidar_to_camera
 
@@ -410,7 +524,10 @@ void AppState::saveCalibration(const char* path)
     j["intrinsics"] = { { "fx", intrinsics.fx }, { "fy", intrinsics.fy }, { "cx", intrinsics.cx }, { "cy", intrinsics.cy },
                         { "k1", intrinsics.k1 }, { "k2", intrinsics.k2 }, { "k3", intrinsics.k3 }, { "k4", intrinsics.k4 },
                         { "k5", intrinsics.k5 }, { "k6", intrinsics.k6 }, { "p1", intrinsics.p1 }, { "p2", intrinsics.p2 } };
-    j["extrinsics"]["camera_rotation_in_world_euler_zyx_deg"] = { extrinsics.rz, extrinsics.ry, extrinsics.rx };
+    // Rotation is stored as a matrix only -- convention-independent (no
+    // Euler/Tait-Bryan angle order or units to document/misread) and
+    // directly portable to any external tool. camera_rotation_matrix_in_world
+    // is the source of truth on load; see AppState::loadCalibration.
     j["extrinsics"]["camera_position_in_world_xyz"] = { C.x(), C.y(), C.z() };
     j["extrinsics"]["camera_rotation_matrix_in_world"] = { { R(0, 0), R(0, 1), R(0, 2) },
                                                            { R(1, 0), R(1, 1), R(1, 2) },
@@ -434,7 +551,13 @@ void AppState::saveCalibration(const char* path)
 void App::run()
 {
     const int W = 1400, H = 900;
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
+    // MSAA was costing real frame time once the 3D view grew to fill the
+    // whole window (was previously confined to half-height) -- point-cloud
+    // rendering is fill-rate-bound, and 4x MSAA multiplies per-pixel
+    // shading/blending cost across that now-doubled area. Point clouds are
+    // rendered as flat-shaded point sprites (no polygon edges to smooth),
+    // so the visual benefit was marginal anyway.
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(W, H, ("LiDAR-Camera Calibration " HDMAPPING_VERSION_STRING));
     raylib_widgets::fitWindowToScreen();
     // The 340px-wide side panel is fixed-width; below this the 3D/image
@@ -469,34 +592,143 @@ void App::run()
     CloseWindow();
 }
 
+// Shift (either side) is the modifier that dedicates the mouse to point
+// picking in both the Image View (UI::drawImageView) and the 3D View
+// (updateAndDrawPicking3D below) -- mirrors the CTRL-to-pick convention
+// core/src/control_points.cpp already uses elsewhere in this codebase.
+static bool shiftHeld()
+{
+    return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+}
+
 // ── App::update ───────────────────────────────────────────────────────────────
 void App::update()
 {
     bool imguiWantMouse = ImGui::GetIO().WantCaptureMouse;
-    state.orbit.update(!imguiWantMouse);
+    // Freeze orbiting while Shift is held so LMB is dedicated to picking
+    // instead of being ambiguous between "start an orbit drag" and "click
+    // to pick".
+    bool allowOrbit = !imguiWantMouse && !shiftHeld();
+    state.orbit.update(allowOrbit);
+}
+
+// ── 3D point picking + correspondence markers ───────────────────────────────
+// Draws small markers for already-picked pairs and, while Shift is held over
+// the 3D view, a live "nearest point under cursor" candidate -- the 3D-side
+// counterpart to the image view's zoom loupe: a precision aid the user sees
+// before committing a click. Must be called inside BeginMode3D/EndMode3D.
+//
+// Index labels for the markers are 2D text (DrawText), which must NOT be
+// called while inside BeginMode3D/EndMode3D -- while a 3D projection matrix
+// is active, DrawText's screen-pixel quads would get warped through it
+// instead of rendering flat. So this only *collects* (screenPos, label)
+// pairs here (GetWorldToScreen just needs the camera, not an active 3D
+// pass); the caller draws them with plain DrawText() after EndMode3D().
+static void updateAndDrawPicking3D(
+    AppState& state, const Camera3D& cam3d, Rectangle viewport3D, std::vector<std::pair<Vector2, int>>& outLabels)
+{
+    Vector3 camFwd = Vector3Normalize(Vector3Subtract(cam3d.target, cam3d.position));
+
+    for (size_t i = 0; i < state.pairs.size(); i++)
+    {
+        const auto& p = state.pairs[i];
+        Vector3 wp = { p.px, p.pz, -p.py };
+        DrawSphere(wp, 0.05f, YELLOW);
+        DrawLine3D(Vector3{ wp.x - 0.1f, wp.y, wp.z }, Vector3{ wp.x + 0.1f, wp.y, wp.z }, YELLOW);
+        DrawLine3D(Vector3{ wp.x, wp.y - 0.1f, wp.z }, Vector3{ wp.x, wp.y + 0.1f, wp.z }, YELLOW);
+
+        if (Vector3DotProduct(Vector3Subtract(wp, cam3d.position), camFwd) > 0.f)
+        {
+            Vector2 s = GetWorldToScreen(wp, cam3d);
+            if (s.x >= viewport3D.x && s.x <= viewport3D.x + viewport3D.width && s.y >= viewport3D.y &&
+                s.y <= viewport3D.y + viewport3D.height)
+                outLabels.emplace_back(s, (int)i);
+        }
+    }
+
+    // Large 3-axis cross for the pair selected in the Correspondences
+    // panel, so it's easy to spot in the (usually much busier) 3D view.
+    if (state.selectedPairIndex >= 0 && state.selectedPairIndex < (int)state.pairs.size())
+    {
+        const auto& p = state.pairs[state.selectedPairIndex];
+        Vector3 wp = { p.px, p.pz, -p.py };
+        const float armLen = 0.5f;
+        DrawLine3D(Vector3{ wp.x - armLen, wp.y, wp.z }, Vector3{ wp.x + armLen, wp.y, wp.z }, MAGENTA);
+        DrawLine3D(Vector3{ wp.x, wp.y - armLen, wp.z }, Vector3{ wp.x, wp.y + armLen, wp.z }, MAGENTA);
+        DrawLine3D(Vector3{ wp.x, wp.y, wp.z - armLen }, Vector3{ wp.x, wp.y, wp.z + armLen }, MAGENTA);
+    }
+
+    if (state.pendingHasCloud)
+    {
+        Vector3 wp = { state.pendingPair.px, state.pendingPair.pz, -state.pendingPair.py };
+        DrawSphere(wp, 0.07f, ORANGE);
+    }
+
+    if (!shiftHeld() || ImGui::GetIO().WantCaptureMouse)
+        return;
+
+    Vector2 mouse = GetMousePosition();
+    if (mouse.x < viewport3D.x || mouse.x > viewport3D.x + viewport3D.width || mouse.y < viewport3D.y ||
+        mouse.y > viewport3D.y + viewport3D.height)
+        return;
+
+    // Plain (not viewport-scoped) ray: BeginMode3D derives its projection's
+    // aspect ratio from the *full* window framebuffer regardless of the
+    // BeginScissorMode() sub-region this 3D view is confined to (see
+    // PointPicking.h), so the ray must be built the same way -- matching
+    // OrbitCamera::pickGroundPlaneTarget's existing convention.
+    Ray ray = GetScreenToWorldRay(mouse, cam3d);
+
+    size_t hitIndex = 0;
+    bool hit = raylib_widgets::pickNearestPoint(
+        state.cloudPointsRaylib.data(), state.cloudPointsRaylib.size(), ray, cam3d.fovy, (float)GetScreenHeight(), 12.f, hitIndex);
+    if (hit)
+    {
+        const auto& hp = state.cloud.points[hitIndex];
+        Vector3 wp = state.cloudPointsRaylib[hitIndex];
+        DrawSphere(wp, 0.08f, LIME);
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+            state.setPendingCloudPoint(hp.x, hp.y, hp.z);
+    }
+    else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+    {
+        state.statusMsg = "No point found near cursor, try again";
+    }
 }
 
 // ── App::draw ─────────────────────────────────────────────────────────────────
+// The 3D view fills the whole background (no more fixed top/bottom split
+// with the image view) -- the image is now a normal floating ImGui window
+// (see UI::draw) that the user can move/resize/overlap on top of it, like
+// any other panel.
 void App::draw()
 {
     float menuBarH = ImGui::GetFrameHeight();
     float panelW = 340.f;
     float viewW = (float)GetScreenWidth() - panelW;
     float viewH = (float)GetScreenHeight() - menuBarH;
-    float view3DY = menuBarH + viewH * 0.5f; // 3D starts at middle, below the menu bar
 
     // ── Image + projection overlay (GPU, into render texture)
+    // Hide the projected-point overlay while Shift is held (picking mode)
+    // so it doesn't obscure the pixel the user is aiming for.
     if (state.imageLoaded)
         state.renderer.renderImageOverlay(
-            state.imageTexture, state.imageW, state.imageH, state.intrinsics, state.extrinsics, !state.imageRectified, state.vizParams);
+            state.imageTexture,
+            state.imageW,
+            state.imageH,
+            state.intrinsics,
+            state.extrinsics,
+            !state.imageRectified,
+            state.vizParams,
+            !shiftHeld());
 
-    // ── 3D scene renders in the bottom-left area (as raylib background)
+    // ── 3D scene renders as the raylib background, filling the whole view
     BeginDrawing();
     ClearBackground(Color{ 30, 30, 30, 255 });
 
-    // Clipping for 3D region (bottom-left)
     // Note: raylib scissor is in screen coords (y-down)
-    BeginScissorMode(0, (int)view3DY, (int)viewW, (int)(viewH * 0.5f));
+    BeginScissorMode(0, (int)menuBarH, (int)viewW, (int)viewH);
 
     Camera3D cam3d = state.orbit.toRaylib();
     BeginMode3D(cam3d);
@@ -517,8 +749,17 @@ void App::draw()
     // Grid on ground plane
     DrawGrid(20, 1.f);
 
+    Rectangle viewport3D = { 0.f, menuBarH, viewW, viewH };
+    std::vector<std::pair<Vector2, int>> pickLabels;
+    updateAndDrawPicking3D(state, cam3d, viewport3D, pickLabels);
+
     EndMode3D();
     EndScissorMode();
+
+    // Index labels for the pair markers -- 2D text, drawn after EndMode3D
+    // (see updateAndDrawPicking3D's comment for why).
+    for (const auto& [screenPos, index] : pickLabels)
+        DrawText(std::to_string(index).c_str(), (int)screenPos.x + 8, (int)screenPos.y - 8, 14, YELLOW);
 
     if (state.showCompassRuler)
     {
@@ -529,10 +770,12 @@ void App::draw()
     }
 
     // ── 3D label
-    DrawText("3D View  [LMB: orbit | RMB: pan | Scroll: zoom]", 8, (int)view3DY + 4, 14, LIGHTGRAY);
+    if (shiftHeld())
+        DrawText("Shift+click to pick a 3D point (green = candidate)", 8, (int)menuBarH + 4, 14, YELLOW);
+    else
+        DrawText("3D View  [LMB: orbit | RMB: pan | Scroll: zoom | Shift: pick]", 8, (int)menuBarH + 4, 14, LIGHTGRAY);
 
-    // ── Divider line
-    DrawLineEx(Vector2{ 0, view3DY }, Vector2{ viewW, view3DY }, 1.f, GRAY);
+    DrawFPS((int)viewW - 90, (int)menuBarH + 4);
 
     // ── ImGui on top ─────────────────────────────────────────────────────────
     rlImGuiBegin();

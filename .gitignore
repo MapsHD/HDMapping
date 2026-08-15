@@ -75,3 +75,5 @@ imgui.ini
 
 # deploy_mandeye.bat output
 /deploy
+
+.cache/

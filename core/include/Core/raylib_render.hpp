@@ -170,6 +170,37 @@ public:
     void drawCachedWithTransform(
         size_t index, const Eigen::Affine3d& extraTransform, Color color, float pointSize, bool useIntensityColor) const;
 
+    // A caller-owned GPU buffer for an arbitrary world-space point set drawn
+    // via drawPoints() below -- for overlays that aren't part of any
+    // PointCloud (e.g. an externally loaded TUM trajectory) but still want
+    // trajectory-style point dots (GL_POINTS, sized via the same pointSize
+    // shader uniform drawTrajectories() uses) instead of a thin rlgl line.
+    // Default-constructed as empty/unallocated; the caller uploadPoints()s
+    // into it once (or whenever its source data actually changes) and
+    // drawPoints()s it every frame, rather than rebuilding a VAO/VBO every
+    // frame. Caller must unloadPoints() it before destruction (e.g. in its
+    // owner's own shutdown/destructor) to avoid leaking the VAO/VBO.
+    struct PointsGPU
+    {
+        unsigned int vao = 0;
+        unsigned int vbo = 0;
+        int vertexCount = 0;
+    };
+
+    // (Re)uploads positions into gpu, replacing whatever it held before.
+    // Call only when positions actually changed -- e.g. once after loading a
+    // new TUM trajectory, not unconditionally every frame.
+    void uploadPoints(PointsGPU& gpu, const std::vector<Eigen::Vector3d>& positions) const;
+
+    // Draws a previously uploaded PointsGPU as GL_POINTS, flat-colored. Safe
+    // to call every frame -- issues one glDrawArrays against the existing
+    // buffer, no allocation. Does nothing if gpu is empty or the shader
+    // failed to load.
+    void drawPoints(const PointsGPU& gpu, Color color, float pointSize) const;
+
+    // Releases gpu's VAO/VBO, resetting it back to empty/unallocated.
+    void unloadPoints(PointsGPU& gpu) const;
+
 private:
     struct CloudGPU
     {

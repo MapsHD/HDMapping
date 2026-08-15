@@ -4,6 +4,7 @@
 #include <Core/gnss.h>
 #include <Core/ground_control_points.h>
 #include <Core/point_clouds.h>
+#include <Core/tum.h>
 
 class PoseGraphLoopClosure
 {
@@ -57,6 +58,7 @@ public:
     void set_current_poses_as_motion_model(PointClouds& point_clouds_container);
     void graph_slam(PointClouds& point_clouds_container, GNSS& gnss, GroundControlPoints& gcps, ControlPoints& cps);
     void FuseTrajectoryWithGNSS(PointClouds& point_clouds_container, GNSS& gnss);
+    void FuseTrajectoryWithTUM(PointClouds& point_clouds_container, TUM& tum);
     void run_icp(
         PointClouds& point_clouds_container,
         int index_active_edge,

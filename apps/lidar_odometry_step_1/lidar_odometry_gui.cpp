@@ -483,7 +483,7 @@ void alternative_approach()
 
                 for (const auto& [timestamp_pair, gyr, acc] : imu_data)
                 {
-                    const double g = 9.81;
+                    const double g = 9.80665;
                     vqf_real_t gyr_vqf[3] = { static_cast<double>(gyr.x()), static_cast<double>(gyr.y()), static_cast<double>(gyr.z()) };
                     vqf_real_t acc_vqf[3] = { static_cast<double>(acc.x()) * g, static_cast<double>(acc.y()) * g, static_cast<double>(acc.z()) * g };
 

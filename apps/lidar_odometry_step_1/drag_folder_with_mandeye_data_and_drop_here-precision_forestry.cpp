@@ -1832,7 +1832,7 @@ void display()
         {
             if (ImGui::BeginMenu("Presets"))
             {
-                if (ImGui::MenuItem("1 Velocity < 8km/h, tiny spaces", nullptr, (lastPar == 1)))
+                if (ImGui::MenuItem("1: Velocity < 8km/h, tiny spaces", nullptr, (lastPar == 1)))
                 {
                     lastPar = 1;
 
@@ -1840,7 +1840,7 @@ void display()
 
                     std::cout << "clicked: Set parameters for velocity up to 8km/h, tiny spaces" << std::endl;
                 }
-                if (ImGui::MenuItem("3 Velocity < 30 km/h, fast motion, open spaces", nullptr, (lastPar == 3)))
+                if (ImGui::MenuItem("2: Velocity < 30 km/h, fast motion, open spaces", nullptr, (lastPar == 3)))
                 {
                     lastPar = 3;
 
@@ -1870,7 +1870,7 @@ void display()
 
                     std::cout << "clicked: Set parameters for velocity < 30 km/h, fast motion, open spaces" << std::endl;
                 }
-                if (ImGui::MenuItem("4 Velocity < 8km/h, precise forestry (generic)", nullptr, (lastPar == 4)))
+                if (ImGui::MenuItem("3: Velocity < 8km/h, precise forestry (generic)", nullptr, (lastPar == 4)))
                 {
                     lastPar = 4;
 
@@ -1899,6 +1899,13 @@ void display()
                     params.real_time_threshold_seconds = 10;
 
                     std::cout << "clicked: Set parameters for velocity < 8km/h, precise forestry (generic)" << std::endl;
+                }
+                if (ImGui::MenuItem(
+                        "4: Best accuracy, precision, and robustness (uncheck to calculate faster)",
+                        nullptr,
+                        params.ablation_study_use_anisotropic_weighting))
+                {
+                    params.ablation_study_use_anisotropic_weighting = !params.ablation_study_use_anisotropic_weighting;
                 }
 
                 ImGui::EndMenu();

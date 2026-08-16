@@ -2305,6 +2305,14 @@ void display()
 
                     std::cout << "clicked: Set parameters for velocity < 30 km/h, largest open spaces, fast motion" << std::endl;
                 }
+                ImGui::Separator();
+                if (ImGui::MenuItem(
+                        "4: Best accuracy, precision, and robustness (uncheck to calculate faster)",
+                        nullptr,
+                        params.ablation_study_use_anisotropic_weighting))
+                {
+                    params.ablation_study_use_anisotropic_weighting = !params.ablation_study_use_anisotropic_weighting;
+                }
 
                 ImGui::EndMenu();
             }

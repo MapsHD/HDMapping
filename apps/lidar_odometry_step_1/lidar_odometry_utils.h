@@ -202,7 +202,7 @@ struct LidarOdometryParams
     bool ablation_study_use_view_point_and_normal_vectors = true;
     bool ablation_study_use_threshold_outer_rgd = false;
     bool save_index_pose = false;
-    bool ablation_study_use_anisotropic_weighting = false;
+    bool ablation_study_use_anisotropic_weighting = true;
 };
 
 inline VQFParams buildVQFParams(const LidarOdometryParams& p)

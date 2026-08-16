@@ -195,7 +195,7 @@ void ManualPoseGraphLoopClosure::Gui(
                 if (ImGui::Button("ICP (0.1)"))
                     run_icp(point_clouds_container, index_active_edge, 0.1, 30, num_edge_extended_before, num_edge_extended_after);
 
-                if (ImGui::Button("Save source"))
+                if (ImGui::Button("Save source (local)"))
                 {
                     const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
                     std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
@@ -225,13 +225,6 @@ void ManualPoseGraphLoopClosure::Gui(
                             p = m_src_inv * p;
                         }
 
-                        // auto m_pose = affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                        // for (auto& p : source)
-                        //{
-                        //     p = m_pose * p;
-                        // }
-
                         std::vector<unsigned short> intensity;
                         std::vector<double> timestamps;
 
@@ -244,7 +237,7 @@ void ManualPoseGraphLoopClosure::Gui(
                     }
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Save target"))
+                if (ImGui::Button("Save target (local)"))
                 {
                     const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
                     std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
@@ -305,6 +298,92 @@ void ManualPoseGraphLoopClosure::Gui(
                         std::cout << m.matrix() << std::endl;
 
                         std::cout << std::endl;
+                    }
+                }
+
+                //-------
+                if (ImGui::Button("Save source (global)"))
+                {
+                    const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                    std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                    if (output_file_name.size() > 0)
+                    {
+                        std::vector<Eigen::Vector3d> source;
+                        auto& e = edges[index_active_edge];
+                        for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                        {
+                            int index_src = e.index_to + i;
+                            if (index_src >= 0 && index_src < point_clouds_container.point_clouds.size())
+                            {
+                                Eigen::Affine3d m_src = point_clouds_container.point_clouds.at(index_src).m_pose;
+                                for (int k = 0; k < point_clouds_container.point_clouds[index_src].points_local.size(); k++)
+                                {
+                                    Eigen::Vector3d p_g = m_src * point_clouds_container.point_clouds[index_src].points_local[k];
+                                    source.push_back(p_g);
+                                }
+                                // point_clouds_container.point_clouds.at(index_src).render(m_src, 1);
+                            }
+                        }
+
+                        //Eigen::Affine3d m_src_inv = point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
+                        //for (auto& p : source)
+                        //{
+                        //    p = m_src_inv * p;
+                        //}
+
+                        std::vector<unsigned short> intensity;
+                        std::vector<double> timestamps;
+
+                        for (int i = 0; i < source.size(); i++)
+                        {
+                            intensity.push_back(0);
+                            timestamps.push_back(0.0);
+                        }
+                        exportLaz(output_file_name, source, intensity, timestamps);
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Save target (global)"))
+                {
+                    const auto output_file_name = mandeye::fd::SaveFileDialog("Output file name", mandeye::fd::LAS_LAZ_filter, ".laz");
+                    std::cout << "laz file to save: '" << output_file_name << "'" << std::endl;
+
+                    if (output_file_name.size() > 0)
+                    {
+                        std::vector<Eigen::Vector3d> target;
+                        auto& e = edges[index_active_edge];
+                        for (int i = -num_edge_extended_before; i <= num_edge_extended_after; i++)
+                        {
+                            int index_trg = e.index_from + i;
+                            if (index_trg >= 0 && index_trg < point_clouds_container.point_clouds.size())
+                            {
+                                Eigen::Affine3d m_trg = point_clouds_container.point_clouds.at(index_trg).m_pose;
+                                for (int k = 0; k < point_clouds_container.point_clouds[index_trg].points_local.size(); k++)
+                                {
+                                    Eigen::Vector3d p_g = m_trg * point_clouds_container.point_clouds[index_trg].points_local[k];
+                                    target.push_back(p_g);
+                                }
+                            }
+                        }
+
+                        ////Eigen::Affine3d m_trg_inv = point_clouds_container.point_clouds[e.index_from].m_pose.inverse();
+
+                        //for (auto& p : target)
+                        //{
+                        //    p = m_trg_inv * p;
+                        //}
+
+                        std::vector<unsigned short> intensity;
+                        std::vector<double> timestamps;
+
+                        for (int i = 0; i < target.size(); i++)
+                        {
+                            intensity.push_back(150);
+                            timestamps.push_back(0.0);
+                        }
+
+                        exportLaz(output_file_name, target, intensity, timestamps);
                     }
                 }
             }

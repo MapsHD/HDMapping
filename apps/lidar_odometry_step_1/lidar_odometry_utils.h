@@ -339,14 +339,6 @@ void optimize_lidar_odometry(
     const double& convergence_result,
     const double& convergence_delta_threshold_outer_rgd);
 
-void optimize_sf(
-    std::vector<Point3Di>& intermediate_points,
-    std::vector<Eigen::Affine3d>& intermediate_trajectory,
-    std::vector<Eigen::Affine3d>& intermediate_trajectory_motion_model,
-    NDT::GridParameters& rgd_params,
-    NDTBucketMapType& buckets,
-    bool useMultithread);
-
 void optimize_sf2(
     std::vector<Point3Di>& intermediate_points,
     std::vector<Point3Di>& intermediate_points_sf,
@@ -360,16 +352,6 @@ void optimize_sf2(
     double wom,
     double wfi,
     double wka);
-
-void optimize_icp(
-    std::vector<Point3Di>& intermediate_points,
-    std::vector<Eigen::Affine3d>& intermediate_trajectory,
-    std::vector<Eigen::Affine3d>& intermediate_trajectory_motion_model,
-    NDT::GridParameters& rgd_params,
-    /*NDTBucketMapType &buckets*/ const std::vector<Point3Di>& points_global,
-    bool useMultithread /*,
-bool add_pitch_roll_constraint, const std::vector<std::pair<double, double>> &imu_roll_pitch*/
-);
 
 // this function registers initial point cloud to geoferenced point cloud
 void align_to_reference(
@@ -458,7 +440,6 @@ bool compute_step_2(
     std::atomic<float>& loProgress,
     const std::atomic<bool>& pause,
     bool debugMsg);
-void compute_step_2_fast_forward_motion(std::vector<WorkerData>& worker_data, LidarOdometryParams& params);
 
 // for reconstructing worker data from step 1 output
 bool loadLaz(

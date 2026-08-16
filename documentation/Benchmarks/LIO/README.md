@@ -22,9 +22,10 @@ abstract = {This paper describes a software toolbox for LiDAR (Light Detection a
 
 Download the dataset from [Bunker DVI Dataset](https://charleshamesse.github.io/bunker-dvi-dataset/)
 
-![bunkier](images/sx1.png)
-![benchmark](images/bunker1.png)
-![hdmapping-lio](images/hdmapping-lio.png)
+![Bunkier](/images/sx1.png)
+![Benchmark](/images/bunker1.png)
+![HDMapping LIO](/images/hdmapping-lio.png)
+
 We provide HDMapping-LIO: easy to run, easy to test LiDAR Inertial Odometry that is as accurate as FAST-LIO, FASTER-LIO and much more precise [[movie]](https://youtu.be/UB-Hx7qgey8).
 
 

@@ -104,7 +104,7 @@ clang-format --version
 In order to format code base run:
 
 ```bash
-python3 run_clang_fromat.py
+python3 scripts/run_clang_format.py
 ```
 
 _Note that PRs without formatting might be rejected from merging_

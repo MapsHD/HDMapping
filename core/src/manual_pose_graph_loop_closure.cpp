@@ -326,11 +326,11 @@ void ManualPoseGraphLoopClosure::Gui(
                             }
                         }
 
-                        //Eigen::Affine3d m_src_inv = point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
-                        //for (auto& p : source)
+                        // Eigen::Affine3d m_src_inv = point_clouds_container.point_clouds[e.index_to].m_pose.inverse();
+                        // for (auto& p : source)
                         //{
-                        //    p = m_src_inv * p;
-                        //}
+                        //     p = m_src_inv * p;
+                        // }
 
                         std::vector<unsigned short> intensity;
                         std::vector<double> timestamps;
@@ -369,10 +369,10 @@ void ManualPoseGraphLoopClosure::Gui(
 
                         ////Eigen::Affine3d m_trg_inv = point_clouds_container.point_clouds[e.index_from].m_pose.inverse();
 
-                        //for (auto& p : target)
+                        // for (auto& p : target)
                         //{
-                        //    p = m_trg_inv * p;
-                        //}
+                        //     p = m_trg_inv * p;
+                        // }
 
                         std::vector<unsigned short> intensity;
                         std::vector<double> timestamps;

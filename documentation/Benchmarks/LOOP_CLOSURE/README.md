@@ -7,7 +7,7 @@ Movie how to use it is available at [prepare training dataset movie](https://you
 [![GROUND-TRUTH-EDGE-ANNOTATION-TOOL](https://img.youtube.com/vi/tJdNNfBubeM/default.jpg)](https://youtu.be/tJdNNfBubeM)
 [![MANUAL-LOOP_CLOSURE-TOOL](https://img.youtube.com/vi/6SNvrZ2ROKg/default.jpg)](https://youtu.be/6SNvrZ2ROKg)
 
-## loop closure benchmark [https://github.com/MapsHD/benchmark-HDMapping-AILoopClosure-Orchestration](https://github.com/MapsHD/benchmark-HDMapping-AILoopClosure-Orchestration)
+## AI loop closure benchmark [https://github.com/MapsHD/benchmark-HDMapping-AILoopClosure-Orchestration](https://github.com/MapsHD/benchmark-HDMapping-AILoopClosure-Orchestration)
 - [1] https://github.com/MapsHD/benchmark-HDMapping-AILoopClosure-LCR-Net (in progress)
 - [2] https://www.open3d.org/docs/latest/python_api/open3d.registration.compute_fpfh_feature.html
 - [3] https://github.com/HxCa1/BEV-LIO-LC/blob/main/README.md
@@ -18,3 +18,13 @@ Movie how to use it is available at [prepare training dataset movie](https://you
 - [8] https://github.com/caodanyang/FUSIONLCD
 - [9] https://www.mdpi.com/2504-446X/8/7/322
 - [10] https://github.com/MIT-SPARK/KISS-Matcher
+
+## LiDAR loop closure benchmark [https://github.com/MapsHD/benchmark-HDMapping-LiDAR-LoopClosure-Orchestration](https://github.com/MapsHD/benchmark-HDMapping-LiDAR-LoopClosure-Orchestration)
+- [1] DALI-SLAM
+- [2] MM-LINS
+- [3] PIN-SLAM
+- [4] voxel-slam
+- [5] nv-liom
+- [6] glim 
+- [7] slict
+- [8] lego-loam

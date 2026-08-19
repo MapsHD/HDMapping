@@ -1,6 +1,6 @@
 # LIO+ Benchmark (Michal W.)
 
-| Project | Original repository | Work / test repository |  Work / test docker | Tested on dataset | Paper | Bear |
+| Project | Original repository | Work / test repository |  Work / test docker | Tested on dataset | Paper | Year |
 |---|---|---|---|---|---|---|
 | COIN-LIO | [COIN-LIO](https://github.com/ethz-asl/COIN-LIO) | [mw-COIN-LIO](https://github.com/mwlasiuk/mw-COIN-LIO) | [Dockerfile](https://github.com/mwlasiuk/mw-COIN-LIO-docker) | [Dataset](https://drive.google.com/drive/folders/1aYDiMkVfTCyCR7pwHDfYItw0eWMeHqVs) | [Paper](https://arxiv.org/pdf/2310.01235) | ? |
 | r3live | [r3live](https://github.com/hku-mars/r3live) | [mw-r3live](https://github.com/mwlasiuk/mw-r3live) | [Dockerfile](https://github.com/mwlasiuk/mw-r3live-docker) | [Dataset](https://onedrive.live.com/?redeem=aHR0cHM6Ly8xZHJ2Lm1zL2YvYy8zZTcxNWI3YWExMzYxOTFhL0VxcEs3UW5ONE9wQ3FIbUwyeWtwWjUwQmp6M3B5SjBrd3l2d3BCQkx0elI0YlE%5FZT1UcVBOOEU&id=3E715B7AA136191A%21s09ed4aaae0cd42eaa8798bdb2929679d&cid=3E715B7AA136191A)  | [Paper](https://arxiv.org/pdf/2109.07982) | ? |

@@ -22,3 +22,5 @@
 
 # To check
 - https://github.com/APRIL-ZJU/Coco-LIC
+- https://github.com/xuankuzcr/Global-LVBA
+- https://github.com/sjtuyinjie/Ground-Fusion2

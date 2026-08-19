@@ -119,5 +119,10 @@ More information can be found in:
 - [Tools](./documentation/Tools/README.md)
 - [Videos](./documentation/VIDEOs/README.md)
 
+# Sponsors
+
+![IPPT_PAN](images/ippt.png)
+
+
 
 

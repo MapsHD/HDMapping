@@ -19,3 +19,6 @@
 - https://drive.google.com/drive/folders/1hEn3sBAvQhSdUFnGMZCCv-W0Ynj2rWBs
 - https://projects.asl.ethz.ch/datasets/enwide/
 - https://drive.google.com/drive/u/0/folders/1uR476FzjN3PfAiCknVKtuZi3_QfVvSdA
+
+# To check
+- https://github.com/APRIL-ZJU/Coco-LIC

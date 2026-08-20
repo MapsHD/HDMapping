@@ -123,6 +123,7 @@ Required PCD format:
 - https://github.com/KTH-RPL/DynamicMap_Benchmark (2023, ITSC, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/dufomap.bib), dynamic scenes) 
 
 ToDo Build Success:
+- https://github.com/PRBonn/rko_lio (2026)
 - https://github.com/NKU-MobFly-Robotics/R-VoxelMap (2026, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/R-VoxelMap.bib)) - Marcin
 - https://github.com/HViktorTsoi/PV-LIO (2023, no publication) - Marcin
 - https://github.com/SlamCabbage/Optimized-SC-F-LOAM (2022, CVCI, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SC-F-LOAM.bib)) - Marcin
@@ -150,7 +151,6 @@ ToDo Build issues:
 
 
 ToDo: check if addressed
-- https://github.com/PRBonn/rko_lio (2026)
 - https://arxiv.org/pdf/2503.12660 - KISS-SLAM
 - https://arxiv.org/pdf/2509.06593 - rko-lio
 - https://arxiv.org/pdf/2410.05433 - 2FAST-LAMA

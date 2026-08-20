@@ -1,3 +1,11 @@
+// See rosbags/McapWriter.h for why this needs to come before any standard
+// header (including <doctest.h>, which pulls in plenty of its own) gets a
+// chance to lock in the project-wide _HAS_STD_BYTE=0 MSVC workaround.
+#if defined(_MSC_VER)
+#  undef _HAS_STD_BYTE
+#  define _HAS_STD_BYTE 1
+#endif
+
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest.h>
 

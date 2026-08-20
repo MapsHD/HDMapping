@@ -201,4 +201,9 @@ message(STATUS "Using external library: wgs84_do_puwg92")
 add_subdirectory(${EXTERNAL_LIBRARIES_DIRECTORY}/WGS84toCartesian)
 message(STATUS "Using external library: WGS84toCartesian")
 
+
+# mcap - support for ROS 2 bag export
+add_subdirectory(${THIRDPARTY_DIRECTORY}/mcap)
+
 message(STATUS "==== Dependencies Configuration Complete ====")
+

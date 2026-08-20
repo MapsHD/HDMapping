@@ -1096,7 +1096,7 @@ void info_window(const std::vector<std::string>& infoLines, const std::vector<Sh
             else if (line.rfind("https://", 0) == 0) // starts with "https://"
                 ImGuiHyperlink(line.c_str());
             else
-                ImGui::Text(line.c_str());
+                ImGui::TextUnformatted(line.c_str());
 
             if (firstLine)
             {
@@ -1231,13 +1231,13 @@ void drawMiniCompassWithRuler()
     // End scale label
     char label[24];
     if (worldLength >= 1000.0f)
-        sprintf(label, "%.0f [km]", worldLength / 1000.0f);
+        snprintf(label, sizeof(label), "%.0f [km]", worldLength / 1000.0f);
     else if (worldLength >= 1.0f)
-        sprintf(label, "%.0f [m]", worldLength);
+        snprintf(label, sizeof(label), "%.0f [m]", worldLength);
     else if (worldLength >= 0.01f)
-        sprintf(label, "%.0f [cm]", worldLength * 100.0f);
+        snprintf(label, sizeof(label), "%.0f [cm]", worldLength * 100.0f);
     else
-        sprintf(label, "<1 [cm]");
+        snprintf(label, sizeof(label), "<1 [cm]");
 
     // drawLabel(axes[2].x() + 0.2f, axes[2].y() + 0.4f, axes[2].z() - 0.2f, label,
     //     colors[2][0], colors[2][1], colors[2][2]);

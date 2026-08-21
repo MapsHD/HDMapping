@@ -103,9 +103,19 @@
 #endif
 
 // Camera/picking/mini-compass/misc-ImGui-widget API this app used to get
-// from <Core/utils.hpp> (see rl_utils.h's top comment for why it's now a
-// local header instead).
-#include "rl_utils.h"
+// from <Core/utils.hpp>, then from its own local rl_utils.h/.cpp (see this
+// section's comments for what replaced what) -- folded directly into this
+// file since everything in rl_utils.h/.cpp turned out to only ever be used
+// here, plus raylib_widgets (shared with the camera_lidar_* apps: OrbitCamera's
+// Euler mode, the Euler center-of-rotation dialog, app-shell scaffolding,
+// double-precision ray/plane math).
+#include <RaylibWidgets/AppShell.h>
+#include <RaylibWidgets/CenterOfRotationWindow.h>
+#include <RaylibWidgets/CompassRuler.h>
+#include <RaylibWidgets/OrbitCamera.h>
+#include <RaylibWidgets/PointPicking.h>
+#include <RaylibWidgets/RayPlaneD.h>
+#include <RaylibWidgets/ShortcutsTable.h>
 
 #ifdef _WIN32
 // windows.h (pulled in transitively above, via portable-file-dialogs.h)
@@ -119,6 +129,105 @@
 
 ///////////////////////////////////////////////////////////////////////////////////
 
+// Now shared with the camera_lidar_* apps -- see
+// raylib_widgets/include/RaylibWidgets/ShortcutsTable.h/AppShell.h.
+using raylib_widgets::ImGuiHyperlink;
+using raylib_widgets::ShortcutEntry;
+using raylib_widgets::ShowMainDockSpace;
+
+const float DEG_TO_RAD = M_PI / 180.0f;
+const float RAD_TO_DEG = 180.0f / M_PI;
+
+const ImVec4 orangeBorder(1.0f, 0.5f, 0.0f, 1.0f);
+
+const std::string out_fn = "Output file name";
+
+constexpr float ImGuiNumberWidth = 120.0f;
+constexpr const char* omText = "Roll (left/right)";
+constexpr const char* fiText = "Pitch (up/down)";
+constexpr const char* kaText = "Yaw (turning left/right)";
+constexpr const char* xText = "Longitudinal (forward/backward)";
+constexpr const char* yText = "Lateral (left/right)";
+constexpr const char* zText = "Vertical (up/down)";
+
+const uint32_t window_width = 1600;
+const uint32_t window_height = 900;
+
+enum ColorScheme
+{
+    CS_SOLID, // fixed color
+    CS_RANDOM, // random
+    CS_GRAD_INTENS, // gradient based on intensity
+    CS_GRAD_ELEV, // gradient based on elevation
+    CS_GRAD_DIST, // gradient based on distance from rotation center
+    CS_FOLLOW // valid for trajectory
+};
+
+struct AppStateBase
+{
+    int viewer_decimate_point_cloud = 2;
+
+    int mouse_old_x = 0, mouse_old_y = 0;
+    int mouse_buttons = 0;
+    bool show_axes = true;
+    ImVec4 bg_color = ImVec4(0.65f, 0.65f, 0.65f, 1.00f);
+    int point_size = 1;
+
+    bool info_gui = false;
+    bool compass_ruler = true;
+
+    // Still Eigen/rlgl-driven directly (not folded into
+    // raylib_widgets::OrbitCamera, which deliberately stays Eigen-free for
+    // its azimuth/elevation half -- only OrbitCamera's own RayPlaneD-using
+    // pieces gained an Eigen dependency) -- used only by
+    // drawMiniCompassWithRuler() below and display()'s own rlMultMatrixf
+    // call. Rebuilt from `camera` every frame.
+    Eigen::Affine3f viewLocal;
+
+    // Camera state (rotate/translate/rotation-center/ortho/presets/
+    // transitions/frame matrices), shared with the camera_lidar_* apps via
+    // raylib_widgets::OrbitCamera's Euler/ortho mode -- see its header.
+    raylib_widgets::OrbitCamera camera;
+
+    // Unlike the original (which probed GL_LINE_WIDTH_RANGE), rlgl's line width
+    // support is uniform enough here not to need a runtime check -- always true.
+    bool glLineWidthSupport = true;
+};
+
+inline AppStateBase app_state;
+
+// Edge-triggered "please open the Center of rotation dialog" request --
+// set by view_kbd_shortcuts()'s Shift+R, consumed once by
+// showEulerCenterOfRotationWindow() in display() below.
+bool cor_gui = false;
+
+bool scroll_hint_enabled = true;
+bool scroll_hint_active = false;
+int scroll_hint_count = 0;
+float scroll_hint_accu = 0.0f;
+double scroll_hint_lastT = 0.0;
+
+std::string truncPath(const std::string& fullPath);
+
+void wheel(int button, int dir, int x, int y);
+void motion(int x, int y);
+
+void showAxes();
+void drawIntersectionGrids(const PointClouds& point_clouds_container, const PointClouds::PointCloudDimensions& dims);
+void camMenu();
+void view_kbd_shortcuts();
+
+void drawMiniCompassWithRuler();
+
+Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane);
+LaserBeam GetLaserBeam(int x, int y);
+double distance_point_to_line(const Eigen::Vector3d& point, const LaserBeam& line);
+void getClosestTrajectoryPoint(Session& session_, int x, int y, bool gcpPicking, int& picked_index);
+
+void setNewRotationCenter(int x, int y);
+
+bool checkClHelp(int argc, char** argv);
+
 // GPU (rlgl-based) point cloud renderer -- replaces core's legacy-GL
 // PointCloud::render()/PointClouds::render() (see Core/raylib_render.hpp).
 // Rebuilt on session load and whenever a scan's pose changes; syncPoses()
@@ -129,16 +238,14 @@ ScanRenderer scan_renderer;
 // This frame's 3D model-view-projection matrix, captured right after the
 // camera transform is set up in display() (before the projection/modelview
 // stack gets reset to the 2D screen ortho for ImGui -- see
-// end3DMatrixStack()). renderLoopClosureLabels() uses it to project pose
-// world positions to screen space for DrawText, since it runs after that
-// reset (2D text needs the 2D ortho active, but still needs to know where
-// each 3D point landed on screen).
+// raylib_widgets::end3DMatrixStack()). renderLoopClosureLabels() uses it to
+// project pose world positions to screen space for DrawText, since it runs
+// after that reset (2D text needs the 2D ortho active, but still needs to
+// know where each 3D point landed on screen).
 Matrix frame_mvp_3d{};
 
 // Forward declarations for this file's own functions defined near
-// display() below (everything else that used to be here is now declared
-// by rl_utils.h, included above) -- panel functions earlier in this file
-// call some of these.
+// display() below -- panel functions earlier in this file call some of these.
 void observationPickingRender(const ObservationPicking& observation_picking);
 void renderLoopClosure(
     PointClouds& point_clouds_container, int index_loop_closure_source, int index_loop_closure_target, int before, int after);
@@ -151,6 +258,596 @@ void renderControlPoints(const ControlPoints& control_points, PointClouds& point
 void renderControlPointsLabels(const ControlPoints& control_points, const PointClouds& point_clouds_container);
 void display();
 void mouse(int glut_button, int state, int x, int y);
+
+///////////////////////////////////////////////////////////////////////////////////
+
+std::string truncPath(const std::string& fullPath)
+{
+    namespace fspath = std::filesystem;
+    fspath::path path(fullPath);
+
+    auto parent1 = path.parent_path().filename().string();
+    auto parent2 = path.parent_path().parent_path().filename().string(); // second to last folder
+    auto filename = path.filename().string();
+
+    return "..\\" + parent2 + "\\" + parent1 + "\\" + filename;
+}
+
+void wheel(int button, int dir, int x, int y)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.MouseWheel += dir; // or direction * 1.0f depending on your setup
+
+    if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+    {
+        // GetMouseWheelMove(), not `dir`: dir is already quantized to +-1 by
+        // main()'s caller (see its comment), which discards a trackpad's
+        // fractional per-frame scroll magnitude -- reading it again here
+        // (stable within the same frame, since raylib only updates it once
+        // per PollInputEvents()) lets zoom() scale the step by how much was
+        // actually scrolled instead of always taking a full step.
+        app_state.camera.zoom(GetMouseWheelMove(), io.KeyShift);
+
+        if (scroll_hint_enabled)
+        {
+            if (!scroll_hint_active)
+            {
+                scroll_hint_accu += fabs(dir);
+
+                if (scroll_hint_accu > 30.0f) // tweak threshold
+                {
+                    scroll_hint_accu = 0.0f;
+                    scroll_hint_active = true;
+                    scroll_hint_count++;
+                }
+            }
+
+            if (scroll_hint_active)
+                scroll_hint_lastT = ImGui::GetTime();
+
+            // Reset and disable hint if Shift is pressed while scrolling
+            if (io.KeyShift || scroll_hint_count > 3)
+            {
+                scroll_hint_active = false;
+                scroll_hint_enabled = false;
+            }
+        }
+    }
+}
+
+void motion(int x, int y)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.MousePos = ImVec2((float)x, (float)y);
+
+    if (!io.WantCaptureMouse)
+    {
+        float dx, dy;
+        dx = (float)(x - app_state.mouse_old_x);
+        dy = (float)(y - app_state.mouse_old_y);
+
+        // Ctrl/Shift held: reserved for the discrete click actions and the
+        // keyboard shortcuts in view_kbd_shortcuts() -- mouse() sets
+        // mouse_buttons for *every* button-down, including a Ctrl/Shift+
+        // click used to pick a new rotation center (which starts a camera
+        // transition -- see getClosestTrajectoryPoint()/
+        // setNewRotationCenter()/the Center of rotation dialog). Without
+        // this guard, any stray sub-pixel movement on the same click
+        // (trackpads are far more prone to this than a physical mouse
+        // button) got read as an ordinary orbit/pan drag and immediately
+        // broke that transition via dragOrbit()/dragPanPerspective()'s
+        // breakEulerTransition() call.
+        if (!io.KeyCtrl && !io.KeyShift)
+        {
+            if (app_state.mouse_buttons & 1) // left button
+            {
+                app_state.camera.dragOrbit(dx, dy);
+            }
+
+            if (app_state.mouse_buttons & 4) // right button
+            {
+                if (app_state.camera.isOrtho)
+                    app_state.camera.dragPanOrtho(dx, dy, io.DisplaySize.x, io.DisplaySize.y);
+                else
+                    app_state.camera.dragPanPerspective(dx, dy);
+            }
+        }
+
+        app_state.mouse_old_x = x;
+        app_state.mouse_old_y = y;
+    }
+}
+
+void showAxes()
+{
+    if (app_state.show_axes || ImGui::GetIO().KeyCtrl) // rotation center axes
+    {
+        const auto& rc = app_state.camera.euler.rotationCenter;
+        rlBegin(RL_LINES);
+        rlColor3f(1.f, 1.f, 1.f);
+        rlVertex3f(rc.x, rc.y, rc.z);
+        rlVertex3f(rc.x + 1.f, rc.y, rc.z);
+        rlVertex3f(rc.x, rc.y, rc.z);
+        rlVertex3f(rc.x - 1.f, rc.y, rc.z);
+        rlVertex3f(rc.x, rc.y, rc.z);
+        rlVertex3f(rc.x, rc.y - 1.f, rc.z);
+        rlVertex3f(rc.x, rc.y, rc.z);
+        rlVertex3f(rc.x, rc.y + 1.f, rc.z);
+        rlVertex3f(rc.x, rc.y, rc.z);
+        rlVertex3f(rc.x, rc.y, rc.z - 1.f);
+        rlVertex3f(rc.x, rc.y, rc.z);
+        rlVertex3f(rc.x, rc.y, rc.z + 1.f);
+        rlEnd();
+    }
+
+    if (app_state.show_axes || ImGui::GetIO().KeyCtrl) // origin axes
+    {
+        rlBegin(RL_LINES);
+        rlColor3f(1.0f, 0.0f, 0.0f);
+        rlVertex3f(0.0f, 0.0f, 0.0f);
+        rlVertex3f(100, 0.0f, 0.0f);
+
+        rlColor3f(0.0f, 1.0f, 0.0f);
+        rlVertex3f(0.0f, 0.0f, 0.0f);
+        rlVertex3f(0.0f, 100, 0.0f);
+
+        rlColor3f(0.0f, 0.0f, 1.0f);
+        rlVertex3f(0.0f, 0.0f, 0.0f);
+        rlVertex3f(0.0f, 0.0f, 100);
+        rlEnd();
+    }
+}
+
+// Ported from PointClouds::draw_grids() (core/src/point_clouds.cpp, legacy
+// immediate-mode GL, shared with the GLUT apps so it can't be changed) --
+// rl*() rename, one helper per cutting plane instead of one copy-pasted
+// block per grid density. Spans the session's bounding box (dims), snapped
+// outward to whole grid steps, same as the original.
+void drawGridXZ(float step, Color color, const PointClouds::PointCloudDimensions& dims)
+{
+    float x_min = std::floor(dims.x_min / step) * step;
+    float x_max = std::ceil(dims.x_max / step) * step;
+    float z_min = std::floor(dims.z_min / step) * step;
+    float z_max = std::ceil(dims.z_max / step) * step;
+
+    rlBegin(RL_LINES);
+    rlColor3f(color.r / 255.f, color.g / 255.f, color.b / 255.f);
+    for (float x = x_min; x <= x_max; x += step)
+    {
+        rlVertex3f(x, 0.0f, z_min);
+        rlVertex3f(x, 0.0f, z_max);
+    }
+    for (float z = z_min; z <= z_max; z += step)
+    {
+        rlVertex3f(x_min, 0.0f, z);
+        rlVertex3f(x_max, 0.0f, z);
+    }
+    rlEnd();
+}
+
+void drawGridYZ(float step, Color color, const PointClouds::PointCloudDimensions& dims)
+{
+    float y_min = std::floor(dims.y_min / step) * step;
+    float y_max = std::ceil(dims.y_max / step) * step;
+    float z_min = std::floor(dims.z_min / step) * step;
+    float z_max = std::ceil(dims.z_max / step) * step;
+
+    rlBegin(RL_LINES);
+    rlColor3f(color.r / 255.f, color.g / 255.f, color.b / 255.f);
+    for (float y = y_min; y <= y_max; y += step)
+    {
+        rlVertex3f(0.0f, y, z_min);
+        rlVertex3f(0.0f, y, z_max);
+    }
+    for (float z = z_min; z <= z_max; z += step)
+    {
+        rlVertex3f(0.0f, y_min, z);
+        rlVertex3f(0.0f, y_max, z);
+    }
+    rlEnd();
+}
+
+void drawGridXY(float step, Color color, const PointClouds::PointCloudDimensions& dims)
+{
+    float x_min = std::floor(dims.x_min / step) * step;
+    float x_max = std::ceil(dims.x_max / step) * step;
+    float y_min = std::floor(dims.y_min / step) * step;
+    float y_max = std::ceil(dims.y_max / step) * step;
+
+    rlBegin(RL_LINES);
+    rlColor3f(color.r / 255.f, color.g / 255.f, color.b / 255.f);
+    for (float x = x_min; x <= x_max; x += step)
+    {
+        rlVertex3f(x, y_min, 0.0f);
+        rlVertex3f(x, y_max, 0.0f);
+    }
+    for (float y = y_min; y <= y_max; y += step)
+    {
+        rlVertex3f(x_min, y, 0.0f);
+        rlVertex3f(x_max, y, 0.0f);
+    }
+    rlEnd();
+}
+
+// Draws whichever of the 9 grid-density/plane checkboxes (View menu, next to
+// the xz/yz/xy_intersection toggles) are on -- was the unconditional
+// draw_grids() call at the top of the legacy PointClouds::render(). Not
+// gated on xz/yz/xy_intersection itself (matching the original): a grid can
+// be shown independent of whether its plane's intersection slab is active.
+void drawIntersectionGrids(const PointClouds& point_clouds_container, const PointClouds::PointCloudDimensions& dims)
+{
+    const Color light = ColorFromNormalized(Vector4{ 0.7f, 0.7f, 0.7f, 1.0f });
+    const Color dark = ColorFromNormalized(Vector4{ 0.3f, 0.3f, 0.3f, 1.0f });
+
+    if (point_clouds_container.xz_grid_10x10)
+        drawGridXZ(10.0f, light, dims);
+    if (point_clouds_container.xz_grid_1x1)
+        drawGridXZ(1.0f, dark, dims);
+    if (point_clouds_container.xz_grid_01x01)
+        drawGridXZ(0.1f, dark, dims);
+
+    if (point_clouds_container.yz_grid_10x10)
+        drawGridYZ(10.0f, light, dims);
+    if (point_clouds_container.yz_grid_1x1)
+        drawGridYZ(1.0f, dark, dims);
+    if (point_clouds_container.yz_grid_01x01)
+        drawGridYZ(0.1f, dark, dims);
+
+    if (point_clouds_container.xy_grid_10x10)
+        drawGridXY(10.0f, light, dims);
+    if (point_clouds_container.xy_grid_1x1)
+        drawGridXY(1.0f, dark, dims);
+    if (point_clouds_container.xy_grid_01x01)
+        drawGridXY(0.1f, dark, dims);
+}
+
+void camMenu()
+{
+    using raylib_widgets::OrbitCamera;
+
+    if (ImGui::BeginMenu("Camera"))
+    {
+        if (ImGui::MenuItem("Front (yz view)", "key F"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Front);
+        if (ImGui::MenuItem("Back", "key B"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Back);
+        if (ImGui::MenuItem("Left (xz view)", "key L"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Left);
+        if (ImGui::MenuItem("Right", "key R"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Right);
+        if (ImGui::MenuItem("Top (xy view)", "key T"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Top);
+        if (ImGui::MenuItem("Bottom", "key U"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Bottom);
+        if (ImGui::MenuItem("Isometric", "key I"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Iso);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Reset", "key Z"))
+        {
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Reset);
+            app_state.viewer_decimate_point_cloud = 2;
+        }
+
+        ImGui::EndMenu();
+    }
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::BeginTooltip();
+        ImGui::Text("Change camera view to fixed positions");
+        ImGui::Separator();
+        ImGui::Text("Metrics:");
+        if (ImGui::BeginTable("Metrics", 4))
+        {
+            ImGui::TableSetupColumn("Coord");
+            ImGui::TableSetupColumn("rotate");
+            ImGui::TableSetupColumn("translate");
+            ImGui::TableSetupColumn("rot center");
+            ImGui::TableHeadersRow();
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+
+            std::string text = "X";
+            float centered = ImGui::GetColumnWidth() - ImGui::CalcTextSize(text.c_str()).x;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+            ImGui::Text("X");
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("%.3f", app_state.camera.euler.rotateX);
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.3f", app_state.camera.euler.translate.x);
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.3f", app_state.camera.euler.rotationCenter.x);
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+            ImGui::Text("Y");
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("%.3f", app_state.camera.euler.rotateY);
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.3f", app_state.camera.euler.translate.y);
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.3f", app_state.camera.euler.rotationCenter.y);
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centered * 0.5f);
+            ImGui::Text("Z");
+
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.3f", app_state.camera.euler.translate.z);
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.3f", app_state.camera.euler.rotationCenter.y);
+
+            ImGui::EndTable();
+        }
+        ImGui::Text("Mouse sensitivity: %.4f", app_state.camera.eulerMouseSensitivity);
+
+        ImGui::EndTooltip();
+    }
+
+    if (scroll_hint_active)
+    {
+        ImVec2 mousePos = ImGui::GetMousePos();
+        ImGui::SetNextWindowPos(ImVec2(mousePos.x + 20, mousePos.y - 40));
+        ImGui::SetNextWindowBgAlpha(0.7f);
+        ImGui::BeginTooltip();
+        ImGui::Text("Tip: To accelerate hold Shift + scroll");
+        ImGui::EndTooltip();
+
+        if (ImGui::GetTime() - scroll_hint_lastT > 1)
+            scroll_hint_active = false;
+    }
+}
+
+void view_kbd_shortcuts()
+{
+    using raylib_widgets::OrbitCamera;
+
+    ImGuiIO& io = ImGui::GetIO();
+
+    if (io.WantCaptureKeyboard)
+        return;
+
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
+    {
+        app_state.camera.euler.translate.x += 0.5f * app_state.camera.eulerMouseSensitivity;
+        app_state.camera.breakEulerTransition();
+    }
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
+    {
+        app_state.camera.euler.translate.x -= 0.5f * app_state.camera.eulerMouseSensitivity;
+        app_state.camera.breakEulerTransition();
+    }
+
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
+    {
+        app_state.camera.euler.translate.y += 0.5f * app_state.camera.eulerMouseSensitivity;
+        app_state.camera.breakEulerTransition();
+    }
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
+    {
+        app_state.camera.euler.translate.y -= 0.5f * app_state.camera.eulerMouseSensitivity;
+        app_state.camera.breakEulerTransition();
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
+    {
+        app_state.camera.euler.rotateY -= 0.6f;
+        app_state.camera.breakEulerTransition();
+    }
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
+    {
+        app_state.camera.euler.rotateY += 0.6f;
+        app_state.camera.breakEulerTransition();
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
+    {
+        app_state.camera.euler.rotateX -= 0.6f;
+        app_state.camera.breakEulerTransition();
+    }
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
+    {
+        app_state.camera.euler.rotateX += 0.6f;
+        app_state.camera.breakEulerTransition();
+    }
+
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_R, false))
+        cor_gui = true;
+
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false) && !app_state.camera.isOrtho)
+        app_state.camera.lockZ = !app_state.camera.lockZ;
+
+    if (io.KeyCtrl || io.KeyAlt || io.KeyShift)
+        return;
+
+    if (ImGui::IsKeyPressed(ImGuiKey_B))
+        app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Back);
+    if (ImGui::IsKeyPressed(ImGuiKey_F))
+        app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Front);
+    if (ImGui::IsKeyPressed(ImGuiKey_I))
+        app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Iso);
+    if (ImGui::IsKeyPressed(ImGuiKey_L))
+        app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Left);
+    if (ImGui::IsKeyPressed(ImGuiKey_R))
+        app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Right);
+    if (ImGui::IsKeyPressed(ImGuiKey_T))
+        app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Top);
+    if (ImGui::IsKeyPressed(ImGuiKey_U))
+        app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Bottom);
+    if (ImGui::IsKeyPressed(ImGuiKey_Z))
+    {
+        app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Reset);
+        app_state.viewer_decimate_point_cloud = 2;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_C, false))
+        app_state.compass_ruler = !app_state.compass_ruler;
+    if (ImGui::IsKeyPressed(ImGuiKey_O, false))
+        app_state.camera.isOrtho = !app_state.camera.isOrtho;
+    if (ImGui::IsKeyPressed(ImGuiKey_X, false))
+        app_state.show_axes = !app_state.show_axes;
+
+    if (ImGui::IsKeyPressed(ImGuiKey_1))
+        app_state.point_size = 1;
+    if (ImGui::IsKeyPressed(ImGuiKey_2))
+        app_state.point_size = 2;
+    if (ImGui::IsKeyPressed(ImGuiKey_3))
+        app_state.point_size = 3;
+    if (ImGui::IsKeyPressed(ImGuiKey_4))
+        app_state.point_size = 4;
+    if (ImGui::IsKeyPressed(ImGuiKey_5))
+        app_state.point_size = 5;
+    if (ImGui::IsKeyPressed(ImGuiKey_6))
+        app_state.point_size = 6;
+    if (ImGui::IsKeyPressed(ImGuiKey_7))
+        app_state.point_size = 7;
+    if (ImGui::IsKeyPressed(ImGuiKey_8))
+        app_state.point_size = 8;
+    if (ImGui::IsKeyPressed(ImGuiKey_9))
+        app_state.point_size = 9;
+}
+
+// Drawing itself lives in raylib_widgets::drawCompassRuler (shared with the
+// camera_lidar_* apps' identical overlay) -- this just adapts this app's own
+// camera/background state (app_state.viewLocal's rotation matrix,
+// app_state.camera.euler.translate.z zoom, app_state.bg_color) into that
+// function's right/up/zoomDistance/rulerColor parameters. Row 0/1 of a
+// world-to-eye rotation matrix R are exactly the world-space directions that
+// map to eye-space +X/+Y (screen right/up): (R * dir).x() == dot(R.row(0), dir).
+void drawMiniCompassWithRuler()
+{
+    const Eigen::Matrix3f& R = app_state.viewLocal.rotation();
+    Vector3 right = { R(0, 0), R(0, 1), R(0, 2) };
+    Vector3 up = { R(1, 0), R(1, 1), R(1, 2) };
+    Color rulerColor =
+        ColorFromNormalized(Vector4{ 1.0f - app_state.bg_color.x, 1.0f - app_state.bg_color.y, 1.0f - app_state.bg_color.z, 1.0f });
+    raylib_widgets::drawCompassRuler(
+        right, up, app_state.camera.euler.translate.z, rulerColor,
+        raylib_widgets::CompassAxisLabels{ "X (long.)", "Y (lat.)", "Z (vert.)" });
+}
+
+// Was distanceToPlane()+its own loop -- both now delegate to the shared
+// raylib_widgets::intersectPlane() (Eigen double precision, matching this
+// app's world coordinates). Falls back to laser_beam.position itself (like
+// the original) when the ray is ~parallel to the plane.
+Eigen::Vector3d rayIntersection(const LaserBeam& laser_beam, const RegistrationPlaneFeature::Plane& plane)
+{
+    Eigen::Vector3d hit = laser_beam.position;
+    raylib_widgets::intersectPlane(laser_beam.position, laser_beam.direction, plane.a, plane.b, plane.c, plane.d, hit);
+    return hit;
+}
+
+// Delegates the actual unprojection to the shared
+// raylib_widgets::OrbitCamera::eulerScreenRay() (also used by
+// camera_lidar_trajectory_viewer) and adapts its raylib Ray into this app's
+// own Eigen-based LaserBeam type, which rayIntersection()/
+// distance_point_to_line()/callers throughout this file still expect.
+LaserBeam GetLaserBeam(int x, int y)
+{
+    Ray ray = app_state.camera.eulerScreenRay(x, y, GetScreenWidth(), GetScreenHeight());
+
+    LaserBeam laser_beam;
+    laser_beam.position = Eigen::Vector3d(ray.position.x, ray.position.y, ray.position.z);
+    laser_beam.direction = Eigen::Vector3d(ray.direction.x, ray.direction.y, ray.direction.z);
+
+    return laser_beam;
+}
+
+// Delegates to the shared raylib_widgets::distancePointToLine().
+double distance_point_to_line(const Eigen::Vector3d& point, const LaserBeam& line)
+{
+    return raylib_widgets::distancePointToLine(point, line.position, line.direction);
+}
+
+// Shared with camera_lidar_trajectory_viewer's equivalent
+// nearestTrajectoryPoint() -- both now delegate the actual nearest-point-
+// to-ray search to raylib_widgets::pickNearestPointOnLine() instead of
+// each keeping its own copy of this loop.
+void getClosestTrajectoryPoint(Session& session_, int x, int y, bool gcpPicking, int& picked_index)
+{
+    picked_index = -1;
+
+    const auto laser_beam = GetLaserBeam(x, y);
+    Ray ray;
+    ray.position = Vector3{
+        static_cast<float>(laser_beam.position.x()), static_cast<float>(laser_beam.position.y()),
+        static_cast<float>(laser_beam.position.z()) };
+    ray.direction = Vector3{
+        static_cast<float>(laser_beam.direction.x()), static_cast<float>(laser_beam.direction.y()),
+        static_cast<float>(laser_beam.direction.z()) };
+
+    std::vector<Vector3> pts;
+    std::vector<std::pair<int, int>> ptOwners; // (point cloud index, local_trajectory index), parallel to pts
+    for (int i = 0; i < session_.point_clouds_container.point_clouds.size(); i++)
+    {
+        for (int j = 0; j < session_.point_clouds_container.point_clouds[i].local_trajectory.size(); j++)
+        {
+            const auto& p = session_.point_clouds_container.point_clouds[i].local_trajectory[j].m_pose.translation();
+            Eigen::Vector3d vp = session_.point_clouds_container.point_clouds[i].m_pose * p;
+            pts.push_back(Vector3{ static_cast<float>(vp.x()), static_cast<float>(vp.y()), static_cast<float>(vp.z()) });
+            ptOwners.push_back({ i, j });
+        }
+    }
+
+    // Defaults to the still-pending transition target (mirrors the
+    // original, which read/wrote its own persistent new_rotation_center
+    // field here rather than a fresh local -- so a call that finds no
+    // point still re-triggers a transition toward whatever that field last
+    // held).
+    Vector3 center = app_state.camera.eulerGoal.rotationCenter;
+
+    size_t bestIdx;
+    if (raylib_widgets::pickNearestPointOnLine(pts.data(), pts.size(), ray, bestIdx))
+    {
+        center = pts[bestIdx];
+        const auto [index_i, index_j] = ptOwners[bestIdx];
+
+        if (gcpPicking)
+        {
+            session_.ground_control_points.picking_mode_index_to_node_inner = index_i;
+            session_.ground_control_points.picking_mode_index_to_node_outer = index_j;
+        }
+
+        picked_index = index_i;
+    }
+
+    app_state.camera.moveEulerRotationCenterTo(center);
+}
+
+void setNewRotationCenter(int x, int y)
+{
+    const auto laser_beam = GetLaserBeam(x, y);
+
+    RegistrationPlaneFeature::Plane pl;
+
+    pl.a = 0;
+    pl.b = 0;
+    pl.c = 1;
+    pl.d = 0;
+    Eigen::Vector3f center_eigen = rayIntersection(laser_beam, pl).cast<float>();
+
+    spdlog::info("Setting new rotation center to: {}, {}, {}", center_eigen.x(), center_eigen.y(), center_eigen.z());
+
+    app_state.camera.moveEulerRotationCenterTo(Vector3{ center_eigen.x(), center_eigen.y(), center_eigen.z() });
+}
+
+bool checkClHelp(int argc, char** argv)
+{
+    for (int i = 1; i < argc; ++i)
+    {
+        std::string arg(argv[i]);
+
+        if (arg == "-h" || arg == "/h" || arg == "--help" || arg == "/?")
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -1032,13 +1729,8 @@ void observation_picking_gui()
 
             if (ImGui::Button("Reset view"))
             {
-                app_state.new_rotation_center = app_state.rotation_center;
-                app_state.new_rotate_x = 0.0;
-                app_state.new_rotate_y = 0.0;
-                app_state.new_translate_x = app_state.translate_x;
-                app_state.new_translate_y = app_state.translate_y;
-                app_state.new_translate_z = app_state.translate_z;
-                app_state.camera_transition_active = true;
+                app_state.camera.startEulerTransition(
+                    0.0f, 0.0f, app_state.camera.euler.translate, app_state.camera.euler.rotationCenter);
             }
         }
         ImGui::EndDisabled();
@@ -1265,9 +1957,9 @@ void lio_segments_gui()
             if (index_end < 0)
                 index_end = 0;
 
-            app_state.rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
-            app_state.rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
-            app_state.rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
+            app_state.camera.euler.rotationCenter.x = (float)session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
+            app_state.camera.euler.rotationCenter.y = (float)session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
+            app_state.camera.euler.rotationCenter.z = (float)session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
             session.point_clouds_container.show_all_from_range(index_begin, index_end);
         }
         ImGui::SameLine();
@@ -1282,9 +1974,9 @@ void lio_segments_gui()
             if (index_end > session.point_clouds_container.point_clouds.size() - 1)
                 index_end = session.point_clouds_container.point_clouds.size() - 1;
 
-            app_state.rotation_center.x() = session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
-            app_state.rotation_center.y() = session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
-            app_state.rotation_center.z() = session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
+            app_state.camera.euler.rotationCenter.x = (float)session.point_clouds_container.point_clouds[index_begin].m_pose(0, 3);
+            app_state.camera.euler.rotationCenter.y = (float)session.point_clouds_container.point_clouds[index_begin].m_pose(1, 3);
+            app_state.camera.euler.rotationCenter.z = (float)session.point_clouds_container.point_clouds[index_begin].m_pose(2, 3);
             session.point_clouds_container.show_all_from_range(index_begin, index_end);
         }
         ImGui::SameLine();
@@ -2004,18 +2696,18 @@ void settings_gui()
 
         ImGui::NewLine();
 
-        ImGui::InputFloat("camera_x", &app_state.new_rotation_center.x());
-        ImGui::InputFloat("camera_y", &app_state.new_rotation_center.y());
-        ImGui::InputFloat("camera_z", &app_state.new_rotation_center.z());
+        ImGui::InputFloat("camera_x", &app_state.camera.eulerGoal.rotationCenter.x);
+        ImGui::InputFloat("camera_y", &app_state.camera.eulerGoal.rotationCenter.y);
+        ImGui::InputFloat("camera_z", &app_state.camera.eulerGoal.rotationCenter.z);
 
         if (ImGui::Button("set camera"))
         {
-            // app_state.new_rotate_x = app_state.rotate_x;
-            // app_state.new_rotate_y = app_state.rotate_y;
-            // app_state.new_translate_x = -app_state.new_rotation_center.x();
-            // app_state.new_translate_y = -app_state.new_rotation_center.y();
-            // app_state.new_translate_z = -app_state.new_rotation_center.z();
-            app_state.camera_transition_active = true;
+            // app_state.camera.eulerGoal.rotateX = app_state.camera.euler.rotateX;
+            // app_state.camera.eulerGoal.rotateY = app_state.camera.euler.rotateY;
+            // app_state.camera.eulerGoal.translate.x = -app_state.camera.eulerGoal.rotationCenter.x;
+            // app_state.camera.eulerGoal.translate.y = -app_state.camera.eulerGoal.rotationCenter.y;
+            // app_state.camera.eulerGoal.translate.z = -app_state.camera.eulerGoal.rotationCenter.z;
+            app_state.camera.eulerTransitionActive = true;
         }
 
         if (ImGui::Button("Set initial pose to Identity and update other poses"))
@@ -2514,14 +3206,18 @@ void renderLoopClosure(
         scanColorModeFromScheme(csPointCloud),
         static_cast<float>(session_dims.z_min),
         static_cast<float>(session_dims.z_max),
-        Eigen::Vector3d(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z()),
+        Eigen::Vector3d(app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z),
         static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
-        1);
+        1,
+        point_clouds_container.xz_intersection,
+        point_clouds_container.yz_intersection,
+        point_clouds_container.xy_intersection,
+        static_cast<float>(point_clouds_container.intersection_width));
 
     // Pose-sequence trail across the whole session, as a chain of thick
     // green cylinders (sphere at each joint), sized relative to the current
-    // zoom (app_state.translate_z) so it stays visible next to the point cloud.
-    const float tubeRadius = std::max(0.005f, fabsf(app_state.translate_z) * 0.001f);
+    // zoom (app_state.camera.euler.translate.z) so it stays visible next to the point cloud.
+    const float tubeRadius = std::max(0.005f, fabsf(app_state.camera.euler.translate.z) * 0.001f);
     bool first = true;
     Vector3 prev{};
     for (const auto& pc : pointClouds)
@@ -2867,9 +3563,13 @@ void renderControlPoints(const ControlPoints& control_points, PointClouds& point
             ScanColorMode::Intensity,
             static_cast<float>(session_dims.z_min),
             static_cast<float>(session_dims.z_max),
-            Eigen::Vector3d(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z()),
+            Eigen::Vector3d(app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z),
             static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
-            1);
+            1,
+            point_clouds_container.xz_intersection,
+            point_clouds_container.yz_intersection,
+            point_clouds_container.xy_intersection,
+            static_cast<float>(point_clouds_container.intersection_width));
 
         for (size_t i = 0; i < pointClouds.size(); ++i)
         {
@@ -3149,93 +3849,81 @@ void display()
     rlLoadIdentity();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
-    updateCameraTransition();
+    app_state.camera.updateEulerTransition(io.DeltaTime);
 
     app_state.viewLocal = Eigen::Affine3f::Identity();
 
-    if (!app_state.is_ortho)
+    if (!app_state.camera.isOrtho)
     {
-        reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+        app_state.camera.applyPerspectiveProjection((int)io.DisplaySize.x, (int)io.DisplaySize.y);
 
         // janusz
         if (is_loop_closure_gui)
         {
             if (new_loop_closure_index)
             {
-                // if (index_loop_closure_source < session.point_clouds_container.point_clouds.size())
-                //{
-                //    app_state.new_rotation_center.x() =
-                //    session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().x();
-                //    app_state.new_rotation_center.y() =
-                //    session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().y();
-                //    app_state.new_rotation_center.z() =
-                //    session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation().z();
-                //
-                //    app_state.new_translate_x = -app_state.new_rotation_center.x();
-                //    app_state.new_translate_y = -app_state.new_rotation_center.y();
-                //    app_state.camera_transition_active = true;
-                //}
+                if (index_loop_closure_source < session.point_clouds_container.point_clouds.size())
+                {
+                    const auto& t = session.point_clouds_container.point_clouds[index_loop_closure_source].m_pose.translation();
+                    app_state.camera.moveEulerRotationCenterTo(
+                        Vector3{ static_cast<float>(t.x()), static_cast<float>(t.y()), static_cast<float>(t.z()) });
+                }
 
                 if (session.pose_graph_loop_closure.manipulate_active_edge)
                 {
+                    Vector3 center = app_state.camera.eulerGoal.rotationCenter;
+
                     if (session.pose_graph_loop_closure.edges.size() > 0)
                     {
                         if (session.pose_graph_loop_closure.index_active_edge < session.pose_graph_loop_closure.edges.size())
                         {
-                            app_state.new_rotation_center.x() =
+                            const auto& t =
                                 session.point_clouds_container
                                     .point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge]
                                                       .index_from]
-                                    .m_pose.translation()
-                                    .x();
-                            app_state.new_rotation_center.y() =
-                                session.point_clouds_container
-                                    .point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge]
-                                                      .index_from]
-                                    .m_pose.translation()
-                                    .y();
-                            app_state.new_rotation_center.z() =
-                                session.point_clouds_container
-                                    .point_clouds[session.pose_graph_loop_closure.edges[session.pose_graph_loop_closure.index_active_edge]
-                                                      .index_from]
-                                    .m_pose.translation()
-                                    .z();
+                                    .m_pose.translation();
+                            center = Vector3{ static_cast<float>(t.x()), static_cast<float>(t.y()), static_cast<float>(t.z()) };
                         }
                     }
 
-                    app_state.new_rotate_x = app_state.rotate_x;
-                    app_state.new_rotate_y = app_state.rotate_y;
-                    app_state.new_translate_x = -app_state.new_rotation_center.x();
-                    app_state.new_translate_y = -app_state.new_rotation_center.y();
-                    app_state.new_translate_z = app_state.translate_z;
-                    app_state.camera_transition_active = true;
+                    app_state.camera.moveEulerRotationCenterTo(center);
                 }
 
                 new_loop_closure_index = false;
             }
         }
 
-        app_state.viewLocal.translate(app_state.rotation_center);
+        Eigen::Vector3f rotationCenter(
+            app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z);
+        app_state.viewLocal.translate(rotationCenter);
 
-        app_state.viewLocal.translate(Eigen::Vector3f(app_state.translate_x, app_state.translate_y, app_state.translate_z));
-        if (!app_state.lock_z)
-            app_state.viewLocal.rotate(Eigen::AngleAxisf(app_state.rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        app_state.viewLocal.translate(Eigen::Vector3f(
+            app_state.camera.euler.translate.x, app_state.camera.euler.translate.y, app_state.camera.euler.translate.z));
+        if (!app_state.camera.lockZ)
+            app_state.viewLocal.rotate(Eigen::AngleAxisf(app_state.camera.euler.rotateX * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
         else
             app_state.viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
-        app_state.viewLocal.rotate(Eigen::AngleAxisf(app_state.rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+        app_state.viewLocal.rotate(Eigen::AngleAxisf(app_state.camera.euler.rotateY * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
 
-        app_state.viewLocal.translate(-app_state.rotation_center);
+        app_state.viewLocal.translate(-rotationCenter);
 
         rlMultMatrixf(app_state.viewLocal.matrix().data());
     }
     else
-        updateOrthoView();
+    {
+        // Still updating app_state.viewLocal for the compass -- the rest of
+        // the original updateOrthoView() (rlOrtho + the ortho gizmo lookAt)
+        // now lives in raylib_widgets::OrbitCamera::updateOrtho().
+        app_state.viewLocal.rotate(Eigen::AngleAxisf(
+            (app_state.camera.euler.rotateX + app_state.camera.euler.rotateY) * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+        app_state.camera.updateOrtho(ratio);
+    }
 
-    app_state.frame_view_3d = rlGetMatrixModelview();
-    app_state.frame_proj_3d = rlGetMatrixProjection();
-    frame_mvp_3d = MatrixMultiply(app_state.frame_view_3d, app_state.frame_proj_3d);
+    app_state.camera.captureFrameMatrices();
+    frame_mvp_3d = MatrixMultiply(app_state.camera.frameView3D, app_state.camera.frameProj3D);
 
     showAxes();
+    drawIntersectionGrids(session.point_clouds_container, session_dims);
 
     // renderLoopClosure() hides every scan except the current source/target
     // range while loop closure editing is active (see its comment) --
@@ -3282,27 +3970,17 @@ void display()
     {
         session.control_points.index_picked_point = -1; // reset picked point when pose changes
 
-        app_state.new_rotation_center.x() =
-            session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().x();
-        app_state.new_rotation_center.y() =
-            session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().y();
-        app_state.new_rotation_center.z() =
-            session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation().z();
+        const auto& t = session.point_clouds_container.point_clouds[session.control_points.index_pose].m_pose.translation();
+        Vector3 center = { static_cast<float>(t.x()), static_cast<float>(t.y()), static_cast<float>(t.z()) };
 
-        app_state.new_rotate_x = app_state.rotate_x;
-        app_state.new_rotate_y = app_state.rotate_y;
+        Vector3 translate = app_state.camera.euler.translate;
         if (session.control_points.track_pose_with_camera)
         {
-            app_state.new_translate_x = -app_state.new_rotation_center.x();
-            app_state.new_translate_y = -app_state.new_rotation_center.y();
+            translate.x = -center.x;
+            translate.y = -center.y;
         }
-        else
-        {
-            app_state.new_translate_x = app_state.translate_x;
-            app_state.new_translate_y = app_state.translate_y;
-        }
-        app_state.new_translate_z = app_state.translate_z;
-        app_state.camera_transition_active = true;
+
+        app_state.camera.startEulerTransition(app_state.camera.euler.rotateX, app_state.camera.euler.rotateY, translate, center);
     }
 
     // rlImGuiBegin() only polls raylib input into ImGui's IO and calls
@@ -3318,7 +3996,11 @@ void display()
     ShowMainDockSpace();
 
     if (session.control_points.is_imgui)
-        session.control_points.imgui(session.point_clouds_container, app_state.rotation_center);
+        session.control_points.imgui(
+            session.point_clouds_container,
+            Eigen::Vector3f(
+                app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y,
+                app_state.camera.euler.rotationCenter.z));
 
     if (session.ground_control_points.is_imgui)
         session.ground_control_points.imgui(session.point_clouds_container);
@@ -3343,7 +4025,7 @@ void display()
                     ImGuizmo::Enable(true);
                     ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-                    if (!app_state.is_ortho)
+                    if (!app_state.camera.isOrtho)
                     {
                         // Named-field copy (not a raw struct memcpy): Matrix's
                         // declared field order isn't guaranteed to match the
@@ -3367,8 +4049,8 @@ void display()
                     }
                     else
                         ImGuizmo::Manipulate(
-                            app_state.m_ortho_gizmo_view,
-                            app_state.m_ortho_projection,
+                            app_state.camera.orthoGizmoView,
+                            app_state.camera.orthoProjection,
                             ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
                             ImGuizmo::WORLD,
                             m_gizmo,
@@ -3445,11 +4127,17 @@ void display()
                 scanColorModeFromScheme(csPointCloud),
                 static_cast<float>(session_dims.z_min),
                 static_cast<float>(session_dims.z_max),
-                Eigen::Vector3d(app_state.rotation_center.x(), app_state.rotation_center.y(), app_state.rotation_center.z()),
+                Eigen::Vector3d(app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z),
                 static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
-                app_state.viewer_decimate_point_cloud);
+                app_state.viewer_decimate_point_cloud,
+                session.point_clouds_container.xz_intersection,
+                session.point_clouds_container.yz_intersection,
+                session.point_clouds_container.xy_intersection,
+                static_cast<float>(session.point_clouds_container.intersection_width));
             scan_renderer.drawTrajectories(
-                session.point_clouds_container.point_clouds, 1, session.point_clouds_container.show_imu_to_lio_diff);
+                session.point_clouds_container.point_clouds, 1, session.point_clouds_container.show_imu_to_lio_diff,
+                session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection,
+                session.point_clouds_container.xy_intersection);
 
             observationPickingRender(observation_picking);
 
@@ -3534,7 +4222,7 @@ void display()
                 ImGuizmo::Enable(true);
                 ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-                if (!app_state.is_ortho)
+                if (!app_state.camera.isOrtho)
                 {
                     Matrix projMat = rlGetMatrixProjection();
                     Matrix modelMat = rlGetMatrixModelview();
@@ -3555,8 +4243,8 @@ void display()
                 }
                 else
                     ImGuizmo::Manipulate(
-                        app_state.m_ortho_gizmo_view,
-                        app_state.m_ortho_projection,
+                        app_state.camera.orthoGizmoView,
+                        app_state.camera.orthoProjection,
                         ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
                         ImGuizmo::WORLD,
                         m_gizmo,
@@ -4305,8 +4993,9 @@ void display()
                         centroid /= static_cast<double>(tls_registration.tum.tum_poses.size());
                         centroid -= session.point_clouds_container.offset;
 
-                        app_state.new_rotation_center = centroid.cast<float>();
-                        app_state.camera_transition_active = true;
+                        Eigen::Vector3f centroid_f = centroid.cast<float>();
+                        app_state.camera.eulerGoal.rotationCenter = Vector3{ centroid_f.x(), centroid_f.y(), centroid_f.z() };
+                        app_state.camera.eulerTransitionActive = true;
                     }
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip(
@@ -4716,17 +5405,12 @@ void display()
             }
             ImGui::EndDisabled();
 
-            if (ImGui::MenuItem("Orthographic", "key O", &app_state.is_ortho))
+            if (ImGui::MenuItem("Orthographic", "key O", &app_state.camera.isOrtho))
             {
-                if (app_state.is_ortho)
+                if (app_state.camera.isOrtho)
                 {
-                    app_state.new_rotation_center = app_state.rotation_center;
-                    app_state.new_rotate_x = 0.0;
-                    app_state.new_rotate_y = 0.0;
-                    app_state.new_translate_x = app_state.translate_x;
-                    app_state.new_translate_y = app_state.translate_y;
-                    app_state.new_translate_z = app_state.translate_z;
-                    app_state.camera_transition_active = true;
+                    app_state.camera.startEulerTransition(
+                        0.0f, 0.0f, app_state.camera.euler.translate, app_state.camera.euler.rotationCenter);
                 }
             }
             if (ImGui::IsItemHovered())
@@ -4735,7 +5419,7 @@ void display()
             ImGui::MenuItem("Show axes", "key X", &app_state.show_axes);
             ImGui::MenuItem("Show compass/ruler", "key C", &app_state.compass_ruler);
 
-            ImGui::MenuItem("Lock Z", "Shift + Z", &app_state.lock_z, !app_state.is_ortho);
+            ImGui::MenuItem("Lock Z", "Shift + Z", &app_state.camera.lockZ, !app_state.camera.isOrtho);
 
             ImGui::Separator();
 
@@ -4884,16 +5568,16 @@ void display()
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
     }
 
-    cor_window();
+    raylib_widgets::showEulerCenterOfRotationWindow(cor_gui, app_state.camera, xText, yText, zText);
 
-    info_window(infoLines, appShortcuts);
+    raylib_widgets::ShowInfoWindow(app_state.info_gui, infoLines, appShortcuts, HDMAPPING_VERSION_STRING, __DATE__);
 
     draw_translate_preview();
 
     // 3D drawing is done -- switch to the 2D screen-space projection the
     // mini-compass (DrawLineEx/DrawText) and rlImGuiEnd()'s UI render both
-    // need (see end3DMatrixStack()'s comment).
-    end3DMatrixStack();
+    // need (see raylib_widgets::end3DMatrixStack()'s comment).
+    raylib_widgets::end3DMatrixStack(io.DisplaySize.x, io.DisplaySize.y);
 
     if (is_loop_closure_gui)
         renderLoopClosureLabels(session.point_clouds_container);
@@ -5009,14 +5693,9 @@ void translate_gui()
         translate_tool.has_transform = false;
         translate_tool.transform = Eigen::Affine3d::Identity();
 
-        app_state.is_ortho = true;
-        app_state.new_rotation_center = app_state.rotation_center;
-        app_state.new_rotate_x = 0.0;
-        app_state.new_rotate_y = 0.0;
-        app_state.new_translate_x = app_state.translate_x;
-        app_state.new_translate_y = app_state.translate_y;
-        app_state.new_translate_z = app_state.translate_z;
-        app_state.camera_transition_active = true;
+        app_state.camera.isOrtho = true;
+        app_state.camera.startEulerTransition(
+            0.0f, 0.0f, app_state.camera.euler.translate, app_state.camera.euler.rotationCenter);
 
         SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);
     }
@@ -5185,6 +5864,8 @@ void mouse(int glut_button, int state, int x, int y)
                 if (session.control_points.index_pose >= 0 &&
                     session.control_points.index_pose < session.point_clouds_container.point_clouds.size())
                 {
+                    Vector3 center = app_state.camera.eulerGoal.rotationCenter;
+
                     for (size_t j = 0; j < session.point_clouds_container.point_clouds[i].points_local.size(); j++)
                     {
                         const auto& p = session.point_clouds_container.point_clouds[i].points_local[j];
@@ -5196,20 +5877,13 @@ void mouse(int glut_button, int state, int x, int y)
                         {
                             min_distance = dist;
 
-                            app_state.new_rotation_center.x() = vp.x();
-                            app_state.new_rotation_center.y() = vp.y();
-                            app_state.new_rotation_center.z() = vp.z();
+                            center = Vector3{ static_cast<float>(vp.x()), static_cast<float>(vp.y()), static_cast<float>(vp.z()) };
 
                             session.control_points.index_picked_point = j;
                         }
                     }
 
-                    app_state.new_rotate_x = app_state.rotate_x;
-                    app_state.new_rotate_y = app_state.rotate_y;
-                    app_state.new_translate_x = -app_state.new_rotation_center.x();
-                    app_state.new_translate_y = -app_state.new_rotation_center.y();
-                    app_state.new_translate_z = app_state.translate_z;
-                    app_state.camera_transition_active = true;
+                    app_state.camera.moveEulerRotationCenterTo(center);
                 }
             }
             else
@@ -5322,7 +5996,7 @@ bool initGL(int* argc, char** argv, const std::string& winTitleArg, void (*)(), 
 
     scan_renderer.init();
 
-    reshape(static_cast<int>(window_width), static_cast<int>(window_height));
+    app_state.camera.applyPerspectiveProjection(static_cast<int>(window_width), static_cast<int>(window_height));
 
     return true;
 }

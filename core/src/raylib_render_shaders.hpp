@@ -44,6 +44,17 @@ uniform float elevMin;
 uniform float elevMax;
 uniform vec3 distCenter;
 uniform float distMax;
+// Intersection-slab gating: was PointCloud::render()'s (core/src/point_cloud.cpp,
+// legacy immediate-mode GL) per-point xz/yz/xy_intersection check, ported here
+// as a fragment discard instead of a CPU-side render_point bool. xzOn/yzOn/xyOn
+// are 0/1 (bool uniforms aren't portable pre-4.x); intersectionWidth is the
+// same half-width in world units on both sides of each cutting plane through
+// the world origin. With all three off, every point draws (matches the
+// original's "no intersection mode active -> always render" fallback).
+uniform int xzOn;
+uniform int yzOn;
+uniform int xyOn;
+uniform float intersectionWidth;
 in float fragIntensity;
 in vec3 fragWorldPos;
 out vec4 finalColor;
@@ -51,6 +62,15 @@ out vec4 finalColor;
         R"(
 void main()
 {
+    if (xzOn != 0 || yzOn != 0 || xyOn != 0)
+    {
+        bool inSlab = false;
+        if (xzOn != 0 && abs(fragWorldPos.y) < intersectionWidth) inSlab = true;
+        if (yzOn != 0 && abs(fragWorldPos.x) < intersectionWidth) inSlab = true;
+        if (xyOn != 0 && abs(fragWorldPos.z) < intersectionWidth) inSlab = true;
+        if (!inSlab) discard;
+    }
+
     if (colorMode == 1)
     {
         finalColor = vec4(jet(fragIntensity), pointColor.a);

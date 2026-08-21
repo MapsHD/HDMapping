@@ -35,4 +35,15 @@ namespace raylib_widgets
         float viewportHeightPx,
         float pixelThreshold,
         size_t& outIndex);
+
+    // Finds the point in `points` whose perpendicular distance to `ray`'s
+    // infinite line is smallest -- unlike pickNearestPoint() above (which
+    // rejects anything past `pixelThreshold` screen pixels, or behind the
+    // camera), this always returns the single closest point, however far.
+    // For "snap the camera to the nearest waypoint on a sparse trajectory/
+    // polyline" use cases -- shared between multi_view_tls_registration_
+    // step_2's rotation-center-on-trajectory picking and
+    // camera_lidar_trajectory_viewer's equivalent. Returns false only when
+    // `points` is empty.
+    bool pickNearestPointOnLine(const Vector3* points, size_t count, const Ray& ray, size_t& outIndex);
 } // namespace raylib_widgets

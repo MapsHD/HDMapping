@@ -16,6 +16,7 @@
 #include <RaylibWidgets/CenterOfRotationWindow.h>
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/OrbitCamera.h>
+#include <RaylibWidgets/PointPicking.h>
 #include <RaylibWidgets/ShortcutsTable.h>
 #include <RaylibWidgets/WindowFit.h>
 #include <algorithm>
@@ -52,13 +53,22 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "", "Ctrl+Shift+O", "Select CAMERA_0 directory" },
     { "", "Ctrl+Shift+C", "Open calibration" },
     { "", "Ctrl+S", "Export colored point cloud" },
+    { "Camera", "F", "Front view" },
+    { "", "B", "Back view" },
+    { "", "L", "Left view" },
+    { "", "R", "Right view" },
+    { "", "T", "Top view" },
+    { "", "U", "Bottom view" },
+    { "", "I", "Isometric view" },
+    { "", "Z", "Reset camera" },
+    { "", "O", "Toggle orthographic/perspective" },
     { "Special keys", "Left arrow", "Previous image (image preview)" },
     { "", "Right arrow", "Next image (image preview)" },
     { "Mouse related", "Left click + drag", "Orbit camera" },
     { "", "Right click + drag", "Pan camera" },
     { "", "Scroll", "Zoom camera" },
     { "", "Ctrl+Right click", "Set center of rotation (ground plane)" },
-    { "", "Middle click", "Set center of rotation (ground plane)" },
+    { "", "Ctrl+Middle click", "Set center of rotation (nearest trajectory point)" },
     { "", "Shift+R", "Open 'Center of rotation' dialog" },
 };
 
@@ -168,7 +178,16 @@ struct AppState
     bool shaderOk = false;
     int locMVP = -1, locPS = -1, locCM = -1, locDecim = -1, locSel = -1;
 
+    // Driving orbit's Euler mode (rotateX/rotateY/translate/rotationCenter/
+    // isOrtho), not its azimuth/elevation/distance/target mode -- the same
+    // camera engine multi_view_tls_registration_step_2 uses, manually
+    // driven through rlgl (see display()'s camera setup) instead of
+    // raylib's Camera3D/BeginMode3D.
     raylib_widgets::OrbitCamera orbit;
+    // Rebuilt from orbit.euler every frame in display() -- used only for
+    // drawCompassRuler()'s right/up vectors, same reasoning as step2's own
+    // app_state.viewLocal (OrbitCamera itself stays Eigen-free).
+    Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
     bool showCenterOfRotationWindow = false;
 
     // controls
@@ -230,13 +249,55 @@ struct AppState
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-static Vector3 toRL(float x, float y, float z)
+// Plain Eigen::Vector3f -> raylib Vector3 conversion. Used to be an axis
+// remap (x, z, -y) that made this app's native Z-up LiDAR data render
+// correctly under raylib's Y-up Camera3D/BeginMode3D convention; now that
+// the camera is multi_view_tls_registration_step_2's own Z-up rlgl-driven
+// one, geometry renders in its native coordinates and this is a no-op
+// component copy.
+static Vector3 toVec3(const Eigen::Vector3f& v)
 {
-    return { x, z, -y };
+    return { v.x(), v.y(), v.z() };
 }
-static Vector3 toRL(const Eigen::Vector3f& v)
+
+// Finds the trajectory pose closest to `ray` (unconditional nearest, no
+// distance cutoff) and returns its world-space position -- mirrors
+// multi_view_tls_registration_step_2's getClosestTrajectoryPoint(), backed
+// by the same shared raylib_widgets::pickNearestPointOnLine() picker.
+// Returns false (outPoint untouched) when the trajectory is empty.
+static bool nearestTrajectoryPoint(const Trajectory& traj, const Ray& ray, Vector3& outPoint)
 {
-    return { v.x(), v.z(), -v.y() };
+    if (traj.poses.empty())
+        return false;
+
+    std::vector<Vector3> pts;
+    pts.reserve(traj.poses.size());
+    for (const auto& pose : traj.poses)
+        pts.push_back(toVec3(pose.T.translation()));
+
+    size_t idx;
+    if (!raylib_widgets::pickNearestPointOnLine(pts.data(), pts.size(), ray, idx))
+        return false;
+
+    outPoint = pts[idx];
+    return true;
+}
+
+// Intersects `ray` with the Z=0 ground plane -- same plane
+// multi_view_tls_registration_step_2's setNewRotationCenter() intersects
+// (via RegistrationPlaneFeature::Plane{0,0,1,0} + rayIntersection()),
+// reimplemented directly in raylib/raymath terms since those two types live
+// in `core`, which this app deliberately doesn't link. Returns false
+// (outPoint untouched) when the ray is ~parallel to the plane.
+static bool intersectGroundPlaneZ0(const Ray& ray, Vector3& outPoint)
+{
+    const float kTolerance = 0.0001f;
+    if (ray.direction.z > -kTolerance && ray.direction.z < kTolerance)
+        return false;
+
+    float t = -ray.position.z / ray.direction.z;
+    outPoint = Vector3Add(ray.position, Vector3Scale(ray.direction, t));
+    return true;
 }
 
 // Load all cam0_*.jpg from CAMERA_0 (sibling of session dir) into s.images, resized by s.imgScale.
@@ -546,8 +607,8 @@ static void loadCloud(AppState& s)
                 pw = *M * pw;
 
             gpuData.push_back(pw.x());
+            gpuData.push_back(pw.y());
             gpuData.push_back(pw.z());
-            gpuData.push_back(-pw.y());
 
             const float rawIntensity = pt.intensity;
             float colorF = packGray(rawIntensity);
@@ -706,8 +767,8 @@ static void loadCloud(AppState& s)
             if (d2 > mx * mx)
                 mx = std::sqrt(d2);
             sumX += pw.x();
-            sumY += pw.z();
-            sumZ += -pw.y();
+            sumY += pw.y();
+            sumZ += pw.z();
             cnt++;
         }
         // chunkImgs and their cv::Mat memory are released here
@@ -721,8 +782,20 @@ static void loadCloud(AppState& s)
     if (cnt > 0)
     {
         s.cloud.upload(gpuData, mx);
-        s.orbit.target = { sumX / cnt, sumY / cnt, sumZ / cnt };
-        s.orbit.distance = std::max(5.f, mx * 0.3f);
+
+        // Frame the loaded cloud -- instant, not eased (this runs once on
+        // load, before there's anything to transition from). Same "recenter
+        // and look at" formula as OrbitCamera::moveEulerRotationCenterTo()
+        // (translate.xy = -center.xy keeps the point centered on screen
+        // regardless of the current rotate angles), applied directly to
+        // both euler and eulerGoal so there's no stale transition target
+        // left over from a previous session.
+        Vector3 center = { sumX / cnt, sumY / cnt, sumZ / cnt };
+        float dist = std::max(5.f, mx * 0.3f);
+        s.orbit.euler.rotationCenter = center;
+        s.orbit.euler.translate = { -center.x, -center.y, -dist };
+        s.orbit.eulerGoal = s.orbit.euler;
+        s.orbit.eulerTransitionActive = false;
     }
 
     s.status = "Pts: " + std::to_string(s.cloud.count) + "  Poses: " + std::to_string(s.traj.poses.size()) +
@@ -1128,7 +1201,7 @@ static void drawScene(AppState& s)
         {
             auto& a = s.traj.poses[i - 1];
             auto& b = s.traj.poses[i];
-            DrawLine3D(toRL(a.T.translation()), toRL(b.T.translation()), Color{ 100, 200, 255, 220 });
+            DrawLine3D(toVec3(a.T.translation()), toVec3(b.T.translation()), Color{ 100, 200, 255, 220 });
         }
     }
 
@@ -1154,13 +1227,13 @@ static void drawScene(AppState& s)
             if (!pose)
                 continue;
 
-            Vector3 origin = toRL(pose->T * C);
+            Vector3 origin = toVec3(pose->T * C);
 
             Vector3 w[4];
             for (int k = 0; k < 4; k++)
             {
                 Eigen::Vector3f pl = R_wc * Eigen::Vector3f(ncx[k] * fs, ncy[k] * fs, fs) + C;
-                w[k] = toRL(pose->T * pl);
+                w[k] = toVec3(pose->T * pl);
             }
 
             bool hl = (ts == hlTs);
@@ -1174,7 +1247,7 @@ static void drawScene(AppState& s)
                 for (int k = 0; k < 4; k++)
                 {
                     Eigen::Vector3f pl = R_wc * Eigen::Vector3f(ncx[k] * sc, ncy[k] * sc, sc) + C;
-                    w2[k] = toRL(pose->T * pl);
+                    w2[k] = toVec3(pose->T * pl);
                 }
                 DrawTriangle3D(w2[0], w2[1], w2[2], Color{ 255, 255, 50, 40 });
                 DrawTriangle3D(w2[2], w2[3], w2[0], Color{ 255, 255, 50, 40 });
@@ -1320,9 +1393,7 @@ int main(int argc, char* argv[])
     while (!WindowShouldClose())
     {
         bool imguiWants = ImGui::GetIO().WantCaptureMouse;
-        s.orbit.update(!imguiWants);
-        s.orbit.updateTransition(GetFrameTime());
-        Camera3D cam = s.orbit.toRaylib();
+        s.orbit.updateEulerTransition(GetFrameTime());
 
         // pick up the ROS export result from the worker thread (if any)
         {
@@ -1346,7 +1417,13 @@ int main(int argc, char* argv[])
             // bare F there is the "camera Front" preset). Ctrl+O and bare
             // C/P are kept aligned with step2 (Ctrl+O = open/load session,
             // C = compass/ruler).
-            bool ctrlDown = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+            // KEY_LEFT/RIGHT_SUPER too: on macOS Cmd (Super) is a distinct
+            // key from Ctrl, and users -- including whoever asked for this
+            // binding -- reach for Cmd as "the" modifier there. Treating
+            // either as ctrlDown matches that expectation instead of
+            // requiring the literal Ctrl key.
+            bool ctrlDown = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER) ||
+                IsKeyDown(KEY_RIGHT_SUPER);
             bool shiftDown = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
             if (ctrlDown && shiftDown && IsKeyPressed(KEY_O))
                 actionSelectCamera0Dir(s);
@@ -1364,12 +1441,85 @@ int main(int argc, char* argv[])
             if (!ctrlDown && IsKeyPressed(KEY_C))
                 s.showCompassRuler = !s.showCompassRuler;
 
+            // Camera drag/zoom -- same raylib_widgets::OrbitCamera Euler
+            // methods multi_view_tls_registration_step_2's motion()/wheel()
+            // call, driven from continuous per-frame deltas the way
+            // OrbitCamera::update() (the other, azimuth/elevation half of
+            // this struct) already reads input, rather than resurrecting
+            // step2's GLUT-shaped mouse_old_x/y/mouse_buttons bookkeeping
+            // (nothing about sharing the camera *math* requires reproducing
+            // that plumbing too). Gated off while Ctrl/Shift is held --
+            // both are reserved for the picking actions below, same
+            // reasoning as step2's own motion() guard (a trackpad's
+            // click jitter while a modifier is held must never get read as
+            // a drag, or it breaks any transition that same click started).
+            if (!imguiWants && !ctrlDown && !shiftDown)
+            {
+                Vector2 d = GetMouseDelta();
+                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+                    s.orbit.dragOrbit(d.x, d.y);
+                if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT))
+                {
+                    if (s.orbit.isOrtho)
+                        s.orbit.dragPanOrtho(d.x, d.y, (float)GetScreenWidth(), (float)GetScreenHeight());
+                    else
+                        s.orbit.dragPanPerspective(d.x, d.y);
+                }
+            }
+            if (!imguiWants)
+            {
+                float wheel = GetMouseWheelMove();
+                if (wheel != 0.f)
+                    s.orbit.zoom(wheel, shiftDown);
+            }
+
+            // Camera presets + orthographic toggle -- same bindings as
+            // step2's camMenu()/view_kbd_shortcuts() (F/B/L/R/T/U/I/Z, O),
+            // gated the same way (bare key, no Ctrl/Shift).
+            if (!ctrlDown && !shiftDown)
+            {
+                if (IsKeyPressed(KEY_F))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Front);
+                if (IsKeyPressed(KEY_B))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Back);
+                if (IsKeyPressed(KEY_L))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Left);
+                if (IsKeyPressed(KEY_R))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Right);
+                if (IsKeyPressed(KEY_T))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Top);
+                if (IsKeyPressed(KEY_U))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Bottom);
+                if (IsKeyPressed(KEY_I))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Iso);
+                if (IsKeyPressed(KEY_Z))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Reset);
+                if (IsKeyPressed(KEY_O))
+                    s.orbit.isOrtho = !s.orbit.isOrtho;
+            }
+
             if (shiftDown && IsKeyPressed(KEY_R))
                 s.showCenterOfRotationWindow = true;
+            // Ctrl+Right-click: ground-plane (Z=0) pick.
             if (!imguiWants && ctrlDown && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
-                s.orbit.pickGroundPlaneTarget(GetMousePosition(), cam);
-            if (!imguiWants && IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE))
-                s.orbit.pickGroundPlaneTarget(GetMousePosition(), cam);
+            {
+                Vector2 mp = GetMousePosition();
+                Ray ray = s.orbit.eulerScreenRay((int)mp.x, (int)mp.y, GetScreenWidth(), GetScreenHeight());
+                Vector3 hit;
+                if (intersectGroundPlaneZ0(ray, hit))
+                    s.orbit.moveEulerRotationCenterTo(hit);
+            }
+            // Ctrl+Middle-click: nearest-trajectory-point pick (like step2's
+            // Ctrl/Shift+Middle-click) -- falls back to the ground-plane
+            // pick when no trajectory is loaded yet.
+            if (!imguiWants && ctrlDown && IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE))
+            {
+                Vector2 mp = GetMousePosition();
+                Ray ray = s.orbit.eulerScreenRay((int)mp.x, (int)mp.y, GetScreenWidth(), GetScreenHeight());
+                Vector3 hit;
+                if (nearestTrajectoryPoint(s.traj, ray, hit) || intersectGroundPlaneZ0(ray, hit))
+                    s.orbit.moveEulerRotationCenterTo(hit);
+            }
 
             if (IsKeyPressed(KEY_LEFT))
             {
@@ -1384,24 +1534,71 @@ int main(int argc, char* argv[])
         }
 
         BeginDrawing();
-        ClearBackground(Color{ 25, 25, 25, 255 });
 
-        BeginMode3D(cam);
+        // GetRenderWidth/Height(), not io.DisplaySize: the GL viewport must
+        // be sized in actual framebuffer pixels, which can differ under DPI
+        // scaling -- same reasoning as step2's display().
+        rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
+        ClearBackground(Color{ 25, 25, 25, 255 });
+        rlEnableDepthTest();
+
+        rlMatrixMode(RL_PROJECTION);
+        rlLoadIdentity();
+        float ratio = float(ImGui::GetIO().DisplaySize.x) / float(ImGui::GetIO().DisplaySize.y);
+
+        // Camera setup -- ported 1:1 from multi_view_tls_registration_step_2's
+        // display(), driving orbit's Euler mode through rlgl's matrix stack
+        // directly instead of raylib's BeginMode3D/EndMode3D.
+        s.viewLocal = Eigen::Affine3f::Identity();
+
+        if (!s.orbit.isOrtho)
+        {
+            s.orbit.applyPerspectiveProjection((int)ImGui::GetIO().DisplaySize.x, (int)ImGui::GetIO().DisplaySize.y);
+
+            Eigen::Vector3f rotationCenter(
+                s.orbit.euler.rotationCenter.x, s.orbit.euler.rotationCenter.y, s.orbit.euler.rotationCenter.z);
+            s.viewLocal.translate(rotationCenter);
+            s.viewLocal.translate(
+                Eigen::Vector3f(s.orbit.euler.translate.x, s.orbit.euler.translate.y, s.orbit.euler.translate.z));
+            if (!s.orbit.lockZ)
+                s.viewLocal.rotate(Eigen::AngleAxisf(s.orbit.euler.rotateX * DEG2RAD, Eigen::Vector3f::UnitX()));
+            else
+                s.viewLocal.rotate(Eigen::AngleAxisf(-90.0f * DEG2RAD, Eigen::Vector3f::UnitX()));
+            s.viewLocal.rotate(Eigen::AngleAxisf(s.orbit.euler.rotateY * DEG2RAD, Eigen::Vector3f::UnitZ()));
+            s.viewLocal.translate(-rotationCenter);
+
+            rlMultMatrixf(s.viewLocal.matrix().data());
+        }
+        else
+        {
+            // Still updating viewLocal for the compass -- the rest of the
+            // ortho projection + gizmo-view lookAt lives in
+            // OrbitCamera::updateOrtho().
+            s.viewLocal.rotate(
+                Eigen::AngleAxisf((s.orbit.euler.rotateX + s.orbit.euler.rotateY) * DEG2RAD, Eigen::Vector3f::UnitZ()));
+            s.orbit.updateOrtho(ratio);
+        }
+
+        s.orbit.captureFrameMatrices();
+
+        // Origin axes + rotation-center cross -- was step2's showAxes(),
+        // unconditional here (this app has no show_axes toggle).
+        DrawLine3D({ 0, 0, 0 }, { 100, 0, 0 }, RED);
+        DrawLine3D({ 0, 0, 0 }, { 0, 100, 0 }, GREEN);
+        DrawLine3D({ 0, 0, 0 }, { 0, 0, 100 }, BLUE);
+        raylib_widgets::drawRotationCenterCross(
+            s.orbit.euler.rotationCenter, std::max(0.1f, fabsf(s.orbit.euler.translate.z) * 0.05f), WHITE);
+
         drawScene(s);
-        DrawGrid(20, 1.f);
-        // axes
-        DrawLine3D({ 0, 0, 0 }, { 2, 0, 0 }, RED);
-        DrawLine3D({ 0, 0, 0 }, { 0, 2, 0 }, GREEN);
-        DrawLine3D({ 0, 0, 0 }, { 0, 0, -2 }, BLUE);
-        raylib_widgets::drawRotationCenterCross(s.orbit.target, s.orbit.distance * 0.05f, WHITE);
-        EndMode3D();
+
+        raylib_widgets::end3DMatrixStack(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
 
         if (s.showCompassRuler)
         {
-            Vector3 fwd = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
-            Vector3 right = Vector3Normalize(Vector3CrossProduct(fwd, cam.up));
-            Vector3 up = Vector3CrossProduct(right, fwd);
-            raylib_widgets::drawCompassRuler(right, up, s.orbit.distance, LIGHTGRAY);
+            const Eigen::Matrix3f& R = s.viewLocal.rotation();
+            Vector3 right = { R(0, 0), R(0, 1), R(0, 2) };
+            Vector3 up = { R(1, 0), R(1, 1), R(1, 2) };
+            raylib_widgets::drawCompassRuler(right, up, s.orbit.euler.translate.z, LIGHTGRAY);
         }
 
         // ── upload image viewer texture if worker produced one ────────────────
@@ -1448,6 +1645,30 @@ int main(int argc, char* argv[])
                 ImGui::Separator();
                 if (ImGui::MenuItem("Select COLMAP Output Directory..."))
                     actionSelectColmapOutputDir(s);
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::BeginMenu("Camera"))
+            {
+                if (ImGui::MenuItem("Front", "key F"))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Front);
+                if (ImGui::MenuItem("Back", "key B"))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Back);
+                if (ImGui::MenuItem("Left", "key L"))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Left);
+                if (ImGui::MenuItem("Right", "key R"))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Right);
+                if (ImGui::MenuItem("Top", "key T"))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Top);
+                if (ImGui::MenuItem("Bottom", "key U"))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Bottom);
+                if (ImGui::MenuItem("Isometric", "key I"))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Iso);
+                ImGui::Separator();
+                if (ImGui::MenuItem("Reset", "key Z"))
+                    s.orbit.setEulerPreset(raylib_widgets::OrbitCamera::EulerPreset::Reset);
+                ImGui::Separator();
+                ImGui::MenuItem("Orthographic", "key O", &s.orbit.isOrtho);
                 ImGui::EndMenu();
             }
 
@@ -1765,7 +1986,7 @@ int main(int argc, char* argv[])
 
         ImGui::End();
 
-        raylib_widgets::showCenterOfRotationWindow(s.showCenterOfRotationWindow, s.orbit);
+        raylib_widgets::showEulerCenterOfRotationWindow(s.showCenterOfRotationWindow, s.orbit);
 
         // ── shortcuts help window ───────────────────────────────────────────────
         if (s.showHelp)

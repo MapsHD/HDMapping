@@ -97,6 +97,15 @@ public:
     // (rebuild()'s default). Uses whatever rlgl projection/modelview
     // matrices are currently active (BeginMode3D or a manually-driven
     // rlMatrixMode/rlMultMatrixf stack, either works).
+    //
+    // xzIntersection/yzIntersection/xyIntersection/intersectionWidth: ported
+    // from PointCloud::render()'s per-point xz/yz/xy_intersection slab
+    // filter (core/src/point_cloud.cpp) -- with any of the three set, only
+    // points within intersectionWidth of the corresponding plane through the
+    // world origin (Z=0 for xy, Y=0 for xz, X=0 for yz) are drawn; with all
+    // three false (the default), every point draws, matching today's
+    // behavior. Applied in the fragment shader (a discard), not a CPU-side
+    // filter -- see raylib_render_shaders.hpp.
     void draw(
         const std::vector<PointCloud>& pointClouds,
         float pointSize,
@@ -105,7 +114,11 @@ public:
         float elevationMax = 1.f,
         const Eigen::Vector3d& distanceCenter = Eigen::Vector3d::Zero(),
         float distanceMax = 1.f,
-        int decimateStride = 1) const;
+        int decimateStride = 1,
+        bool xzIntersection = false,
+        bool yzIntersection = false,
+        bool xyIntersection = false,
+        float intersectionWidth = 0.1f) const;
 
     // Number of glDrawArrays calls draw() issued the last time it ran (one
     // per visible scan) -- raylib/rlgl don't expose a draw-call counter for
@@ -150,9 +163,14 @@ public:
     // Also draws the fuse-inclination-from-IMU quad markers, the fixed-om/fi
     // rings, and the show_IMU/show_pose orientation crosses. If
     // visibleImuDiff is set, also draws the IMU-vs-LIO angular-difference
-    // debug lines. Intersection-slab gating (xz/yz/xy) is not implemented so
-    // these always draw when the relevant per-scan flag is set.
-    void drawTrajectories(const std::vector<PointCloud>& pointClouds, int reduceRenderedTrajectory, bool visibleImuDiff) const;
+    // debug lines. Matches the legacy PointCloud::render()'s trajectory
+    // section: this whole overlay is skipped entirely (not slab-filtered
+    // per-point like draw() above) whenever any of xzIntersection/
+    // yzIntersection/xyIntersection is set, so a cross-section view isn't
+    // cluttered by trajectory points/markers outside the slab.
+    void drawTrajectories(
+        const std::vector<PointCloud>& pointClouds, int reduceRenderedTrajectory, bool visibleImuDiff, bool xzIntersection = false,
+        bool yzIntersection = false, bool xyIntersection = false) const;
 
     // Draws a single already-cached scan (see rebuild()) straight from its
     // persistent, full-resolution GPU buffer -- no CPU re-transform or
@@ -249,6 +267,10 @@ private:
     int locElevMax_ = -1;
     int locDistCenter_ = -1;
     int locDistMax_ = -1;
+    int locXzOn_ = -1;
+    int locYzOn_ = -1;
+    int locXyOn_ = -1;
+    int locIntersectionWidth_ = -1;
     mutable int lastDrawCallCount_ = 0;
     mutable int lastVertexCount_ = 0;
 };

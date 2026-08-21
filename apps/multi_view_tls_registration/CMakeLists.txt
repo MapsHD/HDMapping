@@ -7,13 +7,14 @@ project(multi_view_tls_registration_step_2)
 # multi_view_tls_registration_gui.cpp is raylib-based: the GLUT-window-and-
 # input-loop and point-cloud/loop-closure rendering code that used to go
 # through core's own legacy-GL PointCloud::render()/PointClouds::render()
-# now uses Core/raylib_render.hpp's ScanRenderer instead.
-#
-# rl_utils.cpp/rl_utils.h are this app's own raylib-based replacement for
-# the camera/picking/mini-compass/misc-ImGui-widget API it used to get from
-# core/src/utils.cpp (shared with the remaining GLUT apps, so it can't be
-# changed), using rlgl's rl*() legacy-GL-emulation API instead of real
-# gl*()/glu*()/glut*() calls -- see rl_utils.h's top comment.
+# now uses Core/raylib_render.hpp's ScanRenderer instead. Its
+# camera/picking/mini-compass/misc-ImGui-widget API -- once its own local
+# rl_utils.cpp/rl_utils.h, before that <Core/utils.hpp> -- is folded directly
+# into multi_view_tls_registration_gui.cpp now (everything in rl_utils.h/.cpp
+# turned out to only ever be used there) plus raylib_widgets, shared with the
+# camera_lidar_* apps (OrbitCamera's Euler mode, the Euler center-of-rotation
+# dialog, app-shell scaffolding, double-precision ray/plane math) -- see that
+# file's own top-of-section comment.
 #
 # perform_experiment.cpp still #includes GLUT/glew/imgui-GLUT-backend headers,
 # but never calls anything from them (verified: no glut*/GL_*/ImGui_Impl*
@@ -22,7 +23,6 @@ project(multi_view_tls_registration_step_2)
 set(SOURCES
     multi_view_tls_registration.cpp perform_experiment.cpp
     multi_view_tls_registration_gui.cpp multi_view_tls_registration.h
-    rl_utils.cpp rl_utils.h
     ../lidar_odometry_step_1/lidar_odometry_utils.cpp
 )
 

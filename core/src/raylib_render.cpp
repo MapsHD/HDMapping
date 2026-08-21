@@ -54,6 +54,10 @@ void ScanRenderer::init()
         locElevMax_ = rlGetLocationUniform(shader_.id, "elevMax");
         locDistCenter_ = rlGetLocationUniform(shader_.id, "distCenter");
         locDistMax_ = rlGetLocationUniform(shader_.id, "distMax");
+        locXzOn_ = rlGetLocationUniform(shader_.id, "xzOn");
+        locYzOn_ = rlGetLocationUniform(shader_.id, "yzOn");
+        locXyOn_ = rlGetLocationUniform(shader_.id, "xyOn");
+        locIntersectionWidth_ = rlGetLocationUniform(shader_.id, "intersectionWidth");
     }
     else
     {
@@ -212,7 +216,11 @@ void ScanRenderer::draw(
     float elevationMax,
     const Eigen::Vector3d& distanceCenter,
     float distanceMax,
-    int decimateStride) const
+    int decimateStride,
+    bool xzIntersection,
+    bool yzIntersection,
+    bool xyIntersection,
+    float intersectionWidth) const
 {
     lastDrawCallCount_ = 0;
     lastVertexCount_ = 0;
@@ -238,6 +246,19 @@ void ScanRenderer::draw(
                              static_cast<float>(distanceCenter.z()) };
     rlSetUniform(locDistCenter_, distCenterF, RL_SHADER_UNIFORM_VEC3, 1);
     rlSetUniform(locDistMax_, &distanceMax, RL_SHADER_UNIFORM_FLOAT, 1);
+
+    // Uniform program state persists across draw calls sharing this shader
+    // (drawCachedWithTransform()/drawPoints()/drawTrajectories() below all
+    // use it too), so these must be set unconditionally every call rather
+    // than relying on a previous call having left them at "off" -- see each
+    // of those functions' own explicit xzOn=yzOn=xyOn=0.
+    int xzOnInt = xzIntersection ? 1 : 0;
+    int yzOnInt = yzIntersection ? 1 : 0;
+    int xyOnInt = xyIntersection ? 1 : 0;
+    rlSetUniform(locXzOn_, &xzOnInt, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locYzOn_, &yzOnInt, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locXyOn_, &xyOnInt, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locIntersectionWidth_, &intersectionWidth, RL_SHADER_UNIFORM_FLOAT, 1);
 
     // decimateStride > 1 skips points by widening the vertex attribute
     // stride the GPU fetches from (e.g. stride=10 reads every 10th vertex),
@@ -391,6 +412,13 @@ void ScanRenderer::drawCachedWithTransform(
     rlSetUniform(locPointSize_, &pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locColor_, colorF, RL_SHADER_UNIFORM_VEC4, 1);
     rlSetUniform(locColorMode_, &colorMode, RL_SHADER_UNIFORM_INT, 1);
+    // Explicitly off: uniform program state persists across draw calls
+    // sharing this shader, and this preview draw should never be
+    // slab-filtered regardless of what draw() last set these to.
+    int intersectionOff = 0;
+    rlSetUniform(locXzOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locYzOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locXyOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
 
     rlEnableVertexArray(gpu.vao);
     // Explicitly re-specified (not just inherited from the VAO's last
@@ -454,6 +482,11 @@ void ScanRenderer::drawPoints(const PointsGPU& gpu, Color color, float pointSize
     rlSetUniform(locColorMode_, &colorModeFlat, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locColor_, colorF, RL_SHADER_UNIFORM_VEC4, 1);
     rlSetUniform(locPointSize_, &pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
+    // Explicitly off -- see drawCachedWithTransform()'s comment on why.
+    int intersectionOff = 0;
+    rlSetUniform(locXzOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locYzOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(locXyOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
 
     rlEnableVertexArray(gpu.vao);
     glDrawArrays(GL_POINTS, 0, gpu.vertexCount);
@@ -584,10 +617,16 @@ void ScanRenderer::rebuildTrajectoryGPU(TrajGPU& traj, const PointCloud& pc, int
     traj.vertexCount = static_cast<int>(data.size() / 3);
 }
 
-void ScanRenderer::drawTrajectories(const std::vector<PointCloud>& pointClouds, int reduceRenderedTrajectory, bool visibleImuDiff) const
+void ScanRenderer::drawTrajectories(
+    const std::vector<PointCloud>& pointClouds, int reduceRenderedTrajectory, bool visibleImuDiff, bool xzIntersection,
+    bool yzIntersection, bool xyIntersection) const
 {
     int stride = reduceRenderedTrajectory < 1 ? 1 : reduceRenderedTrajectory;
 
+    // GPU cache bookkeeping stays unconditional (independent of whether this
+    // call ends up drawing anything below) so toggling intersection mode
+    // on/off across frames can't leave trajClouds_ out of sync with
+    // pointClouds or leak a GPU buffer.
     if (trajClouds_.size() > pointClouds.size())
     {
         for (size_t i = pointClouds.size(); i < trajClouds_.size(); ++i)
@@ -597,6 +636,16 @@ void ScanRenderer::drawTrajectories(const std::vector<PointCloud>& pointClouds, 
     }
     trajClouds_.resize(pointClouds.size());
 
+    // Matches the legacy PointCloud::render()'s trajectory section: skip
+    // this whole overlay (trajectory points, IMU-diff lines, quad markers,
+    // rings, orientation crosses) entirely whenever a cross-section slab is
+    // active, rather than slab-filtering it per-point like draw() does for
+    // the main point cloud.
+    if (xzIntersection || yzIntersection || xyIntersection)
+    {
+        return;
+    }
+
     if (shaderValid_)
     {
         rlDrawRenderBatchActive();
@@ -605,6 +654,11 @@ void ScanRenderer::drawTrajectories(const std::vector<PointCloud>& pointClouds, 
         rlSetUniformMatrix(locMVP_, mvp);
         int colorModeFlat = 0;
         rlSetUniform(locColorMode_, &colorModeFlat, RL_SHADER_UNIFORM_INT, 1);
+        // Explicitly off -- see drawCachedWithTransform()'s comment on why.
+        int intersectionOff = 0;
+        rlSetUniform(locXzOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
+        rlSetUniform(locYzOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
+        rlSetUniform(locXyOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
     }
 
     for (size_t idx = 0; idx < pointClouds.size(); ++idx)

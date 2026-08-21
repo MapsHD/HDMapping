@@ -1591,32 +1591,7 @@ void PointCloud::render(
         }
         else
         {
-            if (xz_intersection)
-            {
-                if (fabs(vp.y()) < intersection_width)
-                {
-                    render_point = true;
-                }
-            }
-            if (yz_intersection)
-            {
-                if (fabs(vp.x()) < intersection_width)
-                {
-                    render_point = true;
-                }
-            }
-            if (xy_intersection)
-            {
-                if (fabs(vp.z()) < intersection_width)
-                {
-                    render_point = true;
-                }
-            }
-
-            if (!xz_intersection && !yz_intersection && !xy_intersection)
-            {
-                render_point = true;
-            }
+            render_point = true;
         }
 
         if (render_point)

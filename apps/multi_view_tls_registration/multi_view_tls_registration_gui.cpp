@@ -5976,6 +5976,10 @@ bool initGL(int* argc, char** argv, const std::string& winTitleArg, void (*)(), 
 
     SetConfigFlags(flags);
     InitWindow(static_cast<int>(window_width), static_cast<int>(window_height), winTitleArg.c_str());
+    // raylib's default exit key (Esc) closes the window outright -- too easy
+    // to hit by accident while e.g. cancelling a dialog or backing out of a
+    // gizmo drag. Disabled; there's no keyboard shortcut for quitting.
+    SetExitKey(KEY_NULL);
     SetTargetFPS(60);
 
     // The hardcoded window_width/window_height default (1600x900) can be

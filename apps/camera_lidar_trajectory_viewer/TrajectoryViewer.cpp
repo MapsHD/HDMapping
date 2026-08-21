@@ -1330,6 +1330,9 @@ int main(int argc, char* argv[])
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(1400, 900, ("Trajectory Viewer " HDMAPPING_VERSION_STRING));
+    // raylib's default exit key (Esc) closes the window outright -- too easy
+    // to hit by accident. Disabled; there's no keyboard shortcut for quitting.
+    SetExitKey(KEY_NULL);
     raylib_widgets::fitWindowToScreen();
     // panelW below is user-resizable but the 3D view still needs room.
     SetWindowMinSize(900, 500);

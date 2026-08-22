@@ -601,6 +601,38 @@ static bool shiftHeld()
     return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
 }
 
+// Loads one dropped file by extension -- the same extension -> action mapping as main.cpp's
+// preloadByExt(), but applied immediately (the window is already running) instead of queued for
+// App::run()'s startup pass. `sawCloud` tracks whether a *.laz/*.las has already landed in this
+// drop batch, so the first one replaces the cloud (like UI::actionOpenPointCloud) and later ones
+// merge into it (like UI::actionAddPointCloud) -- mirroring how a multi-file drop of point clouds
+// mixes "open" and "add" semantics for a natural one-shot drop.
+static void handleDroppedFile(AppState& state, const std::string& path, bool& sawCloud)
+{
+    auto pos = path.rfind('.');
+    std::string e = pos == std::string::npos ? "" : path.substr(pos + 1);
+    std::transform(e.begin(), e.end(), e.begin(), ::tolower);
+
+    if (e == "jpg" || e == "jpeg" || e == "png" || e == "bmp")
+        state.loadImage(path.c_str());
+    else if (e == "laz" || e == "las")
+    {
+        if (sawCloud)
+            state.addCloud(path.c_str());
+        else
+        {
+            state.loadCloud(path.c_str());
+            sawCloud = true;
+        }
+    }
+    else if (e == "yml" || e == "yaml")
+        state.loadIntrinsics(path.c_str());
+    else if (e == "json")
+        state.loadCalibration(path.c_str());
+    else
+        state.statusMsg = "Unsupported dropped file: " + path;
+}
+
 // ── App::update ───────────────────────────────────────────────────────────────
 void App::update()
 {
@@ -610,6 +642,19 @@ void App::update()
     // to pick".
     bool allowOrbit = !imguiWantMouse && !shiftHeld();
     state.orbit.update(allowOrbit);
+
+    // Drag & drop images (*.jpg/*.jpeg/*.png/*.bmp), point clouds (*.laz/*.las), intrinsics
+    // (*.yml/*.yaml) or a calibration (*.json) onto the window to load them -- raylib's GLFW
+    // backend surfaces OS drag & drop the same way on Windows, Linux and macOS, so no
+    // platform-specific code is needed here.
+    if (IsFileDropped())
+    {
+        FilePathList dropped = LoadDroppedFiles();
+        bool sawCloud = false;
+        for (unsigned int i = 0; i < dropped.count; i++)
+            handleDroppedFile(state, dropped.paths[i], sawCloud);
+        UnloadDroppedFiles(dropped);
+    }
 }
 
 // ── 3D point picking + correspondence markers ───────────────────────────────

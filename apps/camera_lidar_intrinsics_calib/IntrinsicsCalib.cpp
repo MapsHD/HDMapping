@@ -89,6 +89,20 @@ struct State
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+// Reads one image file and appends it to s.images if it decodes; used by both loadDir() (a whole
+// folder) and the drag & drop handler in main()'s loop below (individual dropped photos).
+static bool appendImage(State& s, const std::string& path)
+{
+    cv::Mat bgr = cv::imread(path, cv::IMREAD_COLOR);
+    if (bgr.empty())
+        return false;
+    CalibImage ci;
+    ci.path = path;
+    cv::cvtColor(bgr, ci.rgb, cv::COLOR_BGR2RGB);
+    s.images.push_back(std::move(ci));
+    return true;
+}
+
 static void loadDir(State& s)
 {
     s.images.clear();
@@ -121,16 +135,32 @@ static void loadDir(State& s)
     std::sort(paths.begin(), paths.end());
 
     for (auto& p : paths)
-    {
-        cv::Mat bgr = cv::imread(p, cv::IMREAD_COLOR);
-        if (bgr.empty())
-            continue;
-        CalibImage ci;
-        ci.path = p;
-        cv::cvtColor(bgr, ci.rgb, cv::COLOR_BGR2RGB);
-        s.images.push_back(std::move(ci));
-    }
+        appendImage(s, p);
     s.statusMsg = "Loaded " + std::to_string(s.images.size()) + " images";
+}
+
+// Drops a directory in as if Browse+Load had picked it (replaces the current image set);
+// individual photo files are appended instead (accumulating shots from wherever they came from,
+// since there's no single directory to re-scan for them). Used by the drag & drop handler in
+// main()'s loop below.
+static void handleDroppedPath(State& s, const std::string& path)
+{
+    if (fs::is_directory(path))
+    {
+        setBuf(s.dirBuf, sizeof(s.dirBuf), path);
+        loadDir(s);
+        return;
+    }
+
+    if (appendImage(s, path))
+    {
+        s.calibrated = false;
+        s.statusMsg = "Added " + path + " (" + std::to_string(s.images.size()) + " images total)";
+    }
+    else
+    {
+        s.statusMsg = "Unsupported dropped file: " + path;
+    }
 }
 
 static void detectAll(State& s)
@@ -335,6 +365,18 @@ int main(int argc, char* argv[])
 
     while (!WindowShouldClose())
     {
+        // Drag & drop a folder of checkerboard photos (replaces the current set, like Browse+Load)
+        // or individual photo files (appended to the current set) onto the window to load them --
+        // raylib's GLFW backend surfaces OS drag & drop the same way on Windows, Linux and macOS,
+        // so no platform-specific code is needed here.
+        if (IsFileDropped())
+        {
+            FilePathList dropped = LoadDroppedFiles();
+            for (unsigned int i = 0; i < dropped.count; i++)
+                handleDroppedPath(state, dropped.paths[i]);
+            UnloadDroppedFiles(dropped);
+        }
+
         refreshTex(state);
 
         BeginDrawing();

@@ -1425,8 +1425,8 @@ int main(int argc, char* argv[])
             // binding -- reach for Cmd as "the" modifier there. Treating
             // either as ctrlDown matches that expectation instead of
             // requiring the literal Ctrl key.
-            bool ctrlDown = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER) ||
-                IsKeyDown(KEY_RIGHT_SUPER);
+            bool ctrlDown =
+                IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_RIGHT_SUPER);
             bool shiftDown = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
             if (ctrlDown && shiftDown && IsKeyPressed(KEY_O))
                 actionSelectCamera0Dir(s);
@@ -1558,11 +1558,9 @@ int main(int argc, char* argv[])
         {
             s.orbit.applyPerspectiveProjection((int)ImGui::GetIO().DisplaySize.x, (int)ImGui::GetIO().DisplaySize.y);
 
-            Eigen::Vector3f rotationCenter(
-                s.orbit.euler.rotationCenter.x, s.orbit.euler.rotationCenter.y, s.orbit.euler.rotationCenter.z);
+            Eigen::Vector3f rotationCenter(s.orbit.euler.rotationCenter.x, s.orbit.euler.rotationCenter.y, s.orbit.euler.rotationCenter.z);
             s.viewLocal.translate(rotationCenter);
-            s.viewLocal.translate(
-                Eigen::Vector3f(s.orbit.euler.translate.x, s.orbit.euler.translate.y, s.orbit.euler.translate.z));
+            s.viewLocal.translate(Eigen::Vector3f(s.orbit.euler.translate.x, s.orbit.euler.translate.y, s.orbit.euler.translate.z));
             if (!s.orbit.lockZ)
                 s.viewLocal.rotate(Eigen::AngleAxisf(s.orbit.euler.rotateX * DEG2RAD, Eigen::Vector3f::UnitX()));
             else
@@ -1577,8 +1575,7 @@ int main(int argc, char* argv[])
             // Still updating viewLocal for the compass -- the rest of the
             // ortho projection + gizmo-view lookAt lives in
             // OrbitCamera::updateOrtho().
-            s.viewLocal.rotate(
-                Eigen::AngleAxisf((s.orbit.euler.rotateX + s.orbit.euler.rotateY) * DEG2RAD, Eigen::Vector3f::UnitZ()));
+            s.viewLocal.rotate(Eigen::AngleAxisf((s.orbit.euler.rotateX + s.orbit.euler.rotateY) * DEG2RAD, Eigen::Vector3f::UnitZ()));
             s.orbit.updateOrtho(ratio);
         }
 

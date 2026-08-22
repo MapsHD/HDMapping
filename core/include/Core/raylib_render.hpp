@@ -169,8 +169,12 @@ public:
     // yzIntersection/xyIntersection is set, so a cross-section view isn't
     // cluttered by trajectory points/markers outside the slab.
     void drawTrajectories(
-        const std::vector<PointCloud>& pointClouds, int reduceRenderedTrajectory, bool visibleImuDiff, bool xzIntersection = false,
-        bool yzIntersection = false, bool xyIntersection = false) const;
+        const std::vector<PointCloud>& pointClouds,
+        int reduceRenderedTrajectory,
+        bool visibleImuDiff,
+        bool xzIntersection = false,
+        bool yzIntersection = false,
+        bool xyIntersection = false) const;
 
     // Draws a single already-cached scan (see rebuild()) straight from its
     // persistent, full-resolution GPU buffer -- no CPU re-transform or

@@ -726,7 +726,10 @@ void drawMiniCompassWithRuler()
     Color rulerColor =
         ColorFromNormalized(Vector4{ 1.0f - app_state.bg_color.x, 1.0f - app_state.bg_color.y, 1.0f - app_state.bg_color.z, 1.0f });
     raylib_widgets::drawCompassRuler(
-        right, up, app_state.camera.euler.translate.z, rulerColor,
+        right,
+        up,
+        app_state.camera.euler.translate.z,
+        rulerColor,
         raylib_widgets::CompassAxisLabels{ "X (long.)", "Y (lat.)", "Z (vert.)" });
 }
 
@@ -773,12 +776,12 @@ void getClosestTrajectoryPoint(Session& session_, int x, int y, bool gcpPicking,
 
     const auto laser_beam = GetLaserBeam(x, y);
     Ray ray;
-    ray.position = Vector3{
-        static_cast<float>(laser_beam.position.x()), static_cast<float>(laser_beam.position.y()),
-        static_cast<float>(laser_beam.position.z()) };
-    ray.direction = Vector3{
-        static_cast<float>(laser_beam.direction.x()), static_cast<float>(laser_beam.direction.y()),
-        static_cast<float>(laser_beam.direction.z()) };
+    ray.position = Vector3{ static_cast<float>(laser_beam.position.x()),
+                            static_cast<float>(laser_beam.position.y()),
+                            static_cast<float>(laser_beam.position.z()) };
+    ray.direction = Vector3{ static_cast<float>(laser_beam.direction.x()),
+                             static_cast<float>(laser_beam.direction.y()),
+                             static_cast<float>(laser_beam.direction.z()) };
 
     std::vector<Vector3> pts;
     std::vector<std::pair<int, int>> ptOwners; // (point cloud index, local_trajectory index), parallel to pts
@@ -1729,8 +1732,7 @@ void observation_picking_gui()
 
             if (ImGui::Button("Reset view"))
             {
-                app_state.camera.startEulerTransition(
-                    0.0f, 0.0f, app_state.camera.euler.translate, app_state.camera.euler.rotationCenter);
+                app_state.camera.startEulerTransition(0.0f, 0.0f, app_state.camera.euler.translate, app_state.camera.euler.rotationCenter);
             }
         }
         ImGui::EndDisabled();
@@ -3206,7 +3208,8 @@ void renderLoopClosure(
         scanColorModeFromScheme(csPointCloud),
         static_cast<float>(session_dims.z_min),
         static_cast<float>(session_dims.z_max),
-        Eigen::Vector3d(app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z),
+        Eigen::Vector3d(
+            app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z),
         static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
         1,
         point_clouds_container.xz_intersection,
@@ -3563,7 +3566,8 @@ void renderControlPoints(const ControlPoints& control_points, PointClouds& point
             ScanColorMode::Intensity,
             static_cast<float>(session_dims.z_min),
             static_cast<float>(session_dims.z_max),
-            Eigen::Vector3d(app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z),
+            Eigen::Vector3d(
+                app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z),
             static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
             1,
             point_clouds_container.xz_intersection,
@@ -3897,8 +3901,8 @@ void display()
             app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z);
         app_state.viewLocal.translate(rotationCenter);
 
-        app_state.viewLocal.translate(Eigen::Vector3f(
-            app_state.camera.euler.translate.x, app_state.camera.euler.translate.y, app_state.camera.euler.translate.z));
+        app_state.viewLocal.translate(
+            Eigen::Vector3f(app_state.camera.euler.translate.x, app_state.camera.euler.translate.y, app_state.camera.euler.translate.z));
         if (!app_state.camera.lockZ)
             app_state.viewLocal.rotate(Eigen::AngleAxisf(app_state.camera.euler.rotateX * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
         else
@@ -3914,8 +3918,8 @@ void display()
         // Still updating app_state.viewLocal for the compass -- the rest of
         // the original updateOrthoView() (rlOrtho + the ortho gizmo lookAt)
         // now lives in raylib_widgets::OrbitCamera::updateOrtho().
-        app_state.viewLocal.rotate(Eigen::AngleAxisf(
-            (app_state.camera.euler.rotateX + app_state.camera.euler.rotateY) * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+        app_state.viewLocal.rotate(
+            Eigen::AngleAxisf((app_state.camera.euler.rotateX + app_state.camera.euler.rotateY) * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
         app_state.camera.updateOrtho(ratio);
     }
 
@@ -3999,8 +4003,7 @@ void display()
         session.control_points.imgui(
             session.point_clouds_container,
             Eigen::Vector3f(
-                app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y,
-                app_state.camera.euler.rotationCenter.z));
+                app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z));
 
     if (session.ground_control_points.is_imgui)
         session.ground_control_points.imgui(session.point_clouds_container);
@@ -4127,7 +4130,10 @@ void display()
                 scanColorModeFromScheme(csPointCloud),
                 static_cast<float>(session_dims.z_min),
                 static_cast<float>(session_dims.z_max),
-                Eigen::Vector3d(app_state.camera.euler.rotationCenter.x, app_state.camera.euler.rotationCenter.y, app_state.camera.euler.rotationCenter.z),
+                Eigen::Vector3d(
+                    app_state.camera.euler.rotationCenter.x,
+                    app_state.camera.euler.rotationCenter.y,
+                    app_state.camera.euler.rotationCenter.z),
                 static_cast<float>(std::max({ session_dims.length, session_dims.width, session_dims.height, 1.0 })),
                 app_state.viewer_decimate_point_cloud,
                 session.point_clouds_container.xz_intersection,
@@ -4135,8 +4141,11 @@ void display()
                 session.point_clouds_container.xy_intersection,
                 static_cast<float>(session.point_clouds_container.intersection_width));
             scan_renderer.drawTrajectories(
-                session.point_clouds_container.point_clouds, 1, session.point_clouds_container.show_imu_to_lio_diff,
-                session.point_clouds_container.xz_intersection, session.point_clouds_container.yz_intersection,
+                session.point_clouds_container.point_clouds,
+                1,
+                session.point_clouds_container.show_imu_to_lio_diff,
+                session.point_clouds_container.xz_intersection,
+                session.point_clouds_container.yz_intersection,
                 session.point_clouds_container.xy_intersection);
 
             observationPickingRender(observation_picking);
@@ -5694,8 +5703,7 @@ void translate_gui()
         translate_tool.transform = Eigen::Affine3d::Identity();
 
         app_state.camera.isOrtho = true;
-        app_state.camera.startEulerTransition(
-            0.0f, 0.0f, app_state.camera.euler.translate, app_state.camera.euler.rotationCenter);
+        app_state.camera.startEulerTransition(0.0f, 0.0f, app_state.camera.euler.translate, app_state.camera.euler.rotationCenter);
 
         SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);
     }

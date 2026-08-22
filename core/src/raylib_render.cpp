@@ -618,8 +618,12 @@ void ScanRenderer::rebuildTrajectoryGPU(TrajGPU& traj, const PointCloud& pc, int
 }
 
 void ScanRenderer::drawTrajectories(
-    const std::vector<PointCloud>& pointClouds, int reduceRenderedTrajectory, bool visibleImuDiff, bool xzIntersection,
-    bool yzIntersection, bool xyIntersection) const
+    const std::vector<PointCloud>& pointClouds,
+    int reduceRenderedTrajectory,
+    bool visibleImuDiff,
+    bool xzIntersection,
+    bool yzIntersection,
+    bool xyIntersection) const
 {
     int stride = reduceRenderedTrajectory < 1 ? 1 : reduceRenderedTrajectory;
 

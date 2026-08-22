@@ -151,6 +151,7 @@ ToDo Build issues:
 ToDo: check if addressed
 - LF-GICP: Parameter-Free Degeneracy-Aware LiDAR Odometry via a Voxel-Normal Localizability Field (2026)
 - https://www.mdpi.com/1424-8220/26/6/1810 (2026)
+- RCP-LO: A Relative Coordinate Prediction Framework for Generalizable Deep LiDAR Odometry (2026)
 - https://arxiv.org/pdf/2503.12660 - KISS-SLAM
 - https://arxiv.org/pdf/2509.06593 - rko-lio
 - https://arxiv.org/pdf/2410.05433 - 2FAST-LAMA

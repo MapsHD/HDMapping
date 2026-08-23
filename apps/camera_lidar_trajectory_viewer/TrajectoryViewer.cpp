@@ -982,6 +982,33 @@ static void actionOpenCalibration(AppState& s)
     }
 }
 
+// Drag & drop equivalent of actionSelectLioResultDir()/actionOpenCalibration(): a dropped
+// directory is this app's session (LIO result dir), and unlike the menu action it loads
+// immediately instead of waiting for the "Load session" button, since a drop is already an
+// explicit "load this" gesture. A dropped *.json is treated as a calibration file. Used by the
+// drag & drop handler in main()'s loop below.
+static void handleDroppedPath(AppState& s, const std::string& path)
+{
+    if (fs::is_directory(path))
+    {
+        setBuf(s.sessionBuf, sizeof(s.sessionBuf), path);
+        loadSession(s);
+        return;
+    }
+
+    std::string ext = fs::path(path).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    if (ext == ".json")
+    {
+        setBuf(s.calibBuf, sizeof(s.calibBuf), path);
+        loadCalib(s);
+    }
+    else
+    {
+        s.status = "Unsupported dropped file: " + path;
+    }
+}
+
 static void actionExportColoredPointCloud(AppState& s)
 {
     std::string defaultName = fs::path(s.exportBuf).filename().string();
@@ -1397,6 +1424,17 @@ int main(int argc, char* argv[])
     {
         bool imguiWants = ImGui::GetIO().WantCaptureMouse;
         s.orbit.updateEulerTransition(GetFrameTime());
+
+        // Drag & drop the LIO result directory (this app's session) or a calibration *.json onto
+        // the window to load it -- raylib's GLFW backend surfaces OS drag & drop the same way on
+        // Windows, Linux and macOS, so no platform-specific code is needed here.
+        if (IsFileDropped())
+        {
+            FilePathList dropped = LoadDroppedFiles();
+            if (dropped.count > 0)
+                handleDroppedPath(s, dropped.paths[0]);
+            UnloadDroppedFiles(dropped);
+        }
 
         // pick up the ROS export result from the worker thread (if any)
         {

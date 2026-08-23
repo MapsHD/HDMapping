@@ -2361,6 +2361,27 @@ void loadSession(const std::string& session_file_name)
     }
 }
 
+// Accepts a Mandeye JSON Session file (*.mjs/*.json) -- shared by the drag & drop handler in main()'s loop and
+// the CLI argv handling below, so both accept the same input and report unsupported drops the same way.
+void loadSessionFromPath(const std::string& path)
+{
+    std::string ext = fs::path(path).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+    if (ext != ".mjs" && ext != ".json")
+    {
+        spdlog::error("Unsupported file dropped: '{}'", path);
+
+        [[maybe_unused]] pfd::message message(
+            "Load session", "Unsupported file:\n" + path + "\n\nDrop a session file (*.mjs/*.json).", pfd::choice::ok, pfd::icon::error);
+        message.result();
+        return;
+    }
+
+    session_file_name = path;
+    loadSession(path);
+}
+
 void openSession()
 {
     session_file_name = mandeye::fd::OpenFileDialogOneFile("Open session", mandeye::fd::Session_filter);
@@ -6043,8 +6064,7 @@ int main(int argc, char* argv[])
 
                 if (ext == ".mjs" || ext == ".json")
                 {
-                    loadSession(argv[i]);
-
+                    loadSessionFromPath(argv[i]);
                     break;
                 }
             }
@@ -6080,6 +6100,20 @@ int main(int argc, char* argv[])
             float wheelMove = GetMouseWheelMove();
             if (wheelMove != 0.0f)
                 wheel(0, wheelMove > 0.0f ? 1 : -1, mx, my);
+
+            // Drag & drop a session file (*.mjs/*.json) onto the window to load it. raylib's GLFW backend
+            // surfaces OS drag & drop the same way on Windows, Linux and macOS, so no platform-specific code is
+            // needed here. Only the first dropped path is used; loadSessionFromPath() reports unsupported drops
+            // via a message box instead of silently ignoring them.
+            if (IsFileDropped())
+            {
+                FilePathList dropped_files = LoadDroppedFiles();
+                if (dropped_files.count > 0)
+                {
+                    loadSessionFromPath(dropped_files.paths[0]);
+                }
+                UnloadDroppedFiles(dropped_files);
+            }
 
             BeginDrawing();
             display();

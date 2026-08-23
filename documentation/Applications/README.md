@@ -1,4 +1,5 @@
 # Possible applications:
+- autonomous driving (ultimate goal for this project)
 - caving
 - speleology
 - surveying

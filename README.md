@@ -5,6 +5,7 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 - **HDMapping_LI0**: our implementation of LiDAR Inertial Odometry that outperforms the State of the Art [[movie]](https://youtu.be/UB-Hx7qgey8).
 - **HDMapping_Pose_GRAPH_SLAM** to create city-level maps.
 - **HDMapping_Georeferencing** (GNSS-RTK, Control Points, Ground Control Points, TLS, ALS).
+- **HDMapping_TLS** (Multi View Terrestrial Laser Scanner Registration)
 
 [![Build with bundled libraries on Ubuntu](https://github.com/MapsHD/HDMapping/actions/workflows/cmake-linux.yml/badge.svg?branch=main)](https://github.com/MapsHD/HDMapping/actions/workflows/cmake-linux.yml)
 [![Build on Windows](https://github.com/MapsHD/HDMapping/actions/workflows/windows.yml/badge.svg?branch=main)](https://github.com/MapsHD/HDMapping/actions/workflows/windows.yml)

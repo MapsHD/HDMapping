@@ -32,3 +32,4 @@ Movie how to use it is available at [prepare training dataset movie](https://you
 ## Interesting links
 - BTC: A Binary and Triangle Combined Descriptor for 3D Place Recognition Unlisted [[YT]](https://www.youtube.com/watch?v=zB4Xqi3-J9U)
 - https://github.com/MapsHD/SemanticLoopClosure
+- https://github.com/mit-spark/kiss-matcher

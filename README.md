@@ -121,6 +121,10 @@ More information can be found in:
 - [Tools](./documentation/Tools/README.md)
 - [Videos](./documentation/VIDEOs/README.md)
 
+# Our datasets
+- [[HUMANOID-LIO-DATASET]](https://zenodo.org/records/21318128)
+- [[Annotated ground truth for LiDAR SLAM loop closures]](https://zenodo.org/records/18527593)
+
 # Sponsors
 
 ![IPPT_PAN](images/ippt.png)

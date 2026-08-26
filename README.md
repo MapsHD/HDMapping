@@ -29,7 +29,7 @@ We provide an end-to-end mobile mapping framework that does not require any inst
 | | | |
 |:--:|:--:|:--:|
 | [<img src="https://img.youtube.com/vi/7a_o7ACH0-M/mqdefault.jpg" width="240">](https://youtu.be/7a_o7ACH0-M) | [<img src="https://img.youtube.com/vi/Bu9kDF5y39s/mqdefault.jpg" width="240">](https://youtu.be/Bu9kDF5y39s) | [<img src="https://img.youtube.com/vi/i6Xg_vPuqrY/mqdefault.jpg" width="240">](https://youtu.be/i6Xg_vPuqrY) |
-| **MANDEYE-K9**<br>▶ [Watch on YouTube](https://youtu.be/7a_o7ACH0-M) | **MANDEYE-MR — caving**<br>▶ [Watch on YouTube](https://youtu.be/Bu9kDF5y39s) | **MANDEYE-MR — forestry**<br>▶ [Watch on YouTube](https://youtu.be/i6Xg_vPuqrY) |
+| **MANDEYE-K9**<br>▶ [Watch on YouTube](https://youtu.be/7a_o7ACH0-M) | **MANDEYE-MR — caving**<br>▶ [Watch on YouTube](https://youtu.be/Bu9kDF5y39s) | **MANDEYE-K9 — forestry**<br>▶ [Watch on YouTube](https://youtu.be/i6Xg_vPuqrY) |
 
 Our MANDEYE is designed for freedom in motion. You can also climb and crawl in most challenging scenarios.
 

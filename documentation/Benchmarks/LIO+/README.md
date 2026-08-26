@@ -39,3 +39,5 @@
 - https://projects.asl.ethz.ch/datasets/enwide/
 - https://drive.google.com/drive/u/0/folders/1uR476FzjN3PfAiCknVKtuZi3_QfVvSdA
 
+## Interesting links:
+- https://arxiv.org/pdf/2505.06483

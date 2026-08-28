@@ -82,6 +82,39 @@ target_link_libraries(
           ${PLATFORM_MISCELLANEOUS_LIBS}
           ${CORE_LIBRARIES})
 
+# mcap_to_laz: the inverse of laz_to_mcap -- MCAP/ROS2 bag -> mandeye session
+# directory. Needs neither lidar_odometry_utils.cpp nor core: reading is
+# rosbags/McapReader and writing is rosbags/MandeyeSessionWriter, so laszip +
+# mcap + spdlog is the whole dependency set.
+#
+# McapWriter.cpp is compiled in even though nothing here writes bags: it holds
+# the single MCAP_IMPLEMENTATION definition, which McapReader.cpp deliberately
+# does not repeat (that would be a duplicate-symbol link error in targets, like
+# the unit tests, that use both).
+add_executable(
+        mcap_to_laz mcap_to_laz.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/McapReader.h ${REPOSITORY_DIRECTORY}/rosbags/McapReader.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.h ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.cpp
+        ${REPOSITORY_DIRECTORY}/rosbags/MandeyeSessionWriter.h ${REPOSITORY_DIRECTORY}/rosbags/MandeyeSessionWriter.cpp
+)
+
+target_include_directories(
+        mcap_to_laz
+        PRIVATE ${REPOSITORY_DIRECTORY}/rosbags
+        ${LASZIP_INCLUDE_DIR}/LASzip/include)
+
+target_link_libraries(
+        mcap_to_laz
+        PRIVATE
+        mcap
+        spdlog::spdlog
+        ${PLATFORM_LASZIP_LIB}
+        ${PLATFORM_MISCELLANEOUS_LIBS})
+
+if (MSVC)
+    target_compile_options(mcap_to_laz PRIVATE /bigobj)
+endif()
+
 if (MSVC)
     target_compile_options(laz_to_mcap PRIVATE /bigobj)
 endif()

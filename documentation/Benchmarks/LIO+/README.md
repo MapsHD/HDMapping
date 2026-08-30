@@ -41,3 +41,4 @@
 
 ## Interesting links:
 - https://arxiv.org/pdf/2505.06483
+- https://github.com/hku-mars/fast-livo

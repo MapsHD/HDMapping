@@ -149,6 +149,7 @@ ToDo Build issues:
 - https://github.com/gisbi-kim/SC-LeGO-LOAM (2018, IEEE/RSJ, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SC-LeGO-LOAM.bib))
   
 ToDo: check if addressed
+- https://arxiv.org/html/2608.14996v1 (2026)
 - LF-GICP: Parameter-Free Degeneracy-Aware LiDAR Odometry via a Voxel-Normal Localizability Field (2026)
 - https://www.mdpi.com/1424-8220/26/6/1810 (2026)
 - RCP-LO: A Relative Coordinate Prediction Framework for Generalizable Deep LiDAR Odometry (2026)

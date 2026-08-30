@@ -134,7 +134,7 @@ ToDo Build Success:
 ToDo Build issues:
 - https://github.com/xuankuzcr/Global-LVBA (2025, no publication)
 - https://github.com/sjtuyinjie/Ground-Fusion2 (2025, IROS, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Ground-Fusion2.bib))
-- https://github.com/ethz-asl/COIN-LIO (2024, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/COIN-LIO.bib))
+- https://github.com/ethz-asl/COIN-LIO (2024, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/COIN-LIO.bib)) (solved https://github.com/MapsHD/HDMapping/tree/main/documentation/Benchmarks/LIO%2B)
 - https://github.com/deepuav/AdaTrajLo (2024, RA-L, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/Traj-LO.bib))
 - https://github.com/StephLin/LIO-SEGMOT (2023, ICRA, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/LIO-SEGMOT.bib))
 - https://github.com/XikunLiu-huskit/GLIO (2023, TIV, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/GLIO.bib))

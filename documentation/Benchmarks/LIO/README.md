@@ -149,9 +149,9 @@ ToDo Build issues:
 - https://github.com/gisbi-kim/SC-LeGO-LOAM (2018, IEEE/RSJ, [[BIB]](https://github.com/MapsHD/HDMapping/blob/main/bib/SC-LeGO-LOAM.bib))
   
 ToDo: check if addressed
+- https://github.com/dongjae0107/LAPS (2026)
 - https://xiaofan4122.github.io/Elevator_LIO_Page/ (2026)
 - CMLGF-LIO https://isprs-archives.copernicus.org/articles/XLIX-B1-2026/71/2026/ (2026)
-- https://github.com/dongjae0107/LAPS (2026)
 - https://github.com/eugeniu1994/MAP_LIO (2026)
 - ieeexplore.ieee.org/document/11264316/ (2026)
 - https://arxiv.org/html/2608.14996v1 (2026)

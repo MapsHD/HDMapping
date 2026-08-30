@@ -153,17 +153,16 @@ ToDo: check if addressed
 - LF-GICP: Parameter-Free Degeneracy-Aware LiDAR Odometry via a Voxel-Normal Localizability Field (2026)
 - https://www.mdpi.com/1424-8220/26/6/1810 (2026)
 - RCP-LO: A Relative Coordinate Prediction Framework for Generalizable Deep LiDAR Odometry (2026)
-- https://arxiv.org/pdf/2503.12660 - KISS-SLAM
-- https://arxiv.org/pdf/2509.06593 - rko-lio
-- https://arxiv.org/pdf/2410.05433 - 2FAST-LAMA
-- https://arxiv.org/pdf/2410.08935 - VOXEL-SLAM
-- https://arxiv.org/pdf/2204.04932 - SC-F-LOAM
-- https://www.mdpi.com/1424-8220/22/2/520 - LEGO-LOAM-SC
-- https://arxiv.org/pdf/1907.02233 - LINS-SLAM
-- https://github.com/hku-mars/fast-livo
-- https://github.com/TixiaoShan/LVI-SAM
-- https://github.com/HxCa1/BEV-LIO-LC
-- https://github.com/hku-mars/fast-livo2
+- https://arxiv.org/pdf/2503.12660 - KISS-SLAM (2025)
+- https://arxiv.org/pdf/2410.05433 - 2FAST-LAMA (2025)
+- https://arxiv.org/pdf/2410.08935 - VOXEL-SLAM (2024)
+- https://arxiv.org/pdf/2204.04932 - SC-F-LOAM (2022)
+- https://www.mdpi.com/1424-8220/22/2/520 - LEGO-LOAM-SC (2022)
+- https://arxiv.org/pdf/1907.02233 - LINS-SLAM (2020)
+- https://github.com/hku-mars/fast-livo (2022)
+- https://github.com/TixiaoShan/LVI-SAM (2021)
+- https://github.com/HxCa1/BEV-LIO-LC (2025)
+- https://github.com/hku-mars/fast-livo2 (2024)
 - https://github.com/dongjae0107/LAPS
 - https://github.com/eugeniu1994/MAP_LIO
 - https://research.buaa.edu.cn/en/publications/ve-liom-a-versatile-and-efficient-lidar-inertial-odometry-and-map/

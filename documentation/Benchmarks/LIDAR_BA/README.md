@@ -1,1 +1,2 @@
 - https://github.com/xuankuzcr/Global-LVBA
+- https://arxiv.org/pdf/2410.08935

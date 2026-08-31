@@ -78,6 +78,8 @@
 
 #include <laszip/laszip_api.h>
 
+#include <nlohmann/json.hpp>
+
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -2333,6 +2335,181 @@ void lio_segments_gui()
     ImGui::End();
 }
 
+// -----------------------------------------------------------------------------
+// GNSS / TUM / ENU-origin session persistence
+//
+// core's Session::save()/Session::load() (core/src/session.cpp) only knows about
+// point clouds, loop-closure edges and control points -- the GNSS track, the TUM
+// track and the ENU projection origin live in the GUI's own `tls_registration`
+// (see multi_view_tls_registration.h), so they're persisted here by re-opening
+// the *.mjs JSON that Session::save() just wrote and adding three extra
+// top-level keys:
+//
+//   "enu_origin"        - the WGS84 lat/lon (+ geoid separation) the GNSS
+//                         topocentric projection is referenced to. Previously
+//                         this was always re-derived from the first GNSS pose on
+//                         every projection/load; saving it lets a reopened
+//                         session keep the exact same origin even before GNSS
+//                         data is reloaded.
+//   "gnss_measurements" - every GNSS::GlobalPose (raw WGS84 + projected ENU).
+//   "tum_trajectory"    - every TUM::TumPose.
+//
+// All three keys are optional: an older session without them just loads with
+// empty GNSS/TUM tracks and the from-first-pose origin behaviour, as before.
+// -----------------------------------------------------------------------------
+static void writeGnssTumToSessionFile(const std::string& path, const GNSS& gnss, const TUM& tum)
+{
+    try
+    {
+        nlohmann::json data;
+        {
+            std::ifstream fin(path);
+            if (!fin.good())
+            {
+                spdlog::error("Can't reopen session file to append GNSS/TUM data: '{}'", path);
+                return;
+            }
+            data = nlohmann::json::parse(fin);
+        }
+
+        nlohmann::json jorigin;
+        jorigin["latitude"] = gnss.WGS84ReferenceLatitude;
+        jorigin["longitude"] = gnss.WGS84ReferenceLongitude;
+        jorigin["geoid_separation"] = gnss.geoidSeparation;
+        jorigin["set_from_first_pose"] = gnss.setWGS84ReferenceFromFirstPose;
+        data["enu_origin"] = jorigin;
+
+        nlohmann::json jgnss = nlohmann::json::array();
+        for (const auto& p : gnss.gnss_poses)
+        {
+            jgnss.push_back(
+                { { "timestamp", p.timestamp },
+                  { "lat", p.lat },
+                  { "lon", p.lon },
+                  { "h_wgs84", p.h_wgs84 },
+                  { "undulation", p.undulation },
+                  { "alt", p.alt },
+                  { "hdop", p.hdop },
+                  { "satelites_tracked", p.satelites_tracked },
+                  { "height", p.height },
+                  { "age", p.age },
+                  { "time", p.time },
+                  { "fix_quality", p.fix_quality },
+                  { "enu_x", p.enu_x },
+                  { "enu_y", p.enu_y },
+                  { "enu_z", p.enu_z },
+                  { "dist_xy_along", p.dist_xy_along } });
+        }
+        data["gnss_measurements"] = jgnss;
+
+        nlohmann::json jtum = nlohmann::json::array();
+        for (const auto& p : tum.tum_poses)
+        {
+            jtum.push_back(
+                { { "timestamp", p.timestamp },
+                  { "x", p.x },
+                  { "y", p.y },
+                  { "z", p.z },
+                  { "qx", p.qx },
+                  { "qy", p.qy },
+                  { "qz", p.qz },
+                  { "qw", p.qw } });
+        }
+        data["tum_trajectory"] = jtum;
+
+        std::ofstream fout(path);
+        if (!fout.good())
+        {
+            spdlog::error("Can't rewrite session file with GNSS/TUM data: '{}'", path);
+            return;
+        }
+        fout << data.dump(2);
+        spdlog::info(
+            "Wrote {} GNSS pose(s), {} TUM pose(s) and ENU origin to session '{}'", gnss.gnss_poses.size(), tum.tum_poses.size(), path);
+    } catch (const std::exception& e)
+    {
+        spdlog::error("Failed writing GNSS/TUM data to session '{}': {}", path, e.what());
+    }
+}
+
+static void readGnssTumFromSessionFile(const std::string& path, GNSS& gnss, TUM& tum)
+{
+    try
+    {
+        std::ifstream fin(path);
+        if (!fin.good())
+            return;
+        nlohmann::json data = nlohmann::json::parse(fin);
+
+        if (data.contains("enu_origin"))
+        {
+            const auto& jorigin = data["enu_origin"];
+            gnss.WGS84ReferenceLatitude = jorigin.value("latitude", 0.0);
+            gnss.WGS84ReferenceLongitude = jorigin.value("longitude", 0.0);
+            gnss.geoidSeparation = jorigin.value("geoid_separation", 0.0);
+            // A stored origin takes precedence over re-deriving one from the
+            // first GNSS pose; honour an explicit flag if the session carries
+            // one, otherwise assume the stored origin should be used as-is.
+            gnss.setWGS84ReferenceFromFirstPose = jorigin.value("set_from_first_pose", false);
+            spdlog::info(
+                "Loaded ENU origin from session: lat={}, lon={}, geoid_separation={}",
+                gnss.WGS84ReferenceLatitude,
+                gnss.WGS84ReferenceLongitude,
+                gnss.geoidSeparation);
+        }
+
+        if (data.contains("gnss_measurements"))
+        {
+            gnss.gnss_poses.clear();
+            for (const auto& j : data["gnss_measurements"])
+            {
+                GNSS::GlobalPose p{};
+                p.timestamp = j.value("timestamp", 0.0);
+                p.lat = j.value("lat", 0.0);
+                p.lon = j.value("lon", 0.0);
+                p.h_wgs84 = j.value("h_wgs84", 0.0);
+                p.undulation = j.value("undulation", 0.0);
+                p.alt = j.value("alt", 0.0);
+                p.hdop = j.value("hdop", 0.0);
+                p.satelites_tracked = j.value("satelites_tracked", 0.0);
+                p.height = j.value("height", 0.0);
+                p.age = j.value("age", 0.0);
+                p.time = j.value("time", 0.0);
+                p.fix_quality = j.value("fix_quality", 0.0);
+                p.enu_x = j.value("enu_x", 0.0);
+                p.enu_y = j.value("enu_y", 0.0);
+                p.enu_z = j.value("enu_z", 0.0);
+                p.dist_xy_along = j.value("dist_xy_along", 0.0);
+                gnss.gnss_poses.push_back(p);
+            }
+            spdlog::info("Loaded {} GNSS measurement(s) from session '{}'", gnss.gnss_poses.size(), path);
+        }
+
+        if (data.contains("tum_trajectory"))
+        {
+            tum.tum_poses.clear();
+            for (const auto& j : data["tum_trajectory"])
+            {
+                TUM::TumPose p{};
+                p.timestamp = j.value("timestamp", 0.0);
+                p.x = j.value("x", 0.0);
+                p.y = j.value("y", 0.0);
+                p.z = j.value("z", 0.0);
+                p.qx = j.value("qx", 0.0);
+                p.qy = j.value("qy", 0.0);
+                p.qz = j.value("qz", 0.0);
+                p.qw = j.value("qw", 1.0);
+                tum.tum_poses.push_back(p);
+            }
+            tum.version++;
+            spdlog::info("Loaded {} TUM pose(s) from session '{}'", tum.tum_poses.size(), path);
+        }
+    } catch (const std::exception& e)
+    {
+        spdlog::error("Failed reading GNSS/TUM data from session '{}': {}", path, e.what());
+    }
+}
+
 void loadSession(const std::string& session_file_name)
 {
     spdlog::info("Session file: '{}'", session_file_name);
@@ -2358,6 +2535,10 @@ void loadSession(const std::string& session_file_name)
         session_dims = session.point_clouds_container.compute_point_cloud_dimension();
 
         scan_renderer.rebuildAll(session.point_clouds_container.point_clouds);
+
+        // Restore the ENU projection origin and the GNSS / TUM tracks that
+        // writeGnssTumToSessionFile() stored alongside the core session data.
+        readGnssTumFromSessionFile(fs::path(session_file_name).string(), tls_registration.gnss, tls_registration.tum);
     }
 }
 
@@ -2462,6 +2643,7 @@ std::string saveSession()
         }
 
         session.save(output_file_name, poses_file_name, initial_poses_file_name, false);
+        writeGnssTumToSessionFile(output_file_name, tls_registration.gnss, tls_registration.tum);
         spdlog::info("Saving result to: '{}'", poses_file_name);
         session.point_clouds_container.save_poses(poses_file_name, false);
 
@@ -2695,6 +2877,7 @@ void saveSubsession()
         const auto poses_file_name = (dir / (stem + "_poses" + ".mrp")).string();
 
         session.save(fs::path(output_file_name).string(), poses_file_name, initial_poses_file_name, true);
+        writeGnssTumToSessionFile(fs::path(output_file_name).string(), tls_registration.gnss, tls_registration.tum);
         spdlog::info("Saving poses to: '{}'", poses_file_name);
         session.point_clouds_container.save_poses(fs::path(poses_file_name).string(), true);
 

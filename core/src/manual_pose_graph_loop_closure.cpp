@@ -114,6 +114,15 @@ void ManualPoseGraphLoopClosure::Gui(
                 ImGui::SameLine();
                 ImGui::Checkbox("Keep initial trajectory curvature", &keep_initial_trajectory_curvature);
 
+                if (gnss.gnss_poses.size() > 0)
+                {
+                    ImGui::Checkbox("Use GNSS correspondences in Pose Graph SLAM", &use_gnss_correspondences);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "When off, loaded GNSS poses are still shown but do not contribute any observations "
+                            "to 'Compute Pose Graph SLAM'");
+                }
+
                 ImGui::Separator();
 
                 ImGui::Text("Motion model sigmas [m] / [deg]:");

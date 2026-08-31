@@ -1,10 +1,11 @@
 #include <GL/freeglut.h>
 
-#include <ImGuizmo.h>
 #include <imgui.h>
 #include <imgui_impl_glut.h>
 #include <imgui_impl_opengl2.h>
 #include <imgui_internal.h>
+
+#include <ImGuizmo.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>

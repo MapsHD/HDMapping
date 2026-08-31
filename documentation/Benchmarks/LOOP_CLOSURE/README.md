@@ -34,3 +34,5 @@ Movie how to use it is available at [prepare training dataset movie](https://you
 - https://github.com/MapsHD/SemanticLoopClosure
 - https://github.com/mit-spark/kiss-matcher
 - https://github.com/zjuluolun/BEVPlace2
+- https://github.com/csiro-robotics/LoGG3D-Net
+- https://github.com/PRBonn/OverlapNet

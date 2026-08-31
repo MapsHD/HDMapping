@@ -167,18 +167,22 @@ TEST_CASE("McapFileReader: PointCloud2 round-trip through every layout")
             writer.writePointCloud(static_cast<uint64_t>(points.front().timestamp * 1e9), points);
         }
 
-        rosbags::McapFileReader reader(path);
-        REQUIRE_MESSAGE(reader.isOpen(), reader.error());
-
         std::vector<rosbags::McapPoint> decoded;
         size_t messages = 0;
-        rosbags::McapFileReader::Callbacks callbacks;
-        callbacks.onPointCloud = [&](uint64_t, std::vector<rosbags::McapPoint>&& pts)
         {
-            ++messages;
-            decoded.insert(decoded.end(), pts.begin(), pts.end());
-        };
-        REQUIRE(reader.read(callbacks));
+            // Scoped so the reader closes the file before fs::remove: Windows
+            // refuses to delete a file that still has an open handle.
+            rosbags::McapFileReader reader(path);
+            REQUIRE_MESSAGE(reader.isOpen(), reader.error());
+
+            rosbags::McapFileReader::Callbacks callbacks;
+            callbacks.onPointCloud = [&](uint64_t, std::vector<rosbags::McapPoint>&& pts)
+            {
+                ++messages;
+                decoded.insert(decoded.end(), pts.begin(), pts.end());
+            };
+            REQUIRE(reader.read(callbacks));
+        }
 
         CHECK(messages == 1);
         REQUIRE(decoded.size() == points.size());
@@ -209,15 +213,18 @@ TEST_CASE("McapFileReader: IMU round-trip and serial number")
         writer.writeImu(samples);
     }
 
-    rosbags::McapFileReader reader(path);
-    REQUIRE_MESSAGE(reader.isOpen(), reader.error());
-
     std::vector<rosbags::McapImuSample> decoded;
     std::string serial;
-    rosbags::McapFileReader::Callbacks callbacks;
-    callbacks.onImu = [&](const rosbags::McapImuSample& s) { decoded.push_back(s); };
-    callbacks.onSn = [&](uint64_t, const std::string& sn) { serial = sn; };
-    REQUIRE(reader.read(callbacks));
+    {
+        // Scoped so the reader closes the file before fs::remove (Windows).
+        rosbags::McapFileReader reader(path);
+        REQUIRE_MESSAGE(reader.isOpen(), reader.error());
+
+        rosbags::McapFileReader::Callbacks callbacks;
+        callbacks.onImu = [&](const rosbags::McapImuSample& s) { decoded.push_back(s); };
+        callbacks.onSn = [&](uint64_t, const std::string& sn) { serial = sn; };
+        REQUIRE(reader.read(callbacks));
+    }
 
     CHECK(serial == "SN-ABC-123");
     REQUIRE(decoded.size() == samples.size());
@@ -294,18 +301,21 @@ TEST_CASE("McapFileReader: the same reader can be read twice")
         writer.writeImu(samples);
     }
 
-    rosbags::McapFileReader reader(path);
-    REQUIRE_MESSAGE(reader.isOpen(), reader.error());
-
     size_t imu_count = 0;
-    rosbags::McapFileReader::Callbacks imu_pass;
-    imu_pass.onImu = [&](const rosbags::McapImuSample&) { ++imu_count; };
-    REQUIRE(reader.read(imu_pass));
-
     size_t point_count = 0;
-    rosbags::McapFileReader::Callbacks lidar_pass;
-    lidar_pass.onPointCloud = [&](uint64_t, std::vector<rosbags::McapPoint>&& pts) { point_count += pts.size(); };
-    REQUIRE(reader.read(lidar_pass));
+    {
+        // Scoped so the reader closes the file before fs::remove (Windows).
+        rosbags::McapFileReader reader(path);
+        REQUIRE_MESSAGE(reader.isOpen(), reader.error());
+
+        rosbags::McapFileReader::Callbacks imu_pass;
+        imu_pass.onImu = [&](const rosbags::McapImuSample&) { ++imu_count; };
+        REQUIRE(reader.read(imu_pass));
+
+        rosbags::McapFileReader::Callbacks lidar_pass;
+        lidar_pass.onPointCloud = [&](uint64_t, std::vector<rosbags::McapPoint>&& pts) { point_count += pts.size(); };
+        REQUIRE(reader.read(lidar_pass));
+    }
 
     CHECK(imu_count == samples.size());
     CHECK(point_count == points.size());
@@ -412,21 +422,25 @@ TEST_CASE("MandeyeSessionWriter: bag -> session round trip preserves points per 
         writer.writePointCloud(static_cast<uint64_t>(cloud_b.front().timestamp * 1e9), cloud_b);
     }
 
-    rosbags::McapFileReader reader(path);
-    REQUIRE_MESSAGE(reader.isOpen(), reader.error());
-
-    rosbags::MandeyeSessionWriter writer(dir);
-    REQUIRE_MESSAGE(writer.isOpen(), writer.error());
-
     int chunk = 0;
-    rosbags::McapFileReader::Callbacks callbacks;
-    callbacks.onPointCloud = [&](uint64_t, std::vector<rosbags::McapPoint>&& pts)
     {
-        REQUIRE(writer.beginChunk(chunk++));
-        REQUIRE(writer.addPoints(pts));
-    };
-    REQUIRE(reader.read(callbacks));
-    REQUIRE(writer.endChunk());
+        // Scoped so the reader/writer close their files before fs::remove and
+        // fs::remove_all below: Windows refuses to delete an open file.
+        rosbags::McapFileReader reader(path);
+        REQUIRE_MESSAGE(reader.isOpen(), reader.error());
+
+        rosbags::MandeyeSessionWriter writer(dir);
+        REQUIRE_MESSAGE(writer.isOpen(), writer.error());
+
+        rosbags::McapFileReader::Callbacks callbacks;
+        callbacks.onPointCloud = [&](uint64_t, std::vector<rosbags::McapPoint>&& pts)
+        {
+            REQUIRE(writer.beginChunk(chunk++));
+            REQUIRE(writer.addPoints(pts));
+        };
+        REQUIRE(reader.read(callbacks));
+        REQUIRE(writer.endChunk());
+    }
 
     REQUIRE(chunk == 2);
     const auto chunk_a = readLaz(dir / "lidar0000.laz");

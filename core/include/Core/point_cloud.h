@@ -88,6 +88,11 @@ public:
     std::vector<PointBucketIndexPair> index_pairs;
     std::vector<Bucket> buckets;
     std::string file_name;
+    // Provenance for scans imported from an E57 file (see openE57 in step 2).
+    // Not serialized to session JSON; used by "Update e57 poses" to write the
+    // refined m_pose back into the originating Data3D block.
+    std::string e57_source_path;
+    int e57_scan_index = -1;
     std::vector<Eigen::Vector3d> points_local;
     std::vector<Eigen::Vector3d> normal_vectors_local;
     std::vector<Eigen::Vector3d> colors;

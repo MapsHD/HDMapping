@@ -114,16 +114,16 @@ More information can be found in:
 
 The knowledge base (applications, hardware, build guide, tools, videos,
 publications and the LiDAR/LIO odometry benchmark suite) now lives in the
-project wiki: **https://github.com/michalpelka/HDMapping/wiki**
+project wiki: **https://github.com/MapsHD/HDMapping/wiki**
 
-- [Applications](https://github.com/michalpelka/HDMapping/wiki/Applications)
-- [Benchmarks](https://github.com/michalpelka/HDMapping/wiki/Benchmarks)
-- [Compatible Community Projects](https://github.com/michalpelka/HDMapping/wiki/Compatible-Community-Projects)
-- [Hardware](https://github.com/michalpelka/HDMapping/wiki/Hardware)
-- [Build and Installation](https://github.com/michalpelka/HDMapping/wiki/Build-and-Installation)
-- [Knowledge Base](https://github.com/michalpelka/HDMapping/wiki/Knowledge-Base)
-- [Tools](https://github.com/michalpelka/HDMapping/wiki/Tools)
-- [Videos](https://github.com/michalpelka/HDMapping/wiki/Videos)
+- [Applications](https://github.com/MapsHD/HDMapping/wiki/Applications)
+- [Benchmarks](https://github.com/MapsHD/HDMapping/wiki/Benchmarks)
+- [Compatible Community Projects](https://github.com/MapsHD/HDMapping/wiki/Compatible-Community-Projects)
+- [Hardware](https://github.com/MapsHD/HDMapping/wiki/Hardware)
+- [Build and Installation](https://github.com/MapsHD/HDMapping/wiki/Build-and-Installation)
+- [Knowledge Base](https://github.com/MapsHD/HDMapping/wiki/Knowledge-Base)
+- [Tools](https://github.com/MapsHD/HDMapping/wiki/Tools)
+- [Videos](https://github.com/MapsHD/HDMapping/wiki/Videos)
 
 # Our datasets
 - [[HUMANOID-LIO-DATASET]](https://zenodo.org/records/21318128)

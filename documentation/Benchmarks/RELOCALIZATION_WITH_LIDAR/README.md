@@ -1,2 +1,0 @@
-- https://github.com/koide3/amcl3d
-- https://github.com/zjuluolun/BEVPlace2

@@ -50,6 +50,12 @@ public:
     double motion_model_w_fi_1_sigma_deg = 1.0 / 100.0 * 180.0 / M_PI;
     double motion_model_w_ka_1_sigma_deg = 1.0 / 100.0 * 180.0 / M_PI;
 
+    // When false, graph_slam() does not add any GNSS <-> LiDAR-trajectory
+    // observations to the optimisation (loaded GNSS poses are still drawn,
+    // they just don't pull on the pose graph). When true (default) every
+    // GNSS pose contributes, as before.
+    bool use_gnss_correspondences = true;
+
     PoseGraphLoopClosure() {};
     ~PoseGraphLoopClosure() {};
 

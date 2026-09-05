@@ -275,7 +275,7 @@ void PoseGraphLoopClosure::graph_slam(PointClouds& point_clouds_container, GNSS&
 
         // gnss
         // for (const auto &pc : point_clouds_container.point_clouds)
-        for (int index_pose = 0; index_pose < point_clouds_container.point_clouds.size(); index_pose++)
+        for (int index_pose = 0; use_gnss_correspondences && index_pose < point_clouds_container.point_clouds.size(); index_pose++)
         {
             const auto& pc = point_clouds_container.point_clouds[index_pose];
             for (int i = 0; i < gnss.gnss_poses.size(); i++)

@@ -2,8 +2,8 @@
 
 // cmake/cpu_optimizations.cmake defines _HAS_STD_BYTE=0 project-wide for
 // MSVC (worked around a std::byte/pybind11 conflict on Windows -- see commit
-// 2af71be); mcap's headers (pulled in transitively by McapWriter.cpp and
-// rosbags/tests/test_mcap_writer.cpp) genuinely need real std::byte, so
+// 2af71be); mcap's headers (pulled in transitively by McapWriter.cpp,
+// McapReader.cpp and rosbags/tests/*) genuinely need real std::byte, so
 // re-enable it here before any standard header can lock the disabled value
 // in for these translation units.
 #if defined(_MSC_VER)

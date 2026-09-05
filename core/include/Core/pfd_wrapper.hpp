@@ -12,6 +12,7 @@ namespace mandeye::fd
 
     const std::vector<std::string> LAS_LAZ_filter = { "LASzip file (*.laz)", "*.laz", "LAS file (*.las)", "*.las", "All files", "*" };
     const std::vector<std::string> LazFilter = { "LAS/LAZ files (*.laz)", "*.las *.laz" };
+    const std::vector<std::string> E57_filter = { "E57 point cloud (*.e57)", "*.e57", "All files", "*" };
     const std::vector<std::string> ImageFilter = {
         "Image files (*.bmp, *.jpg, *.jpeg, *.png)", "*.bmp *.jpg *.jpeg *.png", "All files", "*"
     };

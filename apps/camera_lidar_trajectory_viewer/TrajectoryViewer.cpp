@@ -10,6 +10,7 @@
 #include <CalibCore/CliArgs.h>
 #include <CalibCore/PointCloud.h>
 #include <CalibCore/Trajectory.h>
+#include <Core/e57_utils.h>
 #include <Core/pfd_wrapper.hpp>
 #include <HDMapping/PoseInterpolation.h>
 #include <HDMapping/Version.hpp>
@@ -52,7 +53,7 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "", "Ctrl+O", "Select LIO result directory" },
     { "", "Ctrl+Shift+O", "Select CAMERA_0 directory" },
     { "", "Ctrl+Shift+C", "Open calibration" },
-    { "", "Ctrl+S", "Export colored point cloud" },
+    { "", "Ctrl+S", "Export colored point cloud (LAS/LAZ)" },
     { "Camera", "F", "Front view" },
     { "", "B", "Back view" },
     { "", "L", "Left view" },
@@ -218,6 +219,21 @@ struct AppState
     char cameraBuf[512] = {};
     char exportBuf[512] = "colored.laz";
     std::vector<ColorPt> exportCloud;
+
+    // One entry per loaded LIO chunk ("scan_lio_N"), pointing at a contiguous
+    // [begin, begin+count) slice of exportCloud. `pose` is the chunk's MRP
+    // correction transform (identity when there is no session_poses.mrp). Used
+    // by the "Save session as E57" export to keep the segments as separate
+    // Data3D blocks instead of one collapsed cloud.
+    struct ExportSegment
+    {
+        std::string name;
+        Eigen::Affine3f pose = Eigen::Affine3f::Identity();
+        size_t begin = 0;
+        size_t count = 0;
+    };
+    std::vector<ExportSegment> exportSegments;
+
     std::string status;
 
     // ── ROS 2 export ──────────────────────────────────────────────────────────
@@ -372,6 +388,7 @@ static void loadSession(AppState& s)
     s.traj.poses.clear();
     s.imageTsNs.clear();
     s.exportCloud.clear();
+    s.exportSegments.clear();
     s.cloud.unload();
     loadImages(s);
 
@@ -434,6 +451,7 @@ static void loadSession(AppState& s)
 static void loadCloud(AppState& s)
 {
     s.exportCloud.clear();
+    s.exportSegments.clear();
     s.cloud.unload();
 
     fs::path d(s.sessionBuf);
@@ -594,6 +612,8 @@ static void loadCloud(AppState& s)
             continue;
 
         int nImgs = (int)chunkImgs.size();
+
+        const size_t segBegin = s.exportCloud.size();
 
         // ── step 4: colorize each point ─────────────────────────────────────
         // chunkImgs is sorted by ts (imageTsNs was sorted)
@@ -771,6 +791,12 @@ static void loadCloud(AppState& s)
             sumZ += pw.z();
             cnt++;
         }
+
+        // Record this chunk as an export segment (world-frame slice of
+        // exportCloud + its MRP correction pose).
+        if (s.exportCloud.size() > segBegin)
+            s.exportSegments.push_back({ key, M ? *M : Eigen::Affine3f::Identity(), segBegin, s.exportCloud.size() - segBegin });
+
         // chunkImgs and their cv::Mat memory are released here
     }
     s.useImageColor = canColor && (coloredChunks > 0);
@@ -958,6 +984,110 @@ static void exportLAZ(AppState& s)
     s.status = "Exported " + std::to_string(s.exportCloud.size()) + " pts → " + s.exportBuf;
 }
 
+// E57 counterpart of exportLAZ(): one Data3D block, points already in world
+// coordinates (identity pose), RGB + intensity + per-point timestamp.
+static void exportE57(AppState& s)
+{
+    if (s.exportCloud.empty())
+    {
+        s.status = "No cloud to export";
+        return;
+    }
+
+    std::vector<Eigen::Vector3d> pts;
+    std::vector<Eigen::Vector3d> cols;
+    std::vector<unsigned short> inten;
+    std::vector<double> ts;
+    pts.reserve(s.exportCloud.size());
+    cols.reserve(s.exportCloud.size());
+    inten.reserve(s.exportCloud.size());
+    ts.reserve(s.exportCloud.size());
+    for (const auto& p : s.exportCloud)
+    {
+        pts.emplace_back(p.x, p.y, p.z);
+        cols.emplace_back(p.r / 255.0, p.g / 255.0, p.b / 255.0);
+        inten.push_back(static_cast<unsigned short>(std::min(1.f, std::max(0.f, p.intensity)) * 65535.f));
+        ts.push_back(static_cast<double>(p.ts_ns) * 1e-9);
+    }
+
+    mandeye::e57io::E57WriteScan scan;
+    scan.name = "colored_cloud";
+    scan.description = std::string("HDMapping ") + HDMAPPING_VERSION_STRING + " camera_lidar_trajectory_viewer";
+    scan.points = &pts;
+    scan.colors = &cols;
+    scan.intensities = &inten;
+    scan.timestamps = &ts;
+
+    std::string err;
+    if (mandeye::e57io::save_e57(s.exportBuf, { scan }, err))
+        s.status = "Exported " + std::to_string(s.exportCloud.size()) + " pts → " + s.exportBuf;
+    else
+        s.status = std::string("Export failed: ") + err;
+}
+
+// Save the colored cloud as a *session*: one E57 Data3D block per loaded LIO
+// chunk ("scan_lio_N"), NOT one collapsed cloud. Each block holds that
+// segment's points in its own frame with the chunk's MRP correction as the
+// block pose (identity when there is no session_poses.mrp), so the result
+// re-opens as a multi-scan session (e.g. in step 2).
+static void exportE57Session(AppState& s)
+{
+    if (s.exportSegments.empty())
+    {
+        s.status = "No segments to export (load a session cloud first)";
+        return;
+    }
+
+    const std::string description = std::string("HDMapping ") + HDMAPPING_VERSION_STRING + " camera_lidar_trajectory_viewer segment";
+
+    const size_t nSeg = s.exportSegments.size();
+    std::vector<std::vector<Eigen::Vector3d>> segPts(nSeg), segCols(nSeg);
+    std::vector<std::vector<unsigned short>> segInten(nSeg);
+    std::vector<std::vector<double>> segTs(nSeg);
+    std::vector<mandeye::e57io::E57WriteScan> scans;
+    scans.reserve(nSeg);
+
+    for (size_t si = 0; si < nSeg; si++)
+    {
+        const auto& seg = s.exportSegments[si];
+        const bool identityPose = seg.pose.isApprox(Eigen::Affine3f::Identity());
+        const Eigen::Affine3d inv = seg.pose.inverse().cast<double>();
+
+        segPts[si].reserve(seg.count);
+        segCols[si].reserve(seg.count);
+        segInten[si].reserve(seg.count);
+        segTs[si].reserve(seg.count);
+
+        const size_t end = std::min(seg.begin + seg.count, s.exportCloud.size());
+        for (size_t k = seg.begin; k < end; k++)
+        {
+            const ColorPt& p = s.exportCloud[k];
+            const Eigen::Vector3d world(p.x, p.y, p.z);
+            segPts[si].push_back(identityPose ? world : (inv * world));
+            segCols[si].emplace_back(p.r / 255.0, p.g / 255.0, p.b / 255.0);
+            segInten[si].push_back(static_cast<unsigned short>(std::min(1.f, std::max(0.f, p.intensity)) * 65535.f));
+            segTs[si].push_back(static_cast<double>(p.ts_ns) * 1e-9);
+        }
+
+        mandeye::e57io::E57WriteScan sc;
+        sc.name = seg.name;
+        sc.description = description;
+        sc.points = &segPts[si];
+        sc.colors = &segCols[si];
+        sc.intensities = &segInten[si];
+        sc.timestamps = &segTs[si];
+        sc.pose = seg.pose.cast<double>();
+        scans.push_back(sc);
+    }
+
+    std::string err;
+    if (mandeye::e57io::save_e57(s.exportBuf, scans, err))
+        s.status =
+            "Exported session: " + std::to_string(nSeg) + " segment(s), " + std::to_string(s.exportCloud.size()) + " pts → " + s.exportBuf;
+    else
+        s.status = std::string("Export failed: ") + err;
+}
+
 // ── File actions ─────────────────────────────────────────────────────────────
 // Factored out so the File menu items and their keyboard shortcuts (in the
 // main loop below) call the exact same code, matching the openSession()-style
@@ -1009,14 +1139,36 @@ static void handleDroppedPath(AppState& s, const std::string& path)
     }
 }
 
-static void actionExportColoredPointCloud(AppState& s)
+static void actionExportColoredLAZ(AppState& s)
 {
-    std::string defaultName = fs::path(s.exportBuf).filename().string();
-    std::string path = mandeye::fd::SaveFileDialog("Export colored point cloud", mandeye::fd::LazFilter, ".laz", defaultName);
+    std::string defaultName = fs::path(s.exportBuf).replace_extension(".laz").filename().string();
+    std::string path = mandeye::fd::SaveFileDialog("Export colored point cloud (LAS/LAZ)", mandeye::fd::LazFilter, ".laz", defaultName);
     if (!path.empty())
     {
         setBuf(s.exportBuf, sizeof(s.exportBuf), path);
         exportLAZ(s);
+    }
+}
+
+static void actionExportColoredE57(AppState& s)
+{
+    std::string defaultName = fs::path(s.exportBuf).replace_extension(".e57").filename().string();
+    std::string path = mandeye::fd::SaveFileDialog("Export colored point cloud (E57)", mandeye::fd::E57_filter, ".e57", defaultName);
+    if (!path.empty())
+    {
+        setBuf(s.exportBuf, sizeof(s.exportBuf), path);
+        exportE57(s);
+    }
+}
+
+static void actionExportSessionE57(AppState& s)
+{
+    std::string defaultName = fs::path(s.exportBuf).replace_extension(".e57").filename().string();
+    std::string path = mandeye::fd::SaveFileDialog("Save session as E57 (segments)", mandeye::fd::E57_filter, ".e57", defaultName);
+    if (!path.empty())
+    {
+        setBuf(s.exportBuf, sizeof(s.exportBuf), path);
+        exportE57Session(s);
     }
 }
 
@@ -1473,7 +1625,7 @@ int main(int argc, char* argv[])
             if (ctrlDown && shiftDown && IsKeyPressed(KEY_C))
                 actionOpenCalibration(s);
             if (ctrlDown && IsKeyPressed(KEY_S))
-                actionExportColoredPointCloud(s);
+                actionExportColoredLAZ(s);
 
             if (!ctrlDown && IsKeyPressed(KEY_P))
                 s.showPath = !s.showPath;
@@ -1675,8 +1827,14 @@ int main(int argc, char* argv[])
                 if (ImGui::MenuItem("Open Calibration...", "Ctrl+Shift+C"))
                     actionOpenCalibration(s);
                 ImGui::Separator();
-                if (ImGui::MenuItem("Export Colored Point Cloud...", "Ctrl+S"))
-                    actionExportColoredPointCloud(s);
+                if (ImGui::MenuItem("Export Colored Point Cloud (LAS/LAZ)...", "Ctrl+S"))
+                    actionExportColoredLAZ(s);
+                if (ImGui::MenuItem("Export Colored Point Cloud (E57)..."))
+                    actionExportColoredE57(s);
+                if (ImGui::MenuItem("Save Session as E57 (segments)..."))
+                    actionExportSessionE57(s);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("One E57 Data3D block per LIO segment (scan_lio_N) instead of a single merged cloud");
                 ImGui::Separator();
                 if (ImGui::MenuItem("Select ROS 2 Bag Output Directory..."))
                     actionSelectRosOutputDir(s);
@@ -1921,10 +2079,18 @@ int main(int argc, char* argv[])
         if (ImGui::CollapsingHeader("Export", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::PushItemWidth(-1);
-            ImGui::Text("Output file (.laz / .las):");
+            ImGui::Text("Output file:");
             ImGui::InputText("##out", s.exportBuf, sizeof(s.exportBuf));
             if (ImGui::Button("Export colored LAZ", ImVec2(-1, 0)))
-                exportLAZ(s);
+                actionExportColoredLAZ(s);
+            if (ImGui::Button("Export colored E57", ImVec2(-1, 0)))
+                actionExportColoredE57(s);
+            ImGui::BeginDisabled(s.exportSegments.empty());
+            if (ImGui::Button("Save session E57 (segments)", ImVec2(-1, 0)))
+                actionExportSessionE57(s);
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("One E57 Data3D block per LIO segment (scan_lio_N)");
             if (!s.exportCloud.empty())
                 ImGui::TextDisabled("%d pts ready to export", (int)s.exportCloud.size());
             ImGui::PopItemWidth();

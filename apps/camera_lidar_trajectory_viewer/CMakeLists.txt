@@ -42,6 +42,7 @@ target_compile_definitions(camera_lidar_trajectory_viewer PRIVATE WITH_GUI=1)
 target_link_libraries(camera_lidar_trajectory_viewer PRIVATE
     calib_core
     core_pfd
+    core_e57
     raylib_widgets
     raylib
     imgui_raylib

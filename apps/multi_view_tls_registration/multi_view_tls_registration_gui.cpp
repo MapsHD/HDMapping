@@ -35,6 +35,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <Core/e57_utils.h>
 #include <Core/export_laz.h>
 #include <Core/fmt_filesystem.hpp>
 #include <Core/gnss.h>
@@ -81,6 +82,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <tuple>
 
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
@@ -2483,44 +2485,31 @@ std::string saveSession()
     }
 }
 
-void openLaz(bool fillInSession)
+// Shared tail of openLaz()/openE57(): once session.point_clouds_container is
+// populated, wire up the viewer state and -- when fillInSession is set --
+// materialize a fresh on-disk session (result folder + per-scan .laz +
+// trajectory_lio_*.csv). `sourceDir` is only used for the window title.
+//
+// NOTE: the fillInSession branch mean-centres every cloud, which only makes
+// sense for las/laz where the clouds have no pose. openE57() always passes
+// fillInSession = false (E57 scans keep their embedded poses and never write a
+// session folder) and does its own in-memory fill.
+void finalizeScanSession(const std::string& sourceDir, bool fillInSession)
 {
-    session.point_clouds_container.point_clouds.clear();
-    std::vector<std::string> input_file_names;
-    input_file_names = mandeye::fd::OpenFileDialog("Load las/laz files", mandeye::fd::LAS_LAZ_filter, true);
-    if (input_file_names.size() > 0)
+    session_loaded = true;
+    index_begin = 0;
+    index_end = session.point_clouds_container.point_clouds.size() - 1;
+
+    std::string newTitle = winTitle + " - " + sourceDir;
+    SetWindowTitle(newTitle.c_str());
+
+    for (const auto& pc : session.point_clouds_container.point_clouds)
+        session_total_number_of_points += pc.points_local.size();
+
+    session_dims = session.point_clouds_container.compute_point_cloud_dimension();
+
+    if (fillInSession && !session.point_clouds_container.point_clouds.empty())
     {
-        session.working_directory = fs::path(input_file_names[0]).parent_path().string();
-
-        spdlog::info("Creating session from las/laz files:");
-        for (size_t i = 0; i < input_file_names.size(); i++)
-            spdlog::info("{}", input_file_names[i]);
-
-        if (!session.point_clouds_container.load_whu_tls(
-                input_file_names,
-                tls_registration.is_decimate,
-                tls_registration.bucket_x,
-                tls_registration.bucket_y,
-                tls_registration.bucket_z,
-                tls_registration.calculate_offset,
-                session.load_cache_mode))
-            spdlog::error("Error loading session! Check input files laz/las");
-        else
-            spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
-
-        session_loaded = true;
-        index_begin = 0;
-        index_end = session.point_clouds_container.point_clouds.size() - 1;
-
-        std::string newTitle = winTitle + " - " + fs::path(input_file_names[0]).parent_path().string();
-        SetWindowTitle(newTitle.c_str());
-
-        for (const auto& pc : session.point_clouds_container.point_clouds)
-            session_total_number_of_points += pc.points_local.size();
-
-        session_dims = session.point_clouds_container.compute_point_cloud_dimension();
-
-        if (fillInSession)
         {
             int counter = 1;
             Eigen::Vector3d mean(session.point_clouds_container.point_clouds[0].points_local[0]);
@@ -2575,7 +2564,9 @@ void openLaz(bool fillInSession)
 
                 pc.pose = pose_tait_bryan_from_affine_matrix(m);
             }
+        }
 
+        {
             std::string session_fn = get_next_result_path(session.working_directory).string();
             std::filesystem::create_directory(session_fn);
 
@@ -2649,6 +2640,294 @@ void openLaz(bool fillInSession)
             //    pfd::choice::ok, pfd::icon::info);
             // message.result();
         }
+    }
+}
+
+void openLaz(bool fillInSession)
+{
+    std::vector<std::string> input_file_names;
+    input_file_names = mandeye::fd::OpenFileDialog("Load las/laz files", mandeye::fd::LAS_LAZ_filter, true);
+    if (input_file_names.size() == 0)
+        return; // dialog cancelled -- leave any already-loaded session untouched
+
+    session.point_clouds_container.point_clouds.clear();
+    session.working_directory = fs::path(input_file_names[0]).parent_path().string();
+
+    spdlog::info("Creating session from las/laz files:");
+    for (size_t i = 0; i < input_file_names.size(); i++)
+        spdlog::info("{}", input_file_names[i]);
+
+    if (!session.point_clouds_container.load_whu_tls(
+            input_file_names,
+            tls_registration.is_decimate,
+            tls_registration.bucket_x,
+            tls_registration.bucket_y,
+            tls_registration.bucket_z,
+            tls_registration.calculate_offset,
+            session.load_cache_mode))
+        spdlog::error("Error loading session! Check input files laz/las");
+    else
+        spdlog::info("Loaded: {} point_clouds", session.point_clouds_container.point_clouds.size());
+
+    finalizeScanSession(fs::path(input_file_names[0]).parent_path().string(), fillInSession);
+}
+
+void openE57(bool fillInSession)
+{
+    std::vector<std::string> input_file_names = mandeye::fd::OpenFileDialog("Load e57 files", mandeye::fd::E57_filter, true);
+    if (input_file_names.size() == 0)
+        return; // dialog cancelled -- leave any already-loaded session untouched
+
+    spdlog::info("Creating session from e57 files:");
+    for (const auto& fn : input_file_names)
+        spdlog::info("{}", fn);
+
+    // Build into a local list first so a full failure leaves the current session intact.
+    std::vector<PointCloud> loaded;
+    for (const auto& fn : input_file_names)
+    {
+        std::vector<mandeye::e57io::E57Scan> scans;
+        std::string err;
+        if (!mandeye::e57io::load_e57(fn, scans, err))
+        {
+            spdlog::error("Failed to load e57 '{}': {}", fn, err);
+            [[maybe_unused]] pfd::message message(
+                "E57 load error", "Could not read:\n" + fn + "\n\n" + err, pfd::choice::ok, pfd::icon::error);
+            message.result();
+            continue;
+        }
+
+        const std::string stem = fs::path(fn).stem().string();
+        std::string abs_src;
+        try
+        {
+            abs_src = fs::absolute(fn).string();
+        } catch (const std::exception&)
+        {
+            abs_src = fn;
+        }
+
+        for (size_t si = 0; si < scans.size(); si++)
+        {
+            auto& scan = scans[si];
+
+            PointCloud pc;
+            // Name the cloud so it exports to a sensible .laz in fillInSession mode.
+            pc.file_name = scans.size() > 1 ? (stem + "_" + std::to_string(si) + ".laz") : (stem + ".laz");
+            // Provenance for "Update e57 poses".
+            pc.e57_source_path = abs_src;
+            pc.e57_scan_index = static_cast<int>(si);
+            pc.points_local = std::move(scan.points);
+            pc.intensities = std::move(scan.intensities);
+            pc.colors = std::move(scan.colors);
+            pc.timestamps = std::move(scan.timestamps);
+
+            // exportLaz() and PointCloud::decimate() index intensities/timestamps
+            // per point, so pad the ones the E57 scan didn't provide.
+            if (pc.intensities.size() != pc.points_local.size())
+                pc.intensities.assign(pc.points_local.size(), 0);
+            if (pc.timestamps.size() != pc.points_local.size())
+                pc.timestamps.assign(pc.points_local.size(), 0.0);
+
+            pc.m_initial_pose = scan.pose;
+            pc.m_pose = scan.pose;
+            pc.m_pose_temp = scan.pose;
+            pc.pose = pose_tait_bryan_from_affine_matrix(scan.pose);
+            pc.gui_translation[0] = static_cast<float>(pc.pose.px);
+            pc.gui_translation[1] = static_cast<float>(pc.pose.py);
+            pc.gui_translation[2] = static_cast<float>(pc.pose.pz);
+            pc.gui_rotation[0] = rad2deg(pc.pose.om);
+            pc.gui_rotation[1] = rad2deg(pc.pose.fi);
+            pc.gui_rotation[2] = rad2deg(pc.pose.ka);
+
+            if (tls_registration.is_decimate && pc.points_local.size() > 0)
+                pc.decimate(tls_registration.bucket_x, tls_registration.bucket_y, tls_registration.bucket_z);
+
+            loaded.push_back(std::move(pc));
+        }
+    }
+
+    if (loaded.empty())
+    {
+        spdlog::error("No scans loaded from the selected e57 file(s)");
+        return;
+    }
+
+    session.point_clouds_container.point_clouds = std::move(loaded);
+    session.working_directory = fs::path(input_file_names[0]).parent_path().string();
+    spdlog::info(
+        "Loaded: {} point_clouds from {} e57 file(s)", session.point_clouds_container.point_clouds.size(), input_file_names.size());
+
+    // E57 scans carry their own poses, so the session is already complete in
+    // memory. When "Fill in session" is set, just add the identity local
+    // trajectory node the fill flow expects -- but never write a session/result
+    // folder to disk here. The user saves explicitly via "Save session as".
+    if (fillInSession)
+    {
+        for (auto& pc : session.point_clouds_container.point_clouds)
+        {
+            if (!pc.local_trajectory.empty())
+                continue;
+            PointCloud::LocalTrajectoryNode node;
+            node.imu_diff_angle_om_fi_ka_deg = { 0, 0, 0 };
+            node.imu_om_fi_ka = { 0, 0, 0 };
+            node.m_pose = Eigen::Affine3d::Identity();
+            node.timestamps = { 0, 0 };
+            pc.local_trajectory.push_back(node);
+        }
+    }
+
+    finalizeScanSession(fs::path(input_file_names[0]).parent_path().string(), false /* never create session files for e57 */);
+}
+
+// Write the current (registered) poses of E57-imported scans back into the
+// originating .e57 file(s), replacing each Data3D `pose` element. All other
+// content (points, colors, intensity, line groups, 2D images) is copied
+// verbatim. Only scans that still carry their e57 provenance are considered.
+void updateE57Poses()
+{
+    // file -> { Data3D index -> refined pose }
+    std::map<std::string, std::map<int, Eigen::Affine3d>> by_file;
+    for (const auto& pc : session.point_clouds_container.point_clouds)
+    {
+        if (pc.e57_source_path.empty() || pc.e57_scan_index < 0)
+            continue;
+        // openE57 keeps points scan-local and never applies a session offset, so
+        // the refined m_pose is already the file-level Data3D pose to write back.
+        by_file[pc.e57_source_path][pc.e57_scan_index] = pc.m_pose;
+    }
+
+    if (by_file.empty())
+    {
+        [[maybe_unused]] pfd::message m(
+            "Update e57 poses", "No scans in this session were loaded from an e57 file.", pfd::choice::ok, pfd::icon::warning);
+        m.result();
+        return;
+    }
+
+    const pfd::button choice = pfd::message(
+                                   "Update e57 poses",
+                                   "Write updated Data3D poses into " + std::to_string(by_file.size()) +
+                                       " e57 file(s)?\n\n"
+                                       "Yes    - overwrite the original file(s) in place\n"
+                                       "No     - write copies as <name>_updated.e57\n"
+                                       "Cancel - abort",
+                                   pfd::choice::yes_no_cancel,
+                                   pfd::icon::question)
+                                   .result();
+
+    if (choice == pfd::button::cancel)
+        return;
+    const bool in_place = (choice == pfd::button::yes);
+
+    int ok = 0;
+    int failed = 0;
+    std::string errors;
+    for (const auto& [src, poses] : by_file)
+    {
+        const fs::path srcp(src);
+        const fs::path tmp = srcp.parent_path() / (srcp.stem().string() + ".e57.tmp");
+
+        std::string err;
+        if (!mandeye::e57io::rewrite_e57_poses(src, tmp.string(), poses, err))
+        {
+            failed++;
+            errors += "\n- " + src + "\n    " + err;
+            std::error_code ec;
+            fs::remove(tmp, ec);
+            continue;
+        }
+
+        const fs::path dst = in_place ? srcp : srcp.parent_path() / (srcp.stem().string() + "_updated.e57");
+        std::error_code ec;
+        fs::rename(tmp, dst, ec);
+        if (ec)
+        {
+            ec.clear();
+            fs::copy_file(tmp, dst, fs::copy_options::overwrite_existing, ec);
+            std::error_code ec2;
+            fs::remove(tmp, ec2);
+        }
+        if (ec)
+        {
+            failed++;
+            errors += "\n- " + src + "\n    could not place result: " + ec.message();
+            continue;
+        }
+
+        ok++;
+        spdlog::info("Update e57 poses: wrote '{}' ({} scan pose(s))", dst.string(), poses.size());
+    }
+
+    [[maybe_unused]] pfd::message summary(
+        "Update e57 poses",
+        std::to_string(ok) + " file(s) updated, " + std::to_string(failed) + " failed." +
+            (errors.empty() ? std::string() : ("\n\nErrors:" + errors)),
+        pfd::choice::ok,
+        failed > 0 ? pfd::icon::error : pfd::icon::info);
+    summary.result();
+}
+
+// Write the whole session out as one multi-scan .e57 file: one Data3D block per
+// point cloud, points in their scan-local frame, each block carrying the current
+// (registered) pose. Independent of the "never write files on e57 load" rule --
+// this is an explicit, user-driven export.
+void saveSessionAsE57()
+{
+    if (session.point_clouds_container.point_clouds.empty())
+    {
+        [[maybe_unused]] pfd::message m(
+            "Save session as e57", "The session has no point clouds to save.", pfd::choice::ok, pfd::icon::warning);
+        m.result();
+        return;
+    }
+
+    std::string default_name = "session.e57";
+    if (!session_file_name.empty())
+        default_name = fs::path(session_file_name).replace_extension(".e57").string();
+
+    const std::string out = mandeye::fd::SaveFileDialog("Save session as e57", mandeye::fd::E57_filter, ".e57", default_name);
+    if (out.empty())
+        return;
+
+    const std::string description = std::string("HDMapping ") + HDMAPPING_VERSION_STRING + " session";
+
+    std::vector<mandeye::e57io::E57WriteScan> scans;
+    scans.reserve(session.point_clouds_container.point_clouds.size());
+    for (const auto& pc : session.point_clouds_container.point_clouds)
+    {
+        mandeye::e57io::E57WriteScan s;
+        s.name = fs::path(pc.file_name).stem().string();
+        s.description = description;
+        s.points = &pc.points_local;
+        if (pc.intensities.size() == pc.points_local.size())
+            s.intensities = &pc.intensities;
+        if (pc.colors.size() == pc.points_local.size())
+            s.colors = &pc.colors;
+        if (pc.timestamps.size() == pc.points_local.size())
+            s.timestamps = &pc.timestamps;
+
+        // File-level pose = session offset (a pure translation) composed with the
+        // scan's registered pose. For e57-loaded sessions the offset is zero.
+        s.pose = pc.m_pose;
+        s.pose.translation() += session.point_clouds_container.offset;
+
+        scans.push_back(std::move(s));
+    }
+
+    std::string err;
+    if (mandeye::e57io::save_e57(out, scans, err))
+    {
+        spdlog::info("Saved session as e57: '{}' ({} scans)", out, scans.size());
+        [[maybe_unused]] pfd::message m(
+            "Save session as e57", "Saved " + std::to_string(scans.size()) + " scan(s) to:\n" + out, pfd::choice::ok, pfd::icon::info);
+        m.result();
+    }
+    else
+    {
+        spdlog::error("Save session as e57 failed: {}", err);
+        [[maybe_unused]] pfd::message m("Save session as e57", "Failed:\n" + err, pfd::choice::ok, pfd::icon::error);
+        m.result();
     }
 }
 
@@ -4463,6 +4742,11 @@ void display()
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Create session from las/laz file(s)");
 
+                if (ImGui::MenuItem("Open e57"))
+                    openE57(fillInSession);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Create session from e57 file(s); embedded per-scan poses are used as initial poses");
+
                 ImGui::EndPopup();
             }
 
@@ -4474,6 +4758,57 @@ void display()
         {
             if (ImGui::BeginMenu("File"))
             {
+                if (ImGui::BeginMenu("Open"))
+                {
+                    ImGui::MenuItem("Calculate_offset", nullptr, &tls_registration.calculate_offset);
+                    ImGui::MenuItem("Fill in session", nullptr, &fillInSession);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Fill in data for trajectory and pose to create complete session");
+
+                    ImGui::Separator();
+
+                    if (ImGui::MenuItem("Open session"))
+                        openSession();
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Replace the current session with another one (Ctrl+O)");
+
+                    if (ImGui::MenuItem("Open las/laz"))
+                        openLaz(fillInSession);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Replace the current session with one created from las/laz file(s)");
+
+                    if (ImGui::MenuItem("Open e57"))
+                        openE57(fillInSession);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Replace the current session with one created from e57 file(s); "
+                            "embedded per-scan poses are used as initial poses");
+
+                    ImGui::EndMenu();
+                }
+
+                {
+                    bool has_e57 = false;
+                    for (const auto& pc : session.point_clouds_container.point_clouds)
+                    {
+                        if (!pc.e57_source_path.empty())
+                        {
+                            has_e57 = true;
+                            break;
+                        }
+                    }
+                    ImGui::BeginDisabled(!has_e57);
+                    if (ImGui::MenuItem("Update e57 poses"))
+                        updateE57Poses();
+                    ImGui::EndDisabled();
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Write the current registered poses back into the Data3D headers "
+                            "of the source e57 file(s)");
+                }
+
+                ImGui::Separator();
+
                 if (ImGui::MenuItem("Save session as", "Ctrl+S"))
                     saveSession();
                 if (ImGui::IsItemHovered())
@@ -4488,6 +4823,13 @@ void display()
                     ImGui::SetTooltip("Save session according to selections from 'LIO segments editor' window");
                 //}
                 // ImGui::EndDisabled();
+
+                if (ImGui::MenuItem("Save session as e57"))
+                    saveSessionAsE57();
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Write every point cloud of the session to one multi-scan .e57 file, "
+                        "each scan carrying its current (registered) pose");
 
                 ImGui::Separator();
                 if (ImGui::BeginMenu("Save all marked scans"))

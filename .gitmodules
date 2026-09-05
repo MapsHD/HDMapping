@@ -56,3 +56,9 @@
 [submodule "3rdparty/vqf"]
 	path = 3rdparty/vqf
 	url = https://github.com/dlaidig/vqf.git
+[submodule "3rdparty/xerces-c"]
+	path = 3rdparty/xerces-c
+	url = https://github.com/apache/xerces-c.git
+[submodule "3rdparty/libE57Format"]
+	path = 3rdparty/libE57Format
+	url = https://github.com/asmaloney/libE57Format.git

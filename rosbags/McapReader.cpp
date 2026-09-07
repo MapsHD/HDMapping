@@ -127,9 +127,35 @@ McapFileReader::McapFileReader(const std::filesystem::path& path, const McapRead
 	std::sort(impl_->channels.begin(), impl_->channels.end(), [](const ChannelInfo& a, const ChannelInfo& b) { return a.topic < b.topic; });
 
 	if(!impl_->resolveTopic(options.lidar_topic, "PointCloud2", /*required_unique=*/true, impl_->resolved.lidar) ||
+       !impl_->resolveTopic(options.lidar_topic, "CustomMsg", /*required_unique=*/true, impl_->resolved.lidar) ||
 	   !impl_->resolveTopic(options.imu_topic, "Imu", /*required_unique=*/true, impl_->resolved.imu) ||
 	   !impl_->resolveTopic(options.sn_topic, "String", /*required_unique=*/false, impl_->resolved.sn))
 		return;
+
+		// resolveTopic() only records *which topic* the lidar stream is on; it
+        // doesn't tell read() *which schema* that topic carries, and the two
+        // calls above happily aim at the same output field. Look the resolved
+        // topic back up in `channels` and record its schema, so read() can pick
+        // the matching decoder instead of guessing.
+        if (!impl_->resolved.lidar.empty()) 
+        {
+            const auto it = std::find_if(
+               impl_->channels.begin(),
+               impl_->channels.end(),
+                [&](const ChannelInfo& c)
+                {
+                    return c.topic == impl_->resolved.lidar;
+                });
+            if (it != impl_->channels.end()) 
+            {
+                const auto type = schemaTypeName(it->schema_name);
+                if (type == "PointCloud2") 
+					impl_->resolved.lidar_schema = LidarSchema::PointCloud2;
+                else if (type == "CustomMsg")
+					impl_->resolved.lidar_schema = LidarSchema::LivoxCustomMsg;                
+            }
+            
+        }
 
 	// Ascending-log-time iteration needs per-chunk message indexes; this mirrors
 	// the precondition mcap's own IndexedMessageReader checks, so testing it here
@@ -214,11 +240,16 @@ bool McapFileReader::read(const Callbacks& callbacks)
 
 		if(wantLidar && topic == lidarTopic)
 		{
-			// Only the first complaint is kept: a layout problem is a property of
-			// the file, so it would otherwise repeat once per message.
-			auto points = decodePc2(data, size, impl_->options.lidar_preset, &impl_->lidarLayoutWarning);
-			if(!points.empty())
-				callbacks.onPointCloud(view.message.logTime, std::move(points));
+         // Only the first complaint is kept: a layout problem is a property of
+         // the file, so it would otherwise repeat once per message.
+         std::vector<McapPoint> points;
+         if (impl_->resolved.lidar_schema == LidarSchema::LivoxCustomMsg)
+			  points = decodeLivoxCustomMsg(data, size, 0.0, &impl_->lidarLayoutWarning);
+         else
+			  points = decodePc2(data, size, impl_->options.lidar_preset, &impl_->lidarLayoutWarning);
+         
+		 if (!points.empty())    
+			callbacks.onPointCloud(view.message.logTime, std::move(points));
 		}
 		else if(wantImu && topic == imuTopic)
 		{

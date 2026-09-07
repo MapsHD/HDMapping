@@ -28,12 +28,23 @@ struct McapReaderOptions
 	Pc2Preset lidar_preset = Pc2Preset::Auto;
 };
 
+// Which ros2 message type the resolved lidar topic actually carries. Needed
+// because read() must call a different CDR decoder for each: decodePc2() and
+// decodeLivoxCustomMsg() are not interchangeable.
+enum class LidarSchema
+{
+	Unknown,
+	PointCloud2,
+	LivoxCustomMsg,
+};
+
 // The topics actually in use after auto-detection; empty means "not present".
 struct ResolvedTopics
 {
 	std::string lidar;
 	std::string imu;
 	std::string sn;
+    LidarSchema lidar_schema = LidarSchema::Unknown;
 };
 
 // One channel as found in the file, for --list output and diagnostics.

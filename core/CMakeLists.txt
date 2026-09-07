@@ -61,12 +61,13 @@ set(CORE_GUI_SOURCES
 # core_pfd -- native file/folder picker dialogs (mandeye::fd, wrapping
 # portable-file-dialogs), split out of CORE_GUI_SOURCES into its own minimal
 # target so non-core GUI consumers (the camera_lidar_* apps, via calib_core)
-# can reuse it without linking core_math/PROJ/spdlog/vqf/Fusion/plycpp/
+# can reuse it without linking core_math/PROJ/vqf/Fusion/plycpp/
 # WGS84toCartesian/imgui/ImGuizmo/freeglut, none of which pfd_wrapper.cpp
 # actually needs.
 add_library(core_pfd STATIC src/pfd_wrapper.cpp)
 target_include_directories(core_pfd PUBLIC include)
 target_include_directories(core_pfd PRIVATE ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master)
+target_link_libraries(core_pfd PRIVATE spdlog::spdlog)
 set_target_properties(core_pfd PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # core_e57 -- E57 point-cloud read/write (mandeye::e57io, wrapping libE57Format

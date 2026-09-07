@@ -1,9 +1,9 @@
 #include <Core/pfd_wrapper.hpp>
 
 #include <portable-file-dialogs.h>
+#include <spdlog/spdlog.h>
 
 #include <filesystem>
-#include <iostream>
 #include <memory>
 
 namespace mandeye::fd
@@ -90,13 +90,16 @@ namespace mandeye::fd
 
         return output_folder_name;
     }
-
+    void SetLastLocationHint(const std::string& locationHint)
+    {
+        spdlog::info("File dialogs will open in: '{}'", locationHint);
+        internal::lastLocationHint = locationHint;
+    }
     void OutOfMemMessage()
     {
-        std::cerr << "Adjust paging / swap memory with tips available here : "
-                     "https://github.com/MapsHD/HDMapping/tree/main/doc/"
-                     "virtual_memory.md "
-                  << std::endl;
+        spdlog::error(
+            "Adjust paging / swap memory with tips available here: "
+            "https://github.com/MapsHD/HDMapping/tree/main/doc/virtual_memory.md");
         [[maybe_unused]] pfd::message message(
             "System is out of memory",
             "System is out memory, make sure that virtual memory is set "

@@ -203,6 +203,48 @@ if (MSVC)
     target_compile_options(laz_to_mcap PRIVATE /bigobj)
 endif()
 
+# bow_loop_closure_detect: headless verification tool for the automatic
+# image-based (fbow) loop closure detector shared with step 2's GUI --
+# loads a step-2 session + a CAMERA_0 folder and prints candidate pairs as
+# CSV, without needing the interactive GUI. Links core_no_gui (WITH_GUI=0)
+# since it only needs PointClouds/Session, not the ImGui-dependent
+# ManualPoseGraphLoopClosure/observation_picking pieces core (WITH_GUI=1)
+# adds.
+add_executable(
+  bow_loop_closure_detect bow_loop_closure_detect.cpp
+  ${REPOSITORY_DIRECTORY}/apps/multi_view_tls_registration/bow_loop_closure_detector.h
+  ${REPOSITORY_DIRECTORY}/apps/multi_view_tls_registration/bow_loop_closure_detector.cpp
+)
+
+target_compile_definitions(bow_loop_closure_detect PRIVATE
+    WITH_GUI=0
+    -DFBOW_VOCABULARY_PATH="${THIRDPARTY_DIRECTORY}/fbow/vocabularies/orb_mur.fbow")
+
+target_include_directories(
+  bow_loop_closure_detect PRIVATE
+  ${REPOSITORY_DIRECTORY}/core/include
+  ${REPOSITORY_DIRECTORY}/apps/multi_view_tls_registration
+  ${EIGEN3_INCLUDE_DIR}
+  ${LASZIP_INCLUDE_DIR}/LASzip/include
+  ${THIRDPARTY_DIRECTORY}/json/include
+  ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+  ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+  ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+  ${EXTERNAL_LIBRARIES_DIRECTORY}/include
+  ${FBOW_INCLUDE_DIR}
+  ${OpenCV_INCLUDE_DIRS})
+
+target_link_libraries(
+  bow_loop_closure_detect PRIVATE
+  core_no_gui
+  fbow
+  ${OpenCV_LIBS}
+  ${PLATFORM_LASZIP_LIB}
+  vqf
+  Fusion
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  spdlog::spdlog)
+
 # session_to_mcap: a processed lidar_odometry_step_1 session (session.json)
 # -> MCAP exporter (undistorted lidar in the map frame + /tf map->lidar,
 # optionally /imu re-read from the original recording via --raw-dir). Unlike
@@ -251,6 +293,35 @@ if (MSVC)
     target_compile_options(session_to_mcap PRIVATE /bigobj)
 endif()
 
+# session_intensity_panoramas: a session's lidar intensity rendered as 360-degree
+# panoramas seen from the lidar, one every N seconds, named like camera frames
+# (intensity_<ns>.jpg) so the BoW loop closure can use them. Reads Core::Session,
+# so it links core_no_gui (WITH_GUI=0) like session_to_mcap.
+add_executable(session_intensity_panoramas session_intensity_panoramas.cpp)
+
+target_compile_definitions(session_intensity_panoramas PRIVATE WITH_GUI=0)
+
+target_include_directories(
+  session_intensity_panoramas PRIVATE
+  ${REPOSITORY_DIRECTORY}/core/include
+  ${EIGEN3_INCLUDE_DIR}
+  ${LASZIP_INCLUDE_DIR}/LASzip/include
+  ${THIRDPARTY_DIRECTORY}/json/include
+  ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+  ${OpenCV_INCLUDE_DIRS})
+
+target_link_libraries(
+  session_intensity_panoramas PRIVATE
+  core_no_gui
+  ${OpenCV_LIBS}
+  ${PLATFORM_LASZIP_LIB}
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  spdlog::spdlog)
+
+if (MSVC)
+    target_compile_definitions(session_intensity_panoramas PRIVATE _USE_MATH_DEFINES)
+endif()
+
 # These are built whenever BUILD_WITH_CLI_TOOLS is ON (the default), so they
 # ship in the DEB package alongside the GUI apps.
 hdmapping_install_app(
@@ -264,4 +335,5 @@ hdmapping_install_app(
   laz_to_mcap
   mcap_to_laz
   ouster_pcap_to_laz
+  session_intensity_panoramas
   session_to_mcap)

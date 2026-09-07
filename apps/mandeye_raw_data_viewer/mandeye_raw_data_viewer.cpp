@@ -24,6 +24,8 @@
 
 #include "../lidar_odometry_step_1/lidar_odometry.h"
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 
 #include <HDMapping/Version.hpp>
@@ -69,6 +71,8 @@ std::vector<AllData> all_data;
 struct ImuData
 {
     std::vector<double> timestampLidar;
+    std::vector<double> timestampRel; // timestampLidar shifted so the dataset starts at 0 [s]
+    double datasetStart = 0.0; // absolute timestamp of the first IMU sample [s]
     std::vector<double> angX;
     std::vector<double> angY;
     std::vector<double> angZ;
@@ -120,6 +124,8 @@ bool show_rgd_nn = false;
 bool show_imu_data = false;
 bool show_cameras_data = true;
 bool is_settings_gui = false;
+bool color_by_intensity = false;
+float intensity_gamma = 1.0f;
 
 namespace photos
 {
@@ -901,6 +907,8 @@ void loadFiles(std::vector<std::string> input_file_names)
         all_data.shrink_to_fit();
 
         imu_data_plot.timestampLidar.clear();
+        imu_data_plot.timestampRel.clear();
+        imu_data_plot.datasetStart = 0.0;
         imu_data_plot.angX.clear();
         imu_data_plot.angY.clear();
         imu_data_plot.angZ.clear();
@@ -912,6 +920,7 @@ void loadFiles(std::vector<std::string> input_file_names)
         imu_data_plot.roll.clear();
 
         imu_data_plot.timestampLidar.shrink_to_fit();
+        imu_data_plot.timestampRel.shrink_to_fit();
         imu_data_plot.angX.shrink_to_fit();
         imu_data_plot.angY.shrink_to_fit();
         imu_data_plot.angZ.shrink_to_fit();
@@ -1018,6 +1027,16 @@ void loadFiles(std::vector<std::string> input_file_names)
             imu_data_plot.yaw.push_back(euler.z());
             imu_data_plot.pitch.push_back(euler.y());
             imu_data_plot.roll.push_back(euler.x());
+        }
+
+        // timeline x-axis is shown relative to the first IMU sample so it starts at 0 [s];
+        // datasetStart keeps the absolute value for reference / annotations
+        if (!imu_data_plot.timestampLidar.empty())
+        {
+            imu_data_plot.datasetStart = imu_data_plot.timestampLidar.front();
+            imu_data_plot.timestampRel.reserve(imu_data_plot.timestampLidar.size());
+            for (double ts : imu_data_plot.timestampLidar)
+                imu_data_plot.timestampRel.push_back(ts - imu_data_plot.datasetStart);
         }
 
         std::vector<std::pair<double, double>> timestamps;
@@ -1194,27 +1213,47 @@ void imu_data_gui()
 {
     ImGui::Begin("IMU data", &show_imu_data);
     {
-        if (imu_data_plot.timestampLidar.size() > 0)
+        if (imu_data_plot.timestampRel.size() > 0)
         {
-            static double x_min = imu_data_plot.timestampLidar.front();
-            static double x_max = x_min + 20.0;
+            // All timelines below use time relative to the start of the dataset (t = 0 s).
+            // t0 is that start expressed as an absolute LiDAR timestamp in seconds.
+            const double t0 = imu_data_plot.datasetStart;
+
+            ImGui::TextDisabled("Time axis is relative to dataset start.");
+            ImGui::Text("Dataset start (t = 0 s) = %.6f s absolute LiDAR time", t0);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Add this offset to any x-axis value to get the absolute LiDAR timestamp [s]");
+            ImGui::Text("Dataset duration: %.3f s", imu_data_plot.timestampRel.back());
+            ImGui::Separator();
+
+            static double x_min = 0.0;
+            static double x_max = 20.0;
+
+            // currently rendered point block, expressed on the relative time axis
             double annotation = 0;
+            bool has_annotation = false;
             if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
             {
                 if (all_data[index_rendered_points_local].timestamps.size() > 0)
-                    annotation = all_data[index_rendered_points_local].timestamps.front().first;
+                {
+                    annotation = all_data[index_rendered_points_local].timestamps.front().first - t0;
+                    has_annotation = true;
+                }
             }
+
+            const double* ts = imu_data_plot.timestampRel.data();
+            const int ts_n = (int)imu_data_plot.timestampRel.size();
+
             if (ImPlot::BeginPlot("IMU - acceleration 'm/s^2", ImVec2(-1, 0)))
             {
                 ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Once);
                 ImPlot::SetupAxisLinks(ImAxis_X1, &x_min, &x_max);
-                ImPlot::PlotLine(
-                    "accX", imu_data_plot.timestampLidar.data(), imu_data_plot.accX.data(), (int)imu_data_plot.timestampLidar.size());
-                ImPlot::PlotLine(
-                    "accY", imu_data_plot.timestampLidar.data(), imu_data_plot.accY.data(), (int)imu_data_plot.timestampLidar.size());
-                ImPlot::PlotLine(
-                    "accZ", imu_data_plot.timestampLidar.data(), imu_data_plot.accZ.data(), (int)imu_data_plot.timestampLidar.size());
-                ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
+                ImPlot::SetupAxis(ImAxis_X1, "time since dataset start [s]");
+                ImPlot::PlotLine("accX", ts, imu_data_plot.accX.data(), ts_n);
+                ImPlot::PlotLine("accY", ts, imu_data_plot.accY.data(), ts_n);
+                ImPlot::PlotLine("accZ", ts, imu_data_plot.accZ.data(), ts_n);
+                if (has_annotation)
+                    ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
                 ImPlot::EndPlot();
             }
 
@@ -1222,13 +1261,12 @@ void imu_data_gui()
             {
                 ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Once);
                 ImPlot::SetupAxisLinks(ImAxis_X1, &x_min, &x_max);
-                ImPlot::PlotLine(
-                    "angX", imu_data_plot.timestampLidar.data(), imu_data_plot.angX.data(), (int)imu_data_plot.timestampLidar.size());
-                ImPlot::PlotLine(
-                    "angY", imu_data_plot.timestampLidar.data(), imu_data_plot.angY.data(), (int)imu_data_plot.timestampLidar.size());
-                ImPlot::PlotLine(
-                    "angZ", imu_data_plot.timestampLidar.data(), imu_data_plot.angZ.data(), (int)imu_data_plot.timestampLidar.size());
-                ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
+                ImPlot::SetupAxis(ImAxis_X1, "time since dataset start [s]");
+                ImPlot::PlotLine("angX", ts, imu_data_plot.angX.data(), ts_n);
+                ImPlot::PlotLine("angY", ts, imu_data_plot.angY.data(), ts_n);
+                ImPlot::PlotLine("angZ", ts, imu_data_plot.angZ.data(), ts_n);
+                if (has_annotation)
+                    ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
                 ImPlot::EndPlot();
             }
 
@@ -1236,13 +1274,12 @@ void imu_data_gui()
             {
                 ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Once);
                 ImPlot::SetupAxisLinks(ImAxis_X1, &x_min, &x_max);
-                ImPlot::PlotLine(
-                    "yaw", imu_data_plot.timestampLidar.data(), imu_data_plot.yaw.data(), (int)imu_data_plot.timestampLidar.size());
-                ImPlot::PlotLine(
-                    "pitch", imu_data_plot.timestampLidar.data(), imu_data_plot.pitch.data(), (int)imu_data_plot.timestampLidar.size());
-                ImPlot::PlotLine(
-                    "roll", imu_data_plot.timestampLidar.data(), imu_data_plot.roll.data(), (int)imu_data_plot.timestampLidar.size());
-                ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
+                ImPlot::SetupAxis(ImAxis_X1, "time since dataset start [s]");
+                ImPlot::PlotLine("yaw", ts, imu_data_plot.yaw.data(), ts_n);
+                ImPlot::PlotLine("pitch", ts, imu_data_plot.pitch.data(), ts_n);
+                ImPlot::PlotLine("roll", ts, imu_data_plot.roll.data(), ts_n);
+                if (has_annotation)
+                    ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
                 ImPlot::EndPlot();
             }
 
@@ -1250,16 +1287,18 @@ void imu_data_gui()
             {
                 ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Once);
                 ImPlot::SetupAxisLinks(ImAxis_X1, &x_min, &x_max);
-                // plot photos timestamps
+                ImPlot::SetupAxis(ImAxis_X1, "time since dataset start [s]");
+                // plot photos timestamps, also relative to the dataset start
                 std::vector<double> photo_timestamps;
                 std::vector<double> dummy;
-                for (const auto& [ts, fn] : photo_files_ts)
+                for (const auto& [ts_ns, fn] : photo_files_ts)
                 {
-                    photo_timestamps.push_back(static_cast<double>(ts) / 1e9);
+                    photo_timestamps.push_back(static_cast<double>(ts_ns) / 1e9 - t0);
                     dummy.push_back(0.0);
                 }
                 ImPlot::PlotScatter("photos", photo_timestamps.data(), dummy.data(), (int)photo_timestamps.size());
-                ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
+                if (has_annotation)
+                    ImPlot::TagX(annotation, ImVec4(1, 0, 0, 1));
                 ImPlot::EndPlot();
             }
         }
@@ -1509,8 +1548,12 @@ void display()
     if (index_rendered_points_local >= 0 && index_rendered_points_local < all_data.size())
     {
         double max_diff = 0.0;
+        float max_intensity = 0.0f;
         for (size_t i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
         {
+            if (color_by_intensity && all_data[index_rendered_points_local].points_local[i].intensity > max_intensity)
+                max_intensity = all_data[index_rendered_points_local].points_local[i].intensity;
+
             auto lower = std::lower_bound(
                 all_data[index_rendered_points_local].timestamps.begin(),
                 all_data[index_rendered_points_local].timestamps.end(),
@@ -1532,6 +1575,7 @@ void display()
                 }
             }
         }
+        const float inv_max_intensity = max_intensity > 0.0f ? 1.0f / max_intensity : 0.0f;
 
         for (size_t i = 0; i < all_data[index_rendered_points_local].points_local.size(); i++)
         {
@@ -1556,7 +1600,15 @@ void display()
                     Eigen::Affine3d m = all_data[index_rendered_points_local].poses[index_pose];
                     Eigen::Vector3d p = m * all_data[index_rendered_points_local].points_local[i].point;
 
-                    if (all_data[index_rendered_points_local].lidar_ids[i] == 0)
+                    if (color_by_intensity)
+                    {
+                        float ii = all_data[index_rendered_points_local].points_local[i].intensity * inv_max_intensity;
+                        ii = std::clamp(ii, 0.0f, 1.0f);
+                        if (intensity_gamma != 1.0f)
+                            ii = std::pow(ii, intensity_gamma);
+                        glColor3f(ii, ii, ii);
+                    }
+                    else if (all_data[index_rendered_points_local].lidar_ids[i] == 0)
                         glColor3f(pc_color.x, pc_color.y, pc_color.z);
                     else
                         glColor3f(pc_color2.x, pc_color2.y, pc_color2.z);
@@ -1755,6 +1807,17 @@ void display()
 
             ImGui::MenuItem("Show IMU data", nullptr, &show_imu_data);
             ImGui::MenuItem("Show cameras data", nullptr, &show_cameras_data);
+
+            ImGui::MenuItem("Color by intensity", nullptr, &color_by_intensity);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Render points as grayscale from LiDAR intensity (normalized to current block max)");
+            if (color_by_intensity)
+            {
+                ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                ImGui::SliderFloat("Intensity gamma", &intensity_gamma, 0.1f, 3.0f, "%.2f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Gamma applied to normalized intensity (<1 brightens, >1 darkens)");
+            }
             ImGui::EndDisabled();
 
             ImGui::Separator();

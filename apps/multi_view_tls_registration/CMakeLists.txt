@@ -24,6 +24,7 @@ set(SOURCES
     multi_view_tls_registration.cpp perform_experiment.cpp
     multi_view_tls_registration_gui.cpp multi_view_tls_registration.h
     ../lidar_odometry_step_1/lidar_odometry_utils.cpp
+    bow_loop_closure_detector.h bow_loop_closure_detector.cpp
 )
 
 # Windows: add resource file
@@ -35,7 +36,13 @@ add_executable(
   multi_view_tls_registration_step_2 ${SOURCES}
   )
 
-target_compile_definitions(multi_view_tls_registration_step_2 PRIVATE -DWITH_GUI=1)
+# FBOW_VOCABULARY_PATH: absolute source-tree path to the bundled ORB
+# vocabulary, baked in at configure time (dev-build convenience; a packaged
+# install would instead copy the file next to the binary and resolve it
+# relative to argv[0]).
+target_compile_definitions(multi_view_tls_registration_step_2 PRIVATE
+    -DWITH_GUI=1
+    -DFBOW_VOCABULARY_PATH="${THIRDPARTY_DIRECTORY}/fbow/vocabularies/orb_mur.fbow")
 
 target_include_directories(
           multi_view_tls_registration_step_2
@@ -56,7 +63,9 @@ target_include_directories(
           ${LASZIP_INCLUDE_DIR}/LASzip/include
           ${THIRDPARTY_DIRECTORY}/observation_equations/codes
           ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
-          ${EXTERNAL_LIBRARIES_DIRECTORY}/include)
+          ${EXTERNAL_LIBRARIES_DIRECTORY}/include
+          ${FBOW_INCLUDE_DIR}
+          ${OpenCV_INCLUDE_DIRS})
 
   target_link_libraries(
           multi_view_tls_registration_step_2
@@ -78,7 +87,9 @@ target_include_directories(
           spdlog::spdlog
           ${PLATFORM_LASZIP_LIB}
           ${PLATFORM_MISCELLANEOUS_LIBS}
-          PROJ::proj)
+          PROJ::proj
+          fbow
+          ${OpenCV_LIBS})
 
 if(WIN32)
   add_custom_command(

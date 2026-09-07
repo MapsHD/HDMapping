@@ -84,6 +84,19 @@ include(${THIRDPARTY_DIRECTORY_BINARY}/OpenCV/CMakeLists.txt)
 find_package(OpenCV REQUIRED)
 message(STATUS "OpenCV include dir: ${OpenCV_INCLUDE_DIRS}, OpenCV libs: ${OpenCV_LIBS}")
 
+# fbow - Fast Bag-of-Words image retrieval (needs OpenCV, added above)
+set(BUILD_UTILS OFF CACHE BOOL "" FORCE)
+# fbow's own CMakeLists defaults USE_SSE3/USE_AVX to ON unconditionally (only
+# guards -O2 vs -O3 by CMAKE_SYSTEM_PROCESSOR, not the x86 vector flags), which
+# fails on arm64 (e.g. Apple Silicon) where -msse3/-mavx aren't valid clang flags.
+if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|i686|x86)$")
+    set(USE_SSE3 OFF CACHE BOOL "" FORCE)
+    set(USE_AVX OFF CACHE BOOL "" FORCE)
+endif()
+add_subdirectory(${THIRDPARTY_DIRECTORY}/fbow)
+set(FBOW_INCLUDE_DIR ${THIRDPARTY_DIRECTORY}/fbow/src)
+message(STATUS "Using bundled fbow from: ${THIRDPARTY_DIRECTORY}/fbow")
+
 # PROJ - Cartographic projections library
 include(${THIRDPARTY_DIRECTORY_BINARY}/Proj/CMakeLists.txt)
 message(STATUS "PROJ include dir: ${PROJ_INCLUDE_DIR}, PROJ library: ${PROJ_LIBRARY}")

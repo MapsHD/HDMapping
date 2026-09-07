@@ -56,3 +56,6 @@
 [submodule "3rdparty/vqf"]
 	path = 3rdparty/vqf
 	url = https://github.com/dlaidig/vqf.git
+[submodule "3rdparty/fbow"]
+	path = 3rdparty/fbow
+	url = https://github.com/rmsalinas/fbow.git

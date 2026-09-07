@@ -85,3 +85,45 @@ target_link_libraries(
 if (MSVC)
     target_compile_options(laz_to_mcap PRIVATE /bigobj)
 endif()
+
+# bow_loop_closure_detect: headless verification tool for the automatic
+# image-based (fbow) loop closure detector shared with step 2's GUI --
+# loads a step-2 session + a CAMERA_0 folder and prints candidate pairs as
+# CSV, without needing the interactive GUI. Links core_no_gui (WITH_GUI=0)
+# since it only needs PointClouds/Session, not the ImGui-dependent
+# ManualPoseGraphLoopClosure/observation_picking pieces core (WITH_GUI=1)
+# adds.
+add_executable(
+  bow_loop_closure_detect bow_loop_closure_detect.cpp
+  ${REPOSITORY_DIRECTORY}/apps/multi_view_tls_registration/bow_loop_closure_detector.h
+  ${REPOSITORY_DIRECTORY}/apps/multi_view_tls_registration/bow_loop_closure_detector.cpp
+)
+
+target_compile_definitions(bow_loop_closure_detect PRIVATE
+    WITH_GUI=0
+    -DFBOW_VOCABULARY_PATH="${THIRDPARTY_DIRECTORY}/fbow/vocabularies/orb_mur.fbow")
+
+target_include_directories(
+  bow_loop_closure_detect PRIVATE
+  ${REPOSITORY_DIRECTORY}/core/include
+  ${REPOSITORY_DIRECTORY}/apps/multi_view_tls_registration
+  ${EIGEN3_INCLUDE_DIR}
+  ${LASZIP_INCLUDE_DIR}/LASzip/include
+  ${THIRDPARTY_DIRECTORY}/json/include
+  ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+  ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+  ${THIRDPARTY_DIRECTORY}/Fusion/Fusion
+  ${EXTERNAL_LIBRARIES_DIRECTORY}/include
+  ${FBOW_INCLUDE_DIR}
+  ${OpenCV_INCLUDE_DIRS})
+
+target_link_libraries(
+  bow_loop_closure_detect PRIVATE
+  core_no_gui
+  fbow
+  ${OpenCV_LIBS}
+  ${PLATFORM_LASZIP_LIB}
+  vqf
+  Fusion
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  spdlog::spdlog)

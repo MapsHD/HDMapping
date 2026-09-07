@@ -83,7 +83,15 @@
 #include <iostream>
 #include <tuple>
 
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+
+#include <atomic>
+#include <mutex>
+#include <thread>
+
 #include "../lidar_odometry_step_1/lidar_odometry_utils.h"
+#include "bow_loop_closure_detector.h"
 #include "multi_view_tls_registration.h"
 
 #include <HDMapping/Version.hpp>
@@ -996,6 +1004,7 @@ bool is_rpf_gui = false;
 bool is_pose_graph_slam = false;
 bool is_manual_analisys = false;
 bool is_loop_closure_gui = false;
+bool is_bow_loop_closure_gui = false;
 bool is_lio_segments_gui = false;
 bool is_settings_gui = true;
 bool is_translate_gui = false;
@@ -1846,6 +1855,262 @@ void observation_picking_gui()
             ImGui::InputFloat("Label distance [m]", &observation_picking.label_dist);
         }
         ImGui::EndDisabled();
+    }
+
+    ImGui::End();
+}
+
+// ── Automatic image-based (fbow) loop closure detection ─────────────────────
+// Candidates are only ever surfaced for manual review here (montage preview +
+// per-row "Add edge") -- never auto-added to the pose graph -- per
+// BOW_PLACE_RECOGNITION_HANDOFF.md's documented false-positive risk on
+// repetitive scenes. Detection itself runs on a background thread (ORB
+// extraction over hundreds of frames must not block the render loop); it only
+// reads session.point_clouds_container (poses/timestamps), never mutates it,
+// mirroring TrajectoryViewer.cpp's imgViewThread pattern for its own
+// background image work.
+namespace
+{
+struct BowLoopClosureState
+{
+    char camera_dir[1024] = "";
+    bow_loop_closure::DetectorParams params;
+
+    std::atomic<bool> detecting{ false };
+    std::thread detect_thread;
+
+    std::mutex results_mutex;
+    std::vector<bow_loop_closure::Candidate> results;
+    std::vector<bow_loop_closure::CameraFrame> frames;
+    std::vector<int> chunk_to_frame;
+    std::string status;
+
+    int selected_candidate = -1;
+    Texture2D montage_tex{};
+    bool montage_tex_valid = false;
+};
+BowLoopClosureState bow_state;
+
+void bow_loop_closure_start_detection()
+{
+    if (bow_state.detecting.load())
+        return;
+    if (bow_state.detect_thread.joinable())
+        bow_state.detect_thread.join();
+
+    bow_state.detecting = true;
+    {
+        std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+        bow_state.status = "Detecting...";
+        bow_state.results.clear();
+        bow_state.selected_candidate = -1;
+    }
+
+    std::string camera_dir = bow_state.camera_dir;
+    bow_loop_closure::DetectorParams params = bow_state.params;
+
+    bow_state.detect_thread = std::thread(
+        [camera_dir, params]()
+        {
+            auto frames = bow_loop_closure::loadCameraFrames(camera_dir);
+            std::vector<int> chunk_to_frame;
+            std::vector<bow_loop_closure::Candidate> candidates;
+            std::string status;
+
+            if (frames.empty())
+            {
+                status = "No camera frames found in '" + camera_dir + "'";
+            }
+            else
+            {
+                chunk_to_frame =
+                    bow_loop_closure::associateFramesToChunks(session.point_clouds_container, frames, params.max_frame_time_gap_ns);
+                try
+                {
+                    auto vocabulary = bow_loop_closure::loadVocabulary(bow_loop_closure::defaultVocabularyPath());
+                    candidates =
+                        bow_loop_closure::detectCandidates(session.point_clouds_container, frames, chunk_to_frame, params, vocabulary);
+                    status = std::to_string(candidates.size()) + " candidates found";
+                }
+                catch (const std::exception& e)
+                {
+                    status = e.what();
+                }
+            }
+
+            std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+            bow_state.frames = std::move(frames);
+            bow_state.chunk_to_frame = std::move(chunk_to_frame);
+            bow_state.results = std::move(candidates);
+            bow_state.status = status;
+            bow_state.detecting = false;
+        });
+}
+
+// Uploads `mat` (BGR, as cv::imread/drawMatches produce) as the montage
+// preview texture -- same LoadTextureFromImage/UnloadTexture pattern as
+// TrajectoryViewer.cpp's imgViewTex.
+void bow_loop_closure_upload_montage(cv::Mat mat)
+{
+    if (mat.empty())
+        return;
+    cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+    if (!mat.isContinuous())
+        mat = mat.clone();
+
+    if (bow_state.montage_tex_valid)
+        UnloadTexture(bow_state.montage_tex);
+    Image ri = { mat.data, mat.cols, mat.rows, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8 };
+    bow_state.montage_tex = LoadTextureFromImage(ri);
+    bow_state.montage_tex_valid = bow_state.montage_tex.id > 0;
+}
+} // namespace
+
+void bow_loop_closure_gui()
+{
+    ImGui::Begin("Automatic Image Loop Closure (BoW)", &is_bow_loop_closure_gui);
+
+    ImGui::Text("CAMERA_0 folder:");
+    ImGui::SameLine();
+    ImGui::PushItemWidth(400);
+    ImGui::InputText("##bow_camera_dir", bow_state.camera_dir, sizeof(bow_state.camera_dir));
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    if (ImGui::Button("Select..."))
+    {
+        std::string dir = mandeye::fd::SelectFolder("Select CAMERA_0 directory");
+        if (!dir.empty())
+        {
+            std::snprintf(bow_state.camera_dir, sizeof(bow_state.camera_dir), "%s", dir.c_str());
+        }
+    }
+
+    ImGui::PushItemWidth(ImGuiNumberWidth);
+    ImGui::InputDouble("Min arc gap [m]", &bow_state.params.min_arc_gap_m);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Reject chunk pairs closer than this along the trajectory (excludes trivially-adjacent chunks)");
+    ImGui::InputDouble("Max XY dist [m]", &bow_state.params.max_xy_dist_m);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Reject chunk pairs farther apart in XY than this (plausible same-place threshold)");
+    ImGui::InputDouble("Min BoW score", &bow_state.params.min_bow_score, 0.0, 0.0, "%.4f");
+    ImGui::InputInt("Min inliers", &bow_state.params.min_inliers);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Minimum RANSAC-verified ORB match inliers to accept a candidate");
+    ImGui::InputInt("ORB features", &bow_state.params.orb_features);
+    ImGui::PopItemWidth();
+
+    bool detecting = bow_state.detecting.load();
+    ImGui::BeginDisabled(detecting || session.point_clouds_container.point_clouds.empty());
+    if (ImGui::Button("Detect candidates"))
+        bow_loop_closure_start_detection();
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+
+    std::vector<bow_loop_closure::Candidate> results_copy;
+    std::string status_copy;
+    {
+        std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+        results_copy = bow_state.results;
+        status_copy = bow_state.status;
+    }
+    ImGui::Text("%s", status_copy.c_str());
+
+    ImGui::Separator();
+    ImGui::Text(
+        "Review candidates below before adding an edge -- appearance matching alone is known to produce\n"
+        "confident false positives on repetitive scenes (see BOW_PLACE_RECOGNITION_HANDOFF.md). Select a row\n"
+        "to preview its matched keypoints.");
+
+    ImGui::BeginChild("BowResults", ImVec2(0, 260), true);
+    for (size_t row = 0; row < results_copy.size(); row++)
+    {
+        const auto& c = results_copy[row];
+        ImGui::PushID(static_cast<int>(row));
+
+        bool selected = (bow_state.selected_candidate == static_cast<int>(row));
+        if (ImGui::Selectable("##select_row", selected, ImGuiSelectableFlags_SpanAllColumns))
+        {
+            bow_state.selected_candidate = static_cast<int>(row);
+            std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+            cv::Mat montage = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.chunk_to_frame, bow_state.params);
+            bow_loop_closure_upload_montage(montage);
+        }
+        ImGui::SameLine();
+        ImGui::Text(
+            "i=%d j=%d  xy=%.2fm  arc=%.2fm  score=%.3f  inliers=%d", c.index_i, c.index_j, c.xy_dist_m, c.arc_gap_m, c.bow_score,
+            c.inliers);
+        ImGui::SameLine();
+        if (ImGui::Button("Add edge"))
+        {
+            session.pose_graph_loop_closure.add_edge(session.point_clouds_container, c.index_i, c.index_j);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Preview in 3D"))
+        {
+            index_loop_closure_source = c.index_i;
+            index_loop_closure_target = c.index_j;
+            is_loop_closure_gui = true;
+        }
+
+        ImGui::PopID();
+    }
+    ImGui::EndChild();
+
+    if (!results_copy.empty())
+    {
+        if (ImGui::Button("Add all shown"))
+        {
+            for (const auto& c : results_copy)
+                session.pose_graph_loop_closure.add_edge(session.point_clouds_container, c.index_i, c.index_j);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save all shown as montages..."))
+        {
+            std::string out_dir = mandeye::fd::SelectFolder("Select folder to save montages");
+            if (!out_dir.empty())
+            {
+                std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+                for (const auto& c : results_copy)
+                {
+                    cv::Mat m = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.chunk_to_frame, bow_state.params);
+                    if (!m.empty())
+                    {
+                        std::string fn = out_dir + "/cand_" + std::to_string(c.index_i) + "_" + std::to_string(c.index_j) + ".png";
+                        cv::imwrite(fn, m);
+                    }
+                }
+                bow_state.status = "Saved " + std::to_string(results_copy.size()) + " montages to '" + out_dir + "'";
+            }
+        }
+    }
+
+    if (bow_state.montage_tex_valid)
+    {
+        ImGui::Separator();
+        ImGui::Text("Montage preview:");
+        if (bow_state.selected_candidate >= 0 && bow_state.selected_candidate < static_cast<int>(results_copy.size()))
+        {
+            ImGui::SameLine();
+            if (ImGui::Button("Save montage..."))
+            {
+                const auto& c = results_copy[bow_state.selected_candidate];
+                std::string default_name = "cand_" + std::to_string(c.index_i) + "_" + std::to_string(c.index_j) + ".png";
+                std::string out_file =
+                    mandeye::fd::SaveFileDialog("Save montage", { "PNG image (*.png)", "*.png" }, ".png", default_name);
+                if (!out_file.empty())
+                {
+                    std::lock_guard<std::mutex> lk(bow_state.results_mutex);
+                    cv::Mat m = bow_loop_closure::buildCandidateMontage(c, bow_state.frames, bow_state.chunk_to_frame, bow_state.params);
+                    if (!m.empty())
+                        cv::imwrite(out_file, m);
+                }
+            }
+        }
+        ImVec2 avail = ImGui::GetContentRegionAvail();
+        float aspect = static_cast<float>(bow_state.montage_tex.height) / static_cast<float>(bow_state.montage_tex.width);
+        int dispW = static_cast<int>(avail.x);
+        int dispH = static_cast<int>(avail.x * aspect);
+        rlImGuiImageSize(&bow_state.montage_tex, dispW, dispH);
     }
 
     ImGui::End();
@@ -5137,6 +5402,10 @@ void display()
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Manually connect overlapping scan sections");
 
+                ImGui::MenuItem("Automatic Image Loop Closure (BoW)", nullptr, &is_bow_loop_closure_gui);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Detect loop closure candidates from CAMERA_0 images (fbow); review before adding edges");
+
                 ImGui::Separator();
                 ImGui::MenuItem("LIO segments editor", "Ctrl+E", &is_lio_segments_gui, !is_loop_closure_gui);
                 if (ImGui::IsItemHovered())
@@ -5582,6 +5851,9 @@ void display()
 
     if (is_loop_closure_gui)
         loop_closure_gui();
+
+    if (is_bow_loop_closure_gui)
+        bow_loop_closure_gui();
 
     if (is_lio_segments_gui)
         lio_segments_gui();
@@ -6119,6 +6391,11 @@ int main(int argc, char* argv[])
             display();
             EndDrawing();
         }
+
+        if (bow_state.detect_thread.joinable())
+            bow_state.detect_thread.join();
+        if (bow_state.montage_tex_valid)
+            UnloadTexture(bow_state.montage_tex);
 
         rlImGuiShutdown();
         CloseWindow();

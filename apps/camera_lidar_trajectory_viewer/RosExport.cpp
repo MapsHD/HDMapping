@@ -31,7 +31,7 @@ bool exportRos2Bag(const RosExportInput&, const RosExportOptions&, std::string& 
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include "PointCloud.h"
+#include <CalibCore/PointCloud.h>
 
 #include <algorithm>
 #include <cstring>

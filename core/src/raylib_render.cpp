@@ -208,6 +208,14 @@ void ScanRenderer::syncPoses(const std::vector<PointCloud>& pointClouds)
     }
 }
 
+namespace
+{
+    // Defined lower down with the other file-local helpers; forward declared
+    // here so draw()/drawTrajectories() can fold a per-scan initial-pose delta
+    // into the MVP.
+    Matrix toRaylibMatrix(const Eigen::Affine3d& t);
+} // namespace
+
 void ScanRenderer::draw(
     const std::vector<PointCloud>& pointClouds,
     float pointSize,
@@ -220,7 +228,8 @@ void ScanRenderer::draw(
     bool xzIntersection,
     bool yzIntersection,
     bool xyIntersection,
-    float intersectionWidth) const
+    float intersectionWidth,
+    bool useInitialPose) const
 {
     lastDrawCallCount_ = 0;
     lastVertexCount_ = 0;
@@ -280,6 +289,17 @@ void ScanRenderer::draw(
             continue;
         }
 
+        // Points are cached in world space at m_pose (see rebuild()); to show
+        // them at m_initial_pose instead, prepend the delta
+        // (m_initial_pose * m_pose^-1) to the shared MVP for this scan only --
+        // same technique as drawCachedWithTransform(). With useInitialPose off
+        // the MVP set once above is left untouched.
+        if (useInitialPose)
+        {
+            const Eigen::Affine3d delta = pc.m_initial_pose * pc.m_pose.inverse();
+            rlSetUniformMatrix(locMVP_, MatrixMultiply(toRaylibMatrix(delta), mvp));
+        }
+
         float color[4];
         int colorModeInt;
         if (gpu.hasMarkColor)
@@ -320,6 +340,11 @@ void ScanRenderer::draw(
         ++lastDrawCallCount_;
         lastVertexCount_ += drawCount;
         rlDisableVertexArray();
+    }
+
+    if (useInitialPose)
+    {
+        rlSetUniformMatrix(locMVP_, mvp); // undo the last scan's per-scan fold
     }
 
     rlDisableShader();
@@ -546,12 +571,12 @@ namespace
     // and show_IMU) mirrors the local pose's translation with orientation taken
     // from the first local_trajectory node's raw IMU om/fi/ka instead of the
     // LIO-optimized pose.
-    Eigen::Affine3d imuOrientationAtPose(const PointCloud& pc)
+    Eigen::Affine3d imuOrientationAtPose(const PointCloud& pc, const Eigen::Affine3d& poseForTranslation)
     {
         TaitBryanPose tb;
-        tb.px = pc.m_pose(0, 3);
-        tb.py = pc.m_pose(1, 3);
-        tb.pz = pc.m_pose(2, 3);
+        tb.px = poseForTranslation(0, 3);
+        tb.py = poseForTranslation(1, 3);
+        tb.pz = poseForTranslation(2, 3);
         tb.om = pc.local_trajectory[0].imu_om_fi_ka.x();
         tb.fi = pc.local_trajectory[0].imu_om_fi_ka.y();
         tb.ka = pc.local_trajectory[0].imu_om_fi_ka.z();
@@ -623,7 +648,8 @@ void ScanRenderer::drawTrajectories(
     bool visibleImuDiff,
     bool xzIntersection,
     bool yzIntersection,
-    bool xyIntersection) const
+    bool xyIntersection,
+    bool useInitialPose) const
 {
     int stride = reduceRenderedTrajectory < 1 ? 1 : reduceRenderedTrajectory;
 
@@ -650,10 +676,13 @@ void ScanRenderer::drawTrajectories(
         return;
     }
 
+    // Hoisted out of the `if (shaderValid_)` block below so the per-scan
+    // initial-pose MVP fold in the draw loop can use it as the base.
+    const Matrix mvp = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+
     if (shaderValid_)
     {
         rlDrawRenderBatchActive();
-        Matrix mvp = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
         rlEnableShader(shader_.id);
         rlSetUniformMatrix(locMVP_, mvp);
         int colorModeFlat = 0;
@@ -673,11 +702,16 @@ void ScanRenderer::drawTrajectories(
             continue;
         }
 
+        // Same initial-pose handling as draw(): the trajectory GPU buffer is
+        // cached at m_pose, so fold (m_initial_pose * m_pose^-1) into the MVP
+        // for the polyline; the CPU-side overlays just use shownPose directly.
+        const Eigen::Affine3d& shownPose = useInitialPose ? pc.m_initial_pose : pc.m_pose;
+
         if (visibleImuDiff)
         {
             for (size_t i = 1; i < pc.local_trajectory.size(); ++i)
             {
-                Eigen::Affine3d m = pc.m_pose * pc.local_trajectory[i].m_pose;
+                Eigen::Affine3d m = shownPose * pc.local_trajectory[i].m_pose;
                 Vector3 origin = toVec3(m.translation());
                 const auto& diff = pc.local_trajectory[i].imu_diff_angle_om_fi_ka_deg;
                 DrawLine3D(origin, toVec3(m.translation() + Eigen::Vector3d(diff.x() * 10, 0, 0)), RED);
@@ -698,6 +732,11 @@ void ScanRenderer::drawTrajectories(
 
             if (traj.vertexCount > 0)
             {
+                if (useInitialPose)
+                {
+                    const Eigen::Affine3d delta = pc.m_initial_pose * pc.m_pose.inverse();
+                    rlSetUniformMatrix(locMVP_, MatrixMultiply(toRaylibMatrix(delta), mvp));
+                }
                 float colorF[4] = { pc.traj_color[0], pc.traj_color[1], pc.traj_color[2], 1.0f };
                 rlSetUniform(locColor_, colorF, RL_SHADER_UNIFORM_VEC4, 1);
                 float pointSize = static_cast<float>(pc.line_width);
@@ -705,31 +744,35 @@ void ScanRenderer::drawTrajectories(
                 rlEnableVertexArray(traj.vao);
                 glDrawArrays(GL_POINTS, 0, traj.vertexCount);
                 rlDisableVertexArray();
+                if (useInitialPose)
+                {
+                    rlSetUniformMatrix(locMVP_, mvp); // restore for the next scan
+                }
             }
         }
 
         if (pc.fuse_inclination_from_IMU)
         {
-            drawSquareOutline(pc.m_pose, 0.2, GREEN);
-            drawSquareOutline(imuOrientationAtPose(pc), 0.2, RED);
+            drawSquareOutline(shownPose, 0.2, GREEN);
+            drawSquareOutline(imuOrientationAtPose(pc, shownPose), 0.2, RED);
         }
 
         if (pc.fixed_om && pc.fixed_fi)
         {
             for (double x = 0.4; x <= 1.0; x += 0.1)
             {
-                drawSquareOutline(pc.m_pose, x, RED);
+                drawSquareOutline(shownPose, x, RED);
             }
         }
 
         if (pc.show_IMU)
         {
-            drawOrientationCross(imuOrientationAtPose(pc));
+            drawOrientationCross(imuOrientationAtPose(pc, shownPose));
         }
 
         if (pc.show_pose)
         {
-            drawOrientationCross(pc.m_pose);
+            drawOrientationCross(shownPose);
         }
     }
 

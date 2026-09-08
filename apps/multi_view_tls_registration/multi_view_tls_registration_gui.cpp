@@ -4622,14 +4622,16 @@ void display()
                 session.point_clouds_container.xz_intersection,
                 session.point_clouds_container.yz_intersection,
                 session.point_clouds_container.xy_intersection,
-                static_cast<float>(session.point_clouds_container.intersection_width));
+                static_cast<float>(session.point_clouds_container.intersection_width),
+                session.point_clouds_container.show_with_initial_pose);
             scan_renderer.drawTrajectories(
                 session.point_clouds_container.point_clouds,
                 1,
                 session.point_clouds_container.show_imu_to_lio_diff,
                 session.point_clouds_container.xz_intersection,
                 session.point_clouds_container.yz_intersection,
-                session.point_clouds_container.xy_intersection);
+                session.point_clouds_container.xy_intersection,
+                session.point_clouds_container.show_with_initial_pose);
 
             observationPickingRender(observation_picking);
 

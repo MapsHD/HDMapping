@@ -106,6 +106,12 @@ public:
     // three false (the default), every point draws, matching today's
     // behavior. Applied in the fragment shader (a discard), not a CPU-side
     // filter -- see raylib_render_shaders.hpp.
+    //
+    // useInitialPose draws every scan at its m_initial_pose instead of its
+    // current m_pose (ports the legacy PointCloud::render()'s
+    // show_with_initial_pose branch). The cached GPU buffers stay baked at
+    // m_pose; the per-scan delta (m_initial_pose * m_pose^-1) is folded into
+    // the MVP, the same trick drawCachedWithTransform() uses to preview a pose.
     void draw(
         const std::vector<PointCloud>& pointClouds,
         float pointSize,
@@ -118,7 +124,8 @@ public:
         bool xzIntersection = false,
         bool yzIntersection = false,
         bool xyIntersection = false,
-        float intersectionWidth = 0.1f) const;
+        float intersectionWidth = 0.1f,
+        bool useInitialPose = false) const;
 
     // Number of glDrawArrays calls draw() issued the last time it ran (one
     // per visible scan) -- raylib/rlgl don't expose a draw-call counter for
@@ -168,13 +175,16 @@ public:
     // per-point like draw() above) whenever any of xzIntersection/
     // yzIntersection/xyIntersection is set, so a cross-section view isn't
     // cluttered by trajectory points/markers outside the slab.
+    // useInitialPose: see draw() -- draws each scan's trajectory/markers at
+    // m_initial_pose instead of m_pose.
     void drawTrajectories(
         const std::vector<PointCloud>& pointClouds,
         int reduceRenderedTrajectory,
         bool visibleImuDiff,
         bool xzIntersection = false,
         bool yzIntersection = false,
-        bool xyIntersection = false) const;
+        bool xyIntersection = false,
+        bool useInitialPose = false) const;
 
     // Draws a single already-cached scan (see rebuild()) straight from its
     // persistent, full-resolution GPU buffer -- no CPU re-transform or

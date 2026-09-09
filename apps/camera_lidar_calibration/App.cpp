@@ -663,6 +663,10 @@ void App::update()
 // counterpart to the image view's zoom loupe: a precision aid the user sees
 // before committing a click. Must be called inside BeginMode3D/EndMode3D.
 //
+// The markers are wireframe spheres (not solid ones): a solid marker hides
+// the very point it marks, which defeats the purpose when the user is
+// aiming at a specific point in the cloud.
+//
 // Index labels for the markers are 2D text (DrawText), which must NOT be
 // called while inside BeginMode3D/EndMode3D -- while a 3D projection matrix
 // is active, DrawText's screen-pixel quads would get warped through it
@@ -678,7 +682,7 @@ static void updateAndDrawPicking3D(
     {
         const auto& p = state.pairs[i];
         Vector3 wp = { p.px, p.pz, -p.py };
-        DrawSphere(wp, 0.05f, YELLOW);
+        DrawSphereWires(wp, 0.05f, 6, 8, YELLOW);
         DrawLine3D(Vector3{ wp.x - 0.1f, wp.y, wp.z }, Vector3{ wp.x + 0.1f, wp.y, wp.z }, YELLOW);
         DrawLine3D(Vector3{ wp.x, wp.y - 0.1f, wp.z }, Vector3{ wp.x, wp.y + 0.1f, wp.z }, YELLOW);
 
@@ -706,7 +710,7 @@ static void updateAndDrawPicking3D(
     if (state.pendingHasCloud)
     {
         Vector3 wp = { state.pendingPair.px, state.pendingPair.pz, -state.pendingPair.py };
-        DrawSphere(wp, 0.07f, ORANGE);
+        DrawSphereWires(wp, 0.07f, 6, 8, ORANGE);
     }
 
     if (!shiftHeld() || ImGui::GetIO().WantCaptureMouse)
@@ -731,7 +735,7 @@ static void updateAndDrawPicking3D(
     {
         const auto& hp = state.cloud.points[hitIndex];
         Vector3 wp = state.cloudPointsRaylib[hitIndex];
-        DrawSphere(wp, 0.08f, LIME);
+        DrawSphereWires(wp, 0.08f, 6, 8, LIME);
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
             state.setPendingCloudPoint(hp.x, hp.y, hp.z);

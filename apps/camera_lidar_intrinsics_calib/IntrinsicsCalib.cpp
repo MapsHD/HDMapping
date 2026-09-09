@@ -6,7 +6,6 @@
 #include <HDMapping/Version.hpp>
 #include <RaylibWidgets/WindowFit.h>
 #include <cstdio>
-#include <nlohmann/json.hpp>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -72,7 +71,7 @@ struct State
     cv::Size imageSize;
 
     // output
-    char outPath[512] = "intrinsics.json";
+    char outPath[512] = "intrinsics.yaml";
     std::string statusMsg;
 
     // background detection
@@ -268,29 +267,35 @@ static void runCalibration(State& s)
     s.statusMsg = "RMS: " + std::to_string(s.rmsError).substr(0, 5) + " px  (" + std::to_string(allObj.size()) + " images)";
 }
 
-static void saveJson(const State& s)
+// Saved with cv::FileStorage, so K/D go out in OpenCV's own camera_info
+// YAML (!!opencv-matrix) -- readable by cv::FileStorage, ROS and
+// camera_lidar_calibration's intrinsics loader. Format follows the
+// extension, so outPath must end in .yaml/.yml.
+static void saveYaml(State& s)
 {
     if (!s.calibrated)
         return;
-    double fx = s.K.at<double>(0, 0);
-    double fy = s.K.at<double>(1, 1);
-    double cx = s.K.at<double>(0, 2);
-    double cy = s.K.at<double>(1, 2);
-    // CALIB_RATIONAL_MODEL dist order: k1 k2 p1 p2 k3 k4 k5 k6
-    auto d = [&](int i)
+
+    cv::FileStorage fs(s.outPath, cv::FileStorage::WRITE);
+    if (!fs.isOpened())
     {
-        return i < s.D.rows ? s.D.at<double>(i) : 0.0;
-    };
+        s.statusMsg = std::string("Cannot write: ") + s.outPath;
+        return;
+    }
+    fs << "image_width" << s.imageSize.width;
+    fs << "image_height" << s.imageSize.height;
+    fs << "camera_name"
+       << "camera";
+    fs << "camera_matrix" << s.K;
+    // ROS's name for the 8-coefficient model CALIB_RATIONAL_MODEL solves
+    // for; D's order is OpenCV's distCoeffs order k1 k2 p1 p2 k3 k4 k5 k6.
+    fs << "distortion_model"
+       << "rational_polynomial";
+    fs << "distortion_coefficients" << s.D;
+    fs << "avg_reprojection_error" << s.rmsError;
+    fs.release();
 
-    nlohmann::json j;
-    j["intrinsics"] = { { "fx", fx },   { "fy", fy },   { "cx", cx },   { "cy", cy },   { "k1", d(0) }, { "k2", d(1) },
-                        { "p1", d(2) }, { "p2", d(3) }, { "k3", d(4) }, { "k4", d(5) }, { "k5", d(6) }, { "k6", d(7) } };
-    j["image_size"] = { s.imageSize.width, s.imageSize.height };
-    j["rms_error"] = s.rmsError;
-
-    std::ofstream f(s.outPath);
-    if (f)
-        f << j.dump(4);
+    s.statusMsg = std::string("Saved: ") + s.outPath;
 }
 
 // Upload current image (with corners drawn) to a raylib texture.
@@ -553,13 +558,11 @@ int main(int argc, char* argv[])
                     setBuf(
                         state.outPath,
                         sizeof(state.outPath),
-                        mandeye::fd::SaveFileDialog("Save intrinsics JSON", mandeye::fd::json_filter, ".json", defaultName));
+                        mandeye::fd::SaveFileDialog("Save intrinsics YAML", mandeye::fd::IntrinsicsFilter, ".yaml", defaultName));
                 }
-                if (ImGui::Button("Save JSON", ImVec2(-1, 0)))
-                {
-                    saveJson(state);
-                    state.statusMsg = std::string("Saved: ") + state.outPath;
-                }
+                if (ImGui::Button("Save YAML", ImVec2(-1, 0)))
+                    saveYaml(state);
+
                 ImGui::PopItemWidth();
             }
         }

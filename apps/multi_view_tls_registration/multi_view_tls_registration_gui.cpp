@@ -2544,19 +2544,31 @@ void loadSession(const std::string& session_file_name)
     }
 }
 
+// Lower-cased file extension (with leading '.'), e.g. lowerExtension("Scan.E57") == ".e57".
+// Shared by loadSessionFromPath(), loadDroppedFiles() and the CLI argv handling in main() so
+// extension matching is case-insensitive and consistent everywhere a dropped/passed path is
+// classified.
+std::string lowerExtension(const std::filesystem::path& path)
+{
+    std::string ext = path.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    return ext;
+}
+
 // Accepts a Mandeye JSON Session file (*.mjs/*.json) -- shared by the drag & drop handler in main()'s loop and
 // the CLI argv handling below, so both accept the same input and report unsupported drops the same way.
 void loadSessionFromPath(const std::string& path)
 {
-    std::string ext = fs::path(path).extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
+    const std::string ext = lowerExtension(path);
     if (ext != ".mjs" && ext != ".json")
     {
         spdlog::error("Unsupported file dropped: '{}'", path);
 
         [[maybe_unused]] pfd::message message(
-            "Load session", "Unsupported file:\n" + path + "\n\nDrop a session file (*.mjs/*.json).", pfd::choice::ok, pfd::icon::error);
+            "Load session",
+            "Unsupported file:\n" + path + "\n\nDrop a session file (*.mjs/*.json) or e57 file(s).",
+            pfd::choice::ok,
+            pfd::icon::error);
         message.result();
         return;
     }
@@ -2854,11 +2866,13 @@ void openLaz(bool fillInSession)
     finalizeScanSession(fs::path(input_file_names[0]).parent_path().string(), fillInSession);
 }
 
-void openE57(bool fillInSession)
+// Shared by openE57() (file dialog) and the drag & drop handler in main()'s loop, so
+// both build the session from e57 files the same way -- including honoring the
+// "Downsample during load" (tls_registration.is_decimate/bucket_x/y/z) setting below.
+void loadE57Files(const std::vector<std::string>& input_file_names, bool fillInSession)
 {
-    std::vector<std::string> input_file_names = mandeye::fd::OpenFileDialog("Load e57 files", mandeye::fd::E57_filter, true);
-    if (input_file_names.size() == 0)
-        return; // dialog cancelled -- leave any already-loaded session untouched
+    if (input_file_names.empty())
+        return;
 
     spdlog::info("Creating session from e57 files:");
     for (const auto& fn : input_file_names)
@@ -2960,6 +2974,43 @@ void openE57(bool fillInSession)
     }
 
     finalizeScanSession(fs::path(input_file_names[0]).parent_path().string(), false /* never create session files for e57 */);
+}
+
+void openE57(bool fillInSession)
+{
+    std::vector<std::string> input_file_names = mandeye::fd::OpenFileDialog("Load e57 files", mandeye::fd::E57_filter, true);
+    if (input_file_names.size() == 0)
+        return; // dialog cancelled -- leave any already-loaded session untouched
+
+    loadE57Files(input_file_names, fillInSession);
+}
+
+// Handles one drag & drop event, which may carry several paths at once. A single Mandeye JSON
+// Session file (*.mjs/*.json) is loaded via loadSessionFromPath() as before (only the first path
+// is used, matching the old drop behavior). One or more E57 files are imported together via
+// loadE57Files() -- same as multi-selecting them in the "Open e57" file dialog, so the drop
+// honors "Downsample during load" (tls_registration.is_decimate/bucket_x/y/z) exactly like that
+// dialog does. Any other extension falls back to loadSessionFromPath()'s "unsupported" message.
+void loadDroppedFiles(const std::vector<std::string>& paths)
+{
+    if (paths.empty())
+        return;
+
+    if (lowerExtension(paths[0]) == ".e57")
+    {
+        std::vector<std::string> e57_paths;
+        for (const auto& p : paths)
+        {
+            if (lowerExtension(p) == ".e57")
+                e57_paths.push_back(p);
+            else
+                spdlog::warn("Ignoring non-e57 file dropped alongside e57 file(s): '{}'", p);
+        }
+        loadE57Files(e57_paths, fillInSession);
+        return;
+    }
+
+    loadSessionFromPath(paths[0]);
 }
 
 // Write the current (registered) poses of E57-imported scans back into the
@@ -6586,8 +6637,7 @@ int main(int argc, char* argv[])
         {
             for (int i = 1; i < argc; i++)
             {
-                std::string ext = fs::path(argv[i]).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                const std::string ext = lowerExtension(argv[i]);
 
                 if (ext == ".mjs" || ext == ".json")
                 {
@@ -6628,16 +6678,20 @@ int main(int argc, char* argv[])
             if (wheelMove != 0.0f)
                 wheel(0, wheelMove > 0.0f ? 1 : -1, mx, my);
 
-            // Drag & drop a session file (*.mjs/*.json) onto the window to load it. raylib's GLFW backend
-            // surfaces OS drag & drop the same way on Windows, Linux and macOS, so no platform-specific code is
-            // needed here. Only the first dropped path is used; loadSessionFromPath() reports unsupported drops
-            // via a message box instead of silently ignoring them.
+            // Drag & drop a session file (*.mjs/*.json) or one or more e57 file(s) onto the window to load
+            // them. raylib's GLFW backend surfaces OS drag & drop the same way on Windows, Linux and macOS,
+            // so no platform-specific code is needed here. loadDroppedFiles() reports unsupported drops via
+            // a message box instead of silently ignoring them.
             if (IsFileDropped())
             {
                 FilePathList dropped_files = LoadDroppedFiles();
                 if (dropped_files.count > 0)
                 {
-                    loadSessionFromPath(dropped_files.paths[0]);
+                    std::vector<std::string> paths;
+                    paths.reserve(dropped_files.count);
+                    for (unsigned int i = 0; i < dropped_files.count; i++)
+                        paths.emplace_back(dropped_files.paths[i]);
+                    loadDroppedFiles(paths);
                 }
                 UnloadDroppedFiles(dropped_files);
             }

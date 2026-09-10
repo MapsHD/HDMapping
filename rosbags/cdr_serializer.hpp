@@ -149,6 +149,13 @@ public:
 		safe_copy(&v, 4);
 		return v;
 	}
+    uint64_t read_u64()
+    {
+        align(8);
+        uint64_t v = 0;
+        safe_copy(&v, 8);
+        return v;
+    }
 	float read_f32()
 	{
 		align(4);
@@ -263,6 +270,27 @@ struct Pc2Field
 	{
 		return type != Pc2Type::None;
 	}
+};
+
+// LivoxPoint
+struct LivoxPoint
+{
+    uint32_t offset_time;
+    float x;
+    float y;
+    float z;
+    uint8_t reflectivity;
+    uint8_t tag;
+    uint8_t line;
+};
+
+// Livox CustomMsg
+struct LivoxCustomMsg
+{
+    uint64_t timebase; 
+    uint32_t point_num;
+    uint8_t lidar_id;
+    std::vector<LivoxPoint> points;
 };
 
 // Reads one field out of a point record and widens it to double, so callers do
@@ -479,6 +507,91 @@ inline std::string comparePc2Layouts(const Pc2Layout& preset, const Pc2Layout& m
 // disagreement is reported through `warning` -- forcing a layout that does not
 // match the data is the one way this decoder can silently produce plausible
 // nonsense, so it is never done quietly.
+
+// decode livox_ros_driver2/msg/CustomMsg
+// 
+inline std::vector<McapPoint> decodeLivoxCustomMsg(
+    const uint8_t* data,
+    size_t size,
+    double fallback_stamp = 0.0, 
+    std::string* warning = nullptr)
+{
+    const auto warn = [&](std::string message)
+    {
+        if (warning && warning->empty())
+            *warning = std::move(message);
+    };
+
+    std::vector<McapPoint> points;
+    CdrReader r(data, size);
+
+    if (!r.ok())
+    {
+        warn("Livox CustomMsg data is truncated");
+        return points;
+    }
+
+    // reading header (std ROS2 header)
+    const int32_t stamp_sec = r.read_i32();
+    const uint32_t stamp_nsec = r.read_u32();
+    r.read_string(); // frame_id
+
+    (void)stamp_sec;
+    (void)stamp_nsec;
+    (void)fallback_stamp;
+
+    // reading Livox CustomMsg
+    const uint64_t timebase = r.read_u64();
+    const uint32_t point_num = r.read_u32();
+    r.read_u8(); // lidar_id
+    r.skip(3); // uint8[3] rsvd 
+    
+	const uint32_t seq_len = r.read_u32();
+    if (seq_len != point_num) 
+        warn("CustomMsg point_num (" + std::to_string(point_num) +
+			") != points sequence length (" + std::to_string(seq_len) + ")");
+    const uint32_t n = std::min(point_num, seq_len);
+    
+    // reading points
+    const double timebase_sec = static_cast<double>(timebase) * 1e-9;
+
+	points.reserve(n);
+    for (uint32_t i = 0; i < n; ++i)
+    {
+        if (!r.ok())
+        {
+            warn("Truncated point data at index " + std::to_string(i));
+            break;
+        }
+
+        LivoxPoint pt;        
+        pt.offset_time = r.read_u32();
+        pt.x = r.read_f32();
+        pt.y = r.read_f32();
+        pt.z = r.read_f32();
+        pt.reflectivity = r.read_u8();
+        pt.tag = r.read_u8();
+        pt.line = r.read_u8();        
+
+        // to McapPoint
+        McapPoint mcap_pt;
+        mcap_pt.x = pt.x;
+        mcap_pt.y = pt.y;
+        mcap_pt.z = pt.z;
+        mcap_pt.intensity = static_cast<float>(pt.reflectivity);
+        mcap_pt.ring = static_cast<uint16_t>(pt.line);
+        mcap_pt.laser_id = pt.tag;
+
+        // compute timestamp of point: timebase + offset_time
+        const double offset_sec = static_cast<double>(pt.offset_time) * 1e-9;        
+        mcap_pt.timestamp = timebase_sec + offset_sec;
+
+        points.push_back(mcap_pt);
+    }
+
+    return points;
+}
+
 inline std::vector<McapPoint> decodePc2(
 	const uint8_t* data, size_t size, Pc2Preset preset = Pc2Preset::Auto, std::string* warning = nullptr)
 {

@@ -136,8 +136,14 @@ static float angularSpeedDegAt(const Trajectory& traj, const std::vector<float>&
 {
     if (traj.poses.empty() || perPose.size() != traj.poses.size())
         return 0.f;
-    auto it = std::lower_bound(traj.poses.begin(), traj.poses.end(), ts_ns,
-        [](const TrajPose& p, int64_t t) { return p.ts_ns < t; });
+    auto it = std::lower_bound(
+        traj.poses.begin(),
+        traj.poses.end(),
+        ts_ns,
+        [](const TrajPose& p, int64_t t)
+        {
+            return p.ts_ns < t;
+        });
     size_t idx;
     if (it == traj.poses.end())
         idx = traj.poses.size() - 1;
@@ -146,9 +152,8 @@ static float angularSpeedDegAt(const Trajectory& traj, const std::vector<float>&
     else
     {
         auto prev = std::prev(it);
-        idx = (std::abs(it->ts_ns - ts_ns) < std::abs(prev->ts_ns - ts_ns))
-                  ? (size_t)(it - traj.poses.begin())
-                  : (size_t)(prev - traj.poses.begin());
+        idx = (std::abs(it->ts_ns - ts_ns) < std::abs(prev->ts_ns - ts_ns)) ? (size_t)(it - traj.poses.begin())
+                                                                            : (size_t)(prev - traj.poses.begin());
     }
     return perPose[idx];
 }
@@ -489,9 +494,7 @@ static void loadSession(AppState& s)
 
     // angular speed per pose — feeds the "drop fast-rotating images" colorize filter
     s.poseAngSpeedDeg = computePoseAngularSpeedDeg(s.traj);
-    s.poseAngSpeedMax = s.poseAngSpeedDeg.empty()
-        ? 0.f
-        : *std::max_element(s.poseAngSpeedDeg.begin(), s.poseAngSpeedDeg.end());
+    s.poseAngSpeedMax = s.poseAngSpeedDeg.empty() ? 0.f : *std::max_element(s.poseAngSpeedDeg.begin(), s.poseAngSpeedDeg.end());
 
     // camera image timestamps
     fs::path camDir = s.cameraBuf[0] ? fs::path(s.cameraBuf) : d.parent_path() / "CAMERA_0";
@@ -640,8 +643,7 @@ static void loadCloud(AppState& s)
                     auto fnIt = s.imagesFilenamesInTime.find(imgTs);
                     if (fnIt == s.imagesFilenamesInTime.end())
                         continue;
-                    if (dropFastImgs &&
-                        angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, imgTs) > s.maxImageAngSpeedDeg)
+                    if (dropFastImgs && angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, imgTs) > s.maxImageAngSpeedDeg)
                     {
                         ++angFilteredImgs;
                         continue;
@@ -672,8 +674,7 @@ static void loadCloud(AppState& s)
                 int64_t imgTs = *it;
                 auto fnIt = s.imagesFilenamesInTime.find(imgTs);
                 Eigen::Affine3f pose;
-                const bool tooFast = dropFastImgs &&
-                    angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, imgTs) > s.maxImageAngSpeedDeg;
+                const bool tooFast = dropFastImgs && angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, imgTs) > s.maxImageAngSpeedDeg;
                 if (tooFast)
                     ++angFilteredImgs;
                 if (!tooFast && fnIt != s.imagesFilenamesInTime.end() && interpPose(trajMap, imgTs, pose))
@@ -2087,9 +2088,10 @@ int main(int argc, char* argv[])
             }
             ImGui::Checkbox("Drop fast-rotating images", &s.filterFastImages);
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Exclude camera frames whose pose angular speed exceeds\n"
-                                  "the threshold — motion-smeared, and prone to smearing\n"
-                                  "colour onto the wrong points from the time offset.");
+                ImGui::SetTooltip(
+                    "Exclude camera frames whose pose angular speed exceeds\n"
+                    "the threshold — motion-smeared, and prone to smearing\n"
+                    "colour onto the wrong points from the time offset.");
             if (s.filterFastImages)
             {
                 ImGui::PopItemWidth();
@@ -2172,8 +2174,11 @@ int main(int argc, char* argv[])
                 {
                     float as = angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, s.imageTsNs[s.imgViewIdx]);
                     bool fast = s.filterFastImages && s.maxImageAngSpeedDeg > 0.f && as > s.maxImageAngSpeedDeg;
-                    ImGui::TextColored(fast ? ImVec4(1.f, 0.5f, 0.3f, 1.f) : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),
-                                       "ang. speed: %.1f deg/s%s", as, fast ? "  (dropped)" : "");
+                    ImGui::TextColored(
+                        fast ? ImVec4(1.f, 0.5f, 0.3f, 1.f) : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),
+                        "ang. speed: %.1f deg/s%s",
+                        as,
+                        fast ? "  (dropped)" : "");
                 }
                 ImGui::Checkbox("Only this camera's points", &s.isolateCamera);
                 if (ImGui::IsItemHovered())

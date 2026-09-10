@@ -103,6 +103,61 @@ static bool interpPose(const std::map<double, Eigen::Matrix4d>& trajMap, int64_t
     return true;
 }
 
+static constexpr double kRad2Deg = 57.295779513082320876;
+
+// Angular speed (deg/s) for every trajectory pose: the rotation change to the next
+// pose divided by the time step. Result is parallel to traj.poses; the last entry
+// repeats the previous one. Fewer than two poses -> all zeros. Non-increasing
+// timestamps (chunk boundaries, duplicates) reuse the previous value.
+static std::vector<float> computePoseAngularSpeedDeg(const Trajectory& traj)
+{
+    const auto& poses = traj.poses;
+    std::vector<float> speed(poses.size(), 0.f);
+    for (size_t i = 0; i + 1 < poses.size(); ++i)
+    {
+        const double dt = (poses[i + 1].ts_ns - poses[i].ts_ns) * 1e-9;
+        if (dt <= 1e-6)
+        {
+            speed[i] = (i > 0) ? speed[i - 1] : 0.f;
+            continue;
+        }
+        const Eigen::Matrix3f dR = poses[i].T.linear().transpose() * poses[i + 1].T.linear();
+        const float ang = Eigen::AngleAxisf(dR).angle(); // [0, pi] rad
+        speed[i] = (float)(ang / dt * kRad2Deg);
+    }
+    if (poses.size() >= 2)
+        speed.back() = speed[poses.size() - 2];
+    return speed;
+}
+
+// Angular speed (deg/s) at the trajectory pose nearest ts_ns. 0 when there's no
+// per-pose data (not loaded, or size mismatch with the trajectory).
+static float angularSpeedDegAt(const Trajectory& traj, const std::vector<float>& perPose, int64_t ts_ns)
+{
+    if (traj.poses.empty() || perPose.size() != traj.poses.size())
+        return 0.f;
+    auto it = std::lower_bound(
+        traj.poses.begin(),
+        traj.poses.end(),
+        ts_ns,
+        [](const TrajPose& p, int64_t t)
+        {
+            return p.ts_ns < t;
+        });
+    size_t idx;
+    if (it == traj.poses.end())
+        idx = traj.poses.size() - 1;
+    else if (it == traj.poses.begin())
+        idx = 0;
+    else
+    {
+        auto prev = std::prev(it);
+        idx = (std::abs(it->ts_ns - ts_ns) < std::abs(prev->ts_ns - ts_ns)) ? (size_t)(it - traj.poses.begin())
+                                                                            : (size_t)(prev - traj.poses.begin());
+    }
+    return perPose[idx];
+}
+
 using trajectory_viewer_shaders::kFS;
 using trajectory_viewer_shaders::kVS;
 
@@ -198,8 +253,8 @@ struct AppState
     bool showHelp = false;
     bool isolateCamera = false; // render only points colored by the selected (preview) image
     float frustumScale = 0.5f;
-    float pointSize = 2.f;
-    int cloudDecim = 5;
+    float pointSize = 1.f;
+    int cloudDecim = 1;
     int drawDecim = 1;
     bool multiImgColoring = true; // false = single image per chunk (midpoint)
     // How each point is matched to a camera image:
@@ -209,6 +264,17 @@ struct AppState
     int colorStrategy = 0;
     float maxTemporalDist = 0.5f; // s: skip images farther than this from the point (temporal)
     int maxWiggle = 1; // frames: search startIdx ± maxWiggle for a frustum hit (temporal)
+
+    // ── fast-rotation image filter ─────────────────────────────────────────────
+    // Per-pose angular speed (deg/s), parallel to traj.poses — filled by
+    // loadSession(). Images captured while the rig turns faster than
+    // maxImageAngSpeedDeg are dropped from the colorize pass (motion-smeared).
+    std::vector<float> poseAngSpeedDeg;
+    float poseAngSpeedMax = 0.f; // deg/s: peak over the whole session (display only)
+    bool filterFastImages = true; // drop motion-smeared frames from the colorize pass
+    float maxImageAngSpeedDeg = 60.f; // deg/s threshold
+    int angFilteredImgs = 0; // images skipped by the filter in the last colorize pass
+
     bool useImageColor = false; // true once a colorize pass produced RGB data
     int colorMode = 0; // 0=intensity (jet), 1=RGB by image, 2=camera id
     int coloredPts = 0; // points that received RGB from an image
@@ -389,6 +455,9 @@ static void loadSession(AppState& s)
     s.imageTsNs.clear();
     s.exportCloud.clear();
     s.exportSegments.clear();
+    s.poseAngSpeedDeg.clear();
+    s.poseAngSpeedMax = 0.f;
+    s.angFilteredImgs = 0;
     s.cloud.unload();
     loadImages(s);
 
@@ -422,6 +491,10 @@ static void loadSession(AppState& s)
         s.traj.loadCSV(cp.string(), M);
     }
     s.traj.sort();
+
+    // angular speed per pose — feeds the "drop fast-rotating images" colorize filter
+    s.poseAngSpeedDeg = computePoseAngularSpeedDeg(s.traj);
+    s.poseAngSpeedMax = s.poseAngSpeedDeg.empty() ? 0.f : *std::max_element(s.poseAngSpeedDeg.begin(), s.poseAngSpeedDeg.end());
 
     // camera image timestamps
     fs::path camDir = s.cameraBuf[0] ? fs::path(s.cameraBuf) : d.parent_path() / "CAMERA_0";
@@ -521,6 +594,8 @@ static void loadCloud(AppState& s)
     int step = std::max(1, s.cloudDecim);
     int coloredChunks = 0;
     int coloredPts = 0, uncoloredPts = 0;
+    int angFilteredImgs = 0; // camera frames dropped for excessive pose angular speed
+    const bool dropFastImgs = s.filterFastImages && s.maxImageAngSpeedDeg > 0.f;
 
     for (auto& lp : lazPaths)
     {
@@ -568,6 +643,11 @@ static void loadCloud(AppState& s)
                     auto fnIt = s.imagesFilenamesInTime.find(imgTs);
                     if (fnIt == s.imagesFilenamesInTime.end())
                         continue;
+                    if (dropFastImgs && angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, imgTs) > s.maxImageAngSpeedDeg)
+                    {
+                        ++angFilteredImgs;
+                        continue;
+                    }
                     Eigen::Affine3f pose;
                     if (!interpPose(trajMap, imgTs, pose))
                         continue;
@@ -594,7 +674,10 @@ static void loadCloud(AppState& s)
                 int64_t imgTs = *it;
                 auto fnIt = s.imagesFilenamesInTime.find(imgTs);
                 Eigen::Affine3f pose;
-                if (fnIt != s.imagesFilenamesInTime.end() && interpPose(trajMap, imgTs, pose))
+                const bool tooFast = dropFastImgs && angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, imgTs) > s.maxImageAngSpeedDeg;
+                if (tooFast)
+                    ++angFilteredImgs;
+                if (!tooFast && fnIt != s.imagesFilenamesInTime.end() && interpPose(trajMap, imgTs, pose))
                 {
                     cv::Mat img = cv::imread(fnIt->second);
                     int gidx = (int)(it - s.imageTsNs.begin());
@@ -804,6 +887,7 @@ static void loadCloud(AppState& s)
         s.colorMode = 1; // default to RGB display once RGB data is available
     s.coloredPts = coloredPts;
     s.uncoloredPts = uncoloredPts;
+    s.angFilteredImgs = angFilteredImgs;
 
     if (cnt > 0)
     {
@@ -832,6 +916,8 @@ static void loadCloud(AppState& s)
         s.status += "  | Colored: " + std::to_string(coloredPts) + "  Uncolored: " + std::to_string(uncoloredPts) + "  (" +
             std::to_string((int)std::lround(pct)) + "%)";
     }
+    if (angFilteredImgs > 0)
+        s.status += "  | Fast-img filtered: " + std::to_string(angFilteredImgs);
 }
 
 static void loadCalib(AppState& s)
@@ -2000,6 +2086,25 @@ int main(int argc, char* argv[])
                 ImGui::PopItemWidth();
                 ImGui::PushItemWidth(-1);
             }
+            ImGui::Checkbox("Drop fast-rotating images", &s.filterFastImages);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Exclude camera frames whose pose angular speed exceeds\n"
+                    "the threshold — motion-smeared, and prone to smearing\n"
+                    "colour onto the wrong points from the time offset.");
+            if (s.filterFastImages)
+            {
+                ImGui::PopItemWidth();
+                ImGui::PushItemWidth(-140.f);
+                ImGui::InputFloat("Max ang. speed (deg/s)", &s.maxImageAngSpeedDeg, 1.f, 10.f, "%.1f");
+                s.maxImageAngSpeedDeg = std::max(0.f, s.maxImageAngSpeedDeg);
+                ImGui::PopItemWidth();
+                ImGui::PushItemWidth(-1);
+                if (s.poseAngSpeedMax > 0.f)
+                    ImGui::TextDisabled("session peak: %.1f deg/s", s.poseAngSpeedMax);
+                if (s.angFilteredImgs > 0)
+                    ImGui::TextDisabled("%d image(s) dropped last pass", s.angFilteredImgs);
+            }
             if (ImGui::Button("Load cloud", ImVec2(-1, 0)))
                 loadCloud(s);
             ImGui::PopItemWidth();
@@ -2066,6 +2171,15 @@ int main(int argc, char* argv[])
                     s.imgViewRequest.store(s.imgViewIdx);
                 }
                 ImGui::TextDisabled("ts: %lld", (long long)s.imageTsNs[s.imgViewIdx]);
+                {
+                    float as = angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, s.imageTsNs[s.imgViewIdx]);
+                    bool fast = s.filterFastImages && s.maxImageAngSpeedDeg > 0.f && as > s.maxImageAngSpeedDeg;
+                    ImGui::TextColored(
+                        fast ? ImVec4(1.f, 0.5f, 0.3f, 1.f) : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),
+                        "ang. speed: %.1f deg/s%s",
+                        as,
+                        fast ? "  (dropped)" : "");
+                }
                 ImGui::Checkbox("Only this camera's points", &s.isolateCamera);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("Render only points colored by the selected image.\nNeeds 'Color by image (RGB)' enabled.");

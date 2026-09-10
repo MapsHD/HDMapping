@@ -65,4 +65,4 @@ if (MSVC)
     target_compile_options(mandeye_single_session_viewer PRIVATE /bigobj)
 endif()
 
-install(TARGETS mandeye_single_session_viewer DESTINATION bin)
+hdmapping_install_app(mandeye_single_session_viewer)

@@ -77,4 +77,4 @@ if (MSVC)
     target_compile_options(multi_view_tls_registration_step_2_legacy PRIVATE /bigobj)
 endif()
 
-install (TARGETS multi_view_tls_registration_step_2_legacy DESTINATION bin)
+hdmapping_install_app(multi_view_tls_registration_step_2_legacy)

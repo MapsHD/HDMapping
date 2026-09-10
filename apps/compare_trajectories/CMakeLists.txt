@@ -54,4 +54,4 @@ if (MSVC)
     target_compile_options(mandeye_compare_trajectories PRIVATE /bigobj)
 endif()
 
-install(TARGETS mandeye_compare_trajectories DESTINATION bin)
+hdmapping_install_app(mandeye_compare_trajectories)

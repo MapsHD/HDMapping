@@ -50,4 +50,4 @@ if(MSVC)
     target_compile_options(camera_lidar_intrinsics_calib PRIVATE /bigobj)
 endif()
 
-install(TARGETS camera_lidar_intrinsics_calib DESTINATION bin)
+hdmapping_install_app(camera_lidar_intrinsics_calib)

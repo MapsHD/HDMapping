@@ -42,4 +42,4 @@ if (MSVC)
     target_compile_options(concatenate_multi_livox PRIVATE /bigobj)
 endif()
 
-install (TARGETS concatenate_multi_livox DESTINATION bin)
+hdmapping_install_app(concatenate_multi_livox)

@@ -66,4 +66,4 @@ if (MSVC)
     target_compile_options(mandeye_mission_recorder_calibration PRIVATE /bigobj)
 endif()
 
-install(TARGETS mandeye_mission_recorder_calibration DESTINATION bin)
+hdmapping_install_app(mandeye_mission_recorder_calibration)

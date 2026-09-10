@@ -71,4 +71,4 @@ if (MSVC)
     target_compile_options(mandeye_raw_data_viewer PRIVATE /bigobj)
 endif()
 
-install(TARGETS mandeye_raw_data_viewer DESTINATION bin)
+hdmapping_install_app(mandeye_raw_data_viewer)

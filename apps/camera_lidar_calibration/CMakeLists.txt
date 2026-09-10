@@ -60,4 +60,4 @@ if(MSVC)
     target_compile_options(camera_lidar_calibration PRIVATE /bigobj)
 endif()
 
-install(TARGETS camera_lidar_calibration DESTINATION bin)
+hdmapping_install_app(camera_lidar_calibration)

@@ -322,6 +322,10 @@ struct AppState
     Texture2D imgViewTex = {};
     bool imgViewTexValid = false;
     std::atomic<int> imgViewRequest{ -1 };
+    // Bumped when the image set itself is replaced (a camera directory dropped). The loader
+    // thread skips a request whose index it already served, so without this a swap that keeps
+    // the same index would leave the previous frame on screen.
+    std::atomic<int> imgViewEpoch{ 0 };
     std::atomic<bool> imgViewStop{ false };
     std::atomic<bool> imgViewLoading{ false };
     std::mutex imgViewMtx;
@@ -1198,15 +1202,48 @@ static void actionOpenCalibration(AppState& s)
     }
 }
 
-// Drag & drop equivalent of actionSelectLioResultDir()/actionOpenCalibration(): a dropped
-// directory is this app's session (LIO result dir), and unlike the menu action it loads
-// immediately instead of waiting for the "Load session" button, since a drop is already an
-// explicit "load this" gesture. A dropped *.json is treated as a calibration file. Used by the
-// drag & drop handler in main()'s loop below.
+// A directory holding this app's camera frames (cam0_<timestamp_ns>.jpg).
+static bool isCameraDir(const fs::path& dir)
+{
+    for (const auto& e : fs::directory_iterator(dir))
+    {
+        std::string n = e.path().filename().string();
+        if (n.rfind("cam0_", 0) == 0 && e.path().extension() == ".jpg")
+            return true;
+    }
+    return false;
+}
+
+// Drag & drop equivalent of actionSelectLioResultDir()/actionSelectCamera0Dir()/
+// actionOpenCalibration(), and unlike those menu actions it applies immediately instead of
+// waiting for the "Load session" button, since a drop is already an explicit "load this"
+// gesture. A dropped directory of cam0_*.jpg is the camera directory (only the images are
+// swapped, so the trajectory and the loaded cloud survive); any other directory is this
+// app's session (LIO result dir). A dropped *.json is treated as a calibration file. Used by
+// the drag & drop handler in main()'s loop below.
 static void handleDroppedPath(AppState& s, const std::string& path)
 {
     if (fs::is_directory(path))
     {
+        // Checked before the session branch: a CAMERA_0 folder is never a LIO result dir,
+        // and dropping one onto a loaded session must not wipe the trajectory.
+        if (isCameraDir(path))
+        {
+            setBuf(s.cameraBuf, sizeof(s.cameraBuf), path);
+            loadImages(s);
+            // imageTsNs is the sorted key set of imagesFilenamesInTime -- indices into it are
+            // the "global image index" behind the preview slider, the per-point camera id and
+            // the frustum highlight, so it has to follow the new image set. Normally built by
+            // loadSession(), which we deliberately do not re-run here.
+            s.imageTsNs.clear();
+            s.imageTsNs.reserve(s.imagesFilenamesInTime.size());
+            for (const auto& kv : s.imagesFilenamesInTime)
+                s.imageTsNs.push_back(kv.first); // std::map iterates in key order
+            s.imgViewIdx = std::clamp(s.imgViewIdx, 0, std::max(0, (int)s.imageTsNs.size() - 1));
+            s.imgViewEpoch.fetch_add(1);
+            s.imgViewRequest.store(s.imageTsNs.empty() ? -1 : s.imgViewIdx);
+            return;
+        }
         setBuf(s.sessionBuf, sizeof(s.sessionBuf), path);
         loadSession(s);
         return;
@@ -1621,12 +1658,15 @@ int main(int argc, char* argv[])
         [&s]()
         {
             int lastLoaded = -1;
+            int lastEpoch = -1;
             while (!s.imgViewStop.load())
             {
                 int req = s.imgViewRequest.load();
-                if (req != lastLoaded && req >= 0 && req < (int)s.imageTsNs.size())
+                int epoch = s.imgViewEpoch.load();
+                if ((req != lastLoaded || epoch != lastEpoch) && req >= 0 && req < (int)s.imageTsNs.size())
                 {
                     lastLoaded = req;
+                    lastEpoch = epoch;
                     s.imgViewLoading = true;
                     int64_t ts = s.imageTsNs[req];
                     auto it = s.imagesFilenamesInTime.find(ts);
@@ -1663,9 +1703,10 @@ int main(int argc, char* argv[])
         bool imguiWants = ImGui::GetIO().WantCaptureMouse;
         s.orbit.updateEulerTransition(GetFrameTime());
 
-        // Drag & drop the LIO result directory (this app's session) or a calibration *.json onto
-        // the window to load it -- raylib's GLFW backend surfaces OS drag & drop the same way on
-        // Windows, Linux and macOS, so no platform-specific code is needed here.
+        // Drag & drop the LIO result directory (this app's session), a CAMERA_0 directory or a
+        // calibration *.json onto the window to load it -- raylib's GLFW backend surfaces OS
+        // drag & drop the same way on Windows, Linux and macOS, so no platform-specific code
+        // is needed here. See handleDroppedPath() for how a dropped path is classified.
         if (IsFileDropped())
         {
             FilePathList dropped = LoadDroppedFiles();

@@ -31,7 +31,7 @@ bool exportRos2Bag(const RosExportInput&, const RosExportOptions&, std::string& 
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include "PointCloud.h"
+#include <CalibCore/PointCloud.h>
 
 #include <algorithm>
 #include <cstring>
@@ -207,7 +207,10 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
             cv::Mat map1, map2;
             bool mapsReady = false;
             int camW = 0, camH = 0;
-            const bool rectify = opt.undistortCamera && in.calibLoaded;
+            // initUndistortRectifyMap is pinhole-only: there is nothing to
+            // rectify on a 360 panorama, and Km/Dm describe a camera it isn't.
+            const bool equirect = in.K.model == CameraModel::Equirectangular;
+            const bool rectify = opt.undistortCamera && in.calibLoaded && !equirect;
             // Original jpeg bytes can be copied verbatim only when we neither
             // rectify nor need to re-encode (compressed + no undistort).
             const bool copyJpegBytes = opt.compressCamera && !rectify;
@@ -299,14 +302,29 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
                         ci.header.frame_id = in.cameraFrame;
                         ci.height = static_cast<uint32_t>(camH);
                         ci.width = static_cast<uint32_t>(camW);
-                        ci.distortion_model = "rational_polynomial";
-                        if (rectify) // image already rectified → no distortion
-                            ci.d = { 0, 0, 0, 0, 0, 0, 0, 0 };
+                        if (equirect)
+                        {
+                            // No ROS distortion model describes a 360 panorama,
+                            // and there is no K to report -- width/height are
+                            // the whole projection. Leave k/p zeroed rather than
+                            // publish a pinhole that would mislead consumers.
+                            ci.distortion_model = "equirectangular";
+                            ci.d = {};
+                            ci.k = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                            ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
+                            ci.p = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                        }
                         else
-                            ci.d = { in.K.k1, in.K.k2, in.K.p1, in.K.p2, in.K.k3, in.K.k4, in.K.k5, in.K.k6 };
-                        ci.k = { in.K.fx, 0.f, in.K.cx, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 1.f };
-                        ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
-                        ci.p = { in.K.fx, 0.f, in.K.cx, 0.f, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 0.f, 1.f, 0.f };
+                        {
+                            ci.distortion_model = "rational_polynomial";
+                            if (rectify) // image already rectified → no distortion
+                                ci.d = { 0, 0, 0, 0, 0, 0, 0, 0 };
+                            else
+                                ci.d = { in.K.k1, in.K.k2, in.K.p1, in.K.p2, in.K.k3, in.K.k4, in.K.k5, in.K.k6 };
+                            ci.k = { in.K.fx, 0.f, in.K.cx, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 1.f };
+                            ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
+                            ci.p = { in.K.fx, 0.f, in.K.cx, 0.f, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 0.f, 1.f, 0.f };
+                        }
                         writer.write(ci, kTopicCamInfo, rclcpp::Time(ts));
                     }
                 }

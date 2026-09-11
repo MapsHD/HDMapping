@@ -6,8 +6,35 @@
 namespace calib
 {
 
+    // Which projection projectPoint() applies. Selected by a "model" key in the
+    // calibration JSON.
+    //
+    // Not every consumer honours this yet. apps/camera_lidar_calibration neither
+    // writes the key (saveCalibration) nor reads it (loadCalibration /
+    // loadIntrinsics -- and its OpenCV YAML input cannot express one at all), so
+    // it always operates as Pinhole: opening an Equirectangular calibration there
+    // would silently mis-project it, and rebuildImageTexture() would additionally
+    // run initUndistortRectifyMap over a panorama. Its GLSL projection
+    // (RendererShaders.h) and Renderer::drawCameraFrustum are pinhole-only too.
+    // Likewise solveExtrinsicsFromCorrespondences, whose only caller is that app.
+    //
+    // The solver drop-in is ready when that app is picked up: the vendored
+    // observation_equation_equrectangular_camera_colinearity_tait_bryan_wc[_jacobian]
+    // take the same (tx,ty,tz,om,fi,ka,px,py,pz) order and 9-column layout as the
+    // perspective ones, so the kCameraLidarAxisOffset pre-rotation, the
+    // fixTranslation column slicing and the LM loop all carry over unchanged.
+    // Only three things differ: (fx,fy,cx,cy) becomes (rows,cols,pi), the
+    // jacobian is Eigen::Matrix<double, 2, 9, Eigen::RowMajor> rather than
+    // column-major, and it takes two extra trailing u_kp, v_kp arguments.
+    enum class CameraModel
+    {
+        Pinhole, // fx/fy/cx/cy + the rational distortion coefficients below
+        Equirectangular // 360 panorama; width/height are the intrinsics, k*/p* unused
+    };
+
     struct Intrinsics
     {
+        CameraModel model = CameraModel::Pinhole;
         float fx = 800.f, fy = 800.f;
         float cx = 640.f, cy = 360.f;
         // OpenCV rational distortion model:
@@ -16,6 +43,11 @@ namespace calib
         float k4 = 0.f, k5 = 0.f, k6 = 0.f;
         // tangential
         float p1 = 0.f, p2 = 0.f;
+        // Image dimensions in pixels. Read only by CameraModel::Equirectangular,
+        // where they play the role fx/fy/cx/cy play for a pinhole camera and so
+        // *must* be set -- from the calibration file or from the loaded image --
+        // before projectPoint() is called.
+        int width = 0, height = 0;
     };
 
     // Minimum distance (degrees) fi is kept away from the om/fi/ka
@@ -95,10 +127,25 @@ namespace calib
     // -I/O boundary either way. Result is passed through avoidGimbalLock.
     void omFiKaFromMat3(const Eigen::Matrix3f& R, float& om_deg, float& fi_deg, float& ka_deg);
 
+    // Intrinsics describing the same camera after its images are resampled by
+    // `s` (e.g. 0.5 for half-size images): scales fx/fy/cx/cy for Pinhole and
+    // width/height for Equirectangular, so a downscaled image projects with the
+    // same geometry. Everything else (distortion, model) is carried over.
+    Intrinsics scaleIntrinsics(const Intrinsics& K, float s);
+
     // Project a point from LiDAR frame to image pixel (u, v).
     // R_wc = camera orientation in world, t = camera position in world.
-    // depth = z component in camera frame (positive = in front).
-    // Returns false if depth <= 0 (behind camera).
+    //
+    // Pinhole: depth = z component in camera frame (positive = in front), and
+    // the function returns false for points behind the camera.
+    // Equirectangular: depth = range from the camera, and only a point
+    // essentially at the camera itself fails -- a full-sphere camera has no
+    // frustum and no "behind". u comes back wrapped into [0, width); v spans
+    // [0, height] *inclusive*, the south pole landing exactly on height.
+    //
+    // In both cases the caller owns rounding to integer pixels (which can itself
+    // land on width at the equirectangular seam), bounds checking and any ROI
+    // test.
     bool projectPoint(
         float px,
         float py,

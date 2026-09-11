@@ -22,6 +22,7 @@
 #include <RaylibWidgets/WindowFit.h>
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -164,16 +165,30 @@ struct AppState
 {
     Trajectory traj;
     std::vector<int64_t> imageTsNs;
-    Intrinsics K;
+    Intrinsics K; // K.model selects pinhole vs equirectangular (see CalibCore/Camera.h)
+    // How K.model was decided. The calibration file's "model" key wins; absent
+    // one, the image filenames are the fallback. Both inputs are kept as state
+    // rather than applied on the spot because they arrive in either order --
+    // loadSession() (and with it loadImages()) runs before loadCalib() at
+    // startup, but the user can load either on its own afterwards -- so
+    // resolveCameraModel() below recomputes K.model from scratch each time one
+    // of them changes.
+    CameraModel fileModel = CameraModel::Pinhole;
+    bool modelExplicit = false; // the calibration file named a model
+    bool namesLookEquirect = false; // the frames carry the equirectangular_ prefix
     Extrinsics E; // tx/ty/tz (camera position); rotation lives in R_wc below, not E.om/fi/ka
     Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); // camera orientation in world/LiDAR frame
     Roi roi;
     bool calibLoaded = false;
-    int imgW = 4656, imgH = 3496;
+    int imgW = 4656, imgH = 3496; // overwritten from the first scanned image by loadImages()
 
     // loaded camera images: timestamp → resized BGR Mat
     std::map<int64_t, std::string> imagesFilenamesInTime;
-    const float imgScale = 1.0f;
+    // Downscale applied to every image used for coloring. Equirectangular
+    // frames are large (3840x1920x3 ≈ 22 MB) and multiImgColoring holds a whole
+    // chunk's worth in RAM at once, so this is what keeps that bounded. The
+    // intrinsics are scaled to match via calib::scaleIntrinsics.
+    float imgScale = 1.0f;
     GpuCloud cloud;
     Shader shader = {};
     bool shaderOk = false;
@@ -316,41 +331,104 @@ static bool intersectGroundPlaneZ0(const Ray& ray, Vector3& outPoint)
     return true;
 }
 
-// Load all cam0_*.jpg from CAMERA_0 (sibling of session dir) into s.images, resized by s.imgScale.
+// Prefix marking a frame as a 360 panorama rather than a normal camera image.
+static constexpr const char* kEquirectPrefix = "equirectangular_";
+
+// Timestamp encoded in a camera frame's filename, or -1 when the file isn't
+// one. Three layouts are accepted: Mandeye's own "cam0_<timestamp_ns>.jpg", the
+// 360 rig's "equirectangular_<timestamp_ns>.jpg", and a bare
+// "<timestamp_ns>.jpg". `equirect`, when given, reports whether the panorama
+// prefix was the one found. The all-digits check matters for the bare form --
+// without it every unrelated .jpg in the directory would reach std::stoll.
+static int64_t parseImageTsNs(const fs::path& p, bool* equirect = nullptr)
+{
+    if (equirect)
+        *equirect = false;
+    if (p.extension() != ".jpg")
+        return -1;
+    std::string stem = p.stem().string();
+    if (stem.rfind(kEquirectPrefix, 0) == 0)
+    {
+        stem = stem.substr(std::strlen(kEquirectPrefix));
+        if (equirect)
+            *equirect = true;
+    }
+    else if (stem.rfind("cam0_", 0) == 0)
+    {
+        stem = stem.substr(5);
+    }
+    if (stem.empty() || stem.find_first_not_of("0123456789") != std::string::npos)
+        return -1;
+    try
+    {
+        return std::stoll(stem);
+    } catch (...)
+    {
+        return -1;
+    }
+}
+
+// Directory holding the camera frames: whatever the user picked, else the
+// CAMERA_0 sibling of the session dir.
+static fs::path cameraDir(const AppState& s)
+{
+    return s.cameraBuf[0] ? fs::path(s.cameraBuf) : fs::path(s.sessionBuf).parent_path() / "CAMERA_0";
+}
+
+// Settles K.model from the two inputs that can select it, in precedence order.
+// Call after either of them changes; see AppState::fileModel for why this isn't
+// done inline in the loaders.
+static void resolveCameraModel(AppState& s)
+{
+    if (s.modelExplicit)
+        s.K.model = s.fileModel;
+    else
+        s.K.model = s.namesLookEquirect ? CameraModel::Equirectangular : CameraModel::Pinhole;
+}
+
+// Index every camera frame in the camera directory by timestamp. Also picks up
+// the image dimensions -- which the equirectangular model projects with, and
+// which the ROI default, the frustums and the COLMAP cameras.txt line read --
+// and, absent an explicit "model" in the calibration, infers the camera model
+// from the filenames.
 static void loadImages(AppState& s)
 {
     s.imagesFilenamesInTime.clear();
-    fs::path camDir;
-    if (s.cameraBuf[0])
-    {
-        camDir = fs::path(s.cameraBuf);
-    }
-    else
-    {
-        camDir = fs::path(s.sessionBuf).parent_path() / "CAMERA_0";
-    }
+    fs::path camDir = cameraDir(s);
     if (!fs::is_directory(camDir))
     {
-        s.status = "No CAMERA_0 dir found";
+        s.status = "No camera image dir found: " + camDir.string();
         return;
     }
 
     int loaded = 0;
+    int equirectNames = 0;
     for (auto& e : fs::directory_iterator(camDir))
     {
-        std::string n = e.path().filename().string();
-        if (n.rfind("cam0_", 0) != 0 || e.path().extension() != ".jpg")
+        bool equirect = false;
+        int64_t ts = parseImageTsNs(e.path(), &equirect);
+        if (ts < 0)
             continue;
-        try
+        s.imagesFilenamesInTime[ts] = e.path().string();
+        equirectNames += equirect ? 1 : 0;
+        ++loaded;
+    }
+    if (!s.imagesFilenamesInTime.empty())
+    {
+        cv::Mat probe = cv::imread(s.imagesFilenamesInTime.begin()->second, cv::IMREAD_COLOR);
+        if (!probe.empty())
         {
-            // filename: cam0_<timestamp_ns>.jpg  → strip prefix (5) and ext (4)
-            int64_t ts = std::stoll(n.substr(5, n.size() - 9));
-            s.imagesFilenamesInTime[ts] = e.path().string();
-            ++loaded;
-        } catch (...)
-        {
+            s.imgW = probe.cols;
+            s.imgH = probe.rows;
         }
     }
+    // The "model" key wins whenever the calibration file carried one; the
+    // filenames are only a fallback. Either way the resolved model is shown in
+    // the Calibration panel, so an inferred one is never invisible.
+    s.namesLookEquirect = equirectNames > 0;
+    resolveCameraModel(s);
+    s.K.width = s.imgW;
+    s.K.height = s.imgH;
     s.status = "Images loaded: " + std::to_string(loaded) + " from " + camDir.string();
 }
 
@@ -424,22 +502,14 @@ static void loadSession(AppState& s)
     s.traj.sort();
 
     // camera image timestamps
-    fs::path camDir = s.cameraBuf[0] ? fs::path(s.cameraBuf) : d.parent_path() / "CAMERA_0";
+    fs::path camDir = cameraDir(s);
     if (fs::is_directory(camDir))
     {
         for (auto& e : fs::directory_iterator(camDir))
         {
-            std::string n = e.path().filename().string();
-            if (n.rfind("cam0_", 0) == 0 && e.path().extension() == ".jpg")
-            {
-                try
-                {
-                    int64_t ts = std::stoll(n.substr(5, n.size() - 9));
-                    s.imageTsNs.push_back(ts);
-                } catch (...)
-                {
-                }
-            }
+            int64_t ts = parseImageTsNs(e.path());
+            if (ts >= 0)
+                s.imageTsNs.push_back(ts);
         }
         std::sort(s.imageTsNs.begin(), s.imageTsNs.end());
     }
@@ -477,21 +547,26 @@ static void loadCloud(AppState& s)
     bool canColor = s.calibLoaded && !s.imagesFilenamesInTime.empty();
     Eigen::Matrix3f R_wc = canColor ? s.R_wc : Eigen::Matrix3f::Identity();
     Eigen::Vector3f C(s.E.tx, s.E.ty, s.E.tz);
-    float K_fx = s.K.fx * s.imgScale, K_fy = s.K.fy * s.imgScale;
-    float K_cx = s.K.cx * s.imgScale, K_cy = s.K.cy * s.imgScale;
-    // OpenCV rational + tangential distortion applied to each projected point, so
-    // colours are sampled from the raw (distorted) images at the right pixel.
-    // With all-zero coefficients this reduces exactly to the pinhole model.
-    const float d_k1 = s.K.k1, d_k2 = s.K.k2, d_k3 = s.K.k3;
-    const float d_k4 = s.K.k4, d_k5 = s.K.k5, d_k6 = s.K.k6;
-    const float d_p1 = s.K.p1, d_p2 = s.K.p2;
-    // (x, y) = normalized camera coords (X/Z, Y/Z) → distorted normalized coords.
-    auto distort = [=](float x, float y, float& xd, float& yd)
+    // Images are read at s.imgScale, so the intrinsics have to match: this
+    // scales fx/fy/cx/cy for the pinhole model and width/height for the
+    // equirectangular one. calib::projectPoint then applies whichever model the
+    // calibration selected -- for pinhole that is the OpenCV rational +
+    // tangential distortion, so colours are sampled from the raw (distorted)
+    // images at the right pixel; with all-zero coefficients it reduces exactly
+    // to the ideal pinhole.
+    const Intrinsics Ks = scaleIntrinsics(s.K, s.imgScale);
+    // Every image of a chunk is held in memory at once (multiImgColoring), so
+    // for large frames the scale is what keeps that bounded.
+    auto readImage = [&](const std::string& path)
     {
-        float r2 = x * x + y * y;
-        float radial = (1.f + (d_k1 + (d_k2 + d_k3 * r2) * r2) * r2) / (1.f + (d_k4 + (d_k5 + d_k6 * r2) * r2) * r2);
-        xd = x * radial + 2.f * d_p1 * x * y + d_p2 * (r2 + 2.f * x * x);
-        yd = y * radial + d_p1 * (r2 + 2.f * y * y) + 2.f * d_p2 * x * y;
+        cv::Mat img = cv::imread(path);
+        if (!img.empty() && s.imgScale != 1.0f)
+        {
+            cv::Mat small;
+            cv::resize(img, small, cv::Size(), s.imgScale, s.imgScale, cv::INTER_AREA);
+            img = std::move(small);
+        }
+        return img;
     };
 
     auto packGray = [](float intensity) -> float
@@ -571,7 +646,7 @@ static void loadCloud(AppState& s)
                     Eigen::Affine3f pose;
                     if (!interpPose(trajMap, imgTs, pose))
                         continue;
-                    cv::Mat img = cv::imread(fnIt->second);
+                    cv::Mat img = readImage(fnIt->second);
                     if (img.empty())
                         continue;
                     int gidx = (int)(it - s.imageTsNs.begin());
@@ -596,7 +671,7 @@ static void loadCloud(AppState& s)
                 Eigen::Affine3f pose;
                 if (fnIt != s.imagesFilenamesInTime.end() && interpPose(trajMap, imgTs, pose))
                 {
-                    cv::Mat img = cv::imread(fnIt->second);
+                    cv::Mat img = readImage(fnIt->second);
                     int gidx = (int)(it - s.imageTsNs.begin());
                     if (!img.empty())
                         chunkImgs.push_back({ imgTs, pose, std::move(img), gidx });
@@ -668,6 +743,13 @@ static void loadCloud(AppState& s)
                     float inRoiF = -1.f; // 1 inside ROI, 0 outside, -1 not in frustum
                     int globalIdx = -1;
                 };
+                // Note for the equirectangular model: a 360 camera has no
+                // frustum, so every point projects into every image. The
+                // temporal strategy's outward search therefore always succeeds
+                // at w == 0, leaving maxTemporalDist as the only real gate, and
+                // the geometry strategy compares ranges across all of the
+                // chunk's images rather than only the ones containing the point
+                // -- still correct, just no longer short-circuiting.
                 auto probe = [&](int idx) -> Hit
                 {
                     Hit h;
@@ -675,13 +757,20 @@ static void loadCloud(AppState& s)
                         return h;
                     auto& e = chunkImgs[idx];
                     Eigen::Vector3f pl = e.pose.inverse() * pw;
-                    Eigen::Vector3f pc_ = R_wc.transpose() * (pl - C);
-                    if (pc_.z() <= 0.05f)
+                    float u, v, depth;
+                    if (!projectPoint(pl.x(), pl.y(), pl.z(), Ks, R_wc, C, u, v, depth))
                         return h;
-                    float xd, yd;
-                    distort(pc_.x() / pc_.z(), pc_.y() / pc_.z(), xd, yd);
-                    int iu = (int)std::round(K_fx * xd + K_cx);
-                    int iv = (int)std::round(K_fy * yd + K_cy);
+                    if (Ks.model == CameraModel::Pinhole && depth <= 0.05f)
+                        return h;
+                    int iu = (int)std::round(u);
+                    int iv = (int)std::round(v);
+                    if (Ks.model == CameraModel::Equirectangular)
+                    {
+                        // u is wrapped into [0, cols) but rounding can still
+                        // land on cols at the seam; v spans [0, rows] inclusive.
+                        iu = (iu % e.img.cols + e.img.cols) % e.img.cols;
+                        iv = std::clamp(iv, 0, e.img.rows - 1);
+                    }
                     if (iu < 0 || iu >= e.img.cols || iv < 0 || iv >= e.img.rows)
                         return h;
                     // point projects into this image — record ROI membership so
@@ -697,7 +786,7 @@ static void loadCloud(AppState& s)
                     uint32_t p = (uint32_t(bgr[2]) << 16) | (uint32_t(bgr[1]) << 8) | uint32_t(bgr[0]);
                     std::memcpy(&h.colorF, &p, 4);
                     h.globalIdx = e.globalIdx;
-                    h.depth = pc_.z();
+                    h.depth = depth;
                     h.ok = true;
                     return h;
                 };
@@ -844,6 +933,31 @@ static void loadCalib(AppState& s)
     }
     nlohmann::json j;
     f >> j;
+    // Camera model: "equirectangular"/"equirect" for a 360 panorama, anything
+    // else for the pinhole model this app started with. Accepted both at the
+    // top level and inside "intrinsics". Assigned unconditionally so loading a
+    // pinhole calibration after an equirectangular one clears the flag rather
+    // than inheriting it.
+    {
+        const bool topLevel = j.contains("model");
+        const bool nested = j.contains("intrinsics") && j["intrinsics"].contains("model");
+        s.modelExplicit = topLevel || nested;
+        std::string model;
+        if (topLevel)
+            model = j.value("model", std::string{});
+        else if (nested)
+            model = j["intrinsics"].value("model", std::string{});
+        std::transform(
+            model.begin(),
+            model.end(),
+            model.begin(),
+            [](unsigned char c)
+            {
+                return (char)std::tolower(c);
+            });
+        s.fileModel = (model == "equirectangular" || model == "equirect") ? CameraModel::Equirectangular : CameraModel::Pinhole;
+        resolveCameraModel(s);
+    }
     if (j.contains("intrinsics"))
     {
         auto& ji = j["intrinsics"];
@@ -1196,6 +1310,13 @@ static void exportColmap(AppState& s)
         s.status = "COLMAP: no images";
         return;
     }
+    if (s.K.model == CameraModel::Equirectangular)
+    {
+        // COLMAP's text model has no equirectangular camera type, so the
+        // FULL_OPENCV line below would misdescribe the images.
+        s.status = "COLMAP: equirectangular camera model is not supported by COLMAP";
+        return;
+    }
 
     fs::path out(s.colmapBuf);
     fs::path sparse = out / "sparse";
@@ -1408,16 +1529,31 @@ static void drawScene(AppState& s)
 
             Vector3 origin = toVec3(pose->T * C);
 
+            bool hl = (ts == hlTs);
+            Color fc = hl ? Color{ 255, 255, 50, 255 } : ORANGE;
+            float sc = hl ? fs * 1.05f : fs;
+
+            if (s.K.model == CameraModel::Equirectangular)
+            {
+                // A 360 camera sees the whole sphere, so there is no frustum to
+                // draw -- show where it was and which way its axes point
+                // instead. The triad is the usual X=red, Y=green, Z=blue.
+                DrawSphere(origin, fs * (hl ? 0.08f : 0.05f), fc);
+                const Color axisColors[3] = { RED, GREEN, BLUE };
+                for (int k = 0; k < 3; k++)
+                {
+                    Eigen::Vector3f tip = R_wc.col(k) * (sc * 0.5f) + C;
+                    DrawLine3D(origin, toVec3(pose->T * tip), hl ? fc : axisColors[k]);
+                }
+                continue;
+            }
+
             Vector3 w[4];
             for (int k = 0; k < 4; k++)
             {
                 Eigen::Vector3f pl = R_wc * Eigen::Vector3f(ncx[k] * fs, ncy[k] * fs, fs) + C;
                 w[k] = toVec3(pose->T * pl);
             }
-
-            bool hl = (ts == hlTs);
-            Color fc = hl ? Color{ 255, 255, 50, 255 } : ORANGE;
-            float sc = hl ? fs * 1.05f : fs;
 
             if (hl)
             {
@@ -2014,8 +2150,33 @@ int main(int argc, char* argv[])
                 loadCalib(s);
             if (s.calibLoaded)
             {
-                ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
-                ImGui::Text("cx=%.0f cy=%.0f", s.K.cx, s.K.cy);
+                if (s.K.model == CameraModel::Equirectangular)
+                {
+                    ImGui::Text("Model: equirectangular");
+                    if (!s.modelExplicit && ImGui::IsItemHovered())
+                        ImGui::SetTooltip(
+                            "Inferred from the \"%s\" image filenames.\nAdd \"model\" to the calibration JSON to set it explicitly.",
+                            kEquirectPrefix);
+                    ImGui::Text("%dx%d", s.imgW, s.imgH);
+                }
+                else
+                {
+                    ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
+                    ImGui::Text("cx=%.0f cy=%.0f", s.K.cx, s.K.cy);
+                }
+
+                ImGui::Separator();
+                ImGui::PopItemWidth();
+                ImGui::PushItemWidth(-140.f);
+                // Bounds every image the colorizer holds in memory: a whole
+                // chunk's worth is resident at once when multi-image coloring
+                // is on, which 360 frames make expensive.
+                ImGui::SliderFloat("Image scale", &s.imgScale, 0.125f, 1.0f, "%.3f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Downscale applied to images before coloring.\nLower = less RAM and faster, at coarser color detail.");
+                ImGui::PopItemWidth();
+                ImGui::PushItemWidth(-1);
 
                 ImGui::Separator();
                 if (ImGui::Checkbox("Region of interest", &s.roi.enabled))
@@ -2118,9 +2279,14 @@ int main(int argc, char* argv[])
                 ImGui::Checkbox("Compressed (jpeg)", &s.ros.compressCamera);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("ON: CompressedImage (jpeg)\nOFF: raw Image bgr8");
+                const bool noRectify = s.K.model == CameraModel::Equirectangular;
+                ImGui::BeginDisabled(noRectify);
                 ImGui::Checkbox("Undistort (rectify)", &s.ros.undistortCamera);
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Rectify to pinhole so RViz overlays line up\n(CameraInfo published with zero distortion).");
+                ImGui::EndDisabled();
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip(
+                        noRectify ? "Not applicable to an equirectangular camera."
+                                  : "Rectify to pinhole so RViz overlays line up\n(CameraInfo published with zero distortion).");
                 ImGui::Unindent();
             }
             ImGui::Checkbox("LiDAR undistorted (map frame)", &s.ros.exportLidarUndistorted);
@@ -2169,8 +2335,13 @@ int main(int argc, char* argv[])
             ImGui::PopItemWidth();
             ImGui::PushItemWidth(-1);
             s.colmapPtDecim = std::max(1, s.colmapPtDecim);
+            const bool colmapUnsupported = s.K.model == CameraModel::Equirectangular;
+            ImGui::BeginDisabled(colmapUnsupported);
             if (ImGui::Button("Export COLMAP model", ImVec2(-1, 0)))
                 exportColmap(s);
+            ImGui::EndDisabled();
+            if (colmapUnsupported && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("COLMAP has no equirectangular camera model.");
             ImGui::TextDisabled("Writes sparse/{cameras,images,points3D}.txt");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(

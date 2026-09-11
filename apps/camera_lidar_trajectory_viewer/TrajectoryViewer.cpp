@@ -322,6 +322,10 @@ struct AppState
     Texture2D imgViewTex = {};
     bool imgViewTexValid = false;
     std::atomic<int> imgViewRequest{ -1 };
+    // Bumped when the image set itself is replaced (a camera directory dropped). The loader
+    // thread skips a request whose index it already served, so without this a swap that keeps
+    // the same index would leave the previous frame on screen.
+    std::atomic<int> imgViewEpoch{ 0 };
     std::atomic<bool> imgViewStop{ false };
     std::atomic<bool> imgViewLoading{ false };
     std::mutex imgViewMtx;
@@ -521,6 +525,41 @@ static void loadSession(AppState& s)
         (mrp.empty() ? "  (no MRP)" : "  +MRP") + "  — press Load cloud";
 }
 
+// Radius (in normalized camera coords, squared) past which the rational distortion model
+// stops being usable. r -> r*radial(r) is only injective up to its turning point; beyond it
+// the model folds, so directions far outside the lens' actual field of view map back onto
+// valid pixel coordinates. With a strongly-fitted model that is not a corner case: for the
+// intrinsics this app is used with, a direction 56 deg off the optical axis lands mid-image
+// and one at 60 deg lands exactly on the principal point, painting whatever is at the centre
+// of the frame onto geometry the camera never saw. The projection alone cannot tell such a
+// fold-back from a genuine hit, so find the turning point once and reject everything past
+// it. Scanned numerically -- the turning point of a 6th-order rational function has no
+// useful closed form. It always lies outside the image itself (otherwise the calibration
+// could not reach its own corners), so no legitimate pixel is lost.
+static float maxValidRadiusSq(float k1, float k2, float k3, float k4, float k5, float k6)
+{
+    auto g = [&](float r)
+    {
+        float r2 = r * r;
+        float den = 1.f + (k4 + (k5 + k6 * r2) * r2) * r2;
+        if (std::fabs(den) < 1e-9f)
+            return -1.f; // pole -- certainly past the turning point
+        return r * (1.f + (k1 + (k2 + k3 * r2) * r2) * r2) / den;
+    };
+    // 8.0 == tan(83 deg), wider than any lens this app sees. A distortion-free model is
+    // monotonic everywhere and so keeps the whole range, i.e. no behaviour change.
+    const float kLimit = 8.f, kStep = 0.005f;
+    float prev = 0.f;
+    for (float r = kStep; r <= kLimit; r += kStep)
+    {
+        float cur = g(r);
+        if (cur <= prev)
+            return (r - kStep) * (r - kStep);
+        prev = cur;
+    }
+    return kLimit * kLimit;
+}
+
 static void loadCloud(AppState& s)
 {
     s.exportCloud.clear();
@@ -566,6 +605,8 @@ static void loadCloud(AppState& s)
         xd = x * radial + 2.f * d_p1 * x * y + d_p2 * (r2 + 2.f * x * x);
         yd = y * radial + d_p1 * (r2 + 2.f * y * y) + 2.f * d_p2 * x * y;
     };
+    // Off-axis cutoff for the model above -- see maxValidRadiusSq().
+    const float rMaxSq = maxValidRadiusSq(d_k1, d_k2, d_k3, d_k4, d_k5, d_k6);
 
     auto packGray = [](float intensity) -> float
     {
@@ -761,8 +802,13 @@ static void loadCloud(AppState& s)
                     Eigen::Vector3f pc_ = R_wc.transpose() * (pl - C);
                     if (pc_.z() <= 0.05f)
                         return h;
+                    float xn = pc_.x() / pc_.z(), yn = pc_.y() / pc_.z();
+                    // Outside the cone the lens model is valid over: distorting this would
+                    // fold it back into the frame. See maxValidRadiusSq().
+                    if (xn * xn + yn * yn > rMaxSq)
+                        return h;
                     float xd, yd;
-                    distort(pc_.x() / pc_.z(), pc_.y() / pc_.z(), xd, yd);
+                    distort(xn, yn, xd, yd);
                     int iu = (int)std::round(K_fx * xd + K_cx);
                     int iv = (int)std::round(K_fy * yd + K_cy);
                     if (iu < 0 || iu >= e.img.cols || iv < 0 || iv >= e.img.rows)
@@ -1198,15 +1244,48 @@ static void actionOpenCalibration(AppState& s)
     }
 }
 
-// Drag & drop equivalent of actionSelectLioResultDir()/actionOpenCalibration(): a dropped
-// directory is this app's session (LIO result dir), and unlike the menu action it loads
-// immediately instead of waiting for the "Load session" button, since a drop is already an
-// explicit "load this" gesture. A dropped *.json is treated as a calibration file. Used by the
-// drag & drop handler in main()'s loop below.
+// A directory holding this app's camera frames (cam0_<timestamp_ns>.jpg).
+static bool isCameraDir(const fs::path& dir)
+{
+    for (const auto& e : fs::directory_iterator(dir))
+    {
+        std::string n = e.path().filename().string();
+        if (n.rfind("cam0_", 0) == 0 && e.path().extension() == ".jpg")
+            return true;
+    }
+    return false;
+}
+
+// Drag & drop equivalent of actionSelectLioResultDir()/actionSelectCamera0Dir()/
+// actionOpenCalibration(), and unlike those menu actions it applies immediately instead of
+// waiting for the "Load session" button, since a drop is already an explicit "load this"
+// gesture. A dropped directory of cam0_*.jpg is the camera directory (only the images are
+// swapped, so the trajectory and the loaded cloud survive); any other directory is this
+// app's session (LIO result dir). A dropped *.json is treated as a calibration file. Used by
+// the drag & drop handler in main()'s loop below.
 static void handleDroppedPath(AppState& s, const std::string& path)
 {
     if (fs::is_directory(path))
     {
+        // Checked before the session branch: a CAMERA_0 folder is never a LIO result dir,
+        // and dropping one onto a loaded session must not wipe the trajectory.
+        if (isCameraDir(path))
+        {
+            setBuf(s.cameraBuf, sizeof(s.cameraBuf), path);
+            loadImages(s);
+            // imageTsNs is the sorted key set of imagesFilenamesInTime -- indices into it are
+            // the "global image index" behind the preview slider, the per-point camera id and
+            // the frustum highlight, so it has to follow the new image set. Normally built by
+            // loadSession(), which we deliberately do not re-run here.
+            s.imageTsNs.clear();
+            s.imageTsNs.reserve(s.imagesFilenamesInTime.size());
+            for (const auto& kv : s.imagesFilenamesInTime)
+                s.imageTsNs.push_back(kv.first); // std::map iterates in key order
+            s.imgViewIdx = std::clamp(s.imgViewIdx, 0, std::max(0, (int)s.imageTsNs.size() - 1));
+            s.imgViewEpoch.fetch_add(1);
+            s.imgViewRequest.store(s.imageTsNs.empty() ? -1 : s.imgViewIdx);
+            return;
+        }
         setBuf(s.sessionBuf, sizeof(s.sessionBuf), path);
         loadSession(s);
         return;
@@ -1621,12 +1700,15 @@ int main(int argc, char* argv[])
         [&s]()
         {
             int lastLoaded = -1;
+            int lastEpoch = -1;
             while (!s.imgViewStop.load())
             {
                 int req = s.imgViewRequest.load();
-                if (req != lastLoaded && req >= 0 && req < (int)s.imageTsNs.size())
+                int epoch = s.imgViewEpoch.load();
+                if ((req != lastLoaded || epoch != lastEpoch) && req >= 0 && req < (int)s.imageTsNs.size())
                 {
                     lastLoaded = req;
+                    lastEpoch = epoch;
                     s.imgViewLoading = true;
                     int64_t ts = s.imageTsNs[req];
                     auto it = s.imagesFilenamesInTime.find(ts);
@@ -1663,9 +1745,10 @@ int main(int argc, char* argv[])
         bool imguiWants = ImGui::GetIO().WantCaptureMouse;
         s.orbit.updateEulerTransition(GetFrameTime());
 
-        // Drag & drop the LIO result directory (this app's session) or a calibration *.json onto
-        // the window to load it -- raylib's GLFW backend surfaces OS drag & drop the same way on
-        // Windows, Linux and macOS, so no platform-specific code is needed here.
+        // Drag & drop the LIO result directory (this app's session), a CAMERA_0 directory or a
+        // calibration *.json onto the window to load it -- raylib's GLFW backend surfaces OS
+        // drag & drop the same way on Windows, Linux and macOS, so no platform-specific code
+        // is needed here. See handleDroppedPath() for how a dropped path is classified.
         if (IsFileDropped())
         {
             FilePathList dropped = LoadDroppedFiles();

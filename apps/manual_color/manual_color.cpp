@@ -8,10 +8,13 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <execution>
 #include <iostream>
+#include <limits>
 #include <mutex>
 #include <sstream>
 #include <thread>
@@ -112,7 +115,13 @@ void display();
 void reshape(int w, int h);
 void mouse(int glut_button, int state, int x, int y);
 void motion(int x, int y);
+void keyboard(unsigned char key, int x, int y);
 bool initGL(int* argc, char** argv);
+void loadPhotoFile(const std::string& path);
+void loadLazFile(const std::string& path);
+void recolorPointsFromImage();
+double reprojectionErrorPx(size_t i);
+void removeCorrespondence(size_t i);
 
 float imgui_co_size{ 1000.0f };
 bool imgui_draw_co{ true };
@@ -134,10 +143,61 @@ namespace SystemData
     Eigen::Affine3d camera_pose = Eigen::Affine3d::Identity();
 
     int point_size = 1;
+
+    // ── manual intensity-view calibration ───────────────────────────────────
+    // The intensity view maps raw p.intensity to grayscale as:
+    //   t = clamp((intensity - intensityMin) / (intensityMax - intensityMin), 0, 1) ^ intensityGamma
+    // Defaults cover typical 8-bit LAS intensity; "Auto range" fits them to
+    // the loaded cloud since raw ranges vary a lot by sensor/scale.
+    bool showIntensityCalibWindow = false;
+    float intensityMin = 0.f;
+    float intensityMax = 255.f;
+    float intensityGamma = 1.f;
+
+    // ── manual extrinsics calibration ────────────────────────────────────────
+    // Lets the user nudge camera_pose directly with sliders, as an alternative
+    // to (or a starting point / fine-tune step for) the point-pair Optimize().
+    bool showExtrinsicsCalibWindow = false;
+    float angleStepDeg = 1.f; // nudge size for the extrinsics window's -/+ angle buttons
+
+    // ── optional 2D projection overlay (intensity / depth) ──────────────────
+    // Reprojects the point cloud onto the displayed image with the current
+    // camera_pose, colored by intensity or by range from the camera -- a
+    // quick visual check of extrinsics alignment against the photo.
+    bool showProjectionOverlay = false;
+    int overlayColorMode = 0; // 0 = intensity, 1 = depth
+    int overlayDecim = 5; // draw every Nth point (reprojection is not free)
+    float overlayPointRadius = 1.5f;
+    float overlayDepthMin = 0.f;
+    float overlayDepthMax = 20.f;
+    float overlayAlpha = 0.8f;
 } // namespace SystemData
 
 int main(int argc, char* argv[])
 {
+    std::string photoPath, lazPath;
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string arg = argv[i];
+        auto nextArg = [&]() -> std::string
+        {
+            return (i + 1 < argc) ? argv[++i] : std::string{};
+        };
+        if (arg == "--photo" || arg == "--image")
+            photoPath = nextArg();
+        else if (arg == "--laz" || arg == "--pointcloud")
+            lazPath = nextArg();
+        else if (arg == "-h" || arg == "--help")
+        {
+            std::cout << "Usage: mandeye_with_360_camera_manual_coloring [--photo <image>] [--laz <pointcloud.laz>]\n"
+                      << "  --photo, --image        equirectangular image to color the point cloud with\n"
+                      << "  --laz, --pointcloud     LAZ point cloud to load\n";
+            return 0;
+        }
+        else
+            std::cerr << "Unknown argument: " << arg << " (see --help)\n";
+    }
+
     TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
     // pose.om = M_PI * 0.5;
     // pose.fi = 0;
@@ -155,10 +215,100 @@ int main(int argc, char* argv[])
     SystemData::camera_pose = affine_matrix_from_pose_tait_bryan(pose);
 
     initGL(&argc, argv);
+
+    if (!photoPath.empty())
+        loadPhotoFile(photoPath);
+    if (!lazPath.empty())
+        loadLazFile(lazPath);
+    if (!photoPath.empty() || !lazPath.empty())
+        recolorPointsFromImage();
+
     glutDisplayFunc(display);
     glutMouseFunc(mouse);
     glutMotionFunc(motion);
+    glutKeyboardFunc(keyboard);
     glutMainLoop();
+}
+
+ImU32 jetColor(float t, float alpha = 1.f)
+{
+    t = std::clamp(t, 0.f, 1.f);
+    float r = std::clamp(1.5f - std::fabs(4.f * t - 3.f), 0.f, 1.f);
+    float g = std::clamp(1.5f - std::fabs(4.f * t - 2.f), 0.f, 1.f);
+    float b = std::clamp(1.5f - std::fabs(4.f * t - 1.f), 0.f, 1.f);
+    return IM_COL32(
+        static_cast<int>(r * 255.f),
+        static_cast<int>(g * 255.f),
+        static_cast<int>(b * 255.f),
+        static_cast<int>(std::clamp(alpha, 0.f, 1.f) * 255.f));
+}
+
+// Reprojects SystemData::points onto the image displayed at [img_start,
+// img_start + (my_tex_w, my_tex_h)] using the current camera_pose, colored
+// by intensity or by range from the camera. img_start/my_tex_w/my_tex_h use
+// the same normalized-to-displayed-image mapping as the point_picked overlay
+// drawn right after this in imagePicker(). clip_min/clip_max restrict drawing
+// to the image's visible (scrolled) viewport rect, so the overlay doesn't
+// spill onto the rest of the UI when scrolled or zoomed.
+void drawProjectionOverlay(const ImVec2& img_start, float my_tex_w, float my_tex_h, const ImVec2& clip_min, const ImVec2& clip_max)
+{
+    namespace SD = SystemData;
+    if (!SD::showProjectionOverlay || SD::imageWidth <= 0 || SD::imageHeight <= 0)
+        return;
+
+    const TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SD::camera_pose);
+    const Eigen::Vector3d camPos = SD::camera_pose.translation();
+    auto* drawList = ImGui::GetForegroundDrawList();
+    const int step = std::max(1, SD::overlayDecim);
+    const float intensityRange = std::max(SD::intensityMax - SD::intensityMin, 1e-6f);
+    const float depthRange = std::max(SD::overlayDepthMax - SD::overlayDepthMin, 1e-6f);
+
+    drawList->PushClipRect(clip_min, clip_max, true);
+    for (size_t i = 0; i < SD::points.size(); i += step)
+    {
+        const auto& p = SD::points[i];
+        double du, dv;
+        equrectangular_camera_colinearity_tait_bryan_wc(
+            du,
+            dv,
+            SD::imageHeight,
+            SD::imageWidth,
+            M_PI,
+            pose.px,
+            pose.py,
+            pose.pz,
+            pose.om,
+            pose.fi,
+            pose.ka,
+            p.point.x(),
+            p.point.y(),
+            p.point.z());
+
+        if (du < 0 || dv < 0 || du >= SD::imageWidth || dv >= SD::imageHeight)
+            continue;
+
+        const float u = static_cast<float>(du / SD::imageWidth);
+        const float v = static_cast<float>(dv / SD::imageHeight);
+        const ImVec2 center{ img_start.x + u * my_tex_w, img_start.y + v * my_tex_h };
+
+        if (center.x < clip_min.x || center.x > clip_max.x || center.y < clip_min.y || center.y > clip_max.y)
+            continue;
+
+        float t;
+        if (SD::overlayColorMode == 1) // depth
+        {
+            const float depth = static_cast<float>((p.point - camPos).norm());
+            t = std::clamp((depth - SD::overlayDepthMin) / depthRange, 0.f, 1.f);
+        }
+        else // intensity
+        {
+            t = std::clamp((p.intensity - SD::intensityMin) / intensityRange, 0.f, 1.f);
+            t = std::pow(t, SD::intensityGamma);
+        }
+
+        drawList->AddCircleFilled(center, SD::overlayPointRadius, jetColor(t, SD::overlayAlpha));
+    }
+    drawList->PopClipRect();
 }
 
 void imagePicker(
@@ -204,6 +354,58 @@ void imagePicker(
     const ImVec2 child_size{ ImGui::GetWindowWidth() * 1.0f, ImGui::GetWindowHeight() * 0.5f };
 
     ImGui::Checkbox("color", &color);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Space also toggles this (3D view: RGB <-> intensity)");
+    ImGui::SameLine();
+    if (ImGui::Button("Intensity calibration..."))
+    {
+        SystemData::showIntensityCalibWindow = true;
+    }
+
+    ImGui::Checkbox("2D overlay", &SystemData::showProjectionOverlay);
+    if (SystemData::showProjectionOverlay)
+    {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(110.f);
+        const char* overlayModes[] = { "Intensity", "Depth" };
+        ImGui::Combo("##overlayMode", &SystemData::overlayColorMode, overlayModes, 2);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(90.f);
+        ImGui::DragInt("decim##overlay", &SystemData::overlayDecim, 1, 1, 500);
+        ImGui::SetNextItemWidth(150.f);
+        ImGui::SliderFloat("Alpha##overlay", &SystemData::overlayAlpha, 0.f, 1.f, "%.2f");
+        if (SystemData::overlayColorMode == 1)
+        {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(80.f);
+            ImGui::DragFloat("min##depth", &SystemData::overlayDepthMin, 0.1f, 0.f, SystemData::overlayDepthMax);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(80.f);
+            ImGui::DragFloat("max##depth", &SystemData::overlayDepthMax, 0.1f, SystemData::overlayDepthMin, 1000.f);
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Auto##depth"))
+            {
+                const Eigen::Vector3d camPos = SystemData::camera_pose.translation();
+                float lo = std::numeric_limits<float>::max();
+                float hi = -std::numeric_limits<float>::max();
+                for (const auto& p : SystemData::points)
+                {
+                    const float depth = static_cast<float>((p.point - camPos).norm());
+                    lo = std::min(lo, depth);
+                    hi = std::max(hi, depth);
+                }
+                if (lo <= hi)
+                {
+                    SystemData::overlayDepthMin = lo;
+                    SystemData::overlayDepthMax = hi;
+                }
+            }
+        }
+        if (SystemData::overlayDepthMax < SystemData::overlayDepthMin)
+        {
+            SystemData::overlayDepthMax = SystemData::overlayDepthMin;
+        }
+    }
 
     struct point_pair
     {
@@ -270,6 +472,7 @@ void imagePicker(
         const ImVec2 view_port_start = ImGui::GetWindowPos();
         const ImVec2 view_port_end{ view_port_start.x + ImGui::GetWindowWidth(), view_port_start.y + ImGui::GetWindowHeight() };
         ImVec2 img_start = ImGui::GetItemRectMin();
+        drawProjectionOverlay(img_start, my_tex_w, my_tex_h, view_port_start, view_port_end);
         for (int i = 0; i < point_picked.size(); i++)
         {
             const auto& p = point_picked[i];
@@ -646,6 +849,73 @@ void TimeStampCount()
     }
 }
 
+void loadPhotoFile(const std::string& path)
+{
+    tex1 = make_tex(path);
+    SystemData::imageData = stbi_load(path.c_str(), &SystemData::imageWidth, &SystemData::imageHeight, &SystemData::imageNrChannels, 0);
+}
+
+void loadLazFile(const std::string& path)
+{
+    auto points = mandeye::load(path);
+    SystemData::points.resize(points.size());
+    std::transform(
+        points.begin(),
+        points.end(),
+        SystemData::points.begin(),
+        [&](const mandeye::Point& p)
+        {
+            return p;
+        });
+}
+
+void recolorPointsFromImage()
+{
+    SystemData::points = ApplyColorToPointcloud(
+        SystemData::points,
+        SystemData::imageData,
+        SystemData::imageWidth,
+        SystemData::imageHeight,
+        SystemData::imageNrChannels,
+        SystemData::camera_pose);
+}
+
+// Reprojection error, in image pixels, for the i-th picked correspondence
+// (pointPickedImage[i] <-> pointPickedPointCloud[i]) under the current
+// camera_pose. Returns -1 when the pair doesn't exist (indices out of range
+// or no image loaded yet).
+double reprojectionErrorPx(size_t i)
+{
+    namespace SD = SystemData;
+    if (i >= SD::pointPickedImage.size() || i >= SD::pointPickedPointCloud.size() || SD::imageWidth <= 0 || SD::imageHeight <= 0)
+        return -1.0;
+
+    const TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SD::camera_pose);
+    const auto& P = SD::pointPickedPointCloud[i];
+    double du, dv;
+    equrectangular_camera_colinearity_tait_bryan_wc(
+        du, dv, SD::imageHeight, SD::imageWidth, M_PI, pose.px, pose.py, pose.pz, pose.om, pose.fi, pose.ka, P.x(), P.y(), P.z());
+
+    const double u_kp = SD::pointPickedImage[i].x * SD::imageWidth;
+    const double v_kp = SD::pointPickedImage[i].y * SD::imageHeight;
+    const double dx = du - u_kp;
+    const double dy = dv - v_kp;
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+// Removes the i-th correspondence from both sides at once, keeping
+// pointPickedImage[k] <-> pointPickedPointCloud[k] aligned by index (the two
+// lists' own per-side "-" buttons only erase from one side, which desyncs
+// every later pair -- use this instead when removing a whole pair).
+void removeCorrespondence(size_t i)
+{
+    namespace SD = SystemData;
+    if (i < SD::pointPickedImage.size())
+        SD::pointPickedImage.erase(SD::pointPickedImage.begin() + i);
+    if (i < SD::pointPickedPointCloud.size())
+        SD::pointPickedPointCloud.erase(SD::pointPickedPointCloud.begin() + i);
+}
+
 void ImGuiLoadSaveButtons()
 {
     namespace SD = SystemData;
@@ -654,17 +924,9 @@ void ImGuiLoadSaveButtons()
         const auto input_file_names = mandeye::fd::OpenFileDialog("Choose Image", mandeye::fd::ImageFilter, false);
         if (input_file_names.size())
         {
-            tex1 = make_tex(input_file_names.front());
-            SD::imageData = stbi_load(input_file_names.front().c_str(), &SD::imageWidth, &SD::imageHeight, &SD::imageNrChannels, 0);
+            loadPhotoFile(input_file_names.front());
         }
-
-        SystemData::points = ApplyColorToPointcloud(
-            SystemData::points,
-            SystemData::imageData,
-            SystemData::imageWidth,
-            SystemData::imageHeight,
-            SystemData::imageNrChannels,
-            SystemData::camera_pose);
+        recolorPointsFromImage();
     }
     ImGui::SameLine();
     if (ImGui::Button("Load Poincloud"))
@@ -672,24 +934,9 @@ void ImGuiLoadSaveButtons()
         const auto input_file_names = mandeye::fd::OpenFileDialog("Choose Pointcloud", mandeye::fd::LazFilter, false);
         if (!input_file_names.empty())
         {
-            auto points = mandeye::load(input_file_names.front());
-            SystemData::points.resize(points.size());
-            std::transform(
-                points.begin(),
-                points.end(),
-                SystemData::points.begin(),
-                [&](const mandeye::Point& p)
-                {
-                    return p;
-                });
+            loadLazFile(input_file_names.front());
         }
-        SystemData::points = ApplyColorToPointcloud(
-            SystemData::points,
-            SystemData::imageData,
-            SystemData::imageWidth,
-            SystemData::imageHeight,
-            SystemData::imageNrChannels,
-            SystemData::camera_pose);
+        recolorPointsFromImage();
     }
     ImGui::SameLine();
     if (ImGui::Button("Save Pointcloud"))
@@ -1014,8 +1261,10 @@ void display()
         }
         else
         {
-            glColor3f(p.intensity - 100, p.intensity - 100, p.intensity - 100);
-            // p.intensity
+            const float range = std::max(SystemData::intensityMax - SystemData::intensityMin, 1e-6f);
+            float t = std::clamp((p.intensity - SystemData::intensityMin) / range, 0.f, 1.f);
+            t = std::pow(t, SystemData::intensityGamma);
+            glColor3f(t, t, t);
         }
 
         glVertex3dv(p.point.data());
@@ -1129,6 +1378,11 @@ void display()
             SystemData::imageHeight,
             SystemData::imageNrChannels,
             SystemData::camera_pose);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Extrinsics calibration..."))
+    {
+        SystemData::showExtrinsicsCalibWindow = true;
     }
     ImGui::InputInt("point_size", &SystemData::point_size);
 
@@ -1257,6 +1511,22 @@ void display()
     ImGui::Text("page down: zoom out");
     ImGui::Text("arrows: move image");
 
+    // Reprojection error of the picked pairs under the current camera_pose --
+    // a quick sanity check of calibration quality before/instead of Optimize.
+    {
+        const size_t nPairs = std::min(SystemData::pointPickedImage.size(), SystemData::pointPickedPointCloud.size());
+        if (nPairs > 0)
+        {
+            double sumSq = 0.0;
+            for (size_t i = 0; i < nPairs; ++i)
+            {
+                const double e = reprojectionErrorPx(i);
+                sumSq += e * e;
+            }
+            ImGui::Text("Reprojection RMS error: %.2f px over %zu pair(s)", std::sqrt(sumSq / nPairs), nPairs);
+        }
+    }
+
     // 2D Points Picked
     ImGui::BeginChild("2D", ImVec2(300, 0), true);
     ImGui::Text("2D:");
@@ -1265,6 +1535,22 @@ void display()
         auto index = std::distance(SystemData::pointPickedImage.begin(), it);
         const auto& p = *it;
         ImGui::Text("%d : %.1f,%.1f", index, p.x, p.y);
+        bool pairRemoved = false;
+        if (static_cast<size_t>(index) < SystemData::pointPickedPointCloud.size())
+        {
+            const double err = reprojectionErrorPx(static_cast<size_t>(index));
+            ImGui::SameLine();
+            ImGui::TextColored(err > 20.0 ? ImVec4(1.f, 0.35f, 0.35f, 1.f) : ImVec4(0.6f, 0.6f, 0.6f, 1.f), "err %.1fpx", err);
+            ImGui::SameLine();
+            const auto pairLabel = std::string("remove pair##2s") + std::to_string(index);
+            if (ImGui::SmallButton(pairLabel.c_str()))
+            {
+                removeCorrespondence(static_cast<size_t>(index));
+                pairRemoved = true;
+            }
+        }
+        if (pairRemoved)
+            break;
         ImGui::SameLine();
         const auto label = std::string("-##2s") + std::to_string(index);
         if (ImGui::Button(label.c_str()))
@@ -1316,10 +1602,160 @@ void display()
         }
         ImGui::SameLine();
         ImGui::Text("%ld: %.1f,%.1f,%.1f", index, p.x(), p.y(), p.z());
+        if (static_cast<size_t>(index) < SystemData::pointPickedImage.size())
+        {
+            const double err = reprojectionErrorPx(static_cast<size_t>(index));
+            ImGui::SameLine();
+            ImGui::TextColored(err > 20.0 ? ImVec4(1.f, 0.35f, 0.35f, 1.f) : ImVec4(0.6f, 0.6f, 0.6f, 1.f), "err %.1fpx", err);
+            ImGui::SameLine();
+            const auto pairLabel = std::string("remove pair##3s") + std::to_string(index);
+            if (ImGui::SmallButton(pairLabel.c_str()))
+            {
+                removeCorrespondence(static_cast<size_t>(index));
+                break;
+            }
+        }
     }
     ImGui::EndChild();
 
     ImGui::End();
+
+    // ── intensity view calibration window ───────────────────────────────────
+    if (SystemData::showIntensityCalibWindow)
+    {
+        ImGui::SetNextWindowSize(ImVec2(320, 0), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Intensity calibration", &SystemData::showIntensityCalibWindow))
+        {
+            ImGui::TextDisabled("Grayscale remap for the intensity point-cloud view.");
+            ImGui::SetNextItemWidth(-1);
+            ImGui::DragFloat("Min", &SystemData::intensityMin, 1.f, -1e6f, SystemData::intensityMax);
+            ImGui::SetNextItemWidth(-1);
+            ImGui::DragFloat("Max", &SystemData::intensityMax, 1.f, SystemData::intensityMin, 1e6f);
+            ImGui::SetNextItemWidth(-1);
+            ImGui::SliderFloat("Gamma", &SystemData::intensityGamma, 0.1f, 5.f, "%.2f");
+            if (SystemData::intensityMax < SystemData::intensityMin)
+            {
+                SystemData::intensityMax = SystemData::intensityMin;
+            }
+            ImGui::Separator();
+            if (ImGui::Button("Auto range"))
+            {
+                float lo = std::numeric_limits<float>::max();
+                float hi = -std::numeric_limits<float>::max();
+                for (const auto& p : SystemData::points)
+                {
+                    lo = std::min(lo, p.intensity);
+                    hi = std::max(hi, p.intensity);
+                }
+                if (lo <= hi)
+                {
+                    SystemData::intensityMin = lo;
+                    SystemData::intensityMax = hi;
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Reset"))
+            {
+                SystemData::intensityMin = 0.f;
+                SystemData::intensityMax = 255.f;
+                SystemData::intensityGamma = 1.f;
+            }
+            if (color)
+            {
+                ImGui::TextDisabled("(uncheck 'color' to preview the intensity view)");
+            }
+        }
+        ImGui::End();
+    }
+
+    // ── extrinsics (camera-to-lidar pose) calibration window ────────────────
+    if (SystemData::showExtrinsicsCalibWindow)
+    {
+        ImGui::SetNextWindowSize(ImVec2(340, 0), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Extrinsics calibration", &SystemData::showExtrinsicsCalibWindow))
+        {
+            TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(SystemData::camera_pose);
+            float px = static_cast<float>(pose.px);
+            float py = static_cast<float>(pose.py);
+            float pz = static_cast<float>(pose.pz);
+            float om = static_cast<float>(pose.om);
+            float fi = static_cast<float>(pose.fi);
+            float ka = static_cast<float>(pose.ka);
+
+            ImGui::TextDisabled("Camera-to-LiDAR pose (live preview, recolors on change).");
+            ImGui::Text("Translation [m]");
+            bool changed = false;
+            ImGui::SetNextItemWidth(-1);
+            changed |= ImGui::DragFloat("px", &px, 0.001f, -10.f, 10.f, "%.4f");
+            ImGui::SetNextItemWidth(-1);
+            changed |= ImGui::DragFloat("py", &py, 0.001f, -10.f, 10.f, "%.4f");
+            ImGui::SetNextItemWidth(-1);
+            changed |= ImGui::DragFloat("pz", &pz, 0.001f, -10.f, 10.f, "%.4f");
+            ImGui::Separator();
+            ImGui::Text("Rotation (Tait-Bryan)");
+            ImGui::SetNextItemWidth(90.f);
+            ImGui::DragFloat("Nudge step (deg)", &SystemData::angleStepDeg, 0.05f, 0.01f, 45.f, "%.2f");
+            SystemData::angleStepDeg = std::clamp(SystemData::angleStepDeg, 0.01f, 45.f);
+            const float stepRad = SystemData::angleStepDeg * static_cast<float>(M_PI) / 180.f;
+
+            auto angleRow = [&](const char* label, float& angle, const char* idSuffix) -> bool
+            {
+                ImGui::PushID(idSuffix);
+                bool rowChanged = false;
+                ImGui::SetNextItemWidth(150.f);
+                rowChanged |= ImGui::SliderAngle(label, &angle, -180.f, 180.f);
+                ImGui::SameLine();
+                if (ImGui::Button("-"))
+                {
+                    angle -= stepRad;
+                    rowChanged = true;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("+"))
+                {
+                    angle += stepRad;
+                    rowChanged = true;
+                }
+                ImGui::PopID();
+                return rowChanged;
+            };
+
+            changed |= angleRow("omega (X)", om, "om");
+            changed |= angleRow("phi (Y)", fi, "fi");
+            changed |= angleRow("kappa (Z)", ka, "ka");
+
+            if (changed)
+            {
+                pose.px = px;
+                pose.py = py;
+                pose.pz = pz;
+                pose.om = om;
+                pose.fi = fi;
+                pose.ka = ka;
+                SystemData::camera_pose = affine_matrix_from_pose_tait_bryan(pose);
+                SystemData::points = ApplyColorToPointcloud(
+                    SystemData::points,
+                    SystemData::imageData,
+                    SystemData::imageWidth,
+                    SystemData::imageHeight,
+                    SystemData::imageNrChannels,
+                    SystemData::camera_pose);
+            }
+
+            ImGui::Separator();
+            if (ImGui::Button("Print pose to console"))
+            {
+                std::cout << "pose" << std::endl;
+                std::cout << "px " << pose.px << std::endl;
+                std::cout << "py " << pose.py << std::endl;
+                std::cout << "pz " << pose.pz << std::endl;
+                std::cout << "om " << pose.om << std::endl;
+                std::cout << "fi " << pose.fi << std::endl;
+                std::cout << "ka " << pose.ka << std::endl;
+            }
+        }
+        ImGui::End();
+    }
 
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
@@ -1429,6 +1865,19 @@ void motion(int x, int y)
         mouse_old_y = y;
     }
     glutPostRedisplay();
+}
+
+void keyboard(unsigned char key, int x, int y)
+{
+    ImGui_ImplGLUT_KeyboardFunc(key, x, y);
+    ImGuiIO& io = ImGui::GetIO();
+
+    // Space toggles the 3D view between camera RGB and intensity grayscale,
+    // unless the key is meant for an ImGui text field (e.g. an InputFloat).
+    if (key == ' ' && !io.WantCaptureKeyboard)
+    {
+        color = !color;
+    }
 }
 
 void reshape(int w, int h)

@@ -47,4 +47,4 @@ if (MSVC)
     target_compile_options(mandeye_with_360_camera_manual_coloring PRIVATE /bigobj)
 endif()
 
-install(TARGETS mandeye_with_360_camera_manual_coloring DESTINATION bin)
+hdmapping_install_app(mandeye_with_360_camera_manual_coloring)

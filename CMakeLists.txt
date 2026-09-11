@@ -80,6 +80,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # Include cmake configs
 include(cmake/cpu_optimizations.cmake)
 include(cmake/disable_target_warnings.cmake)
+include(cmake/install_app.cmake)
 include(cmake/platform.cmake)
 include(cmake/imgui.cmake)
 include(cmake/imguizmo.cmake)

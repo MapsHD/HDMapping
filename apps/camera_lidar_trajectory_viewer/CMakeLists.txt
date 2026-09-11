@@ -106,4 +106,4 @@ if(MSVC)
     target_compile_options(camera_lidar_trajectory_viewer PRIVATE /bigobj)
 endif()
 
-install(TARGETS camera_lidar_trajectory_viewer DESTINATION bin)
+hdmapping_install_app(camera_lidar_trajectory_viewer)

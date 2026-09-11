@@ -146,4 +146,6 @@ if (MSVC)
     target_compile_options(drag_folder_with_mandeye_data_and_drop_here-precision_forestry PRIVATE /bigobj)
 endif()
 
-install(TARGETS drag_folder_with_mandeye_data_and_drop_here-precision_forestry DESTINATION bin)
+hdmapping_install_app(
+  lidar_odometry_step_1
+  drag_folder_with_mandeye_data_and_drop_here-precision_forestry)

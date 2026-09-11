@@ -48,4 +48,4 @@ if(WIN32)
     COMMAND_EXPAND_LISTS)
 endif()
 
-install(TARGETS hd_mapper DESTINATION bin)
+hdmapping_install_app(hd_mapper)

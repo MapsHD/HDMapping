@@ -118,3 +118,16 @@ endif()
 if (MSVC)
     target_compile_options(laz_to_mcap PRIVATE /bigobj)
 endif()
+
+# These are built whenever BUILD_WITH_CLI_TOOLS is ON (the default), so they
+# ship in the DEB package alongside the GUI apps.
+hdmapping_install_app(
+  matrix_mul
+  multiply_timestamps_session_point_cloud_laz
+  multiply_timestamps_session_trajectory_csv
+  laz_to_ply
+  laz_to_pcd
+  pcd_to_laz
+  laz_to_txt
+  laz_to_mcap
+  mcap_to_laz)

@@ -52,10 +52,15 @@ echo Copying executables and DLLs...
 xcopy /Y /Q "%BUILD_DIR%\*.exe" "%DEPLOY_DIR%\" >nul
 xcopy /Y /Q "%BUILD_DIR%\*.dll" "%DEPLOY_DIR%\" >nul
 
-rem Everything the last known-good build produced. If a target wasn't
-rem built (e.g. you only built a subset), it just won't be in BUILD_DIR
-rem and xcopy above silently skips it - so check explicitly and warn.
-set "EXPECTED=concatenate_multi_livox.exe drag_folder_with_mandeye_data_and_drop_here-precision_forestry.exe laz_to_pcd.exe laz_to_ply.exe laz_to_txt.exe lidar_odometry_step_1.exe livox_mid_360_intrinsic_calibration.exe mandeye_compare_trajectories.exe mandeye_mission_recorder_calibration.exe mandeye_raw_data_viewer.exe mandeye_single_session_viewer.exe mandeye_with_360_camera_manual_coloring.exe matrix_mul.exe multiply_timestamps_session_point_cloud_laz.exe multiply_timestamps_session_trajectory_csv.exe multi_session_registration_step_3.exe multi_view_tls_registration_step_2.exe pcd_to_laz.exe precision_forestry_tools.exe single_session_manual_coloring.exe split_multi_livox.exe freeglut.dll laszip3.dll opencv_world4130.dll proj_9_3.dll tbb12.dll z.dll"
+rem Everything a default build produces. If a target wasn't built (e.g. you
+rem only built a subset), it just won't be in BUILD_DIR and the xcopy above
+rem silently skips it - so check explicitly and warn.
+rem
+rem This list has to be kept in sync by hand with the hdmapping_install_app()
+rem calls in apps/*/CMakeLists.txt. hd_mapper is deliberately absent: it is
+rem gated behind BUILD_WITH_HD_MAPPER_APPLICATION, which defaults to OFF, so
+rem listing it would warn on every normal build.
+set "EXPECTED=camera_lidar_calibration.exe camera_lidar_intrinsics_calib.exe camera_lidar_trajectory_viewer.exe concatenate_multi_livox.exe drag_folder_with_mandeye_data_and_drop_here-precision_forestry.exe laz_to_mcap.exe laz_to_pcd.exe laz_to_ply.exe laz_to_txt.exe lidar_odometry_step_1.exe livox_mid_360_intrinsic_calibration.exe mandeye_compare_trajectories.exe mandeye_mission_recorder_calibration.exe mandeye_raw_data_viewer.exe mandeye_single_session_viewer.exe mandeye_with_360_camera_manual_coloring.exe matrix_mul.exe mcap_to_laz.exe multiply_timestamps_session_point_cloud_laz.exe multiply_timestamps_session_trajectory_csv.exe multi_session_registration_step_3.exe multi_view_tls_registration_step_2.exe multi_view_tls_registration_step_2_legacy.exe pcd_to_laz.exe precision_forestry_tools.exe single_session_manual_coloring.exe split_multi_livox.exe freeglut.dll laszip3.dll opencv_world4130.dll proj_9_3.dll tbb12.dll z.dll"
 
 set "MISSING="
 for %%F in (%EXPECTED%) do (

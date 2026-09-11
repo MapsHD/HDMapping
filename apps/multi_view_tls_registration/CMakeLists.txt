@@ -95,4 +95,4 @@ if (MSVC)
     target_compile_options(multi_view_tls_registration_step_2 PRIVATE /bigobj)
 endif()
 
-install (TARGETS multi_view_tls_registration_step_2 DESTINATION bin)
+hdmapping_install_app(multi_view_tls_registration_step_2)

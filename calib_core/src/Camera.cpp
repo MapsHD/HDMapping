@@ -31,6 +31,56 @@ void omFiKaFromMat3(const Eigen::Matrix3f& R, float& om_deg, float& fi_deg, floa
     ka_deg = static_cast<float>(rad2deg(pose.ka));
 }
 
+// Radius (in normalized camera coords, squared) past which the rational distortion model
+// stops being usable. r -> r*radial(r) is only injective up to its turning point; beyond it
+// the model folds, so directions far outside the lens' actual field of view map back onto
+// valid pixel coordinates -- painting whatever is at the centre of the frame onto geometry
+// the camera never saw. The projection alone cannot tell such a fold-back from a genuine
+// hit, so find the turning point once and reject everything past it. Scanned numerically --
+// the turning point of a 6th-order rational function has no useful closed form. It always
+// lies outside the image itself (otherwise the calibration could not reach its own corners),
+// so no legitimate pixel is lost. Ported from the equivalent fix applied directly in
+// TrajectoryViewer.cpp's (now-removed) inline distortion code -- see upstream commit
+// "Fix colorization for calibration for invalid points" (#527) -- but placed here so every
+// caller of projectPoint() gets it, not just that one call site.
+static float maxValidRadiusSq(float k1, float k2, float k3, float k4, float k5, float k6) {
+    auto g = [&](float r) {
+        float r2 = r * r;
+        float den = 1.f + (k4 + (k5 + k6 * r2) * r2) * r2;
+        if (std::fabs(den) < 1e-9f)
+            return -1.f; // pole -- certainly past the turning point
+        return r * (1.f + (k1 + (k2 + k3 * r2) * r2) * r2) / den;
+    };
+    // 8.0 == tan(83 deg), wider than any lens this app sees. A distortion-free model is
+    // monotonic everywhere and so keeps the whole range, i.e. no behaviour change.
+    const float kLimit = 8.f, kStep = 0.005f;
+    float prev = 0.f;
+    for (float r = kStep; r <= kLimit; r += kStep) {
+        float cur = g(r);
+        if (cur <= prev)
+            return (r - kStep) * (r - kStep);
+        prev = cur;
+    }
+    return kLimit * kLimit;
+}
+
+// projectPoint() is called per-point -- potentially millions of times per colorize pass --
+// with the SAME Intrinsics each time, so re-running the numeric scan above on every call
+// would be a severe perf regression. Memoize on the six coefficients actually scanned; exact
+// float equality is fine here since it's detecting "same Intrinsics as last call", not
+// comparing independently-derived values.
+static float cachedMaxValidRadiusSq(float k1, float k2, float k3, float k4, float k5, float k6) {
+    thread_local float lastK[6] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+    thread_local float lastResult = -1.f;
+    if (lastResult >= 0.f && lastK[0] == k1 && lastK[1] == k2 && lastK[2] == k3 &&
+        lastK[3] == k4 && lastK[4] == k5 && lastK[5] == k6) {
+        return lastResult;
+    }
+    lastResult = maxValidRadiusSq(k1, k2, k3, k4, k5, k6);
+    lastK[0] = k1; lastK[1] = k2; lastK[2] = k3; lastK[3] = k4; lastK[4] = k5; lastK[5] = k6;
+    return lastResult;
+}
+
 Intrinsics scaleIntrinsics(const Intrinsics& K, float s) {
     Intrinsics out = K;
     out.fx *= s;
@@ -110,7 +160,13 @@ bool projectPoint(float px, float py, float pz,
     float xn = pc.x() / depth;
     float yn = pc.y() / depth;
 
+    // Off-axis cutoff: beyond the rational distortion model's turning point, the projection
+    // folds back and would paint frame-centre content onto geometry the camera never saw.
+    // See maxValidRadiusSq() above.
     float r2 = xn*xn + yn*yn;
+    if (r2 > cachedMaxValidRadiusSq(K.k1, K.k2, K.k3, K.k4, K.k5, K.k6))
+        return false;
+
     float r4 = r2 * r2;
     float r6 = r4 * r2;
     float radial = (1.f + K.k1*r2 + K.k2*r4 + K.k3*r6)

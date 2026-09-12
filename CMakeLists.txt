@@ -23,8 +23,9 @@ set(HD_CPU_OPTIMIZATION "AUTO" CACHE STRING "CPU optimization target (AUTO, INTE
 set_property(CACHE HD_CPU_OPTIMIZATION PROPERTY STRINGS AUTO INTEL AMD ARM GENERIC)
 
 # Options to enable / disable specific components
-option(BUILD_WITH_CLI_TOOLS "Build with command line tools" ON)
+option(BUILD_WITH_CLI_TOOLS "Build with command line tools" OFF)
 option(BUILD_WITH_HD_MAPPER_APPLICATION "Build with hd_mapper tool" OFF)
+option(BUILD_WITH_UTILITY_APPLICATION "Enable build of utility applications" OFF)
 
 # Three-way profiler backend: NONE (zero overhead) | UTL (lightweight) | TRACY (full profiler)
 set(HDMAPPING_PROFILER "NONE" CACHE STRING "Profiler backend: NONE | UTL | TRACY")
@@ -127,23 +128,27 @@ if(BUILD_WITH_HD_MAPPER_APPLICATION)
     add_subdirectory(apps/hd_mapper)
 endif()
 
+# Applications for typical workflow - see images/workflow.png
+add_subdirectory(apps/mandeye_raw_data_viewer)
 add_subdirectory(apps/lidar_odometry_step_1)
-add_subdirectory(apps/manual_color)
-add_subdirectory(apps/multi_session_registration)
+add_subdirectory(apps/mandeye_single_session_viewer)
 add_subdirectory(apps/multi_view_tls_registration)
 add_subdirectory(apps/multi_view_tls_registration_legacy)
-add_subdirectory(apps/split_multi_livox)
-add_subdirectory(apps/precision_forestry_tools)
-add_subdirectory(apps/mandeye_raw_data_viewer)
-add_subdirectory(apps/compare_trajectories)
-add_subdirectory(apps/mandeye_mission_recorder_calibration)
-add_subdirectory(apps/mandeye_single_session_viewer)
-add_subdirectory(apps/livox_mid_360_intrinsic_calibration)
-add_subdirectory(apps/single_session_manual_coloring)
-add_subdirectory(apps/concatenate_multi_livox)
-add_subdirectory(apps/camera_lidar_calibration)
-add_subdirectory(apps/camera_lidar_trajectory_viewer)
-add_subdirectory(apps/camera_lidar_intrinsics_calib)
+add_subdirectory(apps/multi_session_registration)
+
+if(BUILD_WITH_UTILITY_APPLICATION)
+    add_subdirectory(apps/manual_color)
+    add_subdirectory(apps/split_multi_livox)
+    add_subdirectory(apps/precision_forestry_tools)
+    add_subdirectory(apps/compare_trajectories)
+    add_subdirectory(apps/mandeye_mission_recorder_calibration)
+    add_subdirectory(apps/livox_mid_360_intrinsic_calibration)
+    add_subdirectory(apps/single_session_manual_coloring)
+    add_subdirectory(apps/concatenate_multi_livox)
+    add_subdirectory(apps/camera_lidar_calibration)
+    add_subdirectory(apps/camera_lidar_trajectory_viewer)
+    add_subdirectory(apps/camera_lidar_intrinsics_calib)
+endif()
 
 # NOTE(mwlasiuk) : disable warnings for third party libraries so they do not pollute build logs
 

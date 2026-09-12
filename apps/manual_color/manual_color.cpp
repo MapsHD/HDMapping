@@ -122,6 +122,8 @@ void loadLazFile(const std::string& path);
 void recolorPointsFromImage();
 double reprojectionErrorPx(size_t i);
 void removeCorrespondence(size_t i);
+bool loadCalibrationJson(const std::string& path);
+bool saveCalibrationJson(const std::string& path);
 
 float imgui_co_size{ 1000.0f };
 bool imgui_draw_co{ true };
@@ -916,6 +918,94 @@ void removeCorrespondence(size_t i)
         SD::pointPickedPointCloud.erase(SD::pointPickedPointCloud.begin() + i);
 }
 
+// JSON calibration using the same schema as camera_lidar_trajectory_viewer's
+// loadCalib()/saveCalib() (apps/camera_lidar_trajectory_viewer/TrajectoryViewer.cpp):
+// { "model", "intrinsics": {fx,fy,cx,cy,k1..k6,p1,p2,width,height},
+//   "extrinsics": {camera_position_in_world_xyz, camera_rotation_matrix_in_world}, "roi" }.
+// Only extrinsics (+ intrinsics width/height) round-trip here -- this app is
+// fixed to the equirectangular model.
+//
+// NOTE the two functions are NOT each other's inverse: loadCalibrationJson
+// reads "extrinsics" straight into camera_pose (camera-to-LiDAR, matching
+// this app's own "load camera to lidar relative pose (*.reg)" button and
+// camera_lidar_trajectory_viewer's convention), while saveCalibrationJson
+// below writes camera_pose.inverse() (LiDAR-to-camera) per request. Loading a
+// file this app just saved will therefore NOT reproduce the same camera_pose
+// -- flag this if that round-trip turns out to matter.
+bool loadCalibrationJson(const std::string& path)
+{
+    std::ifstream f(path);
+    if (!f)
+        return false;
+    nlohmann::json j;
+    try
+    {
+        f >> j;
+    } catch (const std::exception&)
+    {
+        return false;
+    }
+
+    if (!j.contains("extrinsics"))
+        return false;
+    auto& je = j["extrinsics"];
+    if (!je.contains("camera_position_in_world_xyz") || !je.contains("camera_rotation_matrix_in_world"))
+        return false;
+
+    auto& t = je["camera_position_in_world_xyz"];
+    auto& m = je["camera_rotation_matrix_in_world"];
+    if (t.size() < 3 || m.size() < 3)
+        return false;
+
+    Eigen::Matrix3d R;
+    for (int r = 0; r < 3; ++r)
+        for (int c = 0; c < 3; ++c)
+            R(r, c) = m[r][c].get<double>();
+
+    Eigen::Affine3d pose = Eigen::Affine3d::Identity();
+    pose.linear() = R;
+    pose.translation() = Eigen::Vector3d(t[0].get<double>(), t[1].get<double>(), t[2].get<double>());
+    SystemData::camera_pose = pose;
+    return true;
+}
+
+bool saveCalibrationJson(const std::string& path)
+{
+    nlohmann::json j;
+    j["model"] = "equirectangular";
+
+    nlohmann::json ji;
+    ji["width"] = SystemData::imageWidth;
+    ji["height"] = SystemData::imageHeight;
+    j["intrinsics"] = ji;
+
+    // Exported inverted: camera_pose is this app's camera-to-LiDAR transform
+    // (see the "save camera to lidar relative pose (*.reg)" button above,
+    // which dumps it un-inverted), so its inverse is the LiDAR-to-camera
+    // transform -- write that under the same field names.
+    const Eigen::Affine3d inv = SystemData::camera_pose.inverse();
+    const Eigen::Vector3d t = inv.translation();
+    const Eigen::Matrix3d R = inv.linear();
+    nlohmann::json je;
+    je["camera_position_in_world_xyz"] = { t.x(), t.y(), t.z() };
+    nlohmann::json rows = nlohmann::json::array();
+    for (int r = 0; r < 3; ++r)
+    {
+        nlohmann::json row = nlohmann::json::array();
+        for (int c = 0; c < 3; ++c)
+            row.push_back(R(r, c));
+        rows.push_back(row);
+    }
+    je["camera_rotation_matrix_in_world"] = rows;
+    j["extrinsics"] = je;
+
+    std::ofstream f(path);
+    if (!f)
+        return false;
+    f << j.dump(2);
+    return true;
+}
+
 void ImGuiLoadSaveButtons()
 {
     namespace SD = SystemData;
@@ -1501,6 +1591,27 @@ void display()
             SystemData::imageNrChannels,
             SystemData::camera_pose);
     }
+    ImGui::Separator();
+    if (ImGui::Button("Load calibration (JSON)..."))
+    {
+        const std::string path = mandeye::fd::OpenFileDialogOneFile("Load calibration", mandeye::fd::json_filter);
+        if (!path.empty())
+        {
+            if (loadCalibrationJson(path))
+                recolorPointsFromImage();
+            else
+                std::cerr << "Cannot load calibration: " << path << std::endl;
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Save calibration (JSON)..."))
+    {
+        const std::string path = mandeye::fd::SaveFileDialog("Save calibration", mandeye::fd::json_filter, ".json", "calibration.json");
+        if (!path.empty() && !saveCalibrationJson(path))
+            std::cerr << "Cannot save calibration: " << path << std::endl;
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Same calibration JSON schema as camera_lidar_trajectory_viewer\n(model/intrinsics/extrinsics) -- interchangeable with it.");
 
     imagePicker("ImagePicker", (ImTextureID)tex1, SystemData::pointPickedImage, picked3DPoints);
 

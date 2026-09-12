@@ -130,9 +130,9 @@ struct LidarOdometryParams
     double lidar_odometry_motion_model_y_1_sigma_m = 0.0005;
     double lidar_odometry_motion_model_z_1_sigma_m = 0.0005;
 
-    double lidar_odometry_motion_model_om_1_sigma_deg = 0.01;
-    double lidar_odometry_motion_model_fi_1_sigma_deg = 0.01;
-    double lidar_odometry_motion_model_ka_1_sigma_deg = 0.01;
+    double lidar_odometry_motion_model_om_1_sigma_deg = 0.001;
+    double lidar_odometry_motion_model_fi_1_sigma_deg = 0.001;
+    double lidar_odometry_motion_model_ka_1_sigma_deg = 0.001;
 
     // motion_model first trajectory node prior uncertainty
     double lidar_odometry_motion_model_fix_origin_x_1_sigma_m = 0.000001;

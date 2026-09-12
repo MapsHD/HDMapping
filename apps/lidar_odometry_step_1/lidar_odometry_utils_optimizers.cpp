@@ -2729,7 +2729,8 @@ bool process_worker_step_lidar_odometry_core(
             if (debugMsg)
                 spdlog::info("lm_factor {}, delta {:.10f}", lm_factor, delta);
 
-            lm_factor *= 10.0;
+            //lm_factor *= 10.0;
+            //lm_factor *= 10.0;
         }
 
         if (stopwatch_realtime.elapsed().count() > params.real_time_threshold_seconds)
@@ -2815,14 +2816,24 @@ bool process_worker_step_update_rgd_after(
         {
             std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
 
-            update_rgd_hierarchy(
-                params.in_out_params_indoor,
-                params.buckets_indoor,
-                pg,
-                worker_data.intermediate_trajectory[0].translation(),
-                params.in_out_params_outdoor,
-                params.buckets_outdoor,
-                lookup_stats);
+            //static int count = 0;
+            
+
+            //if(count % 10 == 0){
+                update_rgd_hierarchy(
+                    params.in_out_params_indoor,
+                    params.buckets_indoor,
+                    pg,
+                    worker_data.intermediate_trajectory[0].translation(),
+                    params.in_out_params_outdoor,
+                    params.buckets_outdoor,
+                    lookup_stats);
+                
+            //    count = 0;
+            //}
+
+            //count++;
+            
         }
         else
         {
@@ -2976,7 +2987,7 @@ bool compute_step_2(
 
             loProgress.store((float)(i + 1) / worker_data.size());
 
-            // temp save
+            /*// temp save
             HDMAP_ZONE_BEGIN(temp_save, "temp_save_laz");
             if (i % 100 == 0)
             {
@@ -2996,7 +3007,7 @@ bool compute_step_2(
                 std::string fn = params.working_directory_preview + "/temp_point_cloud_" + std::to_string(i) + ".laz";
                 exportLaz(fn.c_str(), global_pointcloud, intensity, timestamps);
             }
-            HDMAP_ZONE_END(temp_save);
+            HDMAP_ZONE_END(temp_save);*/
 
             auto acc_distance_tmp = acc_distance;
             acc_distance += ((worker_data[i].intermediate_trajectory[0].inverse()) *
@@ -3063,6 +3074,7 @@ bool compute_step_2(
         for (int i = 0; i < worker_data.size(); i++)
             worker_data[i].intermediate_trajectory_motion_model = worker_data[i].intermediate_trajectory;
 
+            
         spdlog::info("finished computation, elapsed time: {:.2f}s", stopwatch_total);
 
         params.total_length_of_calculated_trajectory = 0;

@@ -2207,7 +2207,7 @@ bool process_worker_step_lidar_odometry_core(
             if (debugMsg)
                 spdlog::info("lm_factor {}, delta {:.10f}", lm_factor, delta);
 
-            lm_factor *= 10.0;
+            lm_factor *= params.lm_factor_damping;
         }
 
         if (stopwatch_realtime.elapsed().count() > params.real_time_threshold_seconds)

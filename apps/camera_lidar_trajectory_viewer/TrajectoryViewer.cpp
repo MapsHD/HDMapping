@@ -272,6 +272,14 @@ struct AppState
     float maxImageAngSpeedDeg = 60.f; // deg/s threshold
     int angFilteredImgs = 0; // images skipped by the filter in the last colorize pass
 
+
+    // Manual correction for a constant camera/LiDAR clock offset (e.g. a fixed
+    // trigger/USB latency the camera's own timestamps don't account for).
+    // Applied wherever an image timestamp is matched against the LiDAR/pose
+    // timeline (loadCloud's chunk selection + point matching, exportColmap's
+    // per-image pose lookup) -- never to the raw timestamps used for
+    // filename lookup or image-list indexing (s.imageTsNs/imagesFilenamesInTime).
+    float imageTimeOffsetMs = 0.f;
     bool useImageColor = false; // true once a colorize pass produced RGB data
     int colorMode = 0; // 0=intensity (jet), 1=RGB by image, 2=camera id
     int coloredPts = 0; // points that received RGB from an image
@@ -329,7 +337,28 @@ struct AppState
     cv::Mat imgViewPending;
     bool imgViewHasNew = false;
     std::thread imgViewThread;
+
+    // ── synthetic intensity-projection image (drawn next to the photo) ─────
+    // Reprojects the (already colorized) exportCloud through the same
+    // calibration/projectPoint() as loadCloud()'s colorize pass, painted with
+    // a jet colormap over each point's normalized intensity -- a reference
+    // image to visually check the calibration/coloring against the photo.
+    bool showIntensityProjection = false;
+    bool intensityProjNeedsUpdate = false; // set on toggle/refresh/image change
+    Texture2D intensityProjTex = {};
+    bool intensityProjTexValid = false;
+    int intensityProjDecim = 1; // use every Nth point of exportCloud (perf)
+    float intensityProjPointRadius = 1.5f; // splat radius, in output-image pixels
+    bool intensityProjOverlay = false; // true: alpha-blend on top of the photo instead of side-by-side
+    float intensityProjAlpha = 0.6f; // blend strength when intensityProjOverlay is on
 };
+
+// s.imageTimeOffsetMs, in nanoseconds -- added to a raw image timestamp
+// before comparing it against the LiDAR/pose timeline.
+static int64_t imageOffsetNs(const AppState& s)
+{
+    return static_cast<int64_t>(std::llround(static_cast<double>(s.imageTimeOffsetMs) * 1e6));
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 // Plain Eigen::Vector3f -> raylib Vector3 conversion. Used to be an axis
@@ -684,6 +713,7 @@ static void loadCloud(AppState& s)
 
     // time(s) -> T_world_lidar, for interpolating the pose at each image time.
     std::map<double, Eigen::Matrix4d> trajMap = buildTrajMap(s.traj);
+    const int64_t offNs = imageOffsetNs(s);
 
     std::vector<float> gpuData;
     float mx = 0.f;
@@ -732,12 +762,15 @@ static void loadCloud(AppState& s)
         {
             if (s.multiImgColoring)
             {
-                // new: every image whose timestamp falls inside the chunk range
-                auto it0 = std::lower_bound(s.imageTsNs.begin(), s.imageTsNs.end(), chunkFirst);
-                auto it1 = std::upper_bound(s.imageTsNs.begin(), s.imageTsNs.end(), chunkLast);
+                // new: every image whose timestamp falls inside the chunk range.
+                // Search bounds are shifted by -offNs since s.imageTsNs holds raw
+                // (unshifted) camera timestamps: imgTs+offNs in [chunkFirst,
+                // chunkLast]  <=>  imgTs in [chunkFirst-offNs, chunkLast-offNs].
+                auto it0 = std::lower_bound(s.imageTsNs.begin(), s.imageTsNs.end(), chunkFirst - offNs);
+                auto it1 = std::upper_bound(s.imageTsNs.begin(), s.imageTsNs.end(), chunkLast - offNs);
                 for (auto it = it0; it != it1; ++it)
                 {
-                    int64_t imgTs = *it;
+                    int64_t imgTs = *it; // raw camera-clock timestamp; keyed as-is into imagesFilenamesInTime
                     auto fnIt = s.imagesFilenamesInTime.find(imgTs);
                     if (fnIt == s.imagesFilenamesInTime.end())
                         continue;
@@ -747,19 +780,22 @@ static void loadCloud(AppState& s)
                         continue;
                     }
                     Eigen::Affine3f pose;
-                    if (!interpPose(trajMap, imgTs, pose))
+                    if (!interpPose(trajMap, imgTs + offNs, pose))
                         continue;
                     cv::Mat img = readImage(fnIt->second);
                     if (img.empty())
                         continue;
                     int gidx = (int)(it - s.imageTsNs.begin());
-                    chunkImgs.push_back({ imgTs, pose, std::move(img), gidx });
+                    // ImgEntry.ts is stored already shifted into the LiDAR clock,
+                    // since it's compared against pt.ts_ns further below.
+                    chunkImgs.push_back({ imgTs + offNs, pose, std::move(img), gidx });
                 }
             }
             else
             {
-                // legacy: single image nearest to chunk midpoint
-                int64_t mid = chunkFirst;
+                // legacy: single image nearest to chunk midpoint (see note above
+                // on why the search target is shifted by -offNs)
+                int64_t mid = chunkFirst - offNs;
                 auto it = std::lower_bound(s.imageTsNs.begin(), s.imageTsNs.end(), mid);
                 if (it == s.imageTsNs.end())
                     --it;
@@ -775,12 +811,12 @@ static void loadCloud(AppState& s)
                 const bool tooFast = dropFastImgs && angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, imgTs) > s.maxImageAngSpeedDeg;
                 if (tooFast)
                     ++angFilteredImgs;
-                if (!tooFast && fnIt != s.imagesFilenamesInTime.end() && interpPose(trajMap, imgTs, pose))
+                 if (!tooFast && fnIt != s.imagesFilenamesInTime.end() && interpPose(trajMap, imgTs + offNs, pose))
                 {
                     cv::Mat img = readImage(fnIt->second);
                     int gidx = (int)(it - s.imageTsNs.begin());
                     if (!img.empty())
-                        chunkImgs.push_back({ imgTs, pose, std::move(img), gidx });
+                        chunkImgs.push_back({ imgTs + offNs, pose, std::move(img), gidx });
                 }
             }
         }
@@ -1030,6 +1066,98 @@ static void loadCloud(AppState& s)
     }
     if (angFilteredImgs > 0)
         s.status += "  | Fast-img filtered: " + std::to_string(angFilteredImgs);
+}
+
+// Small CPU jet colormap approximation, matching the GLSL one used by the
+// GPU point renderer's Intensity color mode (raylib_widgets::kJetColormapGLSL)
+// closely enough for a visual reference image. Returns BGR (OpenCV order).
+static cv::Vec3b jetColorBGR(float t)
+{
+    t = std::clamp(t, 0.f, 1.f);
+    float r = std::clamp(1.5f - std::fabs(4.f * t - 3.f), 0.f, 1.f);
+    float g = std::clamp(1.5f - std::fabs(4.f * t - 2.f), 0.f, 1.f);
+    float b = std::clamp(1.5f - std::fabs(4.f * t - 1.f), 0.f, 1.f);
+    return cv::Vec3b((uchar)(b * 255.f), (uchar)(g * 255.f), (uchar)(r * 255.f));
+}
+
+// Rasterizes a synthetic "intensity image" for the camera pose at imgTsAdj
+// (already shifted by the photo time offset), by reprojecting s.exportCloud
+// through the same fixed camera-to-LiDAR extrinsics (R_wc/C) and
+// calib::projectPoint() as loadCloud()'s colorize pass, painted with a jet
+// colormap over each point's normalized [0,1] intensity and a simple
+// per-pixel depth test (nearest point wins) so occluded points don't bleed
+// through. Points farther than s.maxTemporalDist (or a 1s fallback) in time
+// from imgTsAdj are skipped -- otherwise the whole session's merged cloud
+// would be tested against every single preview, which is the same temporal
+// gate loadCloud()'s "Temporal" coloring strategy already applies per point.
+static cv::Mat renderIntensityProjection(const AppState& s, int64_t imgTsAdj)
+{
+    const Intrinsics Ks = scaleIntrinsics(s.K, s.imgScale);
+    cv::Mat out(std::max(1, Ks.height), std::max(1, Ks.width), CV_8UC3, cv::Scalar(25, 25, 25));
+    if (s.exportCloud.empty() || Ks.width <= 0 || Ks.height <= 0)
+        return out;
+
+    auto trajMap = buildTrajMap(s.traj);
+    Eigen::Affine3f pose;
+    if (!interpPose(trajMap, imgTsAdj, pose))
+        return out;
+    const Eigen::Affine3f poseInv = pose.inverse();
+    const Eigen::Matrix3f& R_wc = s.R_wc;
+    const Eigen::Vector3f C(s.E.tx, s.E.ty, s.E.tz);
+
+    const int64_t windowNs = (int64_t)((s.maxTemporalDist > 0.f ? s.maxTemporalDist : 1.0f) * 1e9);
+    const int step = std::max(1, s.intensityProjDecim);
+    const int radius = std::max(1, (int)std::lround(s.intensityProjPointRadius));
+
+    cv::Mat depthBuf(out.rows, out.cols, CV_32F, cv::Scalar(std::numeric_limits<float>::max()));
+    for (size_t i = 0; i < s.exportCloud.size(); i += step)
+    {
+        const auto& p = s.exportCloud[i];
+        if (std::abs(p.ts_ns - imgTsAdj) > windowNs)
+            continue;
+        Eigen::Vector3f pl = poseInv * Eigen::Vector3f(p.x, p.y, p.z);
+        float u, v, depth;
+        if (!projectPoint(pl.x(), pl.y(), pl.z(), Ks, R_wc, C, u, v, depth))
+            continue;
+        if (Ks.model == CameraModel::Pinhole && depth <= 0.05f)
+            continue;
+        // Points near-grazing the camera plane (small but positive depth,
+        // e.g. off to the side) get blown up to huge u/v by the perspective
+        // divide -- unlike colorize()'s tight per-point temporal matching,
+        // this function pulls in every point within a whole time window, so
+        // it hits that edge case far more often. (int)std::round() on such a
+        // value is undefined behavior, which is what produced the
+        // "wrapping"/bowtie look; reject before the cast instead.
+        if (!std::isfinite(u) || !std::isfinite(v) || std::fabs(u) > 1e6f || std::fabs(v) > 1e6f)
+            continue;
+        int iu = (int)std::round(u);
+        int iv = (int)std::round(v);
+        const cv::Vec3b col = jetColorBGR(p.intensity);
+
+        for (int dy = -radius; dy <= radius; ++dy)
+        {
+            int yy = iv + dy;
+            if (yy < 0 || yy >= out.rows)
+                continue;
+            for (int dx = -radius; dx <= radius; ++dx)
+            {
+                if (dx * dx + dy * dy > radius * radius)
+                    continue;
+                int xx = iu + dx;
+                if (Ks.model == CameraModel::Equirectangular)
+                    xx = (xx % out.cols + out.cols) % out.cols;
+                else if (xx < 0 || xx >= out.cols)
+                    continue;
+                float& zb = depthBuf.at<float>(yy, xx);
+                if (depth < zb)
+                {
+                    zb = depth;
+                    out.at<cv::Vec3b>(yy, xx) = col;
+                }
+            }
+        }
+    }
+    return out;
 }
 
 static void loadCalib(AppState& s)
@@ -1495,11 +1623,12 @@ static void exportColmap(AppState& s)
              "#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\n"
              "#   POINTS2D[] as (X, Y, POINT3D_ID)\n";
         auto trajMap = buildTrajMap(s.traj);
+        const int64_t offNs = imageOffsetNs(s);
         int id = 1;
         for (auto& [ts, path] : s.imagesFilenamesInTime)
         {
             Eigen::Affine3f pose;
-            if (!interpPose(trajMap, ts, pose))
+            if (!interpPose(trajMap, ts + offNs, pose))
                 continue;
             Eigen::Affine3f T_wc = pose * T_lc; // camera in world
             Eigen::Affine3f T_cw = T_wc.inverse(); // world -> camera
@@ -1998,11 +2127,13 @@ int main(int argc, char* argv[])
             {
                 s.imgViewIdx = std::max(s.imgViewIdx - 1, 0);
                 s.imgViewRequest.store(s.imgViewIdx);
+                s.intensityProjNeedsUpdate = true;
             }
             if (IsKeyPressed(KEY_RIGHT))
             {
                 s.imgViewIdx = std::min(s.imgViewIdx + 1, (int)s.imageTsNs.size());
                 s.imgViewRequest.store(s.imgViewIdx);
+                s.intensityProjNeedsUpdate = true;
             }
         }
 
@@ -2090,6 +2221,23 @@ int main(int argc, char* argv[])
                 s.imgViewTex = LoadTextureFromImage(ri);
                 s.imgViewTexValid = s.imgViewTex.id > 0;
             }
+        }
+
+        // ── (re)build the intensity-projection texture on demand ────────────────
+        // Rasterization is cheap enough (already-decimated, in-memory
+        // exportCloud) to do synchronously on toggle/refresh/image-change,
+        // unlike the photo loader above which reads a file off disk.
+        if (s.showIntensityProjection && s.intensityProjNeedsUpdate && s.imgViewIdx >= 0 && s.imgViewIdx < (int)s.imageTsNs.size())
+        {
+            s.intensityProjNeedsUpdate = false;
+            int64_t imgTsAdj = s.imageTsNs[s.imgViewIdx] + imageOffsetNs(s);
+            cv::Mat proj = renderIntensityProjection(s, imgTsAdj);
+            cv::cvtColor(proj, proj, cv::COLOR_BGR2RGB);
+            if (s.intensityProjTexValid)
+                UnloadTexture(s.intensityProjTex);
+            Image ri = { proj.data, proj.cols, proj.rows, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8 };
+            s.intensityProjTex = LoadTextureFromImage(ri);
+            s.intensityProjTexValid = s.intensityProjTex.id > 0;
         }
 
         // ── ImGui panel ───────────────────────────────────────────────────────
@@ -2388,8 +2536,15 @@ int main(int argc, char* argv[])
                 {
                     s.imgViewIdx = std::clamp(s.imgViewIdx, 0, nImgs - 1);
                     s.imgViewRequest.store(s.imgViewIdx);
+                    s.intensityProjNeedsUpdate = true;
                 }
                 ImGui::TextDisabled("ts: %lld", (long long)s.imageTsNs[s.imgViewIdx]);
+                if (s.imageTimeOffsetMs != 0.f)
+                {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled(
+                        "(adj: %lld)", (long long)(s.imageTsNs[s.imgViewIdx] + imageOffsetNs(s)));
+                }
                 {
                     float as = angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, s.imageTsNs[s.imgViewIdx]);
                     bool fast = s.filterFastImages && s.maxImageAngSpeedDeg > 0.f && as > s.maxImageAngSpeedDeg;
@@ -2406,6 +2561,37 @@ int main(int argc, char* argv[])
                     ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading...");
                 else if (s.imgViewTexValid)
                     ImGui::TextColored(ImVec4(0, 1, 0, 1), "%dx%d", s.imgViewTex.width, s.imgViewTex.height);
+
+                ImGui::Separator();
+                if (ImGui::Checkbox("Show intensity projection", &s.showIntensityProjection))
+                {
+                    if (s.showIntensityProjection)
+                        s.intensityProjNeedsUpdate = true;
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Draws a synthetic intensity image next to the photo, by\n"
+                        "reprojecting the colorized cloud through the current\n"
+                        "calibration -- a reference to check it against the photo.\n"
+                        "Requires 'Load cloud' to have run first.");
+                if (s.showIntensityProjection)
+                {
+                    ImGui::PushItemWidth(-140.f);
+                    if (ImGui::InputInt("Point decimation##proj", &s.intensityProjDecim))
+                        s.intensityProjDecim = std::max(1, s.intensityProjDecim);
+                    if (ImGui::InputFloat("Point radius (px)##proj", &s.intensityProjPointRadius, 0.5f, 1.f, "%.1f"))
+                        s.intensityProjPointRadius = std::max(1.f, s.intensityProjPointRadius);
+                    ImGui::Checkbox("Overlay on photo", &s.intensityProjOverlay);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("ON: alpha-blended on top of the photo\nOFF: shown side-by-side with it");
+                    if (s.intensityProjOverlay)
+                        ImGui::SliderFloat("Overlay alpha", &s.intensityProjAlpha, 0.f, 1.f, "%.2f");
+                    ImGui::PopItemWidth();
+                    if (ImGui::Button("Refresh projection", ImVec2(-1, 0)))
+                        s.intensityProjNeedsUpdate = true;
+                    if (s.exportCloud.empty())
+                        ImGui::TextColored(ImVec4(1, 0.6f, 0, 1), "No colorized cloud yet -- run 'Load cloud'.");
+                }
             }
         }
 
@@ -2551,9 +2737,13 @@ int main(int argc, char* argv[])
             ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_Once);
             ImGui::Begin("Image##viewer", nullptr, ImGuiWindowFlags_NoScrollbar);
             ImVec2 avail = ImGui::GetContentRegionAvail();
+            const bool showProj = s.showIntensityProjection && s.intensityProjTexValid;
+            const bool overlayMode = showProj && s.intensityProjOverlay;
+            const float colW = (showProj && !overlayMode) ? (avail.x - 4.f) * 0.5f : avail.x;
+
             float aspect = (float)s.imgViewTex.height / (float)s.imgViewTex.width;
-            int dispW = (int)avail.x;
-            int dispH = (int)(avail.x * aspect);
+            int dispW = (int)colW;
+            int dispH = (int)(colW * aspect);
             if (dispH > (int)avail.y)
             {
                 dispH = (int)avail.y;
@@ -2561,6 +2751,23 @@ int main(int argc, char* argv[])
             }
             ImVec2 imgPos = ImGui::GetCursorScreenPos();
             rlImGuiImageSize(&s.imgViewTex, dispW, dispH);
+
+            if (overlayMode)
+            {
+                // Redraw the projection texture at the same screen rect, tinted
+                // with a reduced alpha -- ImGui's renderer alpha-blends draw
+                // commands, so this composites over the photo just drawn above.
+                ImGui::SetCursorScreenPos(imgPos);
+                ImVec4 tint(1.f, 1.f, 1.f, std::clamp(s.intensityProjAlpha, 0.f, 1.f));
+                ImGui::ImageWithBg(
+                    ImTextureID(s.intensityProjTex.id),
+                    ImVec2((float)dispW, (float)dispH),
+                    ImVec2(0.f, 0.f),
+                    ImVec2(1.f, 1.f),
+                    ImVec4(0.f, 0.f, 0.f, 0.f),
+                    tint);
+            }
+
             // overlay the ROI, mapping full-res image pixels to the displayed rect
             if (s.roi.enabled && s.imgViewTex.width > 0 && s.imgViewTex.height > 0)
             {
@@ -2575,6 +2782,20 @@ int main(int argc, char* argv[])
                     /*rounding=*/0.f,
                     /*thickness=*/2.f);
             }
+
+            if (showProj && !overlayMode)
+            {
+                ImGui::SameLine();
+                float pAspect = (float)s.intensityProjTex.height / (float)s.intensityProjTex.width;
+                int pDispW = (int)colW;
+                int pDispH = (int)(colW * pAspect);
+                if (pDispH > (int)avail.y)
+                {
+                    pDispH = (int)avail.y;
+                    pDispW = (int)(avail.y / pAspect);
+                }
+                rlImGuiImageSize(&s.intensityProjTex, pDispW, pDispH);
+            }
             ImGui::End();
         }
 
@@ -2588,6 +2809,8 @@ int main(int argc, char* argv[])
         s.rosThread.join();
     if (s.imgViewTexValid)
         UnloadTexture(s.imgViewTex);
+    if (s.intensityProjTexValid)
+        UnloadTexture(s.intensityProjTex);
 
     s.cloud.unload();
     if (s.shaderOk)

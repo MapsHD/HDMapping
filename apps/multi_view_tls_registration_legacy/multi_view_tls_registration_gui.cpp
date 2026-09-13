@@ -3582,6 +3582,14 @@ void display()
                     }
 
                     ImGui::MenuItem("Show IMU to LIO difference", nullptr, &session.point_clouds_container.show_imu_to_lio_diff);
+                    if (session.point_clouds_container.show_imu_to_lio_diff)
+                    {
+                        ImGui::SetNextItemWidth(ImGuiNumberWidth);
+                        ImGui::InputFloat(
+                            "IMU to LIO diff scale", &session.point_clouds_container.imu_to_lio_diff_scale, 1.0f, 10.0f, "%.1f");
+                        if (session.point_clouds_container.imu_to_lio_diff_scale < 0.0f)
+                            session.point_clouds_container.imu_to_lio_diff_scale = 0.0f;
+                    }
 
                     ImGui::Separator();
 

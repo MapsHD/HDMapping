@@ -795,7 +795,8 @@ void PointClouds::render(
             yz_intersection,
             xy_intersection,
             intersection_width,
-            show_imu_to_lio_diff);
+            show_imu_to_lio_diff,
+            imu_to_lio_diff_scale);
     }
 }
 #endif

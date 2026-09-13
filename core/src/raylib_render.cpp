@@ -649,7 +649,8 @@ void ScanRenderer::drawTrajectories(
     bool xzIntersection,
     bool yzIntersection,
     bool xyIntersection,
-    bool useInitialPose) const
+    bool useInitialPose,
+    float imuDiffScale) const
 {
     int stride = reduceRenderedTrajectory < 1 ? 1 : reduceRenderedTrajectory;
 
@@ -714,9 +715,9 @@ void ScanRenderer::drawTrajectories(
                 Eigen::Affine3d m = shownPose * pc.local_trajectory[i].m_pose;
                 Vector3 origin = toVec3(m.translation());
                 const auto& diff = pc.local_trajectory[i].imu_diff_angle_om_fi_ka_deg;
-                DrawLine3D(origin, toVec3(m.translation() + Eigen::Vector3d(diff.x() * 10, 0, 0)), RED);
-                DrawLine3D(origin, toVec3(m.translation() + Eigen::Vector3d(0, diff.y() * 10, 0)), GREEN);
-                DrawLine3D(origin, toVec3(m.translation() + Eigen::Vector3d(0, 0, diff.z() * 10)), BLUE);
+                DrawLine3D(origin, toVec3(m.translation() + Eigen::Vector3d(diff.x() * imuDiffScale, 0, 0)), RED);
+                DrawLine3D(origin, toVec3(m.translation() + Eigen::Vector3d(0, diff.y() * imuDiffScale, 0)), GREEN);
+                DrawLine3D(origin, toVec3(m.translation() + Eigen::Vector3d(0, 0, diff.z() * imuDiffScale)), BLUE);
             }
         }
 

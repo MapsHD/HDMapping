@@ -161,7 +161,8 @@ public:
         bool yz_intersection,
         bool xy_intersection,
         double intersection_width,
-        bool visible_imu_diff);
+        bool visible_imu_diff,
+        float imu_diff_scale = 10.0f);
     void render(Eigen::Affine3d pose, int viewer_decmiate_point_cloud, int viewer_reduce_rendered_trajectory, float _render_color[3]);
 #endif
 };

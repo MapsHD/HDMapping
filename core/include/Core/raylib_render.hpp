@@ -184,7 +184,8 @@ public:
         bool xzIntersection = false,
         bool yzIntersection = false,
         bool xyIntersection = false,
-        bool useInitialPose = false) const;
+        bool useInitialPose = false,
+        float imuDiffScale = 10.0f) const;
 
     // Draws a single already-cached scan (see rebuild()) straight from its
     // persistent, full-resolution GPU buffer -- no CPU re-transform or

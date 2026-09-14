@@ -141,6 +141,14 @@ namespace calib
     // same geometry. Everything else (distortion, model) is carried over.
     Intrinsics scaleIntrinsics(const Intrinsics& K, float s);
 
+    // The same rectangle on an image resampled by `s`, so a ROI -- which is
+    // given in full-resolution pixels, see Roi above -- can be tested against
+    // the pixels of a downscaled copy. Both edges are scaled rather than the
+    // width alone, so abutting rectangles stay abutting. An empty (w/h == 0)
+    // ROI comes back unchanged, and a non-empty one never scales down to
+    // empty, which every caller would read as "no ROI set".
+    Roi scaleRoi(const Roi& r, float s);
+
     // Project a point from LiDAR frame to image pixel (u, v).
     // R_wc = camera orientation in world, t = camera position in world.
     //

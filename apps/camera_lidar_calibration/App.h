@@ -40,6 +40,14 @@ struct AppState
     // ── calibration params ───────────────────────────────────────────────────
     Intrinsics intrinsics;
     Extrinsics extrinsics;
+    // Resolution `intrinsics` are currently valid for -- from the
+    // calibration file's own width/height when it states one, or (if it
+    // didn't) whatever image was already loaded at the time. 0 = unknown,
+    // meaning autoScaleIntrinsicsToImage() has nothing to scale from.
+    // Kept in sync by that function, so it always names the size the
+    // *current* (possibly already auto-scaled) intrinsics apply to, not
+    // necessarily the original calibration file's resolution.
+    int intrinsicsW = 0, intrinsicsH = 0;
 
     // ── visualization ─────────────────────────────────────────────────────────
     VisualizationParams vizParams;
@@ -92,6 +100,15 @@ struct AppState
     // (Re)build the displayed texture: undistorts with current intrinsics
     // when they were loaded from a file, otherwise shows the raw image.
     void rebuildImageTexture();
+    // If `intrinsicsW/H` names a resolution other than the current
+    // imageW/imageH, rescales `intrinsics` (calib::scaleIntrinsics) to
+    // match and updates intrinsicsW/H to the new size -- called after
+    // whichever of an image load or an intrinsics load comes second, so a
+    // calibration and an image of different resolutions just work instead
+    // of silently mis-projecting or only warning about it. No-op (returns
+    // "") if either resolution is unknown (0) or they already match.
+    // Callers still own calling rebuildImageTexture() afterward.
+    std::string autoScaleIntrinsicsToImage();
 };
 
 class App

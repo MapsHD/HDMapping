@@ -447,22 +447,56 @@ void UI::panelIntrinsics(AppState& state)
     };
 
     ImGui::PushItemWidth(-80.f);
+
+    // Equirectangular isn't wired into this app yet (see CameraModel's own
+    // comment in Camera.h) -- offering it here would silently mis-project,
+    // so the combo only offers the two models this app actually supports.
+    static const char* kModelNames[] = { "Pinhole", "Mei" };
+    int modelIdx = (K.model == CameraModel::Mei) ? 1 : 0;
+    if (ImGui::Combo("Model", &modelIdx, kModelNames, IM_ARRAYSIZE(kModelNames)))
+    {
+        K.model = (modelIdx == 1) ? CameraModel::Mei : CameraModel::Pinhole;
+        edited = true;
+    }
+    ImGui::Separator();
+
     drag("fx", &K.fx, 1.f, 1.f, 10000.f, "%.1f");
     drag("fy", &K.fy, 1.f, 1.f, 10000.f, "%.1f");
     drag("cx", &K.cx, 0.5f, 0.f, 10000.f, "%.1f");
     drag("cy", &K.cy, 0.5f, 0.f, 10000.f, "%.1f");
     ImGui::Separator();
-    ImGui::Text("Radial (rational model):");
-    drag("k1", &K.k1, 0.001f, -100.f, 100.f, "%.4f");
-    drag("k2", &K.k2, 0.001f, -100.f, 100.f, "%.4f");
-    drag("k3", &K.k3, 0.001f, -100.f, 100.f, "%.4f");
-    drag("k4", &K.k4, 0.001f, -100.f, 100.f, "%.4f");
-    drag("k5", &K.k5, 0.001f, -100.f, 100.f, "%.4f");
-    drag("k6", &K.k6, 0.001f, -100.f, 100.f, "%.4f");
-    ImGui::Text("Tangential:");
-    drag("p1", &K.p1, 0.0001f, -1.f, 1.f, "%.5f");
-    drag("p2", &K.p2, 0.0001f, -1.f, 1.f, "%.5f");
-    helpMarker("Drag to adjust. Hold Ctrl+click to type a value.");
+
+    if (K.model == CameraModel::Mei)
+    {
+        // Unified-sphere fisheye (MeiCamera.h): xi + a plain k1/k2/k3 +
+        // p1/p2 polynomial, no rational denominator -- k4/k5/k6 don't apply
+        // here, so they're hidden instead of shown as dead controls.
+        drag("xi", &K.xi, 0.001f, 0.f, 3.f, "%.4f");
+        ImGui::Text("Radial (Mei polynomial):");
+        drag("k1", &K.k1, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k2", &K.k2, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k3", &K.k3, 0.001f, -100.f, 100.f, "%.4f");
+        ImGui::Text("Tangential:");
+        drag("p1", &K.p1, 0.0001f, -1.f, 1.f, "%.5f");
+        drag("p2", &K.p2, 0.0001f, -1.f, 1.f, "%.5f");
+        helpMarker(
+            "Drag to adjust. Hold Ctrl+click to type a value.\nUnlike Pinhole, the displayed image is never undistorted for "
+            "Mei -- the projection overlay and Camera RGB coloring apply this distortion to the raw image directly.");
+    }
+    else
+    {
+        ImGui::Text("Radial (rational model):");
+        drag("k1", &K.k1, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k2", &K.k2, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k3", &K.k3, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k4", &K.k4, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k5", &K.k5, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k6", &K.k6, 0.001f, -100.f, 100.f, "%.4f");
+        ImGui::Text("Tangential:");
+        drag("p1", &K.p1, 0.0001f, -1.f, 1.f, "%.5f");
+        drag("p2", &K.p2, 0.0001f, -1.f, 1.f, "%.5f");
+        helpMarker("Drag to adjust. Hold Ctrl+click to type a value.");
+    }
     ImGui::PopItemWidth();
 
     if (edited && state.intrinsicsLoaded)

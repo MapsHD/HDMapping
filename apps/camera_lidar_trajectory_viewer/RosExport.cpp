@@ -208,9 +208,13 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
             bool mapsReady = false;
             int camW = 0, camH = 0;
             // initUndistortRectifyMap is pinhole-only: there is nothing to
-            // rectify on a 360 panorama, and Km/Dm describe a camera it isn't.
+            // rectify on a 360 panorama, and Km/Dm describe a camera neither
+            // it nor a Mei fisheye is (Mei's k1/k2/k3/p1/p2 are its own
+            // polynomial, applied after a unit-sphere step Km/Dm can't
+            // express), so both keep their raw frames.
             const bool equirect = in.K.model == CameraModel::Equirectangular;
-            const bool rectify = opt.undistortCamera && in.calibLoaded && !equirect;
+            const bool mei = in.K.model == CameraModel::Mei;
+            const bool rectify = opt.undistortCamera && in.calibLoaded && in.K.model == CameraModel::Pinhole;
             // Original jpeg bytes can be copied verbatim only when we neither
             // rectify nor need to re-encode (compressed + no undistort).
             const bool copyJpegBytes = opt.compressCamera && !rectify;
@@ -313,6 +317,28 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
                             ci.k = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
                             ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
                             ci.p = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                        }
+                        else if (mei)
+                        {
+                            // No standard ROS distortion model is a unified
+                            // sphere either, so this reports the rig's own tag
+                            // (the same string its camera_info.yaml carries,
+                            // see CalibCore/MeiCamera.h) rather than claiming
+                            // to be plumb_bob/rational_polynomial, which a
+                            // consumer would undistort with badly wrong math.
+                            //
+                            // d is the yaml's own (k1, k2, k3, p1, p2) order --
+                            // NOT OpenCV's (k1, k2, p1, p2, k3) -- with xi
+                            // appended, since CameraInfo has nowhere else to
+                            // put it and the model is unusable without it.
+                            // K/P stay populated: fx/fy/cx/cy do mean the
+                            // usual thing here, they are just applied after
+                            // the unit-sphere step.
+                            ci.distortion_model = "insta360_mei_v2";
+                            ci.d = { in.K.k1, in.K.k2, in.K.k3, in.K.p1, in.K.p2, in.K.xi };
+                            ci.k = { in.K.fx, 0.f, in.K.cx, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 1.f };
+                            ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
+                            ci.p = { in.K.fx, 0.f, in.K.cx, 0.f, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 0.f, 1.f, 0.f };
                         }
                         else
                         {

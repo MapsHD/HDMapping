@@ -85,12 +85,15 @@ private:
     int locMVP = -1, locColorMode = -1, locHeightRange = -1;
     int locMaxDist = -1, locOpacity = -1, locPointSize = -1, locDecim = -1;
     int locCamXform = -1, locCamK = -1, locCamImgSize = -1, locCamTex = -1;
+    // CameraModel::Mei only -- see kPointVS's Mei branch (RendererShaders.h)
+    int locCamModel = -1, locCamXi = -1, locCamRad1 = -1, locCamTan = -1;
 
     // 2D image-projection shader
     Shader projShader = {};
     bool projShaderValid = false;
     int locPrjXform = -1, locPrjK = -1, locPrjImgSize = -1;
     int locPrjRad1 = -1, locPrjRad2 = -1, locPrjTan = -1;
+    int locPrjModel = -1, locPrjXi = -1; // CameraModel::Mei only
     int locPrjDepthRange = -1, locPrjOpacity = -1;
     int locPrjPointSize = -1, locPrjColorMode = -1, locPrjDecim = -1;
 };

@@ -1,5 +1,7 @@
 #include <CalibCore/Camera.h>
 
+#include <CalibCore/MeiCamera.h>
+
 #include <algorithm>
 
 // Reuses (does not duplicate) core's own om/fi/ka<->matrix conversion --
@@ -68,6 +70,37 @@ bool projectPoint(float px, float py, float pz,
         // atan2 returns exactly +pi on the seam, which maps to u == w
         u = std::fmod(u + w, w);
         v = h * (0.5f + std::asin(std::clamp(pc.y() / depth, -1.f, 1.f)) / pi);
+        return true;
+    }
+
+    if (K.model == CameraModel::Mei) {
+        // Delegates to the tested/certified MeiCamera::Project (MeiCamera.h)
+        // instead of re-deriving the unified-sphere + radial/tangential
+        // formula here -- only the R_wc/t transform into camera frame, the
+        // "point sits on the camera itself" guard (same idiom as
+        // Equirectangular above), and the "in front of the camera" guard
+        // just below belong to this wrapper.
+        depth = pc.norm();
+        if (depth < 1e-4f) return false;
+
+        // Xs.z + xi > 0 is this model's own validity domain (MeiCamera::
+        // Project divides by exactly this with no guard of its own) -- it
+        // reduces exactly to the familiar Pinhole "pc.z > 0" test when
+        // xi == 0 (Xs.z and pc.z then share a sign, depth > 0). Without
+        // this, a point behind the camera can still land inside the image
+        // bounds (the projection isn't injective outside its valid domain)
+        // and get silently treated as visible.
+        if (pc.z() / depth + K.xi <= 0.f) return false;
+
+        MeiCamera cam;
+        cam.fx = K.fx; cam.fy = K.fy; cam.cx = K.cx; cam.cy = K.cy;
+        cam.xi = K.xi;
+        cam.k1 = K.k1; cam.k2 = K.k2; cam.k3 = K.k3;
+        cam.p1 = K.p1; cam.p2 = K.p2;
+
+        const cv::Point2d px = cam.Project(cv::Point3d(pc.x(), pc.y(), pc.z()));
+        u = static_cast<float>(px.x);
+        v = static_cast<float>(px.y);
         return true;
     }
 

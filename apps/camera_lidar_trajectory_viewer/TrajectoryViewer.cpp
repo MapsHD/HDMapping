@@ -216,6 +216,24 @@ struct AppState
     Extrinsics E; // tx/ty/tz (camera position); rotation lives in R_wc below, not E.om/fi/ka
     Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); // camera orientation in world/LiDAR frame
     Roi roi;
+    // Free-form counterpart of `roi`: a per-pixel mask image whose rejected
+    // pixels are excluded from coloring. This is what it takes to drop the
+    // operator/backpack a 360 rig has in frame permanently -- no rectangle can
+    // cut that out without cutting out the scene with it. Kept at whatever
+    // resolution the file had, strictly 0/255 (see loadMask), and resampled to
+    // the working image size where it is used: images are read at s.imgScale,
+    // so there is no one size to pre-fit it to.
+    //
+    // Coloring only -- the images written by the ROS 2 and COLMAP exports are
+    // not masked.
+    cv::Mat mask; // empty = none loaded
+    bool maskEnabled = false; // acted on only while `mask` is non-empty
+    bool maskInvert = false; // UI state; loadMask and the toggle flip `mask` itself
+    char maskBuf[512] = {};
+    float maskRejectFrac = 0.f; // share of pixels the mask drops, for the UI
+    bool showMaskOverlay = true; // tint the rejected area over the image preview
+    Texture2D maskTex = {}; // that tint, RGBA, built by refreshMaskDerived
+    bool maskTexValid = false;
     bool calibLoaded = false;
     int imgW = 4656, imgH = 3496; // overwritten from the first scanned image by loadImages()
 
@@ -687,7 +705,18 @@ static void loadCloud(AppState& s)
     // images at the right pixel; with all-zero coefficients it reduces exactly
     // to the ideal pinhole.
     const Intrinsics Ks = scaleIntrinsics(s.K, s.imgScale);
+    // The ROI is given in full-resolution image pixels (see calib::Roi), but
+    // the iu/iv probe() tests it against below are pixels of the images as
+    // they are actually read, i.e. at s.imgScale -- so the rectangle is scaled
+    // exactly as the intrinsics above are.
+    const Roi roiS = scaleRoi(s.roi, s.imgScale);
     const int64_t offNs = imageTimeOffsetNs(s);
+    // The mask arrives at the resolution of whatever file was loaded while the
+    // images are read at s.imgScale, so it is resampled to the size the frames
+    // actually have -- filled lazily below, on the first image probed, since
+    // that size isn't known until one has been read.
+    const bool haveMask = !s.mask.empty();
+    cv::Mat maskFit;
     // Every image of a chunk is held in memory at once (multiImgColoring), so
     // for large frames the scale is what keeps that bounded.
     auto readImage = [&](const std::string& path)
@@ -930,14 +959,27 @@ static void loadCloud(AppState& s)
                     }
                     if (iu < 0 || iu >= e.img.cols || iv < 0 || iv >= e.img.rows)
                         return h;
-                    // point projects into this image — record ROI membership so
-                    // the "In ROI" render mode can show it, independent of whether
-                    // the ROI filter is currently enabled.
-                    bool haveRoi = s.roi.w > 0 && s.roi.h > 0;
-                    bool insideRoi = !haveRoi || (iu >= s.roi.x && iu < s.roi.x + s.roi.w && iv >= s.roi.y && iv < s.roi.y + s.roi.h);
-                    h.inRoiF = insideRoi ? 1.f : 0.f;
-                    // outside the region of interest? leave the point uncolored
-                    if (s.roi.enabled && !insideRoi)
+                    // point projects into this image — record ROI/mask membership
+                    // so the "In ROI / mask" render mode can show it, independent
+                    // of whether either filter is currently enabled.
+                    bool haveRoi = roiS.w > 0 && roiS.h > 0;
+                    bool insideRoi = !haveRoi || (iu >= roiS.x && iu < roiS.x + roiS.w && iv >= roiS.y && iv < roiS.y + roiS.h);
+                    bool insideMask = true;
+                    if (haveMask)
+                    {
+                        // INTER_NEAREST, so the mask stays strictly 0/255: a
+                        // bilinear resize would invent half-masked pixels along
+                        // every edge, which the test below would then silently
+                        // round one way. Every frame of a session is the same
+                        // size, so this resizes once.
+                        if (maskFit.cols != e.img.cols || maskFit.rows != e.img.rows)
+                            cv::resize(s.mask, maskFit, e.img.size(), 0, 0, cv::INTER_NEAREST);
+                        insideMask = maskFit.at<uint8_t>(iv, iu) != 0;
+                    }
+                    h.inRoiF = (insideRoi && insideMask) ? 1.f : 0.f;
+                    // outside the region of interest, or masked out? leave the
+                    // point uncolored
+                    if ((s.roi.enabled && !insideRoi) || (s.maskEnabled && !insideMask))
                         return h;
                     cv::Vec3b bgr = e.img.at<cv::Vec3b>(iv, iu);
                     uint32_t p = (uint32_t(bgr[2]) << 16) | (uint32_t(bgr[1]) << 8) | uint32_t(bgr[0]);
@@ -1274,6 +1316,89 @@ static void loadCalib(AppState& s)
     s.status = "Calibration loaded";
 }
 
+// Rebuilds what is derived from s.mask: the rejected-pixel share the UI
+// reports, and the translucent red overlay drawn over the image preview. Call
+// after anything that changes the mask. Main thread only -- it creates a GL
+// texture.
+static void refreshMaskDerived(AppState& s)
+{
+    if (s.maskTexValid)
+    {
+        UnloadTexture(s.maskTex);
+        s.maskTexValid = false;
+    }
+    if (s.mask.empty())
+    {
+        s.maskRejectFrac = 0.f;
+        return;
+    }
+    const int total = s.mask.rows * s.mask.cols;
+    const int kept = cv::countNonZero(s.mask);
+    s.maskRejectFrac = total ? (float)(total - kept) / (float)total : 0.f;
+
+    // The overlay only has to read correctly in a preview pane, so it is capped
+    // well below the frame size a 360 rig produces rather than uploading a
+    // 22 MP texture to show a hand-painted blob.
+    cv::Mat m = s.mask;
+    const int kMaxSide = 1024;
+    const int longSide = std::max(m.cols, m.rows);
+    if (longSide > kMaxSide)
+        cv::resize(s.mask, m, cv::Size(), (double)kMaxSide / longSide, (double)kMaxSide / longSide, cv::INTER_NEAREST);
+    cv::Mat rgba(m.rows, m.cols, CV_8UC4);
+    for (int y = 0; y < m.rows; ++y)
+    {
+        const uint8_t* srcRow = m.ptr<uint8_t>(y);
+        cv::Vec4b* dstRow = rgba.ptr<cv::Vec4b>(y);
+        for (int x = 0; x < m.cols; ++x)
+            dstRow[x] = srcRow[x] ? cv::Vec4b(0, 0, 0, 0) : cv::Vec4b(255, 40, 40, 110);
+    }
+    Image ri = { rgba.data, rgba.cols, rgba.rows, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+    s.maskTex = LoadTextureFromImage(ri);
+    s.maskTexValid = s.maskTex.id > 0;
+}
+
+// Loads the mask image named by s.maskBuf. Any format OpenCV reads is accepted
+// and reduced to one 8-bit channel thresholded at 128, so a hand-painted
+// black/white PNG, a grayscale one and an RGB one all behave identically: a
+// pixel is either kept or dropped, never partly -- and a jpeg mask's
+// compression noise can't leak in as almost-black. White keeps the pixel,
+// black drops it, unless "Invert mask" is on.
+//
+// No particular resolution is required: the mask is resampled to whatever the
+// frames turn out to be (loadCloud), so one drawn over a downscaled copy of a
+// frame works as well as a full-resolution one.
+static void loadMask(AppState& s)
+{
+    if (!s.maskBuf[0])
+    {
+        s.status = "No mask file selected";
+        return;
+    }
+    cv::Mat img = cv::imread(s.maskBuf, cv::IMREAD_GRAYSCALE);
+    if (img.empty())
+    {
+        s.status = std::string("Failed to read mask: ") + s.maskBuf;
+        return;
+    }
+    cv::threshold(img, s.mask, 128, 255, s.maskInvert ? cv::THRESH_BINARY_INV : cv::THRESH_BINARY);
+    s.maskEnabled = true;
+    refreshMaskDerived(s);
+    char msg[160];
+    std::snprintf(msg, sizeof(msg), "Mask loaded: %dx%d, %.1f%% masked out", s.mask.cols, s.mask.rows, s.maskRejectFrac * 100.f);
+    s.status = msg;
+}
+
+// Drops the mask entirely, as opposed to unticking "Image mask", which keeps
+// it loaded and ready to re-enable.
+static void clearMask(AppState& s)
+{
+    s.mask.release();
+    s.maskEnabled = false;
+    s.maskBuf[0] = '\0';
+    refreshMaskDerived(s);
+    s.status = "Mask cleared";
+}
+
 static void exportLAZ(AppState& s)
 {
     if (s.exportCloud.empty())
@@ -1507,6 +1632,21 @@ static bool isCameraDir(const fs::path& dir)
 // swapped, so the trajectory and the loaded cloud survive); any other directory is this
 // app's session (LIO result dir). A dropped *.json is treated as a calibration file. Used by
 // the drag & drop handler in main()'s loop below.
+static void actionOpenMask(AppState& s)
+{
+    std::string path = mandeye::fd::OpenFileDialogOneFile("Select image mask", mandeye::fd::ImageFilter);
+    if (!path.empty())
+    {
+        setBuf(s.maskBuf, sizeof(s.maskBuf), path);
+        loadMask(s);
+    }
+}
+
+// Drag & drop equivalent of actionSelectLioResultDir()/actionOpenCalibration(): a dropped
+// directory is this app's session (LIO result dir), and unlike the menu action it loads
+// immediately instead of waiting for the "Load session" button, since a drop is already an
+// explicit "load this" gesture. A dropped *.json is treated as a calibration file. Used by the
+// drag & drop handler in main()'s loop below.
 static void handleDroppedPath(AppState& s, const std::string& path)
 {
     if (fs::is_directory(path))
@@ -1541,6 +1681,14 @@ static void handleDroppedPath(AppState& s, const std::string& path)
     {
         setBuf(s.calibBuf, sizeof(s.calibBuf), path);
         loadCalib(s);
+    }
+    else if (ext == ".png" || ext == ".bmp" || ext == ".jpg" || ext == ".jpeg")
+    {
+        // The only single image this app takes as input is a mask -- camera
+        // frames arrive as the session's whole CAMERA_0 directory, never one
+        // file at a time.
+        setBuf(s.maskBuf, sizeof(s.maskBuf), path);
+        loadMask(s);
     }
     else
     {
@@ -2287,6 +2435,8 @@ int main(int argc, char* argv[])
                 ImGui::Separator();
                 if (ImGui::MenuItem("Open Calibration...", "Ctrl+Shift+C"))
                     actionOpenCalibration(s);
+                if (ImGui::MenuItem("Open Image Mask..."))
+                    actionOpenMask(s);
                 ImGui::Separator();
                 if (ImGui::MenuItem("Export Colored Point Cloud (LAS/LAZ)...", "Ctrl+S"))
                     actionExportColoredLAZ(s);
@@ -2353,7 +2503,7 @@ int main(int argc, char* argv[])
                         s.colorMode = 1;
                     if (ImGui::MenuItem("Camera ID", nullptr, s.colorMode == 2))
                         s.colorMode = 2;
-                    if (ImGui::MenuItem("In ROI", nullptr, s.colorMode == 3))
+                    if (ImGui::MenuItem("In ROI / mask", nullptr, s.colorMode == 3))
                         s.colorMode = 3;
                 }
                 ImGui::EndMenu();
@@ -2549,7 +2699,10 @@ int main(int argc, char* argv[])
                     }
                 }
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Only points projecting inside the ROI get colored.\nDrawn on the image preview.");
+                    ImGui::SetTooltip(
+                        "Only points projecting inside the ROI get colored.\n"
+                        "Full-resolution image pixels, scaled along with Image scale.\n"
+                        "Drawn on the image preview.");
                 if (s.roi.enabled)
                 {
                     ImGui::PopItemWidth();
@@ -2560,6 +2713,37 @@ int main(int argc, char* argv[])
                     ImGui::InputInt("ROI h", &s.roi.h);
                     ImGui::PopItemWidth();
                     ImGui::PushItemWidth(-1);
+                }
+
+                ImGui::Separator();
+                ImGui::BeginDisabled(s.mask.empty());
+                ImGui::Checkbox("Image mask", &s.maskEnabled);
+                ImGui::EndDisabled();
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip(
+                        "Points projecting onto a masked-out (black) pixel stay uncolored.\n"
+                        "Free-form counterpart of the ROI -- for the operator, the rig itself,\n"
+                        "the sky. Coloring only: exported images are never masked.\n"
+                        "Re-run Load cloud to apply.");
+                ImGui::Text("Mask image:");
+                ImGui::InputText("##mask", s.maskBuf, sizeof(s.maskBuf));
+                if (ImGui::Button("Load mask", ImVec2(-1, 0)))
+                    loadMask(s);
+                if (!s.mask.empty())
+                {
+                    ImGui::TextDisabled("%dx%d, %.1f%% masked out", s.mask.cols, s.mask.rows, s.maskRejectFrac * 100.f);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Resampled to the image size in use; any resolution with the same framing works.");
+                    if (ImGui::Checkbox("Invert mask", &s.maskInvert))
+                    {
+                        // The mask is strictly 0/255, so flipping it in place is
+                        // exact and its own inverse -- no need to re-read the file.
+                        cv::bitwise_not(s.mask, s.mask);
+                        refreshMaskDerived(s);
+                    }
+                    ImGui::Checkbox("Show mask on preview", &s.showMaskOverlay);
+                    if (ImGui::Button("Clear mask", ImVec2(-1, 0)))
+                        clearMask(s);
                 }
             }
             ImGui::PopItemWidth();
@@ -2820,6 +3004,15 @@ int main(int argc, char* argv[])
                     tint);
             }
 
+            // masked-out pixels, tinted red over the same rect as the photo (the
+            // mask is resampled wherever it is used, so a mask of a different
+            // resolution is expected and stretches to fit here too)
+            if (s.maskEnabled && s.showMaskOverlay && s.maskTexValid)
+            {
+                ImGui::SetCursorScreenPos(imgPos);
+                rlImGuiImageSize(&s.maskTex, dispW, dispH);
+            }
+
             // overlay the ROI, mapping full-res image pixels to the displayed rect
             if (s.roi.enabled && s.imgViewTex.width > 0 && s.imgViewTex.height > 0)
             {
@@ -2863,6 +3056,8 @@ int main(int argc, char* argv[])
         UnloadTexture(s.imgViewTex);
     if (s.intensityProjTexValid)
         UnloadTexture(s.intensityProjTex);
+    if (s.maskTexValid)
+        UnloadTexture(s.maskTex);
 
     s.cloud.unload();
     if (s.shaderOk)

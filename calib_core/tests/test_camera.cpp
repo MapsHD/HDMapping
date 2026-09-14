@@ -370,6 +370,50 @@ TEST_CASE("pinhole: rejects points at or behind the camera plane")
     CHECK_FALSE(projectPoint(1, 2, 0, K, kIdentity, kOrigin, u, v, depth));
 }
 
+// ── scaleRoi ──────────────────────────────────────────────────────────────────
+
+TEST_CASE("scaleRoi: a half-size image halves the rectangle")
+{
+    Roi r{ true, 100, 200, 40, 60 };
+    Roi h = scaleRoi(r, 0.5f);
+    CHECK(h.enabled);
+    CHECK(h.x == 50);
+    CHECK(h.y == 100);
+    CHECK(h.w == 20);
+    CHECK(h.h == 30);
+}
+
+TEST_CASE("scaleRoi: abutting rectangles stay abutting")
+{
+    // Scaling the width on its own would give both of these w == 2 and make
+    // them overlap at x == 2; rounding the two edges and subtracting cannot.
+    Roi a{ true, 1, 1, 3, 3 };
+    Roi b{ true, 4, 4, 3, 3 };
+    Roi as = scaleRoi(a, 0.5f);
+    Roi bs = scaleRoi(b, 0.5f);
+    CHECK(as.x + as.w == bs.x);
+    CHECK(as.y + as.h == bs.y);
+}
+
+TEST_CASE("scaleRoi: a non-empty rectangle never scales down to empty")
+{
+    // w/h == 0 reads as "no ROI set", i.e. accept everything -- the exact
+    // opposite of what a ROI this small is asking for.
+    Roi tiny{ true, 10, 10, 2, 2 };
+    Roi s = scaleRoi(tiny, 0.1f);
+    CHECK(s.w >= 1);
+    CHECK(s.h >= 1);
+}
+
+TEST_CASE("scaleRoi: an unset rectangle is left alone")
+{
+    Roi none;
+    Roi s = scaleRoi(none, 0.5f);
+    CHECK_FALSE(s.enabled);
+    CHECK(s.w == 0);
+    CHECK(s.h == 0);
+}
+
 // ── scaleIntrinsics ───────────────────────────────────────────────────────────
 
 TEST_CASE("scaleIntrinsics: a half-size image projects to half the pixel")

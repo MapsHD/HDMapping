@@ -92,6 +92,27 @@ Intrinsics scaleIntrinsics(const Intrinsics& K, float s) {
     return out;
 }
 
+Roi scaleRoi(const Roi& r, float s) {
+    Roi out = r;
+    if (r.w <= 0 || r.h <= 0) {
+        return out;  // w/h == 0 is the "no ROI set" sentinel; leave it alone
+    }
+    const int x0 = static_cast<int>(std::lround(r.x * s));
+    const int y0 = static_cast<int>(std::lround(r.y * s));
+    const int x1 = static_cast<int>(std::lround((r.x + r.w) * s));
+    const int y1 = static_cast<int>(std::lround((r.y + r.h) * s));
+    out.x = x0;
+    out.y = y0;
+    // Both edges are rounded and then subtracted, rather than the width being
+    // scaled on its own, so two abutting rectangles cannot come back
+    // overlapping. The clamp keeps a rectangle too small to survive the scale
+    // at one pixel: collapsing it to w/h == 0 would read as "no ROI" and
+    // silently pass everything the ROI was there to reject.
+    out.w = std::max(1, x1 - x0);
+    out.h = std::max(1, y1 - y0);
+    return out;
+}
+
 bool projectPoint(float px, float py, float pz,
                   const Intrinsics& K,
                   const Eigen::Matrix3f& R_wc,

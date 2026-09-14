@@ -101,6 +101,12 @@ int index_rendered_points_local = -1;
 // std::vector<std::vector<Point3Di>> all_points_local;
 // std::vector<std::vector<int>> all_lidar_ids;
 std::vector<int> indexes_to_filename;
+
+// cached inputs to the chunking pass below, kept around so number_of_points_threshold
+// can be changed and re-applied (rebuildAllData) without reloading files from disk
+std::vector<std::vector<Point3Di>> g_points_per_file;
+std::vector<std::pair<double, double>> g_timestamps_cache;
+std::vector<Eigen::Affine3d> g_poses_cache;
 double vqf_tauAcc = 0.5;
 double wx = 1000000.0;
 double wy = 1000000.0;
@@ -885,6 +891,131 @@ std::vector<std::pair<Eigen::Vector3d, Eigen::Matrix3d>> get_mean_cov()
     return mc;
 }
 
+// Re-chunks the already-loaded points (g_points_per_file / g_timestamps_cache / g_poses_cache)
+// into all_data using the current number_of_points_threshold. Smaller thresholds mean each
+// Index step in the toolbar covers less time, giving finer time navigation.
+void rebuildAllData(bool preserve_position)
+{
+    double preserved_time = 0.0;
+    bool have_preserved_time = false;
+    if (preserve_position && index_rendered_points_local >= 0 &&
+        index_rendered_points_local < static_cast<int>(all_data.size()) &&
+        !all_data[index_rendered_points_local].timestamps.empty())
+    {
+        preserved_time = all_data[index_rendered_points_local].timestamps.front().first;
+        have_preserved_time = true;
+    }
+
+    all_data.clear();
+    all_data.shrink_to_fit();
+    indexes_to_filename.clear();
+    indexes_to_filename.shrink_to_fit();
+
+    if (number_of_points_threshold < 1)
+        number_of_points_threshold = 1;
+
+    const auto& pointsPerFile = g_points_per_file;
+    const auto& timestamps = g_timestamps_cache;
+    const auto& poses = g_poses_cache;
+
+    int number_of_points = 0;
+    for (const auto& pp : pointsPerFile)
+        number_of_points += static_cast<int>(pp.size());
+
+    spdlog::info("Number of points: {}", number_of_points);
+    spdlog::info("Start indexing points");
+
+    std::vector<Point3Di> points_local;
+    std::vector<int> lidar_ids;
+
+    for (size_t i = 0; i < pointsPerFile.size(); i++)
+    {
+        std::cout << "Indexed file " << i + 1 << "/" << pointsPerFile.size() << "\r";
+
+        for (const auto& pp : pointsPerFile[i])
+        {
+            auto lower = std::lower_bound(
+                timestamps.begin(),
+                timestamps.end(),
+                pp.timestamp,
+                [](std::pair<double, double> lhs, double rhs) -> bool
+                {
+                    return lhs.first < rhs;
+                });
+
+            int index_pose = static_cast<int>(std::distance(timestamps.begin(), lower)) - 1;
+
+            if (index_pose >= 0 && index_pose < static_cast<int>(poses.size()))
+            {
+                points_local.push_back(pp);
+                lidar_ids.push_back(pp.lidarid);
+            }
+
+            if (points_local.size() > static_cast<size_t>(number_of_points_threshold))
+            {
+                indexes_to_filename.push_back(static_cast<int>(i));
+
+                AllData data;
+                data.points_local = points_local;
+                data.lidar_ids = lidar_ids;
+
+                for (size_t k = 0; k < timestamps.size(); k++)
+                {
+                    if (timestamps[k].first >= points_local[0].timestamp &&
+                        timestamps[k].first <= points_local[points_local.size() - 1].timestamp)
+                    {
+                        data.timestamps.push_back(timestamps[k]);
+                        data.poses.push_back(poses[k]);
+                    }
+                }
+
+                // correct points timestamps
+                if (data.timestamps.size() > 2)
+                {
+                    double ts_begin = data.timestamps[0].first;
+                    double ts_step =
+                        (data.timestamps[data.timestamps.size() - 1].first - data.timestamps[0].first) / data.points_local.size();
+
+                    for (size_t pp_i = 0; pp_i < data.points_local.size(); pp_i++)
+                        data.points_local[pp_i].timestamp = ts_begin + pp_i * ts_step;
+                }
+
+                all_data.push_back(data);
+
+                points_local.clear();
+                lidar_ids.clear();
+            }
+        }
+    }
+
+    spdlog::info("Indexing points finished\n");
+
+    if (all_data.size() > 0)
+    {
+        is_init = true;
+        index_rendered_points_local = 0;
+
+        if (have_preserved_time)
+        {
+            for (size_t i = 0; i < all_data.size(); i++)
+            {
+                if (!all_data[i].timestamps.empty() &&
+                    preserved_time >= all_data[i].timestamps.front().first &&
+                    preserved_time <= all_data[i].timestamps.back().first)
+                {
+                    index_rendered_points_local = static_cast<int>(i);
+                    break;
+                }
+            }
+        }
+    }
+    else
+    {
+        is_init = false;
+        index_rendered_points_local = -1;
+    }
+}
+
 void loadFiles(std::vector<std::string> input_file_names)
 {
     LidarOdometryParams params; // dummy for load_data function
@@ -1049,133 +1180,11 @@ void loadFiles(std::vector<std::string> input_file_names)
             poses.push_back(m);
         }
 
-        int number_of_points = 0;
-        for (const auto& pp : pointsPerFile)
-            number_of_points += pp.size();
+        g_points_per_file = std::move(pointsPerFile);
+        g_timestamps_cache = std::move(timestamps);
+        g_poses_cache = std::move(poses);
 
-        spdlog::info("Number of points: {}", number_of_points);
-
-        spdlog::info("Start indexing points");
-
-        // std::vector<Point3Di> points_global;
-        std::vector<Point3Di> points_local;
-        std::vector<int> lidar_ids;
-
-        Eigen::Affine3d m_prev;
-        Eigen::Affine3d m_next;
-
-        Eigen::Quaterniond q_prev;
-        Eigen::Quaterniond q_next;
-        Eigen::Quaterniond q;
-
-        double time_prev;
-        double time_next;
-        double curr_time;
-
-        double t;
-
-        for (size_t i = 0; i < pointsPerFile.size(); i++)
-        {
-            std::cout << "Indexed file " << i + 1 << "/" << pointsPerFile.size() << "\r";
-
-            for (const auto& pp : pointsPerFile[i])
-            {
-                auto lower = std::lower_bound(
-                    timestamps.begin(),
-                    timestamps.end(),
-                    pp.timestamp,
-                    [](std::pair<double, double> lhs, double rhs) -> bool
-                    {
-                        return lhs.first < rhs;
-                    });
-
-                int index_pose = std::distance(timestamps.begin(), lower) - 1;
-
-                if (index_pose >= 0 && index_pose < poses.size())
-                {
-                    auto ppp = pp;
-                    // Eigen::Affine3d m = poses[index_pose];
-                    /*if (is_slerp)
-                    {
-                        if (index_pose > 0)
-                        {
-                            m_prev = poses[index_pose - 1];
-                            m_next = poses[index_pose];
-
-                            q_prev = Eigen::Quaterniond(m_prev.rotation());
-                            q_next = Eigen::Quaterniond(m_next.rotation());
-
-                            time_prev = timestamps[index_pose - 1].first;
-                            time_next = timestamps[index_pose].first;
-                            curr_time = ppp.timestamp;
-
-                            t = (curr_time - time_prev) / (time_next - time_prev);
-                            q = q_prev.slerp(t, q_next);
-
-                            m.linear() = q.toRotationMatrix();
-                        }
-                    }*/
-
-                    points_local.push_back(ppp);
-
-                    // ppp.point = m * ppp.point;
-                    lidar_ids.push_back(pp.lidarid);
-                    // points_global.push_back(ppp);
-                }
-
-                if (points_local.size() > number_of_points_threshold)
-                {
-                    // all_points_local.push_back(points_global);
-                    indexes_to_filename.push_back(i);
-                    // points_global.clear();
-                    // all_lidar_ids.push_back(lidar_ids);
-
-                    ///////////////////////////////////////
-                    AllData data;
-                    data.points_local = points_local;
-                    data.lidar_ids = lidar_ids;
-
-                    for (size_t i = 0; i < timestamps.size(); i++)
-                    {
-                        if (timestamps[i].first >= points_local[0].timestamp &&
-                            timestamps[i].first <= points_local[points_local.size() - 1].timestamp)
-                        {
-                            data.timestamps.push_back(timestamps[i]);
-                            data.poses.push_back(poses[i]);
-                        }
-                    }
-
-                    // correct points timestamps
-                    if (data.timestamps.size() > 2)
-                    {
-                        double ts_begin = data.timestamps[0].first;
-                        double ts_step =
-                            (data.timestamps[data.timestamps.size() - 1].first - data.timestamps[0].first) / data.points_local.size();
-
-                        // spdlog::info("ts_begin {}", ts_begin);
-                        // spdlog::info("ts_step {}", ts_step);
-                        // spdlog::info("ts_end {}", data.timestamps[data.timestamps.size() - 1].first);
-
-                        for (size_t pp = 0; pp < data.points_local.size(); pp++)
-                            data.points_local[pp].timestamp = ts_begin + pp * ts_step;
-                    }
-
-                    all_data.push_back(data);
-
-                    points_local.clear();
-                    lidar_ids.clear();
-                    //////////////////////////////////////
-                }
-            }
-        }
-
-        spdlog::info("Indexing points finished\n");
-
-        if (all_data.size() > 0)
-        {
-            is_init = true;
-            index_rendered_points_local = 0;
-        }
+        rebuildAllData(false);
     }
 }
 
@@ -1332,12 +1341,25 @@ void settings_gui()
     if (ImGui::Begin("Settings", &is_settings_gui))
     {
         ImGui::PushItemWidth(ImGuiNumberWidth);
-        if (!is_init)
+        ImGui::InputInt("number_of_points_threshold", &number_of_points_threshold);
+        if (number_of_points_threshold < 1)
+            number_of_points_threshold = 1;
+        if (ImGui::IsItemHovered())
         {
-            ImGui::InputInt("number_of_points_threshold", &number_of_points_threshold);
-            if (number_of_points_threshold < 0)
-                number_of_points_threshold = 0;
+            ImGui::BeginTooltip();
+            ImGui::Text("Max number of points per rendered chunk (one 'Index' step).");
+            ImGui::Text("Lower = shorter time span per chunk = finer time navigation with the Index slider.");
+            ImGui::EndTooltip();
         }
+        ImGui::BeginDisabled(!is_init);
+        ImGui::SameLine();
+        if (ImGui::Button("Rebin"))
+            rebuildAllData(true);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Re-chunk the already loaded data with the new threshold, keeping the current time position");
+        ImGui::EndDisabled();
+        if (is_init)
+            ImGui::Text("Chunks: %d", static_cast<int>(all_data.size()));
 
         ImGui::InputDouble("VQF tauAcc [s]", &vqf_tauAcc);
         if (ImGui::IsItemHovered())

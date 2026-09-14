@@ -53,13 +53,11 @@ void main() {
         float n = length(pc);
         vec3 Xs = pc / max(n, 1e-6);
         float denom = Xs.z + xi;
-        // denom>0 is this model's actual "in front of the camera" test --
-        // it reduces exactly to Pinhole's pc.z>0 when xi==0 (Xs.z and pc.z
-        // then share a sign, n>0). fragCamDepth only needs to carry that
-        // sign here (kPointFS only tests fragCamDepth > 0.0), not a real
-        // depth -- unlike kProjVS below, this shader has no depthRange
-        // slider to feed a physical distance to.
-        fragCamDepth = denom;
+        // Validity domain, same rule as calib::projectPoint: the projection
+        // folds back past cos(theta) = -1/xi for xi > 1, and blows up past
+        // -xi otherwise. fragCamDepth only carries this sign (kPointFS tests
+        // fragCamDepth > 0.0), not a real depth.
+        fragCamDepth = Xs.z - ((xi > 1.0) ? -1.0 / xi : -xi);
         vec2 xy = Xs.xy / denom;
         float r2 = dot(xy, xy);
         float radial = 1.0 + kRad1.x*r2 + kRad1.y*r2*r2 + kRad1.z*r2*r2*r2;
@@ -114,10 +112,10 @@ void main() {
     // in raylib coords, converted back to lidar frame here. Pinhole (model==0):
     // rational+tangential distortion (zeros when rectified), w = z_cam so the
     // hardware clip rejects points behind the camera. Mei (model==2): unified-
-    // sphere + polynomial distortion (mirrors MeiCamera::Project), w = Xs.z+xi
-    // (the model's own "in front of the camera" test -- reduces exactly to
-    // Pinhole's z_cam when xi==0), so the hardware clip rejects points outside
-    // its valid dome the same way Pinhole rejects points behind it.
+    // sphere + polynomial distortion (mirrors MeiCamera::Project), with w the
+    // distance inside the model's valid dome -- Xs.z + min(xi, 1/xi) -- so the
+    // hardware clip drops both the blow-up (xi <= 1) and the fold-back
+    // (xi > 1, where far-off-axis directions otherwise re-enter the image).
     inline constexpr const char* kProjVS = R"(
 #version 330
 layout(location = 0) in vec3 vertexPosition;
@@ -157,7 +155,8 @@ void main() {
         float radial = 1.0 + kRad1.x*r2 + kRad1.y*r2*r2 + kRad1.z*r2*r2*r2;
         d = xy*radial + vec2(2.0*pTan.x*xy.x*xy.y + pTan.y*(r2 + 2.0*xy.x*xy.x),
                               pTan.x*(r2 + 2.0*xy.y*xy.y) + 2.0*pTan.y*xy.x*xy.y);
-        w = denom; // NOT n -- see the block comment above kProjVS
+        // >0 exactly inside the valid dome -- see the block comment above kProjVS
+        w = Xs.z - ((xi > 1.0) ? -1.0 / xi : -xi);
     } else {
         fragDepth = pc.z;
         vec2 n = pc.xy / max(pc.z, 1e-6);

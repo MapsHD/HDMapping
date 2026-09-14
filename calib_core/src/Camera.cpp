@@ -154,14 +154,16 @@ bool projectPoint(float px, float py, float pz,
         depth = pc.norm();
         if (depth < 1e-4f) return false;
 
-        // Xs.z + xi > 0 is this model's own validity domain (MeiCamera::
-        // Project divides by exactly this with no guard of its own) -- it
-        // reduces exactly to the familiar Pinhole "pc.z > 0" test when
-        // xi == 0 (Xs.z and pc.z then share a sign, depth > 0). Without
-        // this, a point behind the camera can still land inside the image
-        // bounds (the projection isn't injective outside its valid domain)
-        // and get silently treated as visible.
-        if (pc.z() / depth + K.xi <= 0.f) return false;
+        // Validity domain. r(theta) = sin/(cos+xi) is only injective up to
+        // its turning point at cos(theta) = -1/xi; past it the radius shrinks
+        // again and far-off-axis directions FOLD BACK onto valid pixels --
+        // at theta = 180 deg exactly onto (cx, cy). For xi <= 1 the
+        // denominator blows up first, so "Xs.z + xi > 0" is the limit there.
+        //   xi <= 1: Xs.z > -xi      (reduces to Pinhole's pc.z > 0 at xi = 0)
+        //   xi  > 1: Xs.z > -1/xi
+        // MeiCamera::Project has no guard of its own, so it belongs here.
+        const float zMin = (K.xi > 1.f) ? -1.f / K.xi : -K.xi;
+        if (pc.z() / depth <= zMin) return false;
 
         MeiCamera cam;
         cam.fx = K.fx; cam.fy = K.fy; cam.cx = K.cx; cam.cy = K.cy;

@@ -266,31 +266,48 @@ TEST_CASE("mei: a point on the camera itself is rejected")
 
 TEST_CASE("mei: a point behind the camera is rejected, not silently mis-projected")
 {
-    // Regression: MeiCamera::Project has no domain guard of its own (it
-    // divides by Xs.z+xi unconditionally), so a point behind the camera
-    // does NOT reliably land outside the image -- the projection isn't
-    // injective past the model's valid dome. projectPoint() must reject it
-    // itself rather than return a plausible-looking wrong pixel.
+    // MeiCamera::Project has no domain guard of its own, and past the valid
+    // dome the projection is not injective -- it folds far-off-axis
+    // directions back onto real pixels instead of pushing them out of frame.
     float u, v, depth;
 
-    SUBCASE("xi >= 1 covers the full sphere -- straight behind still succeeds")
+    // Direction at `deg` from the optical axis, in the plane y = 0. The
+    // explicit return type matters: `auto` would deduce an Eigen expression
+    // template holding a reference to the temporary, and dangle.
+    auto at = [](float deg) -> Eigen::Vector3f
     {
-        // mei()'s xi = 1.2: Xs.z + xi ranges over [xi-1, xi+1] = [0.2, 2.2]
-        // for any direction (Xs.z in [-1, 1]), always positive, so no
-        // direction is ever excluded at this xi.
-        const Intrinsics K = mei();
-        CHECK(projectPoint(0, 0, -10, K, kIdentity, kOrigin, u, v, depth));
+        const float r = deg * float(M_PI) / 180.f;
+        return Eigen::Vector3f(std::sin(r), 0.f, std::cos(r)) * 10.f;
+    };
+    auto projects = [&](const Intrinsics& K, const Eigen::Vector3f& p)
+    { return projectPoint(p.x(), p.y(), p.z(), K, kIdentity, kOrigin, u, v, depth); };
+
+    SUBCASE("xi > 1: the limit is the fold-back angle, acos(-1/xi)")
+    {
+        const Intrinsics K = mei(); // xi = 1.2 -> 146.44 deg
+        CHECK(projects(K, at(0.f)));
+        CHECK(projects(K, at(145.f)));
+        CHECK_FALSE(projects(K, at(148.f)));
+        // Straight behind used to land on (cx, cy) -- the whole point of the guard.
+        CHECK_FALSE(projects(K, at(180.f)));
     }
 
-    SUBCASE("xi < 1 excludes a cone behind the camera")
+    SUBCASE("xi <= 1: the limit is where the denominator blows up, acos(-xi)")
     {
         Intrinsics K = mei();
-        K.xi = 0.5f; // Xs.z <= -0.5 is now out of domain
+        K.xi = 0.5f; // -> 120 deg
+        CHECK(projects(K, at(0.f)));
+        CHECK(projects(K, at(119.f)));
+        CHECK_FALSE(projects(K, at(121.f)));
+        CHECK_FALSE(projects(K, at(180.f)));
+    }
 
-        // Straight behind: Xs.z = -1, so Xs.z + xi = -0.5 <= 0.
-        CHECK_FALSE(projectPoint(0, 0, -10, K, kIdentity, kOrigin, u, v, depth));
-        // Straight ahead is unaffected.
-        CHECK(projectPoint(0, 0, 10, K, kIdentity, kOrigin, u, v, depth));
+    SUBCASE("xi = 0 reduces to the pinhole half-space")
+    {
+        Intrinsics K = mei();
+        K.xi = 0.f;
+        CHECK(projects(K, at(89.f)));
+        CHECK_FALSE(projects(K, at(91.f)));
     }
 }
 

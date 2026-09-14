@@ -39,7 +39,7 @@ echo.
 if not exist "%BUILD_DIR%\mandeye_raw_data_viewer.exe" (
     echo ERROR: %BUILD_DIR% does not look like a built output folder.
     echo Build the project first, e.g.:
-    echo   cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    echo   cmake -B build -DBUILD_WITH_UTILITY_APPLICATION=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
     echo   cmake --build build --config RelWithDebInfo
     exit /b 1
 )

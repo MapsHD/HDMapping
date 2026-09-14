@@ -633,40 +633,9 @@ static void loadSession(AppState& s)
         (mrp.empty() ? "  (no MRP)" : "  +MRP") + "  — press Load cloud";
 }
 
-// Radius (in normalized camera coords, squared) past which the rational distortion model
-// stops being usable. r -> r*radial(r) is only injective up to its turning point; beyond it
-// the model folds, so directions far outside the lens' actual field of view map back onto
-// valid pixel coordinates. With a strongly-fitted model that is not a corner case: for the
-// intrinsics this app is used with, a direction 56 deg off the optical axis lands mid-image
-// and one at 60 deg lands exactly on the principal point, painting whatever is at the centre
-// of the frame onto geometry the camera never saw. The projection alone cannot tell such a
-// fold-back from a genuine hit, so find the turning point once and reject everything past
-// it. Scanned numerically -- the turning point of a 6th-order rational function has no
-// useful closed form. It always lies outside the image itself (otherwise the calibration
-// could not reach its own corners), so no legitimate pixel is lost.
-static float maxValidRadiusSq(float k1, float k2, float k3, float k4, float k5, float k6)
-{
-    auto g = [&](float r)
-    {
-        float r2 = r * r;
-        float den = 1.f + (k4 + (k5 + k6 * r2) * r2) * r2;
-        if (std::fabs(den) < 1e-9f)
-            return -1.f; // pole -- certainly past the turning point
-        return r * (1.f + (k1 + (k2 + k3 * r2) * r2) * r2) / den;
-    };
-    // 8.0 == tan(83 deg), wider than any lens this app sees. A distortion-free model is
-    // monotonic everywhere and so keeps the whole range, i.e. no behaviour change.
-    const float kLimit = 8.f, kStep = 0.005f;
-    float prev = 0.f;
-    for (float r = kStep; r <= kLimit; r += kStep)
-    {
-        float cur = g(r);
-        if (cur <= prev)
-            return (r - kStep) * (r - kStep);
-        prev = cur;
-    }
-    return kLimit * kLimit;
-}
+// The off-axis fold-back cutoff that used to live here now lives in
+// calib_core (Camera.cpp's maxValidRadiusSq), applied inside
+// calib::projectPoint so every caller gets it -- not just this one.
 
 static void loadCloud(AppState& s)
 {
@@ -730,9 +699,6 @@ static void loadCloud(AppState& s)
         }
         return img;
     };
-    // Off-axis cutoff for the model above -- see maxValidRadiusSq().
-    const float rMaxSq = maxValidRadiusSq(d_k1, d_k2, d_k3, d_k4, d_k5, d_k6);
-
     auto packGray = [](float intensity) -> float
     {
         uint8_t g = (uint8_t)(std::min(1.f, std::max(0.f, intensity)) * 255.f);

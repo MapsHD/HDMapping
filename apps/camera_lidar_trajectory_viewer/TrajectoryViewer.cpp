@@ -220,7 +220,7 @@ struct AppState
 {
     Trajectory traj;
     std::vector<int64_t> imageTsNs;
-    Intrinsics K; // K.model selects pinhole vs equirectangular (see CalibCore/Camera.h)
+    Intrinsics K; // K.model selects pinhole / equirectangular / Mei (see CalibCore/Camera.h)
     // How K.model was decided. The calibration file's "model" key wins; absent
     // one, the image filenames are the fallback. Both inputs are kept as state
     // rather than applied on the spot because they arrive in either order --
@@ -244,6 +244,14 @@ struct AppState
     // chunk's worth in RAM at once, so this is what keeps that bounded. The
     // intrinsics are scaled to match via calib::scaleIntrinsics.
     float imgScale = 1.0f;
+    // Manual correction for a constant camera/LiDAR clock offset (e.g. a fixed
+    // trigger/USB latency the camera's own timestamps don't account for):
+    // t_traj = t_image + timeOffsetSec. Applied wherever an image timestamp is
+    // matched against the LiDAR/pose timeline (loadCloud's chunk selection +
+    // point matching, exportColmap's per-image pose lookup) -- never to the raw
+    // timestamps used for filename lookup or image-list indexing
+    // (s.imageTsNs/imagesFilenamesInTime).
+    double timeOffsetSec = 0.0;
     GpuCloud cloud;
     Shader shader = {};
     bool shaderOk = false;
@@ -371,13 +379,6 @@ struct AppState
     float intensityProjAlpha = 0.6f; // blend strength when intensityProjOverlay is on
 };
 
-// s.imageTimeOffsetMs, in nanoseconds -- added to a raw image timestamp
-// before comparing it against the LiDAR/pose timeline.
-static int64_t imageOffsetNs(const AppState& s)
-{
-    return static_cast<int64_t>(std::llround(static_cast<double>(s.imageTimeOffsetMs) * 1e6));
-}
-
 // ── helpers ───────────────────────────────────────────────────────────────────
 // Plain Eigen::Vector3f -> raylib Vector3 conversion. Used to be an axis
 // remap (x, z, -y) that made this app's native Z-up LiDAR data render
@@ -434,11 +435,14 @@ static bool intersectGroundPlaneZ0(const Ray& ray, Vector3& outPoint)
 static constexpr const char* kEquirectPrefix = "equirectangular_";
 
 // Timestamp encoded in a camera frame's filename, or -1 when the file isn't
-// one. Three layouts are accepted: Mandeye's own "cam0_<timestamp_ns>.jpg", the
-// 360 rig's "equirectangular_<timestamp_ns>.jpg", and a bare
-// "<timestamp_ns>.jpg". `equirect`, when given, reports whether the panorama
-// prefix was the one found. The all-digits check matters for the bare form --
-// without it every unrelated .jpg in the directory would reach std::stoll.
+// one. The layout is "<any prefix>_<timestamp_ns>.jpg" or a bare
+// "<timestamp_ns>.jpg": everything up to and including the last '_' is
+// ignored, so Mandeye's "cam0_<ts>", the 360 rig's "equirectangular_<ts>" and
+// its per-lens "back_<ts>"/"front_<ts>" frames all parse without this needing
+// to know the list of rigs. `equirect`, when given, reports whether the
+// panorama prefix was the one found -- that one prefix still carries meaning
+// (it selects the camera model, see resolveCameraModel). The all-digits check
+// is what rejects unrelated .jpgs, which would otherwise reach std::stoll.
 static int64_t parseImageTsNs(const fs::path& p, bool* equirect = nullptr)
 {
     if (equirect)
@@ -446,16 +450,10 @@ static int64_t parseImageTsNs(const fs::path& p, bool* equirect = nullptr)
     if (p.extension() != ".jpg")
         return -1;
     std::string stem = p.stem().string();
-    if (stem.rfind(kEquirectPrefix, 0) == 0)
-    {
-        stem = stem.substr(std::strlen(kEquirectPrefix));
-        if (equirect)
-            *equirect = true;
-    }
-    else if (stem.rfind("cam0_", 0) == 0)
-    {
-        stem = stem.substr(5);
-    }
+    if (equirect)
+        *equirect = stem.rfind(kEquirectPrefix, 0) == 0;
+    if (auto us = stem.rfind('_'); us != std::string::npos)
+        stem = stem.substr(us + 1);
     if (stem.empty() || stem.find_first_not_of("0123456789") != std::string::npos)
         return -1;
     try
@@ -474,9 +472,20 @@ static fs::path cameraDir(const AppState& s)
     return s.cameraBuf[0] ? fs::path(s.cameraBuf) : fs::path(s.sessionBuf).parent_path() / "CAMERA_0";
 }
 
+// AppState::timeOffsetSec in nanoseconds, to match the timestamps.
+static int64_t imageTimeOffsetNs(const AppState& s)
+{
+    return (int64_t)std::llround(s.timeOffsetSec * 1e9);
+}
+
 // Settles K.model from the two inputs that can select it, in precedence order.
 // Call after either of them changes; see AppState::fileModel for why this isn't
 // done inline in the loaders.
+//
+// Only Pinhole and Equirectangular are ever inferred: the filename fallback
+// can distinguish those two because the 360 rig marks its frames with
+// kEquirectPrefix, but nothing in a frame's name identifies a Mei fisheye, so
+// CameraModel::Mei is reachable only through an explicit "model" key.
 static void resolveCameraModel(AppState& s)
 {
     if (s.modelExplicit)
@@ -696,6 +705,7 @@ static void loadCloud(AppState& s)
     // images at the right pixel; with all-zero coefficients it reduces exactly
     // to the ideal pinhole.
     const Intrinsics Ks = scaleIntrinsics(s.K, s.imgScale);
+    const int64_t offNs = imageTimeOffsetNs(s);
     // Every image of a chunk is held in memory at once (multiImgColoring), so
     // for large frames the scale is what keeps that bounded.
     auto readImage = [&](const std::string& path)
@@ -731,7 +741,6 @@ static void loadCloud(AppState& s)
 
     // time(s) -> T_world_lidar, for interpolating the pose at each image time.
     std::map<double, Eigen::Matrix4d> trajMap = buildTrajMap(s.traj);
-    const int64_t offNs = imageOffsetNs(s);
 
     std::vector<float> gpuData;
     float mx = 0.f;
@@ -920,7 +929,13 @@ static void loadCloud(AppState& s)
                     float u, v, depth;
                     if (!projectPoint(pl.x(), pl.y(), pl.z(), Ks, R_wc, C, u, v, depth))
                         return h;
-                    if (Ks.model == CameraModel::Pinhole && depth <= 0.05f)
+                    // Too close to the lens to be a real observation. Applies
+                    // to Mei as well as Pinhole (its depth is a range rather
+                    // than a z, but 5 cm means the same thing physically);
+                    // projectPoint's own Mei guard only rejects a point
+                    // essentially AT the camera. Equirectangular keeps its
+                    // long-standing "no near clip" behaviour.
+                    if ((Ks.model == CameraModel::Pinhole || Ks.model == CameraModel::Mei) && depth <= 0.05f)
                         return h;
                     int iu = (int)std::round(u);
                     int iv = (int)std::round(v);
@@ -1188,10 +1203,11 @@ static void loadCalib(AppState& s)
     }
     nlohmann::json j;
     f >> j;
-    // Camera model: "equirectangular"/"equirect" for a 360 panorama, anything
-    // else for the pinhole model this app started with. Accepted both at the
-    // top level and inside "intrinsics". Assigned unconditionally so loading a
-    // pinhole calibration after an equirectangular one clears the flag rather
+    // Camera model: "equirectangular"/"equirect" for a 360 panorama, "mei" (or
+    // the rig's own "insta360_mei_v2" tag) for a unified-sphere fisheye,
+    // anything else for the pinhole model this app started with. Accepted both
+    // at the top level and inside "intrinsics". Assigned unconditionally so
+    // loading a pinhole calibration after another model clears the flag rather
     // than inheriting it.
     {
         const bool topLevel = j.contains("model");
@@ -1210,7 +1226,12 @@ static void loadCalib(AppState& s)
             {
                 return (char)std::tolower(c);
             });
-        s.fileModel = (model == "equirectangular" || model == "equirect") ? CameraModel::Equirectangular : CameraModel::Pinhole;
+        if (model == "equirectangular" || model == "equirect")
+            s.fileModel = CameraModel::Equirectangular;
+        else if (model == "mei" || model == "insta360_mei_v2")
+            s.fileModel = CameraModel::Mei;
+        else
+            s.fileModel = CameraModel::Pinhole;
         resolveCameraModel(s);
     }
     if (j.contains("intrinsics"))
@@ -1220,7 +1241,10 @@ static void loadCalib(AppState& s)
         s.K.fy = ji.value("fy", s.K.fy);
         s.K.cx = ji.value("cx", s.K.cx);
         s.K.cy = ji.value("cy", s.K.cy);
-        // rational distortion model (used by ROS export to rectify images)
+        // Pinhole: the rational distortion model (also what the ROS export
+        // rectifies with). Mei reuses k1/k2/k3 and p1/p2 as its own plain
+        // polynomial and adds xi, leaving k4/k5/k6 unused -- see
+        // CalibCore/Camera.h.
         s.K.k1 = ji.value("k1", s.K.k1);
         s.K.k2 = ji.value("k2", s.K.k2);
         s.K.k3 = ji.value("k3", s.K.k3);
@@ -1229,6 +1253,7 @@ static void loadCalib(AppState& s)
         s.K.k6 = ji.value("k6", s.K.k6);
         s.K.p1 = ji.value("p1", s.K.p1);
         s.K.p2 = ji.value("p2", s.K.p2);
+        s.K.xi = ji.value("xi", s.K.xi);
     }
     if (j.contains("extrinsics"))
     {
@@ -1598,11 +1623,14 @@ static void exportColmap(AppState& s)
         s.status = "COLMAP: no images";
         return;
     }
-    if (s.K.model == CameraModel::Equirectangular)
+    if (s.K.model != CameraModel::Pinhole)
     {
-        // COLMAP's text model has no equirectangular camera type, so the
-        // FULL_OPENCV line below would misdescribe the images.
-        s.status = "COLMAP: equirectangular camera model is not supported by COLMAP";
+        // COLMAP's text model has no equirectangular camera type, and none of
+        // its fisheye types is the unified-sphere (Mei) model -- none carries
+        // an xi -- so the FULL_OPENCV line below would misdescribe the images.
+        s.status = s.K.model == CameraModel::Equirectangular
+                       ? "COLMAP: equirectangular camera model is not supported by COLMAP"
+                       : "COLMAP: Mei camera model is not supported by COLMAP";
         return;
     }
 
@@ -1641,7 +1669,7 @@ static void exportColmap(AppState& s)
              "#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\n"
              "#   POINTS2D[] as (X, Y, POINT3D_ID)\n";
         auto trajMap = buildTrajMap(s.traj);
-        const int64_t offNs = imageOffsetNs(s);
+        const int64_t offNs = imageTimeOffsetNs(s);
         int id = 1;
         for (auto& [ts, path] : s.imagesFilenamesInTime)
         {
@@ -1714,7 +1742,10 @@ static void exportColmap(AppState& s)
 static void buildRosInput(AppState& s, RosExportInput& in)
 {
     in.traj = s.traj;
-    in.imageFiles = s.imagesFilenamesInTime;
+    // Stamps go into the bag on the trajectory clock, like every other topic.
+    in.imageFiles.clear();
+    for (const auto& [ts, path] : s.imagesFilenamesInTime)
+        in.imageFiles[ts + imageTimeOffsetNs(s)] = path;
     in.calibLoaded = s.calibLoaded;
     in.K = s.K;
     in.E = s.E;
@@ -1812,7 +1843,7 @@ static void drawScene(AppState& s)
 
         for (int64_t ts : s.imageTsNs)
         {
-            const TrajPose* pose = s.traj.nearest(ts);
+            const TrajPose* pose = s.traj.nearest(ts + imageTimeOffsetNs(s));
             if (!pose)
                 continue;
 
@@ -1822,11 +1853,13 @@ static void drawScene(AppState& s)
             Color fc = hl ? Color{ 255, 255, 50, 255 } : ORANGE;
             float sc = hl ? fs * 1.05f : fs;
 
-            if (s.K.model == CameraModel::Equirectangular)
+            if (s.K.model != CameraModel::Pinhole)
             {
-                // A 360 camera sees the whole sphere, so there is no frustum to
-                // draw -- show where it was and which way its axes point
-                // instead. The triad is the usual X=red, Y=green, Z=blue.
+                // A 360 camera sees the whole sphere and a Mei fisheye sees far
+                // more than the rectangular pyramid fx/fy/cx/cy imply, so
+                // there is no frustum worth drawing -- show where the camera
+                // was and which way its axes point instead. The triad is the
+                // usual X=red, Y=green, Z=blue.
                 DrawSphere(origin, fs * (hl ? 0.08f : 0.05f), fc);
                 const Color axisColors[3] = { RED, GREEN, BLUE };
                 for (int k = 0; k < 3; k++)
@@ -2250,7 +2283,7 @@ int main(int argc, char* argv[])
         if (s.showIntensityProjection && s.intensityProjNeedsUpdate && s.imgViewIdx >= 0 && s.imgViewIdx < (int)s.imageTsNs.size())
         {
             s.intensityProjNeedsUpdate = false;
-            int64_t imgTsAdj = s.imageTsNs[s.imgViewIdx] + imageOffsetNs(s);
+            int64_t imgTsAdj = s.imageTsNs[s.imgViewIdx] + imageTimeOffsetNs(s);
             cv::Mat proj = renderIntensityProjection(s, imgTsAdj);
             cv::cvtColor(proj, proj, cv::COLOR_BGR2RGB);
             if (s.intensityProjTexValid)
@@ -2490,6 +2523,14 @@ int main(int argc, char* argv[])
                             kEquirectPrefix);
                     ImGui::Text("%dx%d", s.imgW, s.imgH);
                 }
+                else if (s.K.model == CameraModel::Mei)
+                {
+                    // Mei is never inferred (see resolveCameraModel), so it is
+                    // always an explicit "model" key -- no tooltip needed.
+                    ImGui::Text("Model: mei (xi=%.4f)", s.K.xi);
+                    ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
+                    ImGui::Text("cx=%.0f cy=%.0f", s.K.cx, s.K.cy);
+                }
                 else
                 {
                     ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
@@ -2506,6 +2547,12 @@ int main(int argc, char* argv[])
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(
                         "Downscale applied to images before coloring.\nLower = less RAM and faster, at coarser color detail.");
+                ImGui::InputDouble("Time offset (s)", &s.timeOffsetSec, 0.001, 0.01, "%.4f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Camera clock minus trajectory clock: t_traj = t_image + offset.\n"
+                        "Fixes colors smeared along the direction of travel.\n"
+                        "Re-run Colorize to apply.");
                 ImGui::PopItemWidth();
                 ImGui::PushItemWidth(-1);
 
@@ -2559,11 +2606,11 @@ int main(int argc, char* argv[])
                     s.intensityProjNeedsUpdate = true;
                 }
                 ImGui::TextDisabled("ts: %lld", (long long)s.imageTsNs[s.imgViewIdx]);
-                if (s.imageTimeOffsetMs != 0.f)
+                if (s.timeOffsetSec != 0.0)
                 {
                     ImGui::SameLine();
                     ImGui::TextDisabled(
-                        "(adj: %lld)", (long long)(s.imageTsNs[s.imgViewIdx] + imageOffsetNs(s)));
+                        "(adj: %lld)", (long long)(s.imageTsNs[s.imgViewIdx] + imageTimeOffsetNs(s)));
                 }
                 {
                     float as = angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, s.imageTsNs[s.imgViewIdx]);
@@ -2657,14 +2704,17 @@ int main(int argc, char* argv[])
                 ImGui::Checkbox("Compressed (jpeg)", &s.ros.compressCamera);
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("ON: CompressedImage (jpeg)\nOFF: raw Image bgr8");
-                const bool noRectify = s.K.model == CameraModel::Equirectangular;
+                // Rectification is OpenCV's pinhole initUndistortRectifyMap;
+                // it would mis-warp a panorama or a fisheye, not rectify it.
+                const bool noRectify = s.K.model != CameraModel::Pinhole;
                 ImGui::BeginDisabled(noRectify);
                 ImGui::Checkbox("Undistort (rectify)", &s.ros.undistortCamera);
                 ImGui::EndDisabled();
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                     ImGui::SetTooltip(
-                        noRectify ? "Not applicable to an equirectangular camera."
-                                  : "Rectify to pinhole so RViz overlays line up\n(CameraInfo published with zero distortion).");
+                        !noRectify ? "Rectify to pinhole so RViz overlays line up\n(CameraInfo published with zero distortion)."
+                        : s.K.model == CameraModel::Equirectangular ? "Not applicable to an equirectangular camera."
+                                                                    : "Not applicable to a Mei (fisheye) camera.");
                 ImGui::Unindent();
             }
             ImGui::Checkbox("LiDAR undistorted (map frame)", &s.ros.exportLidarUndistorted);
@@ -2713,13 +2763,15 @@ int main(int argc, char* argv[])
             ImGui::PopItemWidth();
             ImGui::PushItemWidth(-1);
             s.colmapPtDecim = std::max(1, s.colmapPtDecim);
-            const bool colmapUnsupported = s.K.model == CameraModel::Equirectangular;
+            const bool colmapUnsupported = s.K.model != CameraModel::Pinhole;
             ImGui::BeginDisabled(colmapUnsupported);
             if (ImGui::Button("Export COLMAP model", ImVec2(-1, 0)))
                 exportColmap(s);
             ImGui::EndDisabled();
             if (colmapUnsupported && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip("COLMAP has no equirectangular camera model.");
+                ImGui::SetTooltip(
+                    s.K.model == CameraModel::Equirectangular ? "COLMAP has no equirectangular camera model."
+                                                              : "COLMAP has no unified-sphere (Mei) camera model.");
             ImGui::TextDisabled("Writes sparse/{cameras,images,points3D}.txt");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(

@@ -29,7 +29,8 @@ namespace calib
     enum class CameraModel
     {
         Pinhole, // fx/fy/cx/cy + the rational distortion coefficients below
-        Equirectangular // 360 panorama; width/height are the intrinsics, k*/p* unused
+        Equirectangular, // 360 panorama; width/height are the intrinsics, k*/p* unused
+        Mei // Insta 360
     };
 
     struct Intrinsics
@@ -37,12 +38,19 @@ namespace calib
         CameraModel model = CameraModel::Pinhole;
         float fx = 800.f, fy = 800.f;
         float cx = 640.f, cy = 360.f;
-        // OpenCV rational distortion model:
+        // OpenCV rational distortion model (CameraModel::Pinhole):
         // radial = (1 + k1 r² + k2 r⁴ + k3 r⁶) / (1 + k4 r² + k5 r⁴ + k6 r⁶)
+        //
+        // CameraModel::Mei reuses k1/k2/k3 and p1/p2 below for its own
+        // (non-rational) radial/tangential polynomial -- see MeiCamera.h --
+        // and leaves k4/k5/k6 at 0, unused.
         float k1 = 0.f, k2 = 0.f, k3 = 0.f;
         float k4 = 0.f, k5 = 0.f, k6 = 0.f;
         // tangential
         float p1 = 0.f, p2 = 0.f;
+        // Unified-sphere mirror parameter, CameraModel::Mei only (see
+        // MeiCamera.h for the model itself). Unused (0) by every other model.
+        float xi = 0.f;
         // Image dimensions in pixels. Read only by CameraModel::Equirectangular,
         // where they play the role fx/fy/cx/cy play for a pinhole camera and so
         // *must* be set -- from the calibration file or from the loaded image --
@@ -142,8 +150,11 @@ namespace calib
     // essentially at the camera itself fails -- a full-sphere camera has no
     // frustum and no "behind". u comes back wrapped into [0, width); v spans
     // [0, height] *inclusive*, the south pole landing exactly on height.
+    // Mei: depth = range from the camera, same "only the camera itself
+    // fails" rule as Equirectangular; (u, v) come straight out of
+    // MeiCamera::Project, unclamped and unwrapped.
     //
-    // In both cases the caller owns rounding to integer pixels (which can itself
+    // In all cases the caller owns rounding to integer pixels (which can itself
     // land on width at the equirectangular seam), bounds checking and any ROI
     // test.
     bool projectPoint(

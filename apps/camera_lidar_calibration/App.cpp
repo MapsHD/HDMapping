@@ -3,6 +3,7 @@
 #include "raymath.h"
 #include "rlImGui.h"
 #include <CalibCore/CameraCalibrationSolver.h>
+#include <CalibCore/MeiCamera.h>
 #include <HDMapping/Version.hpp>
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/PointPicking.h>
@@ -18,6 +19,30 @@
 #include <opencv2/imgproc.hpp>
 #include <vector>
 
+// ── model <-> string, for the calibration JSON's "model" key ─────────────────
+// No `default:` case on purpose: -Wswitch (this target builds with -Wall
+// -Wextra) then flags a future CameraModel enumerator added here without a
+// matching string, instead of it silently falling through to "pinhole".
+static const char* modelToString(CameraModel m)
+{
+    switch (m)
+    {
+    case CameraModel::Pinhole: return "pinhole";
+    case CameraModel::Equirectangular: return "equirectangular";
+    case CameraModel::Mei: return "mei";
+    }
+    return "pinhole";
+}
+
+static CameraModel modelFromString(const std::string& s)
+{
+    if (s == "equirectangular")
+        return CameraModel::Equirectangular;
+    if (s == "mei")
+        return CameraModel::Mei;
+    return CameraModel::Pinhole;
+}
+
 // ── AppState::rebuildImageTexture ─────────────────────────────────────────────
 void AppState::rebuildImageTexture()
 {
@@ -27,7 +52,14 @@ void AppState::rebuildImageTexture()
     cv::Mat display = originalImage;
     imageRectified = false;
 
-    if (intrinsicsLoaded)
+    // initUndistortRectifyMap assumes OpenCV's rational pinhole model --
+    // running it for Mei (or Equirectangular) would silently mis-warp the
+    // image instead of undistorting it. Mei has no "undistort to pinhole"
+    // step here (that would need resampling through MeiCamera::Unproject
+    // into a virtual pinhole, not implemented), so its image is always
+    // shown raw; the projection overlay/GPU shaders apply its distortion
+    // directly to the raw image instead (see Renderer.cpp/RendererShaders.h).
+    if (intrinsicsLoaded && intrinsics.model == CameraModel::Pinhole)
     {
         cv::Mat K = (cv::Mat_<double>(3, 3) << intrinsics.fx, 0, intrinsics.cx, 0, intrinsics.fy, intrinsics.cy, 0, 0, 1);
         // OpenCV distCoeffs order: k1 k2 p1 p2 k3 k4 k5 k6 (rational model)
@@ -59,6 +91,33 @@ void AppState::rebuildImageTexture()
     rimg.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8;
     imageTexture = LoadTextureFromImage(rimg); // copies pixels to GPU
     imageLoaded = true;
+}
+
+// ── AppState::autoScaleIntrinsicsToImage ──────────────────────────────────────
+std::string AppState::autoScaleIntrinsicsToImage()
+{
+    if (!intrinsicsLoaded || intrinsicsW <= 0 || imageW <= 0)
+        return "";
+    if (intrinsicsW == imageW && intrinsicsH == imageH)
+        return "";
+
+    // Width ratio is the scale factor -- calib::scaleIntrinsics only takes
+    // one, so a genuine aspect-ratio change (as opposed to a uniform
+    // resize) can't be fully corrected; sy is only computed to detect and
+    // warn about that case.
+    float sx = static_cast<float>(imageW) / static_cast<float>(intrinsicsW);
+    float sy = static_cast<float>(imageH) / static_cast<float>(intrinsicsH);
+    intrinsics = calib::scaleIntrinsics(intrinsics, sx);
+    intrinsicsW = imageW;
+    intrinsicsH = imageH;
+
+    char buf[192];
+    std::snprintf(
+        buf, sizeof(buf), "intrinsics auto-scaled %.4fx to match the %dx%d image", static_cast<double>(sx), imageW, imageH);
+    std::string note = buf;
+    if (std::fabs(sx - sy) > 0.01f * sx)
+        note += " (WARNING: aspect ratio differs from the calibration -- scaled by width only, results may be off)";
+    return note;
 }
 
 // ── AppState correspondence picking ───────────────────────────────────────────
@@ -139,10 +198,17 @@ bool AppState::solvePairs()
     }
 
     double rms = -1.0;
-    bool ok = calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation);
+    std::string solveErr;
+    // Pinhole's reused observation equations are a pure rectilinear
+    // projection with no unified-sphere term, so they can't be used for
+    // Mei -- solveExtrinsicsMeiCeres (Ceres autodiff, optional at build
+    // time) is its counterpart instead. See CameraCalibrationSolver.h.
+    bool ok = (intrinsics.model == CameraModel::Mei)
+                  ? calib::solveExtrinsicsMeiCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation)
+                  : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation);
     if (!ok)
     {
-        statusMsg = "Solve failed (degenerate correspondences)";
+        statusMsg = !solveErr.empty() ? ("Solve failed: " + solveErr) : "Solve failed (degenerate correspondences)";
         return false;
     }
 
@@ -168,9 +234,14 @@ void AppState::loadImage(const char* path)
     imageW = originalImage.cols;
     imageH = originalImage.rows;
     imagePath = path;
+    // Intrinsics may already be loaded for a different resolution (e.g. a
+    // calibration taken at full res, then a downscaled image loaded here).
+    std::string scaleNote = autoScaleIntrinsicsToImage();
     rebuildImageTexture();
     renderer.init(imageW, imageH);
     statusMsg = imageRectified ? "Image loaded and rectified" : "Image loaded (raw)";
+    if (!scaleNote.empty())
+        statusMsg += "; " + scaleNote;
 }
 
 // ── AppState::loadCloud ───────────────────────────────────────────────────────
@@ -368,6 +439,28 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
     return true;
 }
 
+// A camera_info.yaml (MeiCamera's format) is a flat top-level mapping with a
+// `distortion_model:` key, unlike OpenCV's `camera_matrix:`/`distortion_
+// coefficients:` YAML -- peeked at as plain text (not parsed) so a normal
+// OpenCV pinhole YAML never round-trips through LoadMeiCamera and hits its
+// "missing an expected field" warnings for fields it was never going to have.
+static bool yamlLooksLikeMei(const char* path)
+{
+    std::ifstream f(path);
+    std::string line;
+    while (std::getline(f, line))
+    {
+        auto pos = line.find("distortion_model:");
+        if (pos == std::string::npos)
+            continue;
+        std::string value = line.substr(pos + std::string("distortion_model:").size());
+        for (auto& c : value)
+            c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+        return value.find("mei") != std::string::npos;
+    }
+    return false;
+}
+
 // ── AppState::loadIntrinsics ──────────────────────────────────────────────────
 void AppState::loadIntrinsics(const char* path)
 {
@@ -376,6 +469,39 @@ void AppState::loadIntrinsics(const char* path)
     std::string ext = (dot != std::string::npos) ? p.substr(dot + 1) : "";
     for (auto& c : ext)
         c = static_cast<char>(tolower(c));
+
+    if ((ext == "yml" || ext == "yaml") && yamlLooksLikeMei(path))
+    {
+        MeiCamera cam = LoadMeiCamera(path);
+        if (!cam.loaded)
+        {
+            statusMsg = std::string("Mei intrinsics failed to load (see console): ") + path;
+            return;
+        }
+        intrinsics.model = CameraModel::Mei;
+        intrinsics.fx = static_cast<float>(cam.fx);
+        intrinsics.fy = static_cast<float>(cam.fy);
+        intrinsics.cx = static_cast<float>(cam.cx);
+        intrinsics.cy = static_cast<float>(cam.cy);
+        intrinsics.xi = static_cast<float>(cam.xi);
+        intrinsics.k1 = static_cast<float>(cam.k1);
+        intrinsics.k2 = static_cast<float>(cam.k2);
+        intrinsics.k3 = static_cast<float>(cam.k3);
+        intrinsics.k4 = intrinsics.k5 = intrinsics.k6 = 0.f; // unused by Mei
+        intrinsics.p1 = static_cast<float>(cam.p1);
+        intrinsics.p2 = static_cast<float>(cam.p2);
+        intrinsicsW = cam.width;
+        intrinsicsH = cam.height;
+        intrinsicsLoaded = true;
+        std::string scaleNote = autoScaleIntrinsicsToImage();
+        rebuildImageTexture(); // no-op undistortion for Mei, but refreshes the texture
+        statusMsg = "Mei intrinsics loaded";
+        if (cam.width > 0)
+            statusMsg += " (calibration " + std::to_string(cam.width) + "x" + std::to_string(cam.height) + ")";
+        if (!scaleNote.empty())
+            statusMsg += "; " + scaleNote;
+        return;
+    }
 
     if (ext == "yml" || ext == "yaml")
     {
@@ -386,17 +512,20 @@ void AppState::loadIntrinsics(const char* path)
             statusMsg = std::string("YAML error: ") + err + " (" + path + ")";
             return;
         }
+        intrinsics.model = CameraModel::Pinhole; // this YAML format cannot express any other model
+        intrinsics.xi = 0.f;
+        intrinsicsW = imgW;
+        intrinsicsH = imgH;
         intrinsicsLoaded = true;
-        rebuildImageTexture(); // re-rectify with the new coefficients
+        std::string scaleNote = autoScaleIntrinsicsToImage();
+        rebuildImageTexture(); // re-rectify with the new (possibly auto-scaled) coefficients
         statusMsg = "Intrinsics loaded";
+        if (imgW > 0)
+            statusMsg += " (calibration " + std::to_string(imgW) + "x" + std::to_string(imgH) + ")";
+        if (!scaleNote.empty())
+            statusMsg += "; " + scaleNote;
         if (imageRectified)
             statusMsg += ", image rectified";
-        if (imgW > 0)
-        {
-            statusMsg += " (camera " + std::to_string(imgW) + "x" + std::to_string(imgH) + ")";
-            if (imageLoaded && (imgW != imageW || imgH != imageH))
-                statusMsg += " WARNING: image is " + std::to_string(imageW) + "x" + std::to_string(imageH);
-        }
         return;
     }
 
@@ -408,10 +537,12 @@ void AppState::loadIntrinsics(const char* path)
     }
     nlohmann::json j;
     f >> j;
+    intrinsics.model = modelFromString(j.value("model", std::string("pinhole")));
     intrinsics.fx = j.value("fx", intrinsics.fx);
     intrinsics.fy = j.value("fy", intrinsics.fy);
     intrinsics.cx = j.value("cx", intrinsics.cx);
     intrinsics.cy = j.value("cy", intrinsics.cy);
+    intrinsics.xi = j.value("xi", 0.f);
     intrinsics.k1 = j.value("k1", 0.f);
     intrinsics.k2 = j.value("k2", 0.f);
     intrinsics.k3 = j.value("k3", 0.f);
@@ -420,9 +551,17 @@ void AppState::loadIntrinsics(const char* path)
     intrinsics.k6 = j.value("k6", 0.f);
     intrinsics.p1 = j.value("p1", 0.f);
     intrinsics.p2 = j.value("p2", 0.f);
+    // No "width"/"height" in the file -- assume it matches whatever image is
+    // already loaded (this format historically had no resolution field at
+    // all, so anything already loaded is the best guess available).
+    intrinsicsW = j.value("width", imageLoaded ? imageW : 0);
+    intrinsicsH = j.value("height", imageLoaded ? imageH : 0);
     intrinsicsLoaded = true;
+    std::string scaleNote = autoScaleIntrinsicsToImage();
     rebuildImageTexture();
     statusMsg = "Intrinsics loaded.";
+    if (!scaleNote.empty())
+        statusMsg += " " + scaleNote;
 }
 
 // ── AppState::loadCalibration ─────────────────────────────────────────────────
@@ -449,10 +588,12 @@ void AppState::loadCalibration(const char* path)
     if (j.contains("intrinsics"))
     {
         auto& ji = j["intrinsics"];
+        intrinsics.model = modelFromString(ji.value("model", std::string("pinhole")));
         intrinsics.fx = ji.value("fx", intrinsics.fx);
         intrinsics.fy = ji.value("fy", intrinsics.fy);
         intrinsics.cx = ji.value("cx", intrinsics.cx);
         intrinsics.cy = ji.value("cy", intrinsics.cy);
+        intrinsics.xi = ji.value("xi", 0.f);
         intrinsics.k1 = ji.value("k1", 0.f);
         intrinsics.k2 = ji.value("k2", 0.f);
         intrinsics.k3 = ji.value("k3", 0.f);
@@ -461,6 +602,8 @@ void AppState::loadCalibration(const char* path)
         intrinsics.k6 = ji.value("k6", 0.f);
         intrinsics.p1 = ji.value("p1", 0.f);
         intrinsics.p2 = ji.value("p2", 0.f);
+        intrinsicsW = ji.value("width", imageLoaded ? imageW : 0);
+        intrinsicsH = ji.value("height", imageLoaded ? imageH : 0);
         intrinsicsLoaded = true;
         gotIntrinsics = true;
     }
@@ -498,8 +641,12 @@ void AppState::loadCalibration(const char* path)
         return;
     }
 
+    std::string scaleNote;
     if (gotIntrinsics)
+    {
+        scaleNote = autoScaleIntrinsicsToImage();
         rebuildImageTexture();
+    }
 
     statusMsg = "Loaded";
     if (gotIntrinsics)
@@ -509,6 +656,8 @@ void AppState::loadCalibration(const char* path)
     if (gotExtrinsics)
         statusMsg += " extrinsics";
     statusMsg += std::string(" from ") + path;
+    if (!scaleNote.empty())
+        statusMsg += "; " + scaleNote;
 }
 
 // ── AppState::saveCalibration ─────────────────────────────────────────────────
@@ -521,9 +670,16 @@ void AppState::saveCalibration(const char* path)
     Eigen::Vector3f ti = -(R.transpose() * C); // translation of T_lidar_to_camera
 
     nlohmann::json j;
-    j["intrinsics"] = { { "fx", intrinsics.fx }, { "fy", intrinsics.fy }, { "cx", intrinsics.cx }, { "cy", intrinsics.cy },
-                        { "k1", intrinsics.k1 }, { "k2", intrinsics.k2 }, { "k3", intrinsics.k3 }, { "k4", intrinsics.k4 },
-                        { "k5", intrinsics.k5 }, { "k6", intrinsics.k6 }, { "p1", intrinsics.p1 }, { "p2", intrinsics.p2 } };
+    // width/height record the resolution these intrinsics are valid for
+    // (intrinsicsW/H, not necessarily the original calibration file's own
+    // resolution -- see App.h) so a later load against a different-size
+    // image can auto-scale (AppState::autoScaleIntrinsicsToImage) instead
+    // of just warning about the mismatch. 0 means unknown.
+    j["intrinsics"] = { { "model", modelToString(intrinsics.model) }, { "fx", intrinsics.fx }, { "fy", intrinsics.fy },
+                        { "cx", intrinsics.cx }, { "cy", intrinsics.cy }, { "xi", intrinsics.xi }, { "k1", intrinsics.k1 },
+                        { "k2", intrinsics.k2 }, { "k3", intrinsics.k3 }, { "k4", intrinsics.k4 }, { "k5", intrinsics.k5 },
+                        { "k6", intrinsics.k6 }, { "p1", intrinsics.p1 }, { "p2", intrinsics.p2 },
+                        { "width", intrinsicsW }, { "height", intrinsicsH } };
     // Rotation is stored as a matrix only -- convention-independent (no
     // Euler/Tait-Bryan angle order or units to document/misread) and
     // directly portable to any external tool. camera_rotation_matrix_in_world

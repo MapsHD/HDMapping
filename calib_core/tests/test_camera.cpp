@@ -2,6 +2,7 @@
 #include <doctest.h>
 
 #include <CalibCore/Camera.h>
+#include <CalibCore/MeiCamera.h>
 
 #include <cmath>
 
@@ -19,6 +20,36 @@ namespace
         K.width = kW;
         K.height = kH;
         return K;
+    }
+
+    // A representative Mei/unified-sphere fisheye, values in the shape
+    // insta360_mei_v2 calibrations take (see MeiCamera.h) rather than a
+    // real calibrated camera.
+    Intrinsics mei()
+    {
+        Intrinsics K;
+        K.model = CameraModel::Mei;
+        K.fx = 300.f; K.fy = 300.f;
+        K.cx = 320.f; K.cy = 240.f;
+        K.xi = 1.2f;
+        K.k1 = -0.15f; K.k2 = 0.02f; K.k3 = -0.001f;
+        K.p1 = 0.001f; K.p2 = -0.0005f;
+        K.width = 640; K.height = 480;
+        return K;
+    }
+
+    // The same camera as mei(), built directly as a MeiCamera -- used to
+    // check projectPoint()'s Mei branch against the type it wraps, not
+    // against a re-derivation of the formula.
+    MeiCamera meiCamera()
+    {
+        const Intrinsics K = mei();
+        MeiCamera cam;
+        cam.fx = K.fx; cam.fy = K.fy; cam.cx = K.cx; cam.cy = K.cy;
+        cam.xi = K.xi;
+        cam.k1 = K.k1; cam.k2 = K.k2; cam.k3 = K.k3;
+        cam.p1 = K.p1; cam.p2 = K.p2;
+        return cam;
     }
 
     // Identity pose: p_cam == p_lidar, so test points can be written directly
@@ -190,6 +221,104 @@ TEST_CASE("equirectangular: respects the extrinsics")
     }
 }
 
+// ── Mei ─────────────────────────────────────────────────────────────────────
+
+TEST_CASE("mei: forward is the image centre, depth is range")
+{
+    const Intrinsics K = mei();
+
+    Px r = project(K, { 0, 0, 10 });
+    CHECK(r.u == doctest::Approx(K.cx));
+    CHECK(r.v == doctest::Approx(K.cy));
+    CHECK(r.depth == doctest::Approx(10.0)); // range, not z -- see below
+
+    Px oblique = project(K, { 3, 0, 4 });
+    CHECK(oblique.depth == doctest::Approx(5.0)); // a pinhole camera would report 4
+}
+
+TEST_CASE("mei: projectPoint wraps MeiCamera::Project rather than re-deriving it")
+{
+    const Intrinsics K = mei();
+    const MeiCamera cam = meiCamera();
+
+    const Eigen::Vector3f points[] = {
+        { 0.3f, -0.2f, 0.9f },
+        { -1.5f, 0.8f, 2.0f },
+        { 0.05f, 0.02f, 1.0f },
+        { -0.6f, -1.1f, 0.8f },
+    };
+
+    for (const auto& p : points)
+    {
+        Px r = project(K, p);
+        const cv::Point2d expected = cam.Project(cv::Point3d(p.x(), p.y(), p.z()));
+        CHECK(r.u == doctest::Approx(expected.x));
+        CHECK(r.v == doctest::Approx(expected.y));
+    }
+}
+
+TEST_CASE("mei: a point on the camera itself is rejected")
+{
+    const Intrinsics K = mei();
+    float u, v, depth;
+    CHECK_FALSE(projectPoint(0, 0, 0, K, kIdentity, kOrigin, u, v, depth));
+}
+
+TEST_CASE("mei: a point behind the camera is rejected, not silently mis-projected")
+{
+    // Regression: MeiCamera::Project has no domain guard of its own (it
+    // divides by Xs.z+xi unconditionally), so a point behind the camera
+    // does NOT reliably land outside the image -- the projection isn't
+    // injective past the model's valid dome. projectPoint() must reject it
+    // itself rather than return a plausible-looking wrong pixel.
+    float u, v, depth;
+
+    SUBCASE("xi >= 1 covers the full sphere -- straight behind still succeeds")
+    {
+        // mei()'s xi = 1.2: Xs.z + xi ranges over [xi-1, xi+1] = [0.2, 2.2]
+        // for any direction (Xs.z in [-1, 1]), always positive, so no
+        // direction is ever excluded at this xi.
+        const Intrinsics K = mei();
+        CHECK(projectPoint(0, 0, -10, K, kIdentity, kOrigin, u, v, depth));
+    }
+
+    SUBCASE("xi < 1 excludes a cone behind the camera")
+    {
+        Intrinsics K = mei();
+        K.xi = 0.5f; // Xs.z <= -0.5 is now out of domain
+
+        // Straight behind: Xs.z = -1, so Xs.z + xi = -0.5 <= 0.
+        CHECK_FALSE(projectPoint(0, 0, -10, K, kIdentity, kOrigin, u, v, depth));
+        // Straight ahead is unaffected.
+        CHECK(projectPoint(0, 0, 10, K, kIdentity, kOrigin, u, v, depth));
+    }
+}
+
+TEST_CASE("mei: respects the extrinsics")
+{
+    const Intrinsics K = mei();
+    const MeiCamera cam = meiCamera();
+
+    // om=fi=ka=0 is the nominal camera-vs-LiDAR alignment, so LiDAR forward
+    // (+X) should come out as camera forward, i.e. the image centre.
+    const Eigen::Matrix3f R_wc = kCameraLidarAxisOffset;
+
+    Px r = project(K, { 10, 0, 0 }, R_wc);
+    CHECK(r.u == doctest::Approx(K.cx));
+    CHECK(r.v == doctest::Approx(K.cy));
+
+    // The camera position is subtracted: one metre in front of an offset
+    // camera reprojects the same as one metre in front of the origin.
+    const Eigen::Vector3f C(1.f, 2.f, 3.f);
+    Px offset = project(K, C + Eigen::Vector3f(1.f, 0.f, 0.f), R_wc, C);
+    // p_lidar - C = LiDAR +X, which R_wc's transpose turns into camera +Z
+    // (camera-forward) -- same axis remap as the centre check above.
+    const cv::Point2d expected = cam.Project(cv::Point3d(0.0, 0.0, 1.0));
+    CHECK(offset.u == doctest::Approx(expected.x));
+    CHECK(offset.v == doctest::Approx(expected.y));
+    CHECK(offset.depth == doctest::Approx(1.0));
+}
+
 // ── Pinhole (regression: this path must not change) ───────────────────────────
 
 TEST_CASE("pinhole is the default model")
@@ -279,5 +408,22 @@ TEST_CASE("scaleIntrinsics: a half-size image projects to half the pixel")
         Intrinsics H = scaleIntrinsics(K, 0.25f);
         CHECK(H.k1 == doctest::Approx(0.1));
         CHECK(H.p2 == doctest::Approx(0.02));
+    }
+    SUBCASE("mei")
+    {
+        Intrinsics K = mei();
+        Intrinsics H = scaleIntrinsics(K, 0.5f);
+        CHECK(H.model == CameraModel::Mei);
+        CHECK(H.fx == doctest::Approx(K.fx * 0.5));
+        CHECK(H.cx == doctest::Approx(K.cx * 0.5));
+        // xi and the k*/p* polynomial are dimensionless, carried over as-is.
+        CHECK(H.xi == doctest::Approx(K.xi));
+        CHECK(H.k1 == doctest::Approx(K.k1));
+        CHECK(H.p2 == doctest::Approx(K.p2));
+
+        Px full = project(K, { 0.3f, -0.2f, 0.9f });
+        Px half = project(H, { 0.3f, -0.2f, 0.9f });
+        CHECK(half.u == doctest::Approx(full.u * 0.5));
+        CHECK(half.v == doctest::Approx(full.v * 0.5));
     }
 }

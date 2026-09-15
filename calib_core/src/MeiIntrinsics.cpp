@@ -1,4 +1,4 @@
-#include <CalibCore/MeiCamera.h>
+#include <CalibCore/Camera.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -8,18 +8,8 @@
 #include <string>
 #include <vector>
 
-Eigen::Vector2d MeiCamera::Project(const Eigen::Vector3d& P) const
+namespace calib
 {
-    const Eigen::Vector3d Xs = P.normalized(); // onto the unit sphere
-
-    const double denom = Xs.z() + xi;
-    const double x = Xs.x() / denom, y = Xs.y() / denom;
-    const double r2 = x * x + y * y;
-    const double radial = 1.0 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2;
-    const double xd = x * radial + 2 * p1 * x * y + p2 * (r2 + 2 * x * x);
-    const double yd = y * radial + p1 * (r2 + 2 * y * y) + 2 * p2 * x * y;
-    return { fx * xd + cx, fy * yd + cy };
-}
 
 namespace
 {
@@ -73,14 +63,13 @@ namespace
     }
 } // namespace
 
-MeiCamera LoadMeiCamera(const std::string& path)
+bool loadMeiIntrinsics(const std::string& path, Intrinsics& K)
 {
-    MeiCamera cam;
     std::ifstream f(path);
     if (!f)
     {
-        std::fprintf(stderr, "calib_app: failed to open '%s'\n", path.c_str());
-        return cam;
+        std::fprintf(stderr, "calib_core: failed to open '%s'\n", path.c_str());
+        return false;
     }
     const std::map<std::string, std::string> kv = readFlatYaml(f);
 
@@ -90,8 +79,8 @@ MeiCamera LoadMeiCamera(const std::string& path)
     {
         if (kv.find(key) == kv.end())
         {
-            std::fprintf(stderr, "calib_app: '%s' is missing required field '%s'\n", path.c_str(), key);
-            return cam;
+            std::fprintf(stderr, "calib_core: '%s' is missing required field '%s'\n", path.c_str(), key);
+            return false;
         }
     }
 
@@ -103,49 +92,53 @@ MeiCamera LoadMeiCamera(const std::string& path)
         return s;
     };
 
-    const auto frameIt = kv.find("frame_id");
     const auto modelIt = kv.find("distortion_model");
-    cam.frameId = frameIt != kv.end() ? unquote(frameIt->second) : "";
-    cam.distortionModel = modelIt != kv.end() ? unquote(modelIt->second) : "";
-    cam.width = static_cast<int>(num("width"));
-    cam.height = static_cast<int>(num("height"));
-    cam.fx = num("fx");
-    cam.fy = num("fy");
-    cam.cx = num("cx");
-    cam.cy = num("cy");
-    cam.xi = num("xi");
+    const std::string distortionModel = modelIt != kv.end() ? unquote(modelIt->second) : "";
+
+    K = Intrinsics{};
+    K.model = CameraModel::Mei;
+    K.width = static_cast<int>(num("width"));
+    K.height = static_cast<int>(num("height"));
+    K.fx = static_cast<float>(num("fx"));
+    K.fy = static_cast<float>(num("fy"));
+    K.cx = static_cast<float>(num("cx"));
+    K.cy = static_cast<float>(num("cy"));
+    K.xi = static_cast<float>(num("xi"));
 
     // distortion is (k1, k2, k3, p1, p2) for insta360_mei_v2 -- see
-    // MeiCamera.h. Warn rather than silently drop data if it isn't the 5
+    // Camera.h. Warn rather than silently drop data if it is not the 5
     // elements that order assumes.
     const std::vector<double> d = parseArray(kv.at("distortion"));
     if (d.size() != 5)
     {
         std::fprintf(
             stderr,
-            "calib_app: WARNING '%s' distortion has %zu elements, expected 5 "
+            "calib_core: WARNING '%s' distortion has %zu elements, expected 5 "
             "(k1,k2,k3,p1,p2 for %s) -- missing ones default to 0, extras are ignored\n",
             path.c_str(),
             d.size(),
-            cam.distortionModel.c_str());
+            distortionModel.c_str());
     }
-    auto at = [&](size_t i) { return i < d.size() ? d[i] : 0.0; };
-    cam.k1 = at(0);
-    cam.k2 = at(1);
-    cam.k3 = at(2);
-    cam.p1 = at(3);
-    cam.p2 = at(4);
+    auto at = [&](size_t i) { return i < d.size() ? static_cast<float>(d[i]) : 0.f; };
+    K.k1 = at(0);
+    K.k2 = at(1);
+    K.k3 = at(2);
+    K.p1 = at(3);
+    K.p2 = at(4);
+    // k4/k5/k6 are the rational denominator, which the Mei polynomial has no
+    // equivalent of; Intrinsics{} above already left them at 0.
 
-    if (cam.distortionModel != "insta360_mei_v2")
+    if (distortionModel != "insta360_mei_v2")
     {
         std::fprintf(
             stderr,
-            "calib_app: WARNING '%s' has distortion_model='%s', only insta360_mei_v2 is supported "
+            "calib_core: WARNING '%s' has distortion_model='%s', only insta360_mei_v2 is supported "
             "(results will be wrong if the model differs)\n",
             path.c_str(),
-            cam.distortionModel.c_str());
+            distortionModel.c_str());
     }
 
-    cam.loaded = true;
-    return cam;
+    return true;
 }
+
+} // namespace calib

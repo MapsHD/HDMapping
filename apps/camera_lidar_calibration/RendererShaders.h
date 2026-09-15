@@ -48,7 +48,7 @@ void main() {
         // Mei -- unlike Pinhole (below), AppState::rebuildImageTexture never
         // undistorts the displayed image for this model, so sampling it
         // needs the actual Mei distortion applied here too. Mirrors
-        // MeiCamera::Project (CalibCore/MeiCamera.h) and kProjVS's own Mei
+        // calib::projectPoint's Mei branch (Camera.cpp) and kProjVS's own Mei
         // branch below.
         float n = length(pc);
         vec3 Xs = pc / max(n, 1e-6);
@@ -112,7 +112,7 @@ void main() {
     // in raylib coords, converted back to lidar frame here. Pinhole (model==0):
     // rational+tangential distortion (zeros when rectified), w = z_cam so the
     // hardware clip rejects points behind the camera. Mei (model==2): unified-
-    // sphere + polynomial distortion (mirrors MeiCamera::Project), with w the
+    // sphere + polynomial distortion (mirrors calib::projectPoint), with w the
     // distance inside the model's valid dome -- Xs.z + min(xi, 1/xi) -- so the
     // hardware clip drops both the blow-up (xi <= 1) and the fold-back
     // (xi > 1, where far-off-axis directions otherwise re-enter the image).

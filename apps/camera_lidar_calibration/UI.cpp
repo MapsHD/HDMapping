@@ -468,7 +468,7 @@ void UI::panelIntrinsics(AppState& state)
 
     if (K.model == CameraModel::Mei)
     {
-        // Unified-sphere fisheye (MeiCamera.h): xi + a plain k1/k2/k3 +
+        // Unified-sphere fisheye (see calib::projectPoint): xi + a plain k1/k2/k3 +
         // p1/p2 polynomial, no rational denominator -- k4/k5/k6 don't apply
         // here, so they're hidden instead of shown as dead controls.
         drag("xi", &K.xi, 0.001f, 0.f, 3.f, "%.4f");

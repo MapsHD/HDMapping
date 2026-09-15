@@ -16,6 +16,7 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
+#include <regex>
 #include <vector>
 
 // ── AppState::rebuildImageTexture ─────────────────────────────────────────────
@@ -243,6 +244,8 @@ void AppState::loadCloud(const char* path)
     rebuildCloudPointsRaylib(*this);
     centerOrbitOnCloud(*this);
     statusMsg = "";
+    // load status sidecar
+    lidarId = GetLidarSerial(path);
 }
 
 void AppState::addCloud(const char* path)
@@ -447,6 +450,7 @@ void AppState::loadIntrinsics(const char* path)
         intrinsicsW = intrinsics.width;
         intrinsicsH = intrinsics.height;
         intrinsicsLoaded = true;
+        calib::loadCameraIdentity(path, cameraId);
         std::string scaleNote = autoScaleIntrinsicsToImage();
         rebuildImageTexture(); // no-op undistortion for Mei, but refreshes the texture
         statusMsg = "Mei intrinsics loaded";
@@ -471,6 +475,7 @@ void AppState::loadIntrinsics(const char* path)
         intrinsicsW = imgW;
         intrinsicsH = imgH;
         intrinsicsLoaded = true;
+        calib::loadCameraIdentity(path, cameraId);
         std::string scaleNote = autoScaleIntrinsicsToImage();
         rebuildImageTexture(); // re-rectify with the new (possibly auto-scaled) coefficients
         statusMsg = "Intrinsics loaded";
@@ -511,6 +516,10 @@ void AppState::loadIntrinsics(const char* path)
     intrinsicsW = j.value("width", imageLoaded ? imageW : 0);
     intrinsicsH = j.value("height", imageLoaded ? imageH : 0);
     intrinsicsLoaded = true;
+    cameraId.serial = j.value("serial", "unknown");
+    cameraId.model = j.value("model", "unknown");
+    cameraId.firmware = j.value("firmware", "unknown");
+    cameraId.frameId = j.value("frameId", "unknown");
     std::string scaleNote = autoScaleIntrinsicsToImage();
     rebuildImageTexture();
     statusMsg = "Intrinsics loaded.";
@@ -538,6 +547,21 @@ void AppState::loadCalibration(const char* path)
     }
 
     bool gotIntrinsics = false, gotExtrinsics = false;
+
+    // "camera" identifies the hardware the intrinsics were measured on, so it
+    // is replaced exactly when they are: a file carrying new intrinsics but no
+    // "camera" block clears the previous serial instead of leaving it attached
+    // to a different camera's numbers. A file with only a "camera" block still
+    // sets it, so an identity can be attached to extrinsics on their own.
+    if (j.contains("intrinsics") || j.contains("camera"))
+    {
+        cameraId = CameraIdentity{};
+        cameraId.serial = j.value("serial", std::string{});
+        cameraId.model = j.value("model", std::string{});
+        cameraId.firmware = j.value("firmware", std::string{});
+        cameraId.frameId = j.value("frame_id", std::string{});
+
+    }
 
     if (j.contains("intrinsics"))
     {
@@ -610,6 +634,8 @@ void AppState::loadCalibration(const char* path)
     if (gotExtrinsics)
         statusMsg += " extrinsics";
     statusMsg += std::string(" from ") + path;
+    if (!cameraId.serial.empty())
+        statusMsg += " (serial " + cameraId.serial + ")";
     if (!scaleNote.empty())
         statusMsg += "; " + scaleNote;
 }
@@ -624,6 +650,15 @@ void AppState::saveCalibration(const char* path)
     Eigen::Vector3f ti = -(R.transpose() * C); // translation of T_lidar_to_camera
 
     nlohmann::json j;
+    // Which camera this calibration was measured on, when a tracked source
+    // named it. Omitted entirely when unknown, so an absent block and an empty
+    // one mean the same thing on the way back in.
+
+    j["lidar"]["serial"] = lidarId;
+    j["camera"]["model"] = cameraId.model;
+    j["camera"]["serial"] = cameraId.serial;
+    j["camera"]["frame_id"] = cameraId.frameId;
+
     // width/height record the resolution these intrinsics are valid for (see
     // App.h) so a later load against a different-size image can auto-scale
     // rather than just warn. 0 means unknown.

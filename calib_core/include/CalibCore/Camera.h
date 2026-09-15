@@ -2,6 +2,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <cmath>
+#include <optional>
 #include <string>
 
 namespace calib
@@ -41,6 +42,20 @@ namespace calib
         //! fx/fy/cx/cy play for a pinhole camera and so *must* be set before
         //! @ref projectPoint is called.
         int width = 0, height = 0;
+    };
+
+
+    struct CameraIdentity
+    {
+
+        std::string serial;
+        std::string frameId;
+        std::string model;
+        std::string firmware;
+        bool empty() const
+        {
+            return serial.empty() && frameId.empty();
+        }
     };
 
     //! Name of a camera model, as written to the calibration JSON's "model" key.
@@ -146,6 +161,18 @@ namespace calib
     //!       degrade the app to "no reprojection available", not crash it.
     bool loadMeiIntrinsics(const std::string& path, Intrinsics& K);
 
+    //! Reads a camera_info.yaml-shaped file's `serial`, `frame_id` and
+    //! `model` fields. Opens and scans the file independently of
+    //! @ref loadMeiIntrinsics --
+    //! identity and intrinsics are unrelated concerns read by separate
+    //! functions, not two jobs of the same one.
+    //! @param path file to read
+    //! @param id overwritten on success (cleared first, so a field the file
+    //!        does not name comes back empty rather than kept from a
+    //!        previous load), untouched on failure
+    //! @return false if the file cannot be opened
+    bool loadCameraIdentity(const std::string& path, CameraIdentity& id);
+
     //! The same camera after its images are resampled, so a downscaled image
     //! projects with the same geometry. Distortion terms are dimensionless and
     //! carry over unchanged.
@@ -193,4 +220,15 @@ namespace calib
         float& v,
         float& depth);
 
+    //! Reads the `FRAME_WALL_CLOCK` field (nanoseconds since epoch) from an
+    //! image's `.meta.json` sidecar.
+    //! @param path the image file, e.g. ".../cam0_123.jpg"; the sidecar is
+    //!        the same basename with its extension replaced by ".meta.json"
+    //!        (".../cam0_123.meta.json")
+    //! @return the timestamp in nanoseconds, or nullopt if the sidecar is
+    //!         missing, unreadable, or has no FRAME_WALL_CLOCK field
+    //! @note Scanned as text, like @ref loadMeiIntrinsics's yaml, rather than
+    //!       parsed as JSON, so calib_core keeps depending on nothing but
+    //!       Eigen/LASzip/std.
+    std::optional<double> LoadTimestampFromSideCar(const std::string& path);
 } // namespace calib

@@ -40,6 +40,15 @@ struct AppState
     // ── calibration params ───────────────────────────────────────────────────
     Intrinsics intrinsics;
     Extrinsics extrinsics;
+    // Which camera `intrinsics` describe, when the file said so. Replaced
+    // whenever the intrinsics are -- an untracked source (an OpenCV YAML, the
+    // flat intrinsics JSON) clears it rather than leaving the previous
+    // camera's serial attached to someone else's numbers.
+    CameraIdentity cameraId;
+
+    // Lidar id from status side car to laz
+    std::string lidarId;
+
     // Resolution `intrinsics` are currently valid for: the calibration file's
     // own width/height, else whatever image was loaded at the time. 0 =
     // unknown. autoScaleIntrinsicsToImage() keeps this in sync, so it names

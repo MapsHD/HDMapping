@@ -2820,18 +2820,11 @@ int main(int argc, char* argv[])
                 ImGui::Indent();
                 ImGui::Checkbox("Compressed (jpeg)", &s.ros.compressCamera);
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("ON: CompressedImage (jpeg)\nOFF: raw Image bgr8");
-                // Rectification is OpenCV's pinhole initUndistortRectifyMap;
-                // it would mis-warp a panorama or a fisheye, not rectify it.
-                const bool noRectify = s.K.model != CameraModel::Pinhole;
-                ImGui::BeginDisabled(noRectify);
-                ImGui::Checkbox("Undistort (rectify)", &s.ros.undistortCamera);
-                ImGui::EndDisabled();
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip("ON: CompressedImage, the source jpeg copied verbatim\nOFF: raw Image bgr8");
+                ImGui::TextDisabled("Frames are exported as captured.");
+                if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(
-                        !noRectify ? "Rectify to pinhole so RViz overlays line up\n(CameraInfo published with zero distortion)."
-                            : s.K.model == CameraModel::Equirectangular ? "Not applicable to an equirectangular camera."
-                                                                        : "Not applicable to a Mei (fisheye) camera.");
+                        "Images are never rectified. CameraInfo carries the real\ndistortion, so consumers can undistort from it.");
                 ImGui::Unindent();
             }
             ImGui::Checkbox("LiDAR undistorted (map frame)", &s.ros.exportLidarUndistorted);

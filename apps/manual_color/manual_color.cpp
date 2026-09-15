@@ -925,13 +925,14 @@ void removeCorrespondence(size_t i)
 // Only extrinsics (+ intrinsics width/height) round-trip here -- this app is
 // fixed to the equirectangular model.
 //
-// NOTE the two functions are NOT each other's inverse: loadCalibrationJson
-// reads "extrinsics" straight into camera_pose (camera-to-LiDAR, matching
-// this app's own "load camera to lidar relative pose (*.reg)" button and
-// camera_lidar_trajectory_viewer's convention), while saveCalibrationJson
-// below writes camera_pose.inverse() (LiDAR-to-camera) per request. Loading a
-// file this app just saved will therefore NOT reproduce the same camera_pose
-// -- flag this if that round-trip turns out to matter.
+// Note the JSON and the *.reg file use opposite conventions, so they are read
+// differently. The JSON's camera_rotation_matrix_in_world/
+// camera_position_in_world_xyz are R_wc and C (camera orientation and position
+// in the LiDAR frame, giving p_cam = R_wc^T * (p - C)), while this app's
+// camera_pose -- and the *.reg file, which stores it verbatim -- is the
+// LiDAR-to-camera transform itself (p_cam = M*p). The two are inverses, so
+// both functions below convert; reading the JSON straight into camera_pose
+// would give a plausible-looking but wrong projection rather than a failure.
 bool loadCalibrationJson(const std::string& path)
 {
     std::ifstream f(path);
@@ -962,10 +963,11 @@ bool loadCalibrationJson(const std::string& path)
         for (int c = 0; c < 3; ++c)
             R(r, c) = m[r][c].get<double>();
 
-    Eigen::Affine3d pose = Eigen::Affine3d::Identity();
-    pose.linear() = R;
-    pose.translation() = Eigen::Vector3d(t[0].get<double>(), t[1].get<double>(), t[2].get<double>());
-    SystemData::camera_pose = pose;
+    // (R, t) are R_wc and C; camera_pose is their inverse -- see above.
+    Eigen::Affine3d wc = Eigen::Affine3d::Identity();
+    wc.linear() = R;
+    wc.translation() = Eigen::Vector3d(t[0].get<double>(), t[1].get<double>(), t[2].get<double>());
+    SystemData::camera_pose = wc.inverse();
     return true;
 }
 
@@ -979,10 +981,8 @@ bool saveCalibrationJson(const std::string& path)
     ji["height"] = SystemData::imageHeight;
     j["intrinsics"] = ji;
 
-    // Exported inverted: camera_pose is this app's camera-to-LiDAR transform
-    // (see the "save camera to lidar relative pose (*.reg)" button above,
-    // which dumps it un-inverted), so its inverse is the LiDAR-to-camera
-    // transform -- write that under the same field names.
+    // camera_pose is the LiDAR-to-camera transform (the *.reg button above
+    // dumps it un-inverted); its inverse is the R_wc/C the schema wants.
     const Eigen::Affine3d inv = SystemData::camera_pose.inverse();
     const Eigen::Vector3d t = inv.translation();
     const Eigen::Matrix3d R = inv.linear();
@@ -1611,7 +1611,8 @@ void display()
             std::cerr << "Cannot save calibration: " << path << std::endl;
     }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Same calibration JSON schema as camera_lidar_trajectory_viewer\n(model/intrinsics/extrinsics) -- interchangeable with it.");
+        ImGui::SetTooltip(
+            "Same calibration JSON schema as camera_lidar_trajectory_viewer\n(model/intrinsics/extrinsics) -- interchangeable with it.");
 
     imagePicker("ImagePicker", (ImTextureID)tex1, SystemData::pointPickedImage, picked3DPoints);
 

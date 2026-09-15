@@ -225,13 +225,14 @@ struct AppState
     Trajectory traj;
     std::vector<int64_t> imageTsNs;
     Intrinsics K; //!< K.model selects pinhole / equirectangular / Mei (see CalibCore/Camera.h)
-    //! How K.model was decided: the calibration file's "model" key wins, the
-    //! image filenames are the fallback. Both are kept as state rather than
-    //! applied on the spot because they arrive in either order, so
-    //! resolveCameraModel() recomputes K.model whenever one changes.
+    //! How K.model was decided: the calibration file's "model" key wins when
+    //! present, else the "Load as equirectangular" tick decides between
+    //! Pinhole and Equirectangular. Kept as state rather than applied on the
+    //! spot because either input can change independently of the other, so
+    //! resolveCameraModel() recomputes K.model whenever one does.
     CameraModel fileModel = CameraModel::Pinhole;
     bool modelExplicit = false; //!< the calibration file named a model
-    bool namesLookEquirect = false; //!< the frames carry the equirectangular_ prefix
+    bool loadAsEquirectangular = false; //!< UI tick: treat frames as a 360 panorama
     Extrinsics E; //!< tx/ty/tz (camera position); rotation lives in R_wc below, not E.om/fi/ka
     Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); //!< camera orientation in world/LiDAR frame
     Roi roi;
@@ -254,9 +255,9 @@ struct AppState
 
     //! loaded camera images: timestamp → resized BGR Mat
     std::map<int64_t, std::string> imagesFilenamesInTime;
-    //! Downscale applied to every image used for coloring: equirectangular
-    //! frames are large (3840x1920x3 ~ 22 MB) and multiImgColoring holds a
-    //! chunk's worth at once. Intrinsics are scaled to match.
+    //! Downscale applied to every image used for coloring: full-resolution
+    //! camera frames add up when multiImgColoring holds a chunk's worth at
+    //! once. Intrinsics are scaled to match.
     float imgScale = 1.0f;
     //! Manual correction for a constant camera/LiDAR clock offset (e.g. a fixed
     //! trigger/USB latency the camera's own timestamps don't account for):
@@ -426,39 +427,40 @@ static bool intersectGroundPlaneZ0(const Ray& ray, Vector3& outPoint)
     return true;
 }
 
-//! Prefix marking a frame as a 360 panorama rather than a normal camera image.
-static constexpr const char* kEquirectPrefix = "equirectangular_";
-
-//! Timestamp encoded in a camera frame's filename, or -1 when the file isn't
-//! one. Layout is "<any prefix>_<timestamp_ns>.jpg" or a bare
-//! "<timestamp_ns>.jpg" -- everything up to the last '_' is ignored, so
-//! Mandeye's "cam0_<ts>" and the rig's "equirectangular_<ts>" both parse
-//! without a list of rigs here.
+//! Timestamp for a camera frame, or -1 when the file isn't one. Prefers the
+//! `.meta.json` sidecar's FRAME_WALL_CLOCK (@ref calib::LoadTimestampFromSideCar)
+//! -- the camera's own capture wall clock -- falling back to the timestamp
+//! encoded in the filename when no sidecar is found. Layout is "<any
+//! prefix>_<timestamp_ns>.jpg" or a bare "<timestamp_ns>.jpg" -- everything up
+//! to the last '_' is ignored, so Mandeye's "cam0_<ts>" parses without a list
+//! of rigs here.
 //! @param p file to parse
-//! @param equirect optionally receives whether the panorama prefix was the one
-//!        found, since that prefix selects the camera model
 //! @return the timestamp, or -1 when the name doesn't match. The all-digits
 //!         check rejects unrelated .jpgs, which would reach std::stoll.
-static int64_t parseImageTsNs(const fs::path& p, bool* equirect = nullptr)
+//! @note The filename timestamp is when the frame was saved to disk; the
+//!       sidecar's FRAME_WALL_CLOCK is a few ms earlier and more accurate, so
+//!       it wins whenever present rather than merely filling a gap.
+static int64_t parseImageTsNs(const fs::path& p)
 {
-    if (equirect)
-        *equirect = false;
     if (p.extension() != ".jpg")
         return -1;
     std::string stem = p.stem().string();
-    if (equirect)
-        *equirect = stem.rfind(kEquirectPrefix, 0) == 0;
     if (auto us = stem.rfind('_'); us != std::string::npos)
         stem = stem.substr(us + 1);
     if (stem.empty() || stem.find_first_not_of("0123456789") != std::string::npos)
         return -1;
+    int64_t ts;
     try
     {
-        return std::stoll(stem);
+        ts = std::stoll(stem);
     } catch (...)
     {
         return -1;
     }
+
+    if (const auto sidecarTs = calib::LoadTimestampFromSideCar(p.string()))
+        return static_cast<int64_t>(std::llround(*sidecarTs));
+    return ts;
 }
 
 //! Directory holding the camera frames: whatever the user picked, else the
@@ -474,24 +476,19 @@ static int64_t imageTimeOffsetNs(const AppState& s)
     return (int64_t)std::llround(s.timeOffsetSec * 1e9);
 }
 
-//! Settles K.model from the two inputs that can select it, in precedence order.
-//! Call after either changes; see AppState::fileModel for why.
-//!
-//! Only Pinhole and Equirectangular are inferred: the 360 rig marks its frames
-//! with kEquirectPrefix, but nothing in a filename identifies a Mei fisheye, so
-//! Mei is reachable only through an explicit "model" key.
+//! Settles K.model from the two inputs that can select it, in precedence
+//! order. Call after any of them changes; see AppState::fileModel for why.
 static void resolveCameraModel(AppState& s)
 {
     if (s.modelExplicit)
         s.K.model = s.fileModel;
     else
-        s.K.model = s.namesLookEquirect ? CameraModel::Equirectangular : CameraModel::Pinhole;
+        s.K.model = s.loadAsEquirectangular ? CameraModel::Equirectangular : CameraModel::Pinhole;
 }
 
 //! Index every camera frame in the camera directory by timestamp. Also picks up
-//! the image dimensions -- read by the equirectangular projection, the ROI
-//! default, the frustums and COLMAP's cameras.txt -- and, absent an explicit
-//! "model" in the calibration, infers the camera model from the filenames.
+//! the image dimensions -- read by the ROI default, the frustums and COLMAP's
+//! cameras.txt.
 static void loadImages(AppState& s)
 {
     s.imagesFilenamesInTime.clear();
@@ -503,15 +500,12 @@ static void loadImages(AppState& s)
     }
 
     int loaded = 0;
-    int equirectNames = 0;
     for (auto& e : fs::directory_iterator(camDir))
     {
-        bool equirect = false;
-        int64_t ts = parseImageTsNs(e.path(), &equirect);
+        int64_t ts = parseImageTsNs(e.path());
         if (ts < 0)
             continue;
         s.imagesFilenamesInTime[ts] = e.path().string();
-        equirectNames += equirect ? 1 : 0;
         ++loaded;
     }
     if (!s.imagesFilenamesInTime.empty())
@@ -523,10 +517,7 @@ static void loadImages(AppState& s)
             s.imgH = probe.rows;
         }
     }
-    // The "model" key wins whenever the calibration file carried one; the
-    // filenames are only a fallback. Either way the resolved model is shown in
-    // the Calibration panel, so an inferred one is never invisible.
-    s.namesLookEquirect = equirectNames > 0;
+
     resolveCameraModel(s);
     s.K.width = s.imgW;
     s.K.height = s.imgH;
@@ -1167,10 +1158,10 @@ static void loadCalib(AppState& s)
     }
     nlohmann::json j;
     f >> j;
-    // "equirectangular"/"equirect", "mei" (or the rig's "insta360_mei_v2"),
-    // anything else pinhole. Accepted at the top level or inside "intrinsics".
-    // Assigned unconditionally, so loading a pinhole calibration after another
-    // model clears the flag rather than inheriting it.
+    // "mei" (or the rig's "insta360_mei_v2"), anything else pinhole. Accepted
+    // at the top level or inside "intrinsics". Assigned unconditionally, so
+    // loading a pinhole calibration after another model clears the flag
+    // rather than inheriting it.
     {
         const bool topLevel = j.contains("model");
         const bool nested = j.contains("intrinsics") && j["intrinsics"].contains("model");
@@ -1188,9 +1179,7 @@ static void loadCalib(AppState& s)
             {
                 return (char)std::tolower(c);
             });
-        if (model == "equirectangular" || model == "equirect")
-            s.fileModel = CameraModel::Equirectangular;
-        else if (model == "mei" || model == "insta360_mei_v2")
+        if (model == "mei" || model == "insta360_mei_v2")
             s.fileModel = CameraModel::Mei;
         else
             s.fileModel = CameraModel::Pinhole;
@@ -2468,6 +2457,13 @@ int main(int argc, char* argv[])
             ImGui::InputText("##sess", s.sessionBuf, sizeof(s.sessionBuf));
             ImGui::Text("CAMERA_0 directory (empty = auto):");
             ImGui::InputText("##cam", s.cameraBuf, sizeof(s.cameraBuf));
+            if (ImGui::Checkbox("Load as equirectangular (360)", &s.loadAsEquirectangular))
+                resolveCameraModel(s);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Treat CAMERA_0's frames as a 360 panorama rather than a\n"
+                    "normal camera image. Overridden by an explicit \"model\"\n"
+                    "key in the loaded calibration JSON.");
             if (ImGui::Button("Load session", ImVec2(-1, 0)))
                 loadSession(s);
             if (!s.imagesFilenamesInTime.empty())
@@ -2541,10 +2537,6 @@ int main(int argc, char* argv[])
                 if (s.K.model == CameraModel::Equirectangular)
                 {
                     ImGui::Text("Model: equirectangular");
-                    if (!s.modelExplicit && ImGui::IsItemHovered())
-                        ImGui::SetTooltip(
-                            "Inferred from the \"%s\" image filenames.\nAdd \"model\" to the calibration JSON to set it explicitly.",
-                            kEquirectPrefix);
                     ImGui::Text("%dx%d", s.imgW, s.imgH);
                 }
                 else if (s.K.model == CameraModel::Mei)

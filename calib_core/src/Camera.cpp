@@ -1,6 +1,10 @@
 #include <CalibCore/Camera.h>
 
 #include <algorithm>
+#include <cctype>
+#include <cstdlib>
+#include <fstream>
+#include <map>
 
 // Reuses (does not duplicate) core's own om/fi/ka<->matrix conversion --
 // header-only, pulls in nothing but Eigen/std (see structures.h), so this
@@ -10,6 +14,109 @@
 
 namespace calib {
 
+namespace
+{
+    std::string trim(std::string s)
+    {
+        const char* ws = " \t\r\n";
+        const auto b = s.find_first_not_of(ws);
+        if (b == std::string::npos)
+            return {};
+        return s.substr(b, s.find_last_not_of(ws) - b + 1);
+    }
+
+    std::string unquote(std::string s)
+    {
+        if (s.size() >= 2 && (s.front() == '"' || s.front() == '\'') && s.back() == s.front())
+            return s.substr(1, s.size() - 2);
+        return s;
+    }
+} // namespace
+
+// Unrelated to loadMeiIntrinsics (MeiIntrinsics.cpp) -- opens and reads the
+// file on its own rather than sharing a file handle or result with it,
+// since parsing intrinsics and reading identity fields are two different
+// jobs. Works on any flat `key: value` yaml, not just a Mei camera_info.yaml.
+bool loadCameraIdentity(const std::string& path, CameraIdentity& id)
+{
+    std::ifstream f(path);
+    if (!f)
+        return false;
+
+    // Cleared rather than merged, so a file naming no camera comes back
+    // empty instead of keeping whatever was loaded before it.
+    CameraIdentity next;
+    std::string line;
+    while (std::getline(f, line))
+    {
+        const auto hash = line.find('#');
+        if (hash != std::string::npos)
+            line = line.substr(0, hash);
+        const auto colon = line.find(':');
+        if (colon == std::string::npos)
+            continue;
+        const std::string key = trim(line.substr(0, colon));
+        const std::string value = unquote(trim(line.substr(colon + 1)));
+        if (key == "serial")
+            next.serial = value;
+        else if (key == "frame_id")
+            next.frameId = value;
+        else if (key == "model")
+            next.model = value;
+    }
+    id = next;
+
+    return true;
+}
+
+std::optional<double> LoadTimestampFromSideCar(const std::string& path)
+{
+    const auto dot = path.rfind('.');
+    const std::string sidecar = (dot != std::string::npos ? path.substr(0, dot) : path) + ".meta.json";
+
+    std::ifstream f(sidecar);
+    if (!f)
+        return std::nullopt;
+
+    std::string line;
+    while (std::getline(f, line))
+    {
+        const auto key = line.find("\"FRAME_WALL_CLOCK\"");
+        if (key == std::string::npos)
+            continue;
+        const auto colon = line.find(':', key);
+        if (colon == std::string::npos)
+            return std::nullopt;
+
+        size_t p = colon + 1;
+        while (p < line.size() && std::isspace(static_cast<unsigned char>(line[p])))
+            ++p;
+
+        std::string value;
+        if (p < line.size() && line[p] == '"')
+        {
+            const auto close = line.find('"', p + 1);
+            if (close == std::string::npos)
+                return std::nullopt;
+            value = line.substr(p + 1, close - p - 1);
+        }
+        else
+        {
+            const auto end = line.find_first_of(",}", p);
+            value = trim(line.substr(p, end == std::string::npos ? std::string::npos : end - p));
+        }
+
+        if (value.empty())
+            return std::nullopt;
+        char* endptr = nullptr;
+        const double ts = std::strtod(value.c_str(), &endptr);
+        if (endptr == value.c_str())
+            return std::nullopt; // no digits consumed -- not a number
+        return ts;
+    }
+
+    return std::nullopt;
+}
 
 Eigen::Matrix3f omFiKaToMat3(float om_deg, float fi_deg, float ka_deg) {
     TaitBryanPose pose;

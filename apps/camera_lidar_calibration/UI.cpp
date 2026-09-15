@@ -40,6 +40,35 @@ static void helpMarker(const char* desc)
     }
 }
 
+// Which physical sensors the loaded data belongs to: the camera's serial and
+// frame come from the rig's camera_info.yaml, the LiDAR's from the mandeye
+// status sidecar beside the LAZ. Shown together, above everything else,
+// because a calibration is only valid for the one pair it was measured on.
+static void drawSensorIds(const AppState& state)
+{
+    if (state.cameraId.empty() && state.lidarId.empty())
+        return;
+
+    auto dimmed = [](const std::string& text)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("%s", text.c_str());
+        ImGui::PopStyleColor();
+    };
+
+    if (!state.cameraId.serial.empty())
+        ImGui::TextWrapped("Camera: %s (%s)", state.cameraId.serial.c_str(), state.cameraId.model.c_str());
+    else if (!state.cameraId.frameId.empty())
+        dimmed("Camera: (file named no serial)");
+    if (!state.cameraId.frameId.empty())
+        dimmed("    frame " + state.cameraId.frameId);
+
+    if (!state.lidarId.empty())
+        ImGui::TextWrapped("LiDAR:  %s", state.lidarId.c_str());
+
+    ImGui::Separator();
+}
+
 // ── Main draw ────────────────────────────────────────────────────────────────
 void UI::draw(AppState& state)
 {
@@ -60,6 +89,8 @@ void UI::draw(AppState& state)
 
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.f, 1.f), "LiDAR-Camera Calibration");
     ImGui::Separator();
+
+    drawSensorIds(state);
 
     // Alt/Cmd = toggle Camera RGB ↔ Intensity (works anywhere in the window).
     // Cmd (Super) alongside Alt for macOS, where Option is awkward to use as

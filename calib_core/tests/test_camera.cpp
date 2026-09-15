@@ -493,6 +493,37 @@ TEST_CASE("scaleIntrinsics: a half-size image projects to half the pixel")
         CHECK(half.v == doctest::Approx(full.v * 0.5));
     }
 }
+// ── CameraIdentity::empty ─────────────────────────────────────────────────────
+
+TEST_CASE("CameraIdentity::empty: a default-constructed identity is empty")
+{
+    CHECK(CameraIdentity{}.empty());
+}
+
+TEST_CASE("CameraIdentity::empty: a serial alone makes it non-empty")
+{
+    CameraIdentity id;
+    id.serial = "SN-1";
+    CHECK_FALSE(id.empty());
+}
+
+TEST_CASE("CameraIdentity::empty: a frame_id alone makes it non-empty")
+{
+    CameraIdentity id;
+    id.frameId = "camera_front";
+    CHECK_FALSE(id.empty());
+}
+
+TEST_CASE("CameraIdentity::empty: model/firmware alone do not count")
+{
+    // Only serial/frameId identify a physical camera; model and firmware are
+    // descriptive metadata that can be present without either.
+    CameraIdentity id;
+    id.model = "Insta360 X4";
+    id.firmware = "1.2.3";
+    CHECK(id.empty());
+}
+
 // ── loadMeiIntrinsics ─────────────────────────────────────────────────────────
 
 namespace
@@ -511,6 +542,20 @@ namespace
         const bool ok = loadMeiIntrinsics(path, K);
         std::filesystem::remove(path);
         return ok ? std::optional<Intrinsics>(K) : std::nullopt;
+    }
+
+    // As above, for loadCameraIdentity. `id` is only meaningful when this
+    // returns true.
+    bool loadIdentityFromString(const std::string& body, CameraIdentity& id)
+    {
+        const std::string path = (std::filesystem::temp_directory_path() / "calib_core_test_camera_info.yaml").string();
+        {
+            std::ofstream f(path);
+            f << body;
+        }
+        const bool ok = loadCameraIdentity(path, id);
+        std::filesystem::remove(path);
+        return ok;
     }
 
     const char* kSample = R"(# this rig's camera_info.yaml
@@ -577,4 +622,135 @@ TEST_CASE("loadMeiIntrinsics: a missing file fails cleanly, and leaves K alone")
     CHECK_FALSE(loadMeiIntrinsics("/nonexistent/camera_info.yaml", K));
     CHECK(K.fx == before.fx);
     CHECK(K.xi == before.xi);
+}
+
+// ── loadCameraIdentity ────────────────────────────────────────────────────────
+// Independent of loadMeiIntrinsics -- opens the same kind of file again on
+// its own and only ever looks at `serial`/`frame_id`/`model`, so these tests
+// don't depend on the intrinsics fields being present or valid at all.
+
+TEST_CASE("loadCameraIdentity: reads serial, frame_id and model when all are present")
+{
+    std::string body = kSample;
+    body += "\nserial: SN-12345\nmodel: Insta360 X4\n";
+
+    CameraIdentity id;
+    CHECK(loadIdentityFromString(body, id));
+    CHECK(id.serial == "SN-12345");
+    CHECK(id.frameId == "camera_front");
+    CHECK(id.model == "Insta360 X4");
+}
+
+TEST_CASE("loadCameraIdentity: a field the file does not name comes back empty")
+{
+    // kSample has frame_id but no serial.
+    CameraIdentity id;
+    CHECK(loadIdentityFromString(kSample, id));
+    CHECK(id.serial.empty());
+    CHECK(id.frameId == "camera_front");
+}
+
+TEST_CASE("loadCameraIdentity: a successful load clears a previously-populated id")
+{
+    // Loading a file that names no camera must drop the previous identity
+    // rather than leave it attached to a different one.
+    CameraIdentity id;
+    id.serial = "stale-serial";
+    id.model = "stale-model";
+    id.firmware = "stale-firmware";
+
+    CHECK(loadIdentityFromString(kSample, id));
+    CHECK(id.serial.empty());
+    CHECK(id.model.empty());
+    CHECK(id.firmware.empty());
+    CHECK(id.frameId == "camera_front");
+}
+
+TEST_CASE("loadCameraIdentity: quotes around a value are not taken literally")
+{
+    std::string body = kSample;
+    body += "\nserial: \"SN-12345\"\n";
+
+    CameraIdentity id;
+    CHECK(loadIdentityFromString(body, id));
+    CHECK(id.serial == "SN-12345");
+}
+
+TEST_CASE("loadCameraIdentity: neither field present comes back empty, not a failure")
+{
+    // Unlike loadMeiIntrinsics, no field here is required -- a file that
+    // simply doesn't name a camera is a valid, successful "no identity".
+    std::string body = "distortion_model: insta360_mei_v2\nwidth: 640\n";
+    CameraIdentity id;
+    CHECK(loadIdentityFromString(body, id));
+    CHECK(id.empty());
+}
+
+TEST_CASE("loadCameraIdentity: a missing file fails cleanly, and leaves id alone")
+{
+    CameraIdentity id;
+    id.serial = "untouched";
+
+    CHECK_FALSE(loadCameraIdentity("/nonexistent/camera_info.yaml", id));
+    CHECK(id.serial == "untouched");
+}
+
+// ── LoadTimestampFromSideCar ────────────────────────────────────────────────
+
+namespace
+{
+    // Real-world sample, trimmed from a libcamera-style .meta.json sidecar
+    // next to a captured frame -- FRAME_WALL_CLOCK is a quoted nanosecond
+    // epoch string, not a bare JSON number.
+    const char* kMetaSample = R"({
+    "AE_STATE": "2",
+    "ANALOGUE_GAIN": "1.000000",
+    "EXPOSURE_TIME": 6.34,
+    "FRAME_DURATION": 16.68,
+    "FRAME_WALL_CLOCK": "1789125060554994432",
+    "LUX": "580.969055"
+})";
+
+    // Writes `metaBody` to "<dir>/<stem>.meta.json" and calls
+    // LoadTimestampFromSideCar on "<dir>/<stem>.<ext>" (a file that need not
+    // itself exist -- only the sidecar is read).
+    std::optional<double> loadTimestampForStem(const std::string& stem, const std::string& ext, const std::string& metaBody)
+    {
+        const auto dir = std::filesystem::temp_directory_path();
+        const std::string sidecar = (dir / (stem + ".meta.json")).string();
+        {
+            std::ofstream f(sidecar);
+            f << metaBody;
+        }
+        const auto result = LoadTimestampFromSideCar((dir / (stem + "." + ext)).string());
+        std::filesystem::remove(sidecar);
+        return result;
+    }
+} // namespace
+
+TEST_CASE("LoadTimestampFromSideCar: reads FRAME_WALL_CLOCK from the image's .meta.json")
+{
+    const auto ts = loadTimestampForStem("calib_core_test_cam0_frame", "jpg", kMetaSample);
+    REQUIRE(ts.has_value());
+    CHECK(*ts == doctest::Approx(1789125060554994432.0));
+}
+
+TEST_CASE("LoadTimestampFromSideCar: a missing sidecar returns nullopt")
+{
+    const auto dir = std::filesystem::temp_directory_path();
+    const auto missing = (dir / "calib_core_test_no_such_frame.jpg").string();
+    CHECK_FALSE(LoadTimestampFromSideCar(missing).has_value());
+}
+
+TEST_CASE("LoadTimestampFromSideCar: a sidecar with no FRAME_WALL_CLOCK returns nullopt")
+{
+    const auto ts = loadTimestampForStem("calib_core_test_cam0_nofield", "jpg", R"({"LUX": "580.969055"})");
+    CHECK_FALSE(ts.has_value());
+}
+
+TEST_CASE("LoadTimestampFromSideCar: an unquoted numeric value is read too")
+{
+    const auto ts = loadTimestampForStem("calib_core_test_cam0_unquoted", "jpg", R"({"FRAME_WALL_CLOCK": 1789125060554994432})");
+    REQUIRE(ts.has_value());
+    CHECK(*ts == doctest::Approx(1789125060554994432.0));
 }

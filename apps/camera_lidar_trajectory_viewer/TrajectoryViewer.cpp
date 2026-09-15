@@ -44,9 +44,9 @@
 using namespace calib;
 namespace fs = std::filesystem;
 
-// Shortcuts help table (Help menu). Only lists this app's actual bindings --
-// no A-Z scaffold like multi_view_tls_registration_step_2's, since
-// ShowShortcutsTable() just renders whatever it's given.
+//! Shortcuts help table (Help menu). Only lists this app's actual bindings --
+//! no A-Z scaffold like multi_view_tls_registration_step_2's, since
+//! ShowShortcutsTable() just renders whatever it's given.
 static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "Normal keys", "C", "Toggle compass/ruler" },
     { "", "P", "Toggle show path" },
@@ -75,8 +75,8 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "", "Shift+R", "Open 'Center of rotation' dialog" },
 };
 
-// Copies `path` into `buf` (truncating to fit), for wiring a native-dialog
-// result back into the same fixed-size char[] the matching text field edits.
+//! Copies `path` into `buf` (truncating to fit), for wiring a native-dialog
+//! result back into the same fixed-size char[] the matching text field edits.
 static void setBuf(char* buf, size_t bufSize, const std::string& path)
 {
     if (path.empty())
@@ -85,7 +85,7 @@ static void setBuf(char* buf, size_t bufSize, const std::string& path)
     buf[bufSize - 1] = '\0';
 }
 
-// Build a time(seconds) -> T_world_lidar map suitable for getInterpolatedPose().
+//! Build a time(seconds) -> T_world_lidar map suitable for getInterpolatedPose().
 static std::map<double, Eigen::Matrix4d> buildTrajMap(const Trajectory& traj)
 {
     std::map<double, Eigen::Matrix4d> m;
@@ -94,8 +94,12 @@ static std::map<double, Eigen::Matrix4d> buildTrajMap(const Trajectory& traj)
     return m;
 }
 
-// Interpolated T_world_lidar at ts_ns. Returns false when ts_ns lies outside the
-// trajectory range — getInterpolatedPose() signals that with a zero matrix.
+//! Interpolated T_world_lidar at a timestamp.
+//! @param trajMap trajectory to sample
+//! @param ts_ns timestamp, nanoseconds
+//! @param out receives the pose
+//! @return false when ts_ns lies outside the trajectory range, which
+//!         getInterpolatedPose() signals with a zero matrix
 static bool interpPose(const std::map<double, Eigen::Matrix4d>& trajMap, int64_t ts_ns, Eigen::Affine3f& out)
 {
     Eigen::Matrix4d T = getInterpolatedPose(trajMap, ts_ns * 1e-9);
@@ -107,10 +111,10 @@ static bool interpPose(const std::map<double, Eigen::Matrix4d>& trajMap, int64_t
 
 static constexpr double kRad2Deg = 57.295779513082320876;
 
-// Angular speed (deg/s) for every trajectory pose: the rotation change to the next
-// pose divided by the time step. Result is parallel to traj.poses; the last entry
-// repeats the previous one. Fewer than two poses -> all zeros. Non-increasing
-// timestamps (chunk boundaries, duplicates) reuse the previous value.
+//! Angular speed (deg/s) for every trajectory pose: the rotation change to the next
+//! pose divided by the time step. Result is parallel to traj.poses; the last entry
+//! repeats the previous one. Fewer than two poses -> all zeros. Non-increasing
+//! timestamps (chunk boundaries, duplicates) reuse the previous value.
 static std::vector<float> computePoseAngularSpeedDeg(const Trajectory& traj)
 {
     const auto& poses = traj.poses;
@@ -132,8 +136,8 @@ static std::vector<float> computePoseAngularSpeedDeg(const Trajectory& traj)
     return speed;
 }
 
-// Angular speed (deg/s) at the trajectory pose nearest ts_ns. 0 when there's no
-// per-pose data (not loaded, or size mismatch with the trajectory).
+//! Angular speed (deg/s) at the trajectory pose nearest ts_ns. 0 when there's no
+//! per-pose data (not loaded, or size mismatch with the trajectory).
 static float angularSpeedDegAt(const Trajectory& traj, const std::vector<float>& perPose, int64_t ts_ns)
 {
     if (traj.poses.empty() || perPose.size() != traj.poses.size())
@@ -202,98 +206,98 @@ struct AppState
 {
     Trajectory traj;
     std::vector<int64_t> imageTsNs;
-    Intrinsics K; // K.model selects pinhole / equirectangular / Mei (see CalibCore/Camera.h)
-    // How K.model was decided: the calibration file's "model" key wins, the
-    // image filenames are the fallback. Both are kept as state rather than
-    // applied on the spot because they arrive in either order, so
-    // resolveCameraModel() recomputes K.model whenever one changes.
+    Intrinsics K; //!< K.model selects pinhole / equirectangular / Mei (see CalibCore/Camera.h)
+    //! How K.model was decided: the calibration file's "model" key wins, the
+    //! image filenames are the fallback. Both are kept as state rather than
+    //! applied on the spot because they arrive in either order, so
+    //! resolveCameraModel() recomputes K.model whenever one changes.
     CameraModel fileModel = CameraModel::Pinhole;
-    bool modelExplicit = false; // the calibration file named a model
-    bool namesLookEquirect = false; // the frames carry the equirectangular_ prefix
-    Extrinsics E; // tx/ty/tz (camera position); rotation lives in R_wc below, not E.om/fi/ka
-    Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); // camera orientation in world/LiDAR frame
+    bool modelExplicit = false; //!< the calibration file named a model
+    bool namesLookEquirect = false; //!< the frames carry the equirectangular_ prefix
+    Extrinsics E; //!< tx/ty/tz (camera position); rotation lives in R_wc below, not E.om/fi/ka
+    Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); //!< camera orientation in world/LiDAR frame
     Roi roi;
-    // Free-form counterpart of `roi`: a per-pixel mask whose rejected pixels
-    // are excluded from coloring. Needed to drop the operator/backpack a 360
-    // rig has permanently in frame, which no rectangle can cut out without
-    // taking the scene with it. Kept at the file's own resolution, strictly
-    // 0/255 (see loadMask), and resampled where used since images are read at
-    // s.imgScale. Coloring only -- the ROS 2 and COLMAP exports are not masked.
-    cv::Mat mask; // empty = none loaded
-    bool maskEnabled = false; // acted on only while `mask` is non-empty
-    bool maskInvert = false; // UI state; loadMask and the toggle flip `mask` itself
+    //! Free-form counterpart of `roi`: a per-pixel mask whose rejected pixels
+    //! are excluded from coloring. Needed to drop the operator/backpack a 360
+    //! rig has permanently in frame, which no rectangle can cut out without
+    //! taking the scene with it. Kept at the file's own resolution, strictly
+    //! 0/255 (see loadMask), and resampled where used since images are read at
+    //! s.imgScale. Coloring only -- the ROS 2 and COLMAP exports are not masked.
+    cv::Mat mask; //!< empty = none loaded
+    bool maskEnabled = false; //!< acted on only while `mask` is non-empty
+    bool maskInvert = false; //!< UI state; loadMask and the toggle flip `mask` itself
     char maskBuf[512] = {};
-    float maskRejectFrac = 0.f; // share of pixels the mask drops, for the UI
-    bool showMaskOverlay = true; // tint the rejected area over the image preview
-    Texture2D maskTex = {}; // that tint, RGBA, built by refreshMaskDerived
+    float maskRejectFrac = 0.f; //!< share of pixels the mask drops, for the UI
+    bool showMaskOverlay = true; //!< tint the rejected area over the image preview
+    Texture2D maskTex = {}; //!< that tint, RGBA, built by refreshMaskDerived
     bool maskTexValid = false;
     bool calibLoaded = false;
-    int imgW = 4656, imgH = 3496; // overwritten from the first scanned image by loadImages()
+    int imgW = 4656, imgH = 3496; //!< overwritten from the first scanned image by loadImages()
 
-    // loaded camera images: timestamp → resized BGR Mat
+    //! loaded camera images: timestamp → resized BGR Mat
     std::map<int64_t, std::string> imagesFilenamesInTime;
-    // Downscale applied to every image used for coloring: equirectangular
-    // frames are large (3840x1920x3 ~ 22 MB) and multiImgColoring holds a
-    // chunk's worth at once. Intrinsics are scaled to match.
+    //! Downscale applied to every image used for coloring: equirectangular
+    //! frames are large (3840x1920x3 ~ 22 MB) and multiImgColoring holds a
+    //! chunk's worth at once. Intrinsics are scaled to match.
     float imgScale = 1.0f;
-    // Manual correction for a constant camera/LiDAR clock offset (e.g. a fixed
-    // trigger/USB latency the camera's own timestamps don't account for):
-    // t_traj = t_image + timeOffsetSec. Applied wherever an image timestamp is
-    // matched against the LiDAR/pose timeline (loadCloud's chunk selection +
-    // point matching, exportColmap's per-image pose lookup) -- never to the raw
-    // timestamps used for filename lookup or image-list indexing
-    // (s.imageTsNs/imagesFilenamesInTime).
+    //! Manual correction for a constant camera/LiDAR clock offset (e.g. a fixed
+    //! trigger/USB latency the camera's own timestamps don't account for):
+    //! t_traj = t_image + timeOffsetSec. Applied wherever an image timestamp is
+    //! matched against the LiDAR/pose timeline (loadCloud's chunk selection +
+    //! point matching, exportColmap's per-image pose lookup) -- never to the raw
+    //! timestamps used for filename lookup or image-list indexing
+    //! (s.imageTsNs/imagesFilenamesInTime).
     double timeOffsetSec = 0.0;
     GpuCloud cloud;
     Shader shader = {};
     bool shaderOk = false;
     int locMVP = -1, locPS = -1, locCM = -1, locDecim = -1, locSel = -1;
 
-    // Driving orbit's Euler mode (rotateX/rotateY/translate/rotationCenter/
-    // isOrtho), not its azimuth/elevation/distance/target mode -- the same
-    // camera engine multi_view_tls_registration_step_2 uses, manually
-    // driven through rlgl (see display()'s camera setup) instead of
-    // raylib's Camera3D/BeginMode3D.
+    //! Driving orbit's Euler mode (rotateX/rotateY/translate/rotationCenter/
+    //! isOrtho), not its azimuth/elevation/distance/target mode -- the same
+    //! camera engine multi_view_tls_registration_step_2 uses, manually
+    //! driven through rlgl (see display()'s camera setup) instead of
+    //! raylib's Camera3D/BeginMode3D.
     raylib_widgets::OrbitCamera orbit;
-    // Rebuilt from orbit.euler every frame in display() -- used only for
-    // drawCompassRuler()'s right/up vectors, same reasoning as step2's own
-    // app_state.viewLocal (OrbitCamera itself stays Eigen-free).
+    //! Rebuilt from orbit.euler every frame in display() -- used only for
+    //! drawCompassRuler()'s right/up vectors, same reasoning as step2's own
+    //! app_state.viewLocal (OrbitCamera itself stays Eigen-free).
     Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
     bool showCenterOfRotationWindow = false;
 
-    // controls
+    //! controls
     bool showPath = true;
     bool showFrustums = true;
     bool showCompassRuler = true;
     bool showHelp = false;
-    bool isolateCamera = false; // render only points colored by the selected (preview) image
+    bool isolateCamera = false; //!< render only points colored by the selected (preview) image
     float frustumScale = 0.5f;
     float pointSize = 1.f;
     int cloudDecim = 1;
     int drawDecim = 1;
-    bool multiImgColoring = true; // false = single image per chunk (midpoint)
-    // How each point is matched to a camera image:
-    //   0 = temporal  — image nearest in time (± maxWiggle frames, within maxTemporalDist)
-    //   1 = geometry  — among all chunk images the point projects into, the one
-    //                   with the smallest depth (closest camera)
+    bool multiImgColoring = true; //!< false = single image per chunk (midpoint)
+    //! How each point is matched to a camera image:
+    //!   0 = temporal  — image nearest in time (± maxWiggle frames, within maxTemporalDist)
+    //!   1 = geometry  — among all chunk images the point projects into, the one
+    //!                   with the smallest depth (closest camera)
     int colorStrategy = 0;
-    float maxTemporalDist = 0.5f; // s: skip images farther than this from the point (temporal)
-    int maxWiggle = 1; // frames: search startIdx ± maxWiggle for a frustum hit (temporal)
+    float maxTemporalDist = 0.5f; //!< s: skip images farther than this from the point (temporal)
+    int maxWiggle = 1; //!< frames: search startIdx ± maxWiggle for a frustum hit (temporal)
 
     // ── fast-rotation image filter ─────────────────────────────────────────────
-    // Per-pose angular speed (deg/s), parallel to traj.poses — filled by
-    // loadSession(). Images captured while the rig turns faster than
-    // maxImageAngSpeedDeg are dropped from the colorize pass (motion-smeared).
+    //! Per-pose angular speed (deg/s), parallel to traj.poses — filled by
+    //! loadSession(). Images captured while the rig turns faster than
+    //! maxImageAngSpeedDeg are dropped from the colorize pass (motion-smeared).
     std::vector<float> poseAngSpeedDeg;
-    float poseAngSpeedMax = 0.f; // deg/s: peak over the whole session (display only)
-    bool filterFastImages = true; // drop motion-smeared frames from the colorize pass
-    float maxImageAngSpeedDeg = 60.f; // deg/s threshold
-    int angFilteredImgs = 0; // images skipped by the filter in the last colorize pass
+    float poseAngSpeedMax = 0.f; //!< deg/s: peak over the whole session (display only)
+    bool filterFastImages = true; //!< drop motion-smeared frames from the colorize pass
+    float maxImageAngSpeedDeg = 60.f; //!< deg/s threshold
+    int angFilteredImgs = 0; //!< images skipped by the filter in the last colorize pass
 
-    bool useImageColor = false; // true once a colorize pass produced RGB data
-    int colorMode = 0; // 0=intensity (jet), 1=RGB by image, 2=camera id
-    int coloredPts = 0; // points that received RGB from an image
-    int uncoloredPts = 0; // points left as intensity-gray (no image / out of frustum / outside ROI)
+    bool useImageColor = false; //!< true once a colorize pass produced RGB data
+    int colorMode = 0; //!< 0=intensity (jet), 1=RGB by image, 2=camera id
+    int coloredPts = 0; //!< points that received RGB from an image
+    int uncoloredPts = 0; //!< points left as intensity-gray (no image / out of frustum / outside ROI)
 
     char sessionBuf[512] = {};
     char calibBuf[512] = {};
@@ -319,7 +323,7 @@ struct AppState
 
     // ── ROS 2 export ──────────────────────────────────────────────────────────
     char rosOutBuf[512] = "ros2_export";
-    int rosStorageIdx = 0; // 0 = mcap, 1 = sqlite3
+    int rosStorageIdx = 0; //!< 0 = mcap, 1 = sqlite3
     RosExportOptions ros;
     std::thread rosThread;
     std::atomic<bool> rosBusy{ false };
@@ -330,16 +334,16 @@ struct AppState
     // ── COLMAP export ─────────────────────────────────────────────────────────
     char colmapBuf[512] = "colmap_out";
     bool colmapCopyImages = false;
-    int colmapPtDecim = 50; // splat-friendly default (~500k from a 25M cloud)
+    int colmapPtDecim = 50; //!< splat-friendly default (~500k from a 25M cloud)
 
     // ── image viewer ────────────────────────────────────────────────────────
     int imgViewIdx = 0;
     Texture2D imgViewTex = {};
     bool imgViewTexValid = false;
     std::atomic<int> imgViewRequest{ -1 };
-    // Bumped when the image set itself is replaced (a camera directory dropped). The loader
-    // thread skips a request whose index it already served, so without this a swap that keeps
-    // the same index would leave the previous frame on screen.
+    //! Bumped when the image set itself is replaced (a camera directory dropped). The loader
+    //! thread skips a request whose index it already served, so without this a swap that keeps
+    //! the same index would leave the previous frame on screen.
     std::atomic<int> imgViewEpoch{ 0 };
     std::atomic<bool> imgViewStop{ false };
     std::atomic<bool> imgViewLoading{ false };
@@ -349,36 +353,31 @@ struct AppState
     std::thread imgViewThread;
 
     // ── synthetic intensity-projection image (drawn next to the photo) ─────
-    // Reprojects exportCloud through the same calibration as the colorize
-    // pass, jet-colormapped over intensity -- a reference image to check the
-    // calibration against the photo by eye.
+    //! Reprojects exportCloud through the same calibration as the colorize
+    //! pass, jet-colormapped over intensity -- a reference image to check the
+    //! calibration against the photo by eye.
     bool showIntensityProjection = false;
-    bool intensityProjNeedsUpdate = false; // set on toggle/refresh/image change
+    bool intensityProjNeedsUpdate = false; //!< set on toggle/refresh/image change
     Texture2D intensityProjTex = {};
     bool intensityProjTexValid = false;
-    int intensityProjDecim = 1; // use every Nth point of exportCloud (perf)
-    float intensityProjPointRadius = 1.5f; // splat radius, in output-image pixels
-    bool intensityProjOverlay = false; // true: alpha-blend on top of the photo instead of side-by-side
-    float intensityProjAlpha = 0.6f; // blend strength when intensityProjOverlay is on
+    int intensityProjDecim = 1; //!< use every Nth point of exportCloud (perf)
+    float intensityProjPointRadius = 1.5f; //!< splat radius, in output-image pixels
+    bool intensityProjOverlay = false; //!< true: alpha-blend on top of the photo instead of side-by-side
+    float intensityProjAlpha = 0.6f; //!< blend strength when intensityProjOverlay is on
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-// Plain Eigen::Vector3f -> raylib Vector3 conversion. Used to be an axis
-// remap (x, z, -y) that made this app's native Z-up LiDAR data render
-// correctly under raylib's Y-up Camera3D/BeginMode3D convention; now that
-// the camera is multi_view_tls_registration_step_2's own Z-up rlgl-driven
-// one, geometry renders in its native coordinates and this is a no-op
-// component copy.
+//! Eigen::Vector3f -> raylib Vector3. A plain component copy: the camera is
+//! Z-up, so geometry renders in its native coordinates with no axis remap.
 static Vector3 toVec3(const Eigen::Vector3f& v)
 {
     return { v.x(), v.y(), v.z() };
 }
 
-// Finds the trajectory pose closest to `ray` (unconditional nearest, no
-// distance cutoff) and returns its world-space position -- mirrors
-// multi_view_tls_registration_step_2's getClosestTrajectoryPoint(), backed
-// by the same shared raylib_widgets::pickNearestPointOnLine() picker.
-// Returns false (outPoint untouched) when the trajectory is empty.
+//! Trajectory pose closest to `ray` -- unconditional nearest, no distance
+//! cutoff. Backed by the same picker step2's getClosestTrajectoryPoint() uses.
+//! @param outPoint receives the world-space position
+//! @return false, outPoint untouched, when the trajectory is empty
 static bool nearestTrajectoryPoint(const Trajectory& traj, const Ray& ray, Vector3& outPoint)
 {
     if (traj.poses.empty())
@@ -397,12 +396,11 @@ static bool nearestTrajectoryPoint(const Trajectory& traj, const Ray& ray, Vecto
     return true;
 }
 
-// Intersects `ray` with the Z=0 ground plane -- same plane
-// multi_view_tls_registration_step_2's setNewRotationCenter() intersects
-// (via RegistrationPlaneFeature::Plane{0,0,1,0} + rayIntersection()),
-// reimplemented directly in raylib/raymath terms since those two types live
-// in `core`, which this app deliberately doesn't link. Returns false
-// (outPoint untouched) when the ray is ~parallel to the plane.
+//! Intersects `ray` with the Z=0 ground plane, as step2's
+//! setNewRotationCenter() does -- in raylib/raymath terms, since step2's types
+//! live in `core`, which this app deliberately doesn't link.
+//! @param outPoint receives the intersection
+//! @return false, outPoint untouched, when the ray is ~parallel to the plane
 static bool intersectGroundPlaneZ0(const Ray& ray, Vector3& outPoint)
 {
     const float kTolerance = 0.0001f;
@@ -414,16 +412,19 @@ static bool intersectGroundPlaneZ0(const Ray& ray, Vector3& outPoint)
     return true;
 }
 
-// Prefix marking a frame as a 360 panorama rather than a normal camera image.
+//! Prefix marking a frame as a 360 panorama rather than a normal camera image.
 static constexpr const char* kEquirectPrefix = "equirectangular_";
 
-// Timestamp encoded in a camera frame's filename, or -1 when the file isn't
-// one. Layout is "<any prefix>_<timestamp_ns>.jpg" or a bare
-// "<timestamp_ns>.jpg" -- everything up to the last '_' is ignored, so
-// Mandeye's "cam0_<ts>" and the 360 rig's "equirectangular_<ts>" both parse
-// without a list of rigs here. `equirect` reports whether the panorama prefix
-// was the one found, since that one selects the camera model. The all-digits
-// check rejects unrelated .jpgs, which would otherwise reach std::stoll.
+//! Timestamp encoded in a camera frame's filename, or -1 when the file isn't
+//! one. Layout is "<any prefix>_<timestamp_ns>.jpg" or a bare
+//! "<timestamp_ns>.jpg" -- everything up to the last '_' is ignored, so
+//! Mandeye's "cam0_<ts>" and the rig's "equirectangular_<ts>" both parse
+//! without a list of rigs here.
+//! @param p file to parse
+//! @param equirect optionally receives whether the panorama prefix was the one
+//!        found, since that prefix selects the camera model
+//! @return the timestamp, or -1 when the name doesn't match. The all-digits
+//!         check rejects unrelated .jpgs, which would reach std::stoll.
 static int64_t parseImageTsNs(const fs::path& p, bool* equirect = nullptr)
 {
     if (equirect)
@@ -446,25 +447,25 @@ static int64_t parseImageTsNs(const fs::path& p, bool* equirect = nullptr)
     }
 }
 
-// Directory holding the camera frames: whatever the user picked, else the
-// CAMERA_0 sibling of the session dir.
+//! Directory holding the camera frames: whatever the user picked, else the
+//! CAMERA_0 sibling of the session dir.
 static fs::path cameraDir(const AppState& s)
 {
     return s.cameraBuf[0] ? fs::path(s.cameraBuf) : fs::path(s.sessionBuf).parent_path() / "CAMERA_0";
 }
 
-// AppState::timeOffsetSec in nanoseconds, to match the timestamps.
+//! AppState::timeOffsetSec in nanoseconds, to match the timestamps.
 static int64_t imageTimeOffsetNs(const AppState& s)
 {
     return (int64_t)std::llround(s.timeOffsetSec * 1e9);
 }
 
-// Settles K.model from the two inputs that can select it, in precedence order.
-// Call after either changes; see AppState::fileModel for why.
-//
-// Only Pinhole and Equirectangular are inferred: the 360 rig marks its frames
-// with kEquirectPrefix, but nothing in a filename identifies a Mei fisheye, so
-// Mei is reachable only through an explicit "model" key.
+//! Settles K.model from the two inputs that can select it, in precedence order.
+//! Call after either changes; see AppState::fileModel for why.
+//!
+//! Only Pinhole and Equirectangular are inferred: the 360 rig marks its frames
+//! with kEquirectPrefix, but nothing in a filename identifies a Mei fisheye, so
+//! Mei is reachable only through an explicit "model" key.
 static void resolveCameraModel(AppState& s)
 {
     if (s.modelExplicit)
@@ -473,10 +474,10 @@ static void resolveCameraModel(AppState& s)
         s.K.model = s.namesLookEquirect ? CameraModel::Equirectangular : CameraModel::Pinhole;
 }
 
-// Index every camera frame in the camera directory by timestamp. Also picks up
-// the image dimensions -- read by the equirectangular projection, the ROI
-// default, the frustums and COLMAP's cameras.txt -- and, absent an explicit
-// "model" in the calibration, infers the camera model from the filenames.
+//! Index every camera frame in the camera directory by timestamp. Also picks up
+//! the image dimensions -- read by the equirectangular projection, the ROI
+//! default, the frustums and COLMAP's cameras.txt -- and, absent an explicit
+//! "model" in the calibration, infers the camera model from the filenames.
 static void loadImages(AppState& s)
 {
     s.imagesFilenamesInTime.clear();
@@ -518,7 +519,7 @@ static void loadImages(AppState& s)
     s.status = "Images loaded: " + std::to_string(loaded) + " from " + camDir.string();
 }
 
-// Parse session_poses.mrp → map from chunk stem (e.g. "scan_lio_0") to Affine3f.
+//! Parse session_poses.mrp → map from chunk stem (e.g. "scan_lio_0") to Affine3f.
 static std::map<std::string, Eigen::Affine3f> parseMRP(const fs::path& mrpPath)
 {
     std::map<std::string, Eigen::Affine3f> result;
@@ -875,12 +876,11 @@ static void loadCloud(AppState& s)
                     float u, v, depth;
                     if (!projectPoint(pl.x(), pl.y(), pl.z(), Ks, R_wc, C, u, v, depth))
                         return h;
-                    // Too close to the lens to be a real observation. Applies
-                    // to Mei as well as Pinhole (its depth is a range rather
-                    // than a z, but 5 cm means the same thing physically);
-                    // projectPoint's own Mei guard only rejects a point
-                    // essentially AT the camera. Equirectangular keeps its
-                    // long-standing "no near clip" behaviour.
+                    // Too close to the lens to be a real observation. Mei too:
+                    // its depth is a range rather than a z, but 5 cm means the
+                    // same thing physically, and projectPoint's Mei guard only
+                    // rejects a point essentially AT the camera.
+                    // Equirectangular keeps its "no near clip" behaviour.
                     if ((Ks.model == CameraModel::Pinhole || Ks.model == CameraModel::Mei) && depth <= 0.05f)
                         return h;
                     int iu = (int)std::round(u);
@@ -1060,9 +1060,9 @@ static void loadCloud(AppState& s)
         s.status += "  | Fast-img filtered: " + std::to_string(angFilteredImgs);
 }
 
-// Small CPU jet colormap approximation, matching the GLSL one used by the
-// GPU point renderer's Intensity color mode (raylib_widgets::kJetColormapGLSL)
-// closely enough for a visual reference image. Returns BGR (OpenCV order).
+//! Small CPU jet colormap approximation, matching the GLSL one used by the
+//! GPU point renderer's Intensity color mode (raylib_widgets::kJetColormapGLSL)
+//! closely enough for a visual reference image. Returns BGR (OpenCV order).
 static cv::Vec3b jetColorBGR(float t)
 {
     t = std::clamp(t, 0.f, 1.f);
@@ -1072,16 +1072,13 @@ static cv::Vec3b jetColorBGR(float t)
     return cv::Vec3b((uchar)(b * 255.f), (uchar)(g * 255.f), (uchar)(r * 255.f));
 }
 
-// Rasterizes a synthetic "intensity image" for the camera pose at imgTsAdj
-// (already shifted by the photo time offset), by reprojecting s.exportCloud
-// through the same fixed camera-to-LiDAR extrinsics (R_wc/C) and
-// calib::projectPoint() as loadCloud()'s colorize pass, painted with a jet
-// colormap over each point's normalized [0,1] intensity and a simple
-// per-pixel depth test (nearest point wins) so occluded points don't bleed
-// through. Points farther than s.maxTemporalDist (or a 1s fallback) in time
-// from imgTsAdj are skipped -- otherwise the whole session's merged cloud
-// would be tested against every single preview, which is the same temporal
-// gate loadCloud()'s "Temporal" coloring strategy already applies per point.
+//! Rasterizes a synthetic "intensity image" for the camera pose at imgTsAdj,
+//! reprojecting s.exportCloud through the same extrinsics and projectPoint() as
+//! the colorize pass, jet-colormapped over intensity with a per-pixel depth test
+//! so occluded points don't bleed through. Points more than s.maxTemporalDist
+//! (1s fallback) from imgTsAdj are skipped, the same temporal gate the
+//! "Temporal" coloring strategy applies -- otherwise every preview would test
+//! the whole session's cloud.
 static cv::Mat renderIntensityProjection(const AppState& s, int64_t imgTsAdj)
 {
     const Intrinsics Ks = scaleIntrinsics(s.K, s.imgScale);
@@ -1113,13 +1110,11 @@ static cv::Mat renderIntensityProjection(const AppState& s, int64_t imgTsAdj)
             continue;
         if (Ks.model == CameraModel::Pinhole && depth <= 0.05f)
             continue;
-        // Points near-grazing the camera plane (small but positive depth,
-        // e.g. off to the side) get blown up to huge u/v by the perspective
-        // divide -- unlike colorize()'s tight per-point temporal matching,
-        // this function pulls in every point within a whole time window, so
-        // it hits that edge case far more often. (int)std::round() on such a
-        // value is undefined behavior, which is what produced the
-        // "wrapping"/bowtie look; reject before the cast instead.
+        // Points near-grazing the camera plane get blown up to huge u/v by the
+        // perspective divide, and this function pulls in a whole time window's
+        // worth, so it hits that far more often than colorize() does. Casting
+        // such a value with (int)std::round() is UB -- the "bowtie" artifact --
+        // so reject before the cast.
         if (!std::isfinite(u) || !std::isfinite(v) || std::fabs(u) > 1e6f || std::fabs(v) > 1e6f)
             continue;
         int iu = (int)std::round(u);
@@ -1162,12 +1157,10 @@ static void loadCalib(AppState& s)
     }
     nlohmann::json j;
     f >> j;
-    // Camera model: "equirectangular"/"equirect" for a 360 panorama, "mei" (or
-    // the rig's own "insta360_mei_v2" tag) for a unified-sphere fisheye,
-    // anything else for the pinhole model this app started with. Accepted both
-    // at the top level and inside "intrinsics". Assigned unconditionally so
-    // loading a pinhole calibration after another model clears the flag rather
-    // than inheriting it.
+    // "equirectangular"/"equirect", "mei" (or the rig's "insta360_mei_v2"),
+    // anything else pinhole. Accepted at the top level or inside "intrinsics".
+    // Assigned unconditionally, so loading a pinhole calibration after another
+    // model clears the flag rather than inheriting it.
     {
         const bool topLevel = j.contains("model");
         const bool nested = j.contains("intrinsics") && j["intrinsics"].contains("model");
@@ -1251,10 +1244,10 @@ static void loadCalib(AppState& s)
     s.status = "Calibration loaded";
 }
 
-// Rebuilds what is derived from s.mask: the rejected-pixel share the UI
-// reports, and the translucent red overlay drawn over the image preview. Call
-// after anything that changes the mask. Main thread only -- it creates a GL
-// texture.
+//! Rebuilds what is derived from s.mask: the rejected-pixel share the UI
+//! reports, and the translucent red overlay drawn over the image preview. Call
+//! after anything that changes the mask. Main thread only -- it creates a GL
+//! texture.
 static void refreshMaskDerived(AppState& s)
 {
     if (s.maskTexValid)
@@ -1292,16 +1285,11 @@ static void refreshMaskDerived(AppState& s)
     s.maskTexValid = s.maskTex.id > 0;
 }
 
-// Loads the mask image named by s.maskBuf. Any format OpenCV reads is accepted
-// and reduced to one 8-bit channel thresholded at 128, so a hand-painted
-// black/white PNG, a grayscale one and an RGB one all behave identically: a
-// pixel is either kept or dropped, never partly -- and a jpeg mask's
-// compression noise can't leak in as almost-black. White keeps the pixel,
-// black drops it, unless "Invert mask" is on.
-//
-// No particular resolution is required: the mask is resampled to whatever the
-// frames turn out to be (loadCloud), so one drawn over a downscaled copy of a
-// frame works as well as a full-resolution one.
+//! Loads the mask named by s.maskBuf. Any format OpenCV reads is reduced to one
+//! 8-bit channel thresholded at 128, so a pixel is either kept or dropped, never
+//! partly, and a jpeg mask's compression noise can't leak in as almost-black.
+//! White keeps, black drops, unless "Invert mask" is on. Any resolution works --
+//! the mask is resampled to the frame size in loadCloud.
 static void loadMask(AppState& s)
 {
     if (!s.maskBuf[0])
@@ -1323,8 +1311,8 @@ static void loadMask(AppState& s)
     s.status = msg;
 }
 
-// Drops the mask entirely, as opposed to unticking "Image mask", which keeps
-// it loaded and ready to re-enable.
+//! Drops the mask entirely, as opposed to unticking "Image mask", which keeps
+//! it loaded and ready to re-enable.
 static void clearMask(AppState& s)
 {
     s.mask.release();
@@ -1420,8 +1408,8 @@ static void exportLAZ(AppState& s)
     s.status = "Exported " + std::to_string(s.exportCloud.size()) + " pts → " + s.exportBuf;
 }
 
-// E57 counterpart of exportLAZ(): one Data3D block, points already in world
-// coordinates (identity pose), RGB + intensity + per-point timestamp.
+//! E57 counterpart of exportLAZ(): one Data3D block, points already in world
+//! coordinates (identity pose), RGB + intensity + per-point timestamp.
 static void exportE57(AppState& s)
 {
     if (s.exportCloud.empty())
@@ -1461,11 +1449,11 @@ static void exportE57(AppState& s)
         s.status = std::string("Export failed: ") + err;
 }
 
-// Save the colored cloud as a *session*: one E57 Data3D block per loaded LIO
-// chunk ("scan_lio_N"), NOT one collapsed cloud. Each block holds that
-// segment's points in its own frame with the chunk's MRP correction as the
-// block pose (identity when there is no session_poses.mrp), so the result
-// re-opens as a multi-scan session (e.g. in step 2).
+//! Save the colored cloud as a *session*: one E57 Data3D block per loaded LIO
+//! chunk ("scan_lio_N"), NOT one collapsed cloud. Each block holds that
+//! segment's points in its own frame with the chunk's MRP correction as the
+//! block pose (identity when there is no session_poses.mrp), so the result
+//! re-opens as a multi-scan session (e.g. in step 2).
 static void exportE57Session(AppState& s)
 {
     if (s.exportSegments.empty())
@@ -1525,9 +1513,9 @@ static void exportE57Session(AppState& s)
 }
 
 // ── File actions ─────────────────────────────────────────────────────────────
-// Factored out so the File menu items and their keyboard shortcuts (in the
-// main loop below) call the exact same code, matching the openSession()-style
-// convention used by mandeye_single_session_viewer/multi_view_tls_registration.
+//! Factored out so the File menu items and their keyboard shortcuts (in the
+//! main loop below) call the exact same code, matching the openSession()-style
+//! convention used by mandeye_single_session_viewer/multi_view_tls_registration.
 static void actionSelectLioResultDir(AppState& s)
 {
     setBuf(s.sessionBuf, sizeof(s.sessionBuf), mandeye::fd::SelectFolder("Select LIO result directory"));
@@ -1548,7 +1536,7 @@ static void actionOpenCalibration(AppState& s)
     }
 }
 
-// A directory holding this app's camera frames (cam0_<timestamp_ns>.jpg).
+//! A directory holding this app's camera frames (cam0_<timestamp_ns>.jpg).
 static bool isCameraDir(const fs::path& dir)
 {
     for (const auto& e : fs::directory_iterator(dir))
@@ -1560,13 +1548,13 @@ static bool isCameraDir(const fs::path& dir)
     return false;
 }
 
-// Drag & drop equivalent of actionSelectLioResultDir()/actionSelectCamera0Dir()/
-// actionOpenCalibration(), and unlike those menu actions it applies immediately instead of
-// waiting for the "Load session" button, since a drop is already an explicit "load this"
-// gesture. A dropped directory of cam0_*.jpg is the camera directory (only the images are
-// swapped, so the trajectory and the loaded cloud survive); any other directory is this
-// app's session (LIO result dir). A dropped *.json is treated as a calibration file. Used by
-// the drag & drop handler in main()'s loop below.
+//! Drag & drop equivalent of actionSelectLioResultDir()/actionSelectCamera0Dir()/
+//! actionOpenCalibration(), and unlike those menu actions it applies immediately instead of
+//! waiting for the "Load session" button, since a drop is already an explicit "load this"
+//! gesture. A dropped directory of cam0_*.jpg is the camera directory (only the images are
+//! swapped, so the trajectory and the loaded cloud survive); any other directory is this
+//! app's session (LIO result dir). A dropped *.json is treated as a calibration file. Used by
+//! the drag & drop handler in main()'s loop below.
 static void actionOpenMask(AppState& s)
 {
     std::string path = mandeye::fd::OpenFileDialogOneFile("Select image mask", mandeye::fd::ImageFilter);
@@ -1577,11 +1565,11 @@ static void actionOpenMask(AppState& s)
     }
 }
 
-// Drag & drop equivalent of actionSelectLioResultDir()/actionOpenCalibration(): a dropped
-// directory is this app's session (LIO result dir), and unlike the menu action it loads
-// immediately instead of waiting for the "Load session" button, since a drop is already an
-// explicit "load this" gesture. A dropped *.json is treated as a calibration file. Used by the
-// drag & drop handler in main()'s loop below.
+//! Drag & drop equivalent of actionSelectLioResultDir()/actionOpenCalibration(): a dropped
+//! directory is this app's session (LIO result dir), and unlike the menu action it loads
+//! immediately instead of waiting for the "Load session" button, since a drop is already an
+//! explicit "load this" gesture. A dropped *.json is treated as a calibration file. Used by the
+//! drag & drop handler in main()'s loop below.
 static void handleDroppedPath(AppState& s, const std::string& path)
 {
     if (fs::is_directory(path))
@@ -1674,8 +1662,8 @@ static void actionSelectColmapOutputDir(AppState& s)
     setBuf(s.colmapBuf, sizeof(s.colmapBuf), mandeye::fd::SelectFolder("Select COLMAP output directory"));
 }
 
-// Export a COLMAP sparse text model (cameras/images/points3D) from the current
-// state. Poses are world->camera; the colored cloud becomes points3D.
+//! Export a COLMAP sparse text model (cameras/images/points3D) from the current
+//! state. Poses are world->camera; the colored cloud becomes points3D.
 static void exportColmap(AppState& s)
 {
     if (!s.calibLoaded)
@@ -1802,7 +1790,7 @@ static void exportColmap(AppState& s)
     s.status = "COLMAP: " + std::to_string(nImg) + " images, " + std::to_string(nPts) + " points (+ply) -> " + sparse.string();
 }
 
-// Gather everything the ROS exporter needs from current viewer state.
+//! Gather everything the ROS exporter needs from current viewer state.
 static void buildRosInput(AppState& s, RosExportInput& in)
 {
     in.traj = s.traj;
@@ -1919,11 +1907,9 @@ static void drawScene(AppState& s)
 
             if (s.K.model != CameraModel::Pinhole)
             {
-                // A 360 camera sees the whole sphere and a Mei fisheye sees far
-                // more than the rectangular pyramid fx/fy/cx/cy imply, so
-                // there is no frustum worth drawing -- show where the camera
-                // was and which way its axes point instead. The triad is the
-                // usual X=red, Y=green, Z=blue.
+                // Neither a 360 nor a fisheye camera has a frustum the
+                // fx/fy/cx/cy pyramid describes, so draw position and axes
+                // instead -- the usual X=red, Y=green, Z=blue.
                 DrawSphere(origin, fs * (hl ? 0.08f : 0.05f), fc);
                 const Color axisColors[3] = { RED, GREEN, BLUE };
                 for (int k = 0; k < 3; k++)
@@ -2128,17 +2114,9 @@ int main(int argc, char* argv[])
             if (IsKeyPressed(KEY_LEFT_CONTROL) || IsKeyPressed(KEY_RIGHT_CONTROL))
                 s.colorMode = (s.colorMode == 1) ? 0 : 1;
 
-            // Chord choices avoid colliding in MEANING with
-            // multi_view_tls_registration_step_2's shortcuts (Ctrl+L there
-            // is manual loop closure, Ctrl+E is the lio segments editor;
-            // bare F there is the "camera Front" preset). Ctrl+O and bare
-            // C/P are kept aligned with step2 (Ctrl+O = open/load session,
-            // C = compass/ruler).
-            // KEY_LEFT/RIGHT_SUPER too: on macOS Cmd (Super) is a distinct
-            // key from Ctrl, and users -- including whoever asked for this
-            // binding -- reach for Cmd as "the" modifier there. Treating
-            // either as ctrlDown matches that expectation instead of
-            // requiring the literal Ctrl key.
+            // Chords avoid colliding in meaning with step2's, and keep Ctrl+O
+            // and bare C/P aligned with it. Super counts as ctrlDown so macOS
+            // Cmd works, where it is a distinct key from Ctrl.
             bool ctrlDown =
                 IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_RIGHT_SUPER);
             bool shiftDown = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
@@ -2158,18 +2136,10 @@ int main(int argc, char* argv[])
             if (!ctrlDown && IsKeyPressed(KEY_C))
                 s.showCompassRuler = !s.showCompassRuler;
 
-            // Camera drag/zoom -- same raylib_widgets::OrbitCamera Euler
-            // methods multi_view_tls_registration_step_2's motion()/wheel()
-            // call, driven from continuous per-frame deltas the way
-            // OrbitCamera::update() (the other, azimuth/elevation half of
-            // this struct) already reads input, rather than resurrecting
-            // step2's GLUT-shaped mouse_old_x/y/mouse_buttons bookkeeping
-            // (nothing about sharing the camera *math* requires reproducing
-            // that plumbing too). Gated off while Ctrl/Shift is held --
-            // both are reserved for the picking actions below, same
-            // reasoning as step2's own motion() guard (a trackpad's
-            // click jitter while a modifier is held must never get read as
-            // a drag, or it breaks any transition that same click started).
+            // Camera drag/zoom via the same OrbitCamera Euler methods step2
+            // uses, driven from per-frame deltas. Gated off while Ctrl/Shift is
+            // held: those are the picking modifiers, and click jitter under a
+            // modifier must not read as a drag.
             if (!imguiWants && !ctrlDown && !shiftDown)
             {
                 Vector2 d = GetMouseDelta();
@@ -2465,27 +2435,13 @@ int main(int argc, char* argv[])
 
             // double now = ImGui::GetTime();  // ImGui’s built-in timer (in seconds)
 
-            // ImGui::Checkbox("dynamic", &dynamicSubsampling);
-            // if (ImGui::IsItemHovered())
-            //    ImGui::SetTooltip("automatically control subsampling vs FPS: increase bellow 10, decrease above 60");
-            // if (dynamicSubsampling && (fps_avg < 15) && (now - lastAdjustTime > cooldownSeconds))
-            //{
-            //    app_state.viewer_decimate_point_cloud += 1;
-            //    lastAdjustTime = now;
-            //}
-            // ImGui::SameLine();
-            // ImGui::Text("(avg %.1f)", fps_avg);
-
             if (s.drawDecim < 1)
                 s.drawDecim = 1;
 
             ImGui::SameLine();
-            // GetFPS()/point-cloud draw-call/vertex count via raylib/ScanRenderer,
-            // rather than ImGui's own Framerate tracker -- raylib doesn't
-            // expose a general "draw calls" counter (rlgl's own internal one
-            // only tracks its immediate-mode batch renderer, not custom
-            // glDrawArrays calls like ScanRenderer's), so these are scan_renderer's
-            // own per-frame counts of the calls/points it issued in draw().
+            // Counts come from ScanRenderer's own per-frame tally: rlgl's
+            // internal counter only sees its immediate-mode batch, not the
+            // custom glDrawArrays calls ScanRenderer issues.
             ImGui::Text("(%d FPS)", GetFPS());
 
             ImGui::EndMainMenuBar();

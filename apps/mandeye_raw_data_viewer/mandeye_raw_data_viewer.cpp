@@ -898,8 +898,7 @@ void rebuildAllData(bool preserve_position)
 {
     double preserved_time = 0.0;
     bool have_preserved_time = false;
-    if (preserve_position && index_rendered_points_local >= 0 &&
-        index_rendered_points_local < static_cast<int>(all_data.size()) &&
+    if (preserve_position && index_rendered_points_local >= 0 && index_rendered_points_local < static_cast<int>(all_data.size()) &&
         !all_data[index_rendered_points_local].timestamps.empty())
     {
         preserved_time = all_data[index_rendered_points_local].timestamps.front().first;
@@ -999,8 +998,7 @@ void rebuildAllData(bool preserve_position)
         {
             for (size_t i = 0; i < all_data.size(); i++)
             {
-                if (!all_data[i].timestamps.empty() &&
-                    preserved_time >= all_data[i].timestamps.front().first &&
+                if (!all_data[i].timestamps.empty() && preserved_time >= all_data[i].timestamps.front().first &&
                     preserved_time <= all_data[i].timestamps.back().first)
                 {
                     index_rendered_points_local = static_cast<int>(i);

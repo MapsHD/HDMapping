@@ -1,7 +1,5 @@
 #include <CalibCore/Camera.h>
 
-#include <CalibCore/MeiCamera.h>
-
 #include <algorithm>
 
 // Reuses (does not duplicate) core's own om/fi/ka<->matrix conversion --
@@ -177,19 +175,22 @@ bool projectPoint(float px, float py, float pz,
         // denominator blows up first, so "Xs.z + xi > 0" is the limit there.
         //   xi <= 1: Xs.z > -xi      (reduces to Pinhole's pc.z > 0 at xi = 0)
         //   xi  > 1: Xs.z > -1/xi
-        // MeiCamera::Project has no guard of its own, so it belongs here.
         const float zMin = (K.xi > 1.f) ? -1.f / K.xi : -K.xi;
         if (pc.z() / depth <= zMin) return false;
 
-        MeiCamera cam;
-        cam.fx = K.fx; cam.fy = K.fy; cam.cx = K.cx; cam.cy = K.cy;
-        cam.xi = K.xi;
-        cam.k1 = K.k1; cam.k2 = K.k2; cam.k3 = K.k3;
-        cam.p1 = K.p1; cam.p2 = K.p2;
+        // Unified sphere, then a plain (non-rational) radial/tangential
+        // polynomial. Computed in double: the xi denominator gets small near
+        // the edge of the valid dome, where float loses too much.
+        const Eigen::Vector3d Xs = pc.cast<double>().normalized();
+        const double den = Xs.z() + K.xi;
+        const double x = Xs.x() / den, y = Xs.y() / den;
+        const double r2 = x*x + y*y;
+        const double radial = 1.0 + K.k1*r2 + K.k2*r2*r2 + K.k3*r2*r2*r2;
+        const double xd = x*radial + 2*K.p1*x*y + K.p2*(r2 + 2*x*x);
+        const double yd = y*radial + K.p1*(r2 + 2*y*y) + 2*K.p2*x*y;
 
-        const Eigen::Vector2d px = cam.Project(pc.cast<double>());
-        u = static_cast<float>(px.x());
-        v = static_cast<float>(px.y());
+        u = static_cast<float>(K.fx * xd + K.cx);
+        v = static_cast<float>(K.fy * yd + K.cy);
         return true;
     }
 

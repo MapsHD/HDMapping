@@ -39,6 +39,7 @@ public:
     std::string initial_poses_file_name;
     std::string out_poses_file_name;
     bool show_imu_to_lio_diff = false;
+    float imu_to_lio_diff_scale = 10.0f;
 
     struct PointCloudDimensions
     {

@@ -1533,7 +1533,8 @@ void PointCloud::render(
     bool yz_intersection,
     bool xy_intersection,
     double intersection_width,
-    bool visible_imu_diff)
+    bool visible_imu_diff,
+    float imu_diff_scale)
 {
     if (!this->visible)
         return;
@@ -1547,15 +1548,15 @@ void PointCloud::render(
 
             glColor3f(1, 0, 0);
             glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-            glVertex3f(m(0, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.x() * 10, m(1, 3), m(2, 3));
+            glVertex3f(m(0, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.x() * imu_diff_scale, m(1, 3), m(2, 3));
 
             glColor3f(0, 1, 0);
             glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-            glVertex3f(m(0, 3), m(1, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.y() * 10, m(2, 3));
+            glVertex3f(m(0, 3), m(1, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.y() * imu_diff_scale, m(2, 3));
 
             glColor3f(0, 0, 1);
             glVertex3f(m(0, 3), m(1, 3), m(2, 3));
-            glVertex3f(m(0, 3), m(1, 3), m(2, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.z() * 10);
+            glVertex3f(m(0, 3), m(1, 3), m(2, 3) + this->local_trajectory[i].imu_diff_angle_om_fi_ka_deg.z() * imu_diff_scale);
         }
         glEnd();
     }

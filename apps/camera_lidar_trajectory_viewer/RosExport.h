@@ -55,11 +55,10 @@ struct RosExportOptions
 
     bool exportTf = true; // /tf (dynamic) + /tf_static
     bool exportCamera = true; // /camera/image_raw[/compressed] + /camera/camera_info
-    bool compressCamera = true; // true: CompressedImage (jpeg) ; false: raw Image (bgr8)
-    // Rectify (undistort) images to the pinhole model before writing. Needed for
-    // RViz-style overlays, which project with the pinhole P and ignore the
-    // distortion coefficients. When on, CameraInfo is published with zero D.
-    bool undistortCamera = true;
+    // true: CompressedImage, the source jpeg copied verbatim; false: raw Image
+    // (bgr8). Frames are always written as captured -- see RosExport.cpp on why
+    // nothing is rectified -- so CameraInfo always carries the real distortion.
+    bool compressCamera = true;
 
     // LiDAR can be exported in two flavours, independently:
     //  - undistorted: points as registered by LIO, in the map frame (already

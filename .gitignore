@@ -72,6 +72,10 @@ imgui.ini
 /.gitmodules
 /build2
 /build3
+/build-*
+
+# local test data
+/rosbags.zip
 
 # deploy_mandeye.bat output
 /deploy

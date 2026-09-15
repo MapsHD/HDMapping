@@ -23,4 +23,6 @@ struct PointCloud {
     bool empty() const { return points.empty(); }
 };
 
+std::string GetLidarSerial(const char* path);
+
 }  // namespace calib

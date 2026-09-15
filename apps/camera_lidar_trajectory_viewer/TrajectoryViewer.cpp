@@ -221,29 +221,22 @@ struct AppState
     Trajectory traj;
     std::vector<int64_t> imageTsNs;
     Intrinsics K; // K.model selects pinhole / equirectangular / Mei (see CalibCore/Camera.h)
-    // How K.model was decided. The calibration file's "model" key wins; absent
-    // one, the image filenames are the fallback. Both inputs are kept as state
-    // rather than applied on the spot because they arrive in either order --
-    // loadSession() (and with it loadImages()) runs before loadCalib() at
-    // startup, but the user can load either on its own afterwards -- so
-    // resolveCameraModel() below recomputes K.model from scratch each time one
-    // of them changes.
+    // How K.model was decided: the calibration file's "model" key wins, the
+    // image filenames are the fallback. Both are kept as state rather than
+    // applied on the spot because they arrive in either order, so
+    // resolveCameraModel() recomputes K.model whenever one changes.
     CameraModel fileModel = CameraModel::Pinhole;
     bool modelExplicit = false; // the calibration file named a model
     bool namesLookEquirect = false; // the frames carry the equirectangular_ prefix
     Extrinsics E; // tx/ty/tz (camera position); rotation lives in R_wc below, not E.om/fi/ka
     Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); // camera orientation in world/LiDAR frame
     Roi roi;
-    // Free-form counterpart of `roi`: a per-pixel mask image whose rejected
-    // pixels are excluded from coloring. This is what it takes to drop the
-    // operator/backpack a 360 rig has in frame permanently -- no rectangle can
-    // cut that out without cutting out the scene with it. Kept at whatever
-    // resolution the file had, strictly 0/255 (see loadMask), and resampled to
-    // the working image size where it is used: images are read at s.imgScale,
-    // so there is no one size to pre-fit it to.
-    //
-    // Coloring only -- the images written by the ROS 2 and COLMAP exports are
-    // not masked.
+    // Free-form counterpart of `roi`: a per-pixel mask whose rejected pixels
+    // are excluded from coloring. Needed to drop the operator/backpack a 360
+    // rig has permanently in frame, which no rectangle can cut out without
+    // taking the scene with it. Kept at the file's own resolution, strictly
+    // 0/255 (see loadMask), and resampled where used since images are read at
+    // s.imgScale. Coloring only -- the ROS 2 and COLMAP exports are not masked.
     cv::Mat mask; // empty = none loaded
     bool maskEnabled = false; // acted on only while `mask` is non-empty
     bool maskInvert = false; // UI state; loadMask and the toggle flip `mask` itself
@@ -257,10 +250,9 @@ struct AppState
 
     // loaded camera images: timestamp → resized BGR Mat
     std::map<int64_t, std::string> imagesFilenamesInTime;
-    // Downscale applied to every image used for coloring. Equirectangular
-    // frames are large (3840x1920x3 ≈ 22 MB) and multiImgColoring holds a whole
-    // chunk's worth in RAM at once, so this is what keeps that bounded. The
-    // intrinsics are scaled to match via calib::scaleIntrinsics.
+    // Downscale applied to every image used for coloring: equirectangular
+    // frames are large (3840x1920x3 ~ 22 MB) and multiImgColoring holds a
+    // chunk's worth at once. Intrinsics are scaled to match.
     float imgScale = 1.0f;
     // Manual correction for a constant camera/LiDAR clock offset (e.g. a fixed
     // trigger/USB latency the camera's own timestamps don't account for):
@@ -316,14 +308,6 @@ struct AppState
     float maxImageAngSpeedDeg = 60.f; // deg/s threshold
     int angFilteredImgs = 0; // images skipped by the filter in the last colorize pass
 
-
-    // Manual correction for a constant camera/LiDAR clock offset (e.g. a fixed
-    // trigger/USB latency the camera's own timestamps don't account for).
-    // Applied wherever an image timestamp is matched against the LiDAR/pose
-    // timeline (loadCloud's chunk selection + point matching, exportColmap's
-    // per-image pose lookup) -- never to the raw timestamps used for
-    // filename lookup or image-list indexing (s.imageTsNs/imagesFilenamesInTime).
-    float imageTimeOffsetMs = 0.f;
     bool useImageColor = false; // true once a colorize pass produced RGB data
     int colorMode = 0; // 0=intensity (jet), 1=RGB by image, 2=camera id
     int coloredPts = 0; // points that received RGB from an image
@@ -383,10 +367,9 @@ struct AppState
     std::thread imgViewThread;
 
     // ── synthetic intensity-projection image (drawn next to the photo) ─────
-    // Reprojects the (already colorized) exportCloud through the same
-    // calibration/projectPoint() as loadCloud()'s colorize pass, painted with
-    // a jet colormap over each point's normalized intensity -- a reference
-    // image to visually check the calibration/coloring against the photo.
+    // Reprojects exportCloud through the same calibration as the colorize
+    // pass, jet-colormapped over intensity -- a reference image to check the
+    // calibration against the photo by eye.
     bool showIntensityProjection = false;
     bool intensityProjNeedsUpdate = false; // set on toggle/refresh/image change
     Texture2D intensityProjTex = {};
@@ -453,14 +436,12 @@ static bool intersectGroundPlaneZ0(const Ray& ray, Vector3& outPoint)
 static constexpr const char* kEquirectPrefix = "equirectangular_";
 
 // Timestamp encoded in a camera frame's filename, or -1 when the file isn't
-// one. The layout is "<any prefix>_<timestamp_ns>.jpg" or a bare
-// "<timestamp_ns>.jpg": everything up to and including the last '_' is
-// ignored, so Mandeye's "cam0_<ts>", the 360 rig's "equirectangular_<ts>" and
-// its per-lens "back_<ts>"/"front_<ts>" frames all parse without this needing
-// to know the list of rigs. `equirect`, when given, reports whether the
-// panorama prefix was the one found -- that one prefix still carries meaning
-// (it selects the camera model, see resolveCameraModel). The all-digits check
-// is what rejects unrelated .jpgs, which would otherwise reach std::stoll.
+// one. Layout is "<any prefix>_<timestamp_ns>.jpg" or a bare
+// "<timestamp_ns>.jpg" -- everything up to the last '_' is ignored, so
+// Mandeye's "cam0_<ts>" and the 360 rig's "equirectangular_<ts>" both parse
+// without a list of rigs here. `equirect` reports whether the panorama prefix
+// was the one found, since that one selects the camera model. The all-digits
+// check rejects unrelated .jpgs, which would otherwise reach std::stoll.
 static int64_t parseImageTsNs(const fs::path& p, bool* equirect = nullptr)
 {
     if (equirect)
@@ -497,13 +478,11 @@ static int64_t imageTimeOffsetNs(const AppState& s)
 }
 
 // Settles K.model from the two inputs that can select it, in precedence order.
-// Call after either of them changes; see AppState::fileModel for why this isn't
-// done inline in the loaders.
+// Call after either changes; see AppState::fileModel for why.
 //
-// Only Pinhole and Equirectangular are ever inferred: the filename fallback
-// can distinguish those two because the 360 rig marks its frames with
-// kEquirectPrefix, but nothing in a frame's name identifies a Mei fisheye, so
-// CameraModel::Mei is reachable only through an explicit "model" key.
+// Only Pinhole and Equirectangular are inferred: the 360 rig marks its frames
+// with kEquirectPrefix, but nothing in a filename identifies a Mei fisheye, so
+// Mei is reachable only through an explicit "model" key.
 static void resolveCameraModel(AppState& s)
 {
     if (s.modelExplicit)
@@ -513,10 +492,9 @@ static void resolveCameraModel(AppState& s)
 }
 
 // Index every camera frame in the camera directory by timestamp. Also picks up
-// the image dimensions -- which the equirectangular model projects with, and
-// which the ROI default, the frustums and the COLMAP cameras.txt line read --
-// and, absent an explicit "model" in the calibration, infers the camera model
-// from the filenames.
+// the image dimensions -- read by the equirectangular projection, the ROI
+// default, the frustums and COLMAP's cameras.txt -- and, absent an explicit
+// "model" in the calibration, infers the camera model from the filenames.
 static void loadImages(AppState& s)
 {
     s.imagesFilenamesInTime.clear();
@@ -684,24 +662,17 @@ static void loadCloud(AppState& s)
     bool canColor = s.calibLoaded && !s.imagesFilenamesInTime.empty();
     Eigen::Matrix3f R_wc = canColor ? s.R_wc : Eigen::Matrix3f::Identity();
     Eigen::Vector3f C(s.E.tx, s.E.ty, s.E.tz);
-    // Images are read at s.imgScale, so the intrinsics have to match: this
-    // scales fx/fy/cx/cy for the pinhole model and width/height for the
-    // equirectangular one. calib::projectPoint then applies whichever model the
-    // calibration selected -- for pinhole that is the OpenCV rational +
-    // tangential distortion, so colours are sampled from the raw (distorted)
-    // images at the right pixel; with all-zero coefficients it reduces exactly
-    // to the ideal pinhole.
+    // Images are read at s.imgScale, so the intrinsics must match. For pinhole
+    // calib::projectPoint applies the rational + tangential distortion, so
+    // colours are sampled from the raw (distorted) images at the right pixel.
     const Intrinsics Ks = scaleIntrinsics(s.K, s.imgScale);
-    // The ROI is given in full-resolution image pixels (see calib::Roi), but
-    // the iu/iv probe() tests it against below are pixels of the images as
-    // they are actually read, i.e. at s.imgScale -- so the rectangle is scaled
-    // exactly as the intrinsics above are.
+    // The ROI is in full-resolution pixels (see calib::Roi) but probe() tests
+    // it against pixels read at s.imgScale, so it scales like the intrinsics.
     const Roi roiS = scaleRoi(s.roi, s.imgScale);
     const int64_t offNs = imageTimeOffsetNs(s);
-    // The mask arrives at the resolution of whatever file was loaded while the
-    // images are read at s.imgScale, so it is resampled to the size the frames
-    // actually have -- filled lazily below, on the first image probed, since
-    // that size isn't known until one has been read.
+    // The mask is at its file's resolution while images are read at s.imgScale,
+    // so it is resampled -- lazily, on the first image probed, since the frame
+    // size isn't known until one has been read.
     const bool haveMask = !s.mask.empty();
     cv::Mat maskFit;
     // Every image of a chunk is held in memory at once (multiImgColoring), so
@@ -833,7 +804,7 @@ static void loadCloud(AppState& s)
                 const bool tooFast = dropFastImgs && angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, imgTs) > s.maxImageAngSpeedDeg;
                 if (tooFast)
                     ++angFilteredImgs;
-                 if (!tooFast && fnIt != s.imagesFilenamesInTime.end() && interpPose(trajMap, imgTs + offNs, pose))
+                if (!tooFast && fnIt != s.imagesFilenamesInTime.end() && interpPose(trajMap, imgTs + offNs, pose))
                 {
                     cv::Mat img = readImage(fnIt->second);
                     int gidx = (int)(it - s.imageTsNs.begin());
@@ -907,13 +878,11 @@ static void loadCloud(AppState& s)
                     float inRoiF = -1.f; // 1 inside ROI, 0 outside, -1 not in frustum
                     int globalIdx = -1;
                 };
-                // Note for the equirectangular model: a 360 camera has no
-                // frustum, so every point projects into every image. The
-                // temporal strategy's outward search therefore always succeeds
-                // at w == 0, leaving maxTemporalDist as the only real gate, and
-                // the geometry strategy compares ranges across all of the
-                // chunk's images rather than only the ones containing the point
-                // -- still correct, just no longer short-circuiting.
+                // Equirectangular: a 360 camera has no frustum, so every point
+                // projects into every image. The temporal search therefore
+                // always succeeds at w == 0, leaving maxTemporalDist the only
+                // real gate, and the geometry strategy compares ranges across
+                // every image of the chunk -- correct, just not short-circuiting.
                 auto probe = [&](int idx) -> Hit
                 {
                     Hit h;
@@ -1742,9 +1711,8 @@ static void exportColmap(AppState& s)
         // COLMAP's text model has no equirectangular camera type, and none of
         // its fisheye types is the unified-sphere (Mei) model -- none carries
         // an xi -- so the FULL_OPENCV line below would misdescribe the images.
-        s.status = s.K.model == CameraModel::Equirectangular
-                       ? "COLMAP: equirectangular camera model is not supported by COLMAP"
-                       : "COLMAP: Mei camera model is not supported by COLMAP";
+        s.status = s.K.model == CameraModel::Equirectangular ? "COLMAP: equirectangular camera model is not supported by COLMAP"
+                                                             : "COLMAP: Mei camera model is not supported by COLMAP";
         return;
     }
 
@@ -2759,8 +2727,7 @@ int main(int argc, char* argv[])
                 if (s.timeOffsetSec != 0.0)
                 {
                     ImGui::SameLine();
-                    ImGui::TextDisabled(
-                        "(adj: %lld)", (long long)(s.imageTsNs[s.imgViewIdx] + imageTimeOffsetNs(s)));
+                    ImGui::TextDisabled("(adj: %lld)", (long long)(s.imageTsNs[s.imgViewIdx] + imageTimeOffsetNs(s)));
                 }
                 {
                     float as = angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, s.imageTsNs[s.imgViewIdx]);
@@ -2863,8 +2830,8 @@ int main(int argc, char* argv[])
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                     ImGui::SetTooltip(
                         !noRectify ? "Rectify to pinhole so RViz overlays line up\n(CameraInfo published with zero distortion)."
-                        : s.K.model == CameraModel::Equirectangular ? "Not applicable to an equirectangular camera."
-                                                                    : "Not applicable to a Mei (fisheye) camera.");
+                            : s.K.model == CameraModel::Equirectangular ? "Not applicable to an equirectangular camera."
+                                                                        : "Not applicable to a Mei (fisheye) camera.");
                 ImGui::Unindent();
             }
             ImGui::Checkbox("LiDAR undistorted (map frame)", &s.ros.exportLidarUndistorted);

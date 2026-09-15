@@ -1,10 +1,8 @@
 #include <CalibCore/CameraCalibrationSolver.h>
 
-// Always compiled (see calib_core/CMakeLists.txt); the #ifdef below picks
-// between a real Ceres-based implementation and a stub that just explains
-// why it isn't available, so callers (apps/camera_lidar_calibration's
-// AppState::solvePairs) never need an #ifdef of their own around calling
-// solveExtrinsicsMeiCeres -- only its return value.
+// Always compiled; the #ifdef below picks between the real Ceres
+// implementation and a stub that explains why it isn't available, so callers
+// check solveExtrinsicsMeiCeres's return value rather than an #ifdef.
 #ifdef CALIB_ENABLE_CERES
 
 #include <ceres/ceres.h>
@@ -15,17 +13,15 @@ namespace calib
 {
     namespace
     {
-        // Templated (Ceres::Jet-compatible) equivalent of Camera.cpp's
-        // omFiKaToMat3: R = kCameraLidarAxisOffset * Rx(om)*Ry(fi)*Rz(ka),
-        // om/fi/ka in RADIANS (Extrinsics' own fields are degrees -- solve()
-        // below converts at the boundary). The Rx*Ry*Rz part mirrors
-        // Core/transformations.h's affine_matrix_from_pose_tait_bryan
-        // row-for-row rather than re-deriving it; kCameraLidarAxisOffset
-        // (Camera.h) is applied by permuting/negating Rdelta's rows
-        // directly instead of a general 3x3*3x3 product, since its own
-        // entries are just {0, +-1}: offset = [[0,0,1],[-1,0,0],[0,-1,0]],
-        // so row 0 of R is row 2 of Rdelta, row 1 is -(row 0), row 2 is
-        // -(row 1).
+        // Ceres::Jet-compatible equivalent of Camera.cpp's omFiKaToMat3:
+        // R = kCameraLidarAxisOffset * Rx(om)*Ry(fi)*Rz(ka), om/fi/ka in
+        // RADIANS (Extrinsics stores degrees; solve() converts). The Rx*Ry*Rz
+        // part mirrors Core/transformations.h's
+        // affine_matrix_from_pose_tait_bryan. kCameraLidarAxisOffset's entries
+        // are only {0, +-1}, so it is applied by permuting/negating Rdelta's
+        // rows rather than a general 3x3 product: offset =
+        // [[0,0,1],[-1,0,0],[0,-1,0]], so row 0 of R is row 2 of Rdelta,
+        // row 1 is -(row 0), row 2 is -(row 1).
         template <typename T>
         void rotationMatrix(const T& om, const T& fi, const T& ka, T R[3][3])
         {
@@ -52,10 +48,9 @@ namespace calib
             }
         }
 
-        // Templated equivalent of MeiCamera::Project (CalibCore/
-        // MeiCamera.h) for Ceres autodiff -- same formula, not re-derived;
-        // intrinsics are plain doubles (fixed, not solved for), only pc is
-        // the Jet-typed autodiff variable.
+        // Templated equivalent of MeiCamera::Project for Ceres autodiff --
+        // same formula. Intrinsics stay plain doubles (fixed, not solved
+        // for); only pc is the Jet-typed variable.
         template <typename T>
         void projectMei(
             const T pc[3],
@@ -85,10 +80,8 @@ namespace calib
         }
 
         // Reprojection residual for one correspondence: predicted (u, v)
-        // minus the picked pixel, exactly like the Pinhole solver's reused
-        // observation_equation_perspective_camera_tait_bryan_wc, just
-        // autodiff'd instead of symbolically pre-differentiated (no
-        // vendored Mei Jacobian exists to reuse -- see CameraCalibrationSolver.h).
+        // minus the picked pixel, like the Pinhole solver's observation
+        // equation but autodiff'd, no vendored Mei Jacobian existing.
         struct MeiReprojectionResidual
         {
             MeiReprojectionResidual(const Eigen::Vector3d& p, double u_kp, double v_kp, const Intrinsics& K)
@@ -173,10 +166,9 @@ namespace calib
         extrinsicsInOut.fi = static_cast<float>(omfika[1] / d2r);
         extrinsicsInOut.ka = static_cast<float>(omfika[2] / d2r);
 
-        // Ceres' final_cost is 0.5*sum(residual_i^2) over every SCALAR
-        // residual (2 per correspondence: du, dv), so sum(du^2+dv^2) =
-        // 2*final_cost -- matching the Pinhole solver's own rms formula
-        // (sqrt(sum(du^2+dv^2) / (2*N))) then simplifies to sqrt(final_cost/N).
+        // final_cost is 0.5*sum(residual^2) over every SCALAR residual (2 per
+        // correspondence), so the Pinhole solver's rms formula
+        // sqrt(sum(du^2+dv^2) / (2*N)) simplifies to sqrt(final_cost/N).
         if (outRmsPixels)
             *outRmsPixels = std::sqrt(summary.final_cost / static_cast<double>(correspondences.size()));
 

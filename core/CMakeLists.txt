@@ -116,20 +116,24 @@ function(add_core_target target_name with_gui)
     endif()
 endfunction()
 
-add_core_target(core_no_gui FALSE)
+# core_no_gui is used by python bindings and lidar odometry test subprojects only - if they are not build just do not waste time building core_no_gui
+if(BUILD_TESTING OR BUILD_WITH_PYBIND)
+    add_core_target(core_no_gui FALSE)
+
+    target_precompile_headers(core_no_gui
+        PRIVATE include/pch/pch.h
+    )
+
+    set_target_properties(core_no_gui PROPERTIES
+        POSITION_INDEPENDENT_CODE ON)
+endif()
+
 add_core_target(core TRUE)
 target_link_libraries(core PUBLIC core_pfd)
 
-target_precompile_headers(core_no_gui
-    PRIVATE include/pch/pch.h
+target_precompile_headers(core
+        PRIVATE include/pch/pch.h
 )
-
-target_precompile_headers(core_no_gui
-    PRIVATE include/pch/pch.h
-)
-
-set_target_properties(core_no_gui PROPERTIES
-    POSITION_INDEPENDENT_CODE ON)
 
 # ============================================================================
 # core_raylib -- shared raylib rendering/camera/picking infrastructure

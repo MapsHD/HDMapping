@@ -2,7 +2,8 @@
 #include <laszip/laszip_api.h>
 #include <limits>
 #include <cstdio>
-
+#include <regex>
+#include <nlohmann/json.hpp>
 namespace calib {
 
 void PointCloud::clear() {
@@ -85,4 +86,32 @@ bool PointCloud::load(const std::string& path) {
 
 }
 
+std::string GetLidarSerial(const char* path)
+{
+    static constexpr const char* kUnknownLidarSerial = "unknown";
+
+    const std::string spath(path);
+    const std::regex lidarPattern(R"(lidar(\d+)\.laz$)");
+    std::smatch match;
+
+    if (!std::regex_search(spath, match, lidarPattern))
+        return kUnknownLidarSerial;
+
+    std::string statusPath = std::regex_replace(spath, lidarPattern, "status$1.json");
+
+    std::ifstream f(statusPath);
+    if (!f)
+    {
+        return kUnknownLidarSerial;
+    }
+    try
+    {
+        nlohmann::json j;
+        f >> j;
+        return j["lidar"]["LivoxLidarInfo"]["sn"].get<std::string>();
+    } catch (...)
+    {
+    }
+    return kUnknownLidarSerial;
+}
 }  // namespace calib

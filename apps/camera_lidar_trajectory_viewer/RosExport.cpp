@@ -207,11 +207,10 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
             cv::Mat map1, map2;
             bool mapsReady = false;
             int camW = 0, camH = 0;
-            // initUndistortRectifyMap is pinhole-only: there is nothing to
-            // rectify on a 360 panorama, and Km/Dm describe a camera neither
-            // it nor a Mei fisheye is (Mei's k1/k2/k3/p1/p2 are its own
-            // polynomial, applied after a unit-sphere step Km/Dm can't
-            // express), so both keep their raw frames.
+            // initUndistortRectifyMap is pinhole-only: a 360 panorama has
+            // nothing to rectify, and Mei's k1/k2/k3/p1/p2 are its own
+            // polynomial applied after a unit-sphere step Km/Dm cannot
+            // express -- so both models keep their raw frames.
             const bool equirect = in.K.model == CameraModel::Equirectangular;
             const bool mei = in.K.model == CameraModel::Mei;
             const bool rectify = opt.undistortCamera && in.calibLoaded && in.K.model == CameraModel::Pinhole;
@@ -308,10 +307,10 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
                         ci.width = static_cast<uint32_t>(camW);
                         if (equirect)
                         {
-                            // No ROS distortion model describes a 360 panorama,
+                            // No ROS distortion model describes a 360 panorama
                             // and there is no K to report -- width/height are
-                            // the whole projection. Leave k/p zeroed rather than
-                            // publish a pinhole that would mislead consumers.
+                            // the whole projection. Zeroed rather than
+                            // publishing a pinhole that would mislead consumers.
                             ci.distortion_model = "equirectangular";
                             ci.d = {};
                             ci.k = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -320,20 +319,17 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
                         }
                         else if (mei)
                         {
-                            // No standard ROS distortion model is a unified
-                            // sphere either, so this reports the rig's own tag
-                            // (the same string its camera_info.yaml carries,
-                            // see CalibCore/MeiCamera.h) rather than claiming
-                            // to be plumb_bob/rational_polynomial, which a
+                            // No standard ROS model is a unified sphere, so
+                            // this reports the rig's own tag rather than
+                            // claiming plumb_bob/rational_polynomial, which a
                             // consumer would undistort with badly wrong math.
                             //
-                            // d is the yaml's own (k1, k2, k3, p1, p2) order --
-                            // NOT OpenCV's (k1, k2, p1, p2, k3) -- with xi
-                            // appended, since CameraInfo has nowhere else to
-                            // put it and the model is unusable without it.
-                            // K/P stay populated: fx/fy/cx/cy do mean the
-                            // usual thing here, they are just applied after
-                            // the unit-sphere step.
+                            // d is the yaml's (k1, k2, k3, p1, p2) order -- NOT
+                            // OpenCV's (k1, k2, p1, p2, k3) -- with xi appended,
+                            // since CameraInfo has nowhere else to put it and
+                            // the model is unusable without it. K/P stay
+                            // populated: fx/fy/cx/cy mean the usual thing, just
+                            // applied after the unit-sphere step.
                             ci.distortion_model = "insta360_mei_v2";
                             ci.d = { in.K.k1, in.K.k2, in.K.k3, in.K.p1, in.K.p2, in.K.xi };
                             ci.k = { in.K.fx, 0.f, in.K.cx, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 1.f };

@@ -271,11 +271,9 @@ struct AppState
     bool shaderOk = false;
     int locMVP = -1, locPS = -1, locCM = -1, locDecim = -1, locSel = -1;
 
-    //! Driving orbit's Euler mode (rotateX/rotateY/translate/rotationCenter/
-    //! isOrtho), not its azimuth/elevation/distance/target mode -- the same
-    //! camera engine multi_view_tls_registration_step_2 uses, manually
-    //! driven through rlgl (see display()'s camera setup) instead of
-    //! raylib's Camera3D/BeginMode3D.
+    //! Driven in Euler mode (rotateX/rotateY/translate/rotationCenter/isOrtho),
+    //! not azimuth/elevation/distance/target, through rlgl rather than raylib's
+    //! Camera3D/BeginMode3D -- see display()'s camera setup.
     raylib_widgets::OrbitCamera orbit;
     //! Rebuilt from orbit.euler every frame in display() -- used only for
     //! drawCompassRuler()'s right/up vectors, same reasoning as step2's own
@@ -323,11 +321,9 @@ struct AppState
     char exportBuf[512] = "colored.laz";
     std::vector<ColorPt> exportCloud;
 
-    // One entry per loaded LIO chunk ("scan_lio_N"), pointing at a contiguous
-    // [begin, begin+count) slice of exportCloud. `pose` is the chunk's MRP
-    // correction transform (identity when there is no session_poses.mrp). Used
-    // by the "Save session as E57" export to keep the segments as separate
-    // Data3D blocks instead of one collapsed cloud.
+    //! One entry per loaded LIO chunk ("scan_lio_N"), naming a contiguous
+    //! [begin, begin+count) slice of exportCloud. Lets the E57 session export
+    //! keep the chunks as separate Data3D blocks instead of one collapsed cloud.
     struct ExportSegment
     {
         std::string name;
@@ -1051,13 +1047,9 @@ static void loadCloud(AppState& s)
     {
         s.cloud.upload(gpuData, mx);
 
-        // Frame the loaded cloud -- instant, not eased (this runs once on
-        // load, before there's anything to transition from). Same "recenter
-        // and look at" formula as OrbitCamera::moveEulerRotationCenterTo()
-        // (translate.xy = -center.xy keeps the point centered on screen
-        // regardless of the current rotate angles), applied directly to
-        // both euler and eulerGoal so there's no stale transition target
-        // left over from a previous session.
+        // Frame the loaded cloud, instant rather than eased -- this runs once on
+        // load, with nothing to transition from. Set on both euler and eulerGoal
+        // so no stale transition target survives from a previous session.
         Vector3 center = { sumX / cnt, sumY / cnt, sumZ / cnt };
         float dist = std::max(5.f, mx * 0.3f);
         s.orbit.euler.rotationCenter = center;
@@ -1467,11 +1459,9 @@ static void exportE57(AppState& s)
         s.status = std::string("Export failed: ") + err;
 }
 
-//! Save the colored cloud as a *session*: one E57 Data3D block per loaded LIO
-//! chunk ("scan_lio_N"), NOT one collapsed cloud. Each block holds that
-//! segment's points in its own frame with the chunk's MRP correction as the
-//! block pose (identity when there is no session_poses.mrp), so the result
-//! re-opens as a multi-scan session (e.g. in step 2).
+//! Save the colored cloud as a session: one E57 Data3D block per LIO chunk
+//! rather than one collapsed cloud, each in its own frame with the chunk's MRP
+//! correction as the block pose, so it re-opens as a multi-scan session.
 static void exportE57Session(AppState& s)
 {
     if (s.exportSegments.empty())
@@ -1566,13 +1556,7 @@ static bool isCameraDir(const fs::path& dir)
     return false;
 }
 
-//! Drag & drop equivalent of actionSelectLioResultDir()/actionSelectCamera0Dir()/
-//! actionOpenCalibration(), and unlike those menu actions it applies immediately instead of
-//! waiting for the "Load session" button, since a drop is already an explicit "load this"
-//! gesture. A dropped directory of cam0_*.jpg is the camera directory (only the images are
-//! swapped, so the trajectory and the loaded cloud survive); any other directory is this
-//! app's session (LIO result dir). A dropped *.json is treated as a calibration file. Used by
-//! the drag & drop handler in main()'s loop below.
+//! Menu action: pick a mask image and load it into s.mask.
 static void actionOpenMask(AppState& s)
 {
     std::string path = mandeye::fd::OpenFileDialogOneFile("Select image mask", mandeye::fd::ImageFilter);
@@ -1583,11 +1567,11 @@ static void actionOpenMask(AppState& s)
     }
 }
 
-//! Drag & drop equivalent of actionSelectLioResultDir()/actionOpenCalibration(): a dropped
-//! directory is this app's session (LIO result dir), and unlike the menu action it loads
-//! immediately instead of waiting for the "Load session" button, since a drop is already an
-//! explicit "load this" gesture. A dropped *.json is treated as a calibration file. Used by the
-//! drag & drop handler in main()'s loop below.
+//! Drag & drop equivalent of the menu load actions, applied immediately rather
+//! than waiting for "Load session" -- a drop is already an explicit "load this".
+//! A dropped directory of cam0_*.jpg is the camera directory (only the images
+//! are swapped, so the trajectory and cloud survive); any other directory is a
+//! session (LIO result dir); a *.json is a calibration file.
 static void handleDroppedPath(AppState& s, const std::string& path)
 {
     if (fs::is_directory(path))

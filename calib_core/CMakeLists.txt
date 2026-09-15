@@ -18,7 +18,7 @@ project(calib_core)
 # calib_core and core/core_raylib in the same binary.
 add_library(calib_core STATIC
     src/Camera.cpp
-    src/MeiCamera.cpp
+    src/MeiIntrinsics.cpp
     src/PointCloud.cpp
     src/Trajectory.cpp
     src/CliArgs.cpp

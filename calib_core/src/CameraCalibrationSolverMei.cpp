@@ -48,7 +48,8 @@ namespace calib
             }
         }
 
-        // Templated equivalent of MeiCamera::Project for Ceres autodiff --
+        // Templated equivalent of calib::projectPoint's Mei branch, for
+        // Ceres autodiff --
         // same formula. Intrinsics stay plain doubles (fixed, not solved
         // for); only pc is the Jet-typed variable.
         template <typename T>

@@ -28,14 +28,14 @@ namespace calib
         //! OpenCV rational distortion model (CameraModel::Pinhole):
         //! radial = (1 + k1 r² + k2 r⁴ + k3 r⁶) / (1 + k4 r² + k5 r⁴ + k6 r⁶)
         //! @note CameraModel::Mei reuses k1/k2/k3 and p1/p2 for its own
-        //!       (non-rational) polynomial -- see @ref MeiCamera -- and leaves
-        //!       k4/k5/k6 unused.
+        //!       (non-rational) polynomial and leaves k4/k5/k6 unused -- it has
+        //!       no rational denominator.
         float k1 = 0.f, k2 = 0.f, k3 = 0.f;
         float k4 = 0.f, k5 = 0.f, k6 = 0.f;
         //! Tangential distortion.
         float p1 = 0.f, p2 = 0.f;
         //! Unified-sphere mirror parameter, CameraModel::Mei only.
-        //! @see MeiCamera
+        //! @see loadMeiIntrinsics
         float xi = 0.f;
         //! Read only by CameraModel::Equirectangular, where they play the role
         //! fx/fy/cx/cy play for a pinhole camera and so *must* be set before
@@ -128,6 +128,23 @@ namespace calib
     //!       kCameraLidarAxisOffset) while the UI and solver work in om/fi/ka,
     //!       so this conversion is needed at the file-I/O boundary either way.
     void omFiKaFromMat3(const Eigen::Matrix3f& R, float& om_deg, float& fi_deg, float& ka_deg);
+
+    //! Load CameraModel::Mei intrinsics from a camera_info.yaml in the
+    //! Insta360 rig's format: a flat top-level mapping of scalars plus a
+    //! `distortion` flow sequence.
+    //! @param path file to read
+    //! @param K overwritten with the loaded intrinsics on success, untouched
+    //!        on failure
+    //! @return false on a missing file or a missing required field
+    //! @warning The yaml's `distortion` array is ordered (k1, k2, k3, p1, p2)
+    //!          -- NOT OpenCV's pinhole order (k1, k2, p1, p2, k3). The two are
+    //!          easy to mix up, both being five numbers in a row, and doing so
+    //!          produces a plausible-looking but badly wrong reprojection with
+    //!          no crash.
+    //! @note Failures and a distortion_model other than insta360_mei_v2 are
+    //!       reported on stderr rather than thrown -- a malformed file should
+    //!       degrade the app to "no reprojection available", not crash it.
+    bool loadMeiIntrinsics(const std::string& path, Intrinsics& K);
 
     //! The same camera after its images are resampled, so a downscaled image
     //! projects with the same geometry. Distortion terms are dimensionless and

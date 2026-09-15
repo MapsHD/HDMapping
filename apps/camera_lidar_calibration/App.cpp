@@ -3,7 +3,6 @@
 #include "raymath.h"
 #include "rlImGui.h"
 #include <CalibCore/CameraCalibrationSolver.h>
-#include <CalibCore/MeiCamera.h>
 #include <HDMapping/Version.hpp>
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/PointPicking.h>
@@ -408,9 +407,9 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
     return true;
 }
 
-// MeiCamera's camera_info.yaml is a flat mapping with a `distortion_model:`
+// The Mei camera_info.yaml is a flat mapping with a `distortion_model:`
 // key, unlike OpenCV's `camera_matrix:`/`distortion_coefficients:` YAML.
-// Peeked at as text so an OpenCV pinhole YAML never reaches LoadMeiCamera and
+// Peeked at as text so an OpenCV pinhole YAML never reaches loadMeiIntrinsics and
 // warns about fields it was never going to have.
 static bool yamlLooksLikeMei(const char* path)
 {
@@ -440,32 +439,19 @@ void AppState::loadIntrinsics(const char* path)
 
     if ((ext == "yml" || ext == "yaml") && yamlLooksLikeMei(path))
     {
-        MeiCamera cam = LoadMeiCamera(path);
-        if (!cam.loaded)
+        if (!calib::loadMeiIntrinsics(path, intrinsics))
         {
             statusMsg = std::string("Mei intrinsics failed to load (see console): ") + path;
             return;
         }
-        intrinsics.model = CameraModel::Mei;
-        intrinsics.fx = static_cast<float>(cam.fx);
-        intrinsics.fy = static_cast<float>(cam.fy);
-        intrinsics.cx = static_cast<float>(cam.cx);
-        intrinsics.cy = static_cast<float>(cam.cy);
-        intrinsics.xi = static_cast<float>(cam.xi);
-        intrinsics.k1 = static_cast<float>(cam.k1);
-        intrinsics.k2 = static_cast<float>(cam.k2);
-        intrinsics.k3 = static_cast<float>(cam.k3);
-        intrinsics.k4 = intrinsics.k5 = intrinsics.k6 = 0.f; // unused by Mei
-        intrinsics.p1 = static_cast<float>(cam.p1);
-        intrinsics.p2 = static_cast<float>(cam.p2);
-        intrinsicsW = cam.width;
-        intrinsicsH = cam.height;
+        intrinsicsW = intrinsics.width;
+        intrinsicsH = intrinsics.height;
         intrinsicsLoaded = true;
         std::string scaleNote = autoScaleIntrinsicsToImage();
         rebuildImageTexture(); // no-op undistortion for Mei, but refreshes the texture
         statusMsg = "Mei intrinsics loaded";
-        if (cam.width > 0)
-            statusMsg += " (calibration " + std::to_string(cam.width) + "x" + std::to_string(cam.height) + ")";
+        if (intrinsicsW > 0)
+            statusMsg += " (calibration " + std::to_string(intrinsicsW) + "x" + std::to_string(intrinsicsH) + ")";
         if (!scaleNote.empty())
             statusMsg += "; " + scaleNote;
         return;

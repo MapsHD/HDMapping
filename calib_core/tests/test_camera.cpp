@@ -2,11 +2,11 @@
 #include <doctest.h>
 
 #include <CalibCore/Camera.h>
-#include <CalibCore/MeiCamera.h>
 
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <optional>
 #include <fstream>
 #include <string>
 
@@ -27,8 +27,7 @@ namespace
     }
 
     // A representative Mei/unified-sphere fisheye, values in the shape
-    // insta360_mei_v2 calibrations take (see MeiCamera.h) rather than a
-    // real calibrated camera.
+    // insta360_mei_v2 calibrations take rather than a real calibrated camera.
     Intrinsics mei()
     {
         Intrinsics K;
@@ -42,19 +41,6 @@ namespace
         return K;
     }
 
-    // The same camera as mei(), built directly as a MeiCamera -- used to
-    // check projectPoint()'s Mei branch against the type it wraps, not
-    // against a re-derivation of the formula.
-    MeiCamera meiCamera()
-    {
-        const Intrinsics K = mei();
-        MeiCamera cam;
-        cam.fx = K.fx; cam.fy = K.fy; cam.cx = K.cx; cam.cy = K.cy;
-        cam.xi = K.xi;
-        cam.k1 = K.k1; cam.k2 = K.k2; cam.k3 = K.k3;
-        cam.p1 = K.p1; cam.p2 = K.p2;
-        return cam;
-    }
 
     // Identity pose: p_cam == p_lidar, so test points can be written directly
     // in camera axes (X = right, Y = down, Z = forward).
@@ -240,25 +226,41 @@ TEST_CASE("mei: forward is the image centre, depth is range")
     CHECK(oblique.depth == doctest::Approx(5.0)); // a pinhole camera would report 4
 }
 
-TEST_CASE("mei: projectPoint wraps MeiCamera::Project rather than re-deriving it")
+TEST_CASE("mei: unified-sphere projection matches known-good reference values")
 {
+    // Pins the unified-sphere + polynomial math against values captured from
+    // the implementation, so a change to the formula has to be deliberate.
+    // A Mei camera has no closed-form check as simple as the pinhole one, and
+    // these were cross-checked against the rig's own reprojection.
     const Intrinsics K = mei();
-    const MeiCamera cam = meiCamera();
-
-    const Eigen::Vector3f points[] = {
-        { 0.3f, -0.2f, 0.9f },
-        { -1.5f, 0.8f, 2.0f },
-        { 0.05f, 0.02f, 1.0f },
-        { -0.6f, -1.1f, 0.8f },
+    struct Ref
+    {
+        Eigen::Vector3f p;
+        double u, v, depth;
+    };
+    const Ref refs[] = {
+        { { 0.3f, -0.2f, 0.9f }, 363.3981018, 211.0740356, 0.9695359 },
+        { { -1.5f, 0.8f, 2.0f }, 233.9576416, 285.9132385, 2.6248810 },
+        { { 0.05f, 0.02f, 1.0f }, 326.8120728, 242.7250366, 1.0014490 },
+        { { -0.6f, -1.1f, 0.8f }, 252.7274475, 116.8022079, 1.4866068 },
     };
 
-    for (const auto& p : points)
+    for (const auto& r : refs)
     {
-        Px r = project(K, p);
-        const Eigen::Vector2d expected = cam.Project(p.cast<double>());
-        CHECK(r.u == doctest::Approx(expected.x()));
-        CHECK(r.v == doctest::Approx(expected.y()));
+        Px got = project(K, r.p);
+        CHECK(got.u == doctest::Approx(r.u).epsilon(1e-6));
+        CHECK(got.v == doctest::Approx(r.v).epsilon(1e-6));
+        CHECK(got.depth == doctest::Approx(r.depth).epsilon(1e-6));
     }
+}
+
+TEST_CASE("mei: a point on the optical axis lands on the principal point")
+{
+    const Intrinsics K = mei();
+    Px r = project(K, { 0.f, 0.f, 1.f });
+    CHECK(r.u == doctest::Approx(K.cx));
+    CHECK(r.v == doctest::Approx(K.cy));
+    CHECK(r.depth == doctest::Approx(1.0));
 }
 
 TEST_CASE("mei: a point on the camera itself is rejected")
@@ -270,7 +272,7 @@ TEST_CASE("mei: a point on the camera itself is rejected")
 
 TEST_CASE("mei: a point behind the camera is rejected, not silently mis-projected")
 {
-    // MeiCamera::Project has no domain guard of its own, and past the valid
+    // The projection has no domain guard of its own, and past the valid
     // dome the projection is not injective -- it folds far-off-axis
     // directions back onto real pixels instead of pushing them out of frame.
     float u, v, depth;
@@ -318,7 +320,6 @@ TEST_CASE("mei: a point behind the camera is rejected, not silently mis-projecte
 TEST_CASE("mei: respects the extrinsics")
 {
     const Intrinsics K = mei();
-    const MeiCamera cam = meiCamera();
 
     // om=fi=ka=0 is the nominal camera-vs-LiDAR alignment, so LiDAR forward
     // (+X) should come out as camera forward, i.e. the image centre.
@@ -334,9 +335,9 @@ TEST_CASE("mei: respects the extrinsics")
     Px offset = project(K, C + Eigen::Vector3f(1.f, 0.f, 0.f), R_wc, C);
     // p_lidar - C = LiDAR +X, which R_wc's transpose turns into camera +Z
     // (camera-forward) -- same axis remap as the centre check above.
-    const Eigen::Vector2d expected = cam.Project(Eigen::Vector3d(0.0, 0.0, 1.0));
-    CHECK(offset.u == doctest::Approx(expected.x()));
-    CHECK(offset.v == doctest::Approx(expected.y()));
+    // On-axis, so it lands on the principal point, as the centre check above.
+    CHECK(offset.u == doctest::Approx(K.cx));
+    CHECK(offset.v == doctest::Approx(K.cy));
     CHECK(offset.depth == doctest::Approx(1.0));
 }
 
@@ -492,22 +493,24 @@ TEST_CASE("scaleIntrinsics: a half-size image projects to half the pixel")
         CHECK(half.v == doctest::Approx(full.v * 0.5));
     }
 }
-// ── LoadMeiCamera ─────────────────────────────────────────────────────────────
+// ── loadMeiIntrinsics ─────────────────────────────────────────────────────────
 
 namespace
 {
     // Writes `body` to a temp file and loads it, so the parser is exercised
     // through its real file-reading path.
-    MeiCamera loadFromString(const std::string& body)
+    // Returns the loaded intrinsics, or nullopt when the load failed.
+    std::optional<Intrinsics> loadFromString(const std::string& body)
     {
         const std::string path = (std::filesystem::temp_directory_path() / "calib_core_test_camera_info.yaml").string();
         {
             std::ofstream f(path);
             f << body;
         }
-        MeiCamera cam = LoadMeiCamera(path);
+        Intrinsics K;
+        const bool ok = loadMeiIntrinsics(path, K);
         std::filesystem::remove(path);
-        return cam;
+        return ok ? std::optional<Intrinsics>(K) : std::nullopt;
     }
 
     const char* kSample = R"(# this rig's camera_info.yaml
@@ -524,35 +527,38 @@ distortion: [-0.0123, 0.0045, -0.0007, 0.0011, -0.0002]
 )";
 } // namespace
 
-TEST_CASE("LoadMeiCamera: reads this rig's flat camera_info.yaml")
+TEST_CASE("loadMeiIntrinsics: reads this rig's flat camera_info.yaml")
 {
-    const MeiCamera cam = loadFromString(kSample);
-    REQUIRE(cam.loaded);
-    CHECK(cam.frameId == "camera_front");
-    CHECK(cam.distortionModel == "insta360_mei_v2");
-    CHECK(cam.width == 3840);
-    CHECK(cam.height == 1920);
-    CHECK(cam.fx == doctest::Approx(620.5));
-    CHECK(cam.cy == doctest::Approx(539.5));
-    CHECK(cam.xi == doctest::Approx(1.234));
+    const auto K = loadFromString(kSample);
+    REQUIRE(K.has_value());
+    CHECK(K->model == CameraModel::Mei);
+    CHECK(K->width == 3840);
+    CHECK(K->height == 1920);
+    CHECK(K->fx == doctest::Approx(620.5));
+    CHECK(K->cy == doctest::Approx(539.5));
+    CHECK(K->xi == doctest::Approx(1.234));
     // distortion is (k1, k2, k3, p1, p2) -- NOT OpenCV's pinhole order.
-    CHECK(cam.k1 == doctest::Approx(-0.0123));
-    CHECK(cam.k2 == doctest::Approx(0.0045));
-    CHECK(cam.k3 == doctest::Approx(-0.0007));
-    CHECK(cam.p1 == doctest::Approx(0.0011));
-    CHECK(cam.p2 == doctest::Approx(-0.0002));
+    CHECK(K->k1 == doctest::Approx(-0.0123));
+    CHECK(K->k2 == doctest::Approx(0.0045));
+    CHECK(K->k3 == doctest::Approx(-0.0007));
+    CHECK(K->p1 == doctest::Approx(0.0011));
+    CHECK(K->p2 == doctest::Approx(-0.0002));
+    // The Mei polynomial has no rational denominator.
+    CHECK(K->k4 == 0.f);
+    CHECK(K->k5 == 0.f);
+    CHECK(K->k6 == 0.f);
 }
 
-TEST_CASE("LoadMeiCamera: quotes and comments are not taken literally")
+TEST_CASE("loadMeiIntrinsics: quotes and trailing comments are not taken literally")
 {
     std::string body = kSample;
-    body += "\nframe_id: \"quoted_name\"  # trailing comment\n";
-    const MeiCamera cam = loadFromString(body);
-    REQUIRE(cam.loaded);
-    CHECK(cam.frameId == "quoted_name");
+    body += "\nxi: 0.75  # trailing comment\n";
+    const auto K = loadFromString(body);
+    REQUIRE(K.has_value());
+    CHECK(K->xi == doctest::Approx(0.75));
 }
 
-TEST_CASE("LoadMeiCamera: a missing field fails instead of defaulting to 0")
+TEST_CASE("loadMeiIntrinsics: a missing field fails instead of defaulting to 0")
 {
     // A calibration that silently reads xi as 0 reprojects wrongly with no
     // visible failure, so the load has to reject it outright.
@@ -561,11 +567,14 @@ TEST_CASE("LoadMeiCamera: a missing field fails instead of defaulting to 0")
     REQUIRE(at != std::string::npos);
     body.erase(at, std::string("xi: 1.234\n").size());
 
-    const MeiCamera cam = loadFromString(body);
-    CHECK_FALSE(cam.loaded);
+    CHECK_FALSE(loadFromString(body).has_value());
 }
 
-TEST_CASE("LoadMeiCamera: a missing file degrades to loaded=false, not a crash")
+TEST_CASE("loadMeiIntrinsics: a missing file fails cleanly, and leaves K alone")
 {
-    CHECK_FALSE(LoadMeiCamera("/nonexistent/camera_info.yaml").loaded);
+    Intrinsics K = mei();
+    const Intrinsics before = K;
+    CHECK_FALSE(loadMeiIntrinsics("/nonexistent/camera_info.yaml", K));
+    CHECK(K.fx == before.fx);
+    CHECK(K.xi == before.xi);
 }

@@ -5,6 +5,10 @@
 #include <CalibCore/MeiCamera.h>
 
 #include <cmath>
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <string>
 
 using namespace calib;
 
@@ -251,9 +255,9 @@ TEST_CASE("mei: projectPoint wraps MeiCamera::Project rather than re-deriving it
     for (const auto& p : points)
     {
         Px r = project(K, p);
-        const cv::Point2d expected = cam.Project(cv::Point3d(p.x(), p.y(), p.z()));
-        CHECK(r.u == doctest::Approx(expected.x));
-        CHECK(r.v == doctest::Approx(expected.y));
+        const Eigen::Vector2d expected = cam.Project(p.cast<double>());
+        CHECK(r.u == doctest::Approx(expected.x()));
+        CHECK(r.v == doctest::Approx(expected.y()));
     }
 }
 
@@ -330,9 +334,9 @@ TEST_CASE("mei: respects the extrinsics")
     Px offset = project(K, C + Eigen::Vector3f(1.f, 0.f, 0.f), R_wc, C);
     // p_lidar - C = LiDAR +X, which R_wc's transpose turns into camera +Z
     // (camera-forward) -- same axis remap as the centre check above.
-    const cv::Point2d expected = cam.Project(cv::Point3d(0.0, 0.0, 1.0));
-    CHECK(offset.u == doctest::Approx(expected.x));
-    CHECK(offset.v == doctest::Approx(expected.y));
+    const Eigen::Vector2d expected = cam.Project(Eigen::Vector3d(0.0, 0.0, 1.0));
+    CHECK(offset.u == doctest::Approx(expected.x()));
+    CHECK(offset.v == doctest::Approx(expected.y()));
     CHECK(offset.depth == doctest::Approx(1.0));
 }
 
@@ -487,4 +491,81 @@ TEST_CASE("scaleIntrinsics: a half-size image projects to half the pixel")
         CHECK(half.u == doctest::Approx(full.u * 0.5));
         CHECK(half.v == doctest::Approx(full.v * 0.5));
     }
+}
+// ── LoadMeiCamera ─────────────────────────────────────────────────────────────
+
+namespace
+{
+    // Writes `body` to a temp file and loads it, so the parser is exercised
+    // through its real file-reading path.
+    MeiCamera loadFromString(const std::string& body)
+    {
+        const std::string path = (std::filesystem::temp_directory_path() / "calib_core_test_camera_info.yaml").string();
+        {
+            std::ofstream f(path);
+            f << body;
+        }
+        MeiCamera cam = LoadMeiCamera(path);
+        std::filesystem::remove(path);
+        return cam;
+    }
+
+    const char* kSample = R"(# this rig's camera_info.yaml
+frame_id: camera_front
+distortion_model: insta360_mei_v2
+width: 3840
+height: 1920
+fx: 620.5
+fy: 621.25
+cx: 959.5
+cy: 539.5
+xi: 1.234
+distortion: [-0.0123, 0.0045, -0.0007, 0.0011, -0.0002]
+)";
+} // namespace
+
+TEST_CASE("LoadMeiCamera: reads this rig's flat camera_info.yaml")
+{
+    const MeiCamera cam = loadFromString(kSample);
+    REQUIRE(cam.loaded);
+    CHECK(cam.frameId == "camera_front");
+    CHECK(cam.distortionModel == "insta360_mei_v2");
+    CHECK(cam.width == 3840);
+    CHECK(cam.height == 1920);
+    CHECK(cam.fx == doctest::Approx(620.5));
+    CHECK(cam.cy == doctest::Approx(539.5));
+    CHECK(cam.xi == doctest::Approx(1.234));
+    // distortion is (k1, k2, k3, p1, p2) -- NOT OpenCV's pinhole order.
+    CHECK(cam.k1 == doctest::Approx(-0.0123));
+    CHECK(cam.k2 == doctest::Approx(0.0045));
+    CHECK(cam.k3 == doctest::Approx(-0.0007));
+    CHECK(cam.p1 == doctest::Approx(0.0011));
+    CHECK(cam.p2 == doctest::Approx(-0.0002));
+}
+
+TEST_CASE("LoadMeiCamera: quotes and comments are not taken literally")
+{
+    std::string body = kSample;
+    body += "\nframe_id: \"quoted_name\"  # trailing comment\n";
+    const MeiCamera cam = loadFromString(body);
+    REQUIRE(cam.loaded);
+    CHECK(cam.frameId == "quoted_name");
+}
+
+TEST_CASE("LoadMeiCamera: a missing field fails instead of defaulting to 0")
+{
+    // A calibration that silently reads xi as 0 reprojects wrongly with no
+    // visible failure, so the load has to reject it outright.
+    std::string body = kSample;
+    const auto at = body.find("xi: 1.234\n");
+    REQUIRE(at != std::string::npos);
+    body.erase(at, std::string("xi: 1.234\n").size());
+
+    const MeiCamera cam = loadFromString(body);
+    CHECK_FALSE(cam.loaded);
+}
+
+TEST_CASE("LoadMeiCamera: a missing file degrades to loaded=false, not a crash")
+{
+    CHECK_FALSE(LoadMeiCamera("/nonexistent/camera_info.yaml").loaded);
 }

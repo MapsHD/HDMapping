@@ -31,6 +31,32 @@ void omFiKaFromMat3(const Eigen::Matrix3f& R, float& om_deg, float& fi_deg, floa
     ka_deg = static_cast<float>(rad2deg(pose.ka));
 }
 
+// No `default:` case on purpose: -Wswitch then flags a future CameraModel
+// enumerator added without a matching string here, instead of it silently
+// falling through to "pinhole".
+const char* modelToString(CameraModel m)
+{
+    switch (m)
+    {
+    case CameraModel::Pinhole:
+        return "pinhole";
+    case CameraModel::Equirectangular:
+        return "equirectangular";
+    case CameraModel::Mei:
+        return "mei";
+    }
+    return "pinhole";
+}
+
+CameraModel modelFromString(const std::string& s)
+{
+    if (s == "equirectangular")
+        return CameraModel::Equirectangular;
+    if (s == "mei")
+        return CameraModel::Mei;
+    return CameraModel::Pinhole;
+}
+
 // Radius (in normalized camera coords, squared) past which the rational distortion model
 // stops being usable. r -> r*radial(r) is only injective up to its turning point; beyond it
 // the model folds, so directions far outside the lens' actual field of view map back onto
@@ -122,14 +148,10 @@ bool projectPoint(float px, float py, float pz,
     Eigen::Vector3f pc = R_wc.transpose() * (Eigen::Vector3f(px, py, pz) - t);
 
     if (K.model == CameraModel::Equirectangular) {
-        // Longitude from atan2(x, z) across the full width, latitude from
+        // Longitude from atan2(x, z) across the width, latitude from
         // asin(y/|p|) across the height -- camera X = right, Y = down,
-        // Z = forward, i.e. kCameraLidarAxisOffset's convention, so v grows
-        // downward like image rows. Same model apps/manual_color colors with;
-        // that app reaches it through the vendored equirectangular_camera_
-        // colinearity_tait_bryan_wc_jacobian.h, not used here because it
-        // re-derives the rotation from a Tait-Bryan pose per point while
-        // R_wc/t are already in hand.
+        // Z = forward (kCameraLidarAxisOffset's convention), so v grows
+        // downward like image rows. Same model apps/manual_color colors with.
         depth = pc.norm();
         if (depth < 1e-4f) return false;  // point sits on the camera itself
 
@@ -145,14 +167,8 @@ bool projectPoint(float px, float py, float pz,
     }
 
     if (K.model == CameraModel::Mei) {
-        // Delegates to the tested/certified MeiCamera::Project (MeiCamera.h)
-        // instead of re-deriving the unified-sphere + radial/tangential
-        // formula here -- only the R_wc/t transform into camera frame, the
-        // "point sits on the camera itself" guard (same idiom as
-        // Equirectangular above), and the "in front of the camera" guard
-        // just below belong to this wrapper.
         depth = pc.norm();
-        if (depth < 1e-4f) return false;
+        if (depth < 1e-4f) return false;  // point sits on the camera itself
 
         // Validity domain. r(theta) = sin/(cos+xi) is only injective up to
         // its turning point at cos(theta) = -1/xi; past it the radius shrinks
@@ -171,9 +187,9 @@ bool projectPoint(float px, float py, float pz,
         cam.k1 = K.k1; cam.k2 = K.k2; cam.k3 = K.k3;
         cam.p1 = K.p1; cam.p2 = K.p2;
 
-        const cv::Point2d px = cam.Project(cv::Point3d(pc.x(), pc.y(), pc.z()));
-        u = static_cast<float>(px.x);
-        v = static_cast<float>(px.y);
+        const Eigen::Vector2d px = cam.Project(pc.cast<double>());
+        u = static_cast<float>(px.x());
+        v = static_cast<float>(px.y());
         return true;
     }
 

@@ -19,30 +19,6 @@
 #include <opencv2/imgproc.hpp>
 #include <vector>
 
-// ── model <-> string, for the calibration JSON's "model" key ─────────────────
-// No `default:` case on purpose: -Wswitch (this target builds with -Wall
-// -Wextra) then flags a future CameraModel enumerator added here without a
-// matching string, instead of it silently falling through to "pinhole".
-static const char* modelToString(CameraModel m)
-{
-    switch (m)
-    {
-    case CameraModel::Pinhole: return "pinhole";
-    case CameraModel::Equirectangular: return "equirectangular";
-    case CameraModel::Mei: return "mei";
-    }
-    return "pinhole";
-}
-
-static CameraModel modelFromString(const std::string& s)
-{
-    if (s == "equirectangular")
-        return CameraModel::Equirectangular;
-    if (s == "mei")
-        return CameraModel::Mei;
-    return CameraModel::Pinhole;
-}
-
 // ── AppState::rebuildImageTexture ─────────────────────────────────────────────
 void AppState::rebuildImageTexture()
 {
@@ -54,11 +30,9 @@ void AppState::rebuildImageTexture()
 
     // initUndistortRectifyMap assumes OpenCV's rational pinhole model --
     // running it for Mei (or Equirectangular) would silently mis-warp the
-    // image instead of undistorting it. Mei has no "undistort to pinhole"
-    // step here (that would need resampling through MeiCamera::Unproject
-    // into a virtual pinhole, not implemented), so its image is always
-    // shown raw; the projection overlay/GPU shaders apply its distortion
-    // directly to the raw image instead (see Renderer.cpp/RendererShaders.h).
+    // image rather than undistort it. Those models are shown raw instead,
+    // with the projection overlay and GPU shaders applying their distortion
+    // directly to the raw image (see Renderer.cpp/RendererShaders.h).
     if (intrinsicsLoaded && intrinsics.model == CameraModel::Pinhole)
     {
         cv::Mat K = (cv::Mat_<double>(3, 3) << intrinsics.fx, 0, intrinsics.cx, 0, intrinsics.fy, intrinsics.cy, 0, 0, 1);
@@ -101,10 +75,8 @@ std::string AppState::autoScaleIntrinsicsToImage()
     if (intrinsicsW == imageW && intrinsicsH == imageH)
         return "";
 
-    // Width ratio is the scale factor -- calib::scaleIntrinsics only takes
-    // one, so a genuine aspect-ratio change (as opposed to a uniform
-    // resize) can't be fully corrected; sy is only computed to detect and
-    // warn about that case.
+    // calib::scaleIntrinsics takes a single factor, so the width ratio is it;
+    // sy exists only to detect and warn about a real aspect-ratio change.
     float sx = static_cast<float>(imageW) / static_cast<float>(intrinsicsW);
     float sy = static_cast<float>(imageH) / static_cast<float>(intrinsicsH);
     intrinsics = calib::scaleIntrinsics(intrinsics, sx);
@@ -112,8 +84,7 @@ std::string AppState::autoScaleIntrinsicsToImage()
     intrinsicsH = imageH;
 
     char buf[192];
-    std::snprintf(
-        buf, sizeof(buf), "intrinsics auto-scaled %.4fx to match the %dx%d image", static_cast<double>(sx), imageW, imageH);
+    std::snprintf(buf, sizeof(buf), "intrinsics auto-scaled %.4fx to match the %dx%d image", static_cast<double>(sx), imageW, imageH);
     std::string note = buf;
     if (std::fabs(sx - sy) > 0.01f * sx)
         note += " (WARNING: aspect ratio differs from the calibration -- scaled by width only, results may be off)";
@@ -199,13 +170,11 @@ bool AppState::solvePairs()
 
     double rms = -1.0;
     std::string solveErr;
-    // Pinhole's reused observation equations are a pure rectilinear
-    // projection with no unified-sphere term, so they can't be used for
-    // Mei -- solveExtrinsicsMeiCeres (Ceres autodiff, optional at build
-    // time) is its counterpart instead. See CameraCalibrationSolver.h.
+    // Pinhole's observation equations have no unified-sphere term, so Mei
+    // uses solveExtrinsicsMeiCeres instead. See CameraCalibrationSolver.h.
     bool ok = (intrinsics.model == CameraModel::Mei)
-                  ? calib::solveExtrinsicsMeiCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation)
-                  : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation);
+        ? calib::solveExtrinsicsMeiCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation)
+        : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation);
     if (!ok)
     {
         statusMsg = !solveErr.empty() ? ("Solve failed: " + solveErr) : "Solve failed (degenerate correspondences)";
@@ -439,11 +408,10 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
     return true;
 }
 
-// A camera_info.yaml (MeiCamera's format) is a flat top-level mapping with a
-// `distortion_model:` key, unlike OpenCV's `camera_matrix:`/`distortion_
-// coefficients:` YAML -- peeked at as plain text (not parsed) so a normal
-// OpenCV pinhole YAML never round-trips through LoadMeiCamera and hits its
-// "missing an expected field" warnings for fields it was never going to have.
+// MeiCamera's camera_info.yaml is a flat mapping with a `distortion_model:`
+// key, unlike OpenCV's `camera_matrix:`/`distortion_coefficients:` YAML.
+// Peeked at as text so an OpenCV pinhole YAML never reaches LoadMeiCamera and
+// warns about fields it was never going to have.
 static bool yamlLooksLikeMei(const char* path)
 {
     std::ifstream f(path);
@@ -670,16 +638,25 @@ void AppState::saveCalibration(const char* path)
     Eigen::Vector3f ti = -(R.transpose() * C); // translation of T_lidar_to_camera
 
     nlohmann::json j;
-    // width/height record the resolution these intrinsics are valid for
-    // (intrinsicsW/H, not necessarily the original calibration file's own
-    // resolution -- see App.h) so a later load against a different-size
-    // image can auto-scale (AppState::autoScaleIntrinsicsToImage) instead
-    // of just warning about the mismatch. 0 means unknown.
-    j["intrinsics"] = { { "model", modelToString(intrinsics.model) }, { "fx", intrinsics.fx }, { "fy", intrinsics.fy },
-                        { "cx", intrinsics.cx }, { "cy", intrinsics.cy }, { "xi", intrinsics.xi }, { "k1", intrinsics.k1 },
-                        { "k2", intrinsics.k2 }, { "k3", intrinsics.k3 }, { "k4", intrinsics.k4 }, { "k5", intrinsics.k5 },
-                        { "k6", intrinsics.k6 }, { "p1", intrinsics.p1 }, { "p2", intrinsics.p2 },
-                        { "width", intrinsicsW }, { "height", intrinsicsH } };
+    // width/height record the resolution these intrinsics are valid for (see
+    // App.h) so a later load against a different-size image can auto-scale
+    // rather than just warn. 0 means unknown.
+    j["intrinsics"] = { { "model", modelToString(intrinsics.model) },
+                        { "fx", intrinsics.fx },
+                        { "fy", intrinsics.fy },
+                        { "cx", intrinsics.cx },
+                        { "cy", intrinsics.cy },
+                        { "xi", intrinsics.xi },
+                        { "k1", intrinsics.k1 },
+                        { "k2", intrinsics.k2 },
+                        { "k3", intrinsics.k3 },
+                        { "k4", intrinsics.k4 },
+                        { "k5", intrinsics.k5 },
+                        { "k6", intrinsics.k6 },
+                        { "p1", intrinsics.p1 },
+                        { "p2", intrinsics.p2 },
+                        { "width", intrinsicsW },
+                        { "height", intrinsicsH } };
     // Rotation is stored as a matrix only -- convention-independent (no
     // Euler/Tait-Bryan angle order or units to document/misread) and
     // directly portable to any external tool. camera_rotation_matrix_in_world

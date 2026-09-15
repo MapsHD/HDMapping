@@ -2,17 +2,12 @@ cmake_minimum_required(VERSION 4.0.0)
 
 project(calib_core_tests)
 
-# Unit tests for calib_core's camera model and solvers. calib_core
-# deliberately depends on nothing but Eigen/LASzip/std, plus OpenCV/yaml-cpp
-# for the Mei model and (optionally, see CALIB_ENABLE_CERES) Ceres for its
-# extrinsics solver (see calib_core/CMakeLists.txt) -- no raylib/imgui/GL --
-# so its projection math is directly testable without a GL context, which is
-# the whole reason the equirectangular and Mei models live there rather than
-# in an app.
-# Uses doctest (3rdparty/doctest/doctest.h) for the same reason shared/tests
-# does; see that directory's CMakeLists.txt. test_camera.cpp owns doctest's
-# main() (DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN); test_solver.cpp just adds more
-# TEST_CASEs to the same registry, same multi-TU doctest setup as shared/tests.
+# Unit tests for calib_core's camera models and solvers. calib_core pulls in
+# no raylib/imgui/GL, so its projection math is testable without a GL context
+# -- the reason the equirectangular and Mei models live there, not in an app.
+# Uses doctest, like shared/tests. test_camera.cpp owns doctest's main()
+# (DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN); test_solver.cpp adds more TEST_CASEs
+# to the same registry.
 add_executable(calib_core_tests
     test_camera.cpp
     test_solver.cpp

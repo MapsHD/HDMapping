@@ -788,4 +788,34 @@ inline std::string decodeSn(const uint8_t* data, size_t size)
 	return r.ok() ? s : std::string{};
 }
 
+// tf2_msgs/msg/TFMessage → McapTransform (first TransformStamped only; McapWriter
+// never writes more than one)
+inline std::optional<McapTransform> decodeTf(const uint8_t* data, size_t size)
+{
+	CdrReader r(data, size);
+
+	const uint32_t n = r.read_u32(); // transforms[] sequence length
+	if(n == 0)
+		return std::nullopt;
+
+	const int32_t stamp_sec = r.read_i32();
+	const uint32_t stamp_nsec = r.read_u32();
+	r.read_string(); // frame_id (parent)
+	r.read_string(); // child_frame_id
+
+	McapTransform t{};
+	t.timestamp = static_cast<double>(stamp_sec) + static_cast<double>(stamp_nsec) * 1e-9;
+	t.tx = r.read_f64();
+	t.ty = r.read_f64();
+	t.tz = r.read_f64();
+	t.qx = r.read_f64();
+	t.qy = r.read_f64();
+	t.qz = r.read_f64();
+	t.qw = r.read_f64();
+
+	if(!r.ok())
+		return std::nullopt;
+	return t;
+}
+
 } // namespace rosbags

@@ -262,6 +262,54 @@ TEST_CASE("McapFileWriter: IMU round-trip")
     fs::remove(path);
 }
 
+TEST_CASE("McapFileWriter: TF round-trip")
+{
+    const auto path = tempMcapPath("hdmapping_test_tf.mcap");
+
+    std::vector<rosbags::McapTransform> transforms;
+    for (int i = 0; i < 5; ++i)
+    {
+        rosbags::McapTransform t{};
+        t.timestamp = 6000.0 + i * 0.1;
+        t.tx = 1.0 * i;
+        t.ty = -2.0 * i;
+        t.tz = 0.5;
+        t.qx = 0.0;
+        t.qy = 0.0;
+        t.qz = 0.0;
+        t.qw = 1.0;
+        transforms.push_back(t);
+    }
+
+    {
+        rosbags::McapWriterOptions options;
+        options.frame_id = "lidar";
+        options.map_frame = "map";
+        rosbags::McapFileWriter writer(path, options);
+        REQUIRE(writer.isOpen());
+        writer.writeTf(transforms);
+    }
+
+    const auto decoded = readTopic<std::optional<rosbags::McapTransform>>(
+        path, "/tf", [](const uint8_t* d, size_t n)
+        {
+            return rosbags::decodeTf(d, n);
+        });
+
+    REQUIRE(decoded.size() == transforms.size());
+    for (size_t i = 0; i < transforms.size(); ++i)
+    {
+        REQUIRE(decoded[i].has_value());
+        CHECK(decoded[i]->tx == doctest::Approx(transforms[i].tx));
+        CHECK(decoded[i]->ty == doctest::Approx(transforms[i].ty));
+        CHECK(decoded[i]->tz == doctest::Approx(transforms[i].tz));
+        CHECK(decoded[i]->qw == doctest::Approx(transforms[i].qw));
+        CHECK(decoded[i]->timestamp == doctest::Approx(transforms[i].timestamp).epsilon(1e-6));
+    }
+
+    fs::remove(path);
+}
+
 TEST_CASE("McapFileWriter: custom topic names are honored")
 {
     const auto path = tempMcapPath("hdmapping_test_topics.mcap");

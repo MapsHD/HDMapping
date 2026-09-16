@@ -119,6 +119,54 @@ if (MSVC)
     target_compile_options(laz_to_mcap PRIVATE /bigobj)
 endif()
 
+# session_to_mcap: a processed lidar_odometry_step_1 session (session.json)
+# -> MCAP exporter (undistorted lidar in the map frame + /tf map->lidar,
+# optionally /imu re-read from the original recording via --raw-dir). Unlike
+# laz_to_mcap it touches Core::Session, whose layout branches on WITH_GUI (see
+# core/CMakeLists.txt's add_core_target) -- so this links core_no_gui, not
+# ${CORE_LIBRARIES} (= core, the WITH_GUI=1 build laz_to_mcap gets away with
+# only because it never includes Core/session.h). Mirrors the include/link set
+# apps/lidar_odometry_step_1/tests uses to combine lidar_odometry_utils.cpp
+# with core_no_gui in one binary.
+add_executable(
+  session_to_mcap session_to_mcap.cpp
+  ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1/lidar_odometry_utils.h
+  ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1/lidar_odometry_utils.cpp
+  ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.h ${REPOSITORY_DIRECTORY}/rosbags/McapWriter.cpp
+  )
+
+target_include_directories(
+  session_to_mcap
+  PRIVATE ${REPOSITORY_DIRECTORY}/apps/lidar_odometry_step_1
+          ${REPOSITORY_DIRECTORY}/core/include
+          ${REPOSITORY_DIRECTORY}/rosbags
+          ${THIRDPARTY_DIRECTORY} # csv.hpp (used by load_imu)
+          ${THIRDPARTY_DIRECTORY}/glm
+          ${EIGEN3_INCLUDE_DIR}
+          ${THIRDPARTY_DIRECTORY}/tomlplusplus/include
+          ${THIRDPARTY_DIRECTORY}/json/include
+          ${LASZIP_INCLUDE_DIR}/LASzip/include
+          ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+          ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp
+          ${THIRDPARTY_DIRECTORY}/Fusion/Fusion)
+
+target_link_libraries(
+          session_to_mcap
+          PRIVATE
+          mcap
+          core_no_gui
+          vqf
+          Fusion
+          unordered_dense::unordered_dense
+          spdlog::spdlog
+          UTL::include
+          ${PLATFORM_LASZIP_LIB}
+          ${PLATFORM_MISCELLANEOUS_LIBS})
+
+if (MSVC)
+    target_compile_options(session_to_mcap PRIVATE /bigobj)
+endif()
+
 # These are built whenever BUILD_WITH_CLI_TOOLS is ON (the default), so they
 # ship in the DEB package alongside the GUI apps.
 hdmapping_install_app(
@@ -130,4 +178,5 @@ hdmapping_install_app(
   pcd_to_laz
   laz_to_txt
   laz_to_mcap
-  mcap_to_laz)
+  mcap_to_laz
+  session_to_mcap)

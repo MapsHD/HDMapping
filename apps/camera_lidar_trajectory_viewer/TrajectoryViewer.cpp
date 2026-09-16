@@ -22,6 +22,7 @@
 #include <RaylibWidgets/WindowFit.h>
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -42,9 +43,9 @@
 using namespace calib;
 namespace fs = std::filesystem;
 
-// Shortcuts help table (Help menu). Only lists this app's actual bindings --
-// no A-Z scaffold like multi_view_tls_registration_step_2's, since
-// ShowShortcutsTable() just renders whatever it's given.
+//! Shortcuts help table (Help menu). Only lists this app's actual bindings --
+//! no A-Z scaffold like multi_view_tls_registration_step_2's, since
+//! ShowShortcutsTable() just renders whatever it's given.
 static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "Normal keys", "C", "Toggle compass/ruler" },
     { "", "P", "Toggle show path" },
@@ -73,8 +74,8 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "", "Shift+R", "Open 'Center of rotation' dialog" },
 };
 
-// Copies `path` into `buf` (truncating to fit), for wiring a native-dialog
-// result back into the same fixed-size char[] the matching text field edits.
+//! Copies `path` into `buf` (truncating to fit), for wiring a native-dialog
+//! result back into the same fixed-size char[] the matching text field edits.
 static void setBuf(char* buf, size_t bufSize, const std::string& path)
 {
     if (path.empty())
@@ -83,7 +84,7 @@ static void setBuf(char* buf, size_t bufSize, const std::string& path)
     buf[bufSize - 1] = '\0';
 }
 
-// Build a time(seconds) -> T_world_lidar map suitable for getInterpolatedPose().
+//! Build a time(seconds) -> T_world_lidar map suitable for getInterpolatedPose().
 static std::map<double, Eigen::Matrix4d> buildTrajMap(const Trajectory& traj)
 {
     std::map<double, Eigen::Matrix4d> m;
@@ -92,8 +93,12 @@ static std::map<double, Eigen::Matrix4d> buildTrajMap(const Trajectory& traj)
     return m;
 }
 
-// Interpolated T_world_lidar at ts_ns. Returns false when ts_ns lies outside the
-// trajectory range — getInterpolatedPose() signals that with a zero matrix.
+//! Interpolated T_world_lidar at a timestamp.
+//! @param trajMap trajectory to sample
+//! @param ts_ns timestamp, nanoseconds
+//! @param out receives the pose
+//! @return false when ts_ns lies outside the trajectory range, which
+//!         getInterpolatedPose() signals with a zero matrix
 static bool interpPose(const std::map<double, Eigen::Matrix4d>& trajMap, int64_t ts_ns, Eigen::Affine3f& out)
 {
     Eigen::Matrix4d T = getInterpolatedPose(trajMap, ts_ns * 1e-9);
@@ -105,10 +110,10 @@ static bool interpPose(const std::map<double, Eigen::Matrix4d>& trajMap, int64_t
 
 static constexpr double kRad2Deg = 57.295779513082320876;
 
-// Angular speed (deg/s) for every trajectory pose: the rotation change to the next
-// pose divided by the time step. Result is parallel to traj.poses; the last entry
-// repeats the previous one. Fewer than two poses -> all zeros. Non-increasing
-// timestamps (chunk boundaries, duplicates) reuse the previous value.
+//! Angular speed (deg/s) for every trajectory pose: the rotation change to the next
+//! pose divided by the time step. Result is parallel to traj.poses; the last entry
+//! repeats the previous one. Fewer than two poses -> all zeros. Non-increasing
+//! timestamps (chunk boundaries, duplicates) reuse the previous value.
 static std::vector<float> computePoseAngularSpeedDeg(const Trajectory& traj)
 {
     const auto& poses = traj.poses;
@@ -130,8 +135,8 @@ static std::vector<float> computePoseAngularSpeedDeg(const Trajectory& traj)
     return speed;
 }
 
-// Angular speed (deg/s) at the trajectory pose nearest ts_ns. 0 when there's no
-// per-pose data (not loaded, or size mismatch with the trajectory).
+//! Angular speed (deg/s) at the trajectory pose nearest ts_ns. 0 when there's no
+//! per-pose data (not loaded, or size mismatch with the trajectory).
 static float angularSpeedDegAt(const Trajectory& traj, const std::vector<float>& perPose, int64_t ts_ns)
 {
     if (traj.poses.empty() || perPose.size() != traj.poses.size())
@@ -219,66 +224,97 @@ struct AppState
 {
     Trajectory traj;
     std::vector<int64_t> imageTsNs;
-    Intrinsics K;
-    Extrinsics E; // tx/ty/tz (camera position); rotation lives in R_wc below, not E.om/fi/ka
-    Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); // camera orientation in world/LiDAR frame
+    Intrinsics K; //!< K.model selects pinhole / equirectangular / Mei (see CalibCore/Camera.h)
+    //! How K.model was decided: the calibration file's "model" key wins when
+    //! present, else the "Load as equirectangular" tick decides between
+    //! Pinhole and Equirectangular. Kept as state rather than applied on the
+    //! spot because either input can change independently of the other, so
+    //! resolveCameraModel() recomputes K.model whenever one does.
+    CameraModel fileModel = CameraModel::Pinhole;
+    bool modelExplicit = false; //!< the calibration file named a model
+    bool loadAsEquirectangular = false; //!< UI tick: treat frames as a 360 panorama
+    Extrinsics E; //!< tx/ty/tz (camera position); rotation lives in R_wc below, not E.om/fi/ka
+    Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); //!< camera orientation in world/LiDAR frame
     Roi roi;
+    //! Free-form counterpart of `roi`: a per-pixel mask whose rejected pixels
+    //! are excluded from coloring. Needed to drop the operator/backpack a 360
+    //! rig has permanently in frame, which no rectangle can cut out without
+    //! taking the scene with it. Kept at the file's own resolution, strictly
+    //! 0/255 (see loadMask), and resampled where used since images are read at
+    //! s.imgScale. Coloring only -- the ROS 2 and COLMAP exports are not masked.
+    cv::Mat mask; //!< empty = none loaded
+    bool maskEnabled = false; //!< acted on only while `mask` is non-empty
+    bool maskInvert = false; //!< UI state; loadMask and the toggle flip `mask` itself
+    char maskBuf[512] = {};
+    float maskRejectFrac = 0.f; //!< share of pixels the mask drops, for the UI
+    bool showMaskOverlay = true; //!< tint the rejected area over the image preview
+    Texture2D maskTex = {}; //!< that tint, RGBA, built by refreshMaskDerived
+    bool maskTexValid = false;
     bool calibLoaded = false;
-    int imgW = 4656, imgH = 3496;
+    int imgW = 4656, imgH = 3496; //!< overwritten from the first scanned image by loadImages()
 
-    // loaded camera images: timestamp → resized BGR Mat
+    //! loaded camera images: timestamp → resized BGR Mat
     std::map<int64_t, std::string> imagesFilenamesInTime;
-    const float imgScale = 1.0f;
+    //! Downscale applied to every image used for coloring: full-resolution
+    //! camera frames add up when multiImgColoring holds a chunk's worth at
+    //! once. Intrinsics are scaled to match.
+    float imgScale = 1.0f;
+    //! Manual correction for a constant camera/LiDAR clock offset (e.g. a fixed
+    //! trigger/USB latency the camera's own timestamps don't account for):
+    //! t_traj = t_image + timeOffsetSec. Applied wherever an image timestamp is
+    //! matched against the LiDAR/pose timeline (loadCloud's chunk selection +
+    //! point matching, exportColmap's per-image pose lookup) -- never to the raw
+    //! timestamps used for filename lookup or image-list indexing
+    //! (s.imageTsNs/imagesFilenamesInTime).
+    double timeOffsetSec = 0.0;
     GpuCloud cloud;
     Shader shader = {};
     bool shaderOk = false;
     int locMVP = -1, locPS = -1, locCM = -1, locDecim = -1, locSel = -1;
 
-    // Driving orbit's Euler mode (rotateX/rotateY/translate/rotationCenter/
-    // isOrtho), not its azimuth/elevation/distance/target mode -- the same
-    // camera engine multi_view_tls_registration_step_2 uses, manually
-    // driven through rlgl (see display()'s camera setup) instead of
-    // raylib's Camera3D/BeginMode3D.
+    //! Driven in Euler mode (rotateX/rotateY/translate/rotationCenter/isOrtho),
+    //! not azimuth/elevation/distance/target, through rlgl rather than raylib's
+    //! Camera3D/BeginMode3D -- see display()'s camera setup.
     raylib_widgets::OrbitCamera orbit;
-    // Rebuilt from orbit.euler every frame in display() -- used only for
-    // drawCompassRuler()'s right/up vectors, same reasoning as step2's own
-    // app_state.viewLocal (OrbitCamera itself stays Eigen-free).
+    //! Rebuilt from orbit.euler every frame in display() -- used only for
+    //! drawCompassRuler()'s right/up vectors, same reasoning as step2's own
+    //! app_state.viewLocal (OrbitCamera itself stays Eigen-free).
     Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity();
     bool showCenterOfRotationWindow = false;
 
-    // controls
+    //! controls
     bool showPath = true;
     bool showFrustums = true;
     bool showCompassRuler = true;
     bool showHelp = false;
-    bool isolateCamera = false; // render only points colored by the selected (preview) image
+    bool isolateCamera = false; //!< render only points colored by the selected (preview) image
     float frustumScale = 0.5f;
     float pointSize = 1.f;
     int cloudDecim = 1;
     int drawDecim = 1;
-    bool multiImgColoring = true; // false = single image per chunk (midpoint)
-    // How each point is matched to a camera image:
-    //   0 = temporal  — image nearest in time (± maxWiggle frames, within maxTemporalDist)
-    //   1 = geometry  — among all chunk images the point projects into, the one
-    //                   with the smallest depth (closest camera)
+    bool multiImgColoring = true; //!< false = single image per chunk (midpoint)
+    //! How each point is matched to a camera image:
+    //!   0 = temporal  — image nearest in time (± maxWiggle frames, within maxTemporalDist)
+    //!   1 = geometry  — among all chunk images the point projects into, the one
+    //!                   with the smallest depth (closest camera)
     int colorStrategy = 0;
-    float maxTemporalDist = 0.5f; // s: skip images farther than this from the point (temporal)
-    int maxWiggle = 1; // frames: search startIdx ± maxWiggle for a frustum hit (temporal)
+    float maxTemporalDist = 0.5f; //!< s: skip images farther than this from the point (temporal)
+    int maxWiggle = 1; //!< frames: search startIdx ± maxWiggle for a frustum hit (temporal)
 
     // ── fast-rotation image filter ─────────────────────────────────────────────
-    // Per-pose angular speed (deg/s), parallel to traj.poses — filled by
-    // loadSession(). Images captured while the rig turns faster than
-    // maxImageAngSpeedDeg are dropped from the colorize pass (motion-smeared).
+    //! Per-pose angular speed (deg/s), parallel to traj.poses — filled by
+    //! loadSession(). Images captured while the rig turns faster than
+    //! maxImageAngSpeedDeg are dropped from the colorize pass (motion-smeared).
     std::vector<float> poseAngSpeedDeg;
-    float poseAngSpeedMax = 0.f; // deg/s: peak over the whole session (display only)
-    bool filterFastImages = true; // drop motion-smeared frames from the colorize pass
-    float maxImageAngSpeedDeg = 60.f; // deg/s threshold
-    int angFilteredImgs = 0; // images skipped by the filter in the last colorize pass
+    float poseAngSpeedMax = 0.f; //!< deg/s: peak over the whole session (display only)
+    bool filterFastImages = true; //!< drop motion-smeared frames from the colorize pass
+    float maxImageAngSpeedDeg = 60.f; //!< deg/s threshold
+    int angFilteredImgs = 0; //!< images skipped by the filter in the last colorize pass
 
-    bool useImageColor = false; // true once a colorize pass produced RGB data
-    int colorMode = 0; // 0=intensity (jet), 1=RGB by image, 2=camera id
-    int coloredPts = 0; // points that received RGB from an image
-    int uncoloredPts = 0; // points left as intensity-gray (no image / out of frustum / outside ROI)
+    bool useImageColor = false; //!< true once a colorize pass produced RGB data
+    int colorMode = 0; //!< 0=intensity (jet), 1=RGB by image, 2=camera id
+    int coloredPts = 0; //!< points that received RGB from an image
+    int uncoloredPts = 0; //!< points left as intensity-gray (no image / out of frustum / outside ROI)
 
     char sessionBuf[512] = {};
     char calibBuf[512] = {};
@@ -286,11 +322,9 @@ struct AppState
     char exportBuf[512] = "colored.laz";
     std::vector<ColorPt> exportCloud;
 
-    // One entry per loaded LIO chunk ("scan_lio_N"), pointing at a contiguous
-    // [begin, begin+count) slice of exportCloud. `pose` is the chunk's MRP
-    // correction transform (identity when there is no session_poses.mrp). Used
-    // by the "Save session as E57" export to keep the segments as separate
-    // Data3D blocks instead of one collapsed cloud.
+    //! One entry per loaded LIO chunk ("scan_lio_N"), naming a contiguous
+    //! [begin, begin+count) slice of exportCloud. Lets the E57 session export
+    //! keep the chunks as separate Data3D blocks instead of one collapsed cloud.
     struct ExportSegment
     {
         std::string name;
@@ -304,7 +338,7 @@ struct AppState
 
     // ── ROS 2 export ──────────────────────────────────────────────────────────
     char rosOutBuf[512] = "ros2_export";
-    int rosStorageIdx = 0; // 0 = mcap, 1 = sqlite3
+    int rosStorageIdx = 0; //!< 0 = mcap, 1 = sqlite3
     RosExportOptions ros;
     std::thread rosThread;
     std::atomic<bool> rosBusy{ false };
@@ -315,16 +349,16 @@ struct AppState
     // ── COLMAP export ─────────────────────────────────────────────────────────
     char colmapBuf[512] = "colmap_out";
     bool colmapCopyImages = false;
-    int colmapPtDecim = 50; // splat-friendly default (~500k from a 25M cloud)
+    int colmapPtDecim = 50; //!< splat-friendly default (~500k from a 25M cloud)
 
     // ── image viewer ────────────────────────────────────────────────────────
     int imgViewIdx = 0;
     Texture2D imgViewTex = {};
     bool imgViewTexValid = false;
     std::atomic<int> imgViewRequest{ -1 };
-    // Bumped when the image set itself is replaced (a camera directory dropped). The loader
-    // thread skips a request whose index it already served, so without this a swap that keeps
-    // the same index would leave the previous frame on screen.
+    //! Bumped when the image set itself is replaced (a camera directory dropped). The loader
+    //! thread skips a request whose index it already served, so without this a swap that keeps
+    //! the same index would leave the previous frame on screen.
     std::atomic<int> imgViewEpoch{ 0 };
     std::atomic<bool> imgViewStop{ false };
     std::atomic<bool> imgViewLoading{ false };
@@ -332,25 +366,33 @@ struct AppState
     cv::Mat imgViewPending;
     bool imgViewHasNew = false;
     std::thread imgViewThread;
+
+    // ── synthetic intensity-projection image (drawn next to the photo) ─────
+    //! Reprojects exportCloud through the same calibration as the colorize
+    //! pass, jet-colormapped over intensity -- a reference image to check the
+    //! calibration against the photo by eye.
+    bool showIntensityProjection = false;
+    bool intensityProjNeedsUpdate = false; //!< set on toggle/refresh/image change
+    Texture2D intensityProjTex = {};
+    bool intensityProjTexValid = false;
+    int intensityProjDecim = 1; //!< use every Nth point of exportCloud (perf)
+    float intensityProjPointRadius = 1.5f; //!< splat radius, in output-image pixels
+    bool intensityProjOverlay = false; //!< true: alpha-blend on top of the photo instead of side-by-side
+    float intensityProjAlpha = 0.6f; //!< blend strength when intensityProjOverlay is on
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-// Plain Eigen::Vector3f -> raylib Vector3 conversion. Used to be an axis
-// remap (x, z, -y) that made this app's native Z-up LiDAR data render
-// correctly under raylib's Y-up Camera3D/BeginMode3D convention; now that
-// the camera is multi_view_tls_registration_step_2's own Z-up rlgl-driven
-// one, geometry renders in its native coordinates and this is a no-op
-// component copy.
+//! Eigen::Vector3f -> raylib Vector3. A plain component copy: the camera is
+//! Z-up, so geometry renders in its native coordinates with no axis remap.
 static Vector3 toVec3(const Eigen::Vector3f& v)
 {
     return { v.x(), v.y(), v.z() };
 }
 
-// Finds the trajectory pose closest to `ray` (unconditional nearest, no
-// distance cutoff) and returns its world-space position -- mirrors
-// multi_view_tls_registration_step_2's getClosestTrajectoryPoint(), backed
-// by the same shared raylib_widgets::pickNearestPointOnLine() picker.
-// Returns false (outPoint untouched) when the trajectory is empty.
+//! Trajectory pose closest to `ray` -- unconditional nearest, no distance
+//! cutoff. Backed by the same picker step2's getClosestTrajectoryPoint() uses.
+//! @param outPoint receives the world-space position
+//! @return false, outPoint untouched, when the trajectory is empty
 static bool nearestTrajectoryPoint(const Trajectory& traj, const Ray& ray, Vector3& outPoint)
 {
     if (traj.poses.empty())
@@ -369,12 +411,11 @@ static bool nearestTrajectoryPoint(const Trajectory& traj, const Ray& ray, Vecto
     return true;
 }
 
-// Intersects `ray` with the Z=0 ground plane -- same plane
-// multi_view_tls_registration_step_2's setNewRotationCenter() intersects
-// (via RegistrationPlaneFeature::Plane{0,0,1,0} + rayIntersection()),
-// reimplemented directly in raylib/raymath terms since those two types live
-// in `core`, which this app deliberately doesn't link. Returns false
-// (outPoint untouched) when the ray is ~parallel to the plane.
+//! Intersects `ray` with the Z=0 ground plane, as step2's
+//! setNewRotationCenter() does -- in raylib/raymath terms, since step2's types
+//! live in `core`, which this app deliberately doesn't link.
+//! @param outPoint receives the intersection
+//! @return false, outPoint untouched, when the ray is ~parallel to the plane
 static bool intersectGroundPlaneZ0(const Ray& ray, Vector3& outPoint)
 {
     const float kTolerance = 0.0001f;
@@ -386,45 +427,104 @@ static bool intersectGroundPlaneZ0(const Ray& ray, Vector3& outPoint)
     return true;
 }
 
-// Load all cam0_*.jpg from CAMERA_0 (sibling of session dir) into s.images, resized by s.imgScale.
+//! Timestamp for a camera frame, or -1 when the file isn't one. Prefers the
+//! `.meta.json` sidecar's FRAME_WALL_CLOCK (@ref calib::LoadTimestampFromSideCar)
+//! -- the camera's own capture wall clock -- falling back to the timestamp
+//! encoded in the filename when no sidecar is found. Layout is "<any
+//! prefix>_<timestamp_ns>.jpg" or a bare "<timestamp_ns>.jpg" -- everything up
+//! to the last '_' is ignored, so Mandeye's "cam0_<ts>" parses without a list
+//! of rigs here.
+//! @param p file to parse
+//! @return the timestamp, or -1 when the name doesn't match. The all-digits
+//!         check rejects unrelated .jpgs, which would reach std::stoll.
+//! @note The filename timestamp is when the frame was saved to disk; the
+//!       sidecar's FRAME_WALL_CLOCK is a few ms earlier and more accurate, so
+//!       it wins whenever present rather than merely filling a gap.
+static int64_t parseImageTsNs(const fs::path& p)
+{
+    if (p.extension() != ".jpg")
+        return -1;
+    std::string stem = p.stem().string();
+    if (auto us = stem.rfind('_'); us != std::string::npos)
+        stem = stem.substr(us + 1);
+    if (stem.empty() || stem.find_first_not_of("0123456789") != std::string::npos)
+        return -1;
+    int64_t ts;
+    try
+    {
+        ts = std::stoll(stem);
+    } catch (...)
+    {
+        return -1;
+    }
+
+    if (const auto sidecarTs = calib::LoadTimestampFromSideCar(p.string()))
+        return static_cast<int64_t>(std::llround(*sidecarTs));
+    return ts;
+}
+
+//! Directory holding the camera frames: whatever the user picked, else the
+//! CAMERA_0 sibling of the session dir.
+static fs::path cameraDir(const AppState& s)
+{
+    return s.cameraBuf[0] ? fs::path(s.cameraBuf) : fs::path(s.sessionBuf).parent_path() / "CAMERA_0";
+}
+
+//! AppState::timeOffsetSec in nanoseconds, to match the timestamps.
+static int64_t imageTimeOffsetNs(const AppState& s)
+{
+    return (int64_t)std::llround(s.timeOffsetSec * 1e9);
+}
+
+//! Settles K.model from the two inputs that can select it, in precedence
+//! order. Call after any of them changes; see AppState::fileModel for why.
+static void resolveCameraModel(AppState& s)
+{
+    if (s.modelExplicit)
+        s.K.model = s.fileModel;
+    else
+        s.K.model = s.loadAsEquirectangular ? CameraModel::Equirectangular : CameraModel::Pinhole;
+}
+
+//! Index every camera frame in the camera directory by timestamp. Also picks up
+//! the image dimensions -- read by the ROI default, the frustums and COLMAP's
+//! cameras.txt.
 static void loadImages(AppState& s)
 {
     s.imagesFilenamesInTime.clear();
-    fs::path camDir;
-    if (s.cameraBuf[0])
-    {
-        camDir = fs::path(s.cameraBuf);
-    }
-    else
-    {
-        camDir = fs::path(s.sessionBuf).parent_path() / "CAMERA_0";
-    }
+    fs::path camDir = cameraDir(s);
     if (!fs::is_directory(camDir))
     {
-        s.status = "No CAMERA_0 dir found";
+        s.status = "No camera image dir found: " + camDir.string();
         return;
     }
 
     int loaded = 0;
     for (auto& e : fs::directory_iterator(camDir))
     {
-        std::string n = e.path().filename().string();
-        if (n.rfind("cam0_", 0) != 0 || e.path().extension() != ".jpg")
+        int64_t ts = parseImageTsNs(e.path());
+        if (ts < 0)
             continue;
-        try
+        s.imagesFilenamesInTime[ts] = e.path().string();
+        ++loaded;
+    }
+    if (!s.imagesFilenamesInTime.empty())
+    {
+        cv::Mat probe = cv::imread(s.imagesFilenamesInTime.begin()->second, cv::IMREAD_COLOR);
+        if (!probe.empty())
         {
-            // filename: cam0_<timestamp_ns>.jpg  → strip prefix (5) and ext (4)
-            int64_t ts = std::stoll(n.substr(5, n.size() - 9));
-            s.imagesFilenamesInTime[ts] = e.path().string();
-            ++loaded;
-        } catch (...)
-        {
+            s.imgW = probe.cols;
+            s.imgH = probe.rows;
         }
     }
+
+    resolveCameraModel(s);
+    s.K.width = s.imgW;
+    s.K.height = s.imgH;
     s.status = "Images loaded: " + std::to_string(loaded) + " from " + camDir.string();
 }
 
-// Parse session_poses.mrp → map from chunk stem (e.g. "scan_lio_0") to Affine3f.
+//! Parse session_poses.mrp → map from chunk stem (e.g. "scan_lio_0") to Affine3f.
 static std::map<std::string, Eigen::Affine3f> parseMRP(const fs::path& mrpPath)
 {
     std::map<std::string, Eigen::Affine3f> result;
@@ -501,22 +601,14 @@ static void loadSession(AppState& s)
     s.poseAngSpeedMax = s.poseAngSpeedDeg.empty() ? 0.f : *std::max_element(s.poseAngSpeedDeg.begin(), s.poseAngSpeedDeg.end());
 
     // camera image timestamps
-    fs::path camDir = s.cameraBuf[0] ? fs::path(s.cameraBuf) : d.parent_path() / "CAMERA_0";
+    fs::path camDir = cameraDir(s);
     if (fs::is_directory(camDir))
     {
         for (auto& e : fs::directory_iterator(camDir))
         {
-            std::string n = e.path().filename().string();
-            if (n.rfind("cam0_", 0) == 0 && e.path().extension() == ".jpg")
-            {
-                try
-                {
-                    int64_t ts = std::stoll(n.substr(5, n.size() - 9));
-                    s.imageTsNs.push_back(ts);
-                } catch (...)
-                {
-                }
-            }
+            int64_t ts = parseImageTsNs(e.path());
+            if (ts >= 0)
+                s.imageTsNs.push_back(ts);
         }
         std::sort(s.imageTsNs.begin(), s.imageTsNs.end());
     }
@@ -525,40 +617,9 @@ static void loadSession(AppState& s)
         (mrp.empty() ? "  (no MRP)" : "  +MRP") + "  — press Load cloud";
 }
 
-// Radius (in normalized camera coords, squared) past which the rational distortion model
-// stops being usable. r -> r*radial(r) is only injective up to its turning point; beyond it
-// the model folds, so directions far outside the lens' actual field of view map back onto
-// valid pixel coordinates. With a strongly-fitted model that is not a corner case: for the
-// intrinsics this app is used with, a direction 56 deg off the optical axis lands mid-image
-// and one at 60 deg lands exactly on the principal point, painting whatever is at the centre
-// of the frame onto geometry the camera never saw. The projection alone cannot tell such a
-// fold-back from a genuine hit, so find the turning point once and reject everything past
-// it. Scanned numerically -- the turning point of a 6th-order rational function has no
-// useful closed form. It always lies outside the image itself (otherwise the calibration
-// could not reach its own corners), so no legitimate pixel is lost.
-static float maxValidRadiusSq(float k1, float k2, float k3, float k4, float k5, float k6)
-{
-    auto g = [&](float r)
-    {
-        float r2 = r * r;
-        float den = 1.f + (k4 + (k5 + k6 * r2) * r2) * r2;
-        if (std::fabs(den) < 1e-9f)
-            return -1.f; // pole -- certainly past the turning point
-        return r * (1.f + (k1 + (k2 + k3 * r2) * r2) * r2) / den;
-    };
-    // 8.0 == tan(83 deg), wider than any lens this app sees. A distortion-free model is
-    // monotonic everywhere and so keeps the whole range, i.e. no behaviour change.
-    const float kLimit = 8.f, kStep = 0.005f;
-    float prev = 0.f;
-    for (float r = kStep; r <= kLimit; r += kStep)
-    {
-        float cur = g(r);
-        if (cur <= prev)
-            return (r - kStep) * (r - kStep);
-        prev = cur;
-    }
-    return kLimit * kLimit;
-}
+// The off-axis fold-back cutoff that used to live here now lives in
+// calib_core (Camera.cpp's maxValidRadiusSq), applied inside
+// calib::projectPoint so every caller gets it -- not just this one.
 
 static void loadCloud(AppState& s)
 {
@@ -589,25 +650,32 @@ static void loadCloud(AppState& s)
     bool canColor = s.calibLoaded && !s.imagesFilenamesInTime.empty();
     Eigen::Matrix3f R_wc = canColor ? s.R_wc : Eigen::Matrix3f::Identity();
     Eigen::Vector3f C(s.E.tx, s.E.ty, s.E.tz);
-    float K_fx = s.K.fx * s.imgScale, K_fy = s.K.fy * s.imgScale;
-    float K_cx = s.K.cx * s.imgScale, K_cy = s.K.cy * s.imgScale;
-    // OpenCV rational + tangential distortion applied to each projected point, so
+    // Images are read at s.imgScale, so the intrinsics must match. For pinhole
+    // calib::projectPoint applies the rational + tangential distortion, so
     // colours are sampled from the raw (distorted) images at the right pixel.
-    // With all-zero coefficients this reduces exactly to the pinhole model.
-    const float d_k1 = s.K.k1, d_k2 = s.K.k2, d_k3 = s.K.k3;
-    const float d_k4 = s.K.k4, d_k5 = s.K.k5, d_k6 = s.K.k6;
-    const float d_p1 = s.K.p1, d_p2 = s.K.p2;
-    // (x, y) = normalized camera coords (X/Z, Y/Z) → distorted normalized coords.
-    auto distort = [=](float x, float y, float& xd, float& yd)
+    const Intrinsics Ks = scaleIntrinsics(s.K, s.imgScale);
+    // The ROI is in full-resolution pixels (see calib::Roi) but probe() tests
+    // it against pixels read at s.imgScale, so it scales like the intrinsics.
+    const Roi roiS = scaleRoi(s.roi, s.imgScale);
+    const int64_t offNs = imageTimeOffsetNs(s);
+    // The mask is at its file's resolution while images are read at s.imgScale,
+    // so it is resampled -- lazily, on the first image probed, since the frame
+    // size isn't known until one has been read.
+    const bool haveMask = !s.mask.empty();
+    cv::Mat maskFit;
+    // Every image of a chunk is held in memory at once (multiImgColoring), so
+    // for large frames the scale is what keeps that bounded.
+    auto readImage = [&](const std::string& path)
     {
-        float r2 = x * x + y * y;
-        float radial = (1.f + (d_k1 + (d_k2 + d_k3 * r2) * r2) * r2) / (1.f + (d_k4 + (d_k5 + d_k6 * r2) * r2) * r2);
-        xd = x * radial + 2.f * d_p1 * x * y + d_p2 * (r2 + 2.f * x * x);
-        yd = y * radial + d_p1 * (r2 + 2.f * y * y) + 2.f * d_p2 * x * y;
+        cv::Mat img = cv::imread(path);
+        if (!img.empty() && s.imgScale != 1.0f)
+        {
+            cv::Mat small;
+            cv::resize(img, small, cv::Size(), s.imgScale, s.imgScale, cv::INTER_AREA);
+            img = std::move(small);
+        }
+        return img;
     };
-    // Off-axis cutoff for the model above -- see maxValidRadiusSq().
-    const float rMaxSq = maxValidRadiusSq(d_k1, d_k2, d_k3, d_k4, d_k5, d_k6);
-
     auto packGray = [](float intensity) -> float
     {
         uint8_t g = (uint8_t)(std::min(1.f, std::max(0.f, intensity)) * 255.f);
@@ -675,12 +743,15 @@ static void loadCloud(AppState& s)
         {
             if (s.multiImgColoring)
             {
-                // new: every image whose timestamp falls inside the chunk range
-                auto it0 = std::lower_bound(s.imageTsNs.begin(), s.imageTsNs.end(), chunkFirst);
-                auto it1 = std::upper_bound(s.imageTsNs.begin(), s.imageTsNs.end(), chunkLast);
+                // new: every image whose timestamp falls inside the chunk range.
+                // Search bounds are shifted by -offNs since s.imageTsNs holds raw
+                // (unshifted) camera timestamps: imgTs+offNs in [chunkFirst,
+                // chunkLast]  <=>  imgTs in [chunkFirst-offNs, chunkLast-offNs].
+                auto it0 = std::lower_bound(s.imageTsNs.begin(), s.imageTsNs.end(), chunkFirst - offNs);
+                auto it1 = std::upper_bound(s.imageTsNs.begin(), s.imageTsNs.end(), chunkLast - offNs);
                 for (auto it = it0; it != it1; ++it)
                 {
-                    int64_t imgTs = *it;
+                    int64_t imgTs = *it; // raw camera-clock timestamp; keyed as-is into imagesFilenamesInTime
                     auto fnIt = s.imagesFilenamesInTime.find(imgTs);
                     if (fnIt == s.imagesFilenamesInTime.end())
                         continue;
@@ -690,19 +761,22 @@ static void loadCloud(AppState& s)
                         continue;
                     }
                     Eigen::Affine3f pose;
-                    if (!interpPose(trajMap, imgTs, pose))
+                    if (!interpPose(trajMap, imgTs + offNs, pose))
                         continue;
-                    cv::Mat img = cv::imread(fnIt->second);
+                    cv::Mat img = readImage(fnIt->second);
                     if (img.empty())
                         continue;
                     int gidx = (int)(it - s.imageTsNs.begin());
-                    chunkImgs.push_back({ imgTs, pose, std::move(img), gidx });
+                    // ImgEntry.ts is stored already shifted into the LiDAR clock,
+                    // since it's compared against pt.ts_ns further below.
+                    chunkImgs.push_back({ imgTs + offNs, pose, std::move(img), gidx });
                 }
             }
             else
             {
-                // legacy: single image nearest to chunk midpoint
-                int64_t mid = chunkFirst;
+                // legacy: single image nearest to chunk midpoint (see note above
+                // on why the search target is shifted by -offNs)
+                int64_t mid = chunkFirst - offNs;
                 auto it = std::lower_bound(s.imageTsNs.begin(), s.imageTsNs.end(), mid);
                 if (it == s.imageTsNs.end())
                     --it;
@@ -718,12 +792,12 @@ static void loadCloud(AppState& s)
                 const bool tooFast = dropFastImgs && angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, imgTs) > s.maxImageAngSpeedDeg;
                 if (tooFast)
                     ++angFilteredImgs;
-                if (!tooFast && fnIt != s.imagesFilenamesInTime.end() && interpPose(trajMap, imgTs, pose))
+                if (!tooFast && fnIt != s.imagesFilenamesInTime.end() && interpPose(trajMap, imgTs + offNs, pose))
                 {
-                    cv::Mat img = cv::imread(fnIt->second);
+                    cv::Mat img = readImage(fnIt->second);
                     int gidx = (int)(it - s.imageTsNs.begin());
                     if (!img.empty())
-                        chunkImgs.push_back({ imgTs, pose, std::move(img), gidx });
+                        chunkImgs.push_back({ imgTs + offNs, pose, std::move(img), gidx });
                 }
             }
         }
@@ -792,6 +866,11 @@ static void loadCloud(AppState& s)
                     float inRoiF = -1.f; // 1 inside ROI, 0 outside, -1 not in frustum
                     int globalIdx = -1;
                 };
+                // Equirectangular: a 360 camera has no frustum, so every point
+                // projects into every image. The temporal search therefore
+                // always succeeds at w == 0, leaving maxTemporalDist the only
+                // real gate, and the geometry strategy compares ranges across
+                // every image of the chunk -- correct, just not short-circuiting.
                 auto probe = [&](int idx) -> Hit
                 {
                     Hit h;
@@ -799,34 +878,54 @@ static void loadCloud(AppState& s)
                         return h;
                     auto& e = chunkImgs[idx];
                     Eigen::Vector3f pl = e.pose.inverse() * pw;
-                    Eigen::Vector3f pc_ = R_wc.transpose() * (pl - C);
-                    if (pc_.z() <= 0.05f)
+                    float u, v, depth;
+                    if (!projectPoint(pl.x(), pl.y(), pl.z(), Ks, R_wc, C, u, v, depth))
                         return h;
-                    float xn = pc_.x() / pc_.z(), yn = pc_.y() / pc_.z();
-                    // Outside the cone the lens model is valid over: distorting this would
-                    // fold it back into the frame. See maxValidRadiusSq().
-                    if (xn * xn + yn * yn > rMaxSq)
+                    // Too close to the lens to be a real observation. Mei too:
+                    // its depth is a range rather than a z, but 5 cm means the
+                    // same thing physically, and projectPoint's Mei guard only
+                    // rejects a point essentially AT the camera.
+                    // Equirectangular keeps its "no near clip" behaviour.
+                    if ((Ks.model == CameraModel::Pinhole || Ks.model == CameraModel::Mei) && depth <= 0.05f)
                         return h;
-                    float xd, yd;
-                    distort(xn, yn, xd, yd);
-                    int iu = (int)std::round(K_fx * xd + K_cx);
-                    int iv = (int)std::round(K_fy * yd + K_cy);
+                    int iu = (int)std::round(u);
+                    int iv = (int)std::round(v);
+                    if (Ks.model == CameraModel::Equirectangular)
+                    {
+                        // u is wrapped into [0, cols) but rounding can still
+                        // land on cols at the seam; v spans [0, rows] inclusive.
+                        iu = (iu % e.img.cols + e.img.cols) % e.img.cols;
+                        iv = std::clamp(iv, 0, e.img.rows - 1);
+                    }
                     if (iu < 0 || iu >= e.img.cols || iv < 0 || iv >= e.img.rows)
                         return h;
-                    // point projects into this image — record ROI membership so
-                    // the "In ROI" render mode can show it, independent of whether
-                    // the ROI filter is currently enabled.
-                    bool haveRoi = s.roi.w > 0 && s.roi.h > 0;
-                    bool insideRoi = !haveRoi || (iu >= s.roi.x && iu < s.roi.x + s.roi.w && iv >= s.roi.y && iv < s.roi.y + s.roi.h);
-                    h.inRoiF = insideRoi ? 1.f : 0.f;
-                    // outside the region of interest? leave the point uncolored
-                    if (s.roi.enabled && !insideRoi)
+                    // point projects into this image — record ROI/mask membership
+                    // so the "In ROI / mask" render mode can show it, independent
+                    // of whether either filter is currently enabled.
+                    bool haveRoi = roiS.w > 0 && roiS.h > 0;
+                    bool insideRoi = !haveRoi || (iu >= roiS.x && iu < roiS.x + roiS.w && iv >= roiS.y && iv < roiS.y + roiS.h);
+                    bool insideMask = true;
+                    if (haveMask)
+                    {
+                        // INTER_NEAREST, so the mask stays strictly 0/255: a
+                        // bilinear resize would invent half-masked pixels along
+                        // every edge, which the test below would then silently
+                        // round one way. Every frame of a session is the same
+                        // size, so this resizes once.
+                        if (maskFit.cols != e.img.cols || maskFit.rows != e.img.rows)
+                            cv::resize(s.mask, maskFit, e.img.size(), 0, 0, cv::INTER_NEAREST);
+                        insideMask = maskFit.at<uint8_t>(iv, iu) != 0;
+                    }
+                    h.inRoiF = (insideRoi && insideMask) ? 1.f : 0.f;
+                    // outside the region of interest, or masked out? leave the
+                    // point uncolored
+                    if ((s.roi.enabled && !insideRoi) || (s.maskEnabled && !insideMask))
                         return h;
                     cv::Vec3b bgr = e.img.at<cv::Vec3b>(iv, iu);
                     uint32_t p = (uint32_t(bgr[2]) << 16) | (uint32_t(bgr[1]) << 8) | uint32_t(bgr[0]);
                     std::memcpy(&h.colorF, &p, 4);
                     h.globalIdx = e.globalIdx;
-                    h.depth = pc_.z();
+                    h.depth = depth;
                     h.ok = true;
                     return h;
                 };
@@ -939,13 +1038,9 @@ static void loadCloud(AppState& s)
     {
         s.cloud.upload(gpuData, mx);
 
-        // Frame the loaded cloud -- instant, not eased (this runs once on
-        // load, before there's anything to transition from). Same "recenter
-        // and look at" formula as OrbitCamera::moveEulerRotationCenterTo()
-        // (translate.xy = -center.xy keeps the point centered on screen
-        // regardless of the current rotate angles), applied directly to
-        // both euler and eulerGoal so there's no stale transition target
-        // left over from a previous session.
+        // Frame the loaded cloud, instant rather than eased -- this runs once on
+        // load, with nothing to transition from. Set on both euler and eulerGoal
+        // so no stale transition target survives from a previous session.
         Vector3 center = { sumX / cnt, sumY / cnt, sumZ / cnt };
         float dist = std::max(5.f, mx * 0.3f);
         s.orbit.euler.rotationCenter = center;
@@ -966,6 +1061,93 @@ static void loadCloud(AppState& s)
         s.status += "  | Fast-img filtered: " + std::to_string(angFilteredImgs);
 }
 
+//! Small CPU jet colormap approximation, matching the GLSL one used by the
+//! GPU point renderer's Intensity color mode (raylib_widgets::kJetColormapGLSL)
+//! closely enough for a visual reference image. Returns BGR (OpenCV order).
+static cv::Vec3b jetColorBGR(float t)
+{
+    t = std::clamp(t, 0.f, 1.f);
+    float r = std::clamp(1.5f - std::fabs(4.f * t - 3.f), 0.f, 1.f);
+    float g = std::clamp(1.5f - std::fabs(4.f * t - 2.f), 0.f, 1.f);
+    float b = std::clamp(1.5f - std::fabs(4.f * t - 1.f), 0.f, 1.f);
+    return cv::Vec3b((uchar)(b * 255.f), (uchar)(g * 255.f), (uchar)(r * 255.f));
+}
+
+//! Rasterizes a synthetic "intensity image" for the camera pose at imgTsAdj,
+//! reprojecting s.exportCloud through the same extrinsics and projectPoint() as
+//! the colorize pass, jet-colormapped over intensity with a per-pixel depth test
+//! so occluded points don't bleed through. Points more than s.maxTemporalDist
+//! (1s fallback) from imgTsAdj are skipped, the same temporal gate the
+//! "Temporal" coloring strategy applies -- otherwise every preview would test
+//! the whole session's cloud.
+static cv::Mat renderIntensityProjection(const AppState& s, int64_t imgTsAdj)
+{
+    const Intrinsics Ks = scaleIntrinsics(s.K, s.imgScale);
+    cv::Mat out(std::max(1, Ks.height), std::max(1, Ks.width), CV_8UC3, cv::Scalar(25, 25, 25));
+    if (s.exportCloud.empty() || Ks.width <= 0 || Ks.height <= 0)
+        return out;
+
+    auto trajMap = buildTrajMap(s.traj);
+    Eigen::Affine3f pose;
+    if (!interpPose(trajMap, imgTsAdj, pose))
+        return out;
+    const Eigen::Affine3f poseInv = pose.inverse();
+    const Eigen::Matrix3f& R_wc = s.R_wc;
+    const Eigen::Vector3f C(s.E.tx, s.E.ty, s.E.tz);
+
+    const int64_t windowNs = (int64_t)((s.maxTemporalDist > 0.f ? s.maxTemporalDist : 1.0f) * 1e9);
+    const int step = std::max(1, s.intensityProjDecim);
+    const int radius = std::max(1, (int)std::lround(s.intensityProjPointRadius));
+
+    cv::Mat depthBuf(out.rows, out.cols, CV_32F, cv::Scalar(std::numeric_limits<float>::max()));
+    for (size_t i = 0; i < s.exportCloud.size(); i += step)
+    {
+        const auto& p = s.exportCloud[i];
+        if (std::abs(p.ts_ns - imgTsAdj) > windowNs)
+            continue;
+        Eigen::Vector3f pl = poseInv * Eigen::Vector3f(p.x, p.y, p.z);
+        float u, v, depth;
+        if (!projectPoint(pl.x(), pl.y(), pl.z(), Ks, R_wc, C, u, v, depth))
+            continue;
+        if (Ks.model == CameraModel::Pinhole && depth <= 0.05f)
+            continue;
+        // Points near-grazing the camera plane get blown up to huge u/v by the
+        // perspective divide, and this function pulls in a whole time window's
+        // worth, so it hits that far more often than colorize() does. Casting
+        // such a value with (int)std::round() is UB -- the "bowtie" artifact --
+        // so reject before the cast.
+        if (!std::isfinite(u) || !std::isfinite(v) || std::fabs(u) > 1e6f || std::fabs(v) > 1e6f)
+            continue;
+        int iu = (int)std::round(u);
+        int iv = (int)std::round(v);
+        const cv::Vec3b col = jetColorBGR(p.intensity);
+
+        for (int dy = -radius; dy <= radius; ++dy)
+        {
+            int yy = iv + dy;
+            if (yy < 0 || yy >= out.rows)
+                continue;
+            for (int dx = -radius; dx <= radius; ++dx)
+            {
+                if (dx * dx + dy * dy > radius * radius)
+                    continue;
+                int xx = iu + dx;
+                if (Ks.model == CameraModel::Equirectangular)
+                    xx = (xx % out.cols + out.cols) % out.cols;
+                else if (xx < 0 || xx >= out.cols)
+                    continue;
+                float& zb = depthBuf.at<float>(yy, xx);
+                if (depth < zb)
+                {
+                    zb = depth;
+                    out.at<cv::Vec3b>(yy, xx) = col;
+                }
+            }
+        }
+    }
+    return out;
+}
+
 static void loadCalib(AppState& s)
 {
     std::ifstream f(s.calibBuf);
@@ -976,6 +1158,33 @@ static void loadCalib(AppState& s)
     }
     nlohmann::json j;
     f >> j;
+    // "mei" (or the rig's "insta360_mei_v2"), anything else pinhole. Accepted
+    // at the top level or inside "intrinsics". Assigned unconditionally, so
+    // loading a pinhole calibration after another model clears the flag
+    // rather than inheriting it.
+    {
+        const bool topLevel = j.contains("model");
+        const bool nested = j.contains("intrinsics") && j["intrinsics"].contains("model");
+        s.modelExplicit = topLevel || nested;
+        std::string model;
+        if (topLevel)
+            model = j.value("model", std::string{});
+        else if (nested)
+            model = j["intrinsics"].value("model", std::string{});
+        std::transform(
+            model.begin(),
+            model.end(),
+            model.begin(),
+            [](unsigned char c)
+            {
+                return (char)std::tolower(c);
+            });
+        if (model == "mei" || model == "insta360_mei_v2")
+            s.fileModel = CameraModel::Mei;
+        else
+            s.fileModel = CameraModel::Pinhole;
+        resolveCameraModel(s);
+    }
     if (j.contains("intrinsics"))
     {
         auto& ji = j["intrinsics"];
@@ -983,7 +1192,10 @@ static void loadCalib(AppState& s)
         s.K.fy = ji.value("fy", s.K.fy);
         s.K.cx = ji.value("cx", s.K.cx);
         s.K.cy = ji.value("cy", s.K.cy);
-        // rational distortion model (used by ROS export to rectify images)
+        // Pinhole: the rational distortion model (also what the ROS export
+        // rectifies with). Mei reuses k1/k2/k3 and p1/p2 as its own plain
+        // polynomial and adds xi, leaving k4/k5/k6 unused -- see
+        // CalibCore/Camera.h.
         s.K.k1 = ji.value("k1", s.K.k1);
         s.K.k2 = ji.value("k2", s.K.k2);
         s.K.k3 = ji.value("k3", s.K.k3);
@@ -992,6 +1204,7 @@ static void loadCalib(AppState& s)
         s.K.k6 = ji.value("k6", s.K.k6);
         s.K.p1 = ji.value("p1", s.K.p1);
         s.K.p2 = ji.value("p2", s.K.p2);
+        s.K.xi = ji.value("xi", s.K.xi);
     }
     if (j.contains("extrinsics"))
     {
@@ -1028,6 +1241,84 @@ static void loadCalib(AppState& s)
     }
     s.calibLoaded = true;
     s.status = "Calibration loaded";
+}
+
+//! Rebuilds what is derived from s.mask: the rejected-pixel share the UI
+//! reports, and the translucent red overlay drawn over the image preview. Call
+//! after anything that changes the mask. Main thread only -- it creates a GL
+//! texture.
+static void refreshMaskDerived(AppState& s)
+{
+    if (s.maskTexValid)
+    {
+        UnloadTexture(s.maskTex);
+        s.maskTexValid = false;
+    }
+    if (s.mask.empty())
+    {
+        s.maskRejectFrac = 0.f;
+        return;
+    }
+    const int total = s.mask.rows * s.mask.cols;
+    const int kept = cv::countNonZero(s.mask);
+    s.maskRejectFrac = total ? (float)(total - kept) / (float)total : 0.f;
+
+    // The overlay only has to read correctly in a preview pane, so it is capped
+    // well below the frame size a 360 rig produces rather than uploading a
+    // 22 MP texture to show a hand-painted blob.
+    cv::Mat m = s.mask;
+    const int kMaxSide = 1024;
+    const int longSide = std::max(m.cols, m.rows);
+    if (longSide > kMaxSide)
+        cv::resize(s.mask, m, cv::Size(), (double)kMaxSide / longSide, (double)kMaxSide / longSide, cv::INTER_NEAREST);
+    cv::Mat rgba(m.rows, m.cols, CV_8UC4);
+    for (int y = 0; y < m.rows; ++y)
+    {
+        const uint8_t* srcRow = m.ptr<uint8_t>(y);
+        cv::Vec4b* dstRow = rgba.ptr<cv::Vec4b>(y);
+        for (int x = 0; x < m.cols; ++x)
+            dstRow[x] = srcRow[x] ? cv::Vec4b(0, 0, 0, 0) : cv::Vec4b(255, 40, 40, 110);
+    }
+    Image ri = { rgba.data, rgba.cols, rgba.rows, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+    s.maskTex = LoadTextureFromImage(ri);
+    s.maskTexValid = s.maskTex.id > 0;
+}
+
+//! Loads the mask named by s.maskBuf. Any format OpenCV reads is reduced to one
+//! 8-bit channel thresholded at 128, so a pixel is either kept or dropped, never
+//! partly, and a jpeg mask's compression noise can't leak in as almost-black.
+//! White keeps, black drops, unless "Invert mask" is on. Any resolution works --
+//! the mask is resampled to the frame size in loadCloud.
+static void loadMask(AppState& s)
+{
+    if (!s.maskBuf[0])
+    {
+        s.status = "No mask file selected";
+        return;
+    }
+    cv::Mat img = cv::imread(s.maskBuf, cv::IMREAD_GRAYSCALE);
+    if (img.empty())
+    {
+        s.status = std::string("Failed to read mask: ") + s.maskBuf;
+        return;
+    }
+    cv::threshold(img, s.mask, 128, 255, s.maskInvert ? cv::THRESH_BINARY_INV : cv::THRESH_BINARY);
+    s.maskEnabled = true;
+    refreshMaskDerived(s);
+    char msg[160];
+    std::snprintf(msg, sizeof(msg), "Mask loaded: %dx%d, %.1f%% masked out", s.mask.cols, s.mask.rows, s.maskRejectFrac * 100.f);
+    s.status = msg;
+}
+
+//! Drops the mask entirely, as opposed to unticking "Image mask", which keeps
+//! it loaded and ready to re-enable.
+static void clearMask(AppState& s)
+{
+    s.mask.release();
+    s.maskEnabled = false;
+    s.maskBuf[0] = '\0';
+    refreshMaskDerived(s);
+    s.status = "Mask cleared";
 }
 
 static void exportLAZ(AppState& s)
@@ -1116,8 +1407,8 @@ static void exportLAZ(AppState& s)
     s.status = "Exported " + std::to_string(s.exportCloud.size()) + " pts → " + s.exportBuf;
 }
 
-// E57 counterpart of exportLAZ(): one Data3D block, points already in world
-// coordinates (identity pose), RGB + intensity + per-point timestamp.
+//! E57 counterpart of exportLAZ(): one Data3D block, points already in world
+//! coordinates (identity pose), RGB + intensity + per-point timestamp.
 static void exportE57(AppState& s)
 {
     if (s.exportCloud.empty())
@@ -1157,11 +1448,9 @@ static void exportE57(AppState& s)
         s.status = std::string("Export failed: ") + err;
 }
 
-// Save the colored cloud as a *session*: one E57 Data3D block per loaded LIO
-// chunk ("scan_lio_N"), NOT one collapsed cloud. Each block holds that
-// segment's points in its own frame with the chunk's MRP correction as the
-// block pose (identity when there is no session_poses.mrp), so the result
-// re-opens as a multi-scan session (e.g. in step 2).
+//! Save the colored cloud as a session: one E57 Data3D block per LIO chunk
+//! rather than one collapsed cloud, each in its own frame with the chunk's MRP
+//! correction as the block pose, so it re-opens as a multi-scan session.
 static void exportE57Session(AppState& s)
 {
     if (s.exportSegments.empty())
@@ -1221,9 +1510,9 @@ static void exportE57Session(AppState& s)
 }
 
 // ── File actions ─────────────────────────────────────────────────────────────
-// Factored out so the File menu items and their keyboard shortcuts (in the
-// main loop below) call the exact same code, matching the openSession()-style
-// convention used by mandeye_single_session_viewer/multi_view_tls_registration.
+//! Factored out so the File menu items and their keyboard shortcuts (in the
+//! main loop below) call the exact same code, matching the openSession()-style
+//! convention used by mandeye_single_session_viewer/multi_view_tls_registration.
 static void actionSelectLioResultDir(AppState& s)
 {
     setBuf(s.sessionBuf, sizeof(s.sessionBuf), mandeye::fd::SelectFolder("Select LIO result directory"));
@@ -1244,32 +1533,43 @@ static void actionOpenCalibration(AppState& s)
     }
 }
 
-// A directory holding this app's camera frames (cam0_<timestamp_ns>.jpg).
-static bool isCameraDir(const fs::path& dir)
+//! Whether a directory holds a *.mjs session manifest directly -- lidar_odometry_step_1
+//! writes session.mjs alongside session_poses.mrp/session_ini_poses.mri, so this is a
+//! reliable positive marker for "this is a LIO result (session) directory".
+static bool hasMjsFile(const fs::path& dir)
 {
     for (const auto& e : fs::directory_iterator(dir))
-    {
-        std::string n = e.path().filename().string();
-        if (n.rfind("cam0_", 0) == 0 && e.path().extension() == ".jpg")
+        if (e.path().extension() == ".mjs")
             return true;
-    }
     return false;
 }
 
-// Drag & drop equivalent of actionSelectLioResultDir()/actionSelectCamera0Dir()/
-// actionOpenCalibration(), and unlike those menu actions it applies immediately instead of
-// waiting for the "Load session" button, since a drop is already an explicit "load this"
-// gesture. A dropped directory of cam0_*.jpg is the camera directory (only the images are
-// swapped, so the trajectory and the loaded cloud survive); any other directory is this
-// app's session (LIO result dir). A dropped *.json is treated as a calibration file. Used by
-// the drag & drop handler in main()'s loop below.
+//! Menu action: pick a mask image and load it into s.mask.
+static void actionOpenMask(AppState& s)
+{
+    std::string path = mandeye::fd::OpenFileDialogOneFile("Select image mask", mandeye::fd::ImageFilter);
+    if (!path.empty())
+    {
+        setBuf(s.maskBuf, sizeof(s.maskBuf), path);
+        loadMask(s);
+    }
+}
+
+//! Drag & drop equivalent of the menu load actions, applied immediately rather
+//! than waiting for "Load session" -- a drop is already an explicit "load this".
+//! A dropped directory containing a *.mjs manifest is a session (LIO result
+//! dir); any other dropped directory is the camera directory (only the images
+//! are swapped, so the trajectory and cloud survive); a *.mjs file is a
+//! session manifest (its parent directory is the session, as with --mjs); a
+//! *.json is a calibration file.
 static void handleDroppedPath(AppState& s, const std::string& path)
 {
     if (fs::is_directory(path))
     {
-        // Checked before the session branch: a CAMERA_0 folder is never a LIO result dir,
-        // and dropping one onto a loaded session must not wipe the trajectory.
-        if (isCameraDir(path))
+        // Checked before the session branch: only a *.mjs manifest marks a LIO
+        // result dir, so dropping a plain image folder onto a loaded session
+        // must not wipe the trajectory.
+        if (!hasMjsFile(path))
         {
             setBuf(s.cameraBuf, sizeof(s.cameraBuf), path);
             loadImages(s);
@@ -1297,6 +1597,20 @@ static void handleDroppedPath(AppState& s, const std::string& path)
     {
         setBuf(s.calibBuf, sizeof(s.calibBuf), path);
         loadCalib(s);
+    }
+    else if (ext == ".mjs")
+    {
+        // Session manifest, same convention as --mjs: the session directory is its parent.
+        setBuf(s.sessionBuf, sizeof(s.sessionBuf), fs::path(path).parent_path().string());
+        loadSession(s);
+    }
+    else if (ext == ".png" || ext == ".bmp" || ext == ".jpg" || ext == ".jpeg")
+    {
+        // The only single image this app takes as input is a mask -- camera
+        // frames arrive as the session's whole CAMERA_0 directory, never one
+        // file at a time.
+        setBuf(s.maskBuf, sizeof(s.maskBuf), path);
+        loadMask(s);
     }
     else
     {
@@ -1347,8 +1661,8 @@ static void actionSelectColmapOutputDir(AppState& s)
     setBuf(s.colmapBuf, sizeof(s.colmapBuf), mandeye::fd::SelectFolder("Select COLMAP output directory"));
 }
 
-// Export a COLMAP sparse text model (cameras/images/points3D) from the current
-// state. Poses are world->camera; the colored cloud becomes points3D.
+//! Export a COLMAP sparse text model (cameras/images/points3D) from the current
+//! state. Poses are world->camera; the colored cloud becomes points3D.
 static void exportColmap(AppState& s)
 {
     if (!s.calibLoaded)
@@ -1359,6 +1673,15 @@ static void exportColmap(AppState& s)
     if (s.imagesFilenamesInTime.empty())
     {
         s.status = "COLMAP: no images";
+        return;
+    }
+    if (s.K.model != CameraModel::Pinhole)
+    {
+        // COLMAP's text model has no equirectangular camera type, and none of
+        // its fisheye types is the unified-sphere (Mei) model -- none carries
+        // an xi -- so the FULL_OPENCV line below would misdescribe the images.
+        s.status = s.K.model == CameraModel::Equirectangular ? "COLMAP: equirectangular camera model is not supported by COLMAP"
+                                                             : "COLMAP: Mei camera model is not supported by COLMAP";
         return;
     }
 
@@ -1397,11 +1720,12 @@ static void exportColmap(AppState& s)
              "#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\n"
              "#   POINTS2D[] as (X, Y, POINT3D_ID)\n";
         auto trajMap = buildTrajMap(s.traj);
+        const int64_t offNs = imageTimeOffsetNs(s);
         int id = 1;
         for (auto& [ts, path] : s.imagesFilenamesInTime)
         {
             Eigen::Affine3f pose;
-            if (!interpPose(trajMap, ts, pose))
+            if (!interpPose(trajMap, ts + offNs, pose))
                 continue;
             Eigen::Affine3f T_wc = pose * T_lc; // camera in world
             Eigen::Affine3f T_cw = T_wc.inverse(); // world -> camera
@@ -1465,11 +1789,14 @@ static void exportColmap(AppState& s)
     s.status = "COLMAP: " + std::to_string(nImg) + " images, " + std::to_string(nPts) + " points (+ply) -> " + sparse.string();
 }
 
-// Gather everything the ROS exporter needs from current viewer state.
+//! Gather everything the ROS exporter needs from current viewer state.
 static void buildRosInput(AppState& s, RosExportInput& in)
 {
     in.traj = s.traj;
-    in.imageFiles = s.imagesFilenamesInTime;
+    // Stamps go into the bag on the trajectory clock, like every other topic.
+    in.imageFiles.clear();
+    for (const auto& [ts, path] : s.imagesFilenamesInTime)
+        in.imageFiles[ts + imageTimeOffsetNs(s)] = path;
     in.calibLoaded = s.calibLoaded;
     in.K = s.K;
     in.E = s.E;
@@ -1567,11 +1894,30 @@ static void drawScene(AppState& s)
 
         for (int64_t ts : s.imageTsNs)
         {
-            const TrajPose* pose = s.traj.nearest(ts);
+            const TrajPose* pose = s.traj.nearest(ts + imageTimeOffsetNs(s));
             if (!pose)
                 continue;
 
             Vector3 origin = toVec3(pose->T * C);
+
+            bool hl = (ts == hlTs);
+            Color fc = hl ? Color{ 255, 255, 50, 255 } : ORANGE;
+            float sc = hl ? fs * 1.05f : fs;
+
+            if (s.K.model != CameraModel::Pinhole)
+            {
+                // Neither a 360 nor a fisheye camera has a frustum the
+                // fx/fy/cx/cy pyramid describes, so draw position and axes
+                // instead -- the usual X=red, Y=green, Z=blue.
+                DrawSphere(origin, fs * (hl ? 0.08f : 0.05f), fc);
+                const Color axisColors[3] = { RED, GREEN, BLUE };
+                for (int k = 0; k < 3; k++)
+                {
+                    Eigen::Vector3f tip = R_wc.col(k) * (sc * 0.5f) + C;
+                    DrawLine3D(origin, toVec3(pose->T * tip), hl ? fc : axisColors[k]);
+                }
+                continue;
+            }
 
             Vector3 w[4];
             for (int k = 0; k < 4; k++)
@@ -1579,10 +1925,6 @@ static void drawScene(AppState& s)
                 Eigen::Vector3f pl = R_wc * Eigen::Vector3f(ncx[k] * fs, ncy[k] * fs, fs) + C;
                 w[k] = toVec3(pose->T * pl);
             }
-
-            bool hl = (ts == hlTs);
-            Color fc = hl ? Color{ 255, 255, 50, 255 } : ORANGE;
-            float sc = hl ? fs * 1.05f : fs;
 
             if (hl)
             {
@@ -1648,9 +1990,13 @@ int main(int argc, char* argv[])
 
     AppState s;
     // --mjs gives the session manifest; the session directory is its parent.
+    // Also accepts the session directory itself, for symmetry with drag & drop.
     std::string sessionDir;
     if (args.has("mjs"))
-        sessionDir = fs::path(args.get("mjs")).parent_path().string();
+    {
+        fs::path mjsPath(args.get("mjs"));
+        sessionDir = fs::is_directory(mjsPath) ? mjsPath.string() : mjsPath.parent_path().string();
+    }
     else if (!args.positional.empty())
         sessionDir = args.positional.front(); // back-compat
     if (!sessionDir.empty())
@@ -1773,17 +2119,9 @@ int main(int argc, char* argv[])
             if (IsKeyPressed(KEY_LEFT_CONTROL) || IsKeyPressed(KEY_RIGHT_CONTROL))
                 s.colorMode = (s.colorMode == 1) ? 0 : 1;
 
-            // Chord choices avoid colliding in MEANING with
-            // multi_view_tls_registration_step_2's shortcuts (Ctrl+L there
-            // is manual loop closure, Ctrl+E is the lio segments editor;
-            // bare F there is the "camera Front" preset). Ctrl+O and bare
-            // C/P are kept aligned with step2 (Ctrl+O = open/load session,
-            // C = compass/ruler).
-            // KEY_LEFT/RIGHT_SUPER too: on macOS Cmd (Super) is a distinct
-            // key from Ctrl, and users -- including whoever asked for this
-            // binding -- reach for Cmd as "the" modifier there. Treating
-            // either as ctrlDown matches that expectation instead of
-            // requiring the literal Ctrl key.
+            // Chords avoid colliding in meaning with step2's, and keep Ctrl+O
+            // and bare C/P aligned with it. Super counts as ctrlDown so macOS
+            // Cmd works, where it is a distinct key from Ctrl.
             bool ctrlDown =
                 IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL) || IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_RIGHT_SUPER);
             bool shiftDown = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
@@ -1803,18 +2141,10 @@ int main(int argc, char* argv[])
             if (!ctrlDown && IsKeyPressed(KEY_C))
                 s.showCompassRuler = !s.showCompassRuler;
 
-            // Camera drag/zoom -- same raylib_widgets::OrbitCamera Euler
-            // methods multi_view_tls_registration_step_2's motion()/wheel()
-            // call, driven from continuous per-frame deltas the way
-            // OrbitCamera::update() (the other, azimuth/elevation half of
-            // this struct) already reads input, rather than resurrecting
-            // step2's GLUT-shaped mouse_old_x/y/mouse_buttons bookkeeping
-            // (nothing about sharing the camera *math* requires reproducing
-            // that plumbing too). Gated off while Ctrl/Shift is held --
-            // both are reserved for the picking actions below, same
-            // reasoning as step2's own motion() guard (a trackpad's
-            // click jitter while a modifier is held must never get read as
-            // a drag, or it breaks any transition that same click started).
+            // Camera drag/zoom via the same OrbitCamera Euler methods step2
+            // uses, driven from per-frame deltas. Gated off while Ctrl/Shift is
+            // held: those are the picking modifiers, and click jitter under a
+            // modifier must not read as a drag.
             if (!imguiWants && !ctrlDown && !shiftDown)
             {
                 Vector2 d = GetMouseDelta();
@@ -1887,11 +2217,13 @@ int main(int argc, char* argv[])
             {
                 s.imgViewIdx = std::max(s.imgViewIdx - 1, 0);
                 s.imgViewRequest.store(s.imgViewIdx);
+                s.intensityProjNeedsUpdate = true;
             }
             if (IsKeyPressed(KEY_RIGHT))
             {
                 s.imgViewIdx = std::min(s.imgViewIdx + 1, (int)s.imageTsNs.size());
                 s.imgViewRequest.store(s.imgViewIdx);
+                s.intensityProjNeedsUpdate = true;
             }
         }
 
@@ -1981,6 +2313,23 @@ int main(int argc, char* argv[])
             }
         }
 
+        // ── (re)build the intensity-projection texture on demand ────────────────
+        // Rasterization is cheap enough (already-decimated, in-memory
+        // exportCloud) to do synchronously on toggle/refresh/image-change,
+        // unlike the photo loader above which reads a file off disk.
+        if (s.showIntensityProjection && s.intensityProjNeedsUpdate && s.imgViewIdx >= 0 && s.imgViewIdx < (int)s.imageTsNs.size())
+        {
+            s.intensityProjNeedsUpdate = false;
+            int64_t imgTsAdj = s.imageTsNs[s.imgViewIdx] + imageTimeOffsetNs(s);
+            cv::Mat proj = renderIntensityProjection(s, imgTsAdj);
+            cv::cvtColor(proj, proj, cv::COLOR_BGR2RGB);
+            if (s.intensityProjTexValid)
+                UnloadTexture(s.intensityProjTex);
+            Image ri = { proj.data, proj.cols, proj.rows, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8 };
+            s.intensityProjTex = LoadTextureFromImage(ri);
+            s.intensityProjTexValid = s.intensityProjTex.id > 0;
+        }
+
         // ── ImGui panel ───────────────────────────────────────────────────────
         rlImGuiBegin();
 
@@ -1995,6 +2344,8 @@ int main(int argc, char* argv[])
                 ImGui::Separator();
                 if (ImGui::MenuItem("Open Calibration...", "Ctrl+Shift+C"))
                     actionOpenCalibration(s);
+                if (ImGui::MenuItem("Open Image Mask..."))
+                    actionOpenMask(s);
                 ImGui::Separator();
                 if (ImGui::MenuItem("Export Colored Point Cloud (LAS/LAZ)...", "Ctrl+S"))
                     actionExportColoredLAZ(s);
@@ -2061,7 +2412,7 @@ int main(int argc, char* argv[])
                         s.colorMode = 1;
                     if (ImGui::MenuItem("Camera ID", nullptr, s.colorMode == 2))
                         s.colorMode = 2;
-                    if (ImGui::MenuItem("In ROI", nullptr, s.colorMode == 3))
+                    if (ImGui::MenuItem("In ROI / mask", nullptr, s.colorMode == 3))
                         s.colorMode = 3;
                 }
                 ImGui::EndMenu();
@@ -2089,27 +2440,13 @@ int main(int argc, char* argv[])
 
             // double now = ImGui::GetTime();  // ImGui’s built-in timer (in seconds)
 
-            // ImGui::Checkbox("dynamic", &dynamicSubsampling);
-            // if (ImGui::IsItemHovered())
-            //    ImGui::SetTooltip("automatically control subsampling vs FPS: increase bellow 10, decrease above 60");
-            // if (dynamicSubsampling && (fps_avg < 15) && (now - lastAdjustTime > cooldownSeconds))
-            //{
-            //    app_state.viewer_decimate_point_cloud += 1;
-            //    lastAdjustTime = now;
-            //}
-            // ImGui::SameLine();
-            // ImGui::Text("(avg %.1f)", fps_avg);
-
             if (s.drawDecim < 1)
                 s.drawDecim = 1;
 
             ImGui::SameLine();
-            // GetFPS()/point-cloud draw-call/vertex count via raylib/ScanRenderer,
-            // rather than ImGui's own Framerate tracker -- raylib doesn't
-            // expose a general "draw calls" counter (rlgl's own internal one
-            // only tracks its immediate-mode batch renderer, not custom
-            // glDrawArrays calls like ScanRenderer's), so these are scan_renderer's
-            // own per-frame counts of the calls/points it issued in draw().
+            // Counts come from ScanRenderer's own per-frame tally: rlgl's
+            // internal counter only sees its immediate-mode batch, not the
+            // custom glDrawArrays calls ScanRenderer issues.
             ImGui::Text("(%d FPS)", GetFPS());
 
             ImGui::EndMainMenuBar();
@@ -2132,6 +2469,13 @@ int main(int argc, char* argv[])
             ImGui::InputText("##sess", s.sessionBuf, sizeof(s.sessionBuf));
             ImGui::Text("CAMERA_0 directory (empty = auto):");
             ImGui::InputText("##cam", s.cameraBuf, sizeof(s.cameraBuf));
+            if (ImGui::Checkbox("Load as equirectangular (360)", &s.loadAsEquirectangular))
+                resolveCameraModel(s);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(
+                    "Treat CAMERA_0's frames as a 360 panorama rather than a\n"
+                    "normal camera image. Overridden by an explicit \"model\"\n"
+                    "key in the loaded calibration JSON.");
             if (ImGui::Button("Load session", ImVec2(-1, 0)))
                 loadSession(s);
             if (!s.imagesFilenamesInTime.empty())
@@ -2202,8 +2546,43 @@ int main(int argc, char* argv[])
                 loadCalib(s);
             if (s.calibLoaded)
             {
-                ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
-                ImGui::Text("cx=%.0f cy=%.0f", s.K.cx, s.K.cy);
+                if (s.K.model == CameraModel::Equirectangular)
+                {
+                    ImGui::Text("Model: equirectangular");
+                    ImGui::Text("%dx%d", s.imgW, s.imgH);
+                }
+                else if (s.K.model == CameraModel::Mei)
+                {
+                    // Mei is never inferred (see resolveCameraModel), so it is
+                    // always an explicit "model" key -- no tooltip needed.
+                    ImGui::Text("Model: mei (xi=%.4f)", s.K.xi);
+                    ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
+                    ImGui::Text("cx=%.0f cy=%.0f", s.K.cx, s.K.cy);
+                }
+                else
+                {
+                    ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
+                    ImGui::Text("cx=%.0f cy=%.0f", s.K.cx, s.K.cy);
+                }
+
+                ImGui::Separator();
+                ImGui::PopItemWidth();
+                ImGui::PushItemWidth(-140.f);
+                // Bounds every image the colorizer holds in memory: a whole
+                // chunk's worth is resident at once when multi-image coloring
+                // is on, which 360 frames make expensive.
+                ImGui::SliderFloat("Image scale", &s.imgScale, 0.125f, 1.0f, "%.3f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Downscale applied to images before coloring.\nLower = less RAM and faster, at coarser color detail.");
+                ImGui::InputDouble("Time offset (s)", &s.timeOffsetSec, 0.001, 0.01, "%.4f");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Camera clock minus trajectory clock: t_traj = t_image + offset.\n"
+                        "Fixes colors smeared along the direction of travel.\n"
+                        "Re-run Colorize to apply.");
+                ImGui::PopItemWidth();
+                ImGui::PushItemWidth(-1);
 
                 ImGui::Separator();
                 if (ImGui::Checkbox("Region of interest", &s.roi.enabled))
@@ -2218,7 +2597,10 @@ int main(int argc, char* argv[])
                     }
                 }
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Only points projecting inside the ROI get colored.\nDrawn on the image preview.");
+                    ImGui::SetTooltip(
+                        "Only points projecting inside the ROI get colored.\n"
+                        "Full-resolution image pixels, scaled along with Image scale.\n"
+                        "Drawn on the image preview.");
                 if (s.roi.enabled)
                 {
                     ImGui::PopItemWidth();
@@ -2229,6 +2611,37 @@ int main(int argc, char* argv[])
                     ImGui::InputInt("ROI h", &s.roi.h);
                     ImGui::PopItemWidth();
                     ImGui::PushItemWidth(-1);
+                }
+
+                ImGui::Separator();
+                ImGui::BeginDisabled(s.mask.empty());
+                ImGui::Checkbox("Image mask", &s.maskEnabled);
+                ImGui::EndDisabled();
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip(
+                        "Points projecting onto a masked-out (black) pixel stay uncolored.\n"
+                        "Free-form counterpart of the ROI -- for the operator, the rig itself,\n"
+                        "the sky. Coloring only: exported images are never masked.\n"
+                        "Re-run Load cloud to apply.");
+                ImGui::Text("Mask image:");
+                ImGui::InputText("##mask", s.maskBuf, sizeof(s.maskBuf));
+                if (ImGui::Button("Load mask", ImVec2(-1, 0)))
+                    loadMask(s);
+                if (!s.mask.empty())
+                {
+                    ImGui::TextDisabled("%dx%d, %.1f%% masked out", s.mask.cols, s.mask.rows, s.maskRejectFrac * 100.f);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Resampled to the image size in use; any resolution with the same framing works.");
+                    if (ImGui::Checkbox("Invert mask", &s.maskInvert))
+                    {
+                        // The mask is strictly 0/255, so flipping it in place is
+                        // exact and its own inverse -- no need to re-read the file.
+                        cv::bitwise_not(s.mask, s.mask);
+                        refreshMaskDerived(s);
+                    }
+                    ImGui::Checkbox("Show mask on preview", &s.showMaskOverlay);
+                    if (ImGui::Button("Clear mask", ImVec2(-1, 0)))
+                        clearMask(s);
                 }
             }
             ImGui::PopItemWidth();
@@ -2252,8 +2665,14 @@ int main(int argc, char* argv[])
                 {
                     s.imgViewIdx = std::clamp(s.imgViewIdx, 0, nImgs - 1);
                     s.imgViewRequest.store(s.imgViewIdx);
+                    s.intensityProjNeedsUpdate = true;
                 }
                 ImGui::TextDisabled("ts: %lld", (long long)s.imageTsNs[s.imgViewIdx]);
+                if (s.timeOffsetSec != 0.0)
+                {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("(adj: %lld)", (long long)(s.imageTsNs[s.imgViewIdx] + imageTimeOffsetNs(s)));
+                }
                 {
                     float as = angularSpeedDegAt(s.traj, s.poseAngSpeedDeg, s.imageTsNs[s.imgViewIdx]);
                     bool fast = s.filterFastImages && s.maxImageAngSpeedDeg > 0.f && as > s.maxImageAngSpeedDeg;
@@ -2270,6 +2689,37 @@ int main(int argc, char* argv[])
                     ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading...");
                 else if (s.imgViewTexValid)
                     ImGui::TextColored(ImVec4(0, 1, 0, 1), "%dx%d", s.imgViewTex.width, s.imgViewTex.height);
+
+                ImGui::Separator();
+                if (ImGui::Checkbox("Show intensity projection", &s.showIntensityProjection))
+                {
+                    if (s.showIntensityProjection)
+                        s.intensityProjNeedsUpdate = true;
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Draws a synthetic intensity image next to the photo, by\n"
+                        "reprojecting the colorized cloud through the current\n"
+                        "calibration -- a reference to check it against the photo.\n"
+                        "Requires 'Load cloud' to have run first.");
+                if (s.showIntensityProjection)
+                {
+                    ImGui::PushItemWidth(-140.f);
+                    if (ImGui::InputInt("Point decimation##proj", &s.intensityProjDecim))
+                        s.intensityProjDecim = std::max(1, s.intensityProjDecim);
+                    if (ImGui::InputFloat("Point radius (px)##proj", &s.intensityProjPointRadius, 0.5f, 1.f, "%.1f"))
+                        s.intensityProjPointRadius = std::max(1.f, s.intensityProjPointRadius);
+                    ImGui::Checkbox("Overlay on photo", &s.intensityProjOverlay);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("ON: alpha-blended on top of the photo\nOFF: shown side-by-side with it");
+                    if (s.intensityProjOverlay)
+                        ImGui::SliderFloat("Overlay alpha", &s.intensityProjAlpha, 0.f, 1.f, "%.2f");
+                    ImGui::PopItemWidth();
+                    if (ImGui::Button("Refresh projection", ImVec2(-1, 0)))
+                        s.intensityProjNeedsUpdate = true;
+                    if (s.exportCloud.empty())
+                        ImGui::TextColored(ImVec4(1, 0.6f, 0, 1), "No colorized cloud yet -- run 'Load cloud'.");
+                }
             }
         }
 
@@ -2314,10 +2764,11 @@ int main(int argc, char* argv[])
                 ImGui::Indent();
                 ImGui::Checkbox("Compressed (jpeg)", &s.ros.compressCamera);
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("ON: CompressedImage (jpeg)\nOFF: raw Image bgr8");
-                ImGui::Checkbox("Undistort (rectify)", &s.ros.undistortCamera);
+                    ImGui::SetTooltip("ON: CompressedImage, the source jpeg copied verbatim\nOFF: raw Image bgr8");
+                ImGui::TextDisabled("Frames are exported as captured.");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("Rectify to pinhole so RViz overlays line up\n(CameraInfo published with zero distortion).");
+                    ImGui::SetTooltip(
+                        "Images are never rectified. CameraInfo carries the real\ndistortion, so consumers can undistort from it.");
                 ImGui::Unindent();
             }
             ImGui::Checkbox("LiDAR undistorted (map frame)", &s.ros.exportLidarUndistorted);
@@ -2366,8 +2817,15 @@ int main(int argc, char* argv[])
             ImGui::PopItemWidth();
             ImGui::PushItemWidth(-1);
             s.colmapPtDecim = std::max(1, s.colmapPtDecim);
+            const bool colmapUnsupported = s.K.model != CameraModel::Pinhole;
+            ImGui::BeginDisabled(colmapUnsupported);
             if (ImGui::Button("Export COLMAP model", ImVec2(-1, 0)))
                 exportColmap(s);
+            ImGui::EndDisabled();
+            if (colmapUnsupported && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip(
+                    s.K.model == CameraModel::Equirectangular ? "COLMAP has no equirectangular camera model."
+                                                              : "COLMAP has no unified-sphere (Mei) camera model.");
             ImGui::TextDisabled("Writes sparse/{cameras,images,points3D}.txt");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(
@@ -2405,9 +2863,13 @@ int main(int argc, char* argv[])
             ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_Once);
             ImGui::Begin("Image##viewer", nullptr, ImGuiWindowFlags_NoScrollbar);
             ImVec2 avail = ImGui::GetContentRegionAvail();
+            const bool showProj = s.showIntensityProjection && s.intensityProjTexValid;
+            const bool overlayMode = showProj && s.intensityProjOverlay;
+            const float colW = (showProj && !overlayMode) ? (avail.x - 4.f) * 0.5f : avail.x;
+
             float aspect = (float)s.imgViewTex.height / (float)s.imgViewTex.width;
-            int dispW = (int)avail.x;
-            int dispH = (int)(avail.x * aspect);
+            int dispW = (int)colW;
+            int dispH = (int)(colW * aspect);
             if (dispH > (int)avail.y)
             {
                 dispH = (int)avail.y;
@@ -2415,6 +2877,32 @@ int main(int argc, char* argv[])
             }
             ImVec2 imgPos = ImGui::GetCursorScreenPos();
             rlImGuiImageSize(&s.imgViewTex, dispW, dispH);
+
+            if (overlayMode)
+            {
+                // Redraw the projection texture at the same screen rect, tinted
+                // with a reduced alpha -- ImGui's renderer alpha-blends draw
+                // commands, so this composites over the photo just drawn above.
+                ImGui::SetCursorScreenPos(imgPos);
+                ImVec4 tint(1.f, 1.f, 1.f, std::clamp(s.intensityProjAlpha, 0.f, 1.f));
+                ImGui::ImageWithBg(
+                    ImTextureID(s.intensityProjTex.id),
+                    ImVec2((float)dispW, (float)dispH),
+                    ImVec2(0.f, 0.f),
+                    ImVec2(1.f, 1.f),
+                    ImVec4(0.f, 0.f, 0.f, 0.f),
+                    tint);
+            }
+
+            // masked-out pixels, tinted red over the same rect as the photo (the
+            // mask is resampled wherever it is used, so a mask of a different
+            // resolution is expected and stretches to fit here too)
+            if (s.maskEnabled && s.showMaskOverlay && s.maskTexValid)
+            {
+                ImGui::SetCursorScreenPos(imgPos);
+                rlImGuiImageSize(&s.maskTex, dispW, dispH);
+            }
+
             // overlay the ROI, mapping full-res image pixels to the displayed rect
             if (s.roi.enabled && s.imgViewTex.width > 0 && s.imgViewTex.height > 0)
             {
@@ -2429,6 +2917,20 @@ int main(int argc, char* argv[])
                     /*rounding=*/0.f,
                     /*thickness=*/2.f);
             }
+
+            if (showProj && !overlayMode)
+            {
+                ImGui::SameLine();
+                float pAspect = (float)s.intensityProjTex.height / (float)s.intensityProjTex.width;
+                int pDispW = (int)colW;
+                int pDispH = (int)(colW * pAspect);
+                if (pDispH > (int)avail.y)
+                {
+                    pDispH = (int)avail.y;
+                    pDispW = (int)(avail.y / pAspect);
+                }
+                rlImGuiImageSize(&s.intensityProjTex, pDispW, pDispH);
+            }
             ImGui::End();
         }
 
@@ -2442,6 +2944,10 @@ int main(int argc, char* argv[])
         s.rosThread.join();
     if (s.imgViewTexValid)
         UnloadTexture(s.imgViewTex);
+    if (s.intensityProjTexValid)
+        UnloadTexture(s.intensityProjTex);
+    if (s.maskTexValid)
+        UnloadTexture(s.maskTex);
 
     s.cloud.unload();
     if (s.shaderOk)

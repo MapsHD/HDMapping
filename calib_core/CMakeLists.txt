@@ -68,6 +68,9 @@ target_include_directories(calib_core PRIVATE
     # doesn't violate calib_core's no-raylib/imgui/OpenCV rule above, and
     # nothing here links the core/core_math library, just includes headers.
     ${REPOSITORY_DIRECTORY}/core/include
+    # PointCloud.cpp uses nlohmann::json for metadata I/O; header-only, same
+    # bundled copy core/CMakeLists.txt already exposes to its own targets.
+    ${THIRDPARTY_DIRECTORY}/json/include
 )
 
 target_link_libraries(calib_core PUBLIC ${PLATFORM_LASZIP_LIB})

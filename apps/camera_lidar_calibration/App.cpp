@@ -560,7 +560,6 @@ void AppState::loadCalibration(const char* path)
         cameraId.model = j.value("model", std::string{});
         cameraId.firmware = j.value("firmware", std::string{});
         cameraId.frameId = j.value("frame_id", std::string{});
-
     }
 
     if (j.contains("intrinsics"))

@@ -94,7 +94,12 @@ TEST_CASE("equirectangular: cardinal bearings land on the expected pixels")
     SUBCASE("straight up is the top edge")
     {
         Px r = project(K, { 0, -3, 0 });
-        CHECK(r.v == doctest::Approx(0.0));
+        // asinf(-1) isn't correctly rounded on every platform's libm (its
+        // derivative is infinite at the pole, so even a 1-ULP wobble there
+        // is expected); doctest::Approx's default epsilon is an absolute
+        // tolerance too tight for that when comparing against 0, so widen
+        // it rather than pin down a libm implementation detail.
+        CHECK(r.v == doctest::Approx(0.0).epsilon(1e-3));
     }
 }
 
@@ -195,7 +200,8 @@ TEST_CASE("equirectangular: respects the extrinsics")
     SUBCASE("LiDAR up is the top edge")
     {
         Px r = project(K, { 0, 0, 10 }, R_wc);
-        CHECK(r.v == doctest::Approx(0.0));
+        // See the identical-tolerance comment on the "straight up" case above.
+        CHECK(r.v == doctest::Approx(0.0).epsilon(1e-3));
     }
     SUBCASE("the camera position is subtracted")
     {

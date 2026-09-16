@@ -1515,15 +1515,14 @@ static void actionOpenCalibration(AppState& s)
     }
 }
 
-//! A directory holding this app's camera frames (cam0_<timestamp_ns>.jpg).
-static bool isCameraDir(const fs::path& dir)
+//! Whether a directory holds a *.mjs session manifest directly -- lidar_odometry_step_1
+//! writes session.mjs alongside session_poses.mrp/session_ini_poses.mri, so this is a
+//! reliable positive marker for "this is a LIO result (session) directory".
+static bool hasMjsFile(const fs::path& dir)
 {
     for (const auto& e : fs::directory_iterator(dir))
-    {
-        std::string n = e.path().filename().string();
-        if (n.rfind("cam0_", 0) == 0 && e.path().extension() == ".jpg")
+        if (e.path().extension() == ".mjs")
             return true;
-    }
     return false;
 }
 
@@ -1540,16 +1539,19 @@ static void actionOpenMask(AppState& s)
 
 //! Drag & drop equivalent of the menu load actions, applied immediately rather
 //! than waiting for "Load session" -- a drop is already an explicit "load this".
-//! A dropped directory of cam0_*.jpg is the camera directory (only the images
-//! are swapped, so the trajectory and cloud survive); any other directory is a
-//! session (LIO result dir); a *.json is a calibration file.
+//! A dropped directory containing a *.mjs manifest is a session (LIO result
+//! dir); any other dropped directory is the camera directory (only the images
+//! are swapped, so the trajectory and cloud survive); a *.mjs file is a
+//! session manifest (its parent directory is the session, as with --mjs); a
+//! *.json is a calibration file.
 static void handleDroppedPath(AppState& s, const std::string& path)
 {
     if (fs::is_directory(path))
     {
-        // Checked before the session branch: a CAMERA_0 folder is never a LIO result dir,
-        // and dropping one onto a loaded session must not wipe the trajectory.
-        if (isCameraDir(path))
+        // Checked before the session branch: only a *.mjs manifest marks a LIO
+        // result dir, so dropping a plain image folder onto a loaded session
+        // must not wipe the trajectory.
+        if (!hasMjsFile(path))
         {
             setBuf(s.cameraBuf, sizeof(s.cameraBuf), path);
             loadImages(s);
@@ -1577,6 +1579,12 @@ static void handleDroppedPath(AppState& s, const std::string& path)
     {
         setBuf(s.calibBuf, sizeof(s.calibBuf), path);
         loadCalib(s);
+    }
+    else if (ext == ".mjs")
+    {
+        // Session manifest, same convention as --mjs: the session directory is its parent.
+        setBuf(s.sessionBuf, sizeof(s.sessionBuf), fs::path(path).parent_path().string());
+        loadSession(s);
     }
     else if (ext == ".png" || ext == ".bmp" || ext == ".jpg" || ext == ".jpeg")
     {
@@ -1962,9 +1970,13 @@ int main(int argc, char* argv[])
 
     AppState s;
     // --mjs gives the session manifest; the session directory is its parent.
+    // Also accepts the session directory itself, for symmetry with drag & drop.
     std::string sessionDir;
     if (args.has("mjs"))
-        sessionDir = fs::path(args.get("mjs")).parent_path().string();
+    {
+        fs::path mjsPath(args.get("mjs"));
+        sessionDir = fs::is_directory(mjsPath) ? mjsPath.string() : mjsPath.parent_path().string();
+    }
     else if (!args.positional.empty())
         sessionDir = args.positional.front(); // back-compat
     if (!sessionDir.empty())

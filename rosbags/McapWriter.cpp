@@ -50,6 +50,37 @@ uint8 FLOAT64=8
 static constexpr const char* kStringSchema = R"(string data
 )";
 
+static constexpr const char* kTfMessageSchema = R"(geometry_msgs/TransformStamped[] transforms
+================================================================================
+MSG: geometry_msgs/TransformStamped
+std_msgs/Header header
+string child_frame_id
+geometry_msgs/Transform transform
+================================================================================
+MSG: std_msgs/Header
+builtin_interfaces/Time stamp
+string frame_id
+================================================================================
+MSG: builtin_interfaces/Time
+int32 sec
+uint32 nanosec
+================================================================================
+MSG: geometry_msgs/Transform
+geometry_msgs/Vector3 translation
+geometry_msgs/Quaternion rotation
+================================================================================
+MSG: geometry_msgs/Vector3
+float64 x
+float64 y
+float64 z
+================================================================================
+MSG: geometry_msgs/Quaternion
+float64 x
+float64 y
+float64 z
+float64 w
+)";
+
 static constexpr const char* kImuSchema = R"(std_msgs/Header header
 geometry_msgs/Quaternion orientation
 float64[9] orientation_covariance
@@ -302,6 +333,32 @@ static std::vector<uint8_t> serializeImu(uint64_t timestamp_ns, const McapImuSam
 	return w.data();
 }
 
+// tf2_msgs/msg/TFMessage carrying a single TransformStamped, matching how a
+// real /tf topic publishes one changed transform per message.
+static std::vector<uint8_t> serializeTf(
+	uint64_t timestamp_ns, const McapTransform& t, const std::string& parent_frame, const std::string& child_frame)
+{
+	CdrWriter w;
+
+	w.write_u32(1); // transforms[] sequence length
+
+	writeHeader(w, timestamp_ns, parent_frame); // TransformStamped.header
+	w.write_string(child_frame);
+
+	// transform.translation
+	w.write_f64(t.tx);
+	w.write_f64(t.ty);
+	w.write_f64(t.tz);
+
+	// transform.rotation
+	w.write_f64(t.qx);
+	w.write_f64(t.qy);
+	w.write_f64(t.qz);
+	w.write_f64(t.qw);
+
+	return w.data();
+}
+
 // ---------------------------------------------------------------------------
 // Impl
 // ---------------------------------------------------------------------------
@@ -312,9 +369,11 @@ struct McapFileWriter::Impl
 	mcap::ChannelId lidarChannelId{0};
 	mcap::ChannelId imuChannelId{0};
 	mcap::ChannelId snChannelId{0};
+	mcap::ChannelId tfChannelId{0};
 	uint32_t lidarSequence{0};
 	uint32_t imuSequence{0};
 	uint32_t snSequence{0};
+	uint32_t tfSequence{0};
 	McapWriterOptions options;
 	bool open{false};
 };
@@ -369,6 +428,16 @@ McapFileWriter::McapFileWriter(const std::filesystem::path& path, const McapWrit
 	impl_->writer.addChannel(snChannel);
 	impl_->snChannelId = snChannel.id;
 
+	// Register tf2_msgs/msg/TFMessage schema + /tf channel
+	mcap::Schema tfSchema("tf2_msgs/msg/TFMessage", "ros2msg",
+		{reinterpret_cast<const std::byte*>(kTfMessageSchema),
+		 reinterpret_cast<const std::byte*>(kTfMessageSchema) + std::strlen(kTfMessageSchema)});
+	impl_->writer.addSchema(tfSchema);
+
+	mcap::Channel tfChannel(impl_->options.tf_topic, "cdr", tfSchema.id);
+	impl_->writer.addChannel(tfChannel);
+	impl_->tfChannelId = tfChannel.id;
+
 	impl_->open = true;
 }
 
@@ -409,8 +478,8 @@ void McapFileWriter::writePointCloud(uint64_t timestamp_ns, const std::vector<Mc
 {
 	if(!isOpen() || points.empty())
 		return;
-        std::cerr << "McapWriter:  " << points.size() << " points\n";
-	auto payload = serializePointCloud2(timestamp_ns, points, impl_->options.frame_id, impl_->options.lidar_layout);
+	const std::string& frame_id = impl_->options.pointcloud_frame_id.empty() ? impl_->options.frame_id : impl_->options.pointcloud_frame_id;
+	auto payload = serializePointCloud2(timestamp_ns, points, frame_id, impl_->options.lidar_layout);
 
 	mcap::Message msg;
 	msg.channelId = impl_->lidarChannelId;
@@ -450,6 +519,33 @@ void McapFileWriter::writeImu(const std::vector<McapImuSample>& imu)
 {
 	for(const auto& sample : imu)
 		writeImuSample(sample);
+}
+
+void McapFileWriter::writeTfSample(const McapTransform& transform)
+{
+	if(!isOpen())
+		return;
+
+	const uint64_t ts = static_cast<uint64_t>(transform.timestamp * 1e9);
+	auto payload = serializeTf(ts, transform, impl_->options.map_frame, impl_->options.frame_id);
+
+	mcap::Message msg;
+	msg.channelId = impl_->tfChannelId;
+	msg.sequence = impl_->tfSequence++;
+	msg.publishTime = ts;
+	msg.logTime = ts;
+	msg.data = reinterpret_cast<const std::byte*>(payload.data());
+	msg.dataSize = payload.size();
+
+	auto s = impl_->writer.write(msg);
+	if(!s.ok())
+		std::cerr << "McapWriter: tf write error: " << s.message << "\n";
+}
+
+void McapFileWriter::writeTf(const std::vector<McapTransform>& transforms)
+{
+	for(const auto& t : transforms)
+		writeTfSample(t);
 }
 
 } // namespace rosbags

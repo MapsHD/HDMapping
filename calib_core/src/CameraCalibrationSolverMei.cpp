@@ -179,6 +179,8 @@ namespace calib
 
 #else // !CALIB_ENABLE_CERES
 
+#include <iostream>
+
 namespace calib
 {
     bool solveExtrinsicsMeiCeres(
@@ -190,6 +192,7 @@ namespace calib
         bool)
     {
         errorMessage = "Mei extrinsics solving needs calib_core built with -DCALIB_ENABLE_CERES=ON (see calib_core/CMakeLists.txt)";
+        std::cerr << errorMessage << std::endl;
         return false;
     }
 } // namespace calib

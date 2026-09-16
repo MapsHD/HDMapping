@@ -55,6 +55,23 @@ struct McapImuSample
 	float acc_z{};
 };
 
+// One rigid transform sample (parent -> child), written as a single-element
+// tf2_msgs/msg/TFMessage -- one message per sample, matching how a real /tf
+// topic carries one changed transform per publish. `timestamp` is an
+// absolute timestamp in seconds. Rotation must be a unit quaternion; the
+// default is identity.
+struct McapTransform
+{
+	double timestamp{};
+	double tx{};
+	double ty{};
+	double tz{};
+	double qx{};
+	double qy{};
+	double qz{};
+	double qw{1.0};
+};
+
 // Selects the sensor_msgs/msg/PointCloud2 field layout the lidar channel is
 // written with. The message type is always PointCloud2 -- only the `fields`
 // array/point_step (and thus which McapPoint members get written) changes,
@@ -70,9 +87,18 @@ enum class PointCloudLayout
 struct McapWriterOptions
 {
 	std::string frame_id = "lidar";
+	// Overrides frame_id for PointCloud2 headers only (Imu headers and the
+	// /tf child_frame_id keep using frame_id). Left empty, PointCloud2 also
+	// uses frame_id -- unchanged default behavior. Set this to distinguish a
+	// point cloud published in a fixed frame (e.g. "map", already
+	// motion-compensated) from a sensor's own moving frame.
+	std::string pointcloud_frame_id;
+	// Parent frame written into /tf's TransformStamped.header.frame_id.
+	std::string map_frame = "map";
 	std::string lidar_topic = "/lidar_points";
 	std::string imu_topic = "/imu";
 	std::string sn_topic = "/lidar_sn";
+	std::string tf_topic = "/tf";
 	PointCloudLayout lidar_layout = PointCloudLayout::Generic;
 };
 
@@ -84,6 +110,7 @@ struct McapWriterOptions
 //   /lidar_points  — sensor_msgs/msg/PointCloud2  (field layout per options().lidar_layout)
 //   /imu           — sensor_msgs/msg/Imu
 //   /lidar_sn      — std_msgs/msg/String
+//   /tf            — tf2_msgs/msg/TFMessage        (one TransformStamped per message)
 //
 // PointCloud2 field layouts (see PointCloudLayout):
 //   Generic (point_step = 28):
@@ -139,6 +166,13 @@ public:
 
 	// Write a string to /lidar_sn (std_msgs/msg/String).
 	void writeSn(uint64_t timestamp_ns, const std::string& data);
+
+	// Write a single transform as its own tf2_msgs/msg/TFMessage (one
+	// TransformStamped, parent = options().map_frame, child = options().frame_id).
+	void writeTfSample(const McapTransform& transform);
+
+	// Write a batch of transforms, one /tf message per sample.
+	void writeTf(const std::vector<McapTransform>& transforms);
 
 	bool isOpen() const;
 

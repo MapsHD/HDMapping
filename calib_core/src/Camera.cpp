@@ -2,9 +2,9 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cstdlib>
 #include <fstream>
-#include <map>
+
+#include <nlohmann/json.hpp>
 
 // Reuses (does not duplicate) core's own om/fi/ka<->matrix conversion --
 // header-only, pulls in nothing but Eigen/std (see structures.h), so this
@@ -78,43 +78,33 @@ std::optional<double> LoadTimestampFromSideCar(const std::string& path)
     if (!f)
         return std::nullopt;
 
-    std::string line;
-    while (std::getline(f, line))
+    nlohmann::json j;
+    try
     {
-        const auto key = line.find("\"FRAME_WALL_CLOCK\"");
-        if (key == std::string::npos)
-            continue;
-        const auto colon = line.find(':', key);
-        if (colon == std::string::npos)
-            return std::nullopt;
-
-        size_t p = colon + 1;
-        while (p < line.size() && std::isspace(static_cast<unsigned char>(line[p])))
-            ++p;
-
-        std::string value;
-        if (p < line.size() && line[p] == '"')
-        {
-            const auto close = line.find('"', p + 1);
-            if (close == std::string::npos)
-                return std::nullopt;
-            value = line.substr(p + 1, close - p - 1);
-        }
-        else
-        {
-            const auto end = line.find_first_of(",}", p);
-            value = trim(line.substr(p, end == std::string::npos ? std::string::npos : end - p));
-        }
-
-        if (value.empty())
-            return std::nullopt;
-        char* endptr = nullptr;
-        const double ts = std::strtod(value.c_str(), &endptr);
-        if (endptr == value.c_str())
-            return std::nullopt; // no digits consumed -- not a number
-        return ts;
+        f >> j;
+    } catch (const nlohmann::json::exception&)
+    {
+        return std::nullopt;
     }
 
+    const auto it = j.find("FRAME_WALL_CLOCK");
+    if (it == j.end())
+        return std::nullopt;
+
+    // FRAME_WALL_CLOCK is nanoseconds since epoch, as a number or a numeric
+    // string -- returned as-is, matching the filename timestamps.
+    if (it->is_string())
+    {
+        try
+        {
+            return std::stod(it->get<std::string>());
+        } catch (const std::exception&)
+        {
+            return std::nullopt;
+        }
+    }
+    if (it->is_number())
+        return it->get<double>();
     return std::nullopt;
 }
 

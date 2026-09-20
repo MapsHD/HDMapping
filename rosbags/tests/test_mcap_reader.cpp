@@ -261,7 +261,7 @@ TEST_CASE("McapFileReader: topic resolution")
         CHECK(reader.topics().lidar == "/custom/points");
         CHECK(reader.topics().imu == "/custom/imu");
         CHECK(reader.topics().sn == "/custom/sn");
-        CHECK(reader.channels().size() == 3);
+        CHECK(reader.channels().size() == 4); // lidar, imu, sn, tf are always registered
     }
 
     SUBCASE("an explicit topic is honored")
@@ -280,7 +280,7 @@ TEST_CASE("McapFileReader: topic resolution")
         rosbags::McapFileReader reader(path, options);
         CHECK_FALSE(reader.isOpen());
         CHECK(reader.error().find("/does/not/exist") != std::string::npos);
-        CHECK(reader.channels().size() == 3); // --list still works on an unresolvable file
+        CHECK(reader.channels().size() == 4); // --list still works on an unresolvable file
     }
 
     fs::remove(path);

@@ -43,7 +43,14 @@ namespace
 
     std::string to_lower(std::string s)
     {
-        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+        std::transform(
+            s.begin(),
+            s.end(),
+            s.begin(),
+            [](unsigned char c)
+            {
+                return std::tolower(c);
+            });
         return s;
     }
 
@@ -83,7 +90,13 @@ namespace
 
     void sort_points_by_timestamp(std::vector<rosbags::McapPoint>& points)
     {
-        std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.timestamp < b.timestamp; });
+        std::sort(
+            points.begin(),
+            points.end(),
+            [](const auto& a, const auto& b)
+            {
+                return a.timestamp < b.timestamp;
+            });
     }
 
     rosbags::McapTransform to_mcap_transform(double timestamp_s, const Eigen::Affine3d& T)
@@ -291,7 +304,8 @@ namespace
             std::string ids_str;
             for (int id : all_ids)
                 ids_str += (ids_str.empty() ? "" : ", ") + std::to_string(id);
-            spdlog::warn("{} carries more than one IMU (ids: {}) - session_to_mcap always reads id {}", raw_dir.string(), ids_str, kImuIdToUse);
+            spdlog::warn(
+                "{} carries more than one IMU (ids: {}) - session_to_mcap always reads id {}", raw_dir.string(), ids_str, kImuIdToUse);
         }
 
         std::vector<rosbags::McapImuSample> out;
@@ -311,7 +325,13 @@ namespace
                 out.push_back(s);
             }
         }
-        std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.timestamp < b.timestamp; });
+        std::sort(
+            out.begin(),
+            out.end(),
+            [](const auto& a, const auto& b)
+            {
+                return a.timestamp < b.timestamp;
+            });
         return out;
     }
 
@@ -470,7 +490,13 @@ int main(const int argc, const char** argv)
     spdlog::info(
         "Loaded {} points across {} chunk(s), wrote {} point cloud message(s)", total_points, clouds.size(), splitter.messages_written());
 
-    std::sort(all_tf.begin(), all_tf.end(), [](const auto& a, const auto& b) { return a.timestamp < b.timestamp; });
+    std::sort(
+        all_tf.begin(),
+        all_tf.end(),
+        [](const auto& a, const auto& b)
+        {
+            return a.timestamp < b.timestamp;
+        });
     writer.writeTf(all_tf);
     spdlog::info("Wrote {} tf sample(s)", all_tf.size());
 

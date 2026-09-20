@@ -29,6 +29,7 @@ jobs:
         run: |
           cmake -B ${{github.workspace}}/build \
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DBUILD_WITH_UTILITY_APPLICATION=ON \
             -DFREEGLUT_COCOA=ON \
             -DHD_CPU_OPTIMIZATION=AUTO \
             -DBUILD_TESTING=ON

@@ -2667,14 +2667,48 @@ int main(int argc, char* argv[])
         {
             std::cout << winTitle << "\n\n"
                       << "USAGE:\n"
-                      << std::filesystem::path(argv[0]).stem().string() << " <input_folder> <parameter_file> <output_folder> /?\n\n"
+                      << std::filesystem::path(argv[0]).stem().string() << " <input_folder> <parameter_file> <output_folder> /?\n"
+                      << std::filesystem::path(argv[0]).stem().string() << " <input_folder>\n"
+                      << std::filesystem::path(argv[0]).stem().string() << " --dump-default-params <file.toml>\n\n"
                       << "where\n"
                       << "   <input_folder>       Path where scan files are located (*.csv, *.laz, *.sn)\n"
                       << "   <parameter_file>     Path to TOML parameter file (*.toml)\n"
                       << "   <output_folder>      Path where processed session should be stored\n"
+                      << "                        (with <input_folder> alone, default parameters are used and the\n"
+                      << "                        session is stored in the next free <input_folder>/lio_result_N,\n"
+                      << "                        as the GUI does)\n"
+                      << "   --dump-default-params <file.toml>\n"
+                      << "                        Write the default parameters to <file.toml> and exit\n"
                       << "   -h, /h, --help, /?   Show this help and exit\n\n";
 
             return 0;
+        }
+
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::string(argv[i]) == "--dump-default-params")
+            {
+                if (i + 1 >= argc)
+                {
+                    std::cerr << "--dump-default-params requires an output file (*.toml)" << std::endl;
+                    return 1;
+                }
+                const fs::path out_file(argv[i + 1]);
+                // Value-initialised, as the static `params` is: the NDT grid members carry no
+                // initialisers, and a default-initialised local would dump stack garbage.
+                LidarOdometryParams default_params{};
+                set_lidar_odometry_default_params(default_params);
+                TomlIO toml_io;
+                toml_io.SaveParametersToTomlFile(out_file.string(), default_params);
+                std::error_code ec;
+                if (!fs::exists(out_file, ec) || fs::file_size(out_file, ec) == 0 || ec)
+                {
+                    std::cerr << "Could not write default parameters to: " << out_file.string() << std::endl;
+                    return 1;
+                }
+                std::cout << "Default parameters saved to: " << out_file.string() << std::endl;
+                return 0;
+            }
         }
 
         if (argc == 2) // running from command line
@@ -2699,7 +2733,16 @@ int main(int argc, char* argv[])
                 std::cout << "calculations finished computation at " << std::ctime(&end_time)
                           << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "s\n";
 
-                save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);
+                // Only the input folder was given: store the session where the GUI would,
+                // in the next free lio_result_N under the working directory.
+                if (working_directory.empty())
+                {
+                    std::cerr << "No Mandeye data could be loaded from: '" << path.string() << "'" << std::endl;
+                    return 1;
+                }
+                const fs::path result_dir = get_next_result_path(working_directory);
+                save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, result_dir);
+                std::cout << "Results saved to folder: '" << result_dir.string() << "'" << std::endl;
             }
         }
         else if (argc == 4) // runnning from command line with custom params

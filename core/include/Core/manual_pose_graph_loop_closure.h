@@ -1,12 +1,15 @@
 #pragma once
 
-#if WITH_GUI == 1
 #include <Core/gnss.h>
-#include <Core/observation_picking.h>
 #include <Core/point_clouds.h>
 #include <Core/pose_graph_loop_closure.h>
 #include <Core/tum.h>
 
+#if WITH_GUI == 1
+#include <Core/observation_picking.h>
+#endif
+
+// Defined in every build (not only WITH_GUI) so Session has one layout; only the GUI methods are conditional.
 class ManualPoseGraphLoopClosure : public PoseGraphLoopClosure
 {
 public:
@@ -18,6 +21,7 @@ public:
     ManualPoseGraphLoopClosure() = default;
     ~ManualPoseGraphLoopClosure() = default;
 
+#if WITH_GUI == 1
     void Gui(
         PointClouds& point_clouds_container,
         int& index_loop_closure_source,
@@ -35,6 +39,5 @@ public:
         int index_loop_closure_target,
         int num_edge_extended_before,
         int num_edge_extended_after);
-};
-
 #endif
+};

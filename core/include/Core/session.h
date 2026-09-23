@@ -5,14 +5,9 @@
 #include <string>
 #include <vector>
 
-#if WITH_GUI == 1
 #include <Core/control_points.h>
 #include <Core/ground_control_points.h>
 #include <Core/manual_pose_graph_loop_closure.h>
-
-#else
-#include <Core/pose_graph_loop_closure.h>
-#endif
 
 class Session
 {
@@ -30,13 +25,10 @@ public:
     // bool show_rgb = true;
     bool load_cache_mode = false;
 
-#if WITH_GUI == 1
+    // No WITH_GUI branches here: Session is shared between core_math (WITH_GUI=0) and GUI apps, so its layout must not depend on it.
     ManualPoseGraphLoopClosure pose_graph_loop_closure;
     GroundControlPoints ground_control_points;
     ControlPoints control_points;
-#else
-    PoseGraphLoopClosure pose_graph_loop_closure;
-#endif
 
     bool load(const std::string& file_name, bool is_decimate, double bucket_x, double bucket_y, double bucket_z, bool calculate_offset);
     bool save(

@@ -312,32 +312,33 @@ bool NDT::optimize(std::vector<Session>& sessions, bool compute_only_mahalanobis
             std::cout << "computing AtPA AtPB start" << std::endl;
             for (size_t k = 0; k < jobs.size(); k++)
             {
-                threads.push_back(std::thread(
-                    ndt_job,
-                    k,
-                    &jobs[k],
-                    &buckets,
-                    &(AtPAtmp[k]),
-                    &(AtPBtmp[k]),
-                    &index_pair,
-                    &points_global,
-                    &mposes,
-                    &mposes_inv,
-                    num_point_clouds,
-                    pose_convention,
-                    rotation_matrix_parametrization,
-                    number_of_unknowns,
-                    &(sumrmss[k]),
-                    &(sums[k]),
-                    is_generalized,
-                    sigma_r,
-                    sigma_polar_angle,
-                    sigma_azimuthal_angle,
-                    num_extended_points,
-                    &(md_out[k]),
-                    &(md_count_out[k]),
-                    false,
-                    compute_mean_and_cov_for_bucket));
+                threads.push_back(
+                    std::thread(
+                        ndt_job,
+                        k,
+                        &jobs[k],
+                        &buckets,
+                        &(AtPAtmp[k]),
+                        &(AtPBtmp[k]),
+                        &index_pair,
+                        &points_global,
+                        &mposes,
+                        &mposes_inv,
+                        num_point_clouds,
+                        pose_convention,
+                        rotation_matrix_parametrization,
+                        number_of_unknowns,
+                        &(sumrmss[k]),
+                        &(sums[k]),
+                        is_generalized,
+                        sigma_r,
+                        sigma_polar_angle,
+                        sigma_azimuthal_angle,
+                        num_extended_points,
+                        &(md_out[k]),
+                        &(md_count_out[k]),
+                        false,
+                        compute_mean_and_cov_for_bucket));
             }
 
             for (size_t j = 0; j < threads.size(); j++)

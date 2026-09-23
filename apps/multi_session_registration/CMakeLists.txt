@@ -2,12 +2,11 @@ cmake_minimum_required(VERSION 4.0.0)
 
 project(multi_session_registration_step_3)
 
-# raylib-based, like step 2 (apps/multi_view_tls_registration): no core/src/utils.cpp,
-# GLUT or legacy OpenGL. The GLUT build is kept as apps/multi_session_registration_legacy.
-# multi_session_registration_no_gui.cpp is not part of this app; pybind builds it.
+# Source files
 set(SOURCES
     multi_session_registration.cpp
     multi_session_factor_graph.cpp
+    raylib_utils.cpp
 )
 
 # Windows: add resource file
@@ -27,23 +26,27 @@ target_include_directories(
           ${REPOSITORY_DIRECTORY}/core/include
           ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
           ${THIRDPARTY_DIRECTORY}
+          ${THIRDPARTY_DIRECTORY}/glm
           ${EIGEN3_INCLUDE_DIR}
+          ${THIRDPARTY_DIRECTORY}/imgui
+          ${THIRDPARTY_DIRECTORY}/imgui/backends
+          ${THIRDPARTY_DIRECTORY}/ImGuizmo
           ${THIRDPARTY_DIRECTORY}/json/include
           ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
+          ${THIRDPARTY_DIRECTORY}/glew-cmake/include
           ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+          ${THIRDPARTY_DIRECTORY}/freeglut/include
           ${LASZIP_INCLUDE_DIR}/LASzip/include)
 
 target_link_libraries(
   multi_session_registration_step_3
-  PRIVATE
-  # core_raylib brings in core + raylib (and links FREEGLUT after core for libcore.a's
-  # remaining glutBitmap* references) -- see core/CMakeLists.txt.
+  # PRIVATE ${THIRDPARTY_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
+  # raylib-based like step 2; core_raylib brings in core, raylib and ScanRenderer.
   core_raylib
   raylib_widgets
   imgui_raylib
   rlimgui
   imguizmo_raylib
-  spdlog::spdlog
   ${PLATFORM_LASZIP_LIB}
   ${PLATFORM_MISCELLANEOUS_LIBS})
 

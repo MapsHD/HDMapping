@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <cmath>
 
 namespace calib {
 
@@ -17,7 +18,12 @@ bool Trajectory::loadCSV(const std::string& path, const Eigen::Affine3f* mrp) {
         std::istringstream ss(line);
         TrajPose p;
         float raw[12];
-        ss >> p.ts_ns;
+        // lidar_odometry_step_1 writes the timestamp as a double (seconds * 1e9),
+        // so it can carry a fraction ("548348730189.99993896"); reading it
+        // straight into an int64 would stop at the '.' and shift every column.
+        double ts_ns = 0.0;
+        ss >> ts_ns;
+        p.ts_ns = std::llround(ts_ns);
         for (int i = 0; i < 12; i++) ss >> raw[i];
         if (!ss) continue;
 

@@ -11,6 +11,7 @@ project(calib_core_tests)
 add_executable(calib_core_tests
     test_camera.cpp
     test_solver.cpp
+    test_trajectory.cpp
 )
 
 target_link_libraries(calib_core_tests PRIVATE calib_core)

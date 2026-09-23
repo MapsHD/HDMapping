@@ -708,10 +708,11 @@ static void loadCloud(AppState& s)
                     if (line.empty())
                         continue;
                     std::istringstream ss(line);
-                    int64_t ts;
-                    ss >> ts;
+                    double tsD; // may carry a fraction, see Trajectory::loadCSV
+                    ss >> tsD;
                     if (!ss)
                         continue;
+                    const int64_t ts = std::llround(tsD);
                     if (!chunkFirst)
                         chunkFirst = ts;
                     chunkLast = ts;

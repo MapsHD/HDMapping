@@ -203,30 +203,3 @@ public:
     double sigma_azimuthal_angle = 0.0001;
     int num_extended_points = 10;
 };
-
-//! Per-thread NDT worker (defined in ndt.cpp); declared here so ndt_session.cpp can dispatch it.
-void ndt_job(
-    int i,
-    NDT::Job* job,
-    std::vector<NDT::Bucket>* buckets,
-    Eigen::SparseMatrix<double>* AtPA,
-    Eigen::SparseMatrix<double>* AtPB,
-    std::vector<NDT::PointBucketIndexPair>* index_pair_internal,
-    std::vector<Point3D>* pp,
-    std::vector<Eigen::Affine3d>* mposes,
-    std::vector<Eigen::Affine3d>* mposes_inv,
-    size_t trajectory_size,
-    NDT::PoseConvention pose_convention,
-    NDT::RotationMatrixParametrization rotation_matrix_parametrization,
-    int number_of_unknowns,
-    double* sumssr,
-    int* sums_obs,
-    bool is_generalized,
-    double sigma_r,
-    double sigma_polar_angle,
-    double sigma_azimuthal_angle,
-    int num_extended_points,
-    double* md_out,
-    double* md_count_out,
-    bool compute_only_mean_and_cov,
-    bool compute_mean_and_cov_for_bucket);

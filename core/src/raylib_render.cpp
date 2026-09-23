@@ -317,7 +317,7 @@ void ScanRenderer::draw(
             color[2] = pc.render_color[2];
             color[3] = 1.0f;
             // Matches the shader's colorMode branches (0=flat, 1=intensity,
-            // 2=elevation, 3=distance) exactly, since ScanColorMode's
+            // 2=elevation, 3=distance, 4=flat shaded by intensity) exactly, since ScanColorMode's
             // enumerator order was chosen to match.
             colorModeInt = static_cast<int>(colorMode);
         }

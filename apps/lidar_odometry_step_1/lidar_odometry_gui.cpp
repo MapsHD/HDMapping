@@ -23,6 +23,7 @@
 #include <chrono>
 #include <ctime>
 #include <mutex>
+#include <optional>
 #include <spdlog/cfg/env.h>
 #include <spdlog/spdlog.h>
 
@@ -2663,51 +2664,62 @@ int main(int argc, char* argv[])
 
     try
     {
-        if (checkClHelp(argc, argv))
+        const auto printUsage = [&]()
         {
             std::cout << winTitle << "\n\n"
                       << "USAGE:\n"
-                      << std::filesystem::path(argv[0]).stem().string() << " <input_folder> <parameter_file> <output_folder> /?\n\n"
+                      << std::filesystem::path(argv[0]).stem().string() << " [<input_folder> [<parameter_file> [<output_folder>]]] /?\n\n"
                       << "where\n"
                       << "   <input_folder>       Path where scan files are located (*.csv, *.laz, *.sn)\n"
                       << "   <parameter_file>     Path to TOML parameter file (*.toml)\n"
                       << "   <output_folder>      Path where processed session should be stored\n"
-                      << "   -h, /h, --help, /?   Show this help and exit\n\n";
+                      << "   -h, /h, --help, /?   Show this help and exit\n\n"
+                      << "With no arguments the GUI is started. Without <parameter_file> default parameters are used.\n"
+                      << "Without <output_folder> results are stored in the next free lio_result_<n> folder inside <input_folder>.\n\n";
+        };
 
+        if (checkClHelp(argc, argv))
+        {
+            printUsage();
             return 0;
         }
 
-        if (argc == 2) // running from command line
+        if (argc > 4)
         {
-            auto path = fs::path(argv[1]);
-            if (is_directory(path))
-            {
-                std::string working_directory;
-                std::vector<WorkerData> worker_data;
-
-                std::chrono::time_point<std::chrono::system_clock> start, end;
-                start = std::chrono::system_clock::now();
-
-                std::atomic<bool> loPause{ false };
-                step1(path.string(), params, pointsPerFile, imu_data, working_directory, trajectory, worker_data, loPause);
-
-                step2(worker_data, params, loPause);
-
-                end = std::chrono::system_clock::now();
-                std::chrono::duration<double> elapsed_seconds = end - start;
-                std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-                std::cout << "calculations finished computation at " << std::ctime(&end_time)
-                          << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "s\n";
-
-                save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);
-            }
+            std::cerr << "Too many arguments.\n\n";
+            printUsage();
+            return 1;
         }
-        else if (argc == 4) // runnning from command line with custom params
+
+        std::optional<std::string> input_folder;
+        std::optional<std::string> parameter_file;
+        std::optional<std::string> output_folder;
+
+        if (argc >= 2)
+            input_folder = argv[1];
+        if (argc >= 3)
+            parameter_file = argv[2];
+        if (argc >= 4)
+            output_folder = argv[3];
+
+        if (input_folder) // running from command line
         {
-            // Load parameters from file using original TomlIO class
-            TomlIO toml_io;
-            toml_io.LoadParametersFromTomlFile(argv[2], params);
-            std::cout << "Parameters loaded OK from: " << argv[2] << std::endl;
+            if (!fs::is_directory(*input_folder))
+            {
+                std::cerr << "Input folder does not exist or is not a directory: " << *input_folder << std::endl;
+                return 1;
+            }
+
+            if (parameter_file)
+            {
+                TomlIO toml_io;
+                if (!toml_io.LoadParametersFromTomlFile(*parameter_file, params))
+                {
+                    std::cerr << "Failed to load parameters from: " << *parameter_file << std::endl;
+                    return 1;
+                }
+                std::cout << "Parameters loaded OK from: " << *parameter_file << std::endl;
+            }
 
             std::string working_directory;
             std::vector<WorkerData> worker_data;
@@ -2716,7 +2728,12 @@ int main(int argc, char* argv[])
             start = std::chrono::system_clock::now();
 
             std::atomic<bool> loPause{ false };
-            step1(argv[1], params, pointsPerFile, imu_data, working_directory, trajectory, worker_data, loPause);
+            step1(*input_folder, params, pointsPerFile, imu_data, working_directory, trajectory, worker_data, loPause);
+            if (worker_data.empty())
+            {
+                std::cerr << "No data processed from: " << *input_folder << std::endl;
+                return 1;
+            }
 
             step2(worker_data, params, loPause);
 
@@ -2726,12 +2743,13 @@ int main(int argc, char* argv[])
             std::cout << "calculations finished computation at " << std::ctime(&end_time)
                       << "Elapsed time: " << formatTime(elapsed_seconds.count()).c_str() << "s\n";
 
-            save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, argv[3]);
+            const fs::path output_path = output_folder ? fs::path(*output_folder) : get_next_result_path(working_directory);
+            fs::create_directories(output_path);
+            save_results(false, elapsed_seconds.count(), working_directory, worker_data, params, output_path);
+            std::cout << "Results saved to: " << output_path.string() << std::endl;
         }
         else // full GUI mode
         {
-            std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
-
             initGL(&argc, argv, winTitle, display, mouse);
             glutCloseFunc(on_exit);
 

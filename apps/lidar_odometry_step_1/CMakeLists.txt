@@ -22,7 +22,6 @@ set(SOURCES
   lidar_odometry_utils_optimizers.cpp
   lidar_odometry.cpp lidar_odometry.h
   toml_io.h toml_io.cpp
-  "../../core/src/utils.cpp"
 )
 
 # Windows: add resource file
@@ -30,8 +29,10 @@ if(WIN32)
     list(APPEND SOURCES "resource.rc")
 endif()
 
+# lidar_odometry_step_1 is raylib-based (rlImGui + rlgl, see lidar_odometry_gui.cpp), like step 2.
+# drag_folder_with_mandeye_data_and_drop_here-precision_forestry below is still GLUT-based.
 add_executable(
-  lidar_odometry_step_1 lidar_odometry_gui.cpp ${SOURCES}
+  lidar_odometry_step_1 lidar_odometry_gui.cpp taskbar_progress.h taskbar_progress.cpp ${SOURCES}
   )
 
 target_compile_definitions(lidar_odometry_step_1 PRIVATE WITH_GUI=1)
@@ -46,11 +47,6 @@ target_include_directories(
           ${THIRDPARTY_DIRECTORY}/glm
           ${EIGEN3_INCLUDE_DIR}
           ${THIRDPARTY_DIRECTORY}/tomlplusplus/include
-          ${THIRDPARTY_DIRECTORY}/imgui
-          ${THIRDPARTY_DIRECTORY}/imgui/backends
-          ${THIRDPARTY_DIRECTORY}/ImGuizmo
-          ${THIRDPARTY_DIRECTORY}/glew-cmake/include
-          ${FREEGLUT_INCLUDE_DIR}
           ${THIRDPARTY_DIRECTORY}/json/include
           ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
           ${LASZIP_INCLUDE_DIR}/LASzip/include
@@ -60,19 +56,21 @@ target_include_directories(
 
 target_link_libraries(
           lidar_odometry_step_1
-          PRIVATE 
-          vqf 
+          PRIVATE
+          # core_raylib brings in core, raylib and FREEGLUT_LIBRARY (for core's own GLUT references) --
+          # see core/CMakeLists.txt.
+          core_raylib
+          raylib_widgets
+          imgui_raylib
+          rlimgui
+          imguizmo_raylib
+          vqf
           Fusion
           unordered_dense::unordered_dense
           spdlog::spdlog
           UTL::include
-          OpenGL::GLU
-          ${FREEGLUT_LIBRARY}
-          ${OPENGL_gl_LIBRARY}
           ${PLATFORM_LASZIP_LIB}
-          ${PLATFORM_MISCELLANEOUS_LIBS}
-          ${CORE_LIBRARIES}
-          ${GUI_LIBRARIES})
+          ${PLATFORM_MISCELLANEOUS_LIBS})
 
 if(WIN32)
   add_custom_command(
@@ -89,7 +87,8 @@ if (MSVC)
 endif()
 
 add_executable(
-  drag_folder_with_mandeye_data_and_drop_here-precision_forestry drag_folder_with_mandeye_data_and_drop_here-precision_forestry.cpp ${SOURCES}
+  drag_folder_with_mandeye_data_and_drop_here-precision_forestry drag_folder_with_mandeye_data_and_drop_here-precision_forestry.cpp
+  "../../core/src/utils.cpp" ${SOURCES}
   )
 
 target_compile_definitions(drag_folder_with_mandeye_data_and_drop_here-precision_forestry PRIVATE WITH_GUI=1)

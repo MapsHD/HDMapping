@@ -1,22 +1,48 @@
-﻿#include <imgui.h>
-#include <imgui_impl_glut.h>
-#include <imgui_impl_opengl2.h>
+﻿// raylib + rlImGui GUI (was GLUT + legacy immediate-mode OpenGL via core/src/utils.cpp). raylib's context is
+// OpenGL 3.3 core profile, so the scene is drawn with rlgl's rl*() immediate-mode emulation (lines) and
+// ScanRenderer::PointsGPU buffers (points); camera, compass, docking and dialogs come from raylib_widgets,
+// the same way apps/multi_view_tls_registration (step 2) does it.
+#include "raylib.h"
+#include "raymath.h"
+#include "rlImGui.h"
+#include "rlgl.h"
+
+#include <imgui.h>
 #include <imgui_internal.h>
 
 #include <ImGuizmo.h>
 
-#include <GL/freeglut.h>
+#ifdef _WIN32
+// portable-file-dialogs.h pulls in windows.h, whose CloseWindow(HWND)/ShowCursor(BOOL) collide with raylib's
+// -- see multi_view_tls_registration_gui.cpp for the full story.
+#define CloseWindow CloseWindow_win32
+#define ShowCursor ShowCursor_win32
+#endif
 #include <portable-file-dialogs.h>
+#ifdef _WIN32
+#undef CloseWindow
+#undef ShowCursor
+#undef DrawText
+#endif
 
 #include "lidar_odometry.h"
 #include "lidar_odometry_utils.h"
+#include "taskbar_progress.h"
 
 #include <Core/export_laz.h>
 #include <Core/hash_utils.h>
 #include <Core/pfd_wrapper.hpp>
+#include <Core/raylib_render.hpp>
 #include <Core/registration_plane_feature.h>
 #include <Core/session.h>
-#include <Core/utils.hpp>
+
+#include <RaylibWidgets/AppShell.h>
+#include <RaylibWidgets/CenterOfRotationWindow.h>
+#include <RaylibWidgets/CompassRuler.h>
+#include <RaylibWidgets/OrbitCamera.h>
+#include <RaylibWidgets/RayPlaneD.h>
+#include <RaylibWidgets/ShortcutsTable.h>
+#include <RaylibWidgets/WindowFit.h>
 
 #include "toml_io.h"
 #include <HDMapping/Version.hpp>
@@ -26,11 +52,6 @@
 #include <spdlog/cfg/env.h>
 #include <spdlog/spdlog.h>
 
-#ifdef _WIN32
-#include "resource.h"
-#include <windows.h>
-#endif
-
 ///////////////////////////////////////////////////////////////////////////////////
 
 // This is LiDAR odometry (step 1)
@@ -39,6 +60,22 @@
 // processed by "multi_view_tls_registration" program.
 
 // #define SAMPLE_PERIOD (1.0 / 200.0)
+
+using raylib_widgets::ShortcutEntry;
+
+// Formerly from <Core/utils.hpp>, which is GLUT-only.
+const float DEG_TO_RAD = M_PI / 180.0f;
+
+constexpr float ImGuiNumberWidth = 120.0f;
+constexpr const char* omText = "Roll (left/right)";
+constexpr const char* fiText = "Pitch (up/down)";
+constexpr const char* kaText = "Yaw (turning left/right)";
+constexpr const char* xText = "Longitudinal (forward/backward)";
+constexpr const char* yText = "Lateral (left/right)";
+constexpr const char* zText = "Vertical (up/down)";
+
+const uint32_t window_width = 1600;
+const uint32_t window_height = 900;
 
 std::string winTitle = std::string("Step 1 (Lidar odometry) ") + HDMAPPING_VERSION_STRING;
 
@@ -146,9 +183,6 @@ bool show_trajectory = true;
 bool show_trajectory_as_axes = false;
 bool show_prediction_vectors = false;
 bool intermediate_trajectory_prediction_axes = false;
-bool show_covs_indoor = false;
-bool show_covs_outdoor = false;
-int dec_covs = 10;
 bool simple_gui = true;
 bool step_1_done = false;
 bool step_2_done = false;
@@ -197,6 +231,401 @@ fs::path outwd;
 #else
 #define DEFAULT_PATH "~"
 #endif
+
+///////////////////////////////////////////////////////////////////////////////////
+// View state and camera/input helpers (formerly the globals and functions of core/src/utils.cpp)
+
+struct AppState
+{
+    int mouse_old_x = 0, mouse_old_y = 0;
+    int mouse_buttons = 0; // bit 0: left, bit 2: right (GLUT numbering, as motion() expects)
+    bool show_axes = true;
+    ImVec4 bg_color = ImVec4(0.65f, 0.65f, 0.65f, 1.00f);
+    int point_size = 1;
+
+    bool info_gui = false;
+    bool compass_ruler = true;
+
+    Eigen::Affine3f viewLocal = Eigen::Affine3f::Identity(); // rebuilt from camera every frame
+    raylib_widgets::OrbitCamera camera; // Euler/ortho mode only
+};
+
+AppState app_state;
+
+bool cor_gui = false; // edge-triggered request to open the center-of-rotation dialog (Shift+R)
+
+bool scroll_hint_enabled = true;
+bool scroll_hint_active = false;
+int scroll_hint_count = 0;
+float scroll_hint_accu = 0.0f;
+double scroll_hint_lastT = 0.0;
+
+ScanRenderer scan_renderer; // only its PointsGPU helpers are used here -- this app renders no PointCloud scans
+
+// GPU buffers for the scene's point sets. The static ones are re-uploaded only when their source changes; the
+// ones that grow while odometry runs in the background are re-uploaded every frame they are shown.
+struct ScenePoints
+{
+    ScanRenderer::PointsGPU initial;
+    size_t initial_count = 0;
+    Eigen::Matrix4d initial_m_g = Eigen::Matrix4d::Zero();
+    ScanRenderer::PointsGPU reference;
+    size_t reference_count = 0;
+    int reference_dec = 0;
+    ScanRenderer::PointsGPU trajectory;
+    std::vector<Eigen::Vector3d> trajectory_uploaded;
+    ScanRenderer::PointsGPU buckets[4]; // indoor, indoor filtered, outdoor, outdoor filtered
+    std::vector<Eigen::Vector3d> buckets_uploaded[4];
+} scene_points;
+
+//! Uploads `pts` to `gpu` only if they differ from what was last uploaded.
+//! @param uploaded copy of the points currently in `gpu`, updated on upload.
+void uploadIfChanged(ScanRenderer::PointsGPU& gpu, std::vector<Eigen::Vector3d>& uploaded, std::vector<Eigen::Vector3d>& pts)
+{
+    if (pts == uploaded)
+        return;
+    scan_renderer.uploadPoints(gpu, pts);
+    uploaded.swap(pts);
+}
+
+void unloadScenePoints()
+{
+    scan_renderer.unloadPoints(scene_points.initial);
+    scan_renderer.unloadPoints(scene_points.reference);
+    scan_renderer.unloadPoints(scene_points.trajectory);
+    for (auto& b : scene_points.buckets)
+        scan_renderer.unloadPoints(b);
+}
+
+bool checkClHelp(int argc, char** argv)
+{
+    for (int i = 1; i < argc; ++i)
+    {
+        std::string arg(argv[i]);
+        if (arg == "-h" || arg == "/h" || arg == "--help" || arg == "/?")
+            return true;
+    }
+    return false;
+}
+
+void wheel(float wheelMove)
+{
+    ImGuiIO& io = ImGui::GetIO();
+
+    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+        return;
+
+    app_state.camera.zoom(wheelMove, io.KeyShift);
+
+    if (scroll_hint_enabled)
+    {
+        if (!scroll_hint_active)
+        {
+            scroll_hint_accu += 1.0f;
+            if (scroll_hint_accu > 30.0f)
+            {
+                scroll_hint_accu = 0.0f;
+                scroll_hint_active = true;
+                scroll_hint_count++;
+            }
+        }
+
+        if (scroll_hint_active)
+            scroll_hint_lastT = ImGui::GetTime();
+
+        if (io.KeyShift || scroll_hint_count > 3)
+        {
+            scroll_hint_active = false;
+            scroll_hint_enabled = false;
+        }
+    }
+}
+
+void motion(int x, int y)
+{
+    ImGuiIO& io = ImGui::GetIO();
+
+    if (io.WantCaptureMouse)
+        return;
+
+    const float dx = (float)(x - app_state.mouse_old_x);
+    const float dy = (float)(y - app_state.mouse_old_y);
+
+    // Ctrl/Shift clicks pick a new rotation center; a stray drag on the same click must not break that transition.
+    if (!io.KeyCtrl && !io.KeyShift)
+    {
+        if (app_state.mouse_buttons & 1)
+            app_state.camera.dragOrbit(dx, dy);
+
+        if (app_state.mouse_buttons & 4)
+        {
+            if (app_state.camera.isOrtho)
+                app_state.camera.dragPanOrtho(dx, dy, io.DisplaySize.x, io.DisplaySize.y);
+            else
+                app_state.camera.dragPanPerspective(dx, dy);
+        }
+    }
+
+    app_state.mouse_old_x = x;
+    app_state.mouse_old_y = y;
+}
+
+void setNewRotationCenter(int x, int y)
+{
+    const Ray ray = app_state.camera.eulerScreenRay(x, y, GetScreenWidth(), GetScreenHeight());
+    const Eigen::Vector3d origin(ray.position.x, ray.position.y, ray.position.z);
+    const Eigen::Vector3d direction(ray.direction.x, ray.direction.y, ray.direction.z);
+
+    Eigen::Vector3d center = origin;
+    raylib_widgets::intersectPlane(origin, direction, 0.0, 0.0, 1.0, 0.0, center);
+
+    spdlog::info("Setting new rotation center to: {}, {}, {}", center.x(), center.y(), center.z());
+
+    app_state.camera.moveEulerRotationCenterTo(
+        Vector3{ static_cast<float>(center.x()), static_cast<float>(center.y()), static_cast<float>(center.z()) });
+}
+
+void showAxes()
+{
+    if (!app_state.show_axes && !ImGui::GetIO().KeyCtrl)
+        return;
+
+    const auto& rc = app_state.camera.euler.rotationCenter;
+    rlBegin(RL_LINES);
+    rlColor3f(1.f, 1.f, 1.f);
+    rlVertex3f(rc.x - 1.f, rc.y, rc.z);
+    rlVertex3f(rc.x + 1.f, rc.y, rc.z);
+    rlVertex3f(rc.x, rc.y - 1.f, rc.z);
+    rlVertex3f(rc.x, rc.y + 1.f, rc.z);
+    rlVertex3f(rc.x, rc.y, rc.z - 1.f);
+    rlVertex3f(rc.x, rc.y, rc.z + 1.f);
+
+    rlColor3f(1.0f, 0.0f, 0.0f);
+    rlVertex3f(0.0f, 0.0f, 0.0f);
+    rlVertex3f(100.0f, 0.0f, 0.0f);
+    rlColor3f(0.0f, 1.0f, 0.0f);
+    rlVertex3f(0.0f, 0.0f, 0.0f);
+    rlVertex3f(0.0f, 100.0f, 0.0f);
+    rlColor3f(0.0f, 0.0f, 1.0f);
+    rlVertex3f(0.0f, 0.0f, 0.0f);
+    rlVertex3f(0.0f, 0.0f, 100.0f);
+    rlEnd();
+}
+
+void camMenu()
+{
+    using raylib_widgets::OrbitCamera;
+
+    if (ImGui::BeginMenu("Camera"))
+    {
+        if (ImGui::MenuItem("Front (yz view)", "key F"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Front);
+        if (ImGui::MenuItem("Back", "key B"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Back);
+        if (ImGui::MenuItem("Left (xz view)", "key L"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Left);
+        if (ImGui::MenuItem("Right", "key R"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Right);
+        if (ImGui::MenuItem("Top (xy view)", "key T"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Top);
+        if (ImGui::MenuItem("Bottom", "key U"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Bottom);
+        if (ImGui::MenuItem("Isometric", "key I"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Iso);
+        ImGui::Separator();
+        if (ImGui::MenuItem("Reset", "key Z"))
+            app_state.camera.setEulerPreset(OrbitCamera::EulerPreset::Reset);
+
+        ImGui::EndMenu();
+    }
+    if (ImGui::IsItemHovered())
+    {
+        const auto& e = app_state.camera.euler;
+        ImGui::BeginTooltip();
+        ImGui::Text("Change camera view to fixed positions");
+        ImGui::Separator();
+        ImGui::Text("rotate:     %.3f %.3f", e.rotateX, e.rotateY);
+        ImGui::Text("translate:  %.3f %.3f %.3f", e.translate.x, e.translate.y, e.translate.z);
+        ImGui::Text("rot center: %.3f %.3f %.3f", e.rotationCenter.x, e.rotationCenter.y, e.rotationCenter.z);
+        ImGui::Text("Mouse sensitivity: %.4f", app_state.camera.eulerMouseSensitivity);
+        ImGui::EndTooltip();
+    }
+
+    if (scroll_hint_active)
+    {
+        ImVec2 mousePos = ImGui::GetMousePos();
+        ImGui::SetNextWindowPos(ImVec2(mousePos.x + 20, mousePos.y - 40));
+        ImGui::SetNextWindowBgAlpha(0.7f);
+        ImGui::BeginTooltip();
+        ImGui::Text("Tip: To accelerate hold Shift + scroll");
+        ImGui::EndTooltip();
+
+        if (ImGui::GetTime() - scroll_hint_lastT > 1)
+            scroll_hint_active = false;
+    }
+}
+
+void view_kbd_shortcuts()
+{
+    using raylib_widgets::OrbitCamera;
+
+    ImGuiIO& io = ImGui::GetIO();
+    auto& cam = app_state.camera;
+
+    if (io.WantCaptureKeyboard)
+        return;
+
+    const float step = 0.5f * cam.eulerMouseSensitivity;
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
+    {
+        cam.euler.translate.x += step;
+        cam.breakEulerTransition();
+    }
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
+    {
+        cam.euler.translate.x -= step;
+        cam.breakEulerTransition();
+    }
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
+    {
+        cam.euler.translate.y += step;
+        cam.breakEulerTransition();
+    }
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
+    {
+        cam.euler.translate.y -= step;
+        cam.breakEulerTransition();
+    }
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true))
+    {
+        cam.euler.rotateY -= 0.6f;
+        cam.breakEulerTransition();
+    }
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true))
+    {
+        cam.euler.rotateY += 0.6f;
+        cam.breakEulerTransition();
+    }
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
+    {
+        cam.euler.rotateX -= 0.6f;
+        cam.breakEulerTransition();
+    }
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
+    {
+        cam.euler.rotateX += 0.6f;
+        cam.breakEulerTransition();
+    }
+
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_R, false))
+        cor_gui = true;
+
+    if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false) && !cam.isOrtho)
+        cam.lockZ = !cam.lockZ;
+
+    if (io.KeyCtrl || io.KeyAlt || io.KeyShift)
+        return;
+
+    if (ImGui::IsKeyPressed(ImGuiKey_B))
+        cam.setEulerPreset(OrbitCamera::EulerPreset::Back);
+    if (ImGui::IsKeyPressed(ImGuiKey_F))
+        cam.setEulerPreset(OrbitCamera::EulerPreset::Front);
+    if (ImGui::IsKeyPressed(ImGuiKey_I))
+        cam.setEulerPreset(OrbitCamera::EulerPreset::Iso);
+    if (ImGui::IsKeyPressed(ImGuiKey_L))
+        cam.setEulerPreset(OrbitCamera::EulerPreset::Left);
+    if (ImGui::IsKeyPressed(ImGuiKey_R))
+        cam.setEulerPreset(OrbitCamera::EulerPreset::Right);
+    if (ImGui::IsKeyPressed(ImGuiKey_T))
+        cam.setEulerPreset(OrbitCamera::EulerPreset::Top);
+    if (ImGui::IsKeyPressed(ImGuiKey_U))
+        cam.setEulerPreset(OrbitCamera::EulerPreset::Bottom);
+    if (ImGui::IsKeyPressed(ImGuiKey_Z))
+        cam.setEulerPreset(OrbitCamera::EulerPreset::Reset);
+
+    if (ImGui::IsKeyPressed(ImGuiKey_C, false))
+        app_state.compass_ruler = !app_state.compass_ruler;
+    if (ImGui::IsKeyPressed(ImGuiKey_O, false))
+        cam.isOrtho = !cam.isOrtho;
+    if (ImGui::IsKeyPressed(ImGuiKey_X, false))
+        app_state.show_axes = !app_state.show_axes;
+
+    for (int k = 1; k <= 9; k++)
+        if (ImGui::IsKeyPressed(static_cast<ImGuiKey>(ImGuiKey_0 + k)))
+            app_state.point_size = k;
+}
+
+// Rows 0/1 of the world-to-eye rotation are the world-space directions of screen right/up.
+void drawMiniCompassWithRuler()
+{
+    const Eigen::Matrix3f& R = app_state.viewLocal.rotation();
+    Vector3 right = { R(0, 0), R(0, 1), R(0, 2) };
+    Vector3 up = { R(1, 0), R(1, 1), R(1, 2) };
+    Color rulerColor =
+        ColorFromNormalized(Vector4{ 1.0f - app_state.bg_color.x, 1.0f - app_state.bg_color.y, 1.0f - app_state.bg_color.z, 1.0f });
+    raylib_widgets::drawCompassRuler(
+        right,
+        up,
+        app_state.camera.euler.translate.z,
+        rulerColor,
+        raylib_widgets::CompassAxisLabels{ "X (long.)", "Y (lat.)", "Z (vert.)" });
+}
+
+// Runs ImGuizmo on `m` (column-major 4x4) against this frame's 3D camera.
+void manipulateGizmo(float* m)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    ImGuizmo::BeginFrame();
+    ImGuizmo::Enable(true);
+    ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+    if (!app_state.camera.isOrtho)
+    {
+        float16 view = MatrixToFloatV(app_state.camera.frameView3D);
+        float16 projection = MatrixToFloatV(app_state.camera.frameProj3D);
+        ImGuizmo::Manipulate(
+            view.v,
+            projection.v,
+            ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y,
+            ImGuizmo::WORLD,
+            m,
+            NULL);
+    }
+    else
+    {
+        ImGuizmo::Manipulate(
+            app_state.camera.orthoGizmoView,
+            app_state.camera.orthoProjection,
+            ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Z,
+            ImGuizmo::WORLD,
+            m,
+            NULL);
+    }
+}
+
+void drawCross(const Eigen::Vector3d& p, double size)
+{
+    rlVertex3f(p.x() - size, p.y(), p.z());
+    rlVertex3f(p.x() + size, p.y(), p.z());
+    rlVertex3f(p.x(), p.y() - size, p.z());
+    rlVertex3f(p.x(), p.y() + size, p.z());
+    rlVertex3f(p.x(), p.y(), p.z() - size);
+    rlVertex3f(p.x(), p.y(), p.z() + size);
+}
+
+// Draws axes of `rotation`'s columns scaled by `length`, starting at `origin`.
+void drawAxesAt(const Eigen::Vector3d& origin, const Eigen::Matrix3d& rotation, double length)
+{
+    const float colors[3][3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
+    for (int k = 0; k < 3; k++)
+    {
+        const Eigen::Vector3d end = origin + rotation.col(k) * length;
+        rlColor3f(colors[k][0], colors[k][1], colors[k][2]);
+        rlVertex3f(origin.x(), origin.y(), origin.z());
+        rlVertex3f(end.x(), end.y(), end.z());
+    }
+}
 
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -603,36 +1032,21 @@ void alternative_approach()
 }
 #endif
 
-Eigen::Vector3d GLWidgetGetOGLPos(int x, int y, const ObservationPicking& observation_picking)
+//! Loads Mandeye data and runs the first processing stage.
+//! @param folder data folder; when empty, the user is asked to select one.
+void step1(const std::atomic<bool>& loPause, const std::string& folder = "")
 {
-    const auto laser_beam = GetLaserBeam(x, y);
-
-    RegistrationPlaneFeature::Plane pl;
-
-    pl.a = 0;
-    pl.b = 0;
-    pl.c = 1;
-    pl.d = -observation_picking.picking_plane_height;
-
-    Eigen::Vector3d pos = rayIntersection(laser_beam, pl);
-
-    std::cout << "intersection: " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;
-
-    return pos;
-}
-
-void step1(const std::atomic<bool>& loPause)
-{
-    std::string input_folder_name;
+    std::string input_folder_name = folder;
     std::vector<std::string> input_file_names;
-    input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
+    if (input_folder_name.empty())
+        input_folder_name = mandeye::fd::SelectFolder("Select Mandeye data folder");
 
     std::cout << "Selected folder: '" << input_folder_name << std::endl;
 
     if (fs::exists(input_folder_name))
     {
         std::string newTitle = winTitle + " - ..\\" + std::filesystem::path(input_folder_name).filename().string();
-        glutSetWindowTitle(newTitle.c_str());
+        SetWindowTitle(newTitle.c_str());
 
         for (const auto& entry : fs::directory_iterator(input_folder_name))
             if (entry.is_regular_file())
@@ -647,13 +1061,13 @@ void step1(const std::atomic<bool>& loPause)
         }
         else
         {
-            std::string message_info = "Problem with loading data from folder '" + input_folder_name +
-                "' (Pease check if folder exists). Program will close once You click OK!!!";
-            std::cout << message_info << std::endl;
-            [[maybe_unused]] pfd::message message("Information", message_info.c_str(), pfd::choice::ok, pfd::icon::info);
-            message.result();
+            SetWindowTitle(winTitle.c_str());
 
-            exit(1);
+            std::string message_info = "Problem with loading data from folder '" + input_folder_name +
+                "'. Please check that it contains Mandeye IMU *.csv and LiDAR *.laz files, then select another folder.";
+            std::cout << message_info << std::endl;
+            [[maybe_unused]] pfd::message message("Information", message_info.c_str(), pfd::choice::ok, pfd::icon::warning);
+            message.result();
         }
     }
 }
@@ -1488,8 +1902,7 @@ void settings_gui()
                               << "scan_0.laz" << std::endl
                               << "0.999775 0.000552479 -0.0212158 -0.0251188" << std::endl
                               << "0.000834612 0.997864 0.0653156 -0.0381429" << std::endl
-                              << "0.0212066 - 0.0653186 0.997639 -0.000757752"
-                              << "0 0 0 1" << std::endl
+                              << "0.0212066 - 0.0653186 0.997639 -0.000757752" << "0 0 0 1" << std::endl
                               << "scan_1.laz" << std::endl
                               << "0.999783 0.00178963 -0.0207603 -0.0309683" << std::endl
                               << "-0.000467341 0.99798 0.0635239 -0.0517512" << std::endl
@@ -1672,7 +2085,7 @@ void progress_window()
 {
     ImGui::Begin("Progress", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
-    ImGui::Text(("Working directory:\n'" + working_directory + "'").c_str());
+    ImGui::Text("Working directory:\n'%s'", working_directory.c_str());
 
     // Calculate elapsed time and ETA
     auto currentTime = std::chrono::system_clock::now();
@@ -1760,16 +2173,16 @@ void progress_window()
     ImGui::Checkbox("Show without filtered buckets", &show_without_filtered_buckets);
     ImGui::Checkbox("Show normal vectors indoor", &show_normal_vectors_indoor);
     ImGui::Checkbox("Show normal vectors outdoor", &show_normal_vectors_outdoor);
-    // ImGui::Checkbox("Show covs indoor", &show_covs_indoor);
-    // ImGui::Checkbox("Show covs outdoor", &show_covs_outdoor);
 
     ImGui::End();
 }
 
-void openData()
+//! Loads data and starts processing in the background.
+//! @param folder data folder; when empty, the user is asked to select one.
+void openData(const std::string& folder = "")
 {
     is_settings_gui = false;
-    info_gui = false;
+    app_state.info_gui = false;
 
     loRunning.store(true);
     loProgress.store(0.0f);
@@ -1777,7 +2190,7 @@ void openData()
     loEstimatedTimeRemaining.store(0.0);
     loStartTime = std::chrono::system_clock::now();
 
-    step1(loPause);
+    step1(loPause, folder);
 
     if (step_1_done)
     {
@@ -1860,365 +2273,241 @@ void save_results(
     save_result(worker_data, params, outwd, elapsed_seconds);
 }
 
-void display()
+// Pure colors -- raylib's named RED/GREEN/BLUE are tinted, unlike the original glColor3f values.
+constexpr Color kRed{ 255, 0, 0, 255 };
+constexpr Color kGreen{ 0, 255, 0, 255 };
+constexpr Color kBlue{ 0, 0, 255, 255 };
+constexpr Color kCyan{ 0, 255, 255, 255 };
+constexpr Color kMagenta{ 255, 0, 255, 255 };
+
+// Collects bucket means into the two point sets drawn per bucket map (regular and number_of_points == -1).
+void collectBucketMeans(const NDTBucketMapType& buckets, std::vector<Eigen::Vector3d>& regular, std::vector<Eigen::Vector3d>& marked)
 {
-    ImGuiIO& io = ImGui::GetIO();
-    glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+    regular.clear();
+    marked.clear();
+    for (const auto& b : buckets)
+    {
+        if (show_without_filtered_buckets && b.second.number_of_hits >= 20)
+            continue;
+        (b.second.number_of_points == -1 ? marked : regular).push_back(b.second.mean);
+    }
+}
 
-    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
+void drawBucketNormals(const NDTBucketMapType& buckets)
+{
+    rlBegin(RL_LINES);
+    for (const auto& b : buckets)
+    {
+        const auto& n = b.second.normal_vector;
+        const auto& m = b.second.mean;
+        rlColor3f(fabs(n.x()), fabs(n.y()), fabs(n.z()));
+        rlVertex3f(m.x(), m.y(), m.z());
+        rlVertex3f(m.x() + n.x(), m.y() + n.y(), m.z() + n.z());
+    }
+    rlEnd();
+}
 
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
-
-    updateCameraTransition();
-
-    reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
-
-    viewLocal = Eigen::Affine3f::Identity();
-
-    viewLocal.translate(rotation_center);
-
-    viewLocal.translate(Eigen::Vector3f(translate_x, translate_y, translate_z));
-    if (!lock_z)
-        viewLocal.rotate(Eigen::AngleAxisf(rotate_x * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
-    else
-        viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
-    viewLocal.rotate(Eigen::AngleAxisf(rotate_y * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
-
-    viewLocal.translate(-rotation_center);
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadMatrixf(viewLocal.matrix().data());
+void renderScene()
+{
+    const float point_size = static_cast<float>(app_state.point_size);
 
     showAxes();
 
-    if (show_initial_points)
+    if (show_initial_points && !params.initial_points.empty())
     {
-        glColor3d(0.0, 1.0, 0.0);
-        glPointSize(point_size);
-        glBegin(GL_POINTS);
-        for (const auto& p : params.initial_points)
+        // Re-uploaded only when the points or params.m_g (moved by the initial-transformation gizmo) change.
+        if (scene_points.initial_count != params.initial_points.size() || scene_points.initial_m_g != params.m_g.matrix())
         {
-            auto pp = params.m_g * p.point;
-            glVertex3d(pp.x(), pp.y(), pp.z());
+            std::vector<Eigen::Vector3d> pts;
+            pts.reserve(params.initial_points.size());
+            for (const auto& p : params.initial_points)
+                pts.push_back(params.m_g * p.point);
+            scan_renderer.uploadPoints(scene_points.initial, pts);
+            scene_points.initial_count = params.initial_points.size();
+            scene_points.initial_m_g = params.m_g.matrix();
         }
-        glEnd();
+        scan_renderer.drawPoints(scene_points.initial, kGreen, point_size);
     }
-
-#if 0 // ToDo
-    for (size_t i = 0; i < worker_data.size(); i++)
-    {
-        if (worker_data[i].show)
-        {
-            glPointSize(1);
-            glColor3d(0.0, 0.0, 1.0);
-            glBegin(GL_POINTS);
-            for (const auto &p : worker_data[i].intermediate_points)
-            {
-                Eigen::Vector3d pt = worker_data[i].intermediate_trajectory[p.index_pose] * p.point;
-                glVertex3d(pt.x(), pt.y(), pt.z());
-            }
-            glEnd();
-            glPointSize(1);
-
-            glLineWidth(1);
-            glBegin(GL_LINES);
-            const auto &it = worker_data[i].intermediate_trajectory[0];
-            glColor3f(1, 0, 0);
-            glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-            glVertex3f(it(0, 3) + it(0, 0), it(1, 3) + it(1, 0), it(2, 3) + it(2, 0));
-
-            glColor3f(0, 1, 0);
-            glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-            glVertex3f(it(0, 3) + it(0, 1), it(1, 3) + it(1, 1), it(2, 3) + it(2, 1));
-
-            glEnd();
-        }
-    }
-#endif
 
     if (show_reference_points)
     {
-        glColor3f(1, 0, 0);
-        glBegin(GL_POINTS);
-        for (size_t i = 0; i < params.reference_points.size(); i += dec_reference_points)
-            glVertex3f(params.reference_points[i].point.x(), params.reference_points[i].point.y(), params.reference_points[i].point.z());
-        glEnd();
+        const int dec = std::max(1, dec_reference_points);
+        if (scene_points.reference_count != params.reference_points.size() || scene_points.reference_dec != dec)
+        {
+            std::vector<Eigen::Vector3d> pts;
+            for (size_t i = 0; i < params.reference_points.size(); i += dec)
+                pts.push_back(params.reference_points[i].point);
+            scan_renderer.uploadPoints(scene_points.reference, pts);
+            scene_points.reference_count = params.reference_points.size();
+            scene_points.reference_dec = dec;
+        }
+        scan_renderer.drawPoints(scene_points.reference, kRed, point_size);
     }
 
     if (show_trajectory_as_axes)
     {
-        // glBegin(GL_LINE_STRIP);
-        glBegin(GL_LINES);
+        rlBegin(RL_LINES);
         for (const auto& wd : worker_data)
-        {
             for (const auto& it : wd.intermediate_trajectory)
-            {
-                glColor3f(1, 0, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + it(0, 0) * 0.1, it(1, 3) + it(1, 0) * 0.1, it(2, 3) + it(2, 0) * 0.1);
-
-                glColor3f(0, 1, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + it(0, 1) * 0.1, it(1, 3) + it(1, 1) * 0.1, it(2, 3) + it(2, 1) * 0.1);
-
-                glColor3f(0, 0, 1);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + it(0, 2) * 0.1, it(1, 3) + it(1, 2) * 0.1, it(2, 3) + it(2, 2) * 0.1);
-            }
-        }
-        glEnd();
+                drawAxesAt(it.translation(), it.linear(), 0.1);
+        rlEnd();
     }
 
     if (show_prediction_vectors)
     {
-        glDisable(GL_DEPTH_TEST);
-        glLineWidth(3.0f);
-        glBegin(GL_LINES);
+        // Depth test and line width are GL state, applied when rlgl flushes its batch -- flush around the change.
+        rlDrawRenderBatchActive();
+        rlDisableDepthTest();
+        rlSetLineWidth(3.0f);
+        rlBegin(RL_LINES);
+        rlColor3f(1.0f, 0.0f, 1.0f);
         for (const auto& wd : worker_data)
         {
             if (wd.intermediate_trajectory.empty() || wd.imu_prediction_vector.norm() < 1e-6)
                 continue;
 
-            Eigen::Vector3d start = wd.intermediate_trajectory.front().translation();
-            Eigen::Vector3d end = start + wd.imu_prediction_vector;
-
-            glColor3f(1.0f, 0.0f, 1.0f); // magenta
-            glVertex3d(start.x(), start.y(), start.z());
-            glVertex3d(end.x(), end.y(), end.z());
+            const Eigen::Vector3d start = wd.intermediate_trajectory.front().translation();
+            const Eigen::Vector3d end = start + wd.imu_prediction_vector;
+            rlVertex3f(start.x(), start.y(), start.z());
+            rlVertex3f(end.x(), end.y(), end.z());
         }
-        glEnd();
-        glLineWidth(1.0f);
-        glEnable(GL_DEPTH_TEST);
+        rlEnd();
+        rlDrawRenderBatchActive();
+        rlSetLineWidth(1.0f);
+        rlEnableDepthTest();
     }
 
     if (intermediate_trajectory_prediction_axes)
     {
-        glLineWidth(1.0f);
-        glBegin(GL_LINES);
+        rlBegin(RL_LINES);
         for (const auto& wd : worker_data)
         {
-            if (wd.intermediate_trajectory.empty() || wd.intermediate_trajectory_prediction.empty())
-                continue;
-
-            for (size_t i = 0; i < std::min(wd.intermediate_trajectory.size(), wd.intermediate_trajectory_prediction.size()); i++)
-            {
-                const auto& it = wd.intermediate_trajectory[i];
-                const auto& pred_axis = wd.intermediate_trajectory_prediction[i];
-
-                glColor3f(1, 0, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + pred_axis(0, 0) * 0.05, it(1, 3) + pred_axis(1, 0) * 0.05, it(2, 3) + pred_axis(2, 0) * 0.05);
-
-                glColor3f(0, 1, 0);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + pred_axis(0, 1) * 0.05, it(1, 3) + pred_axis(1, 1) * 0.05, it(2, 3) + pred_axis(2, 1) * 0.05);
-
-                glColor3f(0, 0, 1);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + pred_axis(0, 2) * 0.05, it(1, 3) + pred_axis(1, 2) * 0.05, it(2, 3) + pred_axis(2, 2) * 0.05);
-            }
+            const size_t n = std::min(wd.intermediate_trajectory.size(), wd.intermediate_trajectory_prediction.size());
+            for (size_t i = 0; i < n; i++)
+                drawAxesAt(wd.intermediate_trajectory[i].translation(), wd.intermediate_trajectory_prediction[i].linear(), 0.05);
         }
-        glEnd();
-        glLineWidth(1.0f);
+        rlEnd();
     }
 
     if (show_trajectory)
     {
-        glPointSize(3);
-        glColor3f(0, 1, 1);
-        glBegin(GL_POINTS);
+        std::vector<Eigen::Vector3d> pts;
         for (const auto& wd : worker_data)
-        {
             for (const auto& it : wd.intermediate_trajectory)
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3));
-        }
-        glEnd();
-        glPointSize(1);
+                pts.push_back(it.translation());
+        uploadIfChanged(scene_points.trajectory, scene_points.trajectory_uploaded, pts);
+        scan_renderer.drawPoints(scene_points.trajectory, kCyan, 3.0f);
 
-        glColor3f(1, 0, 0);
-        glBegin(GL_LINES);
-        if (worker_data.size() > 0)
+        if (!worker_data.empty() && !worker_data.back().intermediate_trajectory.empty())
         {
-            const auto& wd = worker_data[worker_data.size() - 1];
-            if (wd.intermediate_trajectory.size() > 0)
-            {
-                const auto& it = wd.intermediate_trajectory[wd.intermediate_trajectory.size() - 1];
-
-                glVertex3f(it(0, 3) - 1, it(1, 3), it(2, 3));
-                glVertex3f(it(0, 3) + 1, it(1, 3), it(2, 3));
-
-                glVertex3f(it(0, 3), it(1, 3) - 1, it(2, 3));
-                glVertex3f(it(0, 3), it(1, 3) + 1, it(2, 3));
-
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3) - 1);
-                glVertex3f(it(0, 3), it(1, 3), it(2, 3) + 1);
-            }
+            rlBegin(RL_LINES);
+            rlColor3f(1, 0, 0);
+            drawCross(worker_data.back().intermediate_trajectory.back().translation(), 1.0);
+            rlEnd();
         }
-        glEnd();
     }
+
+    std::vector<Eigen::Vector3d> regular, marked;
 
     if (show_reference_buckets_indoor)
     {
-        std::scoped_lock lock(params.mutex_buckets_indoor);
-        glColor3f(1, 0, 0);
-        glBegin(GL_POINTS);
-        for (const auto& b : params.buckets_indoor)
         {
-            if (b.second.number_of_points == -1)
-            {
-                glColor3f(0, 1, 1);
-            }
-            else
-            {
-                glColor3f(1, 0, 0);
-            }
-            if (!show_without_filtered_buckets)
-            {
-                glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            }
-            else
-            {
-                if (b.second.number_of_hits < 20)
-                {
-                    glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-                }
-            }
+            std::scoped_lock lock(params.mutex_buckets_indoor);
+            collectBucketMeans(params.buckets_indoor, regular, marked);
         }
-        glEnd();
+        uploadIfChanged(scene_points.buckets[0], scene_points.buckets_uploaded[0], regular);
+        uploadIfChanged(scene_points.buckets[1], scene_points.buckets_uploaded[1], marked);
+        scan_renderer.drawPoints(scene_points.buckets[0], kRed, 1.0f);
+        scan_renderer.drawPoints(scene_points.buckets[1], kCyan, 1.0f);
     }
 
     if (show_reference_buckets_outdoor)
     {
-        std::scoped_lock lock2(params.mutex_buckets_outdoor);
-        glColor3f(0, 0, 1);
-        glBegin(GL_POINTS);
-        for (const auto& b : params.buckets_outdoor)
         {
-            if (b.second.number_of_points == -1)
-            {
-                glColor3f(1, 0, 1);
-            }
-            else
-            {
-                glColor3f(0, 0, 1);
-            }
-            // glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            if (!show_without_filtered_buckets)
-            {
-                glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            }
-            else
-            {
-                if (b.second.number_of_hits < 20)
-                {
-                    glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-                }
-            }
+            std::scoped_lock lock(params.mutex_buckets_outdoor);
+            collectBucketMeans(params.buckets_outdoor, regular, marked);
         }
-        glEnd();
+        uploadIfChanged(scene_points.buckets[2], scene_points.buckets_uploaded[2], regular);
+        uploadIfChanged(scene_points.buckets[3], scene_points.buckets_uploaded[3], marked);
+        scan_renderer.drawPoints(scene_points.buckets[2], kBlue, 1.0f);
+        scan_renderer.drawPoints(scene_points.buckets[3], kMagenta, 1.0f);
     }
 
     if (show_normal_vectors_indoor)
     {
-        std::scoped_lock lock2(params.mutex_buckets_indoor);
-        glColor3f(0, 0, 1);
-        glBegin(GL_LINES);
-        for (const auto& b : params.buckets_indoor)
-        {
-            glColor3f(fabs(b.second.normal_vector.x()), fabs(b.second.normal_vector.y()), fabs(b.second.normal_vector.z()));
-
-            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            glVertex3f(
-                b.second.mean.x() + b.second.normal_vector.x(),
-                b.second.mean.y() + b.second.normal_vector.y(),
-                b.second.mean.z() + b.second.normal_vector.z());
-        }
-        glEnd();
+        std::scoped_lock lock(params.mutex_buckets_indoor);
+        drawBucketNormals(params.buckets_indoor);
     }
 
     if (show_normal_vectors_outdoor)
     {
-        std::scoped_lock lock2(params.mutex_buckets_outdoor);
-        glColor3f(0, 0, 1);
-        glBegin(GL_LINES);
-        for (const auto& b : params.buckets_outdoor)
-        {
-            glColor3f(fabs(b.second.normal_vector.x()), fabs(b.second.normal_vector.y()), fabs(b.second.normal_vector.z()));
-
-            glVertex3f(b.second.mean.x(), b.second.mean.y(), b.second.mean.z());
-            glVertex3f(
-                b.second.mean.x() + b.second.normal_vector.x(),
-                b.second.mean.y() + b.second.normal_vector.y(),
-                b.second.mean.z() + b.second.normal_vector.z());
-        }
-        glEnd();
+        std::scoped_lock lock(params.mutex_buckets_outdoor);
+        drawBucketNormals(params.buckets_outdoor);
     }
 
-    if (show_covs_indoor)
+    // Scan selection range markers: yellow at index_begin, cyan at index_end.
+    const auto drawIndexMarker = [](int index, float r, float g, float b)
     {
-        std::scoped_lock lock(params.mutex_buckets_indoor);
-        for (const auto& b : params.buckets_indoor)
-            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(1.0f, 0.0f, 0.0f), 3);
-    }
+        if (index < 0 || index >= static_cast<int>(worker_data.size()) || worker_data[index].intermediate_trajectory.empty())
+            return;
+        rlBegin(RL_LINES);
+        rlColor3f(r, g, b);
+        drawCross(worker_data[index].intermediate_trajectory[0].translation(), 1.0);
+        rlEnd();
+    };
+    drawIndexMarker(index_begin, 1, 1, 0);
+    drawIndexMarker(index_end, 0, 1, 1);
+}
 
-    if (show_covs_outdoor)
+void display()
+{
+    ImGuiIO& io = ImGui::GetIO();
+    // Framebuffer pixels, not io.DisplaySize: they differ on HiDPI displays.
+    rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
+
+    const ImVec4& bg = app_state.bg_color;
+    ClearBackground(ColorFromNormalized(Vector4{ bg.x * bg.w, bg.y * bg.w, bg.z * bg.w, bg.w }));
+    rlEnableDepthTest();
+
+    rlMatrixMode(RL_PROJECTION);
+    rlLoadIdentity();
+    const float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
+
+    auto& cam = app_state.camera;
+    cam.updateEulerTransition(io.DeltaTime);
+
+    app_state.viewLocal = Eigen::Affine3f::Identity();
+
+    if (!cam.isOrtho)
     {
-        std::scoped_lock lock2(params.mutex_buckets_outdoor);
-        for (const auto& b : params.buckets_outdoor)
-            draw_ellipse(b.second.cov, b.second.mean, Eigen::Vector3f(0.0f, 0.0f, 1.0f), 3);
-    }
+        cam.applyPerspectiveProjection((int)io.DisplaySize.x, (int)io.DisplaySize.y);
 
-    //
-    if (worker_data.size() > 0)
+        const Eigen::Vector3f rotationCenter(cam.euler.rotationCenter.x, cam.euler.rotationCenter.y, cam.euler.rotationCenter.z);
+        app_state.viewLocal.translate(rotationCenter);
+        app_state.viewLocal.translate(Eigen::Vector3f(cam.euler.translate.x, cam.euler.translate.y, cam.euler.translate.z));
+        if (!cam.lockZ)
+            app_state.viewLocal.rotate(Eigen::AngleAxisf(cam.euler.rotateX * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        else
+            app_state.viewLocal.rotate(Eigen::AngleAxisf(-90.0 * DEG_TO_RAD, Eigen::Vector3f::UnitX()));
+        app_state.viewLocal.rotate(Eigen::AngleAxisf(cam.euler.rotateY * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+        app_state.viewLocal.translate(-rotationCenter);
+
+        rlMultMatrixf(app_state.viewLocal.matrix().data());
+    }
+    else
     {
-        if (index_begin < worker_data.size())
-        {
-            glColor3f(1, 1, 0);
-            glBegin(GL_LINES);
-            if (worker_data[index_begin].intermediate_trajectory.size() > 0)
-            {
-                auto p = worker_data[index_begin].intermediate_trajectory[0].translation();
-                glVertex3f(p.x() - 1, p.y(), p.z());
-                glVertex3f(p.x() + 1, p.y(), p.z());
-
-                glVertex3f(p.x(), p.y() - 1, p.z());
-                glVertex3f(p.x(), p.y() + 1, p.z());
-
-                glVertex3f(p.x(), p.y(), p.z() - 1);
-                glVertex3f(p.x(), p.y(), p.z() + 1);
-            }
-            glEnd();
-        }
-
-        if (index_end < worker_data.size())
-        {
-            glColor3f(0, 1, 1);
-            glBegin(GL_LINES);
-            if (worker_data[index_end].intermediate_trajectory.size() > 0)
-            {
-                auto p = worker_data[index_end].intermediate_trajectory[0].translation();
-                glVertex3f(p.x() - 1, p.y(), p.z());
-                glVertex3f(p.x() + 1, p.y(), p.z());
-
-                glVertex3f(p.x(), p.y() - 1, p.z());
-                glVertex3f(p.x(), p.y() + 1, p.z());
-
-                glVertex3f(p.x(), p.y(), p.z() - 1);
-                glVertex3f(p.x(), p.y(), p.z() + 1);
-            }
-            glEnd();
-        }
+        app_state.viewLocal.rotate(Eigen::AngleAxisf((cam.euler.rotateX + cam.euler.rotateY) * DEG_TO_RAD, Eigen::Vector3f::UnitZ()));
+        cam.updateOrtho(ratio);
     }
 
-    ImGui_ImplOpenGL2_NewFrame();
-    ImGui_ImplGLUT_NewFrame();
-    ImGui::NewFrame();
+    cam.captureFrameMatrices();
 
-    ShowMainDockSpace();
+    renderScene();
+
+    // Only polls input into ImGui and starts its frame; the 3D matrices above stay active until end3DMatrixStack().
+    rlImGuiBegin();
+
+    raylib_widgets::ShowMainDockSpace();
 
     view_kbd_shortcuts();
 
@@ -2423,7 +2712,8 @@ void display()
             if (ImGui::Button("Load & process scanning"))
                 openData();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Select folder from where to load data and start processing (Ctrl+O)");
+                ImGui::SetTooltip(
+                    "Select folder from where to load data and start processing (Ctrl+O),\nor drop the folder onto the window");
 
             ImGui::SameLine();
             ImGui::Dummy(ImVec2(20, 0));
@@ -2433,6 +2723,7 @@ void display()
             {
                 ImGui::BeginDisabled(!(session.point_clouds_container.point_clouds.size() > 0));
                 {
+                    int& point_size = app_state.point_size;
                     auto tmp = point_size;
                     ImGui::SetNextItemWidth(ImGuiNumberWidth);
                     ImGui::InputInt("Points size", &point_size);
@@ -2457,9 +2748,9 @@ void display()
                 ImGui::MenuItem("Show prediction vectors", nullptr, &show_prediction_vectors);
                 ImGui::MenuItem("Show intermediate trajectory prediction axes", nullptr, &intermediate_trajectory_prediction_axes);
 
-                ImGui::MenuItem("Show compass/ruler", "key C", &compass_ruler);
+                ImGui::MenuItem("Show compass/ruler", "key C", &app_state.compass_ruler);
 
-                ImGui::MenuItem("Lock Z", "Shift + Z", &lock_z, !is_ortho);
+                ImGui::MenuItem("Lock Z", "Shift + Z", &app_state.camera.lockZ, !app_state.camera.isOrtho);
 
                 // ImGui::MenuItem("show_covs", nullptr, &show_covs);
 
@@ -2469,7 +2760,7 @@ void display()
 
                 ImGui::ColorEdit3("Background", (float*)&params.clear_color, ImGuiColorEditFlags_NoInputs);
 
-                bg_color = params.clear_color;
+                app_state.bg_color = params.clear_color;
 
                 ImGui::Separator();
 
@@ -2494,7 +2785,7 @@ void display()
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_Header));
             if (ImGui::SmallButton("Info"))
-                info_gui = !info_gui;
+                app_state.info_gui = !app_state.info_gui;
 
             ImGui::PopStyleVar(2);
             ImGui::PopStyleColor(3);
@@ -2503,84 +2794,17 @@ void display()
         }
     }
 
+    // m_gizmo is column-major, like Eigen's default storage.
     if (initial_transformation_gizmo)
     {
-        ImGuiIO& io = ImGui::GetIO();
-        // ImGuizmo -----------------------------------------------
-        ImGuizmo::BeginFrame();
-        ImGuizmo::Enable(true);
-        ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-        GLfloat projection[16];
-        glGetFloatv(GL_PROJECTION_MATRIX, projection);
-
-        GLfloat modelview[16];
-        glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-
-        ImGuizmo::Manipulate(
-            &modelview[0],
-            &projection[0],
-            ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y,
-            ImGuizmo::WORLD,
-            m_gizmo,
-            NULL);
-
-        params.m_g(0, 0) = m_gizmo[0];
-        params.m_g(1, 0) = m_gizmo[1];
-        params.m_g(2, 0) = m_gizmo[2];
-        params.m_g(3, 0) = m_gizmo[3];
-        params.m_g(0, 1) = m_gizmo[4];
-        params.m_g(1, 1) = m_gizmo[5];
-        params.m_g(2, 1) = m_gizmo[6];
-        params.m_g(3, 1) = m_gizmo[7];
-        params.m_g(0, 2) = m_gizmo[8];
-        params.m_g(1, 2) = m_gizmo[9];
-        params.m_g(2, 2) = m_gizmo[10];
-        params.m_g(3, 2) = m_gizmo[11];
-        params.m_g(0, 3) = m_gizmo[12];
-        params.m_g(1, 3) = m_gizmo[13];
-        params.m_g(2, 3) = m_gizmo[14];
-        params.m_g(3, 3) = m_gizmo[15];
+        manipulateGizmo(m_gizmo);
+        params.m_g.matrix() = Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>();
     }
 
     if (gizmo_stretch_interval)
     {
-        ImGuiIO& io = ImGui::GetIO();
-        // ImGuizmo -----------------------------------------------
-        ImGuizmo::BeginFrame();
-        ImGuizmo::Enable(true);
-        ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-        GLfloat projection[16];
-        glGetFloatv(GL_PROJECTION_MATRIX, projection);
-
-        GLfloat modelview[16];
-        glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-
-        ImGuizmo::Manipulate(
-            &modelview[0],
-            &projection[0],
-            ImGuizmo::TRANSLATE | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y,
-            ImGuizmo::WORLD,
-            m_gizmo,
-            NULL);
-
-        stretch_gizmo_m(0, 0) = m_gizmo[0];
-        stretch_gizmo_m(1, 0) = m_gizmo[1];
-        stretch_gizmo_m(2, 0) = m_gizmo[2];
-        stretch_gizmo_m(3, 0) = m_gizmo[3];
-        stretch_gizmo_m(0, 1) = m_gizmo[4];
-        stretch_gizmo_m(1, 1) = m_gizmo[5];
-        stretch_gizmo_m(2, 1) = m_gizmo[6];
-        stretch_gizmo_m(3, 1) = m_gizmo[7];
-        stretch_gizmo_m(0, 2) = m_gizmo[8];
-        stretch_gizmo_m(1, 2) = m_gizmo[9];
-        stretch_gizmo_m(2, 2) = m_gizmo[10];
-        stretch_gizmo_m(3, 2) = m_gizmo[11];
-        stretch_gizmo_m(0, 3) = m_gizmo[12];
-        stretch_gizmo_m(1, 3) = m_gizmo[13];
-        stretch_gizmo_m(2, 3) = m_gizmo[14];
-        stretch_gizmo_m(3, 3) = m_gizmo[15];
+        manipulateGizmo(m_gizmo);
+        stretch_gizmo_m.matrix() = Eigen::Map<const Eigen::Matrix4f>(m_gizmo).cast<double>();
     }
 
     if (is_settings_gui)
@@ -2593,22 +2817,44 @@ void display()
     if (loRunning)
         progress_window();
 
-    cor_window();
+    raylib_widgets::showEulerCenterOfRotationWindow(cor_gui, app_state.camera, xText, yText, zText);
 
-    if (info_gui)
+    if (app_state.info_gui)
     {
         infoLines[infoLines.size() - 2] = "It saves session file in " + working_directory + "\\lio_result_*";
-        info_window(infoLines, appShortcuts);
+        raylib_widgets::ShowInfoWindow(app_state.info_gui, infoLines, appShortcuts, HDMAPPING_VERSION_STRING, __DATE__);
     }
 
-    if (compass_ruler)
+    // 3D drawing is done -- switch to the 2D screen-space projection the compass and ImGui need.
+    raylib_widgets::end3DMatrixStack(io.DisplaySize.x, io.DisplaySize.y);
+
+    if (app_state.compass_ruler)
         drawMiniCompassWithRuler();
 
-    ImGui::Render();
-    ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+    rlImGuiEnd();
+}
 
-    glutSwapBuffers();
-    glutPostRedisplay();
+//! Starts processing a folder dropped onto the window. A dropped file stands for the folder that contains it.
+void loadDroppedPaths(const std::vector<std::string>& paths)
+{
+    if (paths.empty())
+        return;
+
+    if (loRunning || step_1_done)
+    {
+        std::string message_info = "Data is already loaded. Restart the program to process another folder.";
+        std::cout << message_info << std::endl;
+        [[maybe_unused]] pfd::message message("Information", message_info.c_str(), pfd::choice::ok, pfd::icon::info);
+        message.result();
+        return;
+    }
+
+    fs::path folder(paths.front());
+    if (!fs::is_directory(folder))
+        folder = folder.parent_path();
+
+    std::cout << "Dropped folder: '" << folder.string() << "'" << std::endl;
+    openData(folder.string());
 }
 
 void on_exit()
@@ -2619,40 +2865,107 @@ void on_exit()
     std::cout << "remove cache: '" << params.working_directory_cache << "' FINISHED" << std::endl;
 }
 
-void mouse(int glut_button, int state, int x, int y)
+//! Handles a raylib mouse button transition (`button` is a raylib MouseButton).
+void mouse(int button, bool down, int x, int y)
 {
     ImGuiIO& io = ImGui::GetIO();
-    io.MousePos = ImVec2((float)x, (float)y);
 
-    int button = -1;
-    if (glut_button == GLUT_LEFT_BUTTON)
-        button = 0;
-    if (glut_button == GLUT_RIGHT_BUTTON)
-        button = 1;
-    if (glut_button == GLUT_MIDDLE_BUTTON)
-        button = 2;
-    if (button != -1 && state == GLUT_DOWN)
-        io.MouseDown[button] = true;
-    if (button != -1 && state == GLUT_UP)
-        io.MouseDown[button] = false;
+    if (io.WantCaptureMouse)
+        return;
 
-    static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
-    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) && glutMajorVersion < 3)
-        wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
+    if ((button == MOUSE_BUTTON_MIDDLE || button == MOUSE_BUTTON_RIGHT) && down && io.KeyCtrl)
+        setNewRotationCenter(x, y);
 
-    if (!io.WantCaptureMouse)
+    if (down)
+        app_state.mouse_buttons |= (button == MOUSE_BUTTON_LEFT) ? 1 : (button == MOUSE_BUTTON_MIDDLE) ? 2 : 4;
+    else
+        app_state.mouse_buttons = 0;
+
+    app_state.mouse_old_x = x;
+    app_state.mouse_old_y = y;
+}
+
+bool initGL()
+{
+    // FLAG_WINDOW_HIGHDPI scales the ImGui menu bar incorrectly on Windows, so it is only used elsewhere.
+    unsigned int flags = FLAG_WINDOW_RESIZABLE;
+#ifndef _WIN32
+    flags |= FLAG_WINDOW_HIGHDPI;
+#endif
+
+    SetConfigFlags(flags);
+    InitWindow(static_cast<int>(window_width), static_cast<int>(window_height), winTitle.c_str());
+    if (!IsWindowReady())
+        return false;
+
+    // Startup info (GL version, GPU) is still logged above; later per-resource INFO lines are noise.
+    SetTraceLogLevel(LOG_WARNING);
+
+    SetExitKey(KEY_NULL); // Esc must not close the window
+    SetTargetFPS(60);
+    raylib_widgets::fitWindowToScreen(/*marginW=*/100, /*marginH=*/100, /*centerVertically=*/true);
+
+    rlImGuiSetup(true);
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad | ImGuiConfigFlags_DockingEnable;
+    io.ConfigDockingWithShift = true;
+
+    scan_renderer.init();
+
+    return true;
+}
+
+void runGui()
+{
+    if (!initGL())
     {
-        if ((glut_button == GLUT_MIDDLE_BUTTON || glut_button == GLUT_RIGHT_BUTTON) && state == GLUT_DOWN && io.KeyCtrl)
-            setNewRotationCenter(x, y);
-
-        if (state == GLUT_DOWN)
-            mouse_buttons |= 1 << glut_button;
-        else if (state == GLUT_UP)
-            mouse_buttons = 0;
-
-        mouse_old_x = x;
-        mouse_old_y = y;
+        spdlog::error("Could not create the application window");
+        return;
     }
+
+#ifdef _WIN32
+    InitTaskbarProgress(GetWindowHandle());
+#endif
+
+    while (!WindowShouldClose())
+    {
+        const int mx = GetMouseX();
+        const int my = GetMouseY();
+
+        for (int button : { MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE })
+        {
+            if (IsMouseButtonPressed(button))
+                mouse(button, true, mx, my);
+            if (IsMouseButtonReleased(button))
+                mouse(button, false, mx, my);
+        }
+
+        motion(mx, my);
+
+        const float wheelMove = GetMouseWheelMove();
+        if (wheelMove != 0.0f)
+            wheel(wheelMove);
+
+        // raylib's GLFW backend reports OS drag & drop the same way on Windows, Linux and macOS.
+        if (IsFileDropped())
+        {
+            FilePathList dropped_files = LoadDroppedFiles();
+            std::vector<std::string> paths(dropped_files.paths, dropped_files.paths + dropped_files.count);
+            UnloadDroppedFiles(dropped_files);
+            loadDroppedPaths(paths);
+        }
+
+        BeginDrawing();
+        display();
+        EndDrawing();
+    }
+
+    on_exit();
+
+    unloadScenePoints();
+    scan_renderer.shutdown();
+    rlImGuiShutdown();
+    CloseWindow();
 }
 
 int main(int argc, char* argv[])
@@ -2775,18 +3088,7 @@ int main(int argc, char* argv[])
         {
             std::cout << argv[0] << " input_folder parameters(*.toml) output_folder" << std::endl;
 
-            initGL(&argc, argv, winTitle, display, mouse);
-            glutCloseFunc(on_exit);
-
-#ifdef _WIN32
-            InitTaskbarProgress();
-#endif
-
-            glutMainLoop();
-
-            ImGui_ImplOpenGL2_Shutdown();
-            ImGui_ImplGLUT_Shutdown();
-            ImGui::DestroyContext();
+            runGui();
         }
     } catch (const std::bad_alloc& e)
     {

@@ -32,6 +32,7 @@
 #include <fstream>
 #include <iomanip>
 #include <laszip/laszip_api.h>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <nlohmann/json.hpp>
@@ -199,6 +200,7 @@ struct ColorPt
     uint8_t r, g, b;
     float intensity;
     int64_t ts_ns;
+    bool validColor; //!< RGB sampled from an image; false = intensity-gray fallback
 };
 
 // ── Application state ─────────────────────────────────────────────────────────
@@ -302,6 +304,7 @@ struct AppState
     char calibBuf[512] = {};
     char cameraBuf[512] = {};
     char exportBuf[512] = "colored.laz";
+    bool exportOnlyValidColor = false; //!< LAS/LAZ export skips points without image RGB
     std::vector<ColorPt> exportCloud;
 
     //! One entry per loaded LIO chunk ("scan_lio_N"), naming a contiguous
@@ -992,7 +995,8 @@ static void loadCloud(AppState& s)
                   (uint8_t)((packed >> 8) & 0xFF),
                   (uint8_t)(packed & 0xFF),
                   rawIntensity,
-                  pt.ts_ns });
+                  pt.ts_ns,
+                  camIdF >= 0.f });
 
             float d2 = pw.squaredNorm();
             if (d2 > mx * mx)
@@ -1306,17 +1310,24 @@ static void clearMask(AppState& s)
 
 static void exportLAZ(AppState& s)
 {
-    if (s.exportCloud.empty())
+    auto keep = [&](const ColorPt& p)
     {
-        s.status = "No cloud to export";
+        return !s.exportOnlyValidColor || p.validColor;
+    };
+    const size_t nOut = std::count_if(s.exportCloud.begin(), s.exportCloud.end(), keep);
+    if (nOut == 0)
+    {
+        s.status = s.exportCloud.empty() ? "No cloud to export" : "No points with valid color to export";
         return;
     }
 
-    double xmin = s.exportCloud[0].x, xmax = xmin;
-    double ymin = s.exportCloud[0].y, ymax = ymin;
-    double zmin = s.exportCloud[0].z, zmax = zmin;
+    double xmin = std::numeric_limits<double>::max(), xmax = std::numeric_limits<double>::lowest();
+    double ymin = xmin, ymax = xmax;
+    double zmin = xmin, zmax = xmax;
     for (auto& p : s.exportCloud)
     {
+        if (!keep(p))
+            continue;
         xmin = std::min(xmin, (double)p.x);
         xmax = std::max(xmax, (double)p.x);
         ymin = std::min(ymin, (double)p.y);
@@ -1341,7 +1352,7 @@ static void exportLAZ(AppState& s)
     header->offset_to_point_data = 227;
     header->point_data_format = 3; // XYZ + RGB + GPS time
     header->point_data_record_length = 34;
-    header->number_of_point_records = (uint32_t)s.exportCloud.size();
+    header->number_of_point_records = (uint32_t)nOut;
     header->x_scale_factor = 0.001;
     header->y_scale_factor = 0.001;
     header->z_scale_factor = 0.001;
@@ -1371,6 +1382,8 @@ static void exportLAZ(AppState& s)
     laszip_F64 coords[3];
     for (auto& p : s.exportCloud)
     {
+        if (!keep(p))
+            continue;
         coords[0] = p.x;
         coords[1] = p.y;
         coords[2] = p.z;
@@ -1387,7 +1400,7 @@ static void exportLAZ(AppState& s)
 
     laszip_close_writer(writer);
     laszip_destroy(writer);
-    s.status = "Exported " + std::to_string(s.exportCloud.size()) + " pts → " + s.exportBuf;
+    s.status = "Exported " + std::to_string(nOut) + " pts → " + s.exportBuf;
 }
 
 //! E57 counterpart of exportLAZ(): one Data3D block, points already in world
@@ -2709,6 +2722,9 @@ int main(int argc, char* argv[])
             ImGui::PushItemWidth(-1);
             ImGui::Text("Output file:");
             ImGui::InputText("##out", s.exportBuf, sizeof(s.exportBuf));
+            ImGui::Checkbox("LAZ: only points with valid color", &s.exportOnlyValidColor);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Skip points that got no RGB from an image (no image / out of frustum / outside ROI or mask)");
             if (ImGui::Button("Export colored LAZ", ImVec2(-1, 0)))
                 actionExportColoredLAZ(s);
             if (ImGui::Button("Export colored E57", ImVec2(-1, 0)))

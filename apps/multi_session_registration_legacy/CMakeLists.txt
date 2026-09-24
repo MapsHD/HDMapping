@@ -1,12 +1,18 @@
 cmake_minimum_required(VERSION 4.0.0)
 
-project(multi_session_registration_step_3)
+# Legacy GLUT + legacy immediate-mode OpenGL build of step3, kept side by
+# side with apps/multi_session_registration (raylib-based since it was
+# ported off GLUT), the same way step2 keeps multi_view_tls_registration_legacy.
+# This is a full, independent copy of the app as it was before that port --
+# not sharing translation units with apps/multi_session_registration -- so
+# the two can diverge or be retired independently.
+project(multi_session_registration_step_3_legacy)
 
 # Source files
 set(SOURCES
     multi_session_registration.cpp
     multi_session_factor_graph.cpp
-    raylib_utils.cpp
+    "../../core/src/utils.cpp"
 )
 
 # Windows: add resource file
@@ -15,13 +21,13 @@ if(WIN32)
 endif()
 
 add_executable(
-  multi_session_registration_step_3 ${SOURCES}
+  multi_session_registration_step_3_legacy ${SOURCES}
   )
 
-target_compile_definitions(multi_session_registration_step_3 PRIVATE -DWITH_GUI=1)
+target_compile_definitions(multi_session_registration_step_3_legacy PRIVATE -DWITH_GUI=1)
 
 target_include_directories(
-  multi_session_registration_step_3
+  multi_session_registration_step_3_legacy
   PRIVATE include
           ${REPOSITORY_DIRECTORY}/core/include
           ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
@@ -39,30 +45,29 @@ target_include_directories(
           ${LASZIP_INCLUDE_DIR}/LASzip/include)
 
 target_link_libraries(
-  multi_session_registration_step_3
+  multi_session_registration_step_3_legacy
   # PRIVATE ${THIRDPARTY_DIRECTORY}/glew-2.2.0/lib/Release/x64/glew32s.lib
-  # raylib-based like step 2; core_raylib brings in core, raylib and ScanRenderer.
-  core_raylib
-  raylib_widgets
-  imgui_raylib
-  rlimgui
-  imguizmo_raylib
+  ${FREEGLUT_LIBRARY}
+  ${OPENGL_gl_LIBRARY}
+  OpenGL::GLU
   ${PLATFORM_LASZIP_LIB}
-  ${PLATFORM_MISCELLANEOUS_LIBS})
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  ${CORE_LIBRARIES}
+  ${GUI_LIBRARIES})
 
 if(WIN32)
   add_custom_command(
-    TARGET multi_session_registration_step_3
+    TARGET multi_session_registration_step_3_legacy
     POST_BUILD
     COMMAND
       ${CMAKE_COMMAND} -E copy
-      $<TARGET_RUNTIME_DLLS:multi_session_registration_step_3>
-      $<TARGET_FILE_DIR:multi_session_registration_step_3>
+      $<TARGET_RUNTIME_DLLS:multi_session_registration_step_3_legacy>
+      $<TARGET_FILE_DIR:multi_session_registration_step_3_legacy>
     COMMAND_EXPAND_LISTS)
 endif()
 
 if (MSVC)
-    target_compile_options(multi_session_registration_step_3 PRIVATE /bigobj)
+    target_compile_options(multi_session_registration_step_3_legacy PRIVATE /bigobj)
 endif()
 
-hdmapping_install_app(multi_session_registration_step_3)
+hdmapping_install_app(multi_session_registration_step_3_legacy)

@@ -135,6 +135,7 @@ add_subdirectory(apps/mandeye_single_session_viewer)
 add_subdirectory(apps/multi_view_tls_registration)
 add_subdirectory(apps/multi_view_tls_registration_legacy)
 add_subdirectory(apps/multi_session_registration)
+add_subdirectory(apps/multi_session_registration_legacy)
 
 if(BUILD_WITH_UTILITY_APPLICATION)
     add_subdirectory(apps/manual_color)

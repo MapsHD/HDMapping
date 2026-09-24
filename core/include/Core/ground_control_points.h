@@ -27,13 +27,14 @@ public:
 
     std::vector<GroundControlPoint> gpcs;
     double default_lidar_height_above_ground = 0.15;
-#if WITH_GUI == 1
+    // Data members stay outside WITH_GUI so the class layout is identical in GUI and non-GUI builds.
     bool is_imgui = false;
     bool picking_mode = false;
     int picking_mode_index_to_node_inner = -1;
     int picking_mode_index_to_node_outer = -1;
     bool draw_uncertainty = false;
 
+#if WITH_GUI == 1
     void imgui(PointClouds& point_clouds_container);
     void render(const PointClouds& point_clouds_container);
     void draw_ellipse(const Eigen::Matrix3d& covar, const Eigen::Vector3d& mean, const Eigen::Vector3f& color, float nstd = 1);

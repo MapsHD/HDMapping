@@ -46,6 +46,7 @@ enum class ScanColorMode
     Intensity, // jet colormap by normalized LAS/LAZ intensity
     Elevation, // jet colormap by world-space Z, normalized over [elevationMin, elevationMax]
     Distance, // jet colormap by distance from distanceCenter, normalized over [0, distanceMax]
+    FlatIntensity, // pc.render_color shaded by normalized intensity (keeps per-scan colors distinguishable)
 };
 
 class ScanRenderer

@@ -2,11 +2,13 @@
 #include <filesystem>
 
 #include <imgui.h>
+#include <imgui_impl_glut.h>
+#include <imgui_impl_opengl2.h>
 #include <imgui_internal.h>
-#include <rlImGui.h>
 
 #include <ImGuizmo.h>
 
+#include <GL/freeglut.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <nlohmann/json.hpp>
@@ -21,27 +23,19 @@
 #include <Core/pfd_wrapper.hpp>
 #include <Core/registration_plane_feature.h>
 #include <Core/session.h>
+#include <Core/utils.hpp>
 
-#ifdef _WIN32
-// windows.h (pulled in by portable-file-dialogs.h) declares CloseWindow/ShowCursor like raylib.h does.
-#define CloseWindow CloseWindow_win32
-#define ShowCursor ShowCursor_win32
-#endif
 #include <portable-file-dialogs.h>
-#ifdef _WIN32
-#undef CloseWindow
-#undef ShowCursor
-#endif
 
 #include <HDMapping/Version.hpp>
 
 #ifdef _WIN32
 #include "resource.h"
+#include <windows.h>
 
 #endif
 
 #include "multi_session_factor_graph.h"
-#include "raylib_utils.h"
 
 std::string winTitle = std::string("Step 3 (Multi session registration) ") + HDMAPPING_VERSION_STRING;
 
@@ -93,7 +87,7 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "Shift+R", "" },
                                                          { "", "S", "" },
                                                          { "", "Ctrl+S", "Save project" },
-                                                         { "", "Ctrl+Shift+S", "Save project as" },
+                                                         { "", "Ctrl+Shift+S", "" },
                                                          { "", "T", "" },
                                                          { "", "Ctrl+T", "" },
                                                          { "", "U", "" },
@@ -172,9 +166,6 @@ struct ProjectSettings
 {
     std::vector<std::string> session_file_names;
 };
-
-// Project file opened or last saved; empty until then (Save project falls back to Save project as).
-std::string project_file_name;
 
 std::vector<Edge> edges;
 int index_active_edge = -1;
@@ -373,35 +364,6 @@ void ndt_gui()
 #endif
 }
 
-// Places the edge gizmo at the active edge's target pose.
-void setGizmoFromActiveEdge()
-{
-    const Edge& e = edges[index_active_edge];
-    const Eigen::Affine3d m_to = sessions[e.index_session_from].point_clouds_container.point_clouds[e.index_from].m_pose *
-        affine_matrix_from_pose_tait_bryan(e.relative_pose_tb);
-    Eigen::Map<Eigen::Matrix4f> gizmo(m_gizmo);
-    gizmo = m_to.matrix().cast<float>();
-}
-
-// Makes edge `i` active. The manipulate-edge view draws the scans picked by first/second_session_index and
-// index_loop_closure_source/target, so these follow the edge; a gizmo that is on is moved to the new edge,
-// otherwise it would write the previous edge's pose into this one.
-void setActiveEdge(int i)
-{
-    if (i < 0 || i >= (int)edges.size())
-        return;
-
-    index_active_edge = i;
-    const Edge& e = edges[i];
-    first_session_index = e.index_session_from;
-    second_session_index = e.index_session_to;
-    index_loop_closure_source = e.index_from;
-    index_loop_closure_target = e.index_to;
-
-    if (edge_gizmo)
-        setGizmoFromActiveEdge();
-}
-
 void loop_closure_gui()
 {
     if (ImGui::Begin("Manual Pose Graph Loop Closure Mode", &is_loop_closure_gui, ImGuiWindowFlags_AlwaysAutoResize))
@@ -500,39 +462,9 @@ void loop_closure_gui()
 
         std::string number_active_edges = "number_edges: " + std::to_string(edges.size());
         ImGui::Text(number_active_edges.c_str());
-
-        // Switching edges is blocked while a session gizmo is on, as for the index_active_edge input below.
-        bool is_session_gizmo = false;
-        for (const auto& s : sessions)
-            is_session_gizmo |= s.is_gizmo;
-
-        ImGui::BeginDisabled(is_session_gizmo);
-        for (int i = 0; i < (int)edges.size(); i++)
-        {
-            const auto& e = edges[i];
-            // session:scan -> session:scan
-            ImGui::Text(
-                "%s edge %d: %d:%d -> %d:%d",
-                (manipulate_active_edge && i == index_active_edge) ? ">" : " ",
-                i,
-                e.index_session_from,
-                e.index_from,
-                e.index_session_to,
-                e.index_to);
-            ImGui::SameLine();
-            char buttonLabel[128];
-            snprintf(buttonLabel, sizeof(buttonLabel), "Set Active##%d", i);
-            if (ImGui::Button(buttonLabel))
-            {
-                setActiveEdge(i);
-                manipulate_active_edge = true;
-            }
-        }
-        ImGui::EndDisabled();
         if (edges.size() > 0)
         {
-            if (ImGui::Checkbox("manipulate_active_edge", &manipulate_active_edge) && manipulate_active_edge)
-                setActiveEdge(std::clamp(index_active_edge, 0, (int)edges.size() - 1));
+            ImGui::Checkbox("manipulate_active_edge", &manipulate_active_edge);
             if (manipulate_active_edge)
             {
                 int remove_edge_index = -1;
@@ -562,8 +494,6 @@ void loop_closure_gui()
                             index_active_edge = 0;
                         if (index_active_edge >= (int)edges.size())
                             index_active_edge = (int)edges.size() - 1;
-                        if (index_active_edge != prev_index_active_edge)
-                            setActiveEdge(index_active_edge);
                     }
                 }
 
@@ -586,15 +516,37 @@ void loop_closure_gui()
                     }
                     edges = new_edges;
 
-                    index_active_edge = edges.empty() ? -1 : std::clamp(remove_edge_index - 1, 0, (int)edges.size() - 1);
+                    index_active_edge = remove_edge_index - 1;
                     manipulate_active_edge = false;
                 }
 
-                const bool prev_gizmo = edge_gizmo;
+                bool prev_gizmo = edge_gizmo;
                 ImGui::Checkbox("gizmo", &edge_gizmo);
 
                 if (prev_gizmo != edge_gizmo)
-                    setGizmoFromActiveEdge();
+                {
+                    auto m_to = sessions[edges[index_active_edge].index_session_from]
+                                    .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
+                                    .m_pose *
+                        affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
+
+                    m_gizmo[0] = (float)m_to(0, 0);
+                    m_gizmo[1] = (float)m_to(1, 0);
+                    m_gizmo[2] = (float)m_to(2, 0);
+                    m_gizmo[3] = (float)m_to(3, 0);
+                    m_gizmo[4] = (float)m_to(0, 1);
+                    m_gizmo[5] = (float)m_to(1, 1);
+                    m_gizmo[6] = (float)m_to(2, 1);
+                    m_gizmo[7] = (float)m_to(3, 1);
+                    m_gizmo[8] = (float)m_to(0, 2);
+                    m_gizmo[9] = (float)m_to(1, 2);
+                    m_gizmo[10] = (float)m_to(2, 2);
+                    m_gizmo[11] = (float)m_to(3, 2);
+                    m_gizmo[12] = (float)m_to(0, 3);
+                    m_gizmo[13] = (float)m_to(1, 3);
+                    m_gizmo[14] = (float)m_to(2, 3);
+                    m_gizmo[15] = (float)m_to(3, 3);
+                }
                 if (!edge_gizmo)
                 {
                     if (ImGui::Button("ICP"))
@@ -1835,15 +1787,16 @@ bool loadProject(const std::string& file_name, ProjectSettings& _project_setting
         }
 
         std::cout << "Found " << edges.size() << "edges\nOpening done\n";
+
+        return true;
     } catch (std::exception& e)
     {
         std::cout << "can't load project settings: " << e.what() << std::endl;
         return false;
     }
 
-    project_file_name = file_name;
     std::string newTitle = winTitle + " - " + truncPath(file_name);
-    SetWindowTitle(newTitle.c_str());
+    glutSetWindowTitle(newTitle.c_str());
 
     loaded_sessions = false;
     time_stamp_offset = 0.0;
@@ -1862,31 +1815,17 @@ void openProject()
     }
 }
 
-void saveProjectTo(const std::string& output_file_name)
-{
-    if (save_project_settings(fs::path(output_file_name).string(), project_settings))
-    {
-        project_file_name = output_file_name;
-        std::string newTitle = winTitle + " - " + truncPath(output_file_name);
-        SetWindowTitle(newTitle.c_str());
-    }
-}
-
-void saveProjectAs()
+void saveProject()
 {
     std::string output_file_name = "";
     output_file_name = mandeye::fd::SaveFileDialog("Save project file", mandeye::fd::Project_filter, ".mjp", "project");
 
     if (output_file_name.size() > 0)
-        saveProjectTo(output_file_name);
-}
-
-void saveProject()
-{
-    if (project_file_name.empty())
-        saveProjectAs();
-    else
-        saveProjectTo(project_file_name);
+        if (save_project_settings(fs::path(output_file_name).string(), project_settings))
+        {
+            std::string newTitle = winTitle + " - " + truncPath(output_file_name);
+            glutSetWindowTitle(newTitle.c_str());
+        }
 }
 
 void addSession()
@@ -1906,82 +1845,10 @@ void addSession()
     }
 }
 
-void appendSession(const std::string& ps);
-void finishLoadingSessions();
-void loadSessions();
-
-// Adds a session file to the project unless it is already there; returns whether it was added.
-bool addSessionFile(const std::string& path)
+void loadSessions()
 {
-    const auto& names = project_settings.session_file_names;
-    if (std::find(names.begin(), names.end(), path) != names.end())
-    {
-        std::cout << "Session file already in project: '" << path << "'" << std::endl;
-        return false;
-    }
-    std::cout << "Adding session file: '" << path << "'" << std::endl;
-    project_settings.session_file_names.push_back(path);
-    return true;
-}
-
-// Drag & drop: a project (*.mjp) replaces the current one; session files (*.mjs, *.json) are added and loaded
-// right away (appended to already loaded sessions, which keep their in-memory state).
-void loadDroppedFiles()
-{
-    FilePathList dropped_files = LoadDroppedFiles();
-    std::vector<fs::path> paths(dropped_files.paths, dropped_files.paths + dropped_files.count);
-    UnloadDroppedFiles(dropped_files);
-
-    auto ext_of = [](const fs::path& p)
-    {
-        std::string ext = p.extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-        return ext;
-    };
-
-    for (const auto& path : paths)
-    {
-        if (ext_of(path) == ".mjp")
-        {
-            loadProject(path.string(), project_settings);
-            return;
-        }
-    }
-
-    std::vector<std::string> added;
-    for (const auto& path : paths)
-    {
-        const std::string ext = ext_of(path);
-        if (ext != ".mjs" && ext != ".json")
-        {
-            std::cout << "Ignoring dropped file: '" << path.string() << "'" << std::endl;
-            continue;
-        }
-        if (addSessionFile(path.string()))
-            added.push_back(path.string());
-    }
-
-    if (added.empty())
-    {
-        pfd::message("Unsupported file", "Drop a project (*.mjp) or session files (*.mjs, *.json).", pfd::choice::ok, pfd::icon::warning);
-        return;
-    }
-
-    if (loaded_sessions)
-    {
-        for (const auto& ps : added)
-            appendSession(ps);
-        finishLoadingSessions();
-    }
-    else
-    {
-        time_stamp_offset = 0.0;
-        loadSessions();
-    }
-}
-
-void appendSession(const std::string& ps)
-{
+    sessions.clear();
+    for (const auto& ps : project_settings.session_file_names)
     {
         Session session;
         session.load(fs::path(ps).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
@@ -2004,11 +1871,8 @@ void appendSession(const std::string& ps)
         if (session.is_ground_truth)
             index_gt = sessions.size() - 1;
     }
-}
+    loaded_sessions = true;
 
-// Reorders (ground truth first), recolors and re-uploads the loaded sessions.
-void finishLoadingSessions()
-{
     // reorder
     std::vector<Session> sessions_reorder;
     std::vector<std::string> session_file_names_reordered;
@@ -2049,9 +1913,6 @@ void finishLoadingSessions()
         std::cout << "session: '" << s.session_file_name << "' ground truth [" << int(s.is_ground_truth) << "]" << std::endl;
     }
 
-    assignDistinctSessionColors(sessions);
-    invalidateSessionRenderers();
-
     // update time_stamp_offset
     std::cout << "update time_stamp_offset" << std::endl;
     for (const auto& s : sessions)
@@ -2067,16 +1928,6 @@ void finishLoadingSessions()
             }
         }
     }
-}
-
-void loadSessions()
-{
-    sessions.clear();
-    for (const auto& ps : project_settings.session_file_names)
-        appendSession(ps);
-    loaded_sessions = true;
-
-    finishLoadingSessions();
 }
 
 void generate_loop_closures(const std::vector<Session>& sessions, std::vector<Edge>& edges)
@@ -2688,16 +2539,15 @@ void settings_gui()
 
 void display()
 {
-    syncSessionRenderers(sessions);
-
     ImGuiIO& io = ImGui::GetIO();
-    rlViewport(0, 0, GetRenderWidth(), GetRenderHeight());
+    glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
 
-    ClearBackground(ColorFromNormalized(Vector4{ bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w }));
-    rlEnableDepthTest();
+    glClearColor(bg_color.x * bg_color.w, bg_color.y * bg_color.w, bg_color.z * bg_color.w, bg_color.w);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
 
-    rlMatrixMode(RL_PROJECTION);
-    rlLoadIdentity();
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
     float ratio = float(io.DisplaySize.x) / float(io.DisplaySize.y);
 
     updateCameraTransition();
@@ -2714,7 +2564,8 @@ void display()
 
     if (!is_ortho)
     {
-        reshape((int)io.DisplaySize.x, (int)io.DisplaySize.y);
+        reshape((GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+        glTranslatef(translate_x, translate_y, translate_z);
 
         // janusz
         if (is_loop_closure_gui)
@@ -2791,11 +2642,10 @@ void display()
 
         viewLocal.translate(-rotation_center);
 
-        rlMultMatrixf(viewLocal.matrix().data());
+        glLoadMatrixf(viewLocal.matrix().data());
     }
     else
         updateOrthoView();
-    captureFrameMatrices();
 
     showAxes();
 
@@ -2848,9 +2698,7 @@ void display()
 
                         // sessions[first_session_index].point_clouds_container.point_clouds.at(i).point_size = gui_point_size;
 
-                        renderScanAtPose(
-                            first_session_index,
-                            i,
+                        sessions[first_session_index].point_clouds_container.point_clouds.at(i).render(
                             m_src,
                             viewer_decimate_point_cloud,
                             viewer_reduce_rendered_trajectory,
@@ -2875,9 +2723,7 @@ void display()
                         Eigen::Affine3d m_trg = _m_trg * (m_trg_0.inverse() * m_trg_curr);
 
                         // sessions[second_session_index].point_clouds_container.point_clouds.at(i).point_size = gui_point_size;
-                        renderScanAtPose(
-                            second_session_index,
-                            i,
+                        sessions[second_session_index].point_clouds_container.point_clouds.at(i).render(
                             m_trg,
                             viewer_decimate_point_cloud,
                             viewer_reduce_rendered_trajectory,
@@ -2914,9 +2760,7 @@ void display()
                     // false);
                     Eigen::Affine3d m_src = sessions[first_session_index].point_clouds_container.point_clouds.at(i).m_pose;
 
-                    renderScan(
-                        first_session_index,
-                        i,
+                    sessions[first_session_index].point_clouds_container.point_clouds.at(i).render(
                         false,
                         observation_picking,
                         viewer_decimate_point_cloud,
@@ -2953,9 +2797,7 @@ void display()
                     // false);
                     Eigen::Affine3d m_src = sessions[second_session_index].point_clouds_container.point_clouds.at(i).m_pose;
 
-                    renderScan(
-                        second_session_index,
-                        i,
+                    sessions[second_session_index].point_clouds_container.point_clouds.at(i).render(
                         false,
                         observation_picking,
                         viewer_decimate_point_cloud,
@@ -2971,37 +2813,37 @@ void display()
 
         // sessions[first_session_index].point_clouds_container.render();
 
-        beginLineStrip();
+        glBegin(GL_LINE_STRIP);
         for (auto& pc : sessions[first_session_index].point_clouds_container.point_clouds)
         {
-            color3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
-            lineStripVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
+            glColor3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
+            glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
         }
-        endLineStrip();
+        glEnd();
 
         int i = 0;
         for (auto& pc : sessions[first_session_index].point_clouds_container.point_clouds)
         {
-            color3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
-            labelPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3) + 0.1);
-            labelText(std::to_string(i).c_str());
+            glColor3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
+            glRasterPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3) + 0.1);
+            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char*)std::to_string(i).c_str());
             i++;
         }
 
-        beginLineStrip();
+        glBegin(GL_LINE_STRIP);
         for (auto& pc : sessions[second_session_index].point_clouds_container.point_clouds)
         {
-            color3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
-            lineStripVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
+            glColor3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
+            glVertex3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3));
         }
-        endLineStrip();
+        glEnd();
 
         i = 0;
         for (auto& pc : sessions[second_session_index].point_clouds_container.point_clouds)
         {
-            color3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
-            labelPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3) + 0.1);
-            labelText(std::to_string(i).c_str());
+            glColor3f(pc.render_color[0], pc.render_color[1], pc.render_color[2]);
+            glRasterPos3f(pc.m_pose(0, 3), pc.m_pose(1, 3), pc.m_pose(2, 3) + 0.1);
+            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char*)std::to_string(i).c_str());
             i++;
         }
 
@@ -3012,19 +2854,19 @@ void display()
                 int index_src = sessions[i].pose_graph_loop_closure.edges[j].index_from;
                 int index_trg = sessions[i].pose_graph_loop_closure.edges[j].index_to;
 
-                color3f(0.0f, 0.0f, 1.0f);
-                rlBegin(RL_LINES);
+                glColor3f(0.0f, 0.0f, 1.0f);
+                glBegin(GL_LINES);
                 auto v1 = sessions[i].point_clouds_container.point_clouds.at(index_src).m_pose.translation();
                 auto v2 = sessions[i].point_clouds_container.point_clouds.at(index_trg).m_pose.translation();
-                rlVertex3f(v1.x(), v1.y(), v1.z());
-                rlVertex3f(v2.x(), v2.y(), v2.z());
+                glVertex3f(v1.x(), v1.y(), v1.z());
+                glVertex3f(v2.x(), v2.y(), v2.z());
 
-                rlVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5);
-                rlVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10);
-                rlEnd();
+                glVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5);
+                glVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10);
+                glEnd();
 
-                labelPos3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10 + 0.1);
-                labelText(std::to_string(j).c_str());
+                glRasterPos3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10 + 0.1);
+                glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char*)std::to_string(j).c_str());
             }
         }
 
@@ -3037,22 +2879,22 @@ void display()
             int index_session_to = edges[i].index_session_to;
 
             if (sessions[index_session_from].is_ground_truth || sessions[index_session_to].is_ground_truth)
-                color3f(0.0f, 1.0f, 1.0f);
+                glColor3f(0.0f, 1.0f, 1.0f);
             else
-                color3f(1.0f, 1.0f, 0.0f);
+                glColor3f(1.0f, 1.0f, 0.0f);
 
-            rlBegin(RL_LINES);
+            glBegin(GL_LINES);
             auto v1 = sessions[index_session_from].point_clouds_container.point_clouds.at(index_src).m_pose.translation();
             auto v2 = sessions[index_session_to].point_clouds_container.point_clouds.at(index_trg).m_pose.translation();
-            rlVertex3f(v1.x(), v1.y(), v1.z());
-            rlVertex3f(v2.x(), v2.y(), v2.z());
+            glVertex3f(v1.x(), v1.y(), v1.z());
+            glVertex3f(v2.x(), v2.y(), v2.z());
 
-            rlVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5);
-            rlVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10);
-            rlEnd();
+            glVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5);
+            glVertex3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10);
+            glEnd();
 
-            labelPos3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10 + 0.1);
-            labelText(std::to_string(i).c_str());
+            glRasterPos3f((v1.x() + v2.x()) * 0.5, (v1.y() + v2.y()) * 0.5, (v1.z() + v2.z()) * 0.5 + 10 + 0.1);
+            glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, (const unsigned char*)std::to_string(i).c_str());
         }
     }
     else
@@ -3061,9 +2903,9 @@ void display()
         {
             if (session.visible)
             {
-                renderSession(session, observation_picking, viewer_decimate_point_cloud, viewer_reduce_rendered_trajectory);
-                renderGroundControlPoints(session.ground_control_points, session.point_clouds_container);
-                renderControlPoints(session.control_points, session.point_clouds_container);
+                session.point_clouds_container.render(observation_picking, viewer_decimate_point_cloud, viewer_reduce_rendered_trajectory);
+                session.ground_control_points.render(session.point_clouds_container);
+                session.control_points.render(session.point_clouds_container, false);
 
                 ////
                 int index_point_clouds = -1;
@@ -3090,11 +2932,11 @@ void display()
                 {
                     if (index_local_trajectory < session.point_clouds_container.point_clouds[index_point_clouds].local_trajectory.size())
                     {
-                        color3f(
+                        glColor3f(
                             session.point_clouds_container.point_clouds[index_point_clouds].render_color[0],
                             session.point_clouds_container.point_clouds[index_point_clouds].render_color[1],
                             session.point_clouds_container.point_clouds[index_point_clouds].render_color[2]);
-                        rlBegin(RL_LINES);
+                        glBegin(GL_LINES);
 
                         auto m1 = session.point_clouds_container.point_clouds[index_point_clouds].m_pose;
                         auto m2 =
@@ -3102,16 +2944,16 @@ void display()
 
                         auto v1 = (m1 * m2).translation();
 
-                        rlVertex3f(v1.x() - 5.0, v1.y(), v1.z());
-                        rlVertex3f(v1.x() + 5.0, v1.y(), v1.z());
+                        glVertex3f(v1.x() - 5.0, v1.y(), v1.z());
+                        glVertex3f(v1.x() + 5.0, v1.y(), v1.z());
 
-                        rlVertex3f(v1.x(), v1.y() - 5.0, v1.z());
-                        rlVertex3f(v1.x(), v1.y() + 5.0, v1.z());
+                        glVertex3f(v1.x(), v1.y() - 5.0, v1.z());
+                        glVertex3f(v1.x(), v1.y() + 5.0, v1.z());
 
-                        rlVertex3f(v1.x(), v1.y(), v1.z() - 5.0);
-                        rlVertex3f(v1.x(), v1.y(), v1.z() + 5.0);
+                        glVertex3f(v1.x(), v1.y(), v1.z() - 5.0);
+                        glVertex3f(v1.x(), v1.y(), v1.z() + 5.0);
 
-                        rlEnd();
+                        glEnd();
                     }
                 }
             }
@@ -3181,7 +3023,9 @@ void display()
 
     // gnss.render(session.point_clouds_container);
 
-    rlImGuiBegin();
+    ImGui_ImplOpenGL2_NewFrame();
+    ImGui_ImplGLUT_NewFrame();
+    ImGui::NewFrame();
 
     ShowMainDockSpace();
 
@@ -3210,11 +3054,11 @@ void display()
 
                     if (!is_ortho)
                     {
-                        float projection[16];
-                        getProjectionMatrix(projection);
+                        GLfloat projection[16];
+                        glGetFloatv(GL_PROJECTION_MATRIX, projection);
 
-                        float modelview[16];
-                        getModelviewMatrix(modelview);
+                        GLfloat modelview[16];
+                        glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
                         ImGuizmo::Manipulate(
                             modelview,
@@ -3348,11 +3192,11 @@ void display()
 
             if (!is_ortho)
             {
-                float projection[16];
-                getProjectionMatrix(projection);
+                GLfloat projection[16];
+                glGetFloatv(GL_PROJECTION_MATRIX, projection);
 
-                float modelview[16];
-                getModelviewMatrix(modelview);
+                GLfloat modelview[16];
+                glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
 
                 ImGuizmo::Manipulate(
                     &modelview[0],
@@ -3594,9 +3438,6 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
 
     view_kbd_shortcuts();
 
-    if (IsFileDropped())
-        loadDroppedFiles();
-
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A, false))
     {
         addSession();
@@ -3636,13 +3477,9 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
     if (sessions.size() > 0)
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false))
         {
-            if (io.KeyShift)
-                saveProjectAs();
-            else
-                saveProject();
+            saveProject();
 
             // workaround
-            io.AddKeyEvent(ImGuiMod_Shift, false);
             io.AddKeyEvent(ImGuiKey_S, false);
             io.AddKeyEvent(ImGuiMod_Ctrl, false);
         }
@@ -3655,10 +3492,6 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
                 openProject();
             if (ImGui::MenuItem("Save project", "Ctrl+S", nullptr, project_settings.session_file_names.size() > 0))
                 saveProject();
-            if (ImGui::MenuItem("Save project as...", "Ctrl+Shift+S", nullptr, project_settings.session_file_names.size() > 0))
-                saveProjectAs();
-            if (ImGui::IsItemHovered() && !project_file_name.empty())
-                ImGui::SetTooltip("Current project: %s", project_file_name.c_str());
 
             ImGui::Separator();
 
@@ -4255,7 +4088,6 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
             ImGui::Text("Colors:");
 
             ImGui::ColorEdit3("Background", (float*)&bg_color, ImGuiColorEditFlags_NoInputs);
-            pointsColorMenu();
 
             ImGui::Separator();
 
@@ -4396,8 +4228,6 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
 
     info_window(infoLines, appShortcuts);
 
-    end3DAndDrawLabels();
-
     if (compass_ruler)
         drawMiniCompassWithRuler();
 
@@ -4418,12 +4248,32 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
     if (is_settings_gui)
         settings_gui();
 
-    rlImGuiEnd();
+    ImGui::Render();
+    ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+
+    glutSwapBuffers();
+    glutPostRedisplay();
 }
 
 void mouse(int glut_button, int state, int x, int y)
 {
     ImGuiIO& io = ImGui::GetIO();
+    io.MousePos = ImVec2((float)x, (float)y);
+    int button = -1;
+    if (glut_button == GLUT_LEFT_BUTTON)
+        button = 0;
+    if (glut_button == GLUT_RIGHT_BUTTON)
+        button = 1;
+    if (glut_button == GLUT_MIDDLE_BUTTON)
+        button = 2;
+    if (button != -1 && state == GLUT_DOWN)
+        io.MouseDown[button] = true;
+    if (button != -1 && state == GLUT_UP)
+        io.MouseDown[button] = false;
+
+    static int glutMajorVersion = glutGet(GLUT_VERSION) / 10000;
+    if (state == GLUT_DOWN && (glut_button == 3 || glut_button == 4) && glutMajorVersion < 3)
+        wheel(glut_button, glut_button == 3 ? 1 : -1, x, y);
 
     if (!io.WantCaptureMouse)
     {
@@ -4494,12 +4344,9 @@ int main(int argc, char* argv[])
         {
             std::cout << winTitle << "\n\n"
                       << "USAGE:\n"
-                      << std::filesystem::path(argv[0]).stem().string()
-                      << " [--mjp <project.mjp>] [--mjs <session.mjs> ...] [<input_file> ...] /?\n\n"
+                      << std::filesystem::path(argv[0]).stem().string() << " <input_file> /?\n\n"
                       << "where\n"
-                      << "   --mjp <project.mjp>  Mandeye JSON Project file to open\n"
-                      << "   --mjs <file> [...]   Session file(s) (*.mjs, *.json) to add to the project and load\n"
-                      << "   <input_file>         *.mjp opens a project, *.mjs / *.json adds a session\n"
+                      << "   <input_file>         Path to Mandeye JSON Project file (*.mjp)\n"
                       << "   -h, /h, --help, /?   Show this help and exit\n\n";
 
             return 0;
@@ -4507,54 +4354,27 @@ int main(int argc, char* argv[])
 
         initGL(&argc, argv, winTitle, display, mouse);
 
-        // --mjp / --mjs take the following non-flag arguments; bare arguments are classified by extension.
-        std::string project_file;
-        std::vector<std::string> session_files;
-        std::string current_flag;
-        for (int i = 1; i < argc; i++)
+        if (argc > 1)
         {
-            const std::string arg(argv[i]);
-            if (arg == "--mjp" || arg == "--mjs")
+            for (int i = 1; i < argc; i++)
             {
-                current_flag = arg;
-                continue;
-            }
-            if (arg.rfind("--", 0) == 0)
-            {
-                std::cerr << "Unknown option: '" << arg << "'" << std::endl;
-                current_flag.clear();
-                continue;
-            }
+                std::string ext = fs::path(argv[i]).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
-            std::string ext = fs::path(arg).extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (ext == ".mjp")
+                {
+                    loadProject(argv[i], project_settings);
 
-            if (current_flag == "--mjp" || (current_flag.empty() && ext == ".mjp"))
-            {
-                if (project_file.empty())
-                    project_file = arg;
-                else
-                    std::cerr << "Only one project can be opened, ignoring: '" << arg << "'" << std::endl;
-                current_flag.clear();
+                    break;
+                }
             }
-            else if (current_flag == "--mjs" || ext == ".mjs" || ext == ".json")
-                session_files.push_back(arg);
-            else
-                std::cerr << "Ignoring argument: '" << arg << "'" << std::endl;
         }
 
-        if (!project_file.empty())
-            loadProject(project_file, project_settings);
+        glutMainLoop();
 
-        bool added = false;
-        for (const auto& session_file : session_files)
-            added |= addSessionFile(session_file);
-        if (added)
-            loadSessions();
-
-        mainLoop();
-
-        shutdownGL();
+        ImGui_ImplOpenGL2_Shutdown();
+        ImGui_ImplGLUT_Shutdown();
+        ImGui::DestroyContext();
     } catch (const std::bad_alloc& e)
     {
         std::cerr << "System is out of memory : " << e.what() << std::endl;

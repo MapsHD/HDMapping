@@ -85,6 +85,12 @@ void main()
         float d = length(fragWorldPos - distCenter);
         finalColor = vec4(jet(d / max(distMax, 1e-6)), pointColor.a);
     }
+    else if (colorMode == 4)
+    {
+        // Flat color shaded by intensity. sqrt lifts the typically low-skewed intensity distribution;
+        // the 0.35 floor keeps low-intensity points' hue visible.
+        finalColor = vec4(pointColor.rgb * mix(0.35, 1.0, sqrt(fragIntensity)), pointColor.a);
+    }
     else
     {
         finalColor = pointColor;

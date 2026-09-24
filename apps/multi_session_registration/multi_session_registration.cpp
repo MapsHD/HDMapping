@@ -79,7 +79,7 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "L", "" },
                                                          { "", "Ctrl+L", "Load sessions" },
                                                          { "", "M", "" },
-                                                         { "", "Ctrl+M", "" },
+                                                         { "", "Ctrl+M", "Manual loop closure" },
                                                          { "", "N", "" },
                                                          { "", "Ctrl+N", "" },
                                                          { "", "O", "" },
@@ -404,6 +404,15 @@ void setActiveEdge(int i)
 
 void loop_closure_gui()
 {
+    // Session gizmos are not drawn in this mode and would block the edge gizmo, so drop the selection.
+    if (index_gizmo != -1)
+    {
+        index_gizmo = -1;
+        old_index_gizmo = -1;
+        for (auto& s : sessions)
+            s.is_gizmo = false;
+    }
+
     if (ImGui::Begin("Manual Pose Graph Loop Closure Mode", &is_loop_closure_gui, ImGuiWindowFlags_AlwaysAutoResize))
     {
         if (ImGui::Button("Optimize GRAPH"))
@@ -507,6 +516,7 @@ void loop_closure_gui()
             is_session_gizmo |= s.is_gizmo;
 
         ImGui::BeginDisabled(is_session_gizmo);
+        int delete_edge_index = -1;
         for (int i = 0; i < (int)edges.size(); i++)
         {
             const auto& e = edges[i];
@@ -527,21 +537,36 @@ void loop_closure_gui()
                 setActiveEdge(i);
                 manipulate_active_edge = true;
             }
+            ImGui::SameLine();
+            snprintf(buttonLabel, sizeof(buttonLabel), "Delete##%d", i);
+            if (ImGui::Button(buttonLabel))
+                delete_edge_index = i;
         }
         ImGui::EndDisabled();
+
+        // Deleted after the loop so the list is not modified while it is drawn. The active edge keeps pointing at
+        // the same edge; deleting the active edge itself leaves manipulate mode, as "remove active edge" does.
+        if (delete_edge_index != -1)
+        {
+            edges.erase(edges.begin() + delete_edge_index);
+
+            if (delete_edge_index == index_active_edge)
+            {
+                edge_gizmo = false;
+                manipulate_active_edge = false;
+                index_active_edge = edges.empty() ? -1 : std::clamp(delete_edge_index - 1, 0, (int)edges.size() - 1);
+            }
+            else if (delete_edge_index < index_active_edge)
+            {
+                index_active_edge--;
+            }
+        }
         if (edges.size() > 0)
         {
             if (ImGui::Checkbox("manipulate_active_edge", &manipulate_active_edge) && manipulate_active_edge)
                 setActiveEdge(std::clamp(index_active_edge, 0, (int)edges.size() - 1));
             if (manipulate_active_edge)
             {
-                int remove_edge_index = -1;
-                if (ImGui::Button("remove active edge"))
-                {
-                    edge_gizmo = false;
-                    remove_edge_index = index_active_edge;
-                }
-
                 int prev_index_active_edge = index_active_edge;
 
                 if (!edge_gizmo)
@@ -575,20 +600,6 @@ void loop_closure_gui()
                 ImGui::Text(txt.c_str());
                 txt = "index_to: " + std::to_string(edges[index_active_edge].index_to);
                 ImGui::Text(txt.c_str());
-
-                if (remove_edge_index != -1)
-                {
-                    std::vector<Edge> new_edges;
-                    for (size_t i = 0; i < edges.size(); i++)
-                    {
-                        if (remove_edge_index != i)
-                            new_edges.push_back(edges[i]);
-                    }
-                    edges = new_edges;
-
-                    index_active_edge = edges.empty() ? -1 : std::clamp(remove_edge_index - 1, 0, (int)edges.size() - 1);
-                    manipulate_active_edge = false;
-                }
 
                 const bool prev_gizmo = edge_gizmo;
                 ImGui::Checkbox("gizmo", &edge_gizmo);
@@ -1750,13 +1761,21 @@ bool revert_to_initial(std::vector<Session>& sessions)
 
 bool save_results(std::vector<Session>& sessions)
 {
+    std::string failed;
     for (auto& session : sessions)
     {
         if (!session.is_ground_truth)
         {
             std::cout << "saving result to: " << session.point_clouds_container.poses_file_name << std::endl;
-            session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false);
+            if (!session.point_clouds_container.save_poses(fs::path(session.point_clouds_container.poses_file_name).string(), false))
+                failed += "'" + session.point_clouds_container.poses_file_name + "'\n";
         }
+    }
+
+    if (!failed.empty())
+    {
+        pfd::message("Saving poses failed", "Could not write poses file(s):\n" + failed, pfd::choice::ok, pfd::icon::error);
+        return false;
     }
     return true;
 }
@@ -2495,7 +2514,7 @@ void settings_gui()
 
                     ImGui::BeginDisabled(!sessions[i].visible);
                     {
-                        ImGui::BeginDisabled(sessions[i].is_ground_truth);
+                        ImGui::BeginDisabled(sessions[i].is_ground_truth || is_loop_closure_gui);
                         {
                             ImGui::SameLine();
                             if (ImGui::RadioButton(("Gizmo##" + std::to_string(i)).c_str(), &index_gizmo, i))
@@ -3614,6 +3633,16 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
             io.AddKeyEvent(ImGuiKey_L, false);
             io.AddKeyEvent(ImGuiMod_Ctrl, false);
         }
+    // Same enable rule as the "Manual Loop Closure" menu item; closing is always allowed.
+    if (is_loop_closure_gui || number_visible_sessions == 1 || number_visible_sessions == 2)
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_M, false))
+        {
+            is_loop_closure_gui = !is_loop_closure_gui;
+
+            // workaround
+            io.AddKeyEvent(ImGuiKey_M, false);
+            io.AddKeyEvent(ImGuiMod_Ctrl, false);
+        }
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
     {
         openProject();
@@ -3671,7 +3700,12 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
                 loadSessions();
 
             ImGui::Separator();
+            if (ImGui::MenuItem("Save session poses", nullptr, nullptr, loaded_sessions && !sessions.empty()))
+                save_results(sessions);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("Overwrite the poses file of every session except ground truth");
 
+            ImGui::Separator();
             if (ImGui::BeginMenu("Save all marked trajectories", sessions.size() > 0))
             {
                 if (ImGui::MenuItem("Save all as las/laz files"))
@@ -4197,7 +4231,7 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
 
             // bool prev_is_loop_closure_gui
             ImGui::MenuItem(
-                "Manual Loop Closure", "Ctrl+L", &is_loop_closure_gui, (number_visible_sessions == 1 || number_visible_sessions == 2));
+                "Manual Loop Closure", "Ctrl+M", &is_loop_closure_gui, (number_visible_sessions == 1 || number_visible_sessions == 2));
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Manually connect overlapping scan sections");
 

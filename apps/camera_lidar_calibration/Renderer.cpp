@@ -4,6 +4,7 @@
 // glad function pointers are compiled into raylib; the header only declares them
 #include "RendererShaders.h"
 #include "external/glad.h"
+#include <RaylibWidgets/PointBufferParts.h>
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -134,32 +135,14 @@ void Renderer::uploadCloud(const PointCloud& cloud)
         data.push_back(p.intensity);
     }
 
-    cloudVAO = rlLoadVertexArray();
-    rlEnableVertexArray(cloudVAO);
-    cloudVBO = rlLoadVertexBuffer(data.data(), static_cast<int>(data.size() * sizeof(float)), false);
-    const int stride = 4 * sizeof(float);
     // locations fixed by layout() qualifiers in both shaders
-    rlSetVertexAttribute(0, 3, RL_FLOAT, false, stride, 0);
-    rlEnableVertexAttribute(0);
-    rlSetVertexAttribute(1, 1, RL_FLOAT, false, stride, 3 * sizeof(float));
-    rlEnableVertexAttribute(1);
-    rlDisableVertexArray();
-
-    cloudCount = static_cast<int>(cloud.points.size());
+    cloudCount = cloud.points.size();
+    cloudParts = raylib_widgets::uploadPointBufferParts(data.data(), cloudCount, { 3, 1 });
 }
 
 void Renderer::unloadCloudGPU()
 {
-    if (cloudVAO)
-    {
-        rlUnloadVertexArray(cloudVAO);
-        cloudVAO = 0;
-    }
-    if (cloudVBO)
-    {
-        rlUnloadVertexBuffer(cloudVBO);
-        cloudVBO = 0;
-    }
+    raylib_widgets::unloadPointBufferParts(cloudParts);
     cloudCount = 0;
 }
 
@@ -219,9 +202,7 @@ void Renderer::renderImageOverlay(
         rlSetUniform(locPrjColorMode, &vp.colorMode, RL_SHADER_UNIFORM_INT, 1);
         rlSetUniform(locPrjDecim, &vp.drawDecim, RL_SHADER_UNIFORM_INT, 1);
 
-        rlEnableVertexArray(cloudVAO);
-        glDrawArrays(GL_POINTS, 0, cloudCount);
-        rlDisableVertexArray();
+        raylib_widgets::drawPointBufferParts(cloudParts);
         rlDisableShader();
     }
 
@@ -283,9 +264,7 @@ void Renderer::draw3DCloud(
         rlSetUniform(locCamTex, &slot, RL_SHADER_UNIFORM_INT, 1);
     }
 
-    rlEnableVertexArray(cloudVAO);
-    glDrawArrays(GL_POINTS, 0, cloudCount);
-    rlDisableVertexArray();
+    raylib_widgets::drawPointBufferParts(cloudParts);
     rlDisableShader();
 }
 

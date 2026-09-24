@@ -25,6 +25,8 @@
 
 #include "raylib.h"
 
+#include <RaylibWidgets/PointBufferPart.h>
+
 #include <Core/point_clouds.h>
 #include <Core/session.h>
 
@@ -238,9 +240,8 @@ public:
 private:
     struct CloudGPU
     {
-        unsigned int vao = 0;
-        unsigned int vbo = 0;
-        int count = 0;
+        std::vector<raylib_widgets::PointBufferPart> parts;
+        size_t count = 0;
         Eigen::Affine3d lastPose = Eigen::Affine3d::Identity();
         bool hasPose = false;
         bool hasMarkColor = false;

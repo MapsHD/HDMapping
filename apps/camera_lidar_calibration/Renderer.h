@@ -3,6 +3,7 @@
 #include <CalibCore/Camera.h>
 #include <CalibCore/PointCloud.h>
 #include <RaylibWidgets/OrbitCamera.h>
+#include <RaylibWidgets/PointBufferPart.h>
 #include <vector>
 
 using namespace calib;
@@ -78,9 +79,8 @@ private:
     // GPU point cloud (VAO shared by both shaders via fixed attrib locations)
     Shader pointShader = {};
     bool shaderValid = false;
-    unsigned int cloudVAO = 0;
-    unsigned int cloudVBO = 0;
-    int cloudCount = 0;
+    std::vector<raylib_widgets::PointBufferPart> cloudParts;
+    size_t cloudCount = 0;
     // 3D view shader uniforms
     int locMVP = -1, locColorMode = -1, locHeightRange = -1;
     int locMaxDist = -1, locOpacity = -1, locPointSize = -1, locDecim = -1;

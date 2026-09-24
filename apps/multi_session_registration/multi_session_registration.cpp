@@ -93,7 +93,7 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "Shift+R", "" },
                                                          { "", "S", "" },
                                                          { "", "Ctrl+S", "Save project" },
-                                                         { "", "Ctrl+Shift+S", "" },
+                                                         { "", "Ctrl+Shift+S", "Save project as" },
                                                          { "", "T", "" },
                                                          { "", "Ctrl+T", "" },
                                                          { "", "U", "" },
@@ -172,6 +172,9 @@ struct ProjectSettings
 {
     std::vector<std::string> session_file_names;
 };
+
+// Project file opened or last saved; empty until then (Save project falls back to Save project as).
+std::string project_file_name;
 
 std::vector<Edge> edges;
 int index_active_edge = -1;
@@ -370,6 +373,35 @@ void ndt_gui()
 #endif
 }
 
+// Places the edge gizmo at the active edge's target pose.
+void setGizmoFromActiveEdge()
+{
+    const Edge& e = edges[index_active_edge];
+    const Eigen::Affine3d m_to = sessions[e.index_session_from].point_clouds_container.point_clouds[e.index_from].m_pose *
+        affine_matrix_from_pose_tait_bryan(e.relative_pose_tb);
+    Eigen::Map<Eigen::Matrix4f> gizmo(m_gizmo);
+    gizmo = m_to.matrix().cast<float>();
+}
+
+// Makes edge `i` active. The manipulate-edge view draws the scans picked by first/second_session_index and
+// index_loop_closure_source/target, so these follow the edge; a gizmo that is on is moved to the new edge,
+// otherwise it would write the previous edge's pose into this one.
+void setActiveEdge(int i)
+{
+    if (i < 0 || i >= (int)edges.size())
+        return;
+
+    index_active_edge = i;
+    const Edge& e = edges[i];
+    first_session_index = e.index_session_from;
+    second_session_index = e.index_session_to;
+    index_loop_closure_source = e.index_from;
+    index_loop_closure_target = e.index_to;
+
+    if (edge_gizmo)
+        setGizmoFromActiveEdge();
+}
+
 void loop_closure_gui()
 {
     if (ImGui::Begin("Manual Pose Graph Loop Closure Mode", &is_loop_closure_gui, ImGuiWindowFlags_AlwaysAutoResize))
@@ -468,9 +500,39 @@ void loop_closure_gui()
 
         std::string number_active_edges = "number_edges: " + std::to_string(edges.size());
         ImGui::Text(number_active_edges.c_str());
+
+        // Switching edges is blocked while a session gizmo is on, as for the index_active_edge input below.
+        bool is_session_gizmo = false;
+        for (const auto& s : sessions)
+            is_session_gizmo |= s.is_gizmo;
+
+        ImGui::BeginDisabled(is_session_gizmo);
+        for (int i = 0; i < (int)edges.size(); i++)
+        {
+            const auto& e = edges[i];
+            // session:scan -> session:scan
+            ImGui::Text(
+                "%s edge %d: %d:%d -> %d:%d",
+                (manipulate_active_edge && i == index_active_edge) ? ">" : " ",
+                i,
+                e.index_session_from,
+                e.index_from,
+                e.index_session_to,
+                e.index_to);
+            ImGui::SameLine();
+            char buttonLabel[128];
+            snprintf(buttonLabel, sizeof(buttonLabel), "Set Active##%d", i);
+            if (ImGui::Button(buttonLabel))
+            {
+                setActiveEdge(i);
+                manipulate_active_edge = true;
+            }
+        }
+        ImGui::EndDisabled();
         if (edges.size() > 0)
         {
-            ImGui::Checkbox("manipulate_active_edge", &manipulate_active_edge);
+            if (ImGui::Checkbox("manipulate_active_edge", &manipulate_active_edge) && manipulate_active_edge)
+                setActiveEdge(std::clamp(index_active_edge, 0, (int)edges.size() - 1));
             if (manipulate_active_edge)
             {
                 int remove_edge_index = -1;
@@ -500,6 +562,8 @@ void loop_closure_gui()
                             index_active_edge = 0;
                         if (index_active_edge >= (int)edges.size())
                             index_active_edge = (int)edges.size() - 1;
+                        if (index_active_edge != prev_index_active_edge)
+                            setActiveEdge(index_active_edge);
                     }
                 }
 
@@ -522,37 +586,15 @@ void loop_closure_gui()
                     }
                     edges = new_edges;
 
-                    index_active_edge = remove_edge_index - 1;
+                    index_active_edge = edges.empty() ? -1 : std::clamp(remove_edge_index - 1, 0, (int)edges.size() - 1);
                     manipulate_active_edge = false;
                 }
 
-                bool prev_gizmo = edge_gizmo;
+                const bool prev_gizmo = edge_gizmo;
                 ImGui::Checkbox("gizmo", &edge_gizmo);
 
                 if (prev_gizmo != edge_gizmo)
-                {
-                    auto m_to = sessions[edges[index_active_edge].index_session_from]
-                                    .point_clouds_container.point_clouds[edges[index_active_edge].index_from]
-                                    .m_pose *
-                        affine_matrix_from_pose_tait_bryan(edges[index_active_edge].relative_pose_tb);
-
-                    m_gizmo[0] = (float)m_to(0, 0);
-                    m_gizmo[1] = (float)m_to(1, 0);
-                    m_gizmo[2] = (float)m_to(2, 0);
-                    m_gizmo[3] = (float)m_to(3, 0);
-                    m_gizmo[4] = (float)m_to(0, 1);
-                    m_gizmo[5] = (float)m_to(1, 1);
-                    m_gizmo[6] = (float)m_to(2, 1);
-                    m_gizmo[7] = (float)m_to(3, 1);
-                    m_gizmo[8] = (float)m_to(0, 2);
-                    m_gizmo[9] = (float)m_to(1, 2);
-                    m_gizmo[10] = (float)m_to(2, 2);
-                    m_gizmo[11] = (float)m_to(3, 2);
-                    m_gizmo[12] = (float)m_to(0, 3);
-                    m_gizmo[13] = (float)m_to(1, 3);
-                    m_gizmo[14] = (float)m_to(2, 3);
-                    m_gizmo[15] = (float)m_to(3, 3);
-                }
+                    setGizmoFromActiveEdge();
                 if (!edge_gizmo)
                 {
                     if (ImGui::Button("ICP"))
@@ -1793,14 +1835,13 @@ bool loadProject(const std::string& file_name, ProjectSettings& _project_setting
         }
 
         std::cout << "Found " << edges.size() << "edges\nOpening done\n";
-
-        return true;
     } catch (std::exception& e)
     {
         std::cout << "can't load project settings: " << e.what() << std::endl;
         return false;
     }
 
+    project_file_name = file_name;
     std::string newTitle = winTitle + " - " + truncPath(file_name);
     SetWindowTitle(newTitle.c_str());
 
@@ -1821,17 +1862,31 @@ void openProject()
     }
 }
 
-void saveProject()
+void saveProjectTo(const std::string& output_file_name)
+{
+    if (save_project_settings(fs::path(output_file_name).string(), project_settings))
+    {
+        project_file_name = output_file_name;
+        std::string newTitle = winTitle + " - " + truncPath(output_file_name);
+        SetWindowTitle(newTitle.c_str());
+    }
+}
+
+void saveProjectAs()
 {
     std::string output_file_name = "";
     output_file_name = mandeye::fd::SaveFileDialog("Save project file", mandeye::fd::Project_filter, ".mjp", "project");
 
     if (output_file_name.size() > 0)
-        if (save_project_settings(fs::path(output_file_name).string(), project_settings))
-        {
-            std::string newTitle = winTitle + " - " + truncPath(output_file_name);
-            SetWindowTitle(newTitle.c_str());
-        }
+        saveProjectTo(output_file_name);
+}
+
+void saveProject()
+{
+    if (project_file_name.empty())
+        saveProjectAs();
+    else
+        saveProjectTo(project_file_name);
 }
 
 void addSession()
@@ -1851,10 +1906,82 @@ void addSession()
     }
 }
 
-void loadSessions()
+void appendSession(const std::string& ps);
+void finishLoadingSessions();
+void loadSessions();
+
+// Adds a session file to the project unless it is already there; returns whether it was added.
+bool addSessionFile(const std::string& path)
 {
-    sessions.clear();
-    for (const auto& ps : project_settings.session_file_names)
+    const auto& names = project_settings.session_file_names;
+    if (std::find(names.begin(), names.end(), path) != names.end())
+    {
+        std::cout << "Session file already in project: '" << path << "'" << std::endl;
+        return false;
+    }
+    std::cout << "Adding session file: '" << path << "'" << std::endl;
+    project_settings.session_file_names.push_back(path);
+    return true;
+}
+
+// Drag & drop: a project (*.mjp) replaces the current one; session files (*.mjs, *.json) are added and loaded
+// right away (appended to already loaded sessions, which keep their in-memory state).
+void loadDroppedFiles()
+{
+    FilePathList dropped_files = LoadDroppedFiles();
+    std::vector<fs::path> paths(dropped_files.paths, dropped_files.paths + dropped_files.count);
+    UnloadDroppedFiles(dropped_files);
+
+    auto ext_of = [](const fs::path& p)
+    {
+        std::string ext = p.extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        return ext;
+    };
+
+    for (const auto& path : paths)
+    {
+        if (ext_of(path) == ".mjp")
+        {
+            loadProject(path.string(), project_settings);
+            return;
+        }
+    }
+
+    std::vector<std::string> added;
+    for (const auto& path : paths)
+    {
+        const std::string ext = ext_of(path);
+        if (ext != ".mjs" && ext != ".json")
+        {
+            std::cout << "Ignoring dropped file: '" << path.string() << "'" << std::endl;
+            continue;
+        }
+        if (addSessionFile(path.string()))
+            added.push_back(path.string());
+    }
+
+    if (added.empty())
+    {
+        pfd::message("Unsupported file", "Drop a project (*.mjp) or session files (*.mjs, *.json).", pfd::choice::ok, pfd::icon::warning);
+        return;
+    }
+
+    if (loaded_sessions)
+    {
+        for (const auto& ps : added)
+            appendSession(ps);
+        finishLoadingSessions();
+    }
+    else
+    {
+        time_stamp_offset = 0.0;
+        loadSessions();
+    }
+}
+
+void appendSession(const std::string& ps)
+{
     {
         Session session;
         session.load(fs::path(ps).string(), is_decimate, bucket_x, bucket_y, bucket_z, calculate_offset);
@@ -1877,8 +2004,11 @@ void loadSessions()
         if (session.is_ground_truth)
             index_gt = sessions.size() - 1;
     }
-    loaded_sessions = true;
+}
 
+// Reorders (ground truth first), recolors and re-uploads the loaded sessions.
+void finishLoadingSessions()
+{
     // reorder
     std::vector<Session> sessions_reorder;
     std::vector<std::string> session_file_names_reordered;
@@ -1937,6 +2067,16 @@ void loadSessions()
             }
         }
     }
+}
+
+void loadSessions()
+{
+    sessions.clear();
+    for (const auto& ps : project_settings.session_file_names)
+        appendSession(ps);
+    loaded_sessions = true;
+
+    finishLoadingSessions();
 }
 
 void generate_loop_closures(const std::vector<Session>& sessions, std::vector<Edge>& edges)
@@ -3454,6 +3594,9 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
 
     view_kbd_shortcuts();
 
+    if (IsFileDropped())
+        loadDroppedFiles();
+
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A, false))
     {
         addSession();
@@ -3493,9 +3636,13 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
     if (sessions.size() > 0)
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false))
         {
-            saveProject();
+            if (io.KeyShift)
+                saveProjectAs();
+            else
+                saveProject();
 
             // workaround
+            io.AddKeyEvent(ImGuiMod_Shift, false);
             io.AddKeyEvent(ImGuiKey_S, false);
             io.AddKeyEvent(ImGuiMod_Ctrl, false);
         }
@@ -3508,6 +3655,10 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
                 openProject();
             if (ImGui::MenuItem("Save project", "Ctrl+S", nullptr, project_settings.session_file_names.size() > 0))
                 saveProject();
+            if (ImGui::MenuItem("Save project as...", "Ctrl+Shift+S", nullptr, project_settings.session_file_names.size() > 0))
+                saveProjectAs();
+            if (ImGui::IsItemHovered() && !project_file_name.empty())
+                ImGui::SetTooltip("Current project: %s", project_file_name.c_str());
 
             ImGui::Separator();
 
@@ -4343,9 +4494,12 @@ int main(int argc, char* argv[])
         {
             std::cout << winTitle << "\n\n"
                       << "USAGE:\n"
-                      << std::filesystem::path(argv[0]).stem().string() << " <input_file> /?\n\n"
+                      << std::filesystem::path(argv[0]).stem().string()
+                      << " [--mjp <project.mjp>] [--mjs <session.mjs> ...] [<input_file> ...] /?\n\n"
                       << "where\n"
-                      << "   <input_file>         Path to Mandeye JSON Project file (*.mjp)\n"
+                      << "   --mjp <project.mjp>  Mandeye JSON Project file to open\n"
+                      << "   --mjs <file> [...]   Session file(s) (*.mjs, *.json) to add to the project and load\n"
+                      << "   <input_file>         *.mjp opens a project, *.mjs / *.json adds a session\n"
                       << "   -h, /h, --help, /?   Show this help and exit\n\n";
 
             return 0;
@@ -4353,21 +4507,50 @@ int main(int argc, char* argv[])
 
         initGL(&argc, argv, winTitle, display, mouse);
 
-        if (argc > 1)
+        // --mjp / --mjs take the following non-flag arguments; bare arguments are classified by extension.
+        std::string project_file;
+        std::vector<std::string> session_files;
+        std::string current_flag;
+        for (int i = 1; i < argc; i++)
         {
-            for (int i = 1; i < argc; i++)
+            const std::string arg(argv[i]);
+            if (arg == "--mjp" || arg == "--mjs")
             {
-                std::string ext = fs::path(argv[i]).extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-                if (ext == ".mjp")
-                {
-                    loadProject(argv[i], project_settings);
-
-                    break;
-                }
+                current_flag = arg;
+                continue;
             }
+            if (arg.rfind("--", 0) == 0)
+            {
+                std::cerr << "Unknown option: '" << arg << "'" << std::endl;
+                current_flag.clear();
+                continue;
+            }
+
+            std::string ext = fs::path(arg).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+            if (current_flag == "--mjp" || (current_flag.empty() && ext == ".mjp"))
+            {
+                if (project_file.empty())
+                    project_file = arg;
+                else
+                    std::cerr << "Only one project can be opened, ignoring: '" << arg << "'" << std::endl;
+                current_flag.clear();
+            }
+            else if (current_flag == "--mjs" || ext == ".mjs" || ext == ".json")
+                session_files.push_back(arg);
+            else
+                std::cerr << "Ignoring argument: '" << arg << "'" << std::endl;
         }
+
+        if (!project_file.empty())
+            loadProject(project_file, project_settings);
+
+        bool added = false;
+        for (const auto& session_file : session_files)
+            added |= addSessionFile(session_file);
+        if (added)
+            loadSessions();
 
         mainLoop();
 

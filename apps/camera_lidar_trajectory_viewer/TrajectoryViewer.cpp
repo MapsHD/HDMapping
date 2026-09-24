@@ -17,6 +17,7 @@
 #include <RaylibWidgets/CenterOfRotationWindow.h>
 #include <RaylibWidgets/CompassRuler.h>
 #include <RaylibWidgets/OrbitCamera.h>
+#include <RaylibWidgets/PointBufferParts.h>
 #include <RaylibWidgets/PointPicking.h>
 #include <RaylibWidgets/ShortcutsTable.h>
 #include <RaylibWidgets/WindowFit.h>
@@ -163,8 +164,8 @@ using trajectory_viewer_shaders::kVS;
 
 struct GpuCloud
 {
-    unsigned int vao = 0, vbo = 0;
-    int count = 0;
+    std::vector<raylib_widgets::PointBufferPart> parts;
+    size_t count = 0;
     float maxDist = 50.f;
 
     void upload(const std::vector<float>& data, float mx)
@@ -173,35 +174,16 @@ struct GpuCloud
         if (data.empty())
             return;
         maxDist = mx;
-        vao = rlLoadVertexArray();
-        rlEnableVertexArray(vao);
-        vbo = rlLoadVertexBuffer(data.data(), (int)(data.size() * sizeof(float)), false);
-        const int stride = 7 * sizeof(float);
-        rlSetVertexAttribute(0, 3, RL_FLOAT, false, stride, 0);
-        rlEnableVertexAttribute(0);
-        rlSetVertexAttribute(1, 1, RL_FLOAT, false, stride, 3 * sizeof(float));
-        rlEnableVertexAttribute(1);
-        rlSetVertexAttribute(2, 1, RL_FLOAT, false, stride, 4 * sizeof(float));
-        rlEnableVertexAttribute(2);
-        rlSetVertexAttribute(3, 1, RL_FLOAT, false, stride, 5 * sizeof(float));
-        rlEnableVertexAttribute(3);
-        rlSetVertexAttribute(4, 1, RL_FLOAT, false, stride, 6 * sizeof(float));
-        rlEnableVertexAttribute(4);
-        rlDisableVertexArray();
-        count = (int)(data.size() / 7);
+        count = data.size() / 7;
+        parts = raylib_widgets::uploadPointBufferParts(data.data(), count, { 3, 1, 1, 1, 1 });
+    }
+    void draw() const
+    {
+        raylib_widgets::drawPointBufferParts(parts);
     }
     void unload()
     {
-        if (vao)
-        {
-            rlUnloadVertexArray(vao);
-            vao = 0;
-        }
-        if (vbo)
-        {
-            rlUnloadVertexBuffer(vbo);
-            vbo = 0;
-        }
+        raylib_widgets::unloadPointBufferParts(parts);
         count = 0;
     }
 };
@@ -1621,9 +1603,7 @@ static void drawScene(AppState& s)
         rlSetUniform(s.locDecim, &s.drawDecim, RL_SHADER_UNIFORM_INT, 1);
         int sel = (s.isolateCamera && s.imgViewIdx >= 0 && s.imgViewIdx < (int)s.imageTsNs.size()) ? s.imgViewIdx : -1;
         rlSetUniform(s.locSel, &sel, RL_SHADER_UNIFORM_INT, 1);
-        rlEnableVertexArray(s.cloud.vao);
-        glDrawArrays(GL_POINTS, 0, s.cloud.count);
-        rlDisableVertexArray();
+        s.cloud.draw();
         rlDisableShader();
     }
 }

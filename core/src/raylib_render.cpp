@@ -7,6 +7,8 @@
 
 #include "raylib_render_shaders.hpp"
 
+#include <RaylibWidgets/PointBufferParts.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -92,16 +94,7 @@ void ScanRenderer::shutdown()
 
 void ScanRenderer::unload(CloudGPU& cloud)
 {
-    if (cloud.vao)
-    {
-        rlUnloadVertexArray(cloud.vao);
-        cloud.vao = 0;
-    }
-    if (cloud.vbo)
-    {
-        rlUnloadVertexBuffer(cloud.vbo);
-        cloud.vbo = 0;
-    }
+    raylib_widgets::unloadPointBufferParts(cloud.parts);
     cloud.count = 0;
 }
 
@@ -172,16 +165,8 @@ void ScanRenderer::rebuild(size_t index, const PointCloud& pc)
         return;
     }
 
-    gpu.vao = rlLoadVertexArray();
-    rlEnableVertexArray(gpu.vao);
-    gpu.vbo = rlLoadVertexBuffer(data.data(), static_cast<int>(data.size() * sizeof(float)), false);
-    rlSetVertexAttribute(0, 3, RL_FLOAT, false, kVertexStride, 0);
-    rlEnableVertexAttribute(0);
-    rlSetVertexAttribute(1, 1, RL_FLOAT, false, kVertexStride, 3 * sizeof(float));
-    rlEnableVertexAttribute(1);
-    rlDisableVertexArray();
-
-    gpu.count = static_cast<int>(data.size() / 4);
+    gpu.count = data.size() / 4;
+    gpu.parts = raylib_widgets::uploadPointBufferParts(data.data(), gpu.count, { 3, 1 });
     gpu.lastPose = pc.m_pose;
     gpu.hasPose = true;
 }
@@ -324,21 +309,24 @@ void ScanRenderer::draw(
         rlSetUniform(locColor_, color, RL_SHADER_UNIFORM_VEC4, 1);
         rlSetUniform(locColorMode_, &colorModeInt, RL_SHADER_UNIFORM_INT, 1);
 
-        rlEnableVertexArray(gpu.vao);
-        // Re-specifies both attributes' stride against the VAO's cached VBO
-        // binding every draw (cheap: a handful of GL calls per visible
-        // scan), since the VAO otherwise keeps whatever stride rebuild()
-        // baked in and there's no persistent "decimated" VAO to switch to.
-        rlEnableVertexBuffer(gpu.vbo);
-        rlSetVertexAttribute(0, 3, RL_FLOAT, false, byteStride, 0);
-        rlEnableVertexAttribute(0);
-        rlSetVertexAttribute(1, 1, RL_FLOAT, false, byteStride, 3 * sizeof(float));
-        rlEnableVertexAttribute(1);
+        for (const auto& part : gpu.parts)
+        {
+            rlEnableVertexArray(part.vao);
+            // Re-specifies both attributes' stride against the VAO's cached VBO
+            // binding every draw (cheap: a handful of GL calls per visible
+            // part), since the VAO otherwise keeps whatever stride rebuild()
+            // baked in and there's no persistent "decimated" VAO to switch to.
+            rlEnableVertexBuffer(part.vbo);
+            rlSetVertexAttribute(0, 3, RL_FLOAT, false, byteStride, 0);
+            rlEnableVertexAttribute(0);
+            rlSetVertexAttribute(1, 1, RL_FLOAT, false, byteStride, 3 * sizeof(float));
+            rlEnableVertexAttribute(1);
 
-        const int drawCount = (gpu.count + stride - 1) / stride;
-        glDrawArrays(GL_POINTS, 0, drawCount);
-        ++lastDrawCallCount_;
-        lastVertexCount_ += drawCount;
+            const int drawCount = (part.count + stride - 1) / stride;
+            glDrawArrays(GL_POINTS, 0, drawCount);
+            ++lastDrawCallCount_;
+            lastVertexCount_ += drawCount;
+        }
         rlDisableVertexArray();
     }
 
@@ -445,18 +433,20 @@ void ScanRenderer::drawCachedWithTransform(
     rlSetUniform(locYzOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locXyOn_, &intersectionOff, RL_SHADER_UNIFORM_INT, 1);
 
-    rlEnableVertexArray(gpu.vao);
-    // Explicitly re-specified (not just inherited from the VAO's last
-    // binding) since draw() rebinds this same VAO's attributes with a
-    // decimation-widened stride every frame -- this draw always wants every
-    // cached point, independent of the current "sparse drawing" setting.
-    rlEnableVertexBuffer(gpu.vbo);
-    rlSetVertexAttribute(0, 3, RL_FLOAT, false, kVertexStride, 0);
-    rlEnableVertexAttribute(0);
-    rlSetVertexAttribute(1, 1, RL_FLOAT, false, kVertexStride, 3 * sizeof(float));
-    rlEnableVertexAttribute(1);
-
-    glDrawArrays(GL_POINTS, 0, gpu.count);
+    for (const auto& part : gpu.parts)
+    {
+        rlEnableVertexArray(part.vao);
+        // Explicitly re-specified (not just inherited from the VAO's last
+        // binding) since draw() rebinds this same VAO's attributes with a
+        // decimation-widened stride every frame -- this draw always wants every
+        // cached point, independent of the current "sparse drawing" setting.
+        rlEnableVertexBuffer(part.vbo);
+        rlSetVertexAttribute(0, 3, RL_FLOAT, false, kVertexStride, 0);
+        rlEnableVertexAttribute(0);
+        rlSetVertexAttribute(1, 1, RL_FLOAT, false, kVertexStride, 3 * sizeof(float));
+        rlEnableVertexAttribute(1);
+        glDrawArrays(GL_POINTS, 0, part.count);
+    }
     rlDisableVertexArray();
     rlDisableShader();
 }

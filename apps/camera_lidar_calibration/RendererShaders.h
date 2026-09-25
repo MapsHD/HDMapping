@@ -22,10 +22,12 @@ uniform int drawDecim;     // draw only every Nth point; 1 = draw all
 uniform mat4 lidarToCam;   // extrinsics (for RGB mode)
 uniform vec4 K;            // fx, fy, cx, cy
 uniform vec2 imgSize;
-uniform int model;         // calib::CameraModel ordinal actually handled here: 0 = Pinhole, 2 = Mei
+uniform int model;         // set by Renderer.cpp, not a CameraModel ordinal: 0 = Pinhole, 2 = Mei, 3 = Fisheye
 uniform float xi;          // CameraModel::Mei only
-uniform vec3 kRad1;        // k1 k2 k3, CameraModel::Mei only
+uniform vec3 kRad1;        // k1 k2 k3, CameraModel::Mei and Fisheye only
+uniform vec3 kRad2;        // k4 in .x, CameraModel::Fisheye only
 uniform vec2 pTan;         // p1 p2, CameraModel::Mei only
+uniform float thetaMax;    // calib::fisheyeMaxTheta, CameraModel::Fisheye only
 out vec3 fragPos;
 out float fragIntensity;
 out vec2 fragUV;
@@ -63,6 +65,17 @@ void main() {
         float radial = 1.0 + kRad1.x*r2 + kRad1.y*r2*r2 + kRad1.z*r2*r2*r2;
         vec2 d = xy*radial + vec2(2.0*pTan.x*xy.x*xy.y + pTan.y*(r2 + 2.0*xy.x*xy.x),
                                   pTan.x*(r2 + 2.0*xy.y*xy.y) + 2.0*pTan.y*xy.x*xy.y);
+        fragUV = (K.xy * d + K.zw) / imgSize;
+    } else if (model == 3) {
+        // Fisheye -- never undistorted either, so the same reasoning as Mei.
+        // Mirrors calib::projectPoint's Fisheye branch. fragCamDepth again
+        // only carries validity: > 0 short of the fold-back angle.
+        float r = length(pc.xy);
+        float theta = atan(r, pc.z);
+        float t2 = theta*theta;
+        float thetaD = theta * (1.0 + t2*(kRad1.x + t2*(kRad1.y + t2*(kRad1.z + t2*kRad2.x))));
+        fragCamDepth = (r > 0.0 || pc.z > 0.0) ? thetaMax - theta : -1.0;
+        vec2 d = (r > 0.0) ? pc.xy * (thetaD / r) : vec2(0.0);
         fragUV = (K.xy * d + K.zw) / imgSize;
     } else {
         // Project into the camera image for RGB sampling (rectified → pinhole)
@@ -116,6 +129,8 @@ void main() {
     // distance inside the model's valid dome -- Xs.z + min(xi, 1/xi) -- so the
     // hardware clip drops both the blow-up (xi <= 1) and the fold-back
     // (xi > 1, where far-off-axis directions otherwise re-enter the image).
+    // Fisheye (model==3): OpenCV's equidistant theta polynomial, with w the
+    // angle left before calib::fisheyeMaxTheta -- the same clip trick.
     inline constexpr const char* kProjVS = R"(
 #version 330
 layout(location = 0) in vec3 vertexPosition;
@@ -124,10 +139,11 @@ uniform mat4 lidarToCam;   // extrinsics
 uniform vec4 K;            // fx, fy, cx, cy
 uniform vec2 imgSize;
 uniform vec3 kRad1;        // k1 k2 k3
-uniform vec3 kRad2;        // k4 k5 k6, Pinhole (model==0) only -- Mei has no rational denominator
+uniform vec3 kRad2;        // k4 k5 k6 for Pinhole (model==0), k4 in .x for Fisheye -- Mei has no rational denominator
 uniform vec2 pTan;         // p1 p2
-uniform int model;         // calib::CameraModel ordinal actually handled here: 0 = Pinhole, 2 = Mei
+uniform int model;         // set by Renderer.cpp, not a CameraModel ordinal: 0 = Pinhole, 2 = Mei, 3 = Fisheye
 uniform float xi;          // CameraModel::Mei only
+uniform float thetaMax;    // calib::fisheyeMaxTheta, CameraModel::Fisheye only
 uniform float pointSize;
 uniform int drawDecim;     // draw only every Nth point; 1 = draw all
 out float fragDepth;
@@ -157,6 +173,16 @@ void main() {
                               pTan.x*(r2 + 2.0*xy.y*xy.y) + 2.0*pTan.y*xy.x*xy.y);
         // >0 exactly inside the valid dome -- see the block comment above kProjVS
         w = Xs.z - ((xi > 1.0) ? -1.0 / xi : -xi);
+    } else if (model == 3) {
+        fragDepth = length(pc); // range, like Mei
+        float r = length(pc.xy);
+        float theta = atan(r, pc.z);
+        float t2 = theta*theta;
+        float thetaD = theta * (1.0 + t2*(kRad1.x + t2*(kRad1.y + t2*(kRad1.z + t2*kRad2.x))));
+        d = (r > 0.0) ? pc.xy * (thetaD / r) : vec2(0.0);
+        // Straight behind (r == 0, z < 0) has no direction and is clipped,
+        // as calib::projectPoint rejects it.
+        w = (r > 0.0 || pc.z > 0.0) ? thetaMax - theta : -1.0;
     } else {
         fragDepth = pc.z;
         vec2 n = pc.xy / max(pc.z, 1e-6);

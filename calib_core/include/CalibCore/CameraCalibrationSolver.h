@@ -12,7 +12,8 @@ namespace calib
     //! @note Pixel coordinates are expected in whatever frame the displayed
     //!       image is in: undistorted/ideal-pinhole for CameraModel::Pinhole
     //!       (picked from the rectified display), raw/distorted for
-    //!       CameraModel::Mei, whose image is never rectified.
+    //!       CameraModel::Mei and CameraModel::Fisheye, whose images are never
+    //!       rectified.
     struct PointPixelCorrespondence
     {
         //! Point in the LiDAR/world frame.
@@ -39,7 +40,7 @@ namespace calib
     //!         (3 with fixTranslation, else 6), or a singular system
     //! @note Pinhole only: the reused observation equations are a pure
     //!       rectilinear perspective projection, with no distortion and no
-    //!       unified-sphere term. @see solveExtrinsicsMeiCeres
+    //!       unified-sphere term. @see solveExtrinsicsCeres
     bool solveExtrinsicsFromCorrespondences(
         const std::vector<PointPixelCorrespondence>& correspondences,
         const Intrinsics& K,
@@ -47,13 +48,14 @@ namespace calib
         double* outRmsPixels = nullptr,
         bool fixTranslation = false);
 
-    //! CameraModel::Mei counterpart to @ref solveExtrinsicsFromCorrespondences.
-    //! No vendored analytic Jacobian exists for the unified-sphere model, so
-    //! this minimizes reprojection error with Ceres' automatic
-    //! differentiation, solving the same (tx,ty,tz,om,fi,ka) Extrinsics.
+    //! CameraModel::Mei and CameraModel::Fisheye counterpart to
+    //! @ref solveExtrinsicsFromCorrespondences. No vendored analytic Jacobian
+    //! exists for either model, so this minimizes reprojection error with
+    //! Ceres' automatic differentiation, solving the same (tx,ty,tz,om,fi,ka)
+    //! Extrinsics.
     //! @param correspondences picked pairs; pixel coordinates are in the raw
-    //!        (distorted) frame, since a Mei image is never rectified
-    //! @param K intrinsics, held fixed
+    //!        (distorted) frame, since neither model's image is rectified
+    //! @param K intrinsics, held fixed; K.model must be Mei or Fisheye
     //! @param extrinsicsInOut initial guess in, solved result out
     //! @param errorMessage set on failure, left untouched on success. Required
     //!        rather than defaulted -- hence its position ahead of the
@@ -61,11 +63,12 @@ namespace calib
     //!        dropped
     //! @param outRmsPixels optionally receives the RMS reprojection error
     //! @param fixTranslation as in @ref solveExtrinsicsFromCorrespondences
-    //! @return false on failure, with the reason in errorMessage
+    //! @return false on failure, with the reason in errorMessage -- including
+    //!         any other K.model
     //! @note Needs -DCALIB_ENABLE_CERES=ON (OFF by default). Built without it
     //!       this always returns false and says so, so callers never need an
     //!       \#ifdef of their own.
-    bool solveExtrinsicsMeiCeres(
+    bool solveExtrinsicsCeres(
         const std::vector<PointPixelCorrespondence>& correspondences,
         const Intrinsics& K,
         Extrinsics& extrinsicsInOut,

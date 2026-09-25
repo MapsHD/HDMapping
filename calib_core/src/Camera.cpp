@@ -137,6 +137,8 @@ const char* modelToString(CameraModel m)
         return "pinhole";
     case CameraModel::Mei:
         return "mei";
+    case CameraModel::Fisheye:
+        return "fisheye";
     }
     return "pinhole";
 }
@@ -145,7 +147,46 @@ CameraModel modelFromString(const std::string& s)
 {
     if (s == "mei")
         return CameraModel::Mei;
+    if (s == "fisheye" || s == "equidistant")
+        return CameraModel::Fisheye;
     return CameraModel::Pinhole;
+}
+
+float fisheyeMaxTheta(const Intrinsics& K)
+{
+    const double k1 = K.k1, k2 = K.k2, k3 = K.k3, k4 = K.k4;
+    auto thetaD = [&](double t)
+    {
+        const double t2 = t * t;
+        return t * (1.0 + t2 * (k1 + t2 * (k2 + t2 * (k3 + t2 * k4))));
+    };
+    // Scanned numerically, like maxValidRadiusSq below: a 9th-order
+    // polynomial's first turning point has no useful closed form.
+    const double kStep = 1e-3;
+    double prev = 0.0;
+    for (double t = kStep; t <= M_PI; t += kStep)
+    {
+        const double cur = thetaD(t);
+        if (cur <= prev)
+            return static_cast<float>(t - kStep);
+        prev = cur;
+    }
+    return static_cast<float>(M_PI);
+}
+
+// Memoized for the same reason as cachedMaxValidRadiusSq below.
+static float cachedFisheyeMaxTheta(const Intrinsics& K)
+{
+    thread_local float lastK[4] = { 0.f, 0.f, 0.f, 0.f };
+    thread_local float lastResult = -1.f;
+    if (lastResult >= 0.f && lastK[0] == K.k1 && lastK[1] == K.k2 && lastK[2] == K.k3 && lastK[3] == K.k4)
+        return lastResult;
+    lastResult = fisheyeMaxTheta(K);
+    lastK[0] = K.k1;
+    lastK[1] = K.k2;
+    lastK[2] = K.k3;
+    lastK[3] = K.k4;
+    return lastResult;
 }
 
 // Radius (in normalized camera coords, squared) past which the rational distortion model
@@ -265,6 +306,32 @@ bool projectPoint(float px, float py, float pz,
 
         u = static_cast<float>(K.fx * xd + K.cx);
         v = static_cast<float>(K.fy * yd + K.cy);
+        return true;
+    }
+
+    if (K.model == CameraModel::Fisheye) {
+        depth = pc.norm();
+        if (depth < 1e-4f) return false;  // point sits on the camera itself
+
+        // Equidistant: image radius grows with the incidence angle theta, not
+        // tan(theta), so there is no z > 0 requirement -- only the fold-back
+        // limit.
+        const double x = pc.x(), y = pc.y(), z = pc.z();
+        const double r = std::hypot(x, y);
+        const double theta = std::atan2(r, z);
+        if (theta >= cachedFisheyeMaxTheta(K)) return false;
+        // Directly behind has no direction to push the point out along, so
+        // s below would drop it on the principal point. Checked on its own:
+        // a limit of pi, rounded to float, lies just above the double pi.
+        if (r == 0.0 && z < 0.0) return false;
+
+        const double t2 = theta * theta;
+        const double thetaD = theta * (1.0 + t2*(K.k1 + t2*(K.k2 + t2*(K.k3 + t2*K.k4))));
+        // r == 0 is the optical axis, which lands on the principal point.
+        const double s = r > 0.0 ? thetaD / r : 0.0;
+
+        u = static_cast<float>(K.fx * x * s + K.cx);
+        v = static_cast<float>(K.fy * y * s + K.cy);
         return true;
     }
 

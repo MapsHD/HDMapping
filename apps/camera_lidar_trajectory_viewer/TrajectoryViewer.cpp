@@ -208,7 +208,7 @@ struct AppState
 {
     Trajectory traj;
     std::vector<int64_t> imageTsNs;
-    Intrinsics K; //!< K.model selects pinhole / Mei (see CalibCore/Camera.h)
+    Intrinsics K; //!< K.model selects pinhole / Mei / fisheye (see CalibCore/Camera.h)
     Extrinsics E; //!< tx/ty/tz (camera position); rotation lives in R_wc below, not E.om/fi/ka
     Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); //!< camera orientation in world/LiDAR frame
     Roi roi;
@@ -843,10 +843,10 @@ static void loadCloud(AppState& s)
                     float u, v, depth;
                     if (!projectPoint(pl.x(), pl.y(), pl.z(), Ks, R_wc, C, u, v, depth))
                         return h;
-                    // Too close to the lens to be a real observation. Mei too:
-                    // its depth is a range rather than a z, but 5 cm means the
-                    // same thing physically, and projectPoint's Mei guard only
-                    // rejects a point essentially AT the camera.
+                    // Too close to the lens to be a real observation. Mei and
+                    // Fisheye too: their depth is a range rather than a z, but
+                    // 5 cm means the same thing physically, and projectPoint's
+                    // guards only reject a point essentially AT the camera.
                     if (depth <= 0.05f)
                         return h;
                     int iu = (int)std::round(u);
@@ -1111,9 +1111,10 @@ static void loadCalib(AppState& s)
     }
     nlohmann::json j;
     f >> j;
-    // "mei" (or the rig's "insta360_mei_v2"), anything else pinhole. Accepted
-    // at the top level or inside "intrinsics". Assigned unconditionally, so
-    // loading a pinhole calibration after a Mei one does not inherit Mei.
+    // Any name calib::modelFromString knows ("mei", "fisheye"/"equidistant"),
+    // plus the rig's "insta360_mei_v2"; anything else pinhole. Accepted at the
+    // top level or inside "intrinsics". Assigned unconditionally, so loading
+    // a pinhole calibration after another model does not inherit it.
     {
         const bool topLevel = j.contains("model");
         const bool nested = j.contains("intrinsics") && j["intrinsics"].contains("model");
@@ -1130,7 +1131,7 @@ static void loadCalib(AppState& s)
             {
                 return (char)std::tolower(c);
             });
-        s.K.model = (model == "mei" || model == "insta360_mei_v2") ? CameraModel::Mei : CameraModel::Pinhole;
+        s.K.model = model == "insta360_mei_v2" ? CameraModel::Mei : modelFromString(model);
     }
     if (j.contains("intrinsics"))
     {
@@ -1141,8 +1142,8 @@ static void loadCalib(AppState& s)
         s.K.cy = ji.value("cy", s.K.cy);
         // Pinhole: the rational distortion model (also what the ROS export
         // rectifies with). Mei reuses k1/k2/k3 and p1/p2 as its own plain
-        // polynomial and adds xi, leaving k4/k5/k6 unused -- see
-        // CalibCore/Camera.h.
+        // polynomial and adds xi, leaving k4/k5/k6 unused; Fisheye reads
+        // k1..k4 as its theta polynomial -- see CalibCore/Camera.h.
         s.K.k1 = ji.value("k1", s.K.k1);
         s.K.k2 = ji.value("k2", s.K.k2);
         s.K.k3 = ji.value("k3", s.K.k3);
@@ -1631,10 +1632,10 @@ static void exportColmap(AppState& s)
         s.status = "COLMAP: no images";
         return;
     }
-    if (s.K.model != CameraModel::Pinhole)
+    if (s.K.model == CameraModel::Mei)
     {
         // None of COLMAP's fisheye types is the unified-sphere (Mei) model --
-        // none carries an xi -- so the FULL_OPENCV line below would
+        // none carries an xi -- so the cameras.txt line below would
         // misdescribe the images.
         s.status = "COLMAP: Mei camera model is not supported by COLMAP";
         return;
@@ -1655,15 +1656,20 @@ static void exportColmap(AppState& s)
     T_lc.linear() = s.R_wc;
     T_lc.translation() = Eigen::Vector3f(s.E.tx, s.E.ty, s.E.tz);
 
-    // cameras.txt — rational OpenCV model == COLMAP FULL_OPENCV (12 params)
+    // cameras.txt — rational OpenCV model == COLMAP FULL_OPENCV (12 params),
+    // OpenCV fisheye == COLMAP OPENCV_FISHEYE (8 params)
     {
         std::ofstream f(sparse / "cameras.txt");
         f << std::setprecision(12);
         f << "# Camera list with one line of data per camera:\n"
              "#   CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[]\n";
-        f << "1 FULL_OPENCV " << s.imgW << ' ' << s.imgH << ' ' << s.K.fx << ' ' << s.K.fy << ' ' << s.K.cx << ' ' << s.K.cy << ' '
-          << s.K.k1 << ' ' << s.K.k2 << ' ' << s.K.p1 << ' ' << s.K.p2 << ' ' << s.K.k3 << ' ' << s.K.k4 << ' ' << s.K.k5 << ' ' << s.K.k6
-          << '\n';
+        if (s.K.model == CameraModel::Fisheye)
+            f << "1 OPENCV_FISHEYE " << s.imgW << ' ' << s.imgH << ' ' << s.K.fx << ' ' << s.K.fy << ' ' << s.K.cx << ' ' << s.K.cy << ' '
+              << s.K.k1 << ' ' << s.K.k2 << ' ' << s.K.k3 << ' ' << s.K.k4 << '\n';
+        else
+            f << "1 FULL_OPENCV " << s.imgW << ' ' << s.imgH << ' ' << s.K.fx << ' ' << s.K.fy << ' ' << s.K.cx << ' ' << s.K.cy << ' '
+              << s.K.k1 << ' ' << s.K.k2 << ' ' << s.K.p1 << ' ' << s.K.p2 << ' ' << s.K.k3 << ' ' << s.K.k4 << ' ' << s.K.k5 << ' '
+              << s.K.k6 << '\n';
     }
 
     // images.txt — one image per camera frame, pose = world->camera
@@ -2498,6 +2504,12 @@ int main(int argc, char* argv[])
                     ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
                     ImGui::Text("cx=%.0f cy=%.0f", s.K.cx, s.K.cy);
                 }
+                else if (s.K.model == CameraModel::Fisheye)
+                {
+                    ImGui::Text("Model: fisheye (equidistant)");
+                    ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
+                    ImGui::Text("cx=%.0f cy=%.0f", s.K.cx, s.K.cy);
+                }
                 else
                 {
                     ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
@@ -2759,7 +2771,7 @@ int main(int argc, char* argv[])
             ImGui::PopItemWidth();
             ImGui::PushItemWidth(-1);
             s.colmapPtDecim = std::max(1, s.colmapPtDecim);
-            const bool colmapUnsupported = s.K.model != CameraModel::Pinhole;
+            const bool colmapUnsupported = s.K.model == CameraModel::Mei;
             ImGui::BeginDisabled(colmapUnsupported);
             if (ImGui::Button("Export COLMAP model", ImVec2(-1, 0)))
                 exportColmap(s);

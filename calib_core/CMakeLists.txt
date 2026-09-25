@@ -23,23 +23,23 @@ add_library(calib_core STATIC
     src/Trajectory.cpp
     src/CliArgs.cpp
     src/CameraCalibrationSolver.cpp
-    src/CameraCalibrationSolverMei.cpp
+    src/CameraCalibrationSolverCeres.cpp
 )
 
-# ── Optional Ceres-based Mei extrinsics solver ────────────────────────────────
+# ── Optional Ceres-based Mei/fisheye extrinsics solver ────────────────────────
 # OFF by default: HDMapping otherwise depends on nothing but Eigen for its
-# optimization. Built without it, solveExtrinsicsMeiCeres() returns false and
+# optimization. Built without it, solveExtrinsicsCeres() returns false and
 # explains why, so callers need no #ifdef of their own. Enable with
 #   cmake -DCALIB_ENABLE_CERES=ON   (needs libceres-dev or equivalent).
-option(CALIB_ENABLE_CERES "Enable the Ceres-based extrinsics solver for the Mei camera model" OFF)
+option(CALIB_ENABLE_CERES "Enable the Ceres-based extrinsics solver for the Mei and fisheye camera models" OFF)
 if(CALIB_ENABLE_CERES)
     find_package(Ceres REQUIRED)
     # PUBLIC so calib_core_tests can #ifdef on it to build the real-solve
     # test only when it can actually run.
     target_compile_definitions(calib_core PUBLIC CALIB_ENABLE_CERES)
-    message(STATUS "calib_core Mei Ceres solver: ENABLED")
+    message(STATUS "calib_core Mei/fisheye Ceres solver: ENABLED")
 else()
-    message(STATUS "calib_core Mei Ceres solver: disabled (set -DCALIB_ENABLE_CERES=ON to enable)")
+    message(STATUS "calib_core Mei/fisheye Ceres solver: disabled (set -DCALIB_ENABLE_CERES=ON to enable)")
 endif()
 
 target_include_directories(calib_core PUBLIC

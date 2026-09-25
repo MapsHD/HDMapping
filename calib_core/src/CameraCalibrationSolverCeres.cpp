@@ -2,7 +2,7 @@
 
 // Always compiled; the #ifdef below picks between the real Ceres
 // implementation and a stub that explains why it isn't available, so callers
-// check solveExtrinsicsMeiCeres's return value rather than an #ifdef.
+// check solveExtrinsicsCeres's return value rather than an #ifdef.
 #ifdef CALIB_ENABLE_CERES
 
 #include <ceres/ceres.h>
@@ -80,12 +80,38 @@ namespace calib
             v = T(fy) * yd + T(cy);
         }
 
+        // Templated equivalent of calib::projectPoint's Fisheye branch, for
+        // Ceres autodiff.
+        template <typename T>
+        void projectFisheye(const T pc[3], double fx, double fy, double cx, double cy, double k1, double k2, double k3, double k4, T& u, T& v)
+        {
+            const T r2 = pc[0] * pc[0] + pc[1] * pc[1];
+            // theta_d / r, the factor that scales (x, y) onto the image plane.
+            // sqrt's derivative is infinite at r = 0, so on the optical axis
+            // use its limit 1/z instead.
+            T s;
+            if (r2 > T(1e-18))
+            {
+                const T r = sqrt(r2);
+                const T theta = atan2(r, pc[2]);
+                const T t2 = theta * theta;
+                s = theta * (T(1.0) + t2 * (T(k1) + t2 * (T(k2) + t2 * (T(k3) + t2 * T(k4))))) / r;
+            }
+            else
+            {
+                s = T(1.0) / pc[2];
+            }
+            u = T(fx) * pc[0] * s + T(cx);
+            v = T(fy) * pc[1] * s + T(cy);
+        }
+
         // Reprojection residual for one correspondence: predicted (u, v)
         // minus the picked pixel, like the Pinhole solver's observation
-        // equation but autodiff'd, no vendored Mei Jacobian existing.
-        struct MeiReprojectionResidual
+        // equation but autodiff'd, no vendored Mei or fisheye Jacobian
+        // existing. K.model must be Mei or Fisheye.
+        struct ReprojectionResidual
         {
-            MeiReprojectionResidual(const Eigen::Vector3d& p, double u_kp, double v_kp, const Intrinsics& K)
+            ReprojectionResidual(const Eigen::Vector3d& p, double u_kp, double v_kp, const Intrinsics& K)
                 : p_(p), u_kp_(u_kp), v_kp_(v_kp), K_(K)
             {
             }
@@ -105,7 +131,10 @@ namespace calib
                 };
 
                 T u, v;
-                projectMei(pc, K_.fx, K_.fy, K_.cx, K_.cy, K_.xi, K_.k1, K_.k2, K_.k3, K_.p1, K_.p2, u, v);
+                if (K_.model == CameraModel::Fisheye)
+                    projectFisheye(pc, K_.fx, K_.fy, K_.cx, K_.cy, K_.k1, K_.k2, K_.k3, K_.k4, u, v);
+                else
+                    projectMei(pc, K_.fx, K_.fy, K_.cx, K_.cy, K_.xi, K_.k1, K_.k2, K_.k3, K_.p1, K_.p2, u, v);
                 residual[0] = u - T(u_kp_);
                 residual[1] = v - T(v_kp_);
                 return true;
@@ -117,7 +146,7 @@ namespace calib
         };
     } // namespace
 
-    bool solveExtrinsicsMeiCeres(
+    bool solveExtrinsicsCeres(
         const std::vector<PointPixelCorrespondence>& correspondences,
         const Intrinsics& K,
         Extrinsics& extrinsicsInOut,
@@ -125,6 +154,12 @@ namespace calib
         double* outRmsPixels,
         bool fixTranslation)
     {
+        if (K.model != CameraModel::Mei && K.model != CameraModel::Fisheye)
+        {
+            errorMessage = std::string("The Ceres solver handles the mei and fisheye models only, not ") + modelToString(K.model);
+            return false;
+        }
+
         const int nParams = fixTranslation ? 3 : 6;
         if (static_cast<int>(correspondences.size()) < 3 || static_cast<int>(correspondences.size()) * 2 < nParams)
         {
@@ -139,8 +174,7 @@ namespace calib
         ceres::Problem problem;
         for (const auto& c : correspondences)
         {
-            auto* cost =
-                new ceres::AutoDiffCostFunction<MeiReprojectionResidual, 2, 3, 3>(new MeiReprojectionResidual(c.p, c.u, c.v, K));
+            auto* cost = new ceres::AutoDiffCostFunction<ReprojectionResidual, 2, 3, 3>(new ReprojectionResidual(c.p, c.u, c.v, K));
             problem.AddResidualBlock(cost, nullptr, txyz, omfika);
         }
         if (fixTranslation)
@@ -183,7 +217,7 @@ namespace calib
 
 namespace calib
 {
-    bool solveExtrinsicsMeiCeres(
+    bool solveExtrinsicsCeres(
         const std::vector<PointPixelCorrespondence>&,
         const Intrinsics&,
         Extrinsics&,
@@ -191,7 +225,8 @@ namespace calib
         double*,
         bool)
     {
-        errorMessage = "Mei extrinsics solving needs calib_core built with -DCALIB_ENABLE_CERES=ON (see calib_core/CMakeLists.txt)";
+        errorMessage =
+            "Mei/fisheye extrinsics solving needs calib_core built with -DCALIB_ENABLE_CERES=ON (see calib_core/CMakeLists.txt)";
         std::cerr << errorMessage << std::endl;
         return false;
     }

@@ -29,6 +29,28 @@ namespace
         return K;
     }
 
+    // Coefficients in the range a real ~180 deg OpenCV fisheye calibration
+    // produces, not a specific camera. Their theta -> theta_d polynomial is
+    // increasing all the way to pi.
+    Intrinsics fisheye()
+    {
+        Intrinsics K;
+        K.model = CameraModel::Fisheye;
+        K.fx = 285.f; K.fy = 286.f;
+        K.cx = 322.f; K.cy = 238.f;
+        K.k1 = -0.0075f; K.k2 = 0.0435f; K.k3 = -0.0414f; K.k4 = 0.0077f;
+        K.width = 640; K.height = 480;
+        return K;
+    }
+
+    // Direction at `deg` from the optical axis, in the plane y = 0. The
+    // explicit return type matters: `auto` would deduce an Eigen expression
+    // template holding a reference to the temporary, and dangle.
+    Eigen::Vector3f offAxis(float deg)
+    {
+        const float r = deg * float(M_PI) / 180.f;
+        return Eigen::Vector3f(std::sin(r), 0.f, std::cos(r)) * 10.f;
+    }
 
     // Identity pose: p_cam == p_lidar, so test points can be written directly
     // in camera axes (X = right, Y = down, Z = forward).
@@ -115,14 +137,7 @@ TEST_CASE("mei: a point behind the camera is rejected, not silently mis-projecte
     // directions back onto real pixels instead of pushing them out of frame.
     float u, v, depth;
 
-    // Direction at `deg` from the optical axis, in the plane y = 0. The
-    // explicit return type matters: `auto` would deduce an Eigen expression
-    // template holding a reference to the temporary, and dangle.
-    auto at = [](float deg) -> Eigen::Vector3f
-    {
-        const float r = deg * float(M_PI) / 180.f;
-        return Eigen::Vector3f(std::sin(r), 0.f, std::cos(r)) * 10.f;
-    };
+    const auto at = offAxis;
     auto projects = [&](const Intrinsics& K, const Eigen::Vector3f& p)
     { return projectPoint(p.x(), p.y(), p.z(), K, kIdentity, kOrigin, u, v, depth); };
 
@@ -177,6 +192,129 @@ TEST_CASE("mei: respects the extrinsics")
     CHECK(offset.u == doctest::Approx(K.cx));
     CHECK(offset.v == doctest::Approx(K.cy));
     CHECK(offset.depth == doctest::Approx(1.0));
+}
+
+// ── Fisheye ───────────────────────────────────────────────────────────────────
+
+TEST_CASE("fisheye: matches cv::fisheye::projectPoints")
+{
+    // Captured from OpenCV 4.6's cv::fisheye::projectPoints with an identity
+    // pose and the same K/D -- the model this one has to agree with, so that
+    // an OpenCV fisheye calibration can be loaded verbatim.
+    const Intrinsics K = fisheye();
+    struct Ref
+    {
+        Eigen::Vector3f p;
+        double u, v;
+    };
+    const Ref refs[] = {
+        { { 0.3f, -0.2f, 0.9f }, 412.3305153, 177.5683570 },
+        { { -1.5f, 0.8f, 2.0f }, 144.4155107, 333.0440495 },
+        { { 0.05f, 0.02f, 1.0f }, 336.2359451, 243.7143583 },
+        { { -0.6f, -1.1f, 0.8f }, 184.8716725, -14.2840458 },
+        { { 2.0f, 1.0f, 0.3f }, 668.3977375, 411.8065841 },
+    };
+
+    for (const auto& r : refs)
+    {
+        Px got = project(K, r.p);
+        CHECK(got.u == doctest::Approx(r.u).epsilon(1e-5));
+        CHECK(got.v == doctest::Approx(r.v).epsilon(1e-5));
+        CHECK(got.depth == doctest::Approx(r.p.norm()));
+    }
+}
+
+TEST_CASE("fisheye: a point on the optical axis lands on the principal point")
+{
+    const Intrinsics K = fisheye();
+    Px r = project(K, { 0.f, 0.f, 4.f });
+    CHECK(r.u == doctest::Approx(K.cx));
+    CHECK(r.v == doctest::Approx(K.cy));
+    CHECK(r.depth == doctest::Approx(4.0));
+}
+
+TEST_CASE("fisheye: without distortion the image radius is f * theta, past 90 deg too")
+{
+    Intrinsics K = fisheye();
+    K.k1 = K.k2 = K.k3 = K.k4 = 0.f;
+    const double pi = M_PI;
+
+    Px side = project(K, offAxis(90.f));
+    CHECK(side.u == doctest::Approx(K.cx + K.fx * pi / 2));
+    CHECK(side.v == doctest::Approx(K.cy));
+
+    // Behind the image plane, which a pinhole camera cannot see at all.
+    Px behind = project(K, offAxis(120.f));
+    CHECK(behind.u == doctest::Approx(K.cx + K.fx * 2 * pi / 3));
+    CHECK(behind.depth == doctest::Approx(10.0)); // range, not z (which is negative)
+
+    Intrinsics P; // Pinhole
+    float u, v, depth;
+    const Eigen::Vector3f p = offAxis(120.f);
+    CHECK_FALSE(projectPoint(p.x(), p.y(), p.z(), P, kIdentity, kOrigin, u, v, depth));
+}
+
+TEST_CASE("fisheye: directions past the fold-back angle are rejected")
+{
+    float u, v, depth;
+    auto projects = [&](const Intrinsics& K, const Eigen::Vector3f& p)
+    { return projectPoint(p.x(), p.y(), p.z(), K, kIdentity, kOrigin, u, v, depth); };
+
+    SUBCASE("a turning point limits the field of view")
+    {
+        // theta_d = theta - 0.3 theta^3 peaks at theta = sqrt(1/0.9) (60.4
+        // deg) and falls back to 0 -- the principal point -- at 104.6 deg.
+        Intrinsics K = fisheye();
+        K.k1 = -0.3f;
+        K.k2 = K.k3 = K.k4 = 0.f;
+        CHECK(fisheyeMaxTheta(K) == doctest::Approx(std::sqrt(1.0 / 0.9)).epsilon(2e-3));
+        CHECK(projects(K, offAxis(55.f)));
+        CHECK_FALSE(projects(K, offAxis(65.f)));
+        CHECK_FALSE(projects(K, offAxis(104.6f)));
+    }
+
+    SUBCASE("a monotonic polynomial keeps everything short of straight behind")
+    {
+        const Intrinsics K = fisheye();
+        CHECK(fisheyeMaxTheta(K) == doctest::Approx(M_PI));
+        CHECK(projects(K, offAxis(170.f)));
+        CHECK_FALSE(projects(K, { 0.f, 0.f, -10.f }));
+    }
+
+    SUBCASE("a point on the camera itself")
+    {
+        CHECK_FALSE(projects(fisheye(), { 0.f, 0.f, 0.f }));
+    }
+}
+
+TEST_CASE("fisheye: respects the extrinsics")
+{
+    const Intrinsics K = fisheye();
+    const Eigen::Matrix3f R_wc = kCameraLidarAxisOffset;
+
+    // LiDAR forward is camera forward at om=fi=ka=0.
+    Px r = project(K, { 10, 0, 0 }, R_wc);
+    CHECK(r.u == doctest::Approx(K.cx));
+    CHECK(r.v == doctest::Approx(K.cy));
+
+    const Eigen::Vector3f C(1.f, 2.f, 3.f);
+    Px offset = project(K, C + Eigen::Vector3f(1.f, 0.f, 0.f), R_wc, C);
+    CHECK(offset.u == doctest::Approx(K.cx));
+    CHECK(offset.v == doctest::Approx(K.cy));
+    CHECK(offset.depth == doctest::Approx(1.0));
+}
+
+// ── modelToString / modelFromString ───────────────────────────────────────────
+
+TEST_CASE("modelFromString reads back every name modelToString writes")
+{
+    for (CameraModel m : { CameraModel::Pinhole, CameraModel::Mei, CameraModel::Fisheye })
+    {
+        CAPTURE(modelToString(m));
+        CHECK(modelFromString(modelToString(m)) == m);
+    }
+    CHECK(modelFromString("equidistant") == CameraModel::Fisheye); // the ROS/Kalibr name
+    CHECK(modelFromString("") == CameraModel::Pinhole);
 }
 
 // ── Pinhole (regression: this path must not change) ───────────────────────────
@@ -316,6 +454,18 @@ TEST_CASE("scaleIntrinsics: a half-size image projects to half the pixel")
 
         Px full = project(K, { 0.3f, -0.2f, 0.9f });
         Px half = project(H, { 0.3f, -0.2f, 0.9f });
+        CHECK(half.u == doctest::Approx(full.u * 0.5));
+        CHECK(half.v == doctest::Approx(full.v * 0.5));
+    }
+    SUBCASE("fisheye")
+    {
+        Intrinsics K = fisheye();
+        Intrinsics H = scaleIntrinsics(K, 0.5f);
+        CHECK(H.model == CameraModel::Fisheye);
+        CHECK(H.k4 == doctest::Approx(K.k4)); // theta coefficients are dimensionless
+
+        Px full = project(K, { 2.0f, 1.0f, 0.3f });
+        Px half = project(H, { 2.0f, 1.0f, 0.3f });
         CHECK(half.u == doctest::Approx(full.u * 0.5));
         CHECK(half.v == doctest::Approx(full.v * 0.5));
     }

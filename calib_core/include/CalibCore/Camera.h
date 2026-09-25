@@ -13,7 +13,8 @@ namespace calib
     enum class CameraModel
     {
         Pinhole, // fx/fy/cx/cy + the rational distortion coefficients below
-        Mei // Insta 360
+        Mei, // Insta 360
+        Fisheye // OpenCV cv::fisheye (equidistant); fx/fy/cx/cy + k1..k4
     };
 
     struct Intrinsics
@@ -26,6 +27,10 @@ namespace calib
         //! @note CameraModel::Mei reuses k1/k2/k3 and p1/p2 for its own
         //!       (non-rational) polynomial and leaves k4/k5/k6 unused -- it has
         //!       no rational denominator.
+        //! @note CameraModel::Fisheye reuses k1..k4 as OpenCV's fisheye
+        //!       coefficients on the incidence angle theta:
+        //!       theta_d = theta (1 + k1 theta² + k2 theta⁴ + k3 theta⁶ + k4 theta⁸).
+        //!       k5/k6 and p1/p2 are unused.
         float k1 = 0.f, k2 = 0.f, k3 = 0.f;
         float k4 = 0.f, k5 = 0.f, k6 = 0.f;
         //! Tangential distortion.
@@ -54,14 +59,24 @@ namespace calib
 
     //! Name of a camera model, as written to the calibration JSON's "model" key.
     //! @param m model to name
-    //! @return one of "pinhole", "mei"
+    //! @return one of "pinhole", "mei", "fisheye"
     const char* modelToString(CameraModel m);
 
     //! Camera model named by a calibration JSON's "model" key.
-    //! @param s model name, as written by @ref modelToString
+    //! @param s model name, as written by @ref modelToString; "equidistant"
+    //!        (the ROS/Kalibr name) is accepted for CameraModel::Fisheye too
     //! @return the named model, or CameraModel::Pinhole for anything
     //!         unrecognized (including an absent key)
     CameraModel modelFromString(const std::string& s);
+
+    //! Largest incidence angle (radians from the optical axis) at which
+    //! CameraModel::Fisheye's theta -> theta_d polynomial is still increasing.
+    //! Past it the image radius shrinks again and far-off-axis directions
+    //! would fold back onto valid pixels, so @ref projectPoint rejects them.
+    //! @param K intrinsics; only k1..k4 are read
+    //! @return an angle in (0, pi]; pi when the polynomial is monotonic over
+    //!         the whole sphere
+    float fisheyeMaxTheta(const Intrinsics& K);
 
     //! Minimum distance (degrees) fi is kept away from the om/fi/ka
     //! parameterization's gimbal-lock points (fi = +/-90 deg), where om and ka
@@ -193,10 +208,14 @@ namespace calib
     //! @param t camera position in world
     //! @param u,v receive the image pixel
     //! @param depth receives the camera-frame z for Pinhole, range from the
-    //!        camera for Mei
+    //!        camera for Mei and Fisheye
     //! @return false when the point does not project: behind the camera for
-    //!         Pinhole, and at the camera itself or past the fold-back angle
-    //!         (where the projection stops being injective) for Mei
+    //!         Pinhole, at the camera itself or past the fold-back angle
+    //!         (where the projection stops being injective) for Mei and
+    //!         Fisheye -- @ref fisheyeMaxTheta gives Fisheye's
+    //! @note Fisheye takes theta from atan2, not OpenCV's atan(r), so it
+    //!       matches cv::fisheye::projectPoints in front of the camera and
+    //!       still projects directions past 90 deg for lenses wider than 180.
     //! @note The caller owns rounding to integer pixels, bounds checking and
     //!       any ROI test.
     bool projectPoint(

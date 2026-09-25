@@ -479,11 +479,16 @@ void UI::panelIntrinsics(AppState& state)
 
     ImGui::PushItemWidth(-80.f);
 
-    static const char* kModelNames[] = { "Pinhole", "Mei" };
-    int modelIdx = (K.model == CameraModel::Mei) ? 1 : 0;
+    static const CameraModel kModels[] = { CameraModel::Pinhole, CameraModel::Mei, CameraModel::Fisheye };
+    static const char* kModelNames[] = { "Pinhole", "Mei", "Fisheye (equidistant)" };
+    static_assert(IM_ARRAYSIZE(kModels) == IM_ARRAYSIZE(kModelNames));
+    int modelIdx = 0;
+    for (int i = 0; i < IM_ARRAYSIZE(kModels); ++i)
+        if (K.model == kModels[i])
+            modelIdx = i;
     if (ImGui::Combo("Model", &modelIdx, kModelNames, IM_ARRAYSIZE(kModelNames)))
     {
-        K.model = (modelIdx == 1) ? CameraModel::Mei : CameraModel::Pinhole;
+        K.model = kModels[modelIdx];
         edited = true;
     }
     ImGui::Separator();
@@ -510,6 +515,19 @@ void UI::panelIntrinsics(AppState& state)
         helpMarker(
             "Drag to adjust. Hold Ctrl+click to type a value.\nUnlike Pinhole, the displayed image is never undistorted for "
             "Mei -- the projection overlay and Camera RGB coloring apply this distortion to the raw image directly.");
+    }
+    else if (K.model == CameraModel::Fisheye)
+    {
+        // OpenCV cv::fisheye (see calib::projectPoint): k1..k4 act on the
+        // incidence angle, with no tangential terms and no k5/k6.
+        ImGui::Text("Radial (theta polynomial):");
+        drag("k1", &K.k1, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k2", &K.k2, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k3", &K.k3, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k4", &K.k4, 0.001f, -100.f, 100.f, "%.4f");
+        helpMarker(
+            "Drag to adjust. Hold Ctrl+click to type a value.\nUnlike Pinhole, the displayed image is never undistorted for "
+            "Fisheye -- the projection overlay and Camera RGB coloring apply this distortion to the raw image directly.");
     }
     else
     {

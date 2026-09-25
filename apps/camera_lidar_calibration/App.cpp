@@ -30,9 +30,10 @@ void AppState::rebuildImageTexture()
 
     // initUndistortRectifyMap assumes OpenCV's rational pinhole model --
     // running it for Mei would silently mis-warp the image rather than
-    // undistort it. A Mei image is shown raw instead, with the projection
-    // overlay and GPU shaders applying its distortion directly to the raw
-    // image (see Renderer.cpp/RendererShaders.h).
+    // undistort it, and rectifying a fisheye onto a pinhole plane would crop
+    // away the wide field of view it exists for. Both are shown raw instead,
+    // with the projection overlay and GPU shaders applying their distortion
+    // directly to the raw image (see Renderer.cpp/RendererShaders.h).
     if (intrinsicsLoaded && intrinsics.model == CameraModel::Pinhole)
     {
         cv::Mat K = (cv::Mat_<double>(3, 3) << intrinsics.fx, 0, intrinsics.cx, 0, intrinsics.fy, intrinsics.cy, 0, 0, 1);
@@ -170,10 +171,11 @@ bool AppState::solvePairs()
 
     double rms = -1.0;
     std::string solveErr;
-    // Pinhole's observation equations have no unified-sphere term, so Mei
-    // uses solveExtrinsicsMeiCeres instead. See CameraCalibrationSolver.h.
-    bool ok = (intrinsics.model == CameraModel::Mei)
-        ? calib::solveExtrinsicsMeiCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation)
+    // Pinhole's observation equations are a plain rectilinear projection, so
+    // Mei and Fisheye use solveExtrinsicsCeres instead. See
+    // CameraCalibrationSolver.h.
+    bool ok = (intrinsics.model == CameraModel::Mei || intrinsics.model == CameraModel::Fisheye)
+        ? calib::solveExtrinsicsCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation)
         : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation);
     if (!ok)
     {
@@ -284,7 +286,10 @@ void AppState::addCloud(const char* path)
 //   data:                  (block)
 //   - a
 //   - b
-// Distortion order is OpenCV distCoeffs: k1 k2 p1 p2 k3 [k4 k5 k6 ...]
+// Distortion order is OpenCV distCoeffs: k1 k2 p1 p2 k3 [k4 k5 k6 ...], or
+// k1 k2 k3 k4 when `distortion_model:` is equidistant/fisheye. Only that key
+// selects the fisheye model: four coefficients alone are also a valid pinhole
+// k1 k2 p1 p2.
 static void extractNumbers(const std::string& s, std::vector<double>& out)
 {
     const char* p = s.c_str();
@@ -315,6 +320,7 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
     }
 
     std::vector<double> camMat, dist;
+    std::string distortionModel; // lower-cased, quotes stripped
     std::vector<double>* active = nullptr; // section whose data we collect
     std::vector<double>* collecting = nullptr;
     bool inFlow = false;
@@ -351,6 +357,12 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
                     imgW = std::atoi(trimmed.c_str() + 12);
                 else if (trimmed.rfind("image_height:", 0) == 0)
                     imgH = std::atoi(trimmed.c_str() + 13);
+                else if (trimmed.rfind("distortion_model:", 0) == 0)
+                {
+                    for (char c : trimmed.substr(17))
+                        if (std::isalnum(static_cast<unsigned char>(c)) || c == '_')
+                            distortionModel += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                }
             }
             continue;
         }
@@ -388,6 +400,15 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
         err = "camera_matrix needs 9 values";
         return false;
     }
+    const bool fisheye = distortionModel == "equidistant" || distortionModel == "fisheye";
+    // Unlike the pinhole list, whose trailing terms may be left off, a
+    // fisheye has exactly four -- a missing one defaulting to 0 would
+    // reproject wrongly with nothing to show for it.
+    if (fisheye && dist.size() != 4)
+    {
+        err = "distortion_model " + distortionModel + " needs 4 distortion_coefficients (k1 k2 k3 k4), got " + std::to_string(dist.size());
+        return false;
+    }
 
     // Row-major 3x3: [fx 0 cx; 0 fy cy; 0 0 1]
     K.fx = static_cast<float>(camMat[0]);
@@ -395,6 +416,18 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
     K.fy = static_cast<float>(camMat[4]);
     K.cy = static_cast<float>(camMat[5]);
 
+    if (fisheye)
+    {
+        K.model = CameraModel::Fisheye;
+        K.k1 = static_cast<float>(dist[0]);
+        K.k2 = static_cast<float>(dist[1]);
+        K.k3 = static_cast<float>(dist[2]);
+        K.k4 = static_cast<float>(dist[3]);
+        K.k5 = K.k6 = K.p1 = K.p2 = 0.f;
+        return true;
+    }
+
+    K.model = CameraModel::Pinhole;
     auto d = [&](size_t i)
     {
         return i < dist.size() ? static_cast<float>(dist[i]) : 0.f;
@@ -470,15 +503,14 @@ void AppState::loadIntrinsics(const char* path)
             statusMsg = std::string("YAML error: ") + err + " (" + path + ")";
             return;
         }
-        intrinsics.model = CameraModel::Pinhole; // this YAML format cannot express any other model
-        intrinsics.xi = 0.f;
+        intrinsics.xi = 0.f; // parseOpenCVYaml set the model: Pinhole or Fisheye
         intrinsicsW = imgW;
         intrinsicsH = imgH;
         intrinsicsLoaded = true;
         calib::loadCameraIdentity(path, cameraId);
         std::string scaleNote = autoScaleIntrinsicsToImage();
         rebuildImageTexture(); // re-rectify with the new (possibly auto-scaled) coefficients
-        statusMsg = "Intrinsics loaded";
+        statusMsg = intrinsics.model == CameraModel::Fisheye ? "Fisheye intrinsics loaded" : "Intrinsics loaded";
         if (imgW > 0)
             statusMsg += " (calibration " + std::to_string(imgW) + "x" + std::to_string(imgH) + ")";
         if (!scaleNote.empty())

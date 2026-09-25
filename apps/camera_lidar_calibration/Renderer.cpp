@@ -93,7 +93,9 @@ void Renderer::initPointShader()
         locCamModel = rlGetLocationUniform(pointShader.id, "model");
         locCamXi = rlGetLocationUniform(pointShader.id, "xi");
         locCamRad1 = rlGetLocationUniform(pointShader.id, "kRad1");
+        locCamRad2 = rlGetLocationUniform(pointShader.id, "kRad2");
         locCamTan = rlGetLocationUniform(pointShader.id, "pTan");
+        locCamThetaMax = rlGetLocationUniform(pointShader.id, "thetaMax");
     }
 
     projShader = LoadShaderFromMemory(kProjVS, kProjFS.c_str());
@@ -112,6 +114,7 @@ void Renderer::initPointShader()
         locPrjTan = rlGetLocationUniform(projShader.id, "pTan");
         locPrjModel = rlGetLocationUniform(projShader.id, "model");
         locPrjXi = rlGetLocationUniform(projShader.id, "xi");
+        locPrjThetaMax = rlGetLocationUniform(projShader.id, "thetaMax");
         locPrjDepthRange = rlGetLocationUniform(projShader.id, "depthRange");
         locPrjOpacity = rlGetLocationUniform(projShader.id, "opacity");
         locPrjPointSize = rlGetLocationUniform(projShader.id, "pointSize");
@@ -185,10 +188,12 @@ void Renderer::renderImageOverlay(
         // model/xi only take effect when applyDistortion is set too, same as
         // rad1/rad2/tan2 below -- applyDistortion==false means "treat as
         // already rectified" regardless of model (kept exactly as before
-        // for Pinhole; Mei in practice always has applyDistortion==true,
-        // since AppState::rebuildImageTexture never rectifies it).
+        // for Pinhole; Mei and Fisheye in practice always have
+        // applyDistortion==true, since AppState::rebuildImageTexture never
+        // rectifies them).
         int model = 0;
         float xiVal = 0.f;
+        float thetaMax = 0.f;
         if (applyDistortion)
         {
             rad1[0] = K.k1;
@@ -204,6 +209,11 @@ void Renderer::renderImageOverlay(
                 model = 2;
                 xiVal = K.xi;
             }
+            else if (K.model == CameraModel::Fisheye)
+            {
+                model = 3;
+                thetaMax = calib::fisheyeMaxTheta(K);
+            }
         }
         float depthRange[2] = { vp.depthMin, vp.depthMax };
 
@@ -216,6 +226,7 @@ void Renderer::renderImageOverlay(
         rlSetUniform(locPrjTan, tan2, RL_SHADER_UNIFORM_VEC2, 1);
         rlSetUniform(locPrjModel, &model, RL_SHADER_UNIFORM_INT, 1);
         rlSetUniform(locPrjXi, &xiVal, RL_SHADER_UNIFORM_FLOAT, 1);
+        rlSetUniform(locPrjThetaMax, &thetaMax, RL_SHADER_UNIFORM_FLOAT, 1);
         rlSetUniform(locPrjDepthRange, depthRange, RL_SHADER_UNIFORM_VEC2, 1);
         rlSetUniform(locPrjOpacity, &vp.opacity, RL_SHADER_UNIFORM_FLOAT, 1);
         rlSetUniform(locPrjPointSize, &vp.pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
@@ -263,13 +274,15 @@ void Renderer::draw3DCloud(
     Matrix camXform = buildLidarToCamMatrix(E);
     float k[4] = { K.fx, K.fy, K.cx, K.cy };
     float imgSize[2] = { (float)std::max(imgW, 1), (float)std::max(imgH, 1) };
-    // Camera RGB sampling always applies Mei's own distortion (unlike the
-    // Pinhole path, this displayed image is never rectified -- see
-    // AppState::rebuildImageTexture and kPointVS's Mei branch).
-    int model = (K.model == CameraModel::Mei) ? 2 : 0;
+    // Camera RGB sampling always applies Mei's or Fisheye's own distortion
+    // (unlike the Pinhole path, their displayed image is never rectified --
+    // see AppState::rebuildImageTexture and kPointVS's branches for them).
+    int model = (K.model == CameraModel::Mei) ? 2 : (K.model == CameraModel::Fisheye) ? 3 : 0;
     float xi = K.xi;
     float rad1[3] = { K.k1, K.k2, K.k3 };
+    float rad2[3] = { K.k4, K.k5, K.k6 };
     float tan2[2] = { K.p1, K.p2 };
+    float thetaMax = (K.model == CameraModel::Fisheye) ? calib::fisheyeMaxTheta(K) : 0.f;
 
     rlEnableShader(pointShader.id);
     rlSetUniformMatrix(locMVP, mvp);
@@ -284,7 +297,9 @@ void Renderer::draw3DCloud(
     rlSetUniform(locCamModel, &model, RL_SHADER_UNIFORM_INT, 1);
     rlSetUniform(locCamXi, &xi, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locCamRad1, rad1, RL_SHADER_UNIFORM_VEC3, 1);
+    rlSetUniform(locCamRad2, rad2, RL_SHADER_UNIFORM_VEC3, 1);
     rlSetUniform(locCamTan, tan2, RL_SHADER_UNIFORM_VEC2, 1);
+    rlSetUniform(locCamThetaMax, &thetaMax, RL_SHADER_UNIFORM_FLOAT, 1);
     rlSetUniform(locCamImgSize, imgSize, RL_SHADER_UNIFORM_VEC2, 1);
 
     if (colorMode == 3)
@@ -310,8 +325,8 @@ void Renderer::drawCameraFrustum(const Intrinsics& K, const Extrinsics& E, int i
     if (K.model != CameraModel::Pinhole)
     {
         // A rectangular pyramid built from fx/fy/cx/cy/imgW/imgH (below)
-        // assumes a narrow rectilinear FOV, which misrepresents a Mei
-        // fisheye's much wider one -- draw a position marker + camera
+        // assumes a narrow rectilinear FOV, which misrepresents a Mei or
+        // equidistant fisheye's much wider one -- draw a position marker + camera
         // forward/right/up axis triad instead, same fallback
         // camera_lidar_trajectory_viewer uses for CameraModel::Mei.
         auto toWorld = [&](const Eigen::Vector3f& axis_c) -> Vector3

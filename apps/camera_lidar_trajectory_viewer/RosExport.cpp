@@ -207,6 +207,7 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
             // Consumers that want rectified images can undistort from the
             // published CameraInfo.
             const bool mei = in.K.model == CameraModel::Mei;
+            const bool fisheye = in.K.model == CameraModel::Fisheye;
 
             for (const auto& [ts, path] : in.imageFiles)
             {
@@ -294,6 +295,16 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
                             // applied after the unit-sphere step.
                             ci.distortion_model = "insta360_mei_v2";
                             ci.d = { in.K.k1, in.K.k2, in.K.k3, in.K.p1, in.K.p2, in.K.xi };
+                            ci.k = { in.K.fx, 0.f, in.K.cx, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 1.f };
+                            ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
+                            ci.p = { in.K.fx, 0.f, in.K.cx, 0.f, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 0.f, 1.f, 0.f };
+                        }
+                        else if (fisheye)
+                        {
+                            // ROS's name for OpenCV's fisheye model, which
+                            // image_pipeline undistorts with cv::fisheye.
+                            ci.distortion_model = "equidistant";
+                            ci.d = { in.K.k1, in.K.k2, in.K.k3, in.K.k4 };
                             ci.k = { in.K.fx, 0.f, in.K.cx, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 1.f };
                             ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
                             ci.p = { in.K.fx, 0.f, in.K.cx, 0.f, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 0.f, 1.f, 0.f };

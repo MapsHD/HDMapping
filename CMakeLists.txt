@@ -9,7 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Versioning settings
 set(HDMAPPING_VERSION_MAJOR 0)
-set(HDMAPPING_VERSION_MINOR 104)
+set(HDMAPPING_VERSION_MINOR 105)
 set(HDMAPPING_VERSION_PATCH 0)
 
 # Set up common paths
@@ -71,6 +71,13 @@ find_package(OpenGL REQUIRED)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# Bundled dylibs (e.g. freeglut) use an @rpath install name, and install(TARGETS)
+# strips the build-tree RPATH, so installed executables need an explicit one
+# pointing at <prefix>/lib or dyld fails with "no LC_RPATH's found".
+if(APPLE)
+    set(CMAKE_INSTALL_RPATH "@executable_path/../lib")
+endif()
 
 # TODO(mwlasiuk) : fix
 # if(WIN32)

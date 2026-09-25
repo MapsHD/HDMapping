@@ -139,7 +139,6 @@ endif()
 # Applications for typical workflow - see images/workflow.png
 add_subdirectory(apps/mandeye_raw_data_viewer)
 add_subdirectory(apps/lidar_odometry_step_1)
-add_subdirectory(apps/mandeye_single_session_viewer)
 add_subdirectory(apps/multi_view_tls_registration)
 add_subdirectory(apps/multi_view_tls_registration_legacy)
 add_subdirectory(apps/multi_session_registration)

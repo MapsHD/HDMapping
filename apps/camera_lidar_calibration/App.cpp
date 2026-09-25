@@ -443,24 +443,17 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
     return true;
 }
 
-// The Mei camera_info.yaml is a flat mapping with a `distortion_model:`
-// key, unlike OpenCV's `camera_matrix:`/`distortion_coefficients:` YAML.
-// Peeked at as text so an OpenCV pinhole YAML never reaches loadMeiIntrinsics and
-// warns about fields it was never going to have.
-static bool yamlLooksLikeMei(const char* path)
+// The flat camera_info.yaml that insta360-to-images and insta360-test-calib
+// write has top-level fx:/fy:/cx:/cy: keys; an OpenCV/ROS YAML keeps them in
+// a camera_matrix: block instead. Peeked at as text so each goes to the
+// parser that understands it.
+static bool yamlIsFlatCameraInfo(const char* path)
 {
     std::ifstream f(path);
     std::string line;
     while (std::getline(f, line))
-    {
-        auto pos = line.find("distortion_model:");
-        if (pos == std::string::npos)
-            continue;
-        std::string value = line.substr(pos + std::string("distortion_model:").size());
-        for (auto& c : value)
-            c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-        return value.find("mei") != std::string::npos;
-    }
+        if (line.rfind("fx:", 0) == 0)
+            return true;
     return false;
 }
 
@@ -473,11 +466,11 @@ void AppState::loadIntrinsics(const char* path)
     for (auto& c : ext)
         c = static_cast<char>(tolower(c));
 
-    if ((ext == "yml" || ext == "yaml") && yamlLooksLikeMei(path))
+    if ((ext == "yml" || ext == "yaml") && yamlIsFlatCameraInfo(path))
     {
-        if (!calib::loadMeiIntrinsics(path, intrinsics))
+        if (!calib::loadCameraInfoYaml(path, intrinsics))
         {
-            statusMsg = std::string("Mei intrinsics failed to load (see console): ") + path;
+            statusMsg = std::string("camera_info.yaml failed to load (see console): ") + path;
             return;
         }
         intrinsicsW = intrinsics.width;
@@ -485,8 +478,10 @@ void AppState::loadIntrinsics(const char* path)
         intrinsicsLoaded = true;
         calib::loadCameraIdentity(path, cameraId);
         std::string scaleNote = autoScaleIntrinsicsToImage();
-        rebuildImageTexture(); // no-op undistortion for Mei, but refreshes the texture
-        statusMsg = "Mei intrinsics loaded";
+        rebuildImageTexture(); // rectifies a pinhole; Mei and Fisheye stay raw
+        statusMsg = std::string("Intrinsics loaded (") + modelToString(intrinsics.model) + ")";
+        if (imageRectified)
+            statusMsg += ", image rectified";
         if (intrinsicsW > 0)
             statusMsg += " (calibration " + std::to_string(intrinsicsW) + "x" + std::to_string(intrinsicsH) + ")";
         if (!scaleNote.empty())

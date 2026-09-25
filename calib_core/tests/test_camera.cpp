@@ -501,24 +501,29 @@ TEST_CASE("CameraIdentity::empty: model/firmware alone do not count")
     CHECK(id.empty());
 }
 
-// ── loadMeiIntrinsics ─────────────────────────────────────────────────────────
+// ── loadCameraInfoYaml ────────────────────────────────────────────────────────
 
 namespace
 {
-    // Writes `body` to a temp file and loads it, so the parser is exercised
-    // through its real file-reading path.
-    // Returns the loaded intrinsics, or nullopt when the load failed.
-    std::optional<Intrinsics> loadFromString(const std::string& body)
+    // Writes `body` to a temp file and loads it into K, so the parser is
+    // exercised through its real file-reading path.
+    bool loadIntoFromString(const std::string& body, Intrinsics& K)
     {
         const std::string path = (std::filesystem::temp_directory_path() / "calib_core_test_camera_info.yaml").string();
         {
             std::ofstream f(path);
             f << body;
         }
-        Intrinsics K;
-        const bool ok = loadMeiIntrinsics(path, K);
+        const bool ok = loadCameraInfoYaml(path, K);
         std::filesystem::remove(path);
-        return ok ? std::optional<Intrinsics>(K) : std::nullopt;
+        return ok;
+    }
+
+    // As above, into a fresh Intrinsics. Returns nullopt when the load failed.
+    std::optional<Intrinsics> loadFromString(const std::string& body)
+    {
+        Intrinsics K;
+        return loadIntoFromString(body, K) ? std::optional<Intrinsics>(K) : std::nullopt;
     }
 
     // As above, for loadCameraIdentity. `id` is only meaningful when this
@@ -547,9 +552,41 @@ cy: 539.5
 xi: 1.234
 distortion: [-0.0123, 0.0045, -0.0007, 0.0011, -0.0002]
 )";
+
+    // Verbatim from insta360-test-calib's SaveCamera, comment line included.
+    const char* kFisheyeSample =
+        R"(# calib_app: intrinsics re-estimated from equidistant, 5 views, 422 corners: rms 0.556 px (was 6.787), 40 iterations; started from a generic guess
+width: 2880
+height: 2880
+distortion_model: equidistant
+fx: 634.3157288
+fy: 633.5613727
+cx: 1454.934903
+cy: 1429.728826
+distortion: [0.1417399868, -0.01614857261, 0.01912948205, -0.006671667431]
+k: [634.3157288, 0, 1454.934903, 0, 633.5613727, 1429.728826, 0, 0, 1]
+r: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+p: [634.3157288, 0, 1454.934903, 0, 0, 633.5613727, 1429.728826, 0, 0, 0, 1, 0]
+)";
+
+    // The same file with `distortion_model` and `distortion` replaced.
+    std::string withModel(const std::string& model, const std::string& distortion)
+    {
+        std::string body = kFisheyeSample;
+        auto replaceLine = [&](const std::string& key, const std::string& value)
+        {
+            const auto at = body.find("\n" + key + ": ");
+            REQUIRE(at != std::string::npos);
+            const auto end = body.find('\n', at + 1);
+            body.replace(at + 1, end - at - 1, key + ": " + value);
+        };
+        replaceLine("distortion_model", model);
+        replaceLine("distortion", distortion);
+        return body;
+    }
 } // namespace
 
-TEST_CASE("loadMeiIntrinsics: reads this rig's flat camera_info.yaml")
+TEST_CASE("loadCameraInfoYaml: reads this rig's flat camera_info.yaml")
 {
     const auto K = loadFromString(kSample);
     REQUIRE(K.has_value());
@@ -571,7 +608,7 @@ TEST_CASE("loadMeiIntrinsics: reads this rig's flat camera_info.yaml")
     CHECK(K->k6 == 0.f);
 }
 
-TEST_CASE("loadMeiIntrinsics: quotes and trailing comments are not taken literally")
+TEST_CASE("loadCameraInfoYaml: quotes and trailing comments are not taken literally")
 {
     std::string body = kSample;
     body += "\nxi: 0.75  # trailing comment\n";
@@ -580,7 +617,7 @@ TEST_CASE("loadMeiIntrinsics: quotes and trailing comments are not taken literal
     CHECK(K->xi == doctest::Approx(0.75));
 }
 
-TEST_CASE("loadMeiIntrinsics: a missing field fails instead of defaulting to 0")
+TEST_CASE("loadCameraInfoYaml: a missing field fails instead of defaulting to 0")
 {
     // A calibration that silently reads xi as 0 reprojects wrongly with no
     // visible failure, so the load has to reject it outright.
@@ -592,17 +629,105 @@ TEST_CASE("loadMeiIntrinsics: a missing field fails instead of defaulting to 0")
     CHECK_FALSE(loadFromString(body).has_value());
 }
 
-TEST_CASE("loadMeiIntrinsics: a missing file fails cleanly, and leaves K alone")
+TEST_CASE("loadCameraInfoYaml: a missing file fails cleanly, and leaves K alone")
 {
     Intrinsics K = mei();
     const Intrinsics before = K;
-    CHECK_FALSE(loadMeiIntrinsics("/nonexistent/camera_info.yaml", K));
+    CHECK_FALSE(loadCameraInfoYaml("/nonexistent/camera_info.yaml", K));
     CHECK(K.fx == before.fx);
     CHECK(K.xi == before.xi);
 }
 
+TEST_CASE("loadCameraInfoYaml: reads insta360-test-calib's equidistant file")
+{
+    const auto K = loadFromString(kFisheyeSample);
+    REQUIRE(K.has_value());
+    CHECK(K->model == CameraModel::Fisheye);
+    CHECK(K->width == 2880);
+    CHECK(K->height == 2880);
+    CHECK(K->fx == doctest::Approx(634.3157288));
+    CHECK(K->fy == doctest::Approx(633.5613727));
+    CHECK(K->cx == doctest::Approx(1454.934903));
+    CHECK(K->cy == doctest::Approx(1429.728826));
+    CHECK(K->k1 == doctest::Approx(0.1417399868));
+    CHECK(K->k2 == doctest::Approx(-0.01614857261));
+    CHECK(K->k3 == doctest::Approx(0.01912948205));
+    CHECK(K->k4 == doctest::Approx(-0.006671667431));
+    CHECK(K->p1 == 0.f);
+    CHECK(K->p2 == 0.f);
+    CHECK(K->xi == 0.f);
+
+    Px r = project(*K, { 0.f, 0.f, 3.f });
+    CHECK(r.u == doctest::Approx(K->cx));
+    CHECK(r.v == doctest::Approx(K->cy));
+}
+
+TEST_CASE("loadCameraInfoYaml: distortion_model fisheye is read as equidistant")
+{
+    const auto K = loadFromString(withModel("fisheye", "[0.1, 0.01, 0, 0]"));
+    REQUIRE(K.has_value());
+    CHECK(K->model == CameraModel::Fisheye);
+    CHECK(K->k1 == doctest::Approx(0.1));
+}
+
+TEST_CASE("loadCameraInfoYaml: equidistant needs exactly four coefficients, and a failure leaves K alone")
+{
+    Intrinsics K = mei();
+    const Intrinsics before = K;
+    CHECK_FALSE(loadIntoFromString(withModel("equidistant", "[0.1, 0.01, 0, 0, 0.5]"), K));
+    CHECK(K.model == before.model);
+    CHECK(K.fx == before.fx);
+    CHECK(K.k1 == before.k1);
+}
+
+TEST_CASE("loadCameraInfoYaml: the pinhole models take OpenCV's coefficient order")
+{
+    // Unlike Mei's (k1, k2, k3, p1, p2), p1/p2 come before k3.
+    SUBCASE("plumb_bob")
+    {
+        const auto K = loadFromString(withModel("plumb_bob", "[0.1, -0.2, 0.001, 0.002, 0.05]"));
+        REQUIRE(K.has_value());
+        CHECK(K->model == CameraModel::Pinhole);
+        CHECK(K->k1 == doctest::Approx(0.1));
+        CHECK(K->k2 == doctest::Approx(-0.2));
+        CHECK(K->p1 == doctest::Approx(0.001));
+        CHECK(K->p2 == doctest::Approx(0.002));
+        CHECK(K->k3 == doctest::Approx(0.05));
+        CHECK(K->k4 == 0.f);
+    }
+    SUBCASE("rational_polynomial")
+    {
+        const auto K = loadFromString(withModel("rational_polynomial", "[0.4, -0.05, 0.0006, -0.0004, 0.001, 0.7, -0.02, 0.005]"));
+        REQUIRE(K.has_value());
+        CHECK(K->model == CameraModel::Pinhole);
+        CHECK(K->p1 == doctest::Approx(0.0006));
+        CHECK(K->k3 == doctest::Approx(0.001));
+        CHECK(K->k4 == doctest::Approx(0.7));
+        CHECK(K->k5 == doctest::Approx(-0.02));
+        CHECK(K->k6 == doctest::Approx(0.005));
+    }
+}
+
+TEST_CASE("loadCameraInfoYaml: an unknown distortion_model fails rather than falling back to pinhole")
+{
+    CHECK_FALSE(loadFromString(withModel("scaramuzza", "[0, 0, 0, 0]")).has_value());
+}
+
+TEST_CASE("loadCameraInfoYaml: xi with no distortion_model is read as Mei")
+{
+    std::string body = kSample;
+    const auto at = body.find("distortion_model: insta360_mei_v2\n");
+    REQUIRE(at != std::string::npos);
+    body.erase(at, std::string("distortion_model: insta360_mei_v2\n").size());
+
+    const auto K = loadFromString(body);
+    REQUIRE(K.has_value());
+    CHECK(K->model == CameraModel::Mei);
+    CHECK(K->xi == doctest::Approx(1.234));
+}
+
 // ── loadCameraIdentity ────────────────────────────────────────────────────────
-// Independent of loadMeiIntrinsics -- opens the same kind of file again on
+// Independent of loadCameraInfoYaml -- opens the same kind of file again on
 // its own and only ever looks at `serial`/`frame_id`/`model`, so these tests
 // don't depend on the intrinsics fields being present or valid at all.
 
@@ -655,7 +780,7 @@ TEST_CASE("loadCameraIdentity: quotes around a value are not taken literally")
 
 TEST_CASE("loadCameraIdentity: neither field present comes back empty, not a failure")
 {
-    // Unlike loadMeiIntrinsics, no field here is required -- a file that
+    // Unlike loadCameraInfoYaml, no field here is required -- a file that
     // simply doesn't name a camera is a valid, successful "no identity".
     std::string body = "distortion_model: insta360_mei_v2\nwidth: 640\n";
     CameraIdentity id;

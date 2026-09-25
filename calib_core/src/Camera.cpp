@@ -33,7 +33,7 @@ namespace
     }
 } // namespace
 
-// Unrelated to loadMeiIntrinsics (MeiIntrinsics.cpp) -- opens and reads the
+// Unrelated to loadCameraInfoYaml (CameraInfoYaml.cpp) -- opens and reads the
 // file on its own rather than sharing a file handle or result with it,
 // since parsing intrinsics and reading identity fields are two different
 // jobs. Works on any flat `key: value` yaml, not just a Mei camera_info.yaml.

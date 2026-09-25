@@ -36,10 +36,10 @@ namespace calib
         //! Tangential distortion.
         float p1 = 0.f, p2 = 0.f;
         //! Unified-sphere mirror parameter, CameraModel::Mei only.
-        //! @see loadMeiIntrinsics
+        //! @see loadCameraInfoYaml
         float xi = 0.f;
         //! Image size in pixels. Not read by @ref projectPoint; set by
-        //! @ref loadMeiIntrinsics and scaled by @ref scaleIntrinsics.
+        //! @ref loadCameraInfoYaml and scaled by @ref scaleIntrinsics.
         int width = 0, height = 0;
     };
 
@@ -153,26 +153,34 @@ namespace calib
     //!       so this conversion is needed at the file-I/O boundary either way.
     void omFiKaFromMat3(const Eigen::Matrix3f& R, float& om_deg, float& fi_deg, float& ka_deg);
 
-    //! Load CameraModel::Mei intrinsics from a camera_info.yaml in the
-    //! Insta360 rig's format: a flat top-level mapping of scalars plus a
-    //! `distortion` flow sequence.
+    //! Load intrinsics from a camera_info.yaml in the flat layout
+    //! insta360-to-images and insta360-test-calib write: top-level `width`,
+    //! `height`, `fx`, `fy`, `cx`, `cy`, [`xi`,] and a `distortion` flow
+    //! sequence whose order `distortion_model` sets:
+    //!   - insta360_mei_v2: CameraModel::Mei, (k1, k2, k3, p1, p2), plus `xi`
+    //!   - equidistant or fisheye: CameraModel::Fisheye, (k1, k2, k3, k4)
+    //!   - plumb_bob: CameraModel::Pinhole, (k1, k2, p1, p2, k3)
+    //!   - rational_polynomial: CameraModel::Pinhole, (k1, k2, p1, p2, k3, k4, k5, k6)
     //! @param path file to read
     //! @param K overwritten with the loaded intrinsics on success, untouched
     //!        on failure
-    //! @return false on a missing file or a missing required field
-    //! @warning The yaml's `distortion` array is ordered (k1, k2, k3, p1, p2)
-    //!          -- NOT OpenCV's pinhole order (k1, k2, p1, p2, k3). The two are
-    //!          easy to mix up, both being five numbers in a row, and doing so
-    //!          produces a plausible-looking but badly wrong reprojection with
-    //!          no crash.
-    //! @note Failures and a distortion_model other than insta360_mei_v2 are
-    //!       reported on stderr rather than thrown -- a malformed file should
-    //!       degrade the app to "no reprojection available", not crash it.
-    bool loadMeiIntrinsics(const std::string& path, Intrinsics& K);
+    //! @return false on a missing file, a missing required field, an unknown
+    //!         distortion_model, or an equidistant file without exactly 4
+    //!         coefficients
+    //! @warning Mei's order (k1, k2, k3, p1, p2) is NOT OpenCV's pinhole order
+    //!          (k1, k2, p1, p2, k3). The two are easy to mix up, both being
+    //!          five numbers in a row, and doing so produces a
+    //!          plausible-looking but badly wrong reprojection with no crash.
+    //! @note A file with `xi` and no distortion_model is taken as Mei, and any
+    //!       distortion_model containing "mei" is read as insta360_mei_v2,
+    //!       both with a warning. Failures and warnings go to stderr rather
+    //!       than being thrown -- a malformed file should degrade the app to
+    //!       "no reprojection available", not crash it.
+    bool loadCameraInfoYaml(const std::string& path, Intrinsics& K);
 
     //! Reads a camera_info.yaml-shaped file's `serial`, `frame_id` and
     //! `model` fields. Opens and scans the file independently of
-    //! @ref loadMeiIntrinsics --
+    //! @ref loadCameraInfoYaml --
     //! identity and intrinsics are unrelated concerns read by separate
     //! functions, not two jobs of the same one.
     //! @param path file to read
@@ -236,8 +244,5 @@ namespace calib
     //!        (".../cam0_123.meta.json")
     //! @return the timestamp in nanoseconds, or nullopt if the sidecar is
     //!         missing, unreadable, or has no FRAME_WALL_CLOCK field
-    //! @note Scanned as text, like @ref loadMeiIntrinsics's yaml, rather than
-    //!       parsed as JSON, so calib_core keeps depending on nothing but
-    //!       Eigen/LASzip/std.
     std::optional<double> LoadTimestampFromSideCar(const std::string& path);
 } // namespace calib

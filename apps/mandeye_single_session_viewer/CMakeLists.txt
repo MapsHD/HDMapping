@@ -1,0 +1,68 @@
+cmake_minimum_required(VERSION 4.0.0)
+
+project(mandeye_raw_data_viewer)
+
+# Source files
+set(SOURCES
+    mandeye_single_session_viewer.cpp
+    ../lidar_odometry_step_1/lidar_odometry_utils.cpp
+    "../../core/src/utils.cpp"
+)
+
+# Windows: add resource file
+if(WIN32)
+    list(APPEND SOURCES resource.rc)
+endif()
+
+add_executable(
+  mandeye_single_session_viewer ${SOURCES}
+  )
+
+target_include_directories(
+  mandeye_single_session_viewer
+  PRIVATE include
+  ${REPOSITORY_DIRECTORY}/core/include
+  ${REPOSITORY_DIRECTORY}/core_hd_mapping/include
+  ${THIRDPARTY_DIRECTORY}
+  ${THIRDPARTY_DIRECTORY}/glm
+  ${EIGEN3_INCLUDE_DIR}
+  ${THIRDPARTY_DIRECTORY}/imgui
+  ${THIRDPARTY_DIRECTORY}/imgui/backends
+  ${THIRDPARTY_DIRECTORY}/ImGuizmo
+  ${THIRDPARTY_DIRECTORY}/glew-cmake/include
+  ${FREEGLUT_INCLUDE_DIR}
+  ${THIRDPARTY_DIRECTORY}/json/include
+  ${THIRDPARTY_DIRECTORY}/portable-file-dialogs-master
+  ${LASZIP_INCLUDE_DIR}/LASzip/include
+  ${THIRDPARTY_DIRECTORY}/observation_equations/codes
+  ${THIRDPARTY_DIRECTORY}/vqf/vqf/cpp)
+
+target_link_libraries(
+  mandeye_single_session_viewer
+  PRIVATE vqf
+  unordered_dense::unordered_dense
+  spdlog::spdlog
+  ${FREEGLUT_LIBRARY}
+  ${OPENGL_gl_LIBRARY}
+  OpenGL::GLU
+  ${PLATFORM_LASZIP_LIB}
+  ${CORE_LIBRARIES}
+  ${GUI_LIBRARIES}
+  ${PLATFORM_MISCELLANEOUS_LIBS}
+  ${GLEW_LIBRARY})
+
+if(WIN32)
+  add_custom_command(
+    TARGET mandeye_single_session_viewer
+    POST_BUILD
+    COMMAND
+    ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:mandeye_single_session_viewer>
+    $<TARGET_FILE_DIR:mandeye_single_session_viewer>
+    COMMAND_EXPAND_LISTS)
+endif()
+
+if (MSVC)
+    target_compile_options(mandeye_single_session_viewer PRIVATE /bigobj)
+endif()
+
+hdmapping_install_app(mandeye_single_session_viewer)

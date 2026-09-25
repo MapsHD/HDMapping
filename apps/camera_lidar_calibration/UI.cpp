@@ -40,6 +40,35 @@ static void helpMarker(const char* desc)
     }
 }
 
+// Which physical sensors the loaded data belongs to: the camera's serial and
+// frame come from the rig's camera_info.yaml, the LiDAR's from the mandeye
+// status sidecar beside the LAZ. Shown together, above everything else,
+// because a calibration is only valid for the one pair it was measured on.
+static void drawSensorIds(const AppState& state)
+{
+    if (state.cameraId.empty() && state.lidarId.empty())
+        return;
+
+    auto dimmed = [](const std::string& text)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("%s", text.c_str());
+        ImGui::PopStyleColor();
+    };
+
+    if (!state.cameraId.serial.empty())
+        ImGui::TextWrapped("Camera: %s (%s)", state.cameraId.serial.c_str(), state.cameraId.model.c_str());
+    else if (!state.cameraId.frameId.empty())
+        dimmed("Camera: (file named no serial)");
+    if (!state.cameraId.frameId.empty())
+        dimmed("    frame " + state.cameraId.frameId);
+
+    if (!state.lidarId.empty())
+        ImGui::TextWrapped("LiDAR:  %s", state.lidarId.c_str());
+
+    ImGui::Separator();
+}
+
 // ── Main draw ────────────────────────────────────────────────────────────────
 void UI::draw(AppState& state)
 {
@@ -60,6 +89,8 @@ void UI::draw(AppState& state)
 
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.f, 1.f), "LiDAR-Camera Calibration");
     ImGui::Separator();
+
+    drawSensorIds(state);
 
     // Alt/Cmd = toggle Camera RGB ↔ Intensity (works anywhere in the window).
     // Cmd (Super) alongside Alt for macOS, where Option is awkward to use as
@@ -447,22 +478,71 @@ void UI::panelIntrinsics(AppState& state)
     };
 
     ImGui::PushItemWidth(-80.f);
+
+    static const CameraModel kModels[] = { CameraModel::Pinhole, CameraModel::Mei, CameraModel::Fisheye };
+    static const char* kModelNames[] = { "Pinhole", "Mei", "Fisheye (equidistant)" };
+    static_assert(IM_ARRAYSIZE(kModels) == IM_ARRAYSIZE(kModelNames));
+    int modelIdx = 0;
+    for (int i = 0; i < IM_ARRAYSIZE(kModels); ++i)
+        if (K.model == kModels[i])
+            modelIdx = i;
+    if (ImGui::Combo("Model", &modelIdx, kModelNames, IM_ARRAYSIZE(kModelNames)))
+    {
+        K.model = kModels[modelIdx];
+        edited = true;
+    }
+    ImGui::Separator();
+
     drag("fx", &K.fx, 1.f, 1.f, 10000.f, "%.1f");
     drag("fy", &K.fy, 1.f, 1.f, 10000.f, "%.1f");
     drag("cx", &K.cx, 0.5f, 0.f, 10000.f, "%.1f");
     drag("cy", &K.cy, 0.5f, 0.f, 10000.f, "%.1f");
     ImGui::Separator();
-    ImGui::Text("Radial (rational model):");
-    drag("k1", &K.k1, 0.001f, -100.f, 100.f, "%.4f");
-    drag("k2", &K.k2, 0.001f, -100.f, 100.f, "%.4f");
-    drag("k3", &K.k3, 0.001f, -100.f, 100.f, "%.4f");
-    drag("k4", &K.k4, 0.001f, -100.f, 100.f, "%.4f");
-    drag("k5", &K.k5, 0.001f, -100.f, 100.f, "%.4f");
-    drag("k6", &K.k6, 0.001f, -100.f, 100.f, "%.4f");
-    ImGui::Text("Tangential:");
-    drag("p1", &K.p1, 0.0001f, -1.f, 1.f, "%.5f");
-    drag("p2", &K.p2, 0.0001f, -1.f, 1.f, "%.5f");
-    helpMarker("Drag to adjust. Hold Ctrl+click to type a value.");
+
+    if (K.model == CameraModel::Mei)
+    {
+        // Unified-sphere fisheye (see calib::projectPoint): xi + a plain k1/k2/k3 +
+        // p1/p2 polynomial, no rational denominator -- k4/k5/k6 don't apply
+        // here, so they're hidden instead of shown as dead controls.
+        drag("xi", &K.xi, 0.001f, 0.f, 3.f, "%.4f");
+        ImGui::Text("Radial (Mei polynomial):");
+        drag("k1", &K.k1, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k2", &K.k2, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k3", &K.k3, 0.001f, -100.f, 100.f, "%.4f");
+        ImGui::Text("Tangential:");
+        drag("p1", &K.p1, 0.0001f, -1.f, 1.f, "%.5f");
+        drag("p2", &K.p2, 0.0001f, -1.f, 1.f, "%.5f");
+        helpMarker(
+            "Drag to adjust. Hold Ctrl+click to type a value.\nUnlike Pinhole, the displayed image is never undistorted for "
+            "Mei -- the projection overlay and Camera RGB coloring apply this distortion to the raw image directly.");
+    }
+    else if (K.model == CameraModel::Fisheye)
+    {
+        // OpenCV cv::fisheye (see calib::projectPoint): k1..k4 act on the
+        // incidence angle, with no tangential terms and no k5/k6.
+        ImGui::Text("Radial (theta polynomial):");
+        drag("k1", &K.k1, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k2", &K.k2, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k3", &K.k3, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k4", &K.k4, 0.001f, -100.f, 100.f, "%.4f");
+        helpMarker(
+            "Drag to adjust. Hold Ctrl+click to type a value.\nUnlike Pinhole, the displayed image is never undistorted for "
+            "Fisheye -- the projection overlay and Camera RGB coloring apply this distortion to the raw image directly.");
+    }
+    else
+    {
+        ImGui::Text("Radial (rational model):");
+        drag("k1", &K.k1, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k2", &K.k2, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k3", &K.k3, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k4", &K.k4, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k5", &K.k5, 0.001f, -100.f, 100.f, "%.4f");
+        drag("k6", &K.k6, 0.001f, -100.f, 100.f, "%.4f");
+        ImGui::Text("Tangential:");
+        drag("p1", &K.p1, 0.0001f, -1.f, 1.f, "%.5f");
+        drag("p2", &K.p2, 0.0001f, -1.f, 1.f, "%.5f");
+        helpMarker("Drag to adjust. Hold Ctrl+click to type a value.");
+    }
     ImGui::PopItemWidth();
 
     if (edited && state.intrinsicsLoaded)

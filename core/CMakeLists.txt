@@ -116,8 +116,8 @@ function(add_core_target target_name with_gui)
     endif()
 endfunction()
 
-# core_no_gui is used by python bindings and lidar odometry test subprojects only - if they are not build just do not waste time building core_no_gui
-if(BUILD_TESTING OR BUILD_WITH_PYBIND)
+# core_no_gui is used by python bindings, lidar odometry test subprojects and session_to_mcap (console tools) only - if they are not build just do not waste time building core_no_gui
+if(BUILD_TESTING OR BUILD_WITH_PYBIND OR BUILD_WITH_CLI_TOOLS)
     add_core_target(core_no_gui FALSE)
 
     target_precompile_headers(core_no_gui

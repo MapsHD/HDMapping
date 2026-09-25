@@ -27,9 +27,7 @@ bool exportRos2Bag(const RosExportInput&, const RosExportOptions&, std::string& 
 #include <sensor_msgs/msg/point_field.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
 
-#include <opencv2/calib3d.hpp>
 #include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
 
 #include <CalibCore/PointCloud.h>
 
@@ -199,26 +197,27 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
         // ── camera images (+ camera_info) ─────────────────────────────────────
         if (opt.exportCamera && !in.imageFiles.empty())
         {
-            // Rectification maps (built lazily once the image size is known).
-            // Mirrors App.cpp: undistort to the same K so that a pinhole
-            // projection — which is all RViz uses — lines up with the image.
-            const cv::Mat Km = (cv::Mat_<double>(3, 3) << in.K.fx, 0, in.K.cx, 0, in.K.fy, in.K.cy, 0, 0, 1);
-            const cv::Mat Dm = (cv::Mat_<double>(1, 8) << in.K.k1, in.K.k2, in.K.p1, in.K.p2, in.K.k3, in.K.k4, in.K.k5, in.K.k6);
-            cv::Mat map1, map2;
-            bool mapsReady = false;
             int camW = 0, camH = 0;
-            const bool rectify = opt.undistortCamera && in.calibLoaded;
-            // Original jpeg bytes can be copied verbatim only when we neither
-            // rectify nor need to re-encode (compressed + no undistort).
-            const bool copyJpegBytes = opt.compressCamera && !rectify;
+            // Frames go out exactly as captured, and CameraInfo describes them
+            // with the real distortion. Rectifying here would only ever have
+            // worked for Pinhole -- Mei's k1/k2/k3/p1/p2 are its own polynomial
+            // applied after a unit-sphere step that OpenCV's
+            // initUndistortRectifyMap and a K/D pair cannot express -- so it
+            // was a per-model special case that also re-encoded every jpeg.
+            // Consumers that want rectified images can undistort from the
+            // published CameraInfo.
+            const bool mei = in.K.model == CameraModel::Mei;
+            const bool fisheye = in.K.model == CameraModel::Fisheye;
 
             for (const auto& [ts, path] : in.imageFiles)
             {
                 std::vector<uint8_t> outBytes; // jpeg, when compressed
                 cv::Mat outImg; // bgr8, when raw
 
-                if (copyJpegBytes)
+                if (opt.compressCamera)
                 {
+                    // Verbatim: imageFiles is jpeg-only (see imageTsFromName),
+                    // so this neither decodes nor re-encodes.
                     std::ifstream f(path, std::ios::binary);
                     if (!f)
                         continue;
@@ -231,29 +230,11 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
                     cv::Mat bgr = cv::imread(path, cv::IMREAD_COLOR);
                     if (bgr.empty())
                         continue;
-                    if (rectify)
-                    {
-                        if (!mapsReady)
-                        {
-                            cv::initUndistortRectifyMap(Km, Dm, cv::noArray(), Km, bgr.size(), CV_16SC2, map1, map2);
-                            mapsReady = true;
-                        }
-                        cv::Mat und;
-                        cv::remap(bgr, und, map1, map2, cv::INTER_LINEAR);
-                        bgr = und;
-                    }
                     camW = bgr.cols;
                     camH = bgr.rows;
-                    if (opt.compressCamera)
-                    {
-                        cv::imencode(".jpg", bgr, outBytes);
-                    }
-                    else
-                    {
-                        if (!bgr.isContinuous())
-                            bgr = bgr.clone();
-                        outImg = bgr;
-                    }
+                    if (!bgr.isContinuous())
+                        bgr = bgr.clone();
+                    outImg = bgr;
                 }
 
                 if (opt.compressCamera)
@@ -299,14 +280,43 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
                         ci.header.frame_id = in.cameraFrame;
                         ci.height = static_cast<uint32_t>(camH);
                         ci.width = static_cast<uint32_t>(camW);
-                        ci.distortion_model = "rational_polynomial";
-                        if (rectify) // image already rectified → no distortion
-                            ci.d = { 0, 0, 0, 0, 0, 0, 0, 0 };
+                        if (mei)
+                        {
+                            // No standard ROS model is a unified sphere, so
+                            // this reports the rig's own tag rather than
+                            // claiming plumb_bob/rational_polynomial, which a
+                            // consumer would undistort with badly wrong math.
+                            //
+                            // d is the yaml's (k1, k2, k3, p1, p2) order -- NOT
+                            // OpenCV's (k1, k2, p1, p2, k3) -- with xi appended,
+                            // since CameraInfo has nowhere else to put it and
+                            // the model is unusable without it. K/P stay
+                            // populated: fx/fy/cx/cy mean the usual thing, just
+                            // applied after the unit-sphere step.
+                            ci.distortion_model = "insta360_mei_v2";
+                            ci.d = { in.K.k1, in.K.k2, in.K.k3, in.K.p1, in.K.p2, in.K.xi };
+                            ci.k = { in.K.fx, 0.f, in.K.cx, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 1.f };
+                            ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
+                            ci.p = { in.K.fx, 0.f, in.K.cx, 0.f, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 0.f, 1.f, 0.f };
+                        }
+                        else if (fisheye)
+                        {
+                            // ROS's name for OpenCV's fisheye model, which
+                            // image_pipeline undistorts with cv::fisheye.
+                            ci.distortion_model = "equidistant";
+                            ci.d = { in.K.k1, in.K.k2, in.K.k3, in.K.k4 };
+                            ci.k = { in.K.fx, 0.f, in.K.cx, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 1.f };
+                            ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
+                            ci.p = { in.K.fx, 0.f, in.K.cx, 0.f, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 0.f, 1.f, 0.f };
+                        }
                         else
+                        {
+                            ci.distortion_model = "rational_polynomial";
                             ci.d = { in.K.k1, in.K.k2, in.K.p1, in.K.p2, in.K.k3, in.K.k4, in.K.k5, in.K.k6 };
-                        ci.k = { in.K.fx, 0.f, in.K.cx, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 1.f };
-                        ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
-                        ci.p = { in.K.fx, 0.f, in.K.cx, 0.f, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 0.f, 1.f, 0.f };
+                            ci.k = { in.K.fx, 0.f, in.K.cx, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 1.f };
+                            ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
+                            ci.p = { in.K.fx, 0.f, in.K.cx, 0.f, 0.f, in.K.fy, in.K.cy, 0.f, 0.f, 0.f, 1.f, 0.f };
+                        }
                         writer.write(ci, kTopicCamInfo, rclcpp::Time(ts));
                     }
                 }

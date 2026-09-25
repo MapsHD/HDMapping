@@ -22,6 +22,12 @@ uniform int drawDecim;     // draw only every Nth point; 1 = draw all
 uniform mat4 lidarToCam;   // extrinsics (for RGB mode)
 uniform vec4 K;            // fx, fy, cx, cy
 uniform vec2 imgSize;
+uniform int model;         // set by Renderer.cpp, not a CameraModel ordinal: 0 = Pinhole, 2 = Mei, 3 = Fisheye
+uniform float xi;          // CameraModel::Mei only
+uniform vec3 kRad1;        // k1 k2 k3, CameraModel::Mei and Fisheye only
+uniform vec3 kRad2;        // k4 in .x, CameraModel::Fisheye only
+uniform vec2 pTan;         // p1 p2, CameraModel::Mei only
+uniform float thetaMax;    // calib::fisheyeMaxTheta, CameraModel::Fisheye only
 out vec3 fragPos;
 out float fragIntensity;
 out vec2 fragUV;
@@ -37,12 +43,46 @@ void main() {
     gl_Position = mvp * vec4(vertexPosition, 1.0);
     gl_PointSize = pointSize;
 
-    // Project into the camera image for RGB sampling (rectified → pinhole)
     vec3 lidar = vec3(vertexPosition.x, -vertexPosition.z, vertexPosition.y);
     vec3 pc = (lidarToCam * vec4(lidar, 1.0)).xyz;
-    fragCamDepth = pc.z;
-    vec2 uv = (K.xy * (pc.xy / max(pc.z, 1e-6)) + K.zw) / imgSize;
-    fragUV = uv;
+
+    if (model == 2) {
+        // Mei -- unlike Pinhole (below), AppState::rebuildImageTexture never
+        // undistorts the displayed image for this model, so sampling it
+        // needs the actual Mei distortion applied here too. Mirrors
+        // calib::projectPoint's Mei branch (Camera.cpp) and kProjVS's own Mei
+        // branch below.
+        float n = length(pc);
+        vec3 Xs = pc / max(n, 1e-6);
+        float denom = Xs.z + xi;
+        // Validity domain, same rule as calib::projectPoint: the projection
+        // folds back past cos(theta) = -1/xi for xi > 1, and blows up past
+        // -xi otherwise. fragCamDepth only carries this sign (kPointFS tests
+        // fragCamDepth > 0.0), not a real depth.
+        fragCamDepth = Xs.z - ((xi > 1.0) ? -1.0 / xi : -xi);
+        vec2 xy = Xs.xy / denom;
+        float r2 = dot(xy, xy);
+        float radial = 1.0 + kRad1.x*r2 + kRad1.y*r2*r2 + kRad1.z*r2*r2*r2;
+        vec2 d = xy*radial + vec2(2.0*pTan.x*xy.x*xy.y + pTan.y*(r2 + 2.0*xy.x*xy.x),
+                                  pTan.x*(r2 + 2.0*xy.y*xy.y) + 2.0*pTan.y*xy.x*xy.y);
+        fragUV = (K.xy * d + K.zw) / imgSize;
+    } else if (model == 3) {
+        // Fisheye -- never undistorted either, so the same reasoning as Mei.
+        // Mirrors calib::projectPoint's Fisheye branch. fragCamDepth again
+        // only carries validity: > 0 short of the fold-back angle.
+        float r = length(pc.xy);
+        float theta = atan(r, pc.z);
+        float t2 = theta*theta;
+        float thetaD = theta * (1.0 + t2*(kRad1.x + t2*(kRad1.y + t2*(kRad1.z + t2*kRad2.x))));
+        fragCamDepth = (r > 0.0 || pc.z > 0.0) ? thetaMax - theta : -1.0;
+        vec2 d = (r > 0.0) ? pc.xy * (thetaD / r) : vec2(0.0);
+        fragUV = (K.xy * d + K.zw) / imgSize;
+    } else {
+        // Project into the camera image for RGB sampling (rectified → pinhole)
+        fragCamDepth = pc.z;
+        vec2 uv = (K.xy * (pc.xy / max(pc.z, 1e-6)) + K.zw) / imgSize;
+        fragUV = uv;
+    }
 }
 )";
 
@@ -82,9 +122,15 @@ void main() {
 )";
 
     // Projects lidar points directly onto the image plane. Position attribute is
-    // in raylib coords, converted back to lidar frame here. With w = z_cam the
-    // hardware clip rejects points behind the camera; optional rational+tangential
-    // distortion handles non-rectified images (pass zeros when rectified).
+    // in raylib coords, converted back to lidar frame here. Pinhole (model==0):
+    // rational+tangential distortion (zeros when rectified), w = z_cam so the
+    // hardware clip rejects points behind the camera. Mei (model==2): unified-
+    // sphere + polynomial distortion (mirrors calib::projectPoint), with w the
+    // distance inside the model's valid dome -- Xs.z + min(xi, 1/xi) -- so the
+    // hardware clip drops both the blow-up (xi <= 1) and the fold-back
+    // (xi > 1, where far-off-axis directions otherwise re-enter the image).
+    // Fisheye (model==3): OpenCV's equidistant theta polynomial, with w the
+    // angle left before calib::fisheyeMaxTheta -- the same clip trick.
     inline constexpr const char* kProjVS = R"(
 #version 330
 layout(location = 0) in vec3 vertexPosition;
@@ -93,8 +139,11 @@ uniform mat4 lidarToCam;   // extrinsics
 uniform vec4 K;            // fx, fy, cx, cy
 uniform vec2 imgSize;
 uniform vec3 kRad1;        // k1 k2 k3
-uniform vec3 kRad2;        // k4 k5 k6
+uniform vec3 kRad2;        // k4 k5 k6 for Pinhole (model==0), k4 in .x for Fisheye -- Mei has no rational denominator
 uniform vec2 pTan;         // p1 p2
+uniform int model;         // set by Renderer.cpp, not a CameraModel ordinal: 0 = Pinhole, 2 = Mei, 3 = Fisheye
+uniform float xi;          // CameraModel::Mei only
+uniform float thetaMax;    // calib::fisheyeMaxTheta, CameraModel::Fisheye only
 uniform float pointSize;
 uniform int drawDecim;     // draw only every Nth point; 1 = draw all
 out float fragDepth;
@@ -108,23 +157,50 @@ void main() {
     // raylib coords -> lidar: x = rx, y = -rz, z = ry
     vec3 lidar = vec3(vertexPosition.x, -vertexPosition.z, vertexPosition.y);
     vec3 pc = (lidarToCam * vec4(lidar, 1.0)).xyz;
-    fragDepth = pc.z;
     fragIntensity = vertexIntensity;
 
-    vec2 n = pc.xy / max(pc.z, 1e-6);
-    float r2 = dot(n, n);
-    float radial = (1.0 + kRad1.x*r2 + kRad1.y*r2*r2 + kRad1.z*r2*r2*r2)
-                 / (1.0 + kRad2.x*r2 + kRad2.y*r2*r2 + kRad2.z*r2*r2*r2);
-    vec2 d = n * radial
-           + vec2(2.0*pTan.x*n.x*n.y + pTan.y*(r2 + 2.0*n.x*n.x),
-                  pTan.x*(r2 + 2.0*n.y*n.y) + 2.0*pTan.y*n.x*n.y);
+    vec2 d;
+    float w;
+    if (model == 2) {
+        float n = length(pc);
+        fragDepth = n; // range -- physical distance, for depthRange/jet coloring
+        vec3 Xs = pc / max(n, 1e-6);
+        float denom = Xs.z + xi;
+        vec2 xy = Xs.xy / denom;
+        float r2 = dot(xy, xy);
+        float radial = 1.0 + kRad1.x*r2 + kRad1.y*r2*r2 + kRad1.z*r2*r2*r2;
+        d = xy*radial + vec2(2.0*pTan.x*xy.x*xy.y + pTan.y*(r2 + 2.0*xy.x*xy.x),
+                              pTan.x*(r2 + 2.0*xy.y*xy.y) + 2.0*pTan.y*xy.x*xy.y);
+        // >0 exactly inside the valid dome -- see the block comment above kProjVS
+        w = Xs.z - ((xi > 1.0) ? -1.0 / xi : -xi);
+    } else if (model == 3) {
+        fragDepth = length(pc); // range, like Mei
+        float r = length(pc.xy);
+        float theta = atan(r, pc.z);
+        float t2 = theta*theta;
+        float thetaD = theta * (1.0 + t2*(kRad1.x + t2*(kRad1.y + t2*(kRad1.z + t2*kRad2.x))));
+        d = (r > 0.0) ? pc.xy * (thetaD / r) : vec2(0.0);
+        // Straight behind (r == 0, z < 0) has no direction and is clipped,
+        // as calib::projectPoint rejects it.
+        w = (r > 0.0 || pc.z > 0.0) ? thetaMax - theta : -1.0;
+    } else {
+        fragDepth = pc.z;
+        vec2 n = pc.xy / max(pc.z, 1e-6);
+        float r2 = dot(n, n);
+        float radial = (1.0 + kRad1.x*r2 + kRad1.y*r2*r2 + kRad1.z*r2*r2*r2)
+                     / (1.0 + kRad2.x*r2 + kRad2.y*r2*r2 + kRad2.z*r2*r2*r2);
+        d = n * radial
+          + vec2(2.0*pTan.x*n.x*n.y + pTan.y*(r2 + 2.0*n.x*n.x),
+                 pTan.x*(r2 + 2.0*n.y*n.y) + 2.0*pTan.y*n.x*n.y);
+        w = pc.z;
+    }
     vec2 uv = K.xy * d + K.zw;                     // pixel coords
 
     // pixel -> clip space (y down, like raylib's render-texture ortho)
-    gl_Position = vec4((2.0*uv.x/imgSize.x - 1.0) * pc.z,
-                       -(2.0*uv.y/imgSize.y - 1.0) * pc.z,
+    gl_Position = vec4((2.0*uv.x/imgSize.x - 1.0) * w,
+                       -(2.0*uv.y/imgSize.y - 1.0) * w,
                        0.0,
-                       pc.z);
+                       w);
     gl_PointSize = pointSize;
 }
 )";

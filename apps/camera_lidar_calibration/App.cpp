@@ -16,6 +16,7 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
+#include <regex>
 #include <vector>
 
 // ── AppState::rebuildImageTexture ─────────────────────────────────────────────
@@ -27,7 +28,13 @@ void AppState::rebuildImageTexture()
     cv::Mat display = originalImage;
     imageRectified = false;
 
-    if (intrinsicsLoaded)
+    // initUndistortRectifyMap assumes OpenCV's rational pinhole model --
+    // running it for Mei would silently mis-warp the image rather than
+    // undistort it, and rectifying a fisheye onto a pinhole plane would crop
+    // away the wide field of view it exists for. Both are shown raw instead,
+    // with the projection overlay and GPU shaders applying their distortion
+    // directly to the raw image (see Renderer.cpp/RendererShaders.h).
+    if (intrinsicsLoaded && intrinsics.model == CameraModel::Pinhole)
     {
         cv::Mat K = (cv::Mat_<double>(3, 3) << intrinsics.fx, 0, intrinsics.cx, 0, intrinsics.fy, intrinsics.cy, 0, 0, 1);
         // OpenCV distCoeffs order: k1 k2 p1 p2 k3 k4 k5 k6 (rational model)
@@ -59,6 +66,30 @@ void AppState::rebuildImageTexture()
     rimg.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8;
     imageTexture = LoadTextureFromImage(rimg); // copies pixels to GPU
     imageLoaded = true;
+}
+
+// ── AppState::autoScaleIntrinsicsToImage ──────────────────────────────────────
+std::string AppState::autoScaleIntrinsicsToImage()
+{
+    if (!intrinsicsLoaded || intrinsicsW <= 0 || imageW <= 0)
+        return "";
+    if (intrinsicsW == imageW && intrinsicsH == imageH)
+        return "";
+
+    // calib::scaleIntrinsics takes a single factor, so the width ratio is it;
+    // sy exists only to detect and warn about a real aspect-ratio change.
+    float sx = static_cast<float>(imageW) / static_cast<float>(intrinsicsW);
+    float sy = static_cast<float>(imageH) / static_cast<float>(intrinsicsH);
+    intrinsics = calib::scaleIntrinsics(intrinsics, sx);
+    intrinsicsW = imageW;
+    intrinsicsH = imageH;
+
+    char buf[192];
+    std::snprintf(buf, sizeof(buf), "intrinsics auto-scaled %.4fx to match the %dx%d image", static_cast<double>(sx), imageW, imageH);
+    std::string note = buf;
+    if (std::fabs(sx - sy) > 0.01f * sx)
+        note += " (WARNING: aspect ratio differs from the calibration -- scaled by width only, results may be off)";
+    return note;
 }
 
 // ── AppState correspondence picking ───────────────────────────────────────────
@@ -139,10 +170,16 @@ bool AppState::solvePairs()
     }
 
     double rms = -1.0;
-    bool ok = calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation);
+    std::string solveErr;
+    // Pinhole's observation equations are a plain rectilinear projection, so
+    // Mei and Fisheye use solveExtrinsicsCeres instead. See
+    // CameraCalibrationSolver.h.
+    bool ok = (intrinsics.model == CameraModel::Mei || intrinsics.model == CameraModel::Fisheye)
+        ? calib::solveExtrinsicsCeres(corr, intrinsics, extrinsics, solveErr, &rms, lockTranslation)
+        : calib::solveExtrinsicsFromCorrespondences(corr, intrinsics, extrinsics, &rms, lockTranslation);
     if (!ok)
     {
-        statusMsg = "Solve failed (degenerate correspondences)";
+        statusMsg = !solveErr.empty() ? ("Solve failed: " + solveErr) : "Solve failed (degenerate correspondences)";
         return false;
     }
 
@@ -168,9 +205,14 @@ void AppState::loadImage(const char* path)
     imageW = originalImage.cols;
     imageH = originalImage.rows;
     imagePath = path;
+    // Intrinsics may already be loaded for a different resolution (e.g. a
+    // calibration taken at full res, then a downscaled image loaded here).
+    std::string scaleNote = autoScaleIntrinsicsToImage();
     rebuildImageTexture();
     renderer.init(imageW, imageH);
     statusMsg = imageRectified ? "Image loaded and rectified" : "Image loaded (raw)";
+    if (!scaleNote.empty())
+        statusMsg += "; " + scaleNote;
 }
 
 // ── AppState::loadCloud ───────────────────────────────────────────────────────
@@ -204,6 +246,8 @@ void AppState::loadCloud(const char* path)
     rebuildCloudPointsRaylib(*this);
     centerOrbitOnCloud(*this);
     statusMsg = "";
+    // load status sidecar
+    lidarId = GetLidarSerial(path);
 }
 
 void AppState::addCloud(const char* path)
@@ -242,7 +286,10 @@ void AppState::addCloud(const char* path)
 //   data:                  (block)
 //   - a
 //   - b
-// Distortion order is OpenCV distCoeffs: k1 k2 p1 p2 k3 [k4 k5 k6 ...]
+// Distortion order is OpenCV distCoeffs: k1 k2 p1 p2 k3 [k4 k5 k6 ...], or
+// k1 k2 k3 k4 when `distortion_model:` is equidistant/fisheye. Only that key
+// selects the fisheye model: four coefficients alone are also a valid pinhole
+// k1 k2 p1 p2.
 static void extractNumbers(const std::string& s, std::vector<double>& out)
 {
     const char* p = s.c_str();
@@ -273,6 +320,7 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
     }
 
     std::vector<double> camMat, dist;
+    std::string distortionModel; // lower-cased, quotes stripped
     std::vector<double>* active = nullptr; // section whose data we collect
     std::vector<double>* collecting = nullptr;
     bool inFlow = false;
@@ -309,6 +357,12 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
                     imgW = std::atoi(trimmed.c_str() + 12);
                 else if (trimmed.rfind("image_height:", 0) == 0)
                     imgH = std::atoi(trimmed.c_str() + 13);
+                else if (trimmed.rfind("distortion_model:", 0) == 0)
+                {
+                    for (char c : trimmed.substr(17))
+                        if (std::isalnum(static_cast<unsigned char>(c)) || c == '_')
+                            distortionModel += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                }
             }
             continue;
         }
@@ -346,6 +400,15 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
         err = "camera_matrix needs 9 values";
         return false;
     }
+    const bool fisheye = distortionModel == "equidistant" || distortionModel == "fisheye";
+    // Unlike the pinhole list, whose trailing terms may be left off, a
+    // fisheye has exactly four -- a missing one defaulting to 0 would
+    // reproject wrongly with nothing to show for it.
+    if (fisheye && dist.size() != 4)
+    {
+        err = "distortion_model " + distortionModel + " needs 4 distortion_coefficients (k1 k2 k3 k4), got " + std::to_string(dist.size());
+        return false;
+    }
 
     // Row-major 3x3: [fx 0 cx; 0 fy cy; 0 0 1]
     K.fx = static_cast<float>(camMat[0]);
@@ -353,6 +416,18 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
     K.fy = static_cast<float>(camMat[4]);
     K.cy = static_cast<float>(camMat[5]);
 
+    if (fisheye)
+    {
+        K.model = CameraModel::Fisheye;
+        K.k1 = static_cast<float>(dist[0]);
+        K.k2 = static_cast<float>(dist[1]);
+        K.k3 = static_cast<float>(dist[2]);
+        K.k4 = static_cast<float>(dist[3]);
+        K.k5 = K.k6 = K.p1 = K.p2 = 0.f;
+        return true;
+    }
+
+    K.model = CameraModel::Pinhole;
     auto d = [&](size_t i)
     {
         return i < dist.size() ? static_cast<float>(dist[i]) : 0.f;
@@ -368,6 +443,20 @@ static bool parseOpenCVYaml(const char* path, Intrinsics& K, int& imgW, int& img
     return true;
 }
 
+// The flat camera_info.yaml that insta360-to-images and insta360-test-calib
+// write has top-level fx:/fy:/cx:/cy: keys; an OpenCV/ROS YAML keeps them in
+// a camera_matrix: block instead. Peeked at as text so each goes to the
+// parser that understands it.
+static bool yamlIsFlatCameraInfo(const char* path)
+{
+    std::ifstream f(path);
+    std::string line;
+    while (std::getline(f, line))
+        if (line.rfind("fx:", 0) == 0)
+            return true;
+    return false;
+}
+
 // ── AppState::loadIntrinsics ──────────────────────────────────────────────────
 void AppState::loadIntrinsics(const char* path)
 {
@@ -376,6 +465,29 @@ void AppState::loadIntrinsics(const char* path)
     std::string ext = (dot != std::string::npos) ? p.substr(dot + 1) : "";
     for (auto& c : ext)
         c = static_cast<char>(tolower(c));
+
+    if ((ext == "yml" || ext == "yaml") && yamlIsFlatCameraInfo(path))
+    {
+        if (!calib::loadCameraInfoYaml(path, intrinsics))
+        {
+            statusMsg = std::string("camera_info.yaml failed to load (see console): ") + path;
+            return;
+        }
+        intrinsicsW = intrinsics.width;
+        intrinsicsH = intrinsics.height;
+        intrinsicsLoaded = true;
+        calib::loadCameraIdentity(path, cameraId);
+        std::string scaleNote = autoScaleIntrinsicsToImage();
+        rebuildImageTexture(); // rectifies a pinhole; Mei and Fisheye stay raw
+        statusMsg = std::string("Intrinsics loaded (") + modelToString(intrinsics.model) + ")";
+        if (imageRectified)
+            statusMsg += ", image rectified";
+        if (intrinsicsW > 0)
+            statusMsg += " (calibration " + std::to_string(intrinsicsW) + "x" + std::to_string(intrinsicsH) + ")";
+        if (!scaleNote.empty())
+            statusMsg += "; " + scaleNote;
+        return;
+    }
 
     if (ext == "yml" || ext == "yaml")
     {
@@ -386,17 +498,20 @@ void AppState::loadIntrinsics(const char* path)
             statusMsg = std::string("YAML error: ") + err + " (" + path + ")";
             return;
         }
+        intrinsics.xi = 0.f; // parseOpenCVYaml set the model: Pinhole or Fisheye
+        intrinsicsW = imgW;
+        intrinsicsH = imgH;
         intrinsicsLoaded = true;
-        rebuildImageTexture(); // re-rectify with the new coefficients
-        statusMsg = "Intrinsics loaded";
+        calib::loadCameraIdentity(path, cameraId);
+        std::string scaleNote = autoScaleIntrinsicsToImage();
+        rebuildImageTexture(); // re-rectify with the new (possibly auto-scaled) coefficients
+        statusMsg = intrinsics.model == CameraModel::Fisheye ? "Fisheye intrinsics loaded" : "Intrinsics loaded";
+        if (imgW > 0)
+            statusMsg += " (calibration " + std::to_string(imgW) + "x" + std::to_string(imgH) + ")";
+        if (!scaleNote.empty())
+            statusMsg += "; " + scaleNote;
         if (imageRectified)
             statusMsg += ", image rectified";
-        if (imgW > 0)
-        {
-            statusMsg += " (camera " + std::to_string(imgW) + "x" + std::to_string(imgH) + ")";
-            if (imageLoaded && (imgW != imageW || imgH != imageH))
-                statusMsg += " WARNING: image is " + std::to_string(imageW) + "x" + std::to_string(imageH);
-        }
         return;
     }
 
@@ -408,10 +523,12 @@ void AppState::loadIntrinsics(const char* path)
     }
     nlohmann::json j;
     f >> j;
+    intrinsics.model = modelFromString(j.value("model", std::string("pinhole")));
     intrinsics.fx = j.value("fx", intrinsics.fx);
     intrinsics.fy = j.value("fy", intrinsics.fy);
     intrinsics.cx = j.value("cx", intrinsics.cx);
     intrinsics.cy = j.value("cy", intrinsics.cy);
+    intrinsics.xi = j.value("xi", 0.f);
     intrinsics.k1 = j.value("k1", 0.f);
     intrinsics.k2 = j.value("k2", 0.f);
     intrinsics.k3 = j.value("k3", 0.f);
@@ -420,9 +537,21 @@ void AppState::loadIntrinsics(const char* path)
     intrinsics.k6 = j.value("k6", 0.f);
     intrinsics.p1 = j.value("p1", 0.f);
     intrinsics.p2 = j.value("p2", 0.f);
+    // No "width"/"height" in the file -- assume it matches whatever image is
+    // already loaded (this format historically had no resolution field at
+    // all, so anything already loaded is the best guess available).
+    intrinsicsW = j.value("width", imageLoaded ? imageW : 0);
+    intrinsicsH = j.value("height", imageLoaded ? imageH : 0);
     intrinsicsLoaded = true;
+    cameraId.serial = j.value("serial", "unknown");
+    cameraId.model = j.value("model", "unknown");
+    cameraId.firmware = j.value("firmware", "unknown");
+    cameraId.frameId = j.value("frameId", "unknown");
+    std::string scaleNote = autoScaleIntrinsicsToImage();
     rebuildImageTexture();
     statusMsg = "Intrinsics loaded.";
+    if (!scaleNote.empty())
+        statusMsg += " " + scaleNote;
 }
 
 // ── AppState::loadCalibration ─────────────────────────────────────────────────
@@ -446,13 +575,30 @@ void AppState::loadCalibration(const char* path)
 
     bool gotIntrinsics = false, gotExtrinsics = false;
 
+    // "camera" identifies the hardware the intrinsics were measured on, so it
+    // is replaced exactly when they are: a file carrying new intrinsics but no
+    // "camera" block clears the previous serial instead of leaving it attached
+    // to a different camera's numbers. A file with only a "camera" block still
+    // sets it, so an identity can be attached to extrinsics on their own.
+    if (j.contains("intrinsics") || j.contains("camera"))
+    {
+        cameraId = CameraIdentity{};
+        const nlohmann::json jc = j.value("camera", nlohmann::json::object());
+        cameraId.serial = jc.value("serial", std::string{});
+        cameraId.model = jc.value("model", std::string{});
+        cameraId.firmware = jc.value("firmware", std::string{});
+        cameraId.frameId = jc.value("frame_id", std::string{});
+    }
+
     if (j.contains("intrinsics"))
     {
         auto& ji = j["intrinsics"];
+        intrinsics.model = modelFromString(ji.value("model", std::string("pinhole")));
         intrinsics.fx = ji.value("fx", intrinsics.fx);
         intrinsics.fy = ji.value("fy", intrinsics.fy);
         intrinsics.cx = ji.value("cx", intrinsics.cx);
         intrinsics.cy = ji.value("cy", intrinsics.cy);
+        intrinsics.xi = ji.value("xi", 0.f);
         intrinsics.k1 = ji.value("k1", 0.f);
         intrinsics.k2 = ji.value("k2", 0.f);
         intrinsics.k3 = ji.value("k3", 0.f);
@@ -461,6 +607,8 @@ void AppState::loadCalibration(const char* path)
         intrinsics.k6 = ji.value("k6", 0.f);
         intrinsics.p1 = ji.value("p1", 0.f);
         intrinsics.p2 = ji.value("p2", 0.f);
+        intrinsicsW = ji.value("width", imageLoaded ? imageW : 0);
+        intrinsicsH = ji.value("height", imageLoaded ? imageH : 0);
         intrinsicsLoaded = true;
         gotIntrinsics = true;
     }
@@ -498,8 +646,12 @@ void AppState::loadCalibration(const char* path)
         return;
     }
 
+    std::string scaleNote;
     if (gotIntrinsics)
+    {
+        scaleNote = autoScaleIntrinsicsToImage();
         rebuildImageTexture();
+    }
 
     statusMsg = "Loaded";
     if (gotIntrinsics)
@@ -509,6 +661,10 @@ void AppState::loadCalibration(const char* path)
     if (gotExtrinsics)
         statusMsg += " extrinsics";
     statusMsg += std::string(" from ") + path;
+    if (!cameraId.serial.empty())
+        statusMsg += " (serial " + cameraId.serial + ")";
+    if (!scaleNote.empty())
+        statusMsg += "; " + scaleNote;
 }
 
 // ── AppState::saveCalibration ─────────────────────────────────────────────────
@@ -521,9 +677,34 @@ void AppState::saveCalibration(const char* path)
     Eigen::Vector3f ti = -(R.transpose() * C); // translation of T_lidar_to_camera
 
     nlohmann::json j;
-    j["intrinsics"] = { { "fx", intrinsics.fx }, { "fy", intrinsics.fy }, { "cx", intrinsics.cx }, { "cy", intrinsics.cy },
-                        { "k1", intrinsics.k1 }, { "k2", intrinsics.k2 }, { "k3", intrinsics.k3 }, { "k4", intrinsics.k4 },
-                        { "k5", intrinsics.k5 }, { "k6", intrinsics.k6 }, { "p1", intrinsics.p1 }, { "p2", intrinsics.p2 } };
+    // Which camera this calibration was measured on, when a tracked source
+    // named it. Omitted entirely when unknown, so an absent block and an empty
+    // one mean the same thing on the way back in.
+
+    j["lidar"]["serial"] = lidarId;
+    j["camera"]["model"] = cameraId.model;
+    j["camera"]["serial"] = cameraId.serial;
+    j["camera"]["frame_id"] = cameraId.frameId;
+
+    // width/height record the resolution these intrinsics are valid for (see
+    // App.h) so a later load against a different-size image can auto-scale
+    // rather than just warn. 0 means unknown.
+    j["intrinsics"] = { { "model", modelToString(intrinsics.model) },
+                        { "fx", intrinsics.fx },
+                        { "fy", intrinsics.fy },
+                        { "cx", intrinsics.cx },
+                        { "cy", intrinsics.cy },
+                        { "xi", intrinsics.xi },
+                        { "k1", intrinsics.k1 },
+                        { "k2", intrinsics.k2 },
+                        { "k3", intrinsics.k3 },
+                        { "k4", intrinsics.k4 },
+                        { "k5", intrinsics.k5 },
+                        { "k6", intrinsics.k6 },
+                        { "p1", intrinsics.p1 },
+                        { "p2", intrinsics.p2 },
+                        { "width", intrinsicsW },
+                        { "height", intrinsicsH } };
     // Rotation is stored as a matrix only -- convention-independent (no
     // Euler/Tait-Bryan angle order or units to document/misread) and
     // directly portable to any external tool. camera_rotation_matrix_in_world

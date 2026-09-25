@@ -9,14 +9,14 @@
 
 namespace trajectory_viewer_shaders
 {
-    // colorPacked: float bits = 0x00RRGGBB; colorMode: 0=jet depth, 1=RGB, 2=camera id, 3=in ROI
+    // colorPacked: float bits = 0x00RRGGBB; colorMode: 0=jet depth, 1=RGB, 2=camera id, 3=in ROI/mask
     inline constexpr const char* kVS = R"(
 #version 330
 layout(location = 0) in vec3  pos;
 layout(location = 1) in float colorPacked;
 layout(location = 2) in float lidarIntensity;
 layout(location = 3) in float colorCameraId;   // global image index that colored this point, or -1
-layout(location = 4) in float inRoi;           // 1=inside ROI, 0=outside ROI, -1=projects into no image
+layout(location = 4) in float inRoi;           // 1=kept by ROI+mask, 0=rejected by either, -1=projects into no image
 uniform mat4  mvp;
 uniform float pointSize;
 uniform int   drawDecim;
@@ -86,8 +86,9 @@ void main() {
     }
     else if (colorMode == 3)
     {
-        // ROI membership: green = inside ROI, red = projects into an image but
-        // outside ROI, dim gray = projects into no image (spatial context).
+        // ROI/mask membership: green = a pixel the ROI and the image mask both
+        // keep, red = projects into an image but is rejected by one of them,
+        // dim gray = projects into no image (spatial context).
         if (fragInRoi < 0.0)
             finalColor = vec4(0.28, 0.28, 0.28, 1.0);
         else

@@ -9,7 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Versioning settings
 set(HDMAPPING_VERSION_MAJOR 0)
-set(HDMAPPING_VERSION_MINOR 104)
+set(HDMAPPING_VERSION_MINOR 105)
 set(HDMAPPING_VERSION_PATCH 0)
 
 # Set up common paths
@@ -72,6 +72,13 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+# Bundled dylibs (e.g. freeglut) use an @rpath install name, and install(TARGETS)
+# strips the build-tree RPATH, so installed executables need an explicit one
+# pointing at <prefix>/lib or dyld fails with "no LC_RPATH's found".
+if(APPLE)
+    set(CMAKE_INSTALL_RPATH "@executable_path/../lib")
+endif()
+
 # TODO(mwlasiuk) : fix
 # if(WIN32)
 #     set(CMAKE_PDB_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -113,6 +120,7 @@ option(BUILD_TESTING "Build HDMapping unit tests" OFF)
 if(BUILD_TESTING)
     enable_testing()
     add_subdirectory(shared/tests)
+    add_subdirectory(calib_core/tests)
     add_subdirectory(apps/lidar_odometry_step_1/tests)
     add_subdirectory(rosbags/tests)
 endif()
@@ -138,13 +146,11 @@ add_subdirectory(apps/multi_session_registration)
 add_subdirectory(apps/multi_session_registration_legacy)
 
 if(BUILD_WITH_UTILITY_APPLICATION)
-    add_subdirectory(apps/manual_color)
     add_subdirectory(apps/split_multi_livox)
     add_subdirectory(apps/precision_forestry_tools)
     add_subdirectory(apps/compare_trajectories)
     add_subdirectory(apps/mandeye_mission_recorder_calibration)
     add_subdirectory(apps/livox_mid_360_intrinsic_calibration)
-    add_subdirectory(apps/single_session_manual_coloring)
     add_subdirectory(apps/concatenate_multi_livox)
     add_subdirectory(apps/camera_lidar_calibration)
     add_subdirectory(apps/camera_lidar_trajectory_viewer)

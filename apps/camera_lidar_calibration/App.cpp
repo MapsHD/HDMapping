@@ -29,10 +29,10 @@ void AppState::rebuildImageTexture()
     imageRectified = false;
 
     // initUndistortRectifyMap assumes OpenCV's rational pinhole model --
-    // running it for Mei (or Equirectangular) would silently mis-warp the
-    // image rather than undistort it. Those models are shown raw instead,
-    // with the projection overlay and GPU shaders applying their distortion
-    // directly to the raw image (see Renderer.cpp/RendererShaders.h).
+    // running it for Mei would silently mis-warp the image rather than
+    // undistort it. A Mei image is shown raw instead, with the projection
+    // overlay and GPU shaders applying its distortion directly to the raw
+    // image (see Renderer.cpp/RendererShaders.h).
     if (intrinsicsLoaded && intrinsics.model == CameraModel::Pinhole)
     {
         cv::Mat K = (cv::Mat_<double>(3, 3) << intrinsics.fx, 0, intrinsics.cx, 0, intrinsics.fy, intrinsics.cy, 0, 0, 1);

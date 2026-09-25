@@ -14,18 +14,6 @@ using namespace calib;
 
 namespace
 {
-    constexpr int kW = 3840; // the 360 rig's equirect frame size
-    constexpr int kH = 1920;
-
-    Intrinsics equirect()
-    {
-        Intrinsics K;
-        K.model = CameraModel::Equirectangular;
-        K.width = kW;
-        K.height = kH;
-        return K;
-    }
-
     // A representative Mei/unified-sphere fisheye, values in the shape
     // insta360_mei_v2 calibrations take rather than a real calibrated camera.
     Intrinsics mei()
@@ -60,162 +48,6 @@ namespace
         return r;
     }
 } // namespace
-
-// ── Equirectangular ───────────────────────────────────────────────────────────
-
-TEST_CASE("equirectangular: cardinal bearings land on the expected pixels")
-{
-    const Intrinsics K = equirect();
-
-    SUBCASE("forward is the image centre")
-    {
-        Px r = project(K, { 0, 0, 10 });
-        CHECK(r.u == doctest::Approx(kW * 0.5));
-        CHECK(r.v == doctest::Approx(kH * 0.5));
-        CHECK(r.depth == doctest::Approx(10.0));
-    }
-    SUBCASE("right is three quarters across")
-    {
-        Px r = project(K, { 5, 0, 0 });
-        CHECK(r.u == doctest::Approx(kW * 0.75));
-        CHECK(r.v == doctest::Approx(kH * 0.5));
-    }
-    SUBCASE("left is one quarter across")
-    {
-        Px r = project(K, { -5, 0, 0 });
-        CHECK(r.u == doctest::Approx(kW * 0.25));
-        CHECK(r.v == doctest::Approx(kH * 0.5));
-    }
-    SUBCASE("straight down is the bottom edge, inclusive")
-    {
-        Px r = project(K, { 0, 3, 0 });
-        CHECK(r.v == doctest::Approx(kH)); // documented inclusive upper bound
-    }
-    SUBCASE("straight up is the top edge")
-    {
-        Px r = project(K, { 0, -3, 0 });
-        // asinf(-1) isn't correctly rounded on every platform's libm (its
-        // derivative is infinite at the pole, so even a 1-ULP wobble there
-        // is expected); doctest::Approx's default epsilon is an absolute
-        // tolerance too tight for that when comparing against 0, so widen
-        // it rather than pin down a libm implementation detail.
-        CHECK(r.v == doctest::Approx(0.0).epsilon(1e-3));
-    }
-}
-
-TEST_CASE("equirectangular: depth is range, not z")
-{
-    const Intrinsics K = equirect();
-    Px r = project(K, { 3, 0, 4 });
-    CHECK(r.depth == doctest::Approx(5.0)); // a pinhole camera would report 4
-}
-
-TEST_CASE("equirectangular: points behind the camera still project")
-{
-    const Intrinsics K = equirect();
-
-    // Directly behind: atan2(0, -1) == +pi maps to u == width, which wraps to 0.
-    Px back = project(K, { 0, 0, -10 });
-    CHECK(back.u == doctest::Approx(0.0));
-    CHECK(back.v == doctest::Approx(kH * 0.5));
-
-    // The same point is rejected outright by the pinhole model.
-    Intrinsics P; // defaults to Pinhole
-    float u, v, depth;
-    CHECK_FALSE(projectPoint(0, 0, -10, P, kIdentity, kOrigin, u, v, depth));
-}
-
-TEST_CASE("equirectangular: u stays inside [0, width) either side of the seam")
-{
-    const Intrinsics K = equirect();
-
-    // Just past the seam on each side -- the wrap must not push u to width.
-    for (float dx : { -1e-3f, 1e-3f })
-    {
-        Px r = project(K, { dx, 0, -10 });
-        CHECK(r.u >= 0.f);
-        CHECK(r.u < static_cast<float>(kW));
-    }
-}
-
-TEST_CASE("equirectangular: poles produce no NaN")
-{
-    const Intrinsics K = equirect();
-
-    // asin's argument is y/|p|, which rounds to slightly outside [-1, 1] for a
-    // point exactly on the axis unless it is clamped.
-    for (float sign : { -1.f, 1.f })
-    {
-        Px r = project(K, { 0, sign * 7.f, 0 });
-        CHECK_FALSE(std::isnan(r.u));
-        CHECK_FALSE(std::isnan(r.v));
-    }
-}
-
-TEST_CASE("equirectangular: bearing -> pixel -> bearing round trip")
-{
-    const Intrinsics K = equirect();
-    const float pi = static_cast<float>(M_PI);
-
-    const Eigen::Vector3f bearings[] = {
-        Eigen::Vector3f(0.3f, -0.2f, 0.9f).normalized(),
-        Eigen::Vector3f(-0.7f, 0.5f, -0.4f).normalized(),
-        Eigen::Vector3f(0.1f, 0.95f, 0.05f).normalized(),
-        Eigen::Vector3f(-0.6f, -0.1f, -0.8f).normalized(),
-    };
-
-    for (const auto& b : bearings)
-    {
-        Px r = project(K, b * 12.f);
-
-        const float az = (r.u / kW - 0.5f) * 2.f * pi;
-        const float el = (r.v / kH - 0.5f) * pi;
-        Eigen::Vector3f back(std::cos(el) * std::sin(az), std::sin(el), std::cos(el) * std::cos(az));
-
-        CHECK(back.x() == doctest::Approx(b.x()).epsilon(1e-4));
-        CHECK(back.y() == doctest::Approx(b.y()).epsilon(1e-4));
-        CHECK(back.z() == doctest::Approx(b.z()).epsilon(1e-4));
-    }
-}
-
-TEST_CASE("equirectangular: respects the extrinsics")
-{
-    const Intrinsics K = equirect();
-
-    // om=fi=ka=0 is the nominal camera-vs-LiDAR alignment, so LiDAR forward
-    // (+X) should come out as camera forward, i.e. the image centre.
-    const Eigen::Matrix3f R_wc = kCameraLidarAxisOffset;
-
-    SUBCASE("LiDAR forward is the image centre")
-    {
-        Px r = project(K, { 10, 0, 0 }, R_wc);
-        CHECK(r.u == doctest::Approx(kW * 0.5));
-        CHECK(r.v == doctest::Approx(kH * 0.5));
-    }
-    SUBCASE("LiDAR left is one quarter across")
-    {
-        Px r = project(K, { 0, 10, 0 }, R_wc);
-        CHECK(r.u == doctest::Approx(kW * 0.25));
-    }
-    SUBCASE("LiDAR up is the top edge")
-    {
-        Px r = project(K, { 0, 0, 10 }, R_wc);
-        // See the identical-tolerance comment on the "straight up" case above.
-        CHECK(r.v == doctest::Approx(0.0).epsilon(1e-3));
-    }
-    SUBCASE("the camera position is subtracted")
-    {
-        // Point at the camera itself: too close to give a bearing.
-        const Eigen::Vector3f C(1.f, 2.f, 3.f);
-        float u, v, depth;
-        CHECK_FALSE(projectPoint(C.x(), C.y(), C.z(), K, R_wc, C, u, v, depth));
-
-        // One metre in front of the camera, not of the origin.
-        Px r = project(K, C + Eigen::Vector3f(1.f, 0.f, 0.f), R_wc, C);
-        CHECK(r.depth == doctest::Approx(1.0));
-        CHECK(r.u == doctest::Approx(kW * 0.5));
-    }
-}
 
 // ── Mei ─────────────────────────────────────────────────────────────────────
 
@@ -459,19 +291,6 @@ TEST_CASE("scaleIntrinsics: a half-size image projects to half the pixel")
         CHECK(half.u == doctest::Approx(full.u * 0.5));
         CHECK(half.v == doctest::Approx(full.v * 0.5));
     }
-    SUBCASE("equirectangular")
-    {
-        Intrinsics K = equirect();
-        Intrinsics H = scaleIntrinsics(K, 0.5f);
-        CHECK(H.model == CameraModel::Equirectangular);
-        CHECK(H.width == kW / 2);
-        CHECK(H.height == kH / 2);
-
-        Px full = project(K, { 3, -1, 4 });
-        Px half = project(H, { 3, -1, 4 });
-        CHECK(half.u == doctest::Approx(full.u * 0.5));
-        CHECK(half.v == doctest::Approx(full.v * 0.5));
-    }
     SUBCASE("distortion and model are carried over unchanged")
     {
         Intrinsics K;
@@ -488,6 +307,8 @@ TEST_CASE("scaleIntrinsics: a half-size image projects to half the pixel")
         CHECK(H.model == CameraModel::Mei);
         CHECK(H.fx == doctest::Approx(K.fx * 0.5));
         CHECK(H.cx == doctest::Approx(K.cx * 0.5));
+        CHECK(H.width == K.width / 2);
+        CHECK(H.height == K.height / 2);
         // xi and the k*/p* polynomial are dimensionless, carried over as-is.
         CHECK(H.xi == doctest::Approx(K.xi));
         CHECK(H.k1 == doctest::Approx(K.k1));

@@ -4,7 +4,7 @@ project(calib_core_tests)
 
 # Unit tests for calib_core's camera models and solvers. calib_core pulls in
 # no raylib/imgui/GL, so its projection math is testable without a GL context
-# -- the reason the equirectangular and Mei models live there, not in an app.
+# -- the reason the Mei model lives there, not in an app.
 # Uses doctest, like shared/tests. test_camera.cpp owns doctest's main()
 # (DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN); test_solver.cpp adds more TEST_CASEs
 # to the same registry.

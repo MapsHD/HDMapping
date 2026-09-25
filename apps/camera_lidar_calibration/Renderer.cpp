@@ -311,10 +311,9 @@ void Renderer::drawCameraFrustum(const Intrinsics& K, const Extrinsics& E, int i
     {
         // A rectangular pyramid built from fx/fy/cx/cy/imgW/imgH (below)
         // assumes a narrow rectilinear FOV, which misrepresents a Mei
-        // fisheye's much wider one (and Equirectangular's full sphere, were
-        // it ever wired into this app) -- draw a position marker + camera
+        // fisheye's much wider one -- draw a position marker + camera
         // forward/right/up axis triad instead, same fallback
-        // camera_lidar_trajectory_viewer uses for CameraModel::Equirectangular.
+        // camera_lidar_trajectory_viewer uses for CameraModel::Mei.
         auto toWorld = [&](const Eigen::Vector3f& axis_c) -> Vector3
         {
             Eigen::Vector3f pl = R * (axis_c * scale * 0.5f) + Eigen::Vector3f(E.tx, E.ty, E.tz);

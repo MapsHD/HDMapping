@@ -208,22 +208,14 @@ struct AppState
 {
     Trajectory traj;
     std::vector<int64_t> imageTsNs;
-    Intrinsics K; //!< K.model selects pinhole / equirectangular / Mei (see CalibCore/Camera.h)
-    //! How K.model was decided: the calibration file's "model" key wins when
-    //! present, else the "Load as equirectangular" tick decides between
-    //! Pinhole and Equirectangular. Kept as state rather than applied on the
-    //! spot because either input can change independently of the other, so
-    //! resolveCameraModel() recomputes K.model whenever one does.
-    CameraModel fileModel = CameraModel::Pinhole;
-    bool modelExplicit = false; //!< the calibration file named a model
-    bool loadAsEquirectangular = false; //!< UI tick: treat frames as a 360 panorama
+    Intrinsics K; //!< K.model selects pinhole / Mei (see CalibCore/Camera.h)
     Extrinsics E; //!< tx/ty/tz (camera position); rotation lives in R_wc below, not E.om/fi/ka
     Eigen::Matrix3f R_wc = Eigen::Matrix3f::Identity(); //!< camera orientation in world/LiDAR frame
     Roi roi;
     //! Free-form counterpart of `roi`: a per-pixel mask whose rejected pixels
-    //! are excluded from coloring. Needed to drop the operator/backpack a 360
-    //! rig has permanently in frame, which no rectangle can cut out without
-    //! taking the scene with it. Kept at the file's own resolution, strictly
+    //! are excluded from coloring. Needed to drop the operator/backpack a
+    //! fisheye rig has permanently in frame, which no rectangle can cut out
+    //! without taking the scene with it. Kept at the file's own resolution, strictly
     //! 0/255 (see loadMask), and resampled where used since images are read at
     //! s.imgScale. Coloring only -- the ROS 2 and COLMAP exports are not masked.
     cv::Mat mask; //!< empty = none loaded
@@ -461,16 +453,6 @@ static int64_t imageTimeOffsetNs(const AppState& s)
     return (int64_t)std::llround(s.timeOffsetSec * 1e9);
 }
 
-//! Settles K.model from the two inputs that can select it, in precedence
-//! order. Call after any of them changes; see AppState::fileModel for why.
-static void resolveCameraModel(AppState& s)
-{
-    if (s.modelExplicit)
-        s.K.model = s.fileModel;
-    else
-        s.K.model = s.loadAsEquirectangular ? CameraModel::Equirectangular : CameraModel::Pinhole;
-}
-
 //! Index every camera frame in the camera directory by timestamp. Also picks up
 //! the image dimensions -- read by the ROI default, the frustums and COLMAP's
 //! cameras.txt.
@@ -503,7 +485,6 @@ static void loadImages(AppState& s)
         }
     }
 
-    resolveCameraModel(s);
     s.K.width = s.imgW;
     s.K.height = s.imgH;
     s.status = "Images loaded: " + std::to_string(loaded) + " from " + camDir.string();
@@ -852,11 +833,6 @@ static void loadCloud(AppState& s)
                     float inRoiF = -1.f; // 1 inside ROI, 0 outside, -1 not in frustum
                     int globalIdx = -1;
                 };
-                // Equirectangular: a 360 camera has no frustum, so every point
-                // projects into every image. The temporal search therefore
-                // always succeeds at w == 0, leaving maxTemporalDist the only
-                // real gate, and the geometry strategy compares ranges across
-                // every image of the chunk -- correct, just not short-circuiting.
                 auto probe = [&](int idx) -> Hit
                 {
                     Hit h;
@@ -871,18 +847,10 @@ static void loadCloud(AppState& s)
                     // its depth is a range rather than a z, but 5 cm means the
                     // same thing physically, and projectPoint's Mei guard only
                     // rejects a point essentially AT the camera.
-                    // Equirectangular keeps its "no near clip" behaviour.
-                    if ((Ks.model == CameraModel::Pinhole || Ks.model == CameraModel::Mei) && depth <= 0.05f)
+                    if (depth <= 0.05f)
                         return h;
                     int iu = (int)std::round(u);
                     int iv = (int)std::round(v);
-                    if (Ks.model == CameraModel::Equirectangular)
-                    {
-                        // u is wrapped into [0, cols) but rounding can still
-                        // land on cols at the seam; v spans [0, rows] inclusive.
-                        iu = (iu % e.img.cols + e.img.cols) % e.img.cols;
-                        iv = std::clamp(iv, 0, e.img.rows - 1);
-                    }
                     if (iu < 0 || iu >= e.img.cols || iv < 0 || iv >= e.img.rows)
                         return h;
                     // point projects into this image — record ROI/mask membership
@@ -1119,9 +1087,7 @@ static cv::Mat renderIntensityProjection(const AppState& s, int64_t imgTsAdj)
                 if (dx * dx + dy * dy > radius * radius)
                     continue;
                 int xx = iu + dx;
-                if (Ks.model == CameraModel::Equirectangular)
-                    xx = (xx % out.cols + out.cols) % out.cols;
-                else if (xx < 0 || xx >= out.cols)
+                if (xx < 0 || xx >= out.cols)
                     continue;
                 float& zb = depthBuf.at<float>(yy, xx);
                 if (depth < zb)
@@ -1147,12 +1113,10 @@ static void loadCalib(AppState& s)
     f >> j;
     // "mei" (or the rig's "insta360_mei_v2"), anything else pinhole. Accepted
     // at the top level or inside "intrinsics". Assigned unconditionally, so
-    // loading a pinhole calibration after another model clears the flag
-    // rather than inheriting it.
+    // loading a pinhole calibration after a Mei one does not inherit Mei.
     {
         const bool topLevel = j.contains("model");
         const bool nested = j.contains("intrinsics") && j["intrinsics"].contains("model");
-        s.modelExplicit = topLevel || nested;
         std::string model;
         if (topLevel)
             model = j.value("model", std::string{});
@@ -1166,11 +1130,7 @@ static void loadCalib(AppState& s)
             {
                 return (char)std::tolower(c);
             });
-        if (model == "mei" || model == "insta360_mei_v2")
-            s.fileModel = CameraModel::Mei;
-        else
-            s.fileModel = CameraModel::Pinhole;
-        resolveCameraModel(s);
+        s.K.model = (model == "mei" || model == "insta360_mei_v2") ? CameraModel::Mei : CameraModel::Pinhole;
     }
     if (j.contains("intrinsics"))
     {
@@ -1251,8 +1211,8 @@ static void refreshMaskDerived(AppState& s)
     s.maskRejectFrac = total ? (float)(total - kept) / (float)total : 0.f;
 
     // The overlay only has to read correctly in a preview pane, so it is capped
-    // well below the frame size a 360 rig produces rather than uploading a
-    // 22 MP texture to show a hand-painted blob.
+    // well below the camera's frame size rather than uploading a full-resolution
+    // texture to show a hand-painted blob.
     cv::Mat m = s.mask;
     const int kMaxSide = 1024;
     const int longSide = std::max(m.cols, m.rows);
@@ -1673,11 +1633,10 @@ static void exportColmap(AppState& s)
     }
     if (s.K.model != CameraModel::Pinhole)
     {
-        // COLMAP's text model has no equirectangular camera type, and none of
-        // its fisheye types is the unified-sphere (Mei) model -- none carries
-        // an xi -- so the FULL_OPENCV line below would misdescribe the images.
-        s.status = s.K.model == CameraModel::Equirectangular ? "COLMAP: equirectangular camera model is not supported by COLMAP"
-                                                             : "COLMAP: Mei camera model is not supported by COLMAP";
+        // None of COLMAP's fisheye types is the unified-sphere (Mei) model --
+        // none carries an xi -- so the FULL_OPENCV line below would
+        // misdescribe the images.
+        s.status = "COLMAP: Mei camera model is not supported by COLMAP";
         return;
     }
 
@@ -1902,9 +1861,9 @@ static void drawScene(AppState& s)
 
             if (s.K.model != CameraModel::Pinhole)
             {
-                // Neither a 360 nor a fisheye camera has a frustum the
-                // fx/fy/cx/cy pyramid describes, so draw position and axes
-                // instead -- the usual X=red, Y=green, Z=blue.
+                // A fisheye camera has no frustum the fx/fy/cx/cy pyramid
+                // describes, so draw position and axes instead -- the usual
+                // X=red, Y=green, Z=blue.
                 DrawSphere(origin, fs * (hl ? 0.08f : 0.05f), fc);
                 const Color axisColors[3] = { RED, GREEN, BLUE };
                 for (int k = 0; k < 3; k++)
@@ -2463,13 +2422,6 @@ int main(int argc, char* argv[])
             ImGui::InputText("##sess", s.sessionBuf, sizeof(s.sessionBuf));
             ImGui::Text("CAMERA_0 directory (empty = auto):");
             ImGui::InputText("##cam", s.cameraBuf, sizeof(s.cameraBuf));
-            if (ImGui::Checkbox("Load as equirectangular (360)", &s.loadAsEquirectangular))
-                resolveCameraModel(s);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(
-                    "Treat CAMERA_0's frames as a 360 panorama rather than a\n"
-                    "normal camera image. Overridden by an explicit \"model\"\n"
-                    "key in the loaded calibration JSON.");
             if (ImGui::Button("Load session", ImVec2(-1, 0)))
                 loadSession(s);
             if (!s.imagesFilenamesInTime.empty())
@@ -2540,15 +2492,8 @@ int main(int argc, char* argv[])
                 loadCalib(s);
             if (s.calibLoaded)
             {
-                if (s.K.model == CameraModel::Equirectangular)
+                if (s.K.model == CameraModel::Mei)
                 {
-                    ImGui::Text("Model: equirectangular");
-                    ImGui::Text("%dx%d", s.imgW, s.imgH);
-                }
-                else if (s.K.model == CameraModel::Mei)
-                {
-                    // Mei is never inferred (see resolveCameraModel), so it is
-                    // always an explicit "model" key -- no tooltip needed.
                     ImGui::Text("Model: mei (xi=%.4f)", s.K.xi);
                     ImGui::Text("fx=%.0f fy=%.0f", s.K.fx, s.K.fy);
                     ImGui::Text("cx=%.0f cy=%.0f", s.K.cx, s.K.cy);
@@ -2564,7 +2509,7 @@ int main(int argc, char* argv[])
                 ImGui::PushItemWidth(-140.f);
                 // Bounds every image the colorizer holds in memory: a whole
                 // chunk's worth is resident at once when multi-image coloring
-                // is on, which 360 frames make expensive.
+                // is on, which full-resolution frames make expensive.
                 ImGui::SliderFloat("Image scale", &s.imgScale, 0.125f, 1.0f, "%.3f");
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip(
@@ -2820,9 +2765,7 @@ int main(int argc, char* argv[])
                 exportColmap(s);
             ImGui::EndDisabled();
             if (colmapUnsupported && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip(
-                    s.K.model == CameraModel::Equirectangular ? "COLMAP has no equirectangular camera model."
-                                                              : "COLMAP has no unified-sphere (Mei) camera model.");
+                ImGui::SetTooltip("COLMAP has no unified-sphere (Mei) camera model.");
             ImGui::TextDisabled("Writes sparse/{cameras,images,points3D}.txt");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(

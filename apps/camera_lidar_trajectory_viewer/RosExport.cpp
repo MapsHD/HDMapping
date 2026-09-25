@@ -200,13 +200,12 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
             int camW = 0, camH = 0;
             // Frames go out exactly as captured, and CameraInfo describes them
             // with the real distortion. Rectifying here would only ever have
-            // worked for Pinhole -- OpenCV's initUndistortRectifyMap has
-            // nothing to say about a 360 panorama, and Mei's k1/k2/k3/p1/p2 are
-            // its own polynomial applied after a unit-sphere step that a K/D
-            // pair cannot express -- so it was a per-model special case that
-            // also re-encoded every jpeg. Consumers that want rectified images
-            // can undistort from the published CameraInfo.
-            const bool equirect = in.K.model == CameraModel::Equirectangular;
+            // worked for Pinhole -- Mei's k1/k2/k3/p1/p2 are its own polynomial
+            // applied after a unit-sphere step that OpenCV's
+            // initUndistortRectifyMap and a K/D pair cannot express -- so it
+            // was a per-model special case that also re-encoded every jpeg.
+            // Consumers that want rectified images can undistort from the
+            // published CameraInfo.
             const bool mei = in.K.model == CameraModel::Mei;
 
             for (const auto& [ts, path] : in.imageFiles)
@@ -280,19 +279,7 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
                         ci.header.frame_id = in.cameraFrame;
                         ci.height = static_cast<uint32_t>(camH);
                         ci.width = static_cast<uint32_t>(camW);
-                        if (equirect)
-                        {
-                            // No ROS distortion model describes a 360 panorama
-                            // and there is no K to report -- width/height are
-                            // the whole projection. Zeroed rather than
-                            // publishing a pinhole that would mislead consumers.
-                            ci.distortion_model = "equirectangular";
-                            ci.d = {};
-                            ci.k = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-                            ci.r = { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
-                            ci.p = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-                        }
-                        else if (mei)
+                        if (mei)
                         {
                             // No standard ROS model is a unified sphere, so
                             // this reports the rig's own tag rather than

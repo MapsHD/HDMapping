@@ -479,9 +479,6 @@ void UI::panelIntrinsics(AppState& state)
 
     ImGui::PushItemWidth(-80.f);
 
-    // Equirectangular isn't wired into this app yet (see CameraModel's own
-    // comment in Camera.h) -- offering it here would silently mis-project,
-    // so the combo only offers the two models this app actually supports.
     static const char* kModelNames[] = { "Pinhole", "Mei" };
     int modelIdx = (K.model == CameraModel::Mei) ? 1 : 0;
     if (ImGui::Combo("Model", &modelIdx, kModelNames, IM_ARRAYSIZE(kModelNames)))

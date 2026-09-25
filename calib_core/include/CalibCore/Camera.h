@@ -10,14 +10,9 @@ namespace calib
 
     //! Which projection @ref projectPoint applies. Selected by a "model" key
     //! in the calibration JSON; absent, it is Pinhole.
-    //! @note apps/camera_lidar_calibration supports Pinhole and Mei only -- it
-    //!       has no Equirectangular solver, and its GLSL projection
-    //!       (RendererShaders.h) and Renderer::drawCameraFrustum assume a
-    //!       frustum a 360 panorama doesn't have.
     enum class CameraModel
     {
         Pinhole, // fx/fy/cx/cy + the rational distortion coefficients below
-        Equirectangular, // 360 panorama; width/height are the intrinsics, k*/p* unused
         Mei // Insta 360
     };
 
@@ -38,9 +33,8 @@ namespace calib
         //! Unified-sphere mirror parameter, CameraModel::Mei only.
         //! @see loadMeiIntrinsics
         float xi = 0.f;
-        //! Read only by CameraModel::Equirectangular, where they play the role
-        //! fx/fy/cx/cy play for a pinhole camera and so *must* be set before
-        //! @ref projectPoint is called.
+        //! Image size in pixels. Not read by @ref projectPoint; set by
+        //! @ref loadMeiIntrinsics and scaled by @ref scaleIntrinsics.
         int width = 0, height = 0;
     };
 
@@ -60,7 +54,7 @@ namespace calib
 
     //! Name of a camera model, as written to the calibration JSON's "model" key.
     //! @param m model to name
-    //! @return one of "pinhole", "equirectangular", "mei"
+    //! @return one of "pinhole", "mei"
     const char* modelToString(CameraModel m);
 
     //! Camera model named by a calibration JSON's "model" key.
@@ -199,16 +193,12 @@ namespace calib
     //! @param t camera position in world
     //! @param u,v receive the image pixel
     //! @param depth receives the camera-frame z for Pinhole, range from the
-    //!        camera for Equirectangular and Mei
+    //!        camera for Mei
     //! @return false when the point does not project: behind the camera for
-    //!         Pinhole, at the camera itself for Equirectangular, and either
-    //!         of those or past the fold-back angle (where the projection
-    //!         stops being injective) for Mei
-    //! @note Equirectangular wraps u into [0, width); v spans [0, height]
-    //!       *inclusive*, the south pole landing exactly on height.
-    //! @note The caller owns rounding to integer pixels (which can land on
-    //!       width at the equirectangular seam), bounds checking and any ROI
-    //!       test.
+    //!         Pinhole, and at the camera itself or past the fold-back angle
+    //!         (where the projection stops being injective) for Mei
+    //! @note The caller owns rounding to integer pixels, bounds checking and
+    //!       any ROI test.
     bool projectPoint(
         float px,
         float py,

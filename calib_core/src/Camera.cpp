@@ -135,8 +135,6 @@ const char* modelToString(CameraModel m)
     {
     case CameraModel::Pinhole:
         return "pinhole";
-    case CameraModel::Equirectangular:
-        return "equirectangular";
     case CameraModel::Mei:
         return "mei";
     }
@@ -145,8 +143,6 @@ const char* modelToString(CameraModel m)
 
 CameraModel modelFromString(const std::string& s)
 {
-    if (s == "equirectangular")
-        return CameraModel::Equirectangular;
     if (s == "mei")
         return CameraModel::Mei;
     return CameraModel::Pinhole;
@@ -241,25 +237,6 @@ bool projectPoint(float px, float py, float pz,
                   float& u, float& v, float& depth) {
     // p_cam = R_wc^T * (p_lidar - C)
     Eigen::Vector3f pc = R_wc.transpose() * (Eigen::Vector3f(px, py, pz) - t);
-
-    if (K.model == CameraModel::Equirectangular) {
-        // Longitude from atan2(x, z) across the width, latitude from
-        // asin(y/|p|) across the height -- camera X = right, Y = down,
-        // Z = forward (kCameraLidarAxisOffset's convention), so v grows
-        // downward like image rows. Same model apps/manual_color colors with.
-        depth = pc.norm();
-        if (depth < 1e-4f) return false;  // point sits on the camera itself
-
-        const float pi = static_cast<float>(M_PI);
-        const float w = static_cast<float>(K.width);
-        const float h = static_cast<float>(K.height);
-
-        u = w * (0.5f + std::atan2(pc.x(), pc.z()) / (2.f*pi));
-        // atan2 returns exactly +pi on the seam, which maps to u == w
-        u = std::fmod(u + w, w);
-        v = h * (0.5f + std::asin(std::clamp(pc.y() / depth, -1.f, 1.f)) / pi);
-        return true;
-    }
 
     if (K.model == CameraModel::Mei) {
         depth = pc.norm();

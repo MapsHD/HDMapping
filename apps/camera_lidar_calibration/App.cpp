@@ -583,10 +583,11 @@ void AppState::loadCalibration(const char* path)
     if (j.contains("intrinsics") || j.contains("camera"))
     {
         cameraId = CameraIdentity{};
-        cameraId.serial = j.value("serial", std::string{});
-        cameraId.model = j.value("model", std::string{});
-        cameraId.firmware = j.value("firmware", std::string{});
-        cameraId.frameId = j.value("frame_id", std::string{});
+        const nlohmann::json jc = j.value("camera", nlohmann::json::object());
+        cameraId.serial = jc.value("serial", std::string{});
+        cameraId.model = jc.value("model", std::string{});
+        cameraId.firmware = jc.value("firmware", std::string{});
+        cameraId.frameId = jc.value("frame_id", std::string{});
     }
 
     if (j.contains("intrinsics"))

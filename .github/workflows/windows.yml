@@ -7,6 +7,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  release:
+    types: [ published ]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -18,6 +20,8 @@ jobs:
     # You can convert this to a matrix build if you need cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
 
@@ -51,9 +55,14 @@ jobs:
         shell: cmd
         run: deploy_mandeye.bat "${{github.workspace}}\deploy\mandeye"
 
-      - name: Upload mandeye ZIP as artifact
+      - name: Upload mandeye folder as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mandeye-zip-windows
-          path: ${{github.workspace}}/deploy/*.zip
+          name: mandeye-windows
+          path: ${{github.workspace}}/deploy/mandeye/
 
+      - name: Attach to GitHub release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{github.workspace}}/deploy/*.zip

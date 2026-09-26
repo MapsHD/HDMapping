@@ -7,6 +7,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  release:
+    types: [ published ]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -18,6 +20,8 @@ jobs:
     # You can convert this to a matrix build if you need cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
 
     steps:
     - name: Load repository cache
@@ -55,3 +59,9 @@ jobs:
       with:
         name: hd_mapping-deb
         path: ${{github.workspace}}/build/*.deb
+
+    - name: Attach to GitHub release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ${{github.workspace}}/build/*.deb

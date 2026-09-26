@@ -5,6 +5,8 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  release:
+    types: [published]
 
 env:
   BUILD_TYPE: Release
@@ -12,6 +14,8 @@ env:
 jobs:
   build:
     runs-on: macos-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -68,3 +72,9 @@ jobs:
           path: ${{github.workspace}}/build/HDMapping.dmg
           retention-days: 90
           compression-level: 0
+
+      - name: Attach to GitHub release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{github.workspace}}/build/HDMapping.dmg

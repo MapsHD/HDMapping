@@ -28,6 +28,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
+
+      - name: Set version
+        shell: bash
+        run: echo "VERSION=$(git describe --tags --always)" >> "$GITHUB_ENV"
 
       - name: Install CMake 4.0 on Windows
         run: |
@@ -58,7 +63,7 @@ jobs:
       - name: Upload mandeye folder as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mandeye-windows
+          name: mandeye-windows-${{env.VERSION}}
           path: ${{github.workspace}}/deploy/mandeye/
 
       - name: Attach to GitHub release

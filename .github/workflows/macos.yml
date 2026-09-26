@@ -21,6 +21,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
+
+      - name: Set version
+        run: echo "VERSION=$(git describe --tags --always)" >> "$GITHUB_ENV"
 
       - name: Install dependencies via Homebrew
         run: |
@@ -64,12 +68,13 @@ jobs:
           chmod +x ${{github.workspace}}/macos_bundle_toolkit/create_dir_bundle_dmg.sh
           cd ${{github.workspace}}
           ./macos_bundle_toolkit/create_dir_bundle_dmg.sh
+          mv build/HDMapping.dmg "build/HDMapping-${VERSION}.dmg"
 
       - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hdmapping-macos-dmg
-          path: ${{github.workspace}}/build/HDMapping.dmg
+          name: hdmapping-macos-dmg-${{env.VERSION}}
+          path: ${{github.workspace}}/build/HDMapping-${{env.VERSION}}.dmg
           retention-days: 90
           compression-level: 0
 
@@ -77,4 +82,4 @@ jobs:
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{github.workspace}}/build/HDMapping.dmg
+          files: ${{github.workspace}}/build/HDMapping-${{env.VERSION}}.dmg

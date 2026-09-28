@@ -2295,6 +2295,30 @@ bool process_worker_step_update_rgd_after(
         {
             std::scoped_lock lock(params.mutex_buckets_indoor, params.mutex_buckets_outdoor);
 
+            static Eigen::Affine3d last_m = worker_data.intermediate_trajectory.back();
+
+            Eigen::Affine3d current_m = worker_data.intermediate_trajectory.back();
+
+            double translation_change = (current_m.translation() - last_m.translation()).norm();
+
+            //std::cout << "translation_change: " << translation_change << std::endl;
+            if (translation_change < params.in_out_params_indoor.resolution_X * 0.5)
+            {
+                //std::cout << "skipping update_rgd_hierarchy due to small translation change" << std::endl;
+                return true;
+            }
+
+            Eigen::Affine3d m_rot = worker_data.intermediate_trajectory[0].inverse() * worker_data.intermediate_trajectory.back();
+            
+            TaitBryanPose pose = pose_tait_bryan_from_affine_matrix(m_rot);
+            //std::cout << "m_rot: " << pose.om * 180.0 / M_PI << ", " << pose.fi * 180.0 / M_PI << ", " << pose.ka * 180.0 / M_PI
+            //          << std::endl;
+
+            if (fabs(pose.om * 180.0 / M_PI) > 5.0 || fabs(pose.fi * 180.0 / M_PI) > 5.0 || fabs(pose.ka * 180.0 / M_PI) > 5.0){
+                //std::cout << "skipping update_rgd_hierarchy due to large rotation change" << std::endl;
+                return true;    
+            }
+
             update_rgd_hierarchy(
                 params.in_out_params_indoor,
                 params.buckets_indoor,
@@ -2303,6 +2327,8 @@ bool process_worker_step_update_rgd_after(
                 params.in_out_params_outdoor,
                 params.buckets_outdoor,
                 lookup_stats);
+
+            last_m = worker_data.intermediate_trajectory.back();
         }
         else
         {

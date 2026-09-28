@@ -1104,13 +1104,13 @@ void loadFiles(std::vector<std::string> input_file_names)
 
         // VQF initialization
         double avg_dt = SAMPLE_PERIOD;
-        if (imu_data.size() >= 2)
+        /*if (imu_data.size() >= 2)
         {
             double t0 = std::get<0>(imu_data.front()).first;
             double t1 = std::get<0>(imu_data.back()).first;
             if (t1 > t0)
                 avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
-        }
+        }*/
 
         VQFParams vqf_params;
         vqf_params.tauAcc = vqf_tauAcc > 0.0 ? vqf_tauAcc : 3.0;

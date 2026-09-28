@@ -356,7 +356,19 @@ struct ColorPt
     float intensity;
     int64_t ts_ns;
     bool validColor; //!< RGB sampled from an image; false = intensity-gray fallback
+    int16_t depthCm; //!< LiDAR range as GpuPoint::depthCm holds it; -1 = unknown
 };
+
+//! kVS's Min/Max range cull on the CPU, so exports drop the points the view hides.
+//! @param depthCm GpuPoint/ColorPt depth; < 0 (unknown) always passes
+//! @param maxRange <= 0 = no upper limit
+static bool passesRangeFilter(int16_t depthCm, float minRange, float maxRange)
+{
+    if (depthCm < 0)
+        return true;
+    const float range = float(depthCm) * 0.01f;
+    return !(range < minRange || (maxRange > 0.f && range > maxRange));
+}
 
 // ── Application state ─────────────────────────────────────────────────────────
 struct AppState
@@ -1155,7 +1167,8 @@ static void loadCloud(AppState& s)
                   (uint8_t)(packed & 0xFF),
                   rawIntensity,
                   pt.ts_ns,
-                  camIdF >= 0.f });
+                  camIdF >= 0.f,
+                  depthCm });
 
             float d2 = pw.squaredNorm();
             if (d2 > mx * mx)
@@ -1524,14 +1537,15 @@ static void clearMask(AppState& s)
 
 static void exportLAZ(AppState& s)
 {
+    // Same Min/Max range as the view, so the file holds what is on screen.
     auto keep = [&](const ColorPt& p)
     {
-        return !s.exportOnlyValidColor || p.validColor;
+        return (!s.exportOnlyValidColor || p.validColor) && passesRangeFilter(p.depthCm, s.minRange, s.maxRange);
     };
     const size_t nOut = std::count_if(s.exportCloud.begin(), s.exportCloud.end(), keep);
     if (nOut == 0)
     {
-        s.status = s.exportCloud.empty() ? "No cloud to export" : "No points with valid color to export";
+        s.status = s.exportCloud.empty() ? "No cloud to export" : "No points left after the color and range filters";
         return;
     }
 
@@ -1615,6 +1629,8 @@ static void exportLAZ(AppState& s)
     laszip_close_writer(writer);
     laszip_destroy(writer);
     s.status = "Exported " + std::to_string(nOut) + " pts → " + s.exportBuf;
+    if (nOut < s.exportCloud.size())
+        s.status += "  (" + std::to_string(s.exportCloud.size() - nOut) + " filtered out)";
 }
 
 //! E57 counterpart of exportLAZ(): one Data3D block, points already in world
@@ -3031,6 +3047,8 @@ int main(int argc, char* argv[])
             ImGui::Checkbox("LAZ: only points with valid color", &s.exportOnlyValidColor);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Skip points that got no RGB from an image (no image / out of frustum / outside ROI or mask)");
+            if (s.minRange > 0.f || s.maxRange > 0.f)
+                ImGui::TextDisabled("LAZ: Min/Max range from the View menu applies");
             if (ImGui::Button("Export colored LAZ", ImVec2(-1, 0)))
                 actionExportColoredLAZ(s);
             if (ImGui::Button("Export colored E57", ImVec2(-1, 0)))

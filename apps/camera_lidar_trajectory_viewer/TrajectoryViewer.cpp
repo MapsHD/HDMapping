@@ -66,6 +66,7 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "", "I", "Isometric view" },
     { "", "Z", "Reset camera" },
     { "", "O", "Toggle orthographic/perspective" },
+    { "", "Shift+F", "Toggle flyover" },
     { "Special keys", "Left arrow", "Previous image (image preview)" },
     { "", "Right arrow", "Next image (image preview)" },
     { "Mouse related", "Left click + drag", "Orbit camera" },
@@ -1717,6 +1718,17 @@ static void exportE57Session(AppState& s)
         s.status = std::string("Export failed: ") + err;
 }
 
+//! Opens the flyover bar and plays from the start, or closes it -- shared by the
+//! View menu item and Shift+F. Opening is a no-op without a trajectory.
+static void toggleFlyover(AppState& s)
+{
+    if (!s.flyover && s.traj.empty())
+        return;
+    s.flyover = !s.flyover;
+    s.flyoverProgress = 0.f;
+    s.flyoverPlaying = s.flyover;
+}
+
 // ── File actions ─────────────────────────────────────────────────────────────
 //! Factored out so the File menu items and their keyboard shortcuts (in the
 //! main loop below) call the exact same code, matching the openSession()-style
@@ -2405,6 +2417,8 @@ int main(int argc, char* argv[])
 
             if (shiftDown && IsKeyPressed(KEY_R))
                 s.showCenterOfRotationWindow = true;
+            if (shiftDown && !ctrlDown && IsKeyPressed(KEY_F))
+                toggleFlyover(s);
             // Ctrl+Right-click: ground-plane (Z=0) pick.
             if (!imguiWants && ctrlDown && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
             {
@@ -2650,11 +2664,8 @@ int main(int argc, char* argv[])
                 if (ImGui::MenuItem("Center of rotation...", "Shift+R"))
                     s.showCenterOfRotationWindow = true;
                 ImGui::Separator();
-                if (ImGui::MenuItem("Flyover", nullptr, &s.flyover, !s.traj.empty()))
-                {
-                    s.flyoverProgress = 0.f;
-                    s.flyoverPlaying = s.flyover;
-                }
+                if (ImGui::MenuItem("Flyover", "Shift+F", s.flyover, !s.traj.empty()))
+                    toggleFlyover(s);
                 ImGui::Separator();
 
                 ImGui::SetNextItemWidth(140.f);

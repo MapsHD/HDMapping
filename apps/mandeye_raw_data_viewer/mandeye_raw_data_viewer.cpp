@@ -1115,7 +1115,7 @@ void loadFiles(std::vector<std::string> input_file_names)
 
             if (duration > 24 * 60 * 60)
             {
-                spdlog::error("Session is absrudly long : start time : {}, end time {}", t0, t1);
+                spdlog::error("Session is absurdly long : start time : {}, end time {}", t0, t1);
                 spdlog::error("Setting rate to {}", SAMPLE_PERIOD);
                 avg_dt = SAMPLE_PERIOD;
             }

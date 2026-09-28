@@ -38,8 +38,6 @@
 // https://github.com/JanuszBedkowski/mandeye_controller The output is a session proving trajekctory and point clouds that can be  further
 // processed by "multi_view_tls_registration" program.
 
-// #define SAMPLE_PERIOD (1.0 / 200.0)
-
 std::string winTitle = std::string("Step 1 (Lidar odometry) ") + HDMAPPING_VERSION_STRING;
 
 std::vector<std::string> infoLines = {

@@ -46,7 +46,6 @@ std::vector<std::string> infoLines = { "This program is optional step in MANDEYE
 // App specific shortcuts (using empty dummy until needed)
 std::vector<ShortcutEntry> appShortcuts(80, { "", "", "" });
 
-#define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
 ImVec4 pc_color = ImVec4(1.0f, 0.0f, 0.0f, 1.00f);

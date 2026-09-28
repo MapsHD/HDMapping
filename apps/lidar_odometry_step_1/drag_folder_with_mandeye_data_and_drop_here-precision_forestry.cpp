@@ -39,8 +39,6 @@
 // https://github.com/JanuszBedkowski/mandeye_controller The output is a session proving trajekctory and point clouds that can be  further
 // processed by "multi_view_tls_registration" program.
 
-// #define SAMPLE_PERIOD (1.0 / 200.0)
-
 std::string winTitle = std::string("drag_folder_with_mandeye_data_and_drop_here-precision_forestry ") + HDMAPPING_VERSION_STRING;
 
 std::vector<std::string> infoLines = {

@@ -126,7 +126,6 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "Ctrl + right click", "" },
                                                          { "", "Ctrl + middle click", "" } };
 
-#define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
 ImVec4 pc_neigbouring_color = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);

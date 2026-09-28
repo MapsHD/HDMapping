@@ -1104,16 +1104,31 @@ void loadFiles(std::vector<std::string> input_file_names)
 
         // VQF initialization
         double avg_dt = SAMPLE_PERIOD;
-        /*if (imu_data.size() >= 2)
+        if (imu_data.size() >= 2)
         {
-            double t0 = std::get<0>(imu_data.front()).first;
-            double t1 = std::get<0>(imu_data.back()).first;
+            const double t0 = std::get<0>(imu_data.front()).first;
+            const double t1 = std::get<0>(imu_data.back()).first;
+            const double duration = t1 - t0;
+
             if (t1 > t0)
-                avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
-        }*/
+                avg_dt = duration / static_cast<double>(imu_data.size() - 1);
+
+            if (duration > 24 * 60 * 60)
+            {
+                spdlog::error("Session is absrudly long : start time : {}, end time {}", t0, t1);
+                spdlog::error("Setting rate to {}", SAMPLE_PERIOD);
+                avg_dt = SAMPLE_PERIOD;
+            }
+        }
 
         VQFParams vqf_params;
         vqf_params.tauAcc = vqf_tauAcc > 0.0 ? vqf_tauAcc : 3.0;
+        // produce warning
+        if (std::fabs(avg_dt - SAMPLE_PERIOD) > 0.01)
+        {
+            spdlog::warn("The dt found is strange : {}", avg_dt);
+        }
+        spdlog::info("avg_dt: {}", avg_dt);
         VQF vqf(vqf_params, avg_dt);
 
         std::map<double, std::pair<Eigen::Matrix4d, double>> trajectory;

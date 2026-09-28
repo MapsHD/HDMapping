@@ -2208,7 +2208,8 @@ int main(int argc, char* argv[])
 {
     CliArgs args = parseArgs(argc, argv);
     static const char* kDesc = "View LIO trajectory, colorize and export point clouds";
-    const std::vector<std::string> usage = { cliopt::MJS, cliopt::CAMERA_DIR, cliopt::CALIB };
+    static const char* kMaskOpt = "  --mask <image>               image mask for coloring: white keeps, black drops";
+    const std::vector<std::string> usage = { cliopt::MJS, cliopt::CAMERA_DIR, cliopt::CALIB, kMaskOpt };
     if (args.help)
     {
         printUsage("TrajectoryViewer", kDesc, usage);
@@ -2250,6 +2251,9 @@ int main(int argc, char* argv[])
             }
     if (!calib.empty())
         strncpy(s.calibBuf, calib.c_str(), sizeof(s.calibBuf) - 1);
+
+    if (args.has("mask"))
+        strncpy(s.maskBuf, args.get("mask").c_str(), sizeof(s.maskBuf) - 1);
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(1400, 900, ("Trajectory Viewer " HDMAPPING_VERSION_STRING));
@@ -2314,7 +2318,10 @@ int main(int argc, char* argv[])
             }
         });
 
-    // auto-load if args given
+    // auto-load if args given; the mask first, since it needs neither of the
+    // others and would otherwise overwrite their status line
+    if (s.maskBuf[0])
+        loadMask(s);
     if (s.sessionBuf[0])
         loadSession(s);
     if (s.calibBuf[0])

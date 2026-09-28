@@ -69,6 +69,7 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "", "Shift+F", "Toggle flyover" },
     { "Special keys", "Left arrow", "Previous image (image preview)" },
     { "", "Right arrow", "Next image (image preview)" },
+    { "", "Space", "Play/pause flyover" },
     { "Mouse related", "Left click + drag", "Orbit camera" },
     { "", "Right click + drag", "Pan camera" },
     { "", "Scroll", "Zoom camera" },
@@ -1729,6 +1730,15 @@ static void toggleFlyover(AppState& s)
     s.flyoverPlaying = s.flyover;
 }
 
+//! Plays or pauses the flyover, replaying from the start once it has reached the
+//! end -- shared by the bar's Play/Pause button and Space.
+static void toggleFlyoverPlaying(AppState& s)
+{
+    if (!s.flyoverPlaying && s.flyoverProgress >= 1.f)
+        s.flyoverProgress = 0.f;
+    s.flyoverPlaying = !s.flyoverPlaying;
+}
+
 // ── File actions ─────────────────────────────────────────────────────────────
 //! Factored out so the File menu items and their keyboard shortcuts (in the
 //! main loop below) call the exact same code, matching the openSession()-style
@@ -2419,6 +2429,8 @@ int main(int argc, char* argv[])
                 s.showCenterOfRotationWindow = true;
             if (shiftDown && !ctrlDown && IsKeyPressed(KEY_F))
                 toggleFlyover(s);
+            if (s.flyover && IsKeyPressed(KEY_SPACE))
+                toggleFlyoverPlaying(s);
             // Ctrl+Right-click: ground-plane (Z=0) pick.
             if (!imguiWants && ctrlDown && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
             {
@@ -3143,11 +3155,9 @@ int main(int argc, char* argv[])
                     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
 
             if (ImGui::Button(s.flyoverPlaying ? "Pause" : "Play", ImVec2(60.f, 0.f)))
-            {
-                if (!s.flyoverPlaying && s.flyoverProgress >= 1.f)
-                    s.flyoverProgress = 0.f; // replay from the start
-                s.flyoverPlaying = !s.flyoverPlaying;
-            }
+                toggleFlyoverPlaying(s);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Space");
             ImGui::SameLine();
             ImGui::Text("%7.1f / %.1f s", s.flyoverProgress * durationSec, durationSec);
             ImGui::SameLine();

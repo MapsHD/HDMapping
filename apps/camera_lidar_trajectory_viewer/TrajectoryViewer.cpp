@@ -257,28 +257,92 @@ static void flyoverTimeline(const char* id, float& progress, double durationSec,
 using trajectory_viewer_shaders::kFS;
 using trajectory_viewer_shaders::kVS;
 
+//! One point as kVS reads it.
+struct GpuPoint
+{
+    float x, y, z; //!< chunk-local position (location 0)
+    float colorPacked; //!< float bits = 0x00RRGGBB (location 1)
+    uint16_t intensity; //!< 0-1 scaled to 0-65535 (location 2)
+    int16_t depthCm; //!< distance from the LiDAR when captured, cm; -1 = unknown (location 4)
+    int32_t cameraId; //!< image that colored it; -1 = projects into no image, -2 = rejected by ROI/mask (location 3)
+};
+static_assert(sizeof(GpuPoint) == 24, "kVS expects a tightly packed 24-byte vertex");
+
+//! The loaded cloud on the GPU: one part per LIO chunk, in chunk-local
+//! coordinates, placed in the world by the chunk's pose at draw time.
 struct GpuCloud
 {
-    std::vector<raylib_widgets::PointBufferPart> parts;
-    size_t count = 0;
-    float maxDist = 50.f;
+    struct Chunk
+    {
+        raylib_widgets::PointBufferPart part;
+        Matrix pose; //!< chunk-local -> world
+    };
+    std::vector<Chunk> chunks;
+    size_t count = 0; //!< points over all chunks
 
-    void upload(const std::vector<float>& data, float mx)
+    //! Uploads one chunk as a new part, after the ones already loaded.
+    //! @param pts the chunk's points; empty is a no-op
+    //! @param pose chunk-local -> world
+    //! @param name chunk name, for the warning
+    //! @note Warns on stderr above kMaxVerticesPerPart, which chunks aren't expected to reach.
+    void addChunk(const std::vector<GpuPoint>& pts, const Eigen::Affine3f& pose, const std::string& name)
     {
-        unload();
-        if (data.empty())
+        if (pts.empty())
             return;
-        maxDist = mx;
-        count = data.size() / 7;
-        parts = raylib_widgets::uploadPointBufferParts(data.data(), count, { 3, 1, 1, 1, 1 });
+        if (pts.size() > raylib_widgets::kMaxVerticesPerPart)
+            std::fprintf(
+                stderr,
+                "Warning: %s has %zu points, more than %zu per GPU buffer\n",
+                name.c_str(),
+                pts.size(),
+                raylib_widgets::kMaxVerticesPerPart);
+
+        Chunk c;
+        c.part.count = (int)pts.size();
+        c.part.vao = rlLoadVertexArray();
+        rlEnableVertexArray(c.part.vao);
+        c.part.vbo = rlLoadVertexBuffer(pts.data(), c.part.count * (int)sizeof(GpuPoint), false);
+        constexpr int stride = sizeof(GpuPoint);
+        rlSetVertexAttribute(0, 3, RL_FLOAT, false, stride, offsetof(GpuPoint, x));
+        rlSetVertexAttribute(1, 1, RL_FLOAT, false, stride, offsetof(GpuPoint, colorPacked));
+        // rlSetVertexAttribute always converts to float; kVS reads these as uint/int.
+        glVertexAttribIPointer(2, 1, GL_UNSIGNED_SHORT, stride, (const void*)offsetof(GpuPoint, intensity));
+        glVertexAttribIPointer(3, 1, GL_INT, stride, (const void*)offsetof(GpuPoint, cameraId));
+        glVertexAttribIPointer(4, 1, GL_SHORT, stride, (const void*)offsetof(GpuPoint, depthCm));
+        for (unsigned int loc = 0; loc <= 4; ++loc)
+            rlEnableVertexAttribute(loc);
+        rlDisableVertexArray();
+
+        // Matrix's fields are declared row by row, so this lists pose row by row.
+        const Eigen::Matrix4f& m = pose.matrix();
+        c.pose = { m(0, 0), m(0, 1), m(0, 2), m(0, 3), m(1, 0), m(1, 1), m(1, 2), m(1, 3),
+                   m(2, 0), m(2, 1), m(2, 2), m(2, 3), m(3, 0), m(3, 1), m(3, 2), m(3, 3) };
+        chunks.push_back(c);
+        count += pts.size();
     }
-    void draw() const
+    //! Draws every chunk through its own pose; the caller binds the shader and sets
+    //! every uniform but the MVP.
+    //! @param view world -> camera (rlGetMatrixModelview())
+    //! @param projection rlGetMatrixProjection()
+    //! @param locMVP location of the shader's mvp uniform
+    void draw(const Matrix& view, const Matrix& projection, int locMVP) const
     {
-        raylib_widgets::drawPointBufferParts(parts);
+        for (const Chunk& c : chunks)
+        {
+            rlSetUniformMatrix(locMVP, MatrixMultiply(MatrixMultiply(c.pose, view), projection));
+            rlEnableVertexArray(c.part.vao);
+            glDrawArrays(GL_POINTS, 0, c.part.count);
+        }
+        rlDisableVertexArray();
     }
     void unload()
     {
-        raylib_widgets::unloadPointBufferParts(parts);
+        for (const Chunk& c : chunks)
+        {
+            rlUnloadVertexArray(c.part.vao);
+            rlUnloadVertexBuffer(c.part.vbo);
+        }
+        chunks.clear();
         count = 0;
     }
 };
@@ -335,7 +399,7 @@ struct AppState
     GpuCloud cloud;
     Shader shader = {};
     bool shaderOk = false;
-    int locMVP = -1, locPS = -1, locCM = -1, locDecim = -1, locSel = -1;
+    int locMVP = -1, locPS = -1, locCM = -1, locDecim = -1, locSel = -1, locMinRange = -1, locMaxRange = -1, locDepthMax = -1;
 
     //! Driven in Euler mode (rotateX/rotateY/translate/rotationCenter/isOrtho),
     //! not azimuth/elevation/distance/target, through rlgl rather than raylib's
@@ -357,6 +421,8 @@ struct AppState
     float pointSize = 1.f;
     int cloudDecim = 1;
     int drawDecim = 1;
+    float minRange = 0.f; //!< m: hide points the LiDAR saw closer than this
+    float maxRange = 0.f; //!< m: hide points the LiDAR saw farther than this; 0 = no limit
     bool multiImgColoring = true; //!< false = single image per chunk (midpoint)
     //! How each point is matched to a camera image:
     //!   0 = temporal  — image nearest in time (± maxWiggle frames, within maxTemporalDist)
@@ -385,7 +451,8 @@ struct AppState
     int angFilteredImgs = 0; //!< images skipped by the filter in the last colorize pass
 
     bool useImageColor = false; //!< true once a colorize pass produced RGB data
-    int colorMode = 0; //!< 0=intensity (jet), 1=RGB by image, 2=camera id
+    int colorMode = 0; //!< 0=intensity (jet), 1=RGB by image, 2=camera id, 3=in ROI/mask, 4=local depth (jet)
+    float depthColorMax = 50.f; //!< m: local depth mode maps 0..this onto the jet colormap
     int coloredPts = 0; //!< points that received RGB from an image
     int uncoloredPts = 0; //!< points left as intensity-gray (no image / out of frustum / outside ROI)
 
@@ -776,7 +843,6 @@ static void loadCloud(AppState& s)
     // time(s) -> T_world_lidar, for interpolating the pose at each image time.
     std::map<double, Eigen::Matrix4d> trajMap = buildTrajMap(s.traj);
 
-    std::vector<float> gpuData;
     float mx = 0.f;
     float sumX = 0, sumY = 0, sumZ = 0;
     int cnt = 0;
@@ -893,6 +959,8 @@ static void loadCloud(AppState& s)
         int nImgs = (int)chunkImgs.size();
 
         const size_t segBegin = s.exportCloud.size();
+        std::vector<GpuPoint> gpuPoints; // this chunk's points, uploaded as its own part below
+        gpuPoints.reserve((pc.points.size() + step - 1) / step);
 
         // ── step 4: colorize each point ─────────────────────────────────────
         // chunkImgs is sorted by ts (imageTsNs was sorted)
@@ -904,10 +972,6 @@ static void loadCloud(AppState& s)
             Eigen::Vector3f pw(pt.x, pt.y, pt.z);
             if (M)
                 pw = *M * pw;
-
-            gpuData.push_back(pw.x());
-            gpuData.push_back(pw.y());
-            gpuData.push_back(pw.z());
 
             const float rawIntensity = pt.intensity;
             float colorF = packGray(rawIntensity);
@@ -1062,10 +1126,19 @@ static void loadCloud(AppState& s)
             else
                 ++uncoloredPts;
 
-            gpuData.push_back(colorF);
-            gpuData.push_back(rawIntensity);
-            gpuData.push_back(camIdF);
-            gpuData.push_back(inRoiF);
+            float rangeM = -1.f; // distance from the LiDAR when the point was captured; -1 = unknown
+            if (pt.ts_ns != 0)
+            {
+                if (const auto pose = s.traj.nearest(pt.ts_ns))
+                    rangeM = (pw - pose->get().T.translation()).norm();
+            }
+            const uint16_t intensityU16 = (uint16_t)std::lround(std::clamp(rawIntensity, 0.f, 1.f) * 65535.f);
+            // int16 cm tops out at 327.67 m
+            const int16_t depthCm = rangeM < 0.f ? int16_t(-1) : (int16_t)std::min(32767L, std::lround(rangeM * 100.f));
+            // -2 keeps kVS's "rejected by ROI/mask" state, which camIdF alone can't tell from "no image"
+            const int32_t cameraId = camIdF >= 0.f ? (int32_t)camIdF : (inRoiF == 0.f ? -2 : -1);
+            // chunk-local position: the GPU applies M per chunk (GpuCloud::draw)
+            gpuPoints.push_back({ pt.x, pt.y, pt.z, colorF, intensityU16, depthCm, cameraId });
 
             uint32_t packed;
             std::memcpy(&packed, &colorF, 4);
@@ -1093,6 +1166,7 @@ static void loadCloud(AppState& s)
         // exportCloud + its MRP correction pose).
         if (s.exportCloud.size() > segBegin)
             s.exportSegments.push_back({ key, M ? *M : Eigen::Affine3f::Identity(), segBegin, s.exportCloud.size() - segBegin });
+        s.cloud.addChunk(gpuPoints, M ? *M : Eigen::Affine3f::Identity(), key);
 
         // chunkImgs and their cv::Mat memory are released here
     }
@@ -1105,8 +1179,6 @@ static void loadCloud(AppState& s)
 
     if (cnt > 0)
     {
-        s.cloud.upload(gpuData, mx);
-
         // Frame the loaded cloud, instant rather than eased -- this runs once on
         // load, with nothing to transition from. Set on both euler and eulerGoal
         // so no stale transition target survives from a previous session.
@@ -2030,15 +2102,16 @@ static void drawScene(AppState& s)
     if (s.cloud.count > 0 && s.shaderOk)
     {
         rlDrawRenderBatchActive();
-        Matrix mvp = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
         rlEnableShader(s.shader.id);
-        rlSetUniformMatrix(s.locMVP, mvp);
         rlSetUniform(s.locPS, &s.pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
         rlSetUniform(s.locCM, &s.colorMode, RL_SHADER_UNIFORM_INT, 1);
         rlSetUniform(s.locDecim, &s.drawDecim, RL_SHADER_UNIFORM_INT, 1);
+        rlSetUniform(s.locMinRange, &s.minRange, RL_SHADER_UNIFORM_FLOAT, 1);
+        rlSetUniform(s.locMaxRange, &s.maxRange, RL_SHADER_UNIFORM_FLOAT, 1);
+        rlSetUniform(s.locDepthMax, &s.depthColorMax, RL_SHADER_UNIFORM_FLOAT, 1);
         int sel = (s.isolateCamera && s.imgViewIdx >= 0 && s.imgViewIdx < (int)s.imageTsNs.size()) ? s.imgViewIdx : -1;
         rlSetUniform(s.locSel, &sel, RL_SHADER_UNIFORM_INT, 1);
-        s.cloud.draw();
+        s.cloud.draw(rlGetMatrixModelview(), rlGetMatrixProjection(), s.locMVP);
         rlDisableShader();
     }
 }
@@ -2111,6 +2184,9 @@ int main(int argc, char* argv[])
         s.locCM = rlGetLocationUniform(s.shader.id, "colorMode");
         s.locDecim = rlGetLocationUniform(s.shader.id, "drawDecim");
         s.locSel = rlGetLocationUniform(s.shader.id, "selectedCamera");
+        s.locMinRange = rlGetLocationUniform(s.shader.id, "minRange");
+        s.locMaxRange = rlGetLocationUniform(s.shader.id, "maxRange");
+        s.locDepthMax = rlGetLocationUniform(s.shader.id, "depthColorMax");
     }
     glEnable(GL_PROGRAM_POINT_SIZE);
 
@@ -2517,12 +2593,29 @@ int main(int argc, char* argv[])
                 ImGui::SliderFloat("Point size", &s.pointSize, 1.f, 20.f, "%.1f");
                 ImGui::SetNextItemWidth(140.f);
                 ImGui::SliderInt("Draw decimation", &s.drawDecim, 1, 64);
+                ImGui::SetNextItemWidth(140.f);
+                ImGui::DragFloat("Min range", &s.minRange, 0.1f, 0.f, 327.f, "%.2f m");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Hide points closer than this to the LiDAR when they were captured");
+                ImGui::SetNextItemWidth(140.f);
+                ImGui::DragFloat("Max range", &s.maxRange, 0.5f, 0.f, 327.f, "%.1f m");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Hide points farther than this from the LiDAR when they were captured; 0 = no limit");
+                ImGui::Separator();
+                ImGui::TextDisabled("Point color:");
+                if (ImGui::MenuItem("Intensity", nullptr, s.colorMode == 0))
+                    s.colorMode = 0;
+                if (ImGui::MenuItem("Local depth", nullptr, s.colorMode == 4))
+                    s.colorMode = 4;
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Distance from the LiDAR when the point was captured; gray = unknown");
+                if (s.colorMode == 4)
+                {
+                    ImGui::SetNextItemWidth(140.f);
+                    ImGui::DragFloat("Depth color max", &s.depthColorMax, 0.5f, 1.f, 327.f, "%.1f m");
+                }
                 if (!s.imagesFilenamesInTime.empty())
                 {
-                    ImGui::Separator();
-                    ImGui::TextDisabled("Point color:");
-                    if (ImGui::MenuItem("Intensity", nullptr, s.colorMode == 0))
-                        s.colorMode = 0;
                     if (ImGui::MenuItem("RGB (image)", "Ctrl", s.colorMode == 1))
                         s.colorMode = 1;
                     if (ImGui::MenuItem("Camera ID", nullptr, s.colorMode == 2))

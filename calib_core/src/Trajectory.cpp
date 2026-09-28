@@ -44,14 +44,23 @@ void Trajectory::sort() {
               [](const TrajPose& a, const TrajPose& b){ return a.ts_ns < b.ts_ns; });
 }
 
-const TrajPose* Trajectory::nearest(int64_t ts_ns) const {
-    if (poses.empty()) return nullptr;
+std::optional<std::reference_wrapper<const TrajPose>> Trajectory::nearest(int64_t ts_ns) const {
+    if (poses.empty()) return std::nullopt;
     auto it = std::lower_bound(poses.begin(), poses.end(), ts_ns,
         [](const TrajPose& p, int64_t t){ return p.ts_ns < t; });
-    if (it == poses.end())   return &poses.back();
-    if (it == poses.begin()) return &poses.front();
+    if (it == poses.end())   return std::cref(poses.back());
+    if (it == poses.begin()) return std::cref(poses.front());
     auto prev = std::prev(it);
-    return (std::abs(it->ts_ns - ts_ns) < std::abs(prev->ts_ns - ts_ns)) ? &*it : &*prev;
+    return (std::abs(it->ts_ns - ts_ns) < std::abs(prev->ts_ns - ts_ns)) ? std::cref(*it) : std::cref(*prev);
+}
+
+std::optional<std::reference_wrapper<const TrajPose>> Trajectory::nearest(float f) const
+{
+    if (poses.empty()) return std::nullopt;
+    const int64_t t0 = poses.front().ts_ns;
+    const int64_t t1 = poses.back().ts_ns;
+    const int64_t t = t0 + static_cast<int64_t>(static_cast<double>(t1 - t0) * f);
+    return nearest(t);
 }
 
 }  // namespace calib

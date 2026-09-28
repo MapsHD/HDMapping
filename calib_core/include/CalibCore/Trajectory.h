@@ -3,6 +3,8 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <optional>
+#include <functional>
 
 namespace calib {
 
@@ -33,10 +35,19 @@ struct Trajectory {
     //! Pose closest in time to `ts_ns`.
     //! @param ts_ns timestamp to look up, nanoseconds
     //! @return the nearest pose, clamped to the first or last one when `ts_ns`
-    //!         falls outside the trajectory, or nullptr when it is empty
+    //!         falls outside the trajectory, or nullopt when it is empty
     //! @warning Assumes @ref poses is sorted by timestamp -- it binary-searches.
     //!          Call @ref sort first, or the result is arbitrary.
-    const TrajPose* nearest(int64_t ts_ns) const;
+    [[nodiscard]] std::optional<std::reference_wrapper<const TrajPose>> nearest(int64_t ts_ns) const;
+
+    //! Pose at fractional position `f` along the trajectory's time span.
+    //! @param f 0 = @ref poses front (earliest), 1 = back (latest); not
+    //!        clamped -- values outside [0,1] extrapolate past the ends and
+    //!        get clamped by @ref nearest(int64_t) to the first/last pose.
+    //! @return nullopt when it is empty; see @ref nearest(int64_t) otherwise.
+    //! @warning Same ordering requirement as @ref nearest(int64_t).
+    [[nodiscard]] std::optional<std::reference_wrapper<const TrajPose>> nearest(float f) const;
+
 
     //! True when no poses have been loaded.
     bool empty() const { return poses.empty(); }

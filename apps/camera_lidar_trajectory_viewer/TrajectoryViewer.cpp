@@ -165,6 +165,95 @@ static float angularSpeedDegAt(const Trajectory& traj, const std::vector<float>&
     return perPose[idx];
 }
 
+//! Time span of the trajectory in seconds; 0 with fewer than two poses.
+static double trajectoryDurationSec(const Trajectory& traj)
+{
+    if (traj.poses.size() < 2)
+        return 0.0;
+    return double(traj.poses.back().ts_ns - traj.poses.front().ts_ns) * 1e-9;
+}
+
+//! Smallest "round" tick step (s) that keeps ticks at least `minPx` apart.
+static double timelineTickStep(double durationSec, float widthPx, float minPx)
+{
+    static const double kSteps[] = { 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600 };
+    const double pxPerSec = widthPx / durationSec;
+    for (double step : kSteps)
+        if (step * pxPerSec >= minPx)
+            return step;
+    double step = kSteps[std::size(kSteps) - 1];
+    while (step * pxPerSec < minPx)
+        step *= 2.0;
+    return step;
+}
+
+//! Tick label: "m:ss" from a minute on, else seconds with a decimal only when
+//! the tick step needs one.
+static std::string formatTickLabel(double sec, double step)
+{
+    char buf[32];
+    if (sec >= 60.0)
+        std::snprintf(buf, sizeof(buf), "%d:%02d", int(sec + 1e-6) / 60, int(sec + 1e-6) % 60);
+    else if (step < 1.0)
+        std::snprintf(buf, sizeof(buf), "%.1fs", sec);
+    else
+        std::snprintf(buf, sizeof(buf), "%.0fs", sec);
+    return buf;
+}
+
+//! Timeline across the available width, with time ticks and a playhead.
+//! Click or drag on it to scrub.
+//! @param id ImGui id of the scrub area
+//! @param progress 0-1 playhead position; written while the user drags
+//! @param durationSec time the full width spans, for the tick labels
+//! @param height total height, including the tick label row
+static void flyoverTimeline(const char* id, float& progress, double durationSec, float height)
+{
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 p0 = ImGui::GetCursorScreenPos();
+    const float w = std::max(1.f, ImGui::GetContentRegionAvail().x);
+    const float trackH = height - ImGui::GetTextLineHeight();
+    const ImVec2 p1(p0.x + w, p0.y + trackH);
+
+    ImGui::InvisibleButton(id, ImVec2(w, height));
+    if (ImGui::IsItemActive())
+        progress = std::clamp((ImGui::GetIO().MousePos.x - p0.x) / w, 0.f, 1.f);
+    if (ImGui::IsItemHovered() && durationSec > 0.0)
+    {
+        const float f = std::clamp((ImGui::GetIO().MousePos.x - p0.x) / w, 0.f, 1.f);
+        ImGui::SetTooltip("%.2f s", f * durationSec);
+    }
+
+    dl->AddRectFilled(p0, p1, IM_COL32(40, 40, 40, 255), 3.f);
+    dl->AddRectFilled(p0, ImVec2(p0.x + w * progress, p1.y), IM_COL32(60, 110, 160, 255), 3.f, ImDrawFlags_RoundCornersLeft);
+
+    if (durationSec > 0.0)
+    {
+        // Major ticks carry a label; four unlabelled minor ticks between them.
+        const double major = timelineTickStep(durationSec, w, 70.f);
+        const double minor = major / 5.0;
+        const double pxPerSec = w / durationSec;
+        for (int k = 0; k * minor <= durationSec + 1e-9; ++k)
+        {
+            const bool isMajor = k % 5 == 0;
+            const float x = p0.x + float(k * minor * pxPerSec);
+            dl->AddLine(ImVec2(x, p1.y - trackH * (isMajor ? 0.6f : 0.3f)), ImVec2(x, p1.y), IM_COL32(170, 170, 170, 255));
+            if (isMajor)
+            {
+                const std::string label = formatTickLabel(k * minor, major);
+                const float lw = ImGui::CalcTextSize(label.c_str()).x;
+                const float lx = std::clamp(x - lw * 0.5f, p0.x, p0.x + w - lw);
+                dl->AddText(ImVec2(lx, p1.y), IM_COL32(200, 200, 200, 255), label.c_str());
+            }
+        }
+    }
+
+    const float px = p0.x + w * progress;
+    const ImU32 playheadCol = IM_COL32(255, 220, 60, 255);
+    dl->AddLine(ImVec2(px, p0.y), ImVec2(px, p1.y), playheadCol, 2.f);
+    dl->AddTriangleFilled(ImVec2(px - 5.f, p0.y), ImVec2(px + 5.f, p0.y), ImVec2(px, p0.y + 6.f), playheadCol);
+}
+
 using trajectory_viewer_shaders::kFS;
 using trajectory_viewer_shaders::kVS;
 
@@ -277,6 +366,14 @@ struct AppState
     float maxTemporalDist = 0.5f; //!< s: skip images farther than this from the point (temporal)
     int maxWiggle = 1; //!< frames: search startIdx ± maxWiggle for a frustum hit (temporal)
 
+    // ── flyover ───────────────────────────────────────────────────────────────
+    //! Flyover mode: the bottom timeline bar is shown and the camera sits on the
+    //! trajectory at @ref flyoverProgress (mouse orbit/pan/zoom have no effect).
+    bool flyover = false;
+    bool flyoverPlaying = false; //!< advance flyoverProgress each frame
+    float flyoverProgress = 0.f; //!< 0-1 position along the trajectory's time span
+    float flyoverSpeed = 1.f; //!< playback rate, multiple of real time
+    bool flyoverUpdateSelectedCamera = true; //!< select the camera image nearest the playhead
     // ── fast-rotation image filter ─────────────────────────────────────────────
     //! Per-pose angular speed (deg/s), parallel to traj.poses — filled by
     //! loadSession(). Images captured while the rig turns faster than
@@ -451,6 +548,23 @@ static fs::path cameraDir(const AppState& s)
 static int64_t imageTimeOffsetNs(const AppState& s)
 {
     return (int64_t)std::llround(s.timeOffsetSec * 1e9);
+}
+
+//! Selects the camera image nearest `imageTs` (image clock) for Image Preview and
+//! the frustum highlight. No-op without images, or when it is already selected.
+static void selectImageNearest(AppState& s, int64_t imageTs)
+{
+    if (s.imageTsNs.empty())
+        return;
+    auto it = std::lower_bound(s.imageTsNs.begin(), s.imageTsNs.end(), imageTs);
+    if (it == s.imageTsNs.end() || (it != s.imageTsNs.begin() && imageTs - *std::prev(it) < *it - imageTs))
+        --it;
+    const int idx = int(it - s.imageTsNs.begin());
+    if (idx == s.imgViewIdx)
+        return;
+    s.imgViewIdx = idx;
+    s.imgViewRequest.store(idx);
+    s.intensityProjNeedsUpdate = true;
 }
 
 //! Index every camera frame in the camera directory by timestamp. Also picks up
@@ -1855,11 +1969,11 @@ static void drawScene(AppState& s)
 
         for (int64_t ts : s.imageTsNs)
         {
-            const TrajPose* pose = s.traj.nearest(ts + imageTimeOffsetNs(s));
+            auto pose = s.traj.nearest(ts + imageTimeOffsetNs(s));
             if (!pose)
                 continue;
 
-            Vector3 origin = toVec3(pose->T * C);
+            Vector3 origin = toVec3(pose->get().T * C);
 
             bool hl = (ts == hlTs);
             Color fc = hl ? Color{ 255, 255, 50, 255 } : ORANGE;
@@ -1875,7 +1989,7 @@ static void drawScene(AppState& s)
                 for (int k = 0; k < 3; k++)
                 {
                     Eigen::Vector3f tip = R_wc.col(k) * (sc * 0.5f) + C;
-                    DrawLine3D(origin, toVec3(pose->T * tip), hl ? fc : axisColors[k]);
+                    DrawLine3D(origin, toVec3(pose->get().T * tip), hl ? fc : axisColors[k]);
                 }
                 continue;
             }
@@ -1884,7 +1998,7 @@ static void drawScene(AppState& s)
             for (int k = 0; k < 4; k++)
             {
                 Eigen::Vector3f pl = R_wc * Eigen::Vector3f(ncx[k] * fs, ncy[k] * fs, fs) + C;
-                w[k] = toVec3(pose->T * pl);
+                w[k] = toVec3(pose->get().T * pl);
             }
 
             if (hl)
@@ -1894,7 +2008,7 @@ static void drawScene(AppState& s)
                 for (int k = 0; k < 4; k++)
                 {
                     Eigen::Vector3f pl = R_wc * Eigen::Vector3f(ncx[k] * sc, ncy[k] * sc, sc) + C;
-                    w2[k] = toVec3(pose->T * pl);
+                    w2[k] = toVec3(pose->get().T * pl);
                 }
                 DrawTriangle3D(w2[0], w2[1], w2[2], Color{ 255, 255, 50, 40 });
                 DrawTriangle3D(w2[2], w2[3], w2[0], Color{ 255, 255, 50, 40 });
@@ -2049,7 +2163,6 @@ int main(int argc, char* argv[])
     {
         bool imguiWants = ImGui::GetIO().WantCaptureMouse;
         s.orbit.updateEulerTransition(GetFrameTime());
-
         // Drag & drop the LIO result directory (this app's session), a CAMERA_0 directory or a
         // calibration *.json onto the window to load it -- raylib's GLFW backend surfaces OS
         // drag & drop the same way on Windows, Linux and macOS, so no platform-specific code
@@ -2204,19 +2317,54 @@ int main(int argc, char* argv[])
         // directly instead of raylib's BeginMode3D/EndMode3D.
         s.viewLocal = Eigen::Affine3f::Identity();
 
+        // Flyover: while its bar is open the camera sits on the trajectory at
+        // the playhead (orbit.viewPose) instead of following the euler fields
+        // below -- also when paused, so scrubbing the timeline previews it.
+        if (s.flyover && s.flyoverPlaying)
+        {
+            const double durationSec = trajectoryDurationSec(s.traj);
+            if (durationSec > 0.0)
+                s.flyoverProgress += float(GetFrameTime() * s.flyoverSpeed / durationSec);
+            if (durationSec <= 0.0 || s.flyoverProgress >= 1.f)
+            {
+                s.flyoverProgress = std::min(s.flyoverProgress, 1.f);
+                s.flyoverPlaying = false;
+            }
+        }
+        s.orbit.viewPose.reset();
+        if (s.flyover)
+        {
+            if (const auto pose = s.traj.nearest(s.flyoverProgress))
+            {
+                s.orbit.setViewPose(pose->get().T);
+                if (s.flyoverUpdateSelectedCamera)
+                    selectImageNearest(s, pose->get().ts_ns - imageTimeOffsetNs(s));
+            }
+        }
+
         if (!s.orbit.isOrtho)
         {
             s.orbit.applyPerspectiveProjection((int)ImGui::GetIO().DisplaySize.x, (int)ImGui::GetIO().DisplaySize.y);
 
-            Eigen::Vector3f rotationCenter(s.orbit.euler.rotationCenter.x, s.orbit.euler.rotationCenter.y, s.orbit.euler.rotationCenter.z);
-            s.viewLocal.translate(rotationCenter);
-            s.viewLocal.translate(Eigen::Vector3f(s.orbit.euler.translate.x, s.orbit.euler.translate.y, s.orbit.euler.translate.z));
-            if (!s.orbit.lockZ)
-                s.viewLocal.rotate(Eigen::AngleAxisf(s.orbit.euler.rotateX * DEG2RAD, Eigen::Vector3f::UnitX()));
+            if (s.orbit.viewPose)
+            {
+                // viewPose is camera-to-world; the modelview matrix needs
+                // world-to-camera.
+                s.viewLocal = s.orbit.viewPose->inverse();
+            }
             else
-                s.viewLocal.rotate(Eigen::AngleAxisf(-90.0f * DEG2RAD, Eigen::Vector3f::UnitX()));
-            s.viewLocal.rotate(Eigen::AngleAxisf(s.orbit.euler.rotateY * DEG2RAD, Eigen::Vector3f::UnitZ()));
-            s.viewLocal.translate(-rotationCenter);
+            {
+                Eigen::Vector3f rotationCenter(
+                    s.orbit.euler.rotationCenter.x, s.orbit.euler.rotationCenter.y, s.orbit.euler.rotationCenter.z);
+                s.viewLocal.translate(rotationCenter);
+                s.viewLocal.translate(Eigen::Vector3f(s.orbit.euler.translate.x, s.orbit.euler.translate.y, s.orbit.euler.translate.z));
+                if (!s.orbit.lockZ)
+                    s.viewLocal.rotate(Eigen::AngleAxisf(s.orbit.euler.rotateX * DEG2RAD, Eigen::Vector3f::UnitX()));
+                else
+                    s.viewLocal.rotate(Eigen::AngleAxisf(-90.0f * DEG2RAD, Eigen::Vector3f::UnitX()));
+                s.viewLocal.rotate(Eigen::AngleAxisf(s.orbit.euler.rotateY * DEG2RAD, Eigen::Vector3f::UnitZ()));
+                s.viewLocal.translate(-rotationCenter);
+            }
 
             rlMultMatrixf(s.viewLocal.matrix().data());
         }
@@ -2224,7 +2372,8 @@ int main(int argc, char* argv[])
         {
             // Still updating viewLocal for the compass -- the rest of the
             // ortho projection + gizmo-view lookAt lives in
-            // OrbitCamera::updateOrtho().
+            // OrbitCamera::updateOrtho(). viewPose is documented as
+            // perspective-only, so ortho mode ignores it same as before.
             s.viewLocal.rotate(Eigen::AngleAxisf((s.orbit.euler.rotateX + s.orbit.euler.rotateY) * DEG2RAD, Eigen::Vector3f::UnitZ()));
             s.orbit.updateOrtho(ratio);
         }
@@ -2355,6 +2504,13 @@ int main(int argc, char* argv[])
                 if (ImGui::MenuItem("Center of rotation...", "Shift+R"))
                     s.showCenterOfRotationWindow = true;
                 ImGui::Separator();
+                if (ImGui::MenuItem("Flyover", nullptr, &s.flyover, !s.traj.empty()))
+                {
+                    s.flyoverProgress = 0.f;
+                    s.flyoverPlaying = s.flyover;
+                }
+                ImGui::Separator();
+
                 ImGui::SetNextItemWidth(140.f);
                 ImGui::SliderFloat("Frustum scale", &s.frustumScale, 0.05f, 5.f, "%.2f");
                 ImGui::SetNextItemWidth(140.f);
@@ -2796,6 +2952,55 @@ int main(int argc, char* argv[])
         ImGui::TextDisabled("LMB: orbit  RMB: pan  Scroll: zoom");
 
         ImGui::End();
+
+        // ── flyover bar, along the bottom of the 3D view ────────────────────────
+        if (s.flyover)
+        {
+            const double durationSec = trajectoryDurationSec(s.traj);
+            const ImGuiStyle& style = ImGui::GetStyle();
+            const float timelineH = 18.f + ImGui::GetTextLineHeight();
+            const float barH = style.WindowPadding.y * 2.f + ImGui::GetFrameHeight() + style.ItemSpacing.y + timelineH;
+            ImGui::SetNextWindowPos(ImVec2(0.f, io.DisplaySize.y - barH), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - panelW, barH), ImGuiCond_Always);
+            ImGui::Begin(
+                "##flyover",
+                nullptr,
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                    ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
+
+            if (ImGui::Button(s.flyoverPlaying ? "Pause" : "Play", ImVec2(60.f, 0.f)))
+            {
+                if (!s.flyoverPlaying && s.flyoverProgress >= 1.f)
+                    s.flyoverProgress = 0.f; // replay from the start
+                s.flyoverPlaying = !s.flyoverPlaying;
+            }
+            ImGui::SameLine();
+            ImGui::Text("%7.1f / %.1f s", s.flyoverProgress * durationSec, durationSec);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(160.f);
+            ImGui::SliderFloat("Speed", &s.flyoverSpeed, 0.1f, 50.f, "%.1fx", ImGuiSliderFlags_Logarithmic);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Playback rate, as a multiple of real time (Ctrl+click to type)");
+            ImGui::SameLine();
+            ImGui::BeginDisabled(s.imageTsNs.empty());
+            ImGui::Checkbox("Update selected camera", &s.flyoverUpdateSelectedCamera);
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip(
+                    s.imageTsNs.empty() ? "No camera images loaded"
+                                        : "Select the camera image nearest the playhead (Image Preview, highlighted frustum)");
+            ImGui::SameLine();
+            const float closeW = ImGui::CalcTextSize("Close").x + style.FramePadding.x * 2.f;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.f, ImGui::GetContentRegionAvail().x - closeW));
+            if (ImGui::Button("Close"))
+            {
+                s.flyover = false;
+                s.flyoverPlaying = false;
+            }
+
+            flyoverTimeline("##flyoverTimeline", s.flyoverProgress, durationSec, timelineH);
+            ImGui::End();
+        }
 
         raylib_widgets::showEulerCenterOfRotationWindow(s.showCenterOfRotationWindow, s.orbit);
 

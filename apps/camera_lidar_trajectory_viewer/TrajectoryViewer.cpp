@@ -1216,6 +1216,69 @@ static cv::Vec3b jetColorBGR(float t)
     return cv::Vec3b((uchar)(b * 255.f), (uchar)(g * 255.f), (uchar)(r * 255.f));
 }
 
+//! Vertical color scale for the Local depth mode, in the 3D view's top-right
+//! corner: 0 m at the bottom, `maxM` at the top, as kFS maps jet(depth / depthColorMax).
+//! @param rightX right edge of the 3D view, screen px
+//! @param topY top edge of the 3D view, screen px
+//! @param maxM depth at the top of the scale; farther points are clamped to its color
+static void drawDepthColorScale(float rightX, float topY, float maxM)
+{
+    constexpr float kMargin = 12.f, kPad = 6.f, kBarW = 14.f, kBarH = 200.f, kTickW = 4.f;
+    constexpr int kLabels = 5; // 0, 1/4, 1/2, 3/4, 1 of maxM
+    auto label = [maxM](int i)
+    {
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), maxM < 10.f ? "%.1f m" : "%.0f m", maxM * float(i) / float(kLabels - 1));
+        return std::string(buf);
+    };
+    float labelW = 0.f;
+    for (int i = 0; i < kLabels; ++i)
+        labelW = std::max(labelW, ImGui::CalcTextSize(label(i).c_str()).x);
+    const float textH = ImGui::GetTextLineHeight();
+    const char* title = "Local depth";
+    const float titleW = ImGui::CalcTextSize(title).x;
+
+    const float boxW = std::max(titleW, labelW + kTickW + kPad + kBarW) + 2.f * kPad;
+    const float boxH = kPad + textH + kPad + kBarH + textH * 0.5f + kPad;
+    const ImVec2 box0(rightX - kMargin - boxW, topY + kMargin);
+    const ImVec2 box1(box0.x + boxW, box0.y + boxH);
+    const float barX0 = box1.x - kPad - kBarW;
+    const float barY0 = box0.y + kPad + textH + kPad; // top of the bar = maxM
+    const float barY1 = barY0 + kBarH; // bottom = 0 m
+
+    // Background draw list: over the 3D scene, under menus and popups.
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    dl->AddRectFilled(box0, box1, IM_COL32(20, 20, 20, 190), 4.f);
+    dl->AddText(ImVec2(box1.x - kPad - titleW, box0.y + kPad), IM_COL32(220, 220, 220, 255), title);
+
+    // jet() is piecewise linear with knots at these t, so one vertical gradient
+    // per segment reproduces it exactly.
+    static const float kKnots[] = { 0.f, 0.125f, 0.375f, 0.625f, 0.875f, 1.f };
+    auto jetU32 = [](float t)
+    {
+        const cv::Vec3b c = jetColorBGR(t);
+        return IM_COL32(c[2], c[1], c[0], 255);
+    };
+    for (size_t k = 0; k + 1 < std::size(kKnots); ++k)
+    {
+        const float yTop = barY1 - kKnots[k + 1] * kBarH;
+        const float yBot = barY1 - kKnots[k] * kBarH;
+        const ImU32 cTop = jetU32(kKnots[k + 1]);
+        const ImU32 cBot = jetU32(kKnots[k]);
+        dl->AddRectFilledMultiColor(ImVec2(barX0, yTop), ImVec2(barX0 + kBarW, yBot), cTop, cTop, cBot, cBot);
+    }
+    dl->AddRect(ImVec2(barX0, barY0), ImVec2(barX0 + kBarW, barY1), IM_COL32(200, 200, 200, 255));
+
+    for (int i = 0; i < kLabels; ++i)
+    {
+        const float y = barY1 - kBarH * float(i) / float(kLabels - 1);
+        dl->AddLine(ImVec2(barX0 - kTickW, y), ImVec2(barX0, y), IM_COL32(200, 200, 200, 255));
+        const std::string text = label(i);
+        const float w = ImGui::CalcTextSize(text.c_str()).x;
+        dl->AddText(ImVec2(barX0 - kTickW - 2.f - w, y - textH * 0.5f), IM_COL32(220, 220, 220, 255), text.c_str());
+    }
+}
+
 //! Rasterizes a synthetic "intensity image" for the camera pose at imgTsAdj,
 //! reprojecting s.exportCloud through the same extrinsics and projectPoint() as
 //! the colorize pass, jet-colormapped over intensity with a per-pixel depth test
@@ -3110,6 +3173,9 @@ int main(int argc, char* argv[])
             flyoverTimeline("##flyoverTimeline", s.flyoverProgress, durationSec, timelineH);
             ImGui::End();
         }
+
+        if (s.colorMode == 4 && s.cloud.count > 0)
+            drawDepthColorScale(io.DisplaySize.x - panelW, menuBarH, s.depthColorMax);
 
         raylib_widgets::showEulerCenterOfRotationWindow(s.showCenterOfRotationWindow, s.orbit);
 

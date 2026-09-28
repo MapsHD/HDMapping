@@ -439,6 +439,8 @@ struct AppState
     bool flyoverPlaying = false; //!< advance flyoverProgress each frame
     float flyoverProgress = 0.f; //!< 0-1 position along the trajectory's time span
     float flyoverSpeed = 1.f; //!< playback rate, multiple of real time
+    float flyoverSmoothingSec = 1.f; //!< camera pose averaged over ± this much trajectory time; 0 = raw poses
+    bool flyoverLevelHorizon = true; //!< remove the camera's roll, keeping heading and pitch
     bool flyoverUpdateSelectedCamera = true; //!< select the camera image nearest the playhead
     // ── fast-rotation image filter ─────────────────────────────────────────────
     //! Per-pose angular speed (deg/s), parallel to traj.poses — filled by
@@ -2410,11 +2412,16 @@ int main(int argc, char* argv[])
         s.orbit.viewPose.reset();
         if (s.flyover)
         {
-            if (const auto pose = s.traj.nearest(s.flyoverProgress))
+            // The continuous playhead time, not the nearest pose's, so the
+            // smoothing window slides instead of stepping from pose to pose.
+            const int64_t ts = s.traj.timeAt(s.flyoverProgress);
+            if (auto pose = s.traj.smoothedPose(ts, s.flyoverSmoothingSec))
             {
-                s.orbit.setViewPose(pose->get().T);
+                if (s.flyoverLevelHorizon)
+                    pose->linear() = levelHorizon(pose->linear());
+                s.orbit.setViewPose(*pose);
                 if (s.flyoverUpdateSelectedCamera)
-                    selectImageNearest(s, pose->get().ts_ns - imageTimeOffsetNs(s));
+                    selectImageNearest(s, ts - imageTimeOffsetNs(s));
             }
         }
 
@@ -3074,6 +3081,15 @@ int main(int argc, char* argv[])
             ImGui::SliderFloat("Speed", &s.flyoverSpeed, 0.1f, 50.f, "%.1fx", ImGuiSliderFlags_Logarithmic);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Playback rate, as a multiple of real time (Ctrl+click to type)");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(120.f);
+            ImGui::SliderFloat("Smoothing", &s.flyoverSmoothingSec, 0.f, 5.f, "%.1f s");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Average the camera pose over +/- this much trajectory time; 0 = raw poses");
+            ImGui::SameLine();
+            ImGui::Checkbox("Level horizon", &s.flyoverLevelHorizon);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Remove camera roll; heading and pitch still follow the trajectory");
             ImGui::SameLine();
             ImGui::BeginDisabled(s.imageTsNs.empty());
             ImGui::Checkbox("Update selected camera", &s.flyoverUpdateSelectedCamera);

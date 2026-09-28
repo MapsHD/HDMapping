@@ -48,9 +48,30 @@ struct Trajectory {
     //! @warning Same ordering requirement as @ref nearest(int64_t).
     [[nodiscard]] std::optional<std::reference_wrapper<const TrajPose>> nearest(float f) const;
 
+    //! Timestamp at fractional position `f` along the trajectory's time span.
+    //! @param f 0 = @ref poses front (earliest), 1 = back (latest); not clamped
+    //! @return 0 when it is empty
+    //! @warning Same ordering requirement as @ref nearest(int64_t).
+    [[nodiscard]] int64_t timeAt(float f) const;
+
+    //! Pose at `ts_ns`, averaged over ±`halfWindowSec` with Hann weights: a
+    //! zero-lag, stateless low-pass for playback, so the same time always gives
+    //! the same pose.
+    //! @param ts_ns window centre, nanoseconds
+    //! @param halfWindowSec window half-width, seconds; <= 0 gives the nearest pose
+    //! @return nullopt when it is empty; the nearest pose when no pose falls inside the window
+    //! @note Rotations are averaged as sign-aligned quaternions, accurate while the
+    //!       window spans no more than a few tens of degrees of turning.
+    //! @warning Same ordering requirement as @ref nearest(int64_t).
+    [[nodiscard]] std::optional<Eigen::Affine3f> smoothedPose(int64_t ts_ns, double halfWindowSec) const;
 
     //! True when no poses have been loaded.
     bool empty() const { return poses.empty(); }
 };
+
+//! Removes roll from a rotation in LiDAR axes (x forward, y left, z up): x keeps
+//! pointing where it did (heading and pitch), and y is turned level with world XY.
+//! @return R unchanged when x points (almost) straight up or down
+[[nodiscard]] Eigen::Matrix3f levelHorizon(const Eigen::Matrix3f& R);
 
 }  // namespace calib

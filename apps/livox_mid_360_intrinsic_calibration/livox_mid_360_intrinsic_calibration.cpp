@@ -30,7 +30,6 @@
 
 #include <spdlog/spdlog.h>
 
-#define SAMPLE_PERIOD (1.0 / 200.0)
 namespace fs = std::filesystem;
 
 const uint32_t window_width = 800;

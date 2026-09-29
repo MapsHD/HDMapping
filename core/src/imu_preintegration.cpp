@@ -134,7 +134,7 @@ namespace imu_utils
                                                      static_cast<float>(raw_imu_data[k].accelerometers.z()) };
 
                 FusionAhrsUpdateNoMagnetometer(&fusion_ahrs, gyroscope, accelerometer, static_cast<float>(dt));
-                
+
                 FusionQuaternion quat = FusionAhrsGetQuaternion(&fusion_ahrs);
                 Eigen::Quaterniond q(quat.element.w, quat.element.x, quat.element.y, quat.element.z);
                 orientations.push_back(q.toRotationMatrix());

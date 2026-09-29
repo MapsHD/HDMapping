@@ -317,10 +317,23 @@ void calculate_trajectory(Trajectory& trajectory, Imu& imu_data, LidarOdometryPa
         double avg_dt = 1.0 / 200.0;
         if (imu_data.size() >= 2)
         {
-            double t0 = std::get<0>(imu_data.front()).first;
-            double t1 = std::get<0>(imu_data.back()).first;
+            const double t0 = std::get<0>(imu_data.front()).first;
+            const double t1 = std::get<0>(imu_data.back()).first;
+            const double duration = t1 - t0;
+
             if (t1 > t0)
-                avg_dt = (t1 - t0) / static_cast<double>(imu_data.size() - 1);
+                avg_dt = duration / static_cast<double>(imu_data.size() - 1);
+
+            if (duration > 24 * 60 * 60)
+            {
+                std::cerr << "ERROR: Session is absurdly long : start time : " << t0 << ", end time " << t1 << std::endl;
+                std::cerr << "ERROR: Setting rate to " << 1.0 / 200.0 << std::endl;
+                avg_dt = 1.0 / 200.0;
+            }
+        }
+        if (std::fabs(avg_dt - 1.0 / 200.0) > 0.01)
+        {
+            std::cerr << "WARNING: The dt found is strange : " << avg_dt << std::endl;
         }
 
         VQFParams vqf_params = buildVQFParams(params);

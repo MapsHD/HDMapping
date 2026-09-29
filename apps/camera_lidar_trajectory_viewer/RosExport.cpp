@@ -363,7 +363,7 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
                     opt.aggregationSec);
 
                 // cache for the raw (sensor-frame) re-projection
-                const TrajPose* lastPose = nullptr;
+                std::optional<std::reference_wrapper<const TrajPose>> lastPose;
                 Eigen::Affine3f lastInv = Eigen::Affine3f::Identity();
 
                 size_t i = 0;
@@ -395,11 +395,11 @@ bool exportRos2Bag(const RosExportInput& in, const RosExportOptions& opt, std::s
                         buf.reserve((j - i) * 4);
                         for (size_t k = i; k < j; ++k)
                         {
-                            const TrajPose* p = in.traj.nearest(pts[k].ts);
-                            if (p != lastPose)
+                            auto p = in.traj.nearest(pts[k].ts);
+                            if (!lastPose || &lastPose->get() != &p->get())
                             {
                                 lastPose = p;
-                                lastInv = p->T.inverse();
+                                lastInv = p->get().T.inverse();
                             }
                             Eigen::Vector3f pl = lastInv * Eigen::Vector3f(pts[k].x, pts[k].y, pts[k].z);
                             buf.push_back(pl.x());

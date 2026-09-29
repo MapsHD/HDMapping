@@ -410,6 +410,17 @@ void OrbitCamera::moveEulerRotationCenterTo(Vector3 center) {
     startEulerTransition(euler.rotateX, euler.rotateY, Vector3{ -center.x, -center.y, euler.translate.z }, center);
 }
 
+void OrbitCamera::setViewPose(Eigen::Affine3f view) {
+    // Columns are the OpenGL camera axes in LiDAR coordinates: right = -y,
+    // up = +z, and +z (backward) = -x, so the camera looks along LiDAR +x.
+    Eigen::Matrix3f lidarFromGl;
+    lidarFromGl << 0.f, 0.f, -1.f,
+                  -1.f, 0.f,  0.f,
+                   0.f, 1.f,  0.f;
+    view.linear() = view.linear() * lidarFromGl;
+    viewPose = view;
+}
+
 void OrbitCamera::updateEulerTransition(float dt) {
     if (!eulerTransitionActive) return;
 

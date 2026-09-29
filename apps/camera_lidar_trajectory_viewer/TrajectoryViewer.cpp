@@ -66,8 +66,10 @@ static const std::vector<raylib_widgets::ShortcutEntry> appShortcuts = {
     { "", "I", "Isometric view" },
     { "", "Z", "Reset camera" },
     { "", "O", "Toggle orthographic/perspective" },
+    { "", "Shift+F", "Toggle flyover" },
     { "Special keys", "Left arrow", "Previous image (image preview)" },
     { "", "Right arrow", "Next image (image preview)" },
+    { "", "Space", "Play/pause flyover" },
     { "Mouse related", "Left click + drag", "Orbit camera" },
     { "", "Right click + drag", "Pan camera" },
     { "", "Scroll", "Zoom camera" },
@@ -165,31 +167,184 @@ static float angularSpeedDegAt(const Trajectory& traj, const std::vector<float>&
     return perPose[idx];
 }
 
+//! Time span of the trajectory in seconds; 0 with fewer than two poses.
+static double trajectoryDurationSec(const Trajectory& traj)
+{
+    if (traj.poses.size() < 2)
+        return 0.0;
+    return double(traj.poses.back().ts_ns - traj.poses.front().ts_ns) * 1e-9;
+}
+
+//! Smallest "round" tick step (s) that keeps ticks at least `minPx` apart.
+static double timelineTickStep(double durationSec, float widthPx, float minPx)
+{
+    static const double kSteps[] = { 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600 };
+    const double pxPerSec = widthPx / durationSec;
+    for (double step : kSteps)
+        if (step * pxPerSec >= minPx)
+            return step;
+    double step = kSteps[std::size(kSteps) - 1];
+    while (step * pxPerSec < minPx)
+        step *= 2.0;
+    return step;
+}
+
+//! Tick label: "m:ss" from a minute on, else seconds with a decimal only when
+//! the tick step needs one.
+static std::string formatTickLabel(double sec, double step)
+{
+    char buf[32];
+    if (sec >= 60.0)
+        std::snprintf(buf, sizeof(buf), "%d:%02d", int(sec + 1e-6) / 60, int(sec + 1e-6) % 60);
+    else if (step < 1.0)
+        std::snprintf(buf, sizeof(buf), "%.1fs", sec);
+    else
+        std::snprintf(buf, sizeof(buf), "%.0fs", sec);
+    return buf;
+}
+
+//! Timeline across the available width, with time ticks and a playhead.
+//! Click or drag on it to scrub.
+//! @param id ImGui id of the scrub area
+//! @param progress 0-1 playhead position; written while the user drags
+//! @param durationSec time the full width spans, for the tick labels
+//! @param height total height, including the tick label row
+static void flyoverTimeline(const char* id, float& progress, double durationSec, float height)
+{
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 p0 = ImGui::GetCursorScreenPos();
+    const float w = std::max(1.f, ImGui::GetContentRegionAvail().x);
+    const float trackH = height - ImGui::GetTextLineHeight();
+    const ImVec2 p1(p0.x + w, p0.y + trackH);
+
+    ImGui::InvisibleButton(id, ImVec2(w, height));
+    if (ImGui::IsItemActive())
+        progress = std::clamp((ImGui::GetIO().MousePos.x - p0.x) / w, 0.f, 1.f);
+    if (ImGui::IsItemHovered() && durationSec > 0.0)
+    {
+        const float f = std::clamp((ImGui::GetIO().MousePos.x - p0.x) / w, 0.f, 1.f);
+        ImGui::SetTooltip("%.2f s", f * durationSec);
+    }
+
+    dl->AddRectFilled(p0, p1, IM_COL32(40, 40, 40, 255), 3.f);
+    dl->AddRectFilled(p0, ImVec2(p0.x + w * progress, p1.y), IM_COL32(60, 110, 160, 255), 3.f, ImDrawFlags_RoundCornersLeft);
+
+    if (durationSec > 0.0)
+    {
+        // Major ticks carry a label; four unlabelled minor ticks between them.
+        const double major = timelineTickStep(durationSec, w, 70.f);
+        const double minor = major / 5.0;
+        const double pxPerSec = w / durationSec;
+        for (int k = 0; k * minor <= durationSec + 1e-9; ++k)
+        {
+            const bool isMajor = k % 5 == 0;
+            const float x = p0.x + float(k * minor * pxPerSec);
+            dl->AddLine(ImVec2(x, p1.y - trackH * (isMajor ? 0.6f : 0.3f)), ImVec2(x, p1.y), IM_COL32(170, 170, 170, 255));
+            if (isMajor)
+            {
+                const std::string label = formatTickLabel(k * minor, major);
+                const float lw = ImGui::CalcTextSize(label.c_str()).x;
+                const float lx = std::clamp(x - lw * 0.5f, p0.x, p0.x + w - lw);
+                dl->AddText(ImVec2(lx, p1.y), IM_COL32(200, 200, 200, 255), label.c_str());
+            }
+        }
+    }
+
+    const float px = p0.x + w * progress;
+    const ImU32 playheadCol = IM_COL32(255, 220, 60, 255);
+    dl->AddLine(ImVec2(px, p0.y), ImVec2(px, p1.y), playheadCol, 2.f);
+    dl->AddTriangleFilled(ImVec2(px - 5.f, p0.y), ImVec2(px + 5.f, p0.y), ImVec2(px, p0.y + 6.f), playheadCol);
+}
+
 using trajectory_viewer_shaders::kFS;
 using trajectory_viewer_shaders::kVS;
 
+//! One point as kVS reads it.
+struct GpuPoint
+{
+    float x, y, z; //!< chunk-local position (location 0)
+    float colorPacked; //!< float bits = 0x00RRGGBB (location 1)
+    uint16_t intensity; //!< 0-1 scaled to 0-65535 (location 2)
+    int16_t depthCm; //!< distance from the LiDAR when captured, cm; -1 = unknown (location 4)
+    int32_t cameraId; //!< image that colored it; -1 = projects into no image, -2 = rejected by ROI/mask (location 3)
+};
+static_assert(sizeof(GpuPoint) == 24, "kVS expects a tightly packed 24-byte vertex");
+
+//! The loaded cloud on the GPU: one part per LIO chunk, in chunk-local
+//! coordinates, placed in the world by the chunk's pose at draw time.
 struct GpuCloud
 {
-    std::vector<raylib_widgets::PointBufferPart> parts;
-    size_t count = 0;
-    float maxDist = 50.f;
+    struct Chunk
+    {
+        raylib_widgets::PointBufferPart part;
+        Matrix pose; //!< chunk-local -> world
+    };
+    std::vector<Chunk> chunks;
+    size_t count = 0; //!< points over all chunks
 
-    void upload(const std::vector<float>& data, float mx)
+    //! Uploads one chunk as a new part, after the ones already loaded.
+    //! @param pts the chunk's points; empty is a no-op
+    //! @param pose chunk-local -> world
+    //! @param name chunk name, for the warning
+    //! @note Warns on stderr above kMaxVerticesPerPart, which chunks aren't expected to reach.
+    void addChunk(const std::vector<GpuPoint>& pts, const Eigen::Affine3f& pose, const std::string& name)
     {
-        unload();
-        if (data.empty())
+        if (pts.empty())
             return;
-        maxDist = mx;
-        count = data.size() / 7;
-        parts = raylib_widgets::uploadPointBufferParts(data.data(), count, { 3, 1, 1, 1, 1 });
+        if (pts.size() > raylib_widgets::kMaxVerticesPerPart)
+            std::fprintf(
+                stderr,
+                "Warning: %s has %zu points, more than %zu per GPU buffer\n",
+                name.c_str(),
+                pts.size(),
+                raylib_widgets::kMaxVerticesPerPart);
+
+        Chunk c;
+        c.part.count = (int)pts.size();
+        c.part.vao = rlLoadVertexArray();
+        rlEnableVertexArray(c.part.vao);
+        c.part.vbo = rlLoadVertexBuffer(pts.data(), c.part.count * (int)sizeof(GpuPoint), false);
+        constexpr int stride = sizeof(GpuPoint);
+        rlSetVertexAttribute(0, 3, RL_FLOAT, false, stride, offsetof(GpuPoint, x));
+        rlSetVertexAttribute(1, 1, RL_FLOAT, false, stride, offsetof(GpuPoint, colorPacked));
+        // rlSetVertexAttribute always converts to float; kVS reads these as uint/int.
+        glVertexAttribIPointer(2, 1, GL_UNSIGNED_SHORT, stride, (const void*)offsetof(GpuPoint, intensity));
+        glVertexAttribIPointer(3, 1, GL_INT, stride, (const void*)offsetof(GpuPoint, cameraId));
+        glVertexAttribIPointer(4, 1, GL_SHORT, stride, (const void*)offsetof(GpuPoint, depthCm));
+        for (unsigned int loc = 0; loc <= 4; ++loc)
+            rlEnableVertexAttribute(loc);
+        rlDisableVertexArray();
+
+        // Matrix's fields are declared row by row, so this lists pose row by row.
+        const Eigen::Matrix4f& m = pose.matrix();
+        c.pose = { m(0, 0), m(0, 1), m(0, 2), m(0, 3), m(1, 0), m(1, 1), m(1, 2), m(1, 3),
+                   m(2, 0), m(2, 1), m(2, 2), m(2, 3), m(3, 0), m(3, 1), m(3, 2), m(3, 3) };
+        chunks.push_back(c);
+        count += pts.size();
     }
-    void draw() const
+    //! Draws every chunk through its own pose; the caller binds the shader and sets
+    //! every uniform but the MVP.
+    //! @param view world -> camera (rlGetMatrixModelview())
+    //! @param projection rlGetMatrixProjection()
+    //! @param locMVP location of the shader's mvp uniform
+    void draw(const Matrix& view, const Matrix& projection, int locMVP) const
     {
-        raylib_widgets::drawPointBufferParts(parts);
+        for (const Chunk& c : chunks)
+        {
+            rlSetUniformMatrix(locMVP, MatrixMultiply(MatrixMultiply(c.pose, view), projection));
+            rlEnableVertexArray(c.part.vao);
+            glDrawArrays(GL_POINTS, 0, c.part.count);
+        }
+        rlDisableVertexArray();
     }
     void unload()
     {
-        raylib_widgets::unloadPointBufferParts(parts);
+        for (const Chunk& c : chunks)
+        {
+            rlUnloadVertexArray(c.part.vao);
+            rlUnloadVertexBuffer(c.part.vbo);
+        }
+        chunks.clear();
         count = 0;
     }
 };
@@ -201,7 +356,19 @@ struct ColorPt
     float intensity;
     int64_t ts_ns;
     bool validColor; //!< RGB sampled from an image; false = intensity-gray fallback
+    int16_t depthCm; //!< LiDAR range as GpuPoint::depthCm holds it; -1 = unknown
 };
+
+//! kVS's Min/Max range cull on the CPU, so exports drop the points the view hides.
+//! @param depthCm GpuPoint/ColorPt depth; < 0 (unknown) always passes
+//! @param maxRange <= 0 = no upper limit
+static bool passesRangeFilter(int16_t depthCm, float minRange, float maxRange)
+{
+    if (depthCm < 0)
+        return true;
+    const float range = float(depthCm) * 0.01f;
+    return !(range < minRange || (maxRange > 0.f && range > maxRange));
+}
 
 // ── Application state ─────────────────────────────────────────────────────────
 struct AppState
@@ -246,7 +413,7 @@ struct AppState
     GpuCloud cloud;
     Shader shader = {};
     bool shaderOk = false;
-    int locMVP = -1, locPS = -1, locCM = -1, locDecim = -1, locSel = -1;
+    int locMVP = -1, locPS = -1, locCM = -1, locDecim = -1, locSel = -1, locMinRange = -1, locMaxRange = -1, locDepthMax = -1;
 
     //! Driven in Euler mode (rotateX/rotateY/translate/rotationCenter/isOrtho),
     //! not azimuth/elevation/distance/target, through rlgl rather than raylib's
@@ -268,6 +435,8 @@ struct AppState
     float pointSize = 1.f;
     int cloudDecim = 1;
     int drawDecim = 1;
+    float minRange = 0.f; //!< m: hide points the LiDAR saw closer than this
+    float maxRange = 0.f; //!< m: hide points the LiDAR saw farther than this; 0 = no limit
     bool multiImgColoring = true; //!< false = single image per chunk (midpoint)
     //! How each point is matched to a camera image:
     //!   0 = temporal  — image nearest in time (± maxWiggle frames, within maxTemporalDist)
@@ -277,6 +446,16 @@ struct AppState
     float maxTemporalDist = 0.5f; //!< s: skip images farther than this from the point (temporal)
     int maxWiggle = 1; //!< frames: search startIdx ± maxWiggle for a frustum hit (temporal)
 
+    // ── flyover ───────────────────────────────────────────────────────────────
+    //! Flyover mode: the bottom timeline bar is shown and the camera sits on the
+    //! trajectory at @ref flyoverProgress (mouse orbit/pan/zoom have no effect).
+    bool flyover = false;
+    bool flyoverPlaying = false; //!< advance flyoverProgress each frame
+    float flyoverProgress = 0.f; //!< 0-1 position along the trajectory's time span
+    float flyoverSpeed = 1.f; //!< playback rate, multiple of real time
+    float flyoverSmoothingSec = 1.f; //!< camera pose averaged over ± this much trajectory time; 0 = raw poses
+    bool flyoverLevelHorizon = true; //!< remove the camera's roll, keeping heading and pitch
+    bool flyoverUpdateSelectedCamera = true; //!< select the camera image nearest the playhead
     // ── fast-rotation image filter ─────────────────────────────────────────────
     //! Per-pose angular speed (deg/s), parallel to traj.poses — filled by
     //! loadSession(). Images captured while the rig turns faster than
@@ -288,7 +467,8 @@ struct AppState
     int angFilteredImgs = 0; //!< images skipped by the filter in the last colorize pass
 
     bool useImageColor = false; //!< true once a colorize pass produced RGB data
-    int colorMode = 0; //!< 0=intensity (jet), 1=RGB by image, 2=camera id
+    int colorMode = 0; //!< 0=intensity (jet), 1=RGB by image, 2=camera id, 3=in ROI/mask, 4=local depth (jet)
+    float depthColorMax = 50.f; //!< m: local depth mode maps 0..this onto the jet colormap
     int coloredPts = 0; //!< points that received RGB from an image
     int uncoloredPts = 0; //!< points left as intensity-gray (no image / out of frustum / outside ROI)
 
@@ -451,6 +631,23 @@ static fs::path cameraDir(const AppState& s)
 static int64_t imageTimeOffsetNs(const AppState& s)
 {
     return (int64_t)std::llround(s.timeOffsetSec * 1e9);
+}
+
+//! Selects the camera image nearest `imageTs` (image clock) for Image Preview and
+//! the frustum highlight. No-op without images, or when it is already selected.
+static void selectImageNearest(AppState& s, int64_t imageTs)
+{
+    if (s.imageTsNs.empty())
+        return;
+    auto it = std::lower_bound(s.imageTsNs.begin(), s.imageTsNs.end(), imageTs);
+    if (it == s.imageTsNs.end() || (it != s.imageTsNs.begin() && imageTs - *std::prev(it) < *it - imageTs))
+        --it;
+    const int idx = int(it - s.imageTsNs.begin());
+    if (idx == s.imgViewIdx)
+        return;
+    s.imgViewIdx = idx;
+    s.imgViewRequest.store(idx);
+    s.intensityProjNeedsUpdate = true;
 }
 
 //! Index every camera frame in the camera directory by timestamp. Also picks up
@@ -662,7 +859,6 @@ static void loadCloud(AppState& s)
     // time(s) -> T_world_lidar, for interpolating the pose at each image time.
     std::map<double, Eigen::Matrix4d> trajMap = buildTrajMap(s.traj);
 
-    std::vector<float> gpuData;
     float mx = 0.f;
     float sumX = 0, sumY = 0, sumZ = 0;
     int cnt = 0;
@@ -779,6 +975,8 @@ static void loadCloud(AppState& s)
         int nImgs = (int)chunkImgs.size();
 
         const size_t segBegin = s.exportCloud.size();
+        std::vector<GpuPoint> gpuPoints; // this chunk's points, uploaded as its own part below
+        gpuPoints.reserve((pc.points.size() + step - 1) / step);
 
         // ── step 4: colorize each point ─────────────────────────────────────
         // chunkImgs is sorted by ts (imageTsNs was sorted)
@@ -790,10 +988,6 @@ static void loadCloud(AppState& s)
             Eigen::Vector3f pw(pt.x, pt.y, pt.z);
             if (M)
                 pw = *M * pw;
-
-            gpuData.push_back(pw.x());
-            gpuData.push_back(pw.y());
-            gpuData.push_back(pw.z());
 
             const float rawIntensity = pt.intensity;
             float colorF = packGray(rawIntensity);
@@ -948,10 +1142,19 @@ static void loadCloud(AppState& s)
             else
                 ++uncoloredPts;
 
-            gpuData.push_back(colorF);
-            gpuData.push_back(rawIntensity);
-            gpuData.push_back(camIdF);
-            gpuData.push_back(inRoiF);
+            float rangeM = -1.f; // distance from the LiDAR when the point was captured; -1 = unknown
+            if (pt.ts_ns != 0)
+            {
+                if (const auto pose = s.traj.nearest(pt.ts_ns))
+                    rangeM = (pw - pose->get().T.translation()).norm();
+            }
+            const uint16_t intensityU16 = (uint16_t)std::lround(std::clamp(rawIntensity, 0.f, 1.f) * 65535.f);
+            // int16 cm tops out at 327.67 m
+            const int16_t depthCm = rangeM < 0.f ? int16_t(-1) : (int16_t)std::min(32767L, std::lround(rangeM * 100.f));
+            // -2 keeps kVS's "rejected by ROI/mask" state, which camIdF alone can't tell from "no image"
+            const int32_t cameraId = camIdF >= 0.f ? (int32_t)camIdF : (inRoiF == 0.f ? -2 : -1);
+            // chunk-local position: the GPU applies M per chunk (GpuCloud::draw)
+            gpuPoints.push_back({ pt.x, pt.y, pt.z, colorF, intensityU16, depthCm, cameraId });
 
             uint32_t packed;
             std::memcpy(&packed, &colorF, 4);
@@ -964,7 +1167,8 @@ static void loadCloud(AppState& s)
                   (uint8_t)(packed & 0xFF),
                   rawIntensity,
                   pt.ts_ns,
-                  camIdF >= 0.f });
+                  camIdF >= 0.f,
+                  depthCm });
 
             float d2 = pw.squaredNorm();
             if (d2 > mx * mx)
@@ -979,6 +1183,7 @@ static void loadCloud(AppState& s)
         // exportCloud + its MRP correction pose).
         if (s.exportCloud.size() > segBegin)
             s.exportSegments.push_back({ key, M ? *M : Eigen::Affine3f::Identity(), segBegin, s.exportCloud.size() - segBegin });
+        s.cloud.addChunk(gpuPoints, M ? *M : Eigen::Affine3f::Identity(), key);
 
         // chunkImgs and their cv::Mat memory are released here
     }
@@ -991,8 +1196,6 @@ static void loadCloud(AppState& s)
 
     if (cnt > 0)
     {
-        s.cloud.upload(gpuData, mx);
-
         // Frame the loaded cloud, instant rather than eased -- this runs once on
         // load, with nothing to transition from. Set on both euler and eulerGoal
         // so no stale transition target survives from a previous session.
@@ -1026,6 +1229,69 @@ static cv::Vec3b jetColorBGR(float t)
     float g = std::clamp(1.5f - std::fabs(4.f * t - 2.f), 0.f, 1.f);
     float b = std::clamp(1.5f - std::fabs(4.f * t - 1.f), 0.f, 1.f);
     return cv::Vec3b((uchar)(b * 255.f), (uchar)(g * 255.f), (uchar)(r * 255.f));
+}
+
+//! Vertical color scale for the Local depth mode, in the 3D view's top-right
+//! corner: 0 m at the bottom, `maxM` at the top, as kFS maps jet(depth / depthColorMax).
+//! @param rightX right edge of the 3D view, screen px
+//! @param topY top edge of the 3D view, screen px
+//! @param maxM depth at the top of the scale; farther points are clamped to its color
+static void drawDepthColorScale(float rightX, float topY, float maxM)
+{
+    constexpr float kMargin = 12.f, kPad = 6.f, kBarW = 14.f, kBarH = 200.f, kTickW = 4.f;
+    constexpr int kLabels = 5; // 0, 1/4, 1/2, 3/4, 1 of maxM
+    auto label = [maxM](int i)
+    {
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), maxM < 10.f ? "%.1f m" : "%.0f m", maxM * float(i) / float(kLabels - 1));
+        return std::string(buf);
+    };
+    float labelW = 0.f;
+    for (int i = 0; i < kLabels; ++i)
+        labelW = std::max(labelW, ImGui::CalcTextSize(label(i).c_str()).x);
+    const float textH = ImGui::GetTextLineHeight();
+    const char* title = "Local depth";
+    const float titleW = ImGui::CalcTextSize(title).x;
+
+    const float boxW = std::max(titleW, labelW + kTickW + kPad + kBarW) + 2.f * kPad;
+    const float boxH = kPad + textH + kPad + kBarH + textH * 0.5f + kPad;
+    const ImVec2 box0(rightX - kMargin - boxW, topY + kMargin);
+    const ImVec2 box1(box0.x + boxW, box0.y + boxH);
+    const float barX0 = box1.x - kPad - kBarW;
+    const float barY0 = box0.y + kPad + textH + kPad; // top of the bar = maxM
+    const float barY1 = barY0 + kBarH; // bottom = 0 m
+
+    // Background draw list: over the 3D scene, under menus and popups.
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    dl->AddRectFilled(box0, box1, IM_COL32(20, 20, 20, 190), 4.f);
+    dl->AddText(ImVec2(box1.x - kPad - titleW, box0.y + kPad), IM_COL32(220, 220, 220, 255), title);
+
+    // jet() is piecewise linear with knots at these t, so one vertical gradient
+    // per segment reproduces it exactly.
+    static const float kKnots[] = { 0.f, 0.125f, 0.375f, 0.625f, 0.875f, 1.f };
+    auto jetU32 = [](float t)
+    {
+        const cv::Vec3b c = jetColorBGR(t);
+        return IM_COL32(c[2], c[1], c[0], 255);
+    };
+    for (size_t k = 0; k + 1 < std::size(kKnots); ++k)
+    {
+        const float yTop = barY1 - kKnots[k + 1] * kBarH;
+        const float yBot = barY1 - kKnots[k] * kBarH;
+        const ImU32 cTop = jetU32(kKnots[k + 1]);
+        const ImU32 cBot = jetU32(kKnots[k]);
+        dl->AddRectFilledMultiColor(ImVec2(barX0, yTop), ImVec2(barX0 + kBarW, yBot), cTop, cTop, cBot, cBot);
+    }
+    dl->AddRect(ImVec2(barX0, barY0), ImVec2(barX0 + kBarW, barY1), IM_COL32(200, 200, 200, 255));
+
+    for (int i = 0; i < kLabels; ++i)
+    {
+        const float y = barY1 - kBarH * float(i) / float(kLabels - 1);
+        dl->AddLine(ImVec2(barX0 - kTickW, y), ImVec2(barX0, y), IM_COL32(200, 200, 200, 255));
+        const std::string text = label(i);
+        const float w = ImGui::CalcTextSize(text.c_str()).x;
+        dl->AddText(ImVec2(barX0 - kTickW - 2.f - w, y - textH * 0.5f), IM_COL32(220, 220, 220, 255), text.c_str());
+    }
 }
 
 //! Rasterizes a synthetic "intensity image" for the camera pose at imgTsAdj,
@@ -1271,14 +1537,15 @@ static void clearMask(AppState& s)
 
 static void exportLAZ(AppState& s)
 {
+    // Same Min/Max range as the view, so the file holds what is on screen.
     auto keep = [&](const ColorPt& p)
     {
-        return !s.exportOnlyValidColor || p.validColor;
+        return (!s.exportOnlyValidColor || p.validColor) && passesRangeFilter(p.depthCm, s.minRange, s.maxRange);
     };
     const size_t nOut = std::count_if(s.exportCloud.begin(), s.exportCloud.end(), keep);
     if (nOut == 0)
     {
-        s.status = s.exportCloud.empty() ? "No cloud to export" : "No points with valid color to export";
+        s.status = s.exportCloud.empty() ? "No cloud to export" : "No points left after the color and range filters";
         return;
     }
 
@@ -1362,6 +1629,8 @@ static void exportLAZ(AppState& s)
     laszip_close_writer(writer);
     laszip_destroy(writer);
     s.status = "Exported " + std::to_string(nOut) + " pts → " + s.exportBuf;
+    if (nOut < s.exportCloud.size())
+        s.status += "  (" + std::to_string(s.exportCloud.size() - nOut) + " filtered out)";
 }
 
 //! E57 counterpart of exportLAZ(): one Data3D block, points already in world
@@ -1464,6 +1733,26 @@ static void exportE57Session(AppState& s)
             "Exported session: " + std::to_string(nSeg) + " segment(s), " + std::to_string(s.exportCloud.size()) + " pts → " + s.exportBuf;
     else
         s.status = std::string("Export failed: ") + err;
+}
+
+//! Opens the flyover bar and plays from the start, or closes it -- shared by the
+//! View menu item and Shift+F. Opening is a no-op without a trajectory.
+static void toggleFlyover(AppState& s)
+{
+    if (!s.flyover && s.traj.empty())
+        return;
+    s.flyover = !s.flyover;
+    s.flyoverProgress = 0.f;
+    s.flyoverPlaying = s.flyover;
+}
+
+//! Plays or pauses the flyover, replaying from the start once it has reached the
+//! end -- shared by the bar's Play/Pause button and Space.
+static void toggleFlyoverPlaying(AppState& s)
+{
+    if (!s.flyoverPlaying && s.flyoverProgress >= 1.f)
+        s.flyoverProgress = 0.f;
+    s.flyoverPlaying = !s.flyoverPlaying;
 }
 
 // ── File actions ─────────────────────────────────────────────────────────────
@@ -1855,11 +2144,11 @@ static void drawScene(AppState& s)
 
         for (int64_t ts : s.imageTsNs)
         {
-            const TrajPose* pose = s.traj.nearest(ts + imageTimeOffsetNs(s));
+            auto pose = s.traj.nearest(ts + imageTimeOffsetNs(s));
             if (!pose)
                 continue;
 
-            Vector3 origin = toVec3(pose->T * C);
+            Vector3 origin = toVec3(pose->get().T * C);
 
             bool hl = (ts == hlTs);
             Color fc = hl ? Color{ 255, 255, 50, 255 } : ORANGE;
@@ -1875,7 +2164,7 @@ static void drawScene(AppState& s)
                 for (int k = 0; k < 3; k++)
                 {
                     Eigen::Vector3f tip = R_wc.col(k) * (sc * 0.5f) + C;
-                    DrawLine3D(origin, toVec3(pose->T * tip), hl ? fc : axisColors[k]);
+                    DrawLine3D(origin, toVec3(pose->get().T * tip), hl ? fc : axisColors[k]);
                 }
                 continue;
             }
@@ -1884,7 +2173,7 @@ static void drawScene(AppState& s)
             for (int k = 0; k < 4; k++)
             {
                 Eigen::Vector3f pl = R_wc * Eigen::Vector3f(ncx[k] * fs, ncy[k] * fs, fs) + C;
-                w[k] = toVec3(pose->T * pl);
+                w[k] = toVec3(pose->get().T * pl);
             }
 
             if (hl)
@@ -1894,7 +2183,7 @@ static void drawScene(AppState& s)
                 for (int k = 0; k < 4; k++)
                 {
                     Eigen::Vector3f pl = R_wc * Eigen::Vector3f(ncx[k] * sc, ncy[k] * sc, sc) + C;
-                    w2[k] = toVec3(pose->T * pl);
+                    w2[k] = toVec3(pose->get().T * pl);
                 }
                 DrawTriangle3D(w2[0], w2[1], w2[2], Color{ 255, 255, 50, 40 });
                 DrawTriangle3D(w2[2], w2[3], w2[0], Color{ 255, 255, 50, 40 });
@@ -1916,15 +2205,16 @@ static void drawScene(AppState& s)
     if (s.cloud.count > 0 && s.shaderOk)
     {
         rlDrawRenderBatchActive();
-        Matrix mvp = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
         rlEnableShader(s.shader.id);
-        rlSetUniformMatrix(s.locMVP, mvp);
         rlSetUniform(s.locPS, &s.pointSize, RL_SHADER_UNIFORM_FLOAT, 1);
         rlSetUniform(s.locCM, &s.colorMode, RL_SHADER_UNIFORM_INT, 1);
         rlSetUniform(s.locDecim, &s.drawDecim, RL_SHADER_UNIFORM_INT, 1);
+        rlSetUniform(s.locMinRange, &s.minRange, RL_SHADER_UNIFORM_FLOAT, 1);
+        rlSetUniform(s.locMaxRange, &s.maxRange, RL_SHADER_UNIFORM_FLOAT, 1);
+        rlSetUniform(s.locDepthMax, &s.depthColorMax, RL_SHADER_UNIFORM_FLOAT, 1);
         int sel = (s.isolateCamera && s.imgViewIdx >= 0 && s.imgViewIdx < (int)s.imageTsNs.size()) ? s.imgViewIdx : -1;
         rlSetUniform(s.locSel, &sel, RL_SHADER_UNIFORM_INT, 1);
-        s.cloud.draw();
+        s.cloud.draw(rlGetMatrixModelview(), rlGetMatrixProjection(), s.locMVP);
         rlDisableShader();
     }
 }
@@ -1934,7 +2224,8 @@ int main(int argc, char* argv[])
 {
     CliArgs args = parseArgs(argc, argv);
     static const char* kDesc = "View LIO trajectory, colorize and export point clouds";
-    const std::vector<std::string> usage = { cliopt::MJS, cliopt::CAMERA_DIR, cliopt::CALIB };
+    static const char* kMaskOpt = "  --mask <image>               image mask for coloring: white keeps, black drops";
+    const std::vector<std::string> usage = { cliopt::MJS, cliopt::CAMERA_DIR, cliopt::CALIB, kMaskOpt };
     if (args.help)
     {
         printUsage("TrajectoryViewer", kDesc, usage);
@@ -1977,6 +2268,9 @@ int main(int argc, char* argv[])
     if (!calib.empty())
         strncpy(s.calibBuf, calib.c_str(), sizeof(s.calibBuf) - 1);
 
+    if (args.has("mask"))
+        strncpy(s.maskBuf, args.get("mask").c_str(), sizeof(s.maskBuf) - 1);
+
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(1400, 900, ("Trajectory Viewer " HDMAPPING_VERSION_STRING));
     // raylib's default exit key (Esc) closes the window outright -- too easy
@@ -1997,6 +2291,9 @@ int main(int argc, char* argv[])
         s.locCM = rlGetLocationUniform(s.shader.id, "colorMode");
         s.locDecim = rlGetLocationUniform(s.shader.id, "drawDecim");
         s.locSel = rlGetLocationUniform(s.shader.id, "selectedCamera");
+        s.locMinRange = rlGetLocationUniform(s.shader.id, "minRange");
+        s.locMaxRange = rlGetLocationUniform(s.shader.id, "maxRange");
+        s.locDepthMax = rlGetLocationUniform(s.shader.id, "depthColorMax");
     }
     glEnable(GL_PROGRAM_POINT_SIZE);
 
@@ -2037,7 +2334,10 @@ int main(int argc, char* argv[])
             }
         });
 
-    // auto-load if args given
+    // auto-load if args given; the mask first, since it needs neither of the
+    // others and would otherwise overwrite their status line
+    if (s.maskBuf[0])
+        loadMask(s);
     if (s.sessionBuf[0])
         loadSession(s);
     if (s.calibBuf[0])
@@ -2049,7 +2349,6 @@ int main(int argc, char* argv[])
     {
         bool imguiWants = ImGui::GetIO().WantCaptureMouse;
         s.orbit.updateEulerTransition(GetFrameTime());
-
         // Drag & drop the LIO result directory (this app's session), a CAMERA_0 directory or a
         // calibration *.json onto the window to load it -- raylib's GLFW backend surfaces OS
         // drag & drop the same way on Windows, Linux and macOS, so no platform-specific code
@@ -2151,6 +2450,10 @@ int main(int argc, char* argv[])
 
             if (shiftDown && IsKeyPressed(KEY_R))
                 s.showCenterOfRotationWindow = true;
+            if (shiftDown && !ctrlDown && IsKeyPressed(KEY_F))
+                toggleFlyover(s);
+            if (s.flyover && IsKeyPressed(KEY_SPACE))
+                toggleFlyoverPlaying(s);
             // Ctrl+Right-click: ground-plane (Z=0) pick.
             if (!imguiWants && ctrlDown && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
             {
@@ -2204,19 +2507,59 @@ int main(int argc, char* argv[])
         // directly instead of raylib's BeginMode3D/EndMode3D.
         s.viewLocal = Eigen::Affine3f::Identity();
 
+        // Flyover: while its bar is open the camera sits on the trajectory at
+        // the playhead (orbit.viewPose) instead of following the euler fields
+        // below -- also when paused, so scrubbing the timeline previews it.
+        if (s.flyover && s.flyoverPlaying)
+        {
+            const double durationSec = trajectoryDurationSec(s.traj);
+            if (durationSec > 0.0)
+                s.flyoverProgress += float(GetFrameTime() * s.flyoverSpeed / durationSec);
+            if (durationSec <= 0.0 || s.flyoverProgress >= 1.f)
+            {
+                s.flyoverProgress = std::min(s.flyoverProgress, 1.f);
+                s.flyoverPlaying = false;
+            }
+        }
+        s.orbit.viewPose.reset();
+        if (s.flyover)
+        {
+            // The continuous playhead time, not the nearest pose's, so the
+            // smoothing window slides instead of stepping from pose to pose.
+            const int64_t ts = s.traj.timeAt(s.flyoverProgress);
+            if (auto pose = s.traj.smoothedPose(ts, s.flyoverSmoothingSec))
+            {
+                if (s.flyoverLevelHorizon)
+                    pose->linear() = levelHorizon(pose->linear());
+                s.orbit.setViewPose(*pose);
+                if (s.flyoverUpdateSelectedCamera)
+                    selectImageNearest(s, ts - imageTimeOffsetNs(s));
+            }
+        }
+
         if (!s.orbit.isOrtho)
         {
             s.orbit.applyPerspectiveProjection((int)ImGui::GetIO().DisplaySize.x, (int)ImGui::GetIO().DisplaySize.y);
 
-            Eigen::Vector3f rotationCenter(s.orbit.euler.rotationCenter.x, s.orbit.euler.rotationCenter.y, s.orbit.euler.rotationCenter.z);
-            s.viewLocal.translate(rotationCenter);
-            s.viewLocal.translate(Eigen::Vector3f(s.orbit.euler.translate.x, s.orbit.euler.translate.y, s.orbit.euler.translate.z));
-            if (!s.orbit.lockZ)
-                s.viewLocal.rotate(Eigen::AngleAxisf(s.orbit.euler.rotateX * DEG2RAD, Eigen::Vector3f::UnitX()));
+            if (s.orbit.viewPose)
+            {
+                // viewPose is camera-to-world; the modelview matrix needs
+                // world-to-camera.
+                s.viewLocal = s.orbit.viewPose->inverse();
+            }
             else
-                s.viewLocal.rotate(Eigen::AngleAxisf(-90.0f * DEG2RAD, Eigen::Vector3f::UnitX()));
-            s.viewLocal.rotate(Eigen::AngleAxisf(s.orbit.euler.rotateY * DEG2RAD, Eigen::Vector3f::UnitZ()));
-            s.viewLocal.translate(-rotationCenter);
+            {
+                Eigen::Vector3f rotationCenter(
+                    s.orbit.euler.rotationCenter.x, s.orbit.euler.rotationCenter.y, s.orbit.euler.rotationCenter.z);
+                s.viewLocal.translate(rotationCenter);
+                s.viewLocal.translate(Eigen::Vector3f(s.orbit.euler.translate.x, s.orbit.euler.translate.y, s.orbit.euler.translate.z));
+                if (!s.orbit.lockZ)
+                    s.viewLocal.rotate(Eigen::AngleAxisf(s.orbit.euler.rotateX * DEG2RAD, Eigen::Vector3f::UnitX()));
+                else
+                    s.viewLocal.rotate(Eigen::AngleAxisf(-90.0f * DEG2RAD, Eigen::Vector3f::UnitX()));
+                s.viewLocal.rotate(Eigen::AngleAxisf(s.orbit.euler.rotateY * DEG2RAD, Eigen::Vector3f::UnitZ()));
+                s.viewLocal.translate(-rotationCenter);
+            }
 
             rlMultMatrixf(s.viewLocal.matrix().data());
         }
@@ -2224,7 +2567,8 @@ int main(int argc, char* argv[])
         {
             // Still updating viewLocal for the compass -- the rest of the
             // ortho projection + gizmo-view lookAt lives in
-            // OrbitCamera::updateOrtho().
+            // OrbitCamera::updateOrtho(). viewPose is documented as
+            // perspective-only, so ortho mode ignores it same as before.
             s.viewLocal.rotate(Eigen::AngleAxisf((s.orbit.euler.rotateX + s.orbit.euler.rotateY) * DEG2RAD, Eigen::Vector3f::UnitZ()));
             s.orbit.updateOrtho(ratio);
         }
@@ -2355,18 +2699,39 @@ int main(int argc, char* argv[])
                 if (ImGui::MenuItem("Center of rotation...", "Shift+R"))
                     s.showCenterOfRotationWindow = true;
                 ImGui::Separator();
+                if (ImGui::MenuItem("Flyover", "Shift+F", s.flyover, !s.traj.empty()))
+                    toggleFlyover(s);
+                ImGui::Separator();
+
                 ImGui::SetNextItemWidth(140.f);
                 ImGui::SliderFloat("Frustum scale", &s.frustumScale, 0.05f, 5.f, "%.2f");
                 ImGui::SetNextItemWidth(140.f);
                 ImGui::SliderFloat("Point size", &s.pointSize, 1.f, 20.f, "%.1f");
                 ImGui::SetNextItemWidth(140.f);
                 ImGui::SliderInt("Draw decimation", &s.drawDecim, 1, 64);
+                ImGui::SetNextItemWidth(140.f);
+                ImGui::DragFloat("Min range", &s.minRange, 0.1f, 0.f, 327.f, "%.2f m");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Hide points closer than this to the LiDAR when they were captured");
+                ImGui::SetNextItemWidth(140.f);
+                ImGui::DragFloat("Max range", &s.maxRange, 0.5f, 0.f, 327.f, "%.1f m");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Hide points farther than this from the LiDAR when they were captured; 0 = no limit");
+                ImGui::Separator();
+                ImGui::TextDisabled("Point color:");
+                if (ImGui::MenuItem("Intensity", nullptr, s.colorMode == 0))
+                    s.colorMode = 0;
+                if (ImGui::MenuItem("Local depth", nullptr, s.colorMode == 4))
+                    s.colorMode = 4;
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Distance from the LiDAR when the point was captured; gray = unknown");
+                if (s.colorMode == 4)
+                {
+                    ImGui::SetNextItemWidth(140.f);
+                    ImGui::DragFloat("Depth color max", &s.depthColorMax, 0.5f, 1.f, 327.f, "%.1f m");
+                }
                 if (!s.imagesFilenamesInTime.empty())
                 {
-                    ImGui::Separator();
-                    ImGui::TextDisabled("Point color:");
-                    if (ImGui::MenuItem("Intensity", nullptr, s.colorMode == 0))
-                        s.colorMode = 0;
                     if (ImGui::MenuItem("RGB (image)", "Ctrl", s.colorMode == 1))
                         s.colorMode = 1;
                     if (ImGui::MenuItem("Camera ID", nullptr, s.colorMode == 2))
@@ -2682,6 +3047,8 @@ int main(int argc, char* argv[])
             ImGui::Checkbox("LAZ: only points with valid color", &s.exportOnlyValidColor);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Skip points that got no RGB from an image (no image / out of frustum / outside ROI or mask)");
+            if (s.minRange > 0.f || s.maxRange > 0.f)
+                ImGui::TextDisabled("LAZ: Min/Max range from the View menu applies");
             if (ImGui::Button("Export colored LAZ", ImVec2(-1, 0)))
                 actionExportColoredLAZ(s);
             if (ImGui::Button("Export colored E57", ImVec2(-1, 0)))
@@ -2796,6 +3163,65 @@ int main(int argc, char* argv[])
         ImGui::TextDisabled("LMB: orbit  RMB: pan  Scroll: zoom");
 
         ImGui::End();
+
+        // ── flyover bar, along the bottom of the 3D view ────────────────────────
+        if (s.flyover)
+        {
+            const double durationSec = trajectoryDurationSec(s.traj);
+            const ImGuiStyle& style = ImGui::GetStyle();
+            const float timelineH = 18.f + ImGui::GetTextLineHeight();
+            const float barH = style.WindowPadding.y * 2.f + ImGui::GetFrameHeight() + style.ItemSpacing.y + timelineH;
+            ImGui::SetNextWindowPos(ImVec2(0.f, io.DisplaySize.y - barH), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - panelW, barH), ImGuiCond_Always);
+            ImGui::Begin(
+                "##flyover",
+                nullptr,
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                    ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
+
+            if (ImGui::Button(s.flyoverPlaying ? "Pause" : "Play", ImVec2(60.f, 0.f)))
+                toggleFlyoverPlaying(s);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Space");
+            ImGui::SameLine();
+            ImGui::Text("%7.1f / %.1f s", s.flyoverProgress * durationSec, durationSec);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(160.f);
+            ImGui::SliderFloat("Speed", &s.flyoverSpeed, 0.1f, 50.f, "%.1fx", ImGuiSliderFlags_Logarithmic);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Playback rate, as a multiple of real time (Ctrl+click to type)");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(120.f);
+            ImGui::SliderFloat("Smoothing", &s.flyoverSmoothingSec, 0.f, 5.f, "%.1f s");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Average the camera pose over +/- this much trajectory time; 0 = raw poses");
+            ImGui::SameLine();
+            ImGui::Checkbox("Level horizon", &s.flyoverLevelHorizon);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Remove camera roll; heading and pitch still follow the trajectory");
+            ImGui::SameLine();
+            ImGui::BeginDisabled(s.imageTsNs.empty());
+            ImGui::Checkbox("Update selected camera", &s.flyoverUpdateSelectedCamera);
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip(
+                    s.imageTsNs.empty() ? "No camera images loaded"
+                                        : "Select the camera image nearest the playhead (Image Preview, highlighted frustum)");
+            ImGui::SameLine();
+            const float closeW = ImGui::CalcTextSize("Close").x + style.FramePadding.x * 2.f;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.f, ImGui::GetContentRegionAvail().x - closeW));
+            if (ImGui::Button("Close"))
+            {
+                s.flyover = false;
+                s.flyoverPlaying = false;
+            }
+
+            flyoverTimeline("##flyoverTimeline", s.flyoverProgress, durationSec, timelineH);
+            ImGui::End();
+        }
+
+        if (s.colorMode == 4 && s.cloud.count > 0)
+            drawDepthColorScale(io.DisplaySize.x - panelW, menuBarH, s.depthColorMax);
 
         raylib_widgets::showEulerCenterOfRotationWindow(s.showCenterOfRotationWindow, s.orbit);
 

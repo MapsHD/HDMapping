@@ -1,11 +1,14 @@
 #pragma once
+#include <Eigen/Geometry>
 #include "raylib.h"
+
+#include <optional>
 
 // Mouse-driven orbit/pan/zoom camera, shared between
 // apps/camera_lidar_calibration and apps/camera_lidar_trajectory_viewer (was
 // byte-for-byte duplicated as camera_lidar_calibration's OrbitCamera and
-// camera_lidar_trajectory_viewer's Orbit). Depends on nothing but raylib --
-// no Eigen, no core -- so it stays linkable from both the core_raylib side
+// camera_lidar_trajectory_viewer's Orbit). Depends on raylib and header-only
+// Eigen (setViewPose) -- no core -- so it stays linkable from both the core_raylib side
 // (which already pulls in core/core_math) and the calib_core side (which
 // deliberately doesn't) without adding coupling either way.
 namespace raylib_widgets {
@@ -150,6 +153,17 @@ struct OrbitCamera {
     // parameter rather than reading ImGui here, since OrbitCamera otherwise
     // depends on nothing but raylib.
     void applyOrthoProjection(float aspect) const;
+
+    //! Camera-to-world pose in OpenGL axes (x right, y up, looking down -z), set by
+    //! setViewPose(). While set, the caller builds the view from it instead of from
+    //! `euler`, so mouse orbit/pan/zoom have no effect; reset() it to return to euler.
+    std::optional<Eigen::Affine3f> viewPose;
+
+    //! Places the camera at a pose, without animation. Used for flyovers.
+    //! @param view pose on the trajectory in LiDAR axes (x forward, y left, z up);
+    //!        stored in `viewPose` swapped to OpenGL axes
+    //! @note Only the perspective view uses it; ortho mode ignores it.
+    void setViewPose(Eigen::Affine3f view);
 
     // Builds this frame's ortho projection + folds an eye/center/up lookAt
     // (derived from euler.rotateX/rotateY and the ortho pan/height state)

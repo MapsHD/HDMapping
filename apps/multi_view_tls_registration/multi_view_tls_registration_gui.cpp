@@ -2587,6 +2587,28 @@ void openSession()
     }
 }
 
+// Writes clouds that have no .laz on disk yet (laz_in_memory_only, e.g. e57 scans) into `dir`
+// and points their file_name there, so the session about to be saved references real files.
+// `visible_only` matches Session::save(..., is_subsession), which only lists visible clouds.
+void exportInMemoryPointClouds(const fs::path& dir, bool visible_only)
+{
+    for (auto& pc : session.point_clouds_container.point_clouds)
+    {
+        if (!pc.laz_in_memory_only || (visible_only && !pc.visible))
+            continue;
+
+        const std::string laz_file_name = (dir / fs::path(pc.file_name).filename()).string();
+        spdlog::info("Saving in-memory point cloud to: '{}'", laz_file_name);
+        if (exportLaz(laz_file_name, pc.points_local, pc.intensities, pc.timestamps))
+        {
+            pc.file_name = laz_file_name;
+            pc.laz_in_memory_only = false;
+        }
+        else
+            spdlog::error("Error saving file: '{}'", laz_file_name);
+    }
+}
+
 std::string saveSession()
 {
     const std::string output_file_name =
@@ -2602,60 +2624,11 @@ std::string saveSession()
         const auto dir = path.parent_path();
         const auto stem = path.stem().string();
 
-        // Build new names
-        std::string initial_poses_file_name = (dir / (stem + "_ini_poses.mri")).string();
-        std::string poses_file_name = (dir / (stem + "_poses.mrp")).string();
+        // Build new names. Poses always go next to the session file; sessions opened from e57/laz have no poses files yet
+        const std::string initial_poses_file_name = (dir / (stem + "_ini_poses.mri")).string();
+        const std::string poses_file_name = (dir / (stem + "_poses.mrp")).string();
 
-        if (session.point_clouds_container.initial_poses_file_name.empty())
-        {
-            spdlog::info("Please assign initial_poses_file_name to session");
-            spdlog::warn("Session is not saved!");
-
-            [[maybe_unused]] pfd::message message(
-                "Please assign initial_poses_file_name to session",
-                "Session is not saved. Please assign initial_poses_file_name to session. "
-                "Follow guidlines available here : "
-                "https://github.com/MapsHD/HDMapping/tree/main/doc/, "
-                "You can do this using button 'update initial poses from RESSO file'",
-                pfd::choice::ok,
-                pfd::icon::error);
-            message.result();
-
-            initial_poses_file_name =
-                mandeye::fd::SaveFileDialog("Initial poses file name", mandeye::fd::IniPoses_filter, initial_poses_file_name);
-            spdlog::info("Resso file to save: '{}'", initial_poses_file_name);
-
-            if (initial_poses_file_name.size() > 0)
-            {
-                spdlog::info("Saving initial poses to: '{}'", initial_poses_file_name);
-                session.point_clouds_container.save_poses(initial_poses_file_name, false);
-            }
-        }
-
-        if (session.point_clouds_container.poses_file_name.empty())
-        {
-            spdlog::info("Please assign poses_file_name to session");
-            spdlog::warn("Session is not saved!");
-
-            [[maybe_unused]] pfd::message message(
-                "Please assign poses_file_name to session",
-                "Session is not saved. Please assign poses_file_name to session. "
-                "Follow guidlines available here : "
-                "https://github.com/MapsHD/HDMapping/tree/main/doc/,"
-                "You can do this using button 'update poses from RESSO file'",
-                pfd::choice::ok,
-                pfd::icon::error);
-            message.result();
-
-            poses_file_name = mandeye::fd::SaveFileDialog("Poses file name", mandeye::fd::Poses_filter, poses_file_name);
-            spdlog::info("Resso file to save: '{}'", poses_file_name);
-            if (poses_file_name.size() > 0)
-            {
-                spdlog::info("Saving poses to: '{}'", poses_file_name);
-                session.point_clouds_container.save_poses(poses_file_name, false);
-            }
-        }
-
+        exportInMemoryPointClouds(dir, false);
         session.save(output_file_name, poses_file_name, initial_poses_file_name, false);
         writeGnssTumToSessionFile(output_file_name, tls_registration.gnss, tls_registration.tum);
         spdlog::info("Saving result to: '{}'", poses_file_name);
@@ -2910,6 +2883,7 @@ void loadE57Files(const std::vector<std::string>& input_file_names, bool fillInS
             PointCloud pc;
             // Name the cloud so it exports to a sensible .laz in fillInSession mode.
             pc.file_name = scans.size() > 1 ? (stem + "_" + std::to_string(si) + ".laz") : (stem + ".laz");
+            pc.laz_in_memory_only = true;
             // Provenance for "Update e57 poses".
             pc.e57_source_path = abs_src;
             pc.e57_scan_index = static_cast<int>(si);
@@ -3206,6 +3180,7 @@ void saveSubsession()
         const auto initial_poses_file_name = (dir / (stem + "_ini_poses" + ".mri")).string();
         const auto poses_file_name = (dir / (stem + "_poses" + ".mrp")).string();
 
+        exportInMemoryPointClouds(dir, true);
         session.save(fs::path(output_file_name).string(), poses_file_name, initial_poses_file_name, true);
         writeGnssTumToSessionFile(fs::path(output_file_name).string(), tls_registration.gnss, tls_registration.tum);
         spdlog::info("Saving poses to: '{}'", poses_file_name);

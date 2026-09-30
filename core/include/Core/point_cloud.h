@@ -88,6 +88,9 @@ public:
     std::vector<PointBucketIndexPair> index_pairs;
     std::vector<Bucket> buckets;
     std::string file_name;
+    // True when file_name does not exist on disk yet (e.g. scan imported from E57);
+    // "Save session as" in step 2 exports the cloud as .laz next to the session.
+    bool laz_in_memory_only = false;
     // Provenance for scans imported from an E57 file (see openE57 in step 2).
     // Not serialized to session JSON; used by "Update e57 poses" to write the
     // refined m_pose back into the originating Data3D block.

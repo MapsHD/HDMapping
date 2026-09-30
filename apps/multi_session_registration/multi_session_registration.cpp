@@ -61,7 +61,7 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "C", "" },
                                                          { "", "Ctrl+C", "" },
                                                          { "", "D", "" },
-                                                         { "", "Ctrl+D", "" },
+                                                         { "", "Ctrl+D", "Remove session(s)" },
                                                          { "", "E", "" },
                                                          { "", "Ctrl+E", "" },
                                                          { "", "F", "" },
@@ -89,7 +89,7 @@ static const std::vector<ShortcutEntry> appShortcuts = { { "Normal keys", "A", "
                                                          { "", "Q", "" },
                                                          { "", "Ctrl+Q", "" },
                                                          { "", "R", "" },
-                                                         { "", "Ctrl+R", "Remove session(s)" },
+                                                         { "", "Ctrl+R", "Random colors per session" },
                                                          { "", "Shift+R", "" },
                                                          { "", "S", "" },
                                                          { "", "Ctrl+S", "Save project" },
@@ -3616,51 +3616,48 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
     if (IsFileDropped())
         loadDroppedFiles();
 
+    // No synthetic key/modifier release after handling a shortcut here:
+    // rlImGui only forwards modifier edges, so a faked Ctrl release is never
+    // undone while Ctrl stays held, and the next key press falls through to
+    // the plain-key view shortcuts (e.g. Ctrl+R, R -> camera "Right" preset).
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A, false))
-    {
         addSession();
 
-        // workaround
-        io.AddKeyEvent(ImGuiKey_A, false);
-        io.AddKeyEvent(ImGuiMod_Ctrl, false);
-    }
     if ((project_settings.session_file_names.size() > 0) && !loaded_sessions)
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_L, false))
-        {
             loadSessions();
 
-            // workaround
-            io.AddKeyEvent(ImGuiKey_L, false);
-            io.AddKeyEvent(ImGuiMod_Ctrl, false);
-        }
     // Same enable rule as the "Manual Loop Closure" menu item; closing is always allowed.
     if (is_loop_closure_gui || number_visible_sessions == 1 || number_visible_sessions == 2)
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_M, false))
-        {
             is_loop_closure_gui = !is_loop_closure_gui;
 
-            // workaround
-            io.AddKeyEvent(ImGuiKey_M, false);
-            io.AddKeyEvent(ImGuiMod_Ctrl, false);
-        }
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
-    {
         openProject();
 
-        // workaround
-        io.AddKeyEvent(ImGuiKey_O, false);
-        io.AddKeyEvent(ImGuiMod_Ctrl, false);
-    }
-
     if (project_settings.session_file_names.size() > 0)
-        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R, false))
-        {
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D, false))
             remove_gui = true;
 
-            // workaround
-            io.AddKeyEvent(ImGuiKey_R, false);
-            io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R, false)) // random colors per session
+    {
+        for (auto& session : sessions)
+        {
+            session.render_color[0] = float(rand() % 255) / 255.0f;
+            session.render_color[1] = float(rand() % 255) / 255.0f;
+            session.render_color[2] = float(rand() % 255) / 255.0f;
+
+            for (auto& pc : session.point_clouds_container.point_clouds)
+            {
+                pc.traj_color[0] = session.render_color[0];
+                pc.traj_color[1] = session.render_color[1];
+                pc.traj_color[2] = session.render_color[2];
+                pc.render_color[0] = session.render_color[0];
+                pc.render_color[1] = session.render_color[1];
+                pc.render_color[2] = session.render_color[2];
+            }
         }
+    }
 
     if (sessions.size() > 0)
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false))
@@ -3669,11 +3666,6 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
                 saveProjectAs();
             else
                 saveProject();
-
-            // workaround
-            io.AddKeyEvent(ImGuiMod_Shift, false);
-            io.AddKeyEvent(ImGuiKey_S, false);
-            io.AddKeyEvent(ImGuiMod_Ctrl, false);
         }
 
     if (ImGui::BeginMainMenuBar())
@@ -3693,7 +3685,7 @@ pose_tait_bryan_from_affine_matrix(m_src.inverse() * m_g);
 
             if (ImGui::MenuItem("Add session(s)", "Ctrl+A"))
                 addSession();
-            if (ImGui::MenuItem("Remove session(s)", "Ctrl+R", nullptr, project_settings.session_file_names.size() > 0))
+            if (ImGui::MenuItem("Remove session(s)", "Ctrl+D", nullptr, project_settings.session_file_names.size() > 0))
                 remove_gui = true;
 
             if (ImGui::MenuItem("Load sessions", "Ctrl+L", nullptr, (project_settings.session_file_names.size() > 0) && !loaded_sessions))

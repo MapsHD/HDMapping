@@ -481,6 +481,9 @@ namespace mandeye::e57io
                 }
 
                 header.pointCount = total;
+                // libE57Format builds the intensity prototype with value 0.0; FloatNode throws if 0 is outside [min, max]
+                if (header.pointFields.intensityField && header.intensityLimits.intensityMinimum > 0.0)
+                    header.intensityLimits.intensityMinimum = 0.0;
                 const int64_t di = writer.NewData3D(header);
 
                 if (total > 0)
